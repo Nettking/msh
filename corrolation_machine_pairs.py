@@ -5,8 +5,8 @@ from pathlib import Path
 import json
 
 DATA_DIR = Path("data")
-STOPPED_STATES = ["STOPPED", "READY"]
-MAX_GAP_SECONDS = 120
+STOPPED_STATES = ["STOPPED"]
+MAX_GAP_SECONDS = 2
 
 # --------------------------------------------------------------------
 # Load and reuse logic from previous scripts
