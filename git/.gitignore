@@ -2,3 +2,6 @@ dockerfile
 ig_recorder.py
 record_data.py
 standalone_recorder.py
+auto_connect/auto_connect.py
+auto_connect/dockerfile
+data.zip
