@@ -1,3 +1,7 @@
+"""Extract intervention state episodes and override-change events from MTConnect JSONL telemetry.
+
+Note: DATA_DIR is intentionally environment-specific in this script and may require local editing.
+"""
 import os
 import json
 from pathlib import Path

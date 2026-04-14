@@ -1,8 +1,37 @@
-/data
+# Data and generated artifacts
 /data_old
 /graphs
 /plots
 /plots_per_machine
+/data.zip
 *.csv
 *.png
-data.zip
+
+# Keep the canonical data directory documented, but ignore its contents by default
+/data/*
+!/data/README.md
+!/data/.gitkeep
+
+# Optional shared results area (documentation tracked, generated files ignored)
+/results/*
+!/results/README.md
+!/results/.gitkeep
+
+# Python / environment
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# Local virtual environments
+.venv/
+venv/
+env/
+
+# OS/editor noise
+.DS_Store
+Thumbs.db
