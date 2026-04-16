@@ -206,21 +206,21 @@ def filter_data_by_date_range(source_data_dir: Path, destination_data_dir: Path,
 
 
 def print_numbered_menu(title: str, options: Iterable[str]) -> None:
-    print(f"\n{title}")
+    print(f"\n{title}", flush=True)
     for index, option in enumerate(options, start=1):
-        print(f"{index}) {option}")
+        print(f"{index}) {option}", flush=True)
 
 
 def prompt_menu_choice(max_choice: int, prompt: str) -> int:
     while True:
         raw = input(prompt).strip()
         if not raw.isdigit():
-            print("Please enter a number.")
+            print("Please enter a number.", flush=True)
             continue
         value = int(raw)
         if 1 <= value <= max_choice:
             return value
-        print(f"Please choose a value between 1 and {max_choice}.")
+        print(f"Please choose a value between 1 and {max_choice}.", flush=True)
 
 
 def create_run_workspace(output_base_dir: Path) -> Path:
@@ -235,8 +235,8 @@ def run_script(script_path: Path, workspace_dir: Path) -> int:
     env.setdefault("MPLBACKEND", "Agg")
 
     command = [sys.executable, str(script_path)]
-    print(f"\nRunning: {' '.join(command)}")
-    print(f"Working directory: {workspace_dir}")
+    print(f"\nRunning: {' '.join(command)}", flush=True)
+    print(f"Working directory: {workspace_dir}", flush=True)
 
     completed = subprocess.run(command, cwd=workspace_dir, env=env)
     return completed.returncode
