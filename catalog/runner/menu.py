@@ -31,28 +31,30 @@ def pick_date_range(available_dates):
     while True:
         end_index = prompt_menu_choice(len(labels), "Choose end date number: ") - 1
         if end_index < start_index:
-            print("End date must be on or after start date.")
+            print("End date must be on or after start date.", flush=True)
             continue
         return available_dates[start_index], available_dates[end_index]
 
 
 def confirm_or_exit(script: ScriptOption, start_date, end_date) -> None:
-    print("\nSelection summary")
-    print(f"Script: {script.key}")
-    print(f"Start date: {start_date.isoformat()}")
-    print(f"End date: {end_date.isoformat()}")
+    print("\nSelection summary", flush=True)
+    print(f"Script: {script.key}", flush=True)
+    print(f"Start date: {start_date.isoformat()}", flush=True)
+    print(f"End date: {end_date.isoformat()}", flush=True)
 
     while True:
         answer = input("Run now? (y/n): ").strip().lower()
         if answer in {"y", "yes"}:
             return
         if answer in {"n", "no"}:
-            print("Cancelled.")
+            print("Cancelled.", flush=True)
             raise SystemExit(0)
-        print("Please type y or n.")
+        print("Please type y or n.", flush=True)
 
 
 def main() -> int:
+    print("MSH interactive runner started", flush=True)
+
     root = repo_root()
     catalog_dir = root / "catalog"
     data_dir = root / "data"
@@ -60,18 +62,18 @@ def main() -> int:
 
     script_options = discover_runnable_scripts(catalog_dir)
     if not script_options:
-        print("No runnable scripts found in catalog/.")
+        print("No runnable scripts found in catalog/.", flush=True)
         return 1
 
     if not data_dir.exists():
-        print(f"Data directory not found: {data_dir}")
-        print("Tip: start the project with Docker Compose so data and results are mounted automatically.")
-        print("Run: docker compose up")
+        print(f"Data directory not found: {data_dir}", flush=True)
+        print("Tip: start the project with Docker Compose so data and results are mounted automatically.", flush=True)
+        print("Run: docker compose run --rm msh", flush=True)
         return 1
 
     available_dates = discover_available_dates(data_dir)
     if not available_dates:
-        print("No dates discovered in data/. Ensure records include timestamps or filenames include YYYY-MM-DD / YYYYMMDD.")
+        print("No dates discovered in data/. Ensure records include timestamps or filenames include YYYY-MM-DD / YYYYMMDD.", flush=True)
         return 1
 
     script = pick_script(script_options)
@@ -83,30 +85,30 @@ def main() -> int:
 
     matched_records, matched_files = filter_data_by_date_range(data_dir, filtered_data_dir, start_date, end_date)
     if matched_records == 0:
-        print("\nNo records found in selected date range. Nothing to run.")
-        print(f"Filtered data path: {filtered_data_dir}")
+        print("\nNo records found in selected date range. Nothing to run.", flush=True)
+        print(f"Filtered data path: {filtered_data_dir}", flush=True)
         return 0
 
     copy_repo_catalog_into_workspace(workspace)
 
     script_to_run = workspace / script.script_path
-    print("\nRun configuration")
-    print(f"Selected script: {script.key}")
-    print(f"Script path: {script.script_path}")
-    print(f"Selected start date: {start_date.isoformat()}")
-    print(f"Selected end date: {end_date.isoformat()}")
-    print(f"Filtered dataset path: {filtered_data_dir}")
-    print(f"Matched records: {matched_records}")
-    print(f"Matched files: {matched_files}")
-    print(f"Outputs will be written under: {workspace}")
+    print("\nRun configuration", flush=True)
+    print(f"Selected script: {script.key}", flush=True)
+    print(f"Script path: {script.script_path}", flush=True)
+    print(f"Selected start date: {start_date.isoformat()}", flush=True)
+    print(f"Selected end date: {end_date.isoformat()}", flush=True)
+    print(f"Filtered dataset path: {filtered_data_dir}", flush=True)
+    print(f"Matched records: {matched_records}", flush=True)
+    print(f"Matched files: {matched_files}", flush=True)
+    print(f"Outputs will be written under: {workspace}", flush=True)
 
     exit_code = run_script(script_to_run, workspace)
     if exit_code == 0:
-        print("\nScript completed successfully.")
-        print(f"Run output directory: {workspace}")
+        print("\nScript completed successfully.", flush=True)
+        print(f"Run output directory: {workspace}", flush=True)
     else:
-        print(f"\nScript failed with exit code {exit_code}.")
-        print(f"Inspect run output directory: {workspace}")
+        print(f"\nScript failed with exit code {exit_code}.", flush=True)
+        print(f"Inspect run output directory: {workspace}", flush=True)
 
     return exit_code
 
