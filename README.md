@@ -7,8 +7,13 @@ Script-first repository for recording and analyzing MTConnect machine telemetry.
 ```text
 .
 ├── README.md
+├── Dockerfile
+├── requirements.txt
 ├── catalog/
 │   ├── README.md
+│   ├── runner/
+│   │   ├── menu.py
+│   │   └── menu_utils.py
 │   └── <script-folder>/
 │       ├── <script>.py
 │       └── README.md
@@ -16,33 +21,92 @@ Script-first repository for recording and analyzing MTConnect machine telemetry.
 ├── results/
 ├── legacy/
 └── record data/
-    ├── README.md
-    └── button.png
 ```
 
-## Where Python scripts live
+## Docker quick start
 
-All Python entrypoints are under `catalog/`.
-
-- Catalog index and script status: `catalog/README.md`
-- Script docs: `catalog/<script-folder>/README.md`
-
-Status meanings:
-
-- **Active** — operational scripts in regular use
-- **Experimental** — exploratory/prototype scripts
-- **Legacy** — retained for compatibility/history
-
-## Run from repository root
-
-### Recorders
+Build image from repo root:
 
 ```bash
-python catalog/standalone-recorder_v2/standalone-recorder_v2.py
-python catalog/standalone_recorder/standalone_recorder.py
+docker build -t msh-tools .
 ```
 
-### Quality and analysis
+Run the interactive menu:
+
+```bash
+docker run --rm -it msh-tools
+```
+
+Recommended for local persistence (Linux/macOS shell syntax):
+
+```bash
+docker run --rm -it \
+  -v "$(pwd)/data:/app/data" \
+  -v "$(pwd)/results:/app/results" \
+  msh-tools
+```
+
+PowerShell equivalent:
+
+```powershell
+docker run --rm -it `
+  -v "${PWD}/data:/app/data" `
+  -v "${PWD}/results:/app/results" `
+  msh-tools
+```
+
+Container details:
+- Working directory: `/app`
+- Entrypoint: `python catalog/runner/menu.py`
+- Python runs unbuffered for readable logs.
+
+## Interactive numeric menu flow
+
+When the container starts, `catalog/runner/menu.py` runs and prompts:
+
+1. Choose one discovered script (numbered `1..N`)
+2. Choose start date by number from discovered available dates
+3. Choose end date by number from the same list
+4. Confirm and execute
+
+Script discovery is dynamic at runtime and sorted alphabetically for stable numbering.
+
+Date list discovery (`data/`):
+- Primary strategy: parse JSONL `timestamp` fields
+- Fallback: parse `YYYY-MM-DD` or `YYYYMMDD` from filename
+- Output dates are unique and sorted ISO dates (`YYYY-MM-DD`)
+- Filtering uses the same logic to avoid offering date choices that cannot match data.
+
+Execution strategy:
+- A filtered dataset is built under `results/menu_runs/menu_run_*/data`
+- Only records inside the selected date range are copied
+- The selected script runs inside that run directory, so outputs for that run stay together
+
+The launcher prints:
+- selected script
+- selected script path
+- selected start and end date
+- filtered dataset path
+- matched record/file counts
+- run output directory
+
+## Script discovery rules and exclusions
+
+Discovery includes scripts under `catalog/` matching:
+- `catalog/<folder>/<folder>.py`
+- `catalog/<folder>/main.py` (fallback if present)
+
+Discovery excludes:
+- `catalog/runner/*`
+- helper-style files (`menu.py`, `menu_utils.py`, `__init__.py`)
+- known environment-specific/incompatible folders:
+  - `auto_connect`
+  - `data_simulator`
+  - `interventions`
+  - `standalone_recorder`
+  - `standalone-recorder_v2`
+
+## Run scripts directly from repository root (without Docker)
 
 ```bash
 python catalog/sampling_rate_analysis/sampling_rate_analysis.py
@@ -51,24 +115,14 @@ python catalog/missing_per_day_by_machine/missing_per_day_by_machine.py
 python catalog/machines_active_per_day/machines_active_per_day.py
 python catalog/find_stops/find_stops.py
 python catalog/data_pr_day/data_pr_day.py
-python catalog/interventions/interventions.py
-```
-
-### Experimental and interactive
-
-```bash
 python catalog/corrolation_machine_pairs/corrolation_machine_pairs.py
 python catalog/data_analysis/data_analysis.py
 python catalog/data_visualizer/data_visualizer.py
 python catalog/ml_analysis/ml_analysis.py
-streamlit run catalog/data_simulator/data_simulator.py
 ```
 
-## Documentation scope
+## Limitations
 
-Catalog documentation is based on static code inspection (constants, paths, and declared required fields), not full end-to-end runtime validation.
-
-## Breaking change
-
-Python entrypoints were moved from repository root and `record data/` into `catalog/`.
-Update local scripts/automation that still use old paths.
+- Scripts still have mixed output paths internally, but menu runs isolate outputs per run directory.
+- Date filtering keeps records with parseable `timestamp`; malformed JSONL lines and records without valid timestamps are skipped.
+- For files without parseable timestamps, filename date fallback is used only when the entire file follows a date-in-name pattern.
