@@ -65,16 +65,13 @@ def main() -> int:
 
     if not data_dir.exists():
         print(f"Data directory not found: {data_dir}")
-        print("Tip: mount your local data folder into the container.")
-        print("PowerShell:")
-        print('  docker run --rm -it -v "${PWD}/data:/app/data" -v "${PWD}/results:/app/results" msh-tools')
-        print("bash:")
-        print('  docker run --rm -it -v "$(pwd)/data:/app/data" -v "$(pwd)/results:/app/results" msh-tools')
+        print("Tip: start the project with Docker Compose so data and results are mounted automatically.")
+        print("Run: docker compose up")
         return 1
 
     available_dates = discover_available_dates(data_dir)
     if not available_dates:
-        print("No dates discovered in data/. Ensure JSONL records include a timestamp field.")
+        print("No dates discovered in data/. Ensure records include timestamps or filenames include YYYY-MM-DD / YYYYMMDD.")
         return 1
 
     script = pick_script(script_options)

@@ -25,35 +25,29 @@ Script-first repository for recording and analyzing MTConnect machine telemetry.
 
 ## Docker quick start
 
-Build image from repo root:
+First run (build + run):
 
 ```bash
-docker build -t msh-tools .
+docker compose up --build
 ```
 
-Run the interactive menu:
+Normal subsequent runs:
 
 ```bash
-docker run --rm -it msh-tools
+docker compose up
 ```
 
-Recommended for local persistence (Linux/macOS shell syntax):
+Stop the container:
 
 ```bash
-docker run --rm -it \
-  -v "$(pwd)/data:/app/data" \
-  -v "$(pwd)/results:/app/results" \
-  msh-tools
+docker compose down
 ```
 
-PowerShell equivalent:
+Docker Compose automatically mounts local folders:
+- `./data` → `/app/data`
+- `./results` → `/app/results`
 
-```powershell
-docker run --rm -it `
-  -v "${PWD}/data:/app/data" `
-  -v "${PWD}/results:/app/results" `
-  msh-tools
-```
+No manual `-v` flags are needed.
 
 Container details:
 - Working directory: `/app`
