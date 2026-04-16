@@ -65,6 +65,11 @@ def main() -> int:
 
     if not data_dir.exists():
         print(f"Data directory not found: {data_dir}")
+        print("Tip: mount your local data folder into the container.")
+        print("PowerShell:")
+        print('  docker run --rm -it -v "${PWD}/data:/app/data" -v "${PWD}/results:/app/results" msh-tools')
+        print("bash:")
+        print('  docker run --rm -it -v "$(pwd)/data:/app/data" -v "$(pwd)/results:/app/results" msh-tools')
         return 1
 
     available_dates = discover_available_dates(data_dir)
