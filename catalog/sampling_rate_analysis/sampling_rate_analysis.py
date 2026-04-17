@@ -1,17 +1,56 @@
-import os
+"""
+Summarize average sampling rate per day from JSONL telemetry data.
+
+This script reads top-level JSONL files from ``data/``, parses timestamps,
+sorts records chronologically, estimates instantaneous sampling rate from the
+time gap between consecutive rows, and then computes the daily average sampling
+rate.
+
+A day is flagged as low-rate if its average sampling rate falls below the
+configured threshold.
+
+Outputs
+-------
+- ``sampling_rate_summary.csv``:
+    daily average sampling rate summary
+- ``daily_sampling_rate.png``:
+    line plot of average daily sampling rate with target and threshold markers
+
+Notes
+-----
+- This script reads only top-level JSONL files in ``data/``.
+- Rows with malformed JSON or invalid timestamps are skipped.
+- The sampling rate is estimated as ``1 / time_gap_s`` between consecutive rows.
+- If multiple machines or streams are mixed together, the estimated rate may not
+  reflect the true sampling rate of any single source.
+- The daily value is the mean of per-row instantaneous rates, which is an
+  exploratory indicator rather than a strict acquisition-system metric.
+"""
+
 import json
-import pandas as pd
-import matplotlib.pyplot as plt
+import os
 from datetime import datetime
 
-# === CONFIGURATION ===
-DATA_DIR = "data"  # Folder containing .jsonl files
-OUTPUT_CSV = "sampling_rate_summary.csv"
-OUTPUT_PLOT = "daily_sampling_rate.png"
-FREQUENCY_THRESHOLD = 4.9  # Expected is 5.0 Hz
+import matplotlib.pyplot as plt
+import pandas as pd
 
-# === READ AND COMBINE JSONL FILES ===
+# Folder containing input JSONL files.
+DATA_DIR = "data"
+
+# Output CSV containing daily average sampling-rate estimates.
+OUTPUT_CSV = "sampling_rate_summary.csv"
+
+# Output plot showing daily sampling-rate trends.
+OUTPUT_PLOT = "daily_sampling_rate.png"
+
+# Days below this daily average are highlighted as potentially problematic.
+# The nominal target is 5.0 Hz.
+FREQUENCY_THRESHOLD = 4.9
+
+
 records = []
+
+# Preserve original behavior by reading only top-level JSONL files.
 for filename in sorted(os.listdir(DATA_DIR)):
     if filename.endswith(".jsonl"):
         filepath = os.path.join(DATA_DIR, filename)
@@ -23,50 +62,59 @@ for filename in sorted(os.listdir(DATA_DIR)):
                         entry["timestamp"] = datetime.fromisoformat(entry["timestamp"])
                         records.append(entry)
                     except Exception as e:
+                        # Invalid rows are skipped instead of halting the full run.
                         print(f"Error parsing line in {filename}: {e}")
 
 if not records:
-    print("No valid records found.")
-    exit()
+    raise SystemExit("No valid records found.")
 
-# === PARSE TO DATAFRAME ===
 df = pd.DataFrame(records)
 df.sort_values("timestamp", inplace=True)
 df.reset_index(drop=True, inplace=True)
 
-# === CALCULATE SAMPLING RATE ===
+# Estimate instantaneous sampling rate from the time gap between consecutive rows.
+# For a gap of x seconds, the estimated rate is 1 / x Hz.
 df["time_gap_s"] = df["timestamp"].diff().dt.total_seconds()
-df["sampling_rate_hz"] = df["time_gap_s"].apply(lambda x: round(1 / x, 2) if x > 0 else None)
+df["sampling_rate_hz"] = df["time_gap_s"].apply(
+    lambda x: round(1 / x, 2) if x > 0 else None
+)
 df["date"] = df["timestamp"].dt.date
 
-# === DAILY AVERAGE FREQUENCY ===
+# Aggregate to a daily average sampling-rate estimate.
 daily_freq = df.groupby("date")["sampling_rate_hz"].mean().reset_index()
 daily_freq.rename(columns={"sampling_rate_hz": "avg_sampling_rate_hz"}, inplace=True)
 
-# === FLAG DAYS BELOW THRESHOLD ===
+# Highlight days whose average falls below the configured threshold.
 below_threshold = daily_freq[daily_freq["avg_sampling_rate_hz"] < FREQUENCY_THRESHOLD]
 
-# === PRINT RESULT ===
-print("\n📊 Daily average sampling rate:")
+print("\nDaily average sampling rate:")
 print(daily_freq)
 
 if not below_threshold.empty:
-    print("\n⚠️ Days with low sampling rate:")
+    print("\nDays with low sampling rate:")
     print(below_threshold)
 
-# === SAVE CSV ===
 daily_freq.to_csv(OUTPUT_CSV, index=False)
 print(f"\nSaved summary to: {OUTPUT_CSV}")
 
-# === PLOT LINE CHART ===
 plt.figure(figsize=(10, 5))
-plt.plot(daily_freq["date"], daily_freq["avg_sampling_rate_hz"], marker='o', label="Avg Frequency")
-plt.axhline(y=5.0, color='green', linestyle='--', label="Target (5 Hz)")
-plt.axhline(y=FREQUENCY_THRESHOLD, color='red', linestyle='--', label=f"Threshold ({FREQUENCY_THRESHOLD} Hz)")
+plt.plot(
+    daily_freq["date"],
+    daily_freq["avg_sampling_rate_hz"],
+    marker="o",
+    label="Avg Frequency",
+)
+plt.axhline(y=5.0, color="green", linestyle="--", label="Target (5 Hz)")
+plt.axhline(
+    y=FREQUENCY_THRESHOLD,
+    color="red",
+    linestyle="--",
+    label=f"Threshold ({FREQUENCY_THRESHOLD} Hz)",
+)
 plt.title("Average Sampling Rate per Day")
 plt.xlabel("Date")
 plt.ylabel("Avg Sampling Rate (Hz)")
-plt.xticks(rotation=45, ha='right')
+plt.xticks(rotation=45, ha="right")
 plt.grid(True)
 plt.legend()
 plt.tight_layout()
