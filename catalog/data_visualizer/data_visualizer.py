@@ -1,22 +1,70 @@
-import os
+"""
+Infer machine states from telemetry data and generate per-day timeline plots.
+
+This script loads JSONL telemetry files, prepares the data, infers a simple
+state model per machine and day, extracts candidate intervention rows, and
+renders daily timeline visualizations.
+
+Pipeline
+--------
+1. Load JSONL files from ``data/``
+2. Parse timestamps and normalize selected numeric/context columns
+3. Infer per-row machine states using heuristic rules
+4. Convert state rows into merged time intervals
+5. Extract intervention-candidate rows for inspection
+6. Write candidate rows to CSV
+7. Generate one timeline image per day across all machines
+
+State model
+-----------
+Rows are assigned one of four states:
+
+- ``idle``:
+    no evidence of active operation and not densely sampled
+- ``dense_idle``:
+    densely sampled but not classified as active
+- ``active``:
+    dense sampling together with RPM/load evidence of activity
+- ``intervention_candidate``:
+    rows near activity where one or more heuristic event rules fire
+
+Important
+---------
+This is an exploratory heuristic pipeline, not a validated ground-truth event
+detector. Its outputs are useful for inspection and discussion, but should be
+interpreted cautiously.
+
+Outputs
+-------
+- ``candidate_events.csv``:
+    candidate rows with timestamps, scores, and fired rule descriptions
+- ``timeline_images/timeline_<date>.png``:
+    one timeline plot per day showing machine states over time
+"""
+
 import glob
 import json
+import os
+
+import matplotlib.dates as mdates
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-import matplotlib.dates as mdates
 from matplotlib.patches import Patch
 
-# ============================================================
-# CONFIG
-# ============================================================
-
+# Folder containing input JSONL telemetry files.
 FOLDER = r"./data"
+
+# File pattern used to find telemetry input files.
 FILE_PATTERN = "*.jsonl"
+
+# Directory for generated timeline images.
 OUTPUT_DIR = r"./timeline_images"
+
+# Output CSV containing candidate intervention rows.
 CANDIDATE_CSV = r"./candidate_events.csv"
 
-# Try these column names to identify machine
+# Candidate column names for identifying the machine/source of a row.
 MACHINE_ID_CANDIDATES = [
     "machine",
     "machine_id",
@@ -28,7 +76,7 @@ MACHINE_ID_CANDIDATES = [
     "device",
 ]
 
-# Signals used for state inference
+# Canonical signal names used in state inference and diagnostics.
 RPM_COL = "Srpm"
 LOAD_COL = "Sload"
 OVR_COL = "Sovr"
@@ -39,41 +87,54 @@ TIME_COL = "timestamp"
 FOVR_COL = "Fovr"
 FRAPIDOVR_COL = "Frapidovr"
 
-# Heuristics
+# Heuristics for dense sampling and activity detection.
 DENSE_DT_SEC = 5.0
 RPM_ACTIVE_THRESHOLD = 100.0
 LOAD_ACTIVE_THRESHOLD = 1.0
 
-# Less strict rate thresholds
+# Quantiles used to derive rate-change thresholds. These are intentionally less
+# strict than extreme-tail settings in order to favor exploratory recall.
 LOAD_RATE_Q = 0.95
 RPM_RATE_Q = 0.95
 OVR_RATE_Q = 0.95
 FOVR_RATE_Q = 0.95
 FRAPIDOVR_RATE_Q = 0.95
 
-# Explicit pattern thresholds
+# Explicit intervention-like pattern thresholds.
 OVR_DROP_THRESHOLD = -10.0
 FOVR_DROP_THRESHOLD = -10.0
 RPM_COLLAPSE_RATIO = 0.5
 LOAD_COLLAPSE_RATIO = 0.5
 
-# Merge neighbouring intervals with same state if close in time
+# Merge neighboring intervals with the same state if the gap is small.
 MERGE_GAP_SEC = 30.0
 
-# Smooth out very short state fragments
+# Minimum state duration used by the optional smoothing function.
 MIN_STATE_DURATION_SEC = 5.0
 
-# Figure settings
+# Figure settings for timeline plots.
 FIG_WIDTH = 18
 ROW_HEIGHT = 0.8
 SAVE_FIGURES = True
 SHOW_FIGURES = False
 
-# ============================================================
-# HELPERS
-# ============================================================
 
 def load_jsonl(path):
+    """
+    Load one JSONL file into a DataFrame.
+
+    Blank lines are skipped. Malformed JSON lines are reported and ignored.
+
+    Parameters
+    ----------
+    path : str
+        Path to the JSONL file.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing all successfully parsed rows.
+    """
     rows = []
     with open(path, "r", encoding="utf-8") as f:
         for i, line in enumerate(f, start=1):
@@ -86,21 +147,70 @@ def load_jsonl(path):
                 print(f"[WARNING] Failed to parse line {i} in {path}: {e}")
     return pd.DataFrame(rows)
 
+
 def replace_unavailable(series):
+    """
+    Replace string-based 'UNAVAILABLE' values with NaN.
+
+    This supports mixed telemetry columns where missingness is represented as
+    a literal string rather than a real null value.
+    """
     if series.dtype == object or str(series.dtype).startswith("string"):
         return series.replace("UNAVAILABLE", np.nan)
     return series
 
+
 def to_numeric(series):
+    """
+    Convert a telemetry series to numeric values where possible.
+
+    Non-numeric values are coerced to NaN after first normalizing
+    'UNAVAILABLE' markers.
+    """
     return pd.to_numeric(replace_unavailable(series), errors="coerce")
 
+
 def find_machine_col(df):
+    """
+    Find the first plausible machine identifier column in a DataFrame.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+
+    Returns
+    -------
+    str | None
+        Name of the detected machine-ID column, or None if none is found.
+    """
     for col in MACHINE_ID_CANDIDATES:
         if col in df.columns:
             return col
     return None
 
+
 def prepare_dataframe(df, source_name):
+    """
+    Prepare one raw telemetry DataFrame for downstream analysis.
+
+    This step:
+    - validates and parses timestamps
+    - detects or synthesizes a machine identifier
+    - normalizes selected numeric and context columns
+    - adds source file and date metadata
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Raw telemetry rows.
+    source_name : str
+        Source filename used as fallback machine identifier if needed.
+
+    Returns
+    -------
+    pandas.DataFrame | None
+        Prepared DataFrame, or None if the input is unusable.
+    """
     df = df.copy()
 
     if TIME_COL not in df.columns:
@@ -113,6 +223,7 @@ def prepare_dataframe(df, source_name):
 
     machine_col = find_machine_col(df)
     if machine_col is None:
+        # Fall back to source filename when no machine identifier exists.
         df["machine_fallback"] = source_name
         machine_col = "machine_fallback"
 
@@ -131,7 +242,28 @@ def prepare_dataframe(df, source_name):
 
     return df
 
+
 def smooth_state_sequence(g, min_duration_sec=5.0):
+    """
+    Smooth very short state fragments by replacing them with neighboring states.
+
+    Parameters
+    ----------
+    g : pandas.DataFrame
+        Row-level state sequence for one machine/day.
+    min_duration_sec : float, default=5.0
+        Minimum duration below which a state fragment is treated as too short.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Smoothed copy of the state sequence.
+
+    Notes
+    -----
+    This is currently not applied in the main pipeline because the unsmoothed
+    state sequence is being kept for debugging and inspection.
+    """
     g = g.sort_values(TIME_COL).copy()
     if len(g) < 3:
         return g
@@ -182,15 +314,60 @@ def smooth_state_sequence(g, min_duration_sec=5.0):
     g = g.drop(columns=["state_group"], errors="ignore")
     return g
 
+
 def build_fired_rules(events_df, idx):
+    """
+    Build a comma-separated description of which event rules fired at one row.
+
+    Parameters
+    ----------
+    events_df : pandas.DataFrame
+        Boolean event-rule table plus ``event_score``.
+    idx : Any
+        Row index in ``events_df``.
+
+    Returns
+    -------
+    str
+        Comma-separated rule names that evaluated to True for the row.
+    """
     fired = [col for col in events_df.columns if col != "event_score" and bool(events_df.loc[idx, col])]
     return ", ".join(fired)
 
-# ============================================================
-# CORE ANALYSIS
-# ============================================================
 
 def infer_states_for_machine(g):
+    """
+    Infer per-row machine state and intervention-candidate flags for one machine/day.
+
+    The logic combines:
+    - dense sampling
+    - RPM/load activity
+    - context changes
+    - rate-based numeric jumps
+    - explicit override drops or collapses
+
+    The resulting state labels are:
+    - ``idle``
+    - ``dense_idle``
+    - ``active``
+    - ``intervention_candidate``
+
+    Parameters
+    ----------
+    g : pandas.DataFrame
+        Rows for one machine on one day.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Copy of the input with inferred state columns and diagnostic metadata
+        attached in ``attrs``.
+
+    Notes
+    -----
+    The event score is currently used for diagnostics only. Candidate selection
+    is deliberately more permissive than a strict score threshold.
+    """
     g = g.sort_values(TIME_COL).copy()
     g["dt_sec"] = g[TIME_COL].diff().dt.total_seconds()
 
@@ -211,9 +388,7 @@ def infer_states_for_machine(g):
 
     valid_dt = g["dt_sec"].between(0.1, 30.0)
 
-    # --------------------------------------------------------
-    # Rate-based features
-    # --------------------------------------------------------
+    # Compute adaptive rate features for selected signals.
     rate_specs = [
         (RPM_COL, "rate_rpm", RPM_RATE_Q),
         (LOAD_COL, "rate_load", LOAD_RATE_Q),
@@ -232,9 +407,6 @@ def infer_states_for_machine(g):
             g[rate_col] = np.nan
             thresholds[rate_col] = np.nan
 
-    # --------------------------------------------------------
-    # Event rules
-    # --------------------------------------------------------
     events = pd.DataFrame(index=g.index)
 
     if EXEC_COL in g.columns:
@@ -305,9 +477,7 @@ def infer_states_for_machine(g):
     if len(events) > 0:
         events.iloc[0] = False
 
-    # --------------------------------------------------------
-    # Scoring kept for diagnostics only
-    # --------------------------------------------------------
+    # Weighted score retained for diagnostics, not as the sole decision rule.
     weights = {
         "execution_change": 2,
         "mode_change": 2,
@@ -331,9 +501,6 @@ def infer_states_for_machine(g):
             continue
         events["event_score"] += events[col].astype(int) * weights.get(col, 1)
 
-    # --------------------------------------------------------
-    # More permissive candidate definition
-    # --------------------------------------------------------
     active_next = g["active"].shift(-1).fillna(False)
     near_active = active_now | active_prev | active_next
 
@@ -359,19 +526,18 @@ def infer_states_for_machine(g):
         "rate_fovr_jump",
         "rate_frapidovr_jump",
     ]:
-        jump_col = f"{col}" if col in events.columns else None
-        if jump_col is not None:
-            numeric_candidate |= events[jump_col]
+        if col in events.columns:
+            numeric_candidate |= events[col]
 
+    # Candidate rows are defined more permissively than the event score alone.
     g["intervention_candidate"] = near_active & (base_candidate | numeric_candidate)
 
-    # Build state model
     g["state"] = np.where(
         g["intervention_candidate"], "intervention_candidate",
         np.where(
             g["active"], "active",
-            np.where(g["dense_idle"], "dense_idle", "idle")
-        )
+            np.where(g["dense_idle"], "dense_idle", "idle"),
+        ),
     )
 
     if len(g) > 0:
@@ -380,7 +546,6 @@ def infer_states_for_machine(g):
         if g.loc[first_idx, "state"] == "intervention_candidate":
             g.loc[first_idx, "state"] = "active" if bool(g.loc[first_idx, "active"]) else "idle"
 
-    # Attach diagnostics to row data
     g["event_score"] = events["event_score"]
     g["fired_rules"] = [build_fired_rules(events, idx) for idx in g.index]
 
@@ -388,12 +553,30 @@ def infer_states_for_machine(g):
     g.attrs["trigger_counts"] = trigger_counts
     g.attrs["thresholds"] = thresholds
 
-    # Intentionally disabled for debugging:
+    # Intentionally disabled during debugging to preserve raw state transitions.
     # g = smooth_state_sequence(g, min_duration_sec=MIN_STATE_DURATION_SEC)
 
     return g
 
+
 def rows_to_intervals(g):
+    """
+    Merge consecutive rows with the same inferred state into time intervals.
+
+    Neighboring rows are merged only if they share the same state and are close
+    enough in time according to ``MERGE_GAP_SEC``.
+
+    Parameters
+    ----------
+    g : pandas.DataFrame
+        Row-level state sequence for one machine/day.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Interval table with machine, date, state, start/end time, duration, and
+        row count.
+    """
     g = g.sort_values(TIME_COL).copy()
     if len(g) == 0:
         return pd.DataFrame(columns=["machine_id", "state", "start", "end", "duration_sec", "n_points", "date"])
@@ -417,33 +600,52 @@ def rows_to_intervals(g):
             prev_time = t
             n_points += 1
         else:
-            rows.append({
-                "machine_id": machine_id,
-                "date": day_value,
-                "state": current_state,
-                "start": start_time,
-                "end": prev_time,
-                "duration_sec": (prev_time - start_time).total_seconds(),
-                "n_points": n_points,
-            })
+            rows.append(
+                {
+                    "machine_id": machine_id,
+                    "date": day_value,
+                    "state": current_state,
+                    "start": start_time,
+                    "end": prev_time,
+                    "duration_sec": (prev_time - start_time).total_seconds(),
+                    "n_points": n_points,
+                }
+            )
             current_state = state
             start_time = t
             prev_time = t
             n_points = 1
 
-    rows.append({
-        "machine_id": machine_id,
-        "date": day_value,
-        "state": current_state,
-        "start": start_time,
-        "end": prev_time,
-        "duration_sec": (prev_time - start_time).total_seconds(),
-        "n_points": n_points,
-    })
+    rows.append(
+        {
+            "machine_id": machine_id,
+            "date": day_value,
+            "state": current_state,
+            "start": start_time,
+            "end": prev_time,
+            "duration_sec": (prev_time - start_time).total_seconds(),
+            "n_points": n_points,
+        }
+    )
 
     return pd.DataFrame(rows)
 
+
 def extract_candidate_rows(g):
+    """
+    Extract rows marked as intervention candidates for CSV export and inspection.
+
+    Parameters
+    ----------
+    g : pandas.DataFrame
+        Row-level state sequence with candidate flags.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Candidate-row table including timestamps, scores, fired rules, and
+        selected telemetry/context columns when available.
+    """
     cols = ["date", "machine_id", TIME_COL, "state", "event_score", "fired_rules"]
     for col in [RPM_COL, LOAD_COL, OVR_COL, FOVR_COL, FRAPIDOVR_COL, EXEC_COL, MODE_COL, PROG_COL]:
         if col in g.columns:
@@ -453,7 +655,28 @@ def extract_candidate_rows(g):
     out = out.rename(columns={TIME_COL: "timestamp"})
     return out
 
+
 def plot_day_timeline(interval_df_day, output_path=None, show=False):
+    """
+    Plot one day's inferred machine timelines.
+
+    Each machine is shown on a separate horizontal row. Intervals are colored
+    by inferred state.
+
+    Parameters
+    ----------
+    interval_df_day : pandas.DataFrame
+        Interval table for one day across one or more machines.
+    output_path : str | None, optional
+        If provided, save the figure to this path.
+    show : bool, default=False
+        If True, display the figure interactively. Otherwise close it after
+        saving.
+
+    Notes
+    -----
+    Zero-length intervals are widened to one second for visibility in the plot.
+    """
     if interval_df_day.empty:
         return
 
@@ -485,7 +708,7 @@ def plot_day_timeline(interval_df_day, output_path=None, show=False):
             left=mdates.date2num(start),
             height=0.6,
             color=color,
-            edgecolor="none"
+            edgecolor="none",
         )
 
     ax.set_yticks(list(y_positions.values()))
@@ -519,10 +742,8 @@ def plot_day_timeline(interval_df_day, output_path=None, show=False):
     else:
         plt.close(fig)
 
-# ============================================================
-# MAIN LOAD
-# ============================================================
 
+# Ensure the timeline output directory exists.
 os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 all_frames = []
@@ -543,10 +764,6 @@ if not all_frames:
 
 data = pd.concat(all_frames, ignore_index=True)
 data = data.sort_values(["date", "machine_id", TIME_COL]).reset_index(drop=True)
-
-# ============================================================
-# INFER STATES DAY BY DAY
-# ============================================================
 
 state_frames = []
 interval_frames = []
@@ -590,7 +807,7 @@ else:
     )
     print(f"Saved empty candidate file to: {os.path.abspath(CANDIDATE_CSV)}")
 
-# Optional cleanup: drop trivial one-point zero-length idle intervals
+# Drop trivial one-point zero-length idle intervals to reduce plot clutter.
 interval_df = interval_df[
     ~(
         (interval_df["state"] == "idle")
@@ -598,10 +815,6 @@ interval_df = interval_df[
         & (interval_df["n_points"] == 1)
     )
 ].copy()
-
-# ============================================================
-# PRINT SUMMARY
-# ============================================================
 
 print("\n=== MACHINE SUMMARY BY DAY ===")
 summary = (
@@ -619,10 +832,6 @@ if not candidate_df.empty:
     print("\n=== FIRST CANDIDATE ROWS ===")
     print(candidate_df.head(50).to_string(index=False))
 
-# ============================================================
-# CREATE DAILY IMAGES
-# ============================================================
-
 unique_days = sorted(interval_df["date"].dropna().unique().tolist())
 
 for day_value in unique_days:
@@ -636,7 +845,7 @@ for day_value in unique_days:
     plot_day_timeline(
         day_intervals,
         output_path=output_path if SAVE_FIGURES else None,
-        show=SHOW_FIGURES
+        show=SHOW_FIGURES,
     )
 
 print(f"\nDone. Images are in: {os.path.abspath(OUTPUT_DIR)}")
