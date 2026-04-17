@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import argparse
+import os
+import sys
 import time
 import tempfile
 from pathlib import Path
@@ -22,6 +25,7 @@ STATE_COLORS = {
 }
 
 SIGNALS = ["Srpm", "Sload", "Sovr", "Fovr", "Frapidovr"]
+DEFAULT_EXPORT_CANDIDATES = ["timeline_rows.csv", "timeline_rows.parquet", "timeline_rows.jsonl", "timeline_rows.json"]
 
 
 @st.cache_data(show_spinner=False)
@@ -157,6 +161,47 @@ def _state_badge(state: str):
     return f"<span style='padding:4px 10px;border-radius:999px;background:{color};color:white;font-weight:600'>{state}</span>"
 
 
+def _parse_bootstrap_args() -> argparse.Namespace:
+    parser = argparse.ArgumentParser(add_help=False)
+    parser.add_argument("--session-export-dir", default="")
+    parser.add_argument("--source-path", default="")
+    return parser.parse_known_args(sys.argv[1:])[0]
+
+
+def _resolve_session_export_file(path: str) -> str:
+    if not path:
+        return ""
+    root = Path(path).expanduser()
+    if not root.exists() or not root.is_dir():
+        return ""
+    for file_name in DEFAULT_EXPORT_CANDIDATES:
+        candidate = root / file_name
+        if candidate.exists():
+            return str(candidate)
+    return ""
+
+
+def _resolve_bootstrap_source() -> tuple[str, str]:
+    args = _parse_bootstrap_args()
+    if args.source_path:
+        return args.source_path, "command-line source"
+
+    from_session_dir = _resolve_session_export_file(args.session_export_dir)
+    if from_session_dir:
+        return from_session_dir, f"session export ({args.session_export_dir})"
+
+    env_source = os.getenv("MSH_PLAYBACK_SOURCE_PATH", "").strip()
+    if env_source:
+        return env_source, "MSH_PLAYBACK_SOURCE_PATH"
+
+    env_export_dir = os.getenv("MSH_PLAYBACK_EXPORT_DIR", "").strip()
+    from_env_export = _resolve_session_export_file(env_export_dir)
+    if from_env_export:
+        return from_env_export, f"MSH_PLAYBACK_EXPORT_DIR ({env_export_dir})"
+
+    return "", ""
+
+
 def main():
     st.set_page_config(page_title="Telemetry Playback", layout="wide")
     st.title("Machine Telemetry Playback")
@@ -165,7 +210,10 @@ def main():
     with st.sidebar:
         st.header("Data source")
         uploaded = st.file_uploader("Upload timeline export", type=["csv", "parquet", "pq", "jsonl", "json"])
-        local_path = st.text_input("or local path", value="")
+        default_source, source_hint = _resolve_bootstrap_source()
+        local_path = st.text_input("or local path", value=default_source)
+        if source_hint:
+            st.caption(f"Prefilled source: {source_hint}")
 
     df: pd.DataFrame | None = None
     if uploaded is not None:

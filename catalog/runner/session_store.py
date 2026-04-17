@@ -124,6 +124,7 @@ def initialize_session_metadata(
         "paths": {
             "filtered_data_dir": "data",
             "runs_dir": "runs",
+            "playback_exports_dir": "exports/timeline",
         },
         "filter_result": {
             "filtered_data_path": "data",
@@ -154,6 +155,9 @@ def normalize_session_metadata(
         changed = True
     if "runs_dir" not in paths:
         paths["runs_dir"] = "runs"
+        changed = True
+    if "playback_exports_dir" not in paths:
+        paths["playback_exports_dir"] = "exports/timeline"
         changed = True
 
     filter_payload = metadata.setdefault("filter", {})

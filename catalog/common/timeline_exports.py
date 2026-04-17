@@ -112,6 +112,34 @@ def infer_timeline_rows(
     return _ensure_timeline_columns(inferred)
 
 
+def build_timeline_rows_export(
+    source_df: pd.DataFrame,
+    *,
+    config: StateInferenceConfig = StateInferenceConfig(),
+) -> pd.DataFrame:
+    """Infer playback timeline rows for all machine/day slices in a dataframe."""
+    prepared = _normalize_machine_and_time(source_df)
+    if prepared.empty:
+        return pd.DataFrame(columns=TIMELINE_COLUMNS)
+
+    frames: list[pd.DataFrame] = []
+    for _, selected in prepared.groupby(["date", "machine_id"], sort=True):
+        inferred = infer_states_for_machine(selected, config=config)
+        if "execution" in inferred.columns:
+            inferred["stopped"] = inferred["execution"].astype("string").str.upper().isin(STOPPED_STATES)
+        else:
+            inferred["stopped"] = False
+        rows = _ensure_timeline_columns(inferred)
+        if not rows.empty:
+            frames.append(rows)
+
+    if not frames:
+        return pd.DataFrame(columns=TIMELINE_COLUMNS)
+
+    merged = pd.concat(frames, ignore_index=True)
+    return _ensure_timeline_columns(merged).sort_values(["date", "machine_id", "timestamp"]).reset_index(drop=True)
+
+
 def build_state_interval_export(
     timeline_rows: pd.DataFrame,
     *,
@@ -165,6 +193,20 @@ def export_timeline_for_machine_day(
 ) -> Path:
     """Infer and export timeline rows for one machine/day to CSV."""
     rows = infer_timeline_rows(source_df, machine_id=machine_id, day=day)
+    target = Path(output_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    rows.to_csv(target, index=False)
+    return target
+
+
+def export_timeline_rows(
+    source_df: pd.DataFrame,
+    *,
+    output_path: str | Path,
+    config: StateInferenceConfig = StateInferenceConfig(),
+) -> Path:
+    """Infer and export timeline rows for all machine/day slices to CSV."""
+    rows = build_timeline_rows_export(source_df, config=config)
     target = Path(output_path)
     target.parent.mkdir(parents=True, exist_ok=True)
     rows.to_csv(target, index=False)
