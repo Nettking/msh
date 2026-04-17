@@ -82,10 +82,46 @@ These are ingestion tools, not one-shot analysis scripts:
 
 ## Runner behavior (`catalog/runner/menu.py`)
 
-The interactive runner presents only one-shot analysis scripts and keeps them grouped for navigation:
+The interactive runner now uses **file-based analysis sessions** under `results/workflows/<session-id>/`.
 
-- **Simple — Stage 1–3 first-pass workflow**
-- **Advanced — Stage 4 deeper exploration**
-- **Legacy — compatibility / reference**
+Each session stores:
+- selected date range (and optional same-day hour range)
+- one filtered dataset copy (`data/`) reused by later script runs in that session
+- per-script execution status (`not_run`, `done`, `failed`) plus run metadata
+- script run outputs under `runs/<script>/<timestamp>/`
+- session metadata in `session.json`
 
-Streamlit, recorder, and environment-specific tools remain documented here but intentionally outside the runner’s default one-shot path.
+Workflow guidance remains step-based:
+- **Step 1:** health checks
+- **Step 2:** raw inspection
+- **Step 3:** stop-focused inspection
+- **Step 4:** deeper exploratory analysis
+
+Execution and caching are script-level:
+- step completion is derived from script statuses
+- completed scripts are skipped by default unless rerun is requested
+- failed scripts are visible in session status and can be rerun
+
+Runner actions include:
+- create or reuse a session
+- run next workflow step
+- run a selected workflow step
+- run one selected script
+- precompute all workflow scripts
+- precompute selected workflow scripts
+- show session status / cached outputs
+
+Default precompute scope includes the standard runner-visible workflow scripts:
+- `machines_active_per_day`
+- `analyze_missing_sequence_number`
+- `missing_per_day_by_machine`
+- `sampling_rate_analysis`
+- `data_pr_day`
+- `find_stops`
+- `data_visualizer`
+- `data_analysis`
+- `ml_analysis`
+
+Intentionally excluded from default precompute/workflow path:
+- legacy `corrolation_machine_pairs` (still runnable explicitly)
+- Streamlit and environment/recorder tools (`data_simulator`, `interventions`, recorders, `auto_connect`)

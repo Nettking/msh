@@ -6,9 +6,9 @@ This module supports the CLI runner by providing functionality for:
 - discovering runnable catalog scripts
 - discovering available data dates from JSONL telemetry files
 - caching per-file date discovery results
-- filtering source telemetry into a temporary run workspace
-- copying catalog code into the workspace
-- executing the selected script in isolation
+- filtering source telemetry into session-scoped workspaces
+- storing and updating session metadata and script execution status
+- executing selected scripts in isolated per-run directories
 
 Key behavior
 ------------
@@ -27,9 +27,10 @@ Filtering:
   fallback, because filenames cannot determine hour-of-day
 
 Execution:
-- each run is executed in its own temporary workspace under ``results/menu_runs/``
-- the selected script runs against a filtered copy of the data
-- the catalog source is copied into the workspace before execution
+- sessions live under ``results/workflows/<session-id>/``
+- each script execution gets its own run directory under ``runs/<script>/<timestamp>/``
+- the selected script runs against the session-filtered data copy
+- the catalog source is copied into each run workspace before execution
 
 Notes
 -----
@@ -51,7 +52,8 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile, mkdtemp
-from typing import Iterable, Literal
+from time import perf_counter
+from typing import Any, Iterable, Literal
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -129,6 +131,43 @@ SCRIPT_METADATA: dict[str, dict[str, str | bool]] = {
 }
 
 CATEGORY_ORDER: dict[str, int] = {"Simple": 0, "Advanced": 1, "Legacy": 2}
+
+SESSION_VERSION = 1
+WORKFLOW_STEPS: list[tuple[str, list[str]]] = [
+    (
+        "Step 1: Health checks",
+        [
+            "machines_active_per_day",
+            "analyze_missing_sequence_number",
+            "missing_per_day_by_machine",
+            "sampling_rate_analysis",
+        ],
+    ),
+    ("Step 2: Raw inspection", ["data_pr_day"]),
+    ("Step 3: Stop-focused inspection", ["find_stops"]),
+    ("Step 4: Deeper exploratory analysis", ["data_visualizer", "data_analysis", "ml_analysis"]),
+]
+WORKFLOW_SCRIPT_ORDER: list[str] = [script for _, scripts in WORKFLOW_STEPS for script in scripts]
+
+
+@dataclass(frozen=True)
+class SessionInfo:
+    """
+    Summary of one workflow session directory.
+
+    Attributes
+    ----------
+    session_id : str
+        Stable session folder name.
+    session_dir : pathlib.Path
+        Absolute path to the session directory.
+    metadata : dict[str, Any]
+        Parsed session metadata payload.
+    """
+
+    session_id: str
+    session_dir: Path
+    metadata: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -574,6 +613,199 @@ def create_run_workspace(output_base_dir: Path) -> Path:
     output_base_dir.mkdir(parents=True, exist_ok=True)
     path = Path(mkdtemp(prefix="menu_run_", dir=output_base_dir))
     return path
+
+
+def workflow_step_for_script(script_key: str) -> str | None:
+    """
+    Resolve the workflow step label for a script key.
+    """
+    for step_name, scripts in WORKFLOW_STEPS:
+        if script_key in scripts:
+            return step_name
+    return None
+
+
+def workflow_step_status(session_metadata: dict[str, Any], step_scripts: list[str]) -> str:
+    """
+    Derive step status from script-level statuses.
+    """
+    statuses = [str(session_metadata.get("scripts", {}).get(key, {}).get("status", "not_run")) for key in step_scripts]
+    if statuses and all(value == "done" for value in statuses):
+        return "complete"
+    if any(value == "failed" for value in statuses):
+        return "failed"
+    if any(value == "done" for value in statuses):
+        return "partial"
+    return "not_run"
+
+
+def list_sessions(workflows_root: Path) -> list[SessionInfo]:
+    """
+    List known workflow sessions sorted by creation time descending.
+    """
+    if not workflows_root.exists():
+        return []
+
+    sessions: list[SessionInfo] = []
+    for item in sorted(workflows_root.iterdir(), key=lambda path: path.name, reverse=True):
+        if not item.is_dir():
+            continue
+        metadata_path = item / "session.json"
+        if not metadata_path.exists():
+            continue
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            continue
+        sessions.append(SessionInfo(session_id=item.name, session_dir=item, metadata=metadata))
+    return sessions
+
+
+def initialize_session_metadata(
+    session_id: str,
+    start_date: date,
+    end_date: date,
+    *,
+    start_hour: int | None,
+    end_hour: int | None,
+    script_options: list[ScriptOption],
+) -> dict[str, Any]:
+    """
+    Build a new session metadata payload.
+    """
+    scripts: dict[str, dict[str, Any]] = {}
+    for item in script_options:
+        scripts[item.key] = {
+            "script_name": item.key,
+            "category": item.category,
+            "workflow_step": workflow_step_for_script(item.key),
+            "status": "not_run",
+            "output_path": None,
+            "last_run_at": None,
+            "duration_seconds": None,
+            "exit_code": None,
+        }
+
+    now = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    return {
+        "version": SESSION_VERSION,
+        "session_id": session_id,
+        "created_at": now,
+        "updated_at": now,
+        "filter": {
+            "start_date": start_date.isoformat(),
+            "end_date": end_date.isoformat(),
+            "start_hour": start_hour,
+            "end_hour": end_hour,
+        },
+        "paths": {
+            "filtered_data_dir": "data",
+            "runs_dir": "runs",
+        },
+        "filter_result": {
+            "matched_records": None,
+            "matched_files": None,
+            "generated_at": None,
+        },
+        "scripts": scripts,
+    }
+
+
+def write_session_metadata(session_dir: Path, metadata: dict[str, Any]) -> None:
+    """
+    Persist session metadata atomically.
+    """
+    metadata["updated_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    target = session_dir / "session.json"
+    with NamedTemporaryFile("w", encoding="utf-8", dir=session_dir, delete=False) as tmp:
+        json.dump(metadata, tmp, ensure_ascii=False, indent=2, sort_keys=True)
+        tmp.write("\n")
+        temp_path = Path(tmp.name)
+    temp_path.replace(target)
+
+
+def ensure_session_filtered_data(
+    *,
+    source_data_dir: Path,
+    session_dir: Path,
+    metadata: dict[str, Any],
+) -> tuple[int, int]:
+    """
+    Ensure the session-scoped filtered dataset exists, creating it once.
+    """
+    filtered_data_dir = session_dir / str(metadata["paths"]["filtered_data_dir"])
+    filter_result = metadata.setdefault("filter_result", {})
+    if (
+        filtered_data_dir.exists()
+        and filter_result.get("matched_records") is not None
+        and filter_result.get("matched_files") is not None
+    ):
+        return int(filter_result["matched_records"]), int(filter_result["matched_files"])
+
+    if filtered_data_dir.exists():
+        shutil.rmtree(filtered_data_dir)
+
+    filter_config = metadata["filter"]
+    matched_records, matched_files = filter_data_by_date_range(
+        source_data_dir,
+        filtered_data_dir,
+        date.fromisoformat(str(filter_config["start_date"])),
+        date.fromisoformat(str(filter_config["end_date"])),
+        start_hour=int(filter_config["start_hour"]) if filter_config.get("start_hour") is not None else None,
+        end_hour=int(filter_config["end_hour"]) if filter_config.get("end_hour") is not None else None,
+    )
+    filter_result["matched_records"] = matched_records
+    filter_result["matched_files"] = matched_files
+    filter_result["generated_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    write_session_metadata(session_dir, metadata)
+    return matched_records, matched_files
+
+
+def execute_script_for_session(
+    *,
+    session_dir: Path,
+    metadata: dict[str, Any],
+    script: ScriptOption,
+    force_rerun: bool = False,
+) -> tuple[str, int | None]:
+    """
+    Execute one script in the session and update script-level status.
+    """
+    script_entry = metadata.get("scripts", {}).get(script.key)
+    if script_entry is None:
+        return "not_tracked", None
+
+    if script_entry.get("status") == "done" and not force_rerun:
+        return "skipped_done", int(script_entry["exit_code"]) if script_entry.get("exit_code") is not None else 0
+
+    runs_dir = session_dir / str(metadata["paths"]["runs_dir"])
+    runs_dir.mkdir(parents=True, exist_ok=True)
+
+    timestamp = datetime.utcnow().strftime("%Y%m%dT%H%M%SZ")
+    run_dir = runs_dir / script.key / timestamp
+    run_dir.mkdir(parents=True, exist_ok=False)
+
+    copy_repo_catalog_into_workspace(run_dir)
+
+    session_data_dir = session_dir / str(metadata["paths"]["filtered_data_dir"])
+    run_data_dir = run_dir / "data"
+    try:
+        run_data_dir.symlink_to(session_data_dir, target_is_directory=True)
+    except OSError:
+        shutil.copytree(session_data_dir, run_data_dir)
+
+    script_to_run = run_dir / script.script_path
+    started = perf_counter()
+    exit_code = run_script(script_to_run, run_dir)
+    duration_seconds = round(perf_counter() - started, 3)
+
+    script_entry["status"] = "done" if exit_code == 0 else "failed"
+    script_entry["output_path"] = run_dir.relative_to(session_dir).as_posix()
+    script_entry["last_run_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    script_entry["duration_seconds"] = duration_seconds
+    script_entry["exit_code"] = exit_code
+    write_session_metadata(session_dir, metadata)
+    return "ran", exit_code
 
 
 def run_script(script_path: Path, workspace_dir: Path) -> int:
