@@ -25,26 +25,23 @@ Script-first repository for recording and analyzing MTConnect machine telemetry.
 
 ## Docker quick start
 
-First run (build image):
+Build the interactive runner image:
 
 ```bash
-docker compose up --build
+docker compose build msh
 ```
 
-Interactive run (recommended for this project):
+Run the interactive one-shot analysis container:
 
 ```bash
 docker compose run --rm msh
 ```
 
-This repository runs an **interactive CLI menu** (`catalog/runner/menu.py`), not a long-running background service.
-For interactive use, `docker compose run --rm msh` is the correct workflow because it attaches directly to the container process so keyboard input goes to the Python menu prompt.
+The `msh` service is an **interactive runner** (`catalog/runner/menu.py`), not a long-running background service.
+Use `docker compose run --rm msh` for normal usage so keyboard input is attached directly to the CLI prompt.
+`docker compose up` / `docker compose up --build` is **not** the intended entrypoint for this service.
 
-Stop the container:
-
-```bash
-docker compose down
-```
+Because this is a one-shot CLI workflow, the container exits when the run completes (`--rm` removes it automatically).
 
 Docker Compose automatically mounts local folders:
 - `./data` → `/app/data`
