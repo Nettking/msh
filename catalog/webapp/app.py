@@ -32,6 +32,7 @@ STATE_COLORS = {
 
 SIGNALS = ["Srpm", "Sload", "Sovr", "Fovr", "Frapidovr"]
 DEFAULT_EXPORT_CANDIDATES = ["timeline_rows.csv", "timeline_rows.parquet", "timeline_rows.jsonl", "timeline_rows.json"]
+REQUIRED_PLAYBACK_COLUMNS = {"timestamp", "machine_id", "state"}
 
 
 @st.cache_data(show_spinner=False)
@@ -50,6 +51,9 @@ def _load_data_from_upload(content: bytes, suffix: str) -> pd.DataFrame:
         if tmp_path.exists():
             tmp_path.unlink()
 
+def _validate_playback_export_schema(df: pd.DataFrame) -> tuple[bool, list[str]]:
+    missing = sorted(REQUIRED_PLAYBACK_COLUMNS.difference(df.columns))
+    return not missing, missing
 
 def _filter_machine_day(df: pd.DataFrame, machine_id: str, day) -> pd.DataFrame:
     rows = df[(df["machine_id"] == str(machine_id)) & (df["date"] == day)].copy()
@@ -215,7 +219,7 @@ def main():
 
     with st.sidebar:
         st.header("Data source")
-        uploaded = st.file_uploader("Upload timeline export", type=["csv", "parquet", "pq", "jsonl", "json"])
+        uploaded = st.file_uploader("Upload playback export", type=["csv", "parquet", "pq", "jsonl", "json"])
         default_source, source_hint = _resolve_bootstrap_source()
         local_path = st.text_input("or local path", value=default_source)
         if source_hint:
@@ -229,12 +233,23 @@ def main():
         df = _load_data_from_path(local_path.strip())
 
     if df is None:
-        st.info("Load an exported timeline file (CSV/Parquet/JSONL/JSON) to begin playback.")
+        st.info("Load a playback export file (CSV/Parquet/JSONL/JSON) to begin playback.")
+        return
+
+    valid_schema, missing_columns = _validate_playback_export_schema(df)
+    if not valid_schema:
+        st.warning(
+            "This file does not match the playback-export schema. "
+            f"Missing required columns: {', '.join(missing_columns)}. "
+            "It may be a raw telemetry file. "
+            "Please launch playback from a workflow session or load a generated export from "
+            "results/workflows/<session-id>/exports/timeline/."
+        )
         return
 
     machines = sorted(df["machine_id"].dropna().astype(str).unique().tolist())
     if not machines:
-        st.warning("No machine IDs in the selected timeline file.")
+        st.warning("Playback export looks valid, but it contains no machine IDs.")
         return
 
     c1, c2 = st.columns([1, 1])
@@ -245,7 +260,7 @@ def main():
 
     rows = _filter_machine_day(df, selected_machine, selected_day)
     if rows.empty:
-        st.warning("No rows for selected machine/day.")
+        st.warning("Playback export is valid, but the selected machine/day has no rows.")
         return
 
     speed, playback_mode = _playback_controls(len(rows))
