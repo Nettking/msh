@@ -14,6 +14,12 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
+if not __package__:
+    repo_root = Path(__file__).resolve().parents[2]
+    repo_root_str = str(repo_root)
+    if repo_root_str not in sys.path:
+        sys.path.insert(0, repo_root_str)
+
 from catalog.common.timeline_exports import build_state_interval_export, load_timeline_export
 
 STATE_COLORS = {

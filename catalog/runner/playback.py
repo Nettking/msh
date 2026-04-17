@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 from datetime import datetime
@@ -140,6 +141,7 @@ def prepare_session_playback_exports(session_dir: Path, metadata: dict[str, Any]
 def launch_playback_app_for_session(session_dir: Path, metadata: dict[str, Any]) -> int:
     """Launch the Streamlit playback app preloaded with session exports."""
     export_dir = session_playback_export_dir(session_dir, metadata)
+    root = repo_root()
     command = [
         sys.executable,
         "-m",
@@ -150,7 +152,14 @@ def launch_playback_app_for_session(session_dir: Path, metadata: dict[str, Any])
         "--session-export-dir",
         str(export_dir.resolve()),
     ]
+    env = dict(os.environ)
+    existing_pythonpath = env.get("PYTHONPATH", "")
+    root_str = str(root)
+    if existing_pythonpath:
+        env["PYTHONPATH"] = f"{root_str}{os.pathsep}{existing_pythonpath}"
+    else:
+        env["PYTHONPATH"] = root_str
     print("\nLaunching Streamlit playback app...", flush=True)
     print(f"Command: {' '.join(command)}", flush=True)
     print("Stop Streamlit with Ctrl+C to return to runner.", flush=True)
-    return subprocess.run(command, cwd=repo_root()).returncode
+    return subprocess.run(command, cwd=root, env=env).returncode
