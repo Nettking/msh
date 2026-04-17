@@ -52,6 +52,15 @@ import numpy as np
 import pandas as pd
 from matplotlib.patches import Patch
 
+from catalog.common.telemetry_prep import (
+    add_date_column,
+    add_machine_id_column,
+    find_machine_column,
+    prepare_timestamp_column,
+    replace_unavailable,
+    to_numeric,
+)
+
 # Folder containing input JSONL telemetry files.
 FOLDER = r"./data"
 
@@ -148,47 +157,6 @@ def load_jsonl(path):
     return pd.DataFrame(rows)
 
 
-def replace_unavailable(series):
-    """
-    Replace string-based 'UNAVAILABLE' values with NaN.
-
-    This supports mixed telemetry columns where missingness is represented as
-    a literal string rather than a real null value.
-    """
-    if series.dtype == object or str(series.dtype).startswith("string"):
-        return series.replace("UNAVAILABLE", np.nan)
-    return series
-
-
-def to_numeric(series):
-    """
-    Convert a telemetry series to numeric values where possible.
-
-    Non-numeric values are coerced to NaN after first normalizing
-    'UNAVAILABLE' markers.
-    """
-    return pd.to_numeric(replace_unavailable(series), errors="coerce")
-
-
-def find_machine_col(df):
-    """
-    Find the first plausible machine identifier column in a DataFrame.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-
-    Returns
-    -------
-    str | None
-        Name of the detected machine-ID column, or None if none is found.
-    """
-    for col in MACHINE_ID_CANDIDATES:
-        if col in df.columns:
-            return col
-    return None
-
-
 def prepare_dataframe(df, source_name):
     """
     Prepare one raw telemetry DataFrame for downstream analysis.
@@ -216,12 +184,11 @@ def prepare_dataframe(df, source_name):
     if TIME_COL not in df.columns:
         return None
 
-    df[TIME_COL] = pd.to_datetime(df[TIME_COL], errors="coerce")
-    df = df[df[TIME_COL].notna()].copy()
+    df = prepare_timestamp_column(df, time_col=TIME_COL, drop_invalid=True, sort=False)
     if df.empty:
         return None
 
-    machine_col = find_machine_col(df)
+    machine_col = find_machine_column(df, MACHINE_ID_CANDIDATES)
     if machine_col is None:
         # Fall back to source filename when no machine identifier exists.
         df["machine_fallback"] = source_name
@@ -236,9 +203,9 @@ def prepare_dataframe(df, source_name):
         if col in df.columns:
             df[col] = replace_unavailable(df[col]).astype("string")
 
-    df["machine_id"] = df[machine_col].astype(str)
+    df = add_machine_id_column(df, source_col=machine_col, target_col="machine_id")
     df["source_file"] = source_name
-    df["date"] = df[TIME_COL].dt.date
+    df = add_date_column(df, time_col=TIME_COL, target_col="date")
 
     return df
 

@@ -50,6 +50,8 @@ from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.model_selection import train_test_split
 
+from catalog.common.telemetry_prep import prepare_timestamp_column, to_numeric
+
 # Directory containing input JSONL telemetry files.
 DATA_DIR = Path("data")
 
@@ -109,8 +111,7 @@ def load_all_data(data_dir):
     if "timestamp" not in df.columns:
         raise ValueError("timestamp column missing")
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    df = df.dropna(subset=["timestamp"]).sort_values("timestamp")
+    df = prepare_timestamp_column(df, time_col="timestamp", drop_invalid=True, sort=True)
     df = df.set_index("timestamp")
     return df
 
@@ -175,7 +176,7 @@ def preprocess(df):
         raise ValueError("No numeric telemetry features found in this dataset.")
 
     for col in numeric_features:
-        df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
+        df[col] = to_numeric(df[col]).fillna(0)
 
     # Create lagged features so the model can use recent history.
     for col in numeric_features:
