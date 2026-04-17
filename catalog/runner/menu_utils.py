@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
 import ast
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
 from tempfile import mkdtemp
@@ -18,7 +19,7 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
-from catalog.common.time_utils import date_from_filename, parse_timestamp_to_date
+from catalog.common.time_utils import date_from_filename, parse_iso_timestamp, parse_timestamp_to_date
 
 DEFAULT_SCRIPT_EXCLUSIONS = {
     "runner",
@@ -146,8 +147,17 @@ def discover_available_dates(data_dir: Path) -> list[date]:
     return sorted(dates)
 
 
-def filter_data_by_date_range(source_data_dir: Path, destination_data_dir: Path, start_date: date, end_date: date) -> tuple[int, int]:
+def filter_data_by_date_range(
+    source_data_dir: Path,
+    destination_data_dir: Path,
+    start_date: date,
+    end_date: date,
+    *,
+    start_hour: int | None = None,
+    end_hour: int | None = None,
+) -> tuple[int, int]:
     destination_data_dir.mkdir(parents=True, exist_ok=True)
+    use_hour_filter = start_date == end_date and start_hour is not None and end_hour is not None
     matched_records = 0
     written_files = 0
     processed_files = 0
@@ -172,6 +182,18 @@ def filter_data_by_date_range(source_data_dir: Path, destination_data_dir: Path,
 
         with destination_file.open("w", encoding="utf-8") as dst:
             for record in parsed_records:
+                if use_hour_filter:
+                    record_dt = _parse_timestamp_to_datetime(str(record.get("timestamp", "")))
+                    if record_dt is None:
+                        continue
+                    if record_dt.date() != start_date:
+                        continue
+                    if start_hour <= record_dt.hour <= end_hour:
+                        dst.write(json.dumps(record, ensure_ascii=False) + "\n")
+                        matched_records += 1
+                        file_matched += 1
+                    continue
+
                 record_date = parse_timestamp_to_date(str(record.get("timestamp", "")))
                 if record_date is None:
                     if not file_has_timestamp and file_in_fallback_window:
@@ -204,6 +226,30 @@ def filter_data_by_date_range(source_data_dir: Path, destination_data_dir: Path,
     )
 
     return matched_records, written_files
+
+
+def _parse_timestamp_to_datetime(timestamp: str | None) -> datetime | None:
+    parsed = parse_iso_timestamp(timestamp, allow_z_suffix=True)
+    if parsed is not None:
+        return parsed
+
+    value = str(timestamp).strip() if timestamp is not None else ""
+    # fallback for common MTConnect format: 2026-03-01T12:00:00.0000000Z
+    match = re.search(r"(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2}):(\d{2})", value)
+    if not match:
+        return None
+
+    try:
+        return datetime(
+            year=int(match.group(1)[0:4]),
+            month=int(match.group(1)[5:7]),
+            day=int(match.group(1)[8:10]),
+            hour=int(match.group(2)),
+            minute=int(match.group(3)),
+            second=int(match.group(4)),
+        )
+    except ValueError:
+        return None
 
 
 def print_numbered_menu(title: str, options: Iterable[str]) -> None:
