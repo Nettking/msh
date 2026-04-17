@@ -8,6 +8,25 @@ A lightweight Streamlit page for replaying processed telemetry/state exports ove
 streamlit run catalog/webapp/app.py
 ```
 
+### Launch preloaded from a workflow session export directory
+
+```bash
+streamlit run catalog/webapp/app.py -- --session-export-dir results/workflows/<session-id>/exports/timeline
+```
+
+You can also preload via environment variable:
+
+```bash
+MSH_PLAYBACK_EXPORT_DIR=results/workflows/<session-id>/exports/timeline streamlit run catalog/webapp/app.py
+```
+
+The app will automatically look for session export files named:
+
+- `timeline_rows.csv`
+- `timeline_rows.parquet`
+- `timeline_rows.jsonl`
+- `timeline_rows.json`
+
 ## Expected input
 
 Provide a timeline export (`.csv`, `.parquet`, `.jsonl`, or `.json`) containing row-level fields such as:
@@ -24,6 +43,11 @@ Provide a timeline export (`.csv`, `.parquet`, `.jsonl`, or `.json`) containing 
 - `fired_rules`
 - `Srpm`, `Sload`, `Sovr`, `Fovr`, `Frapidovr`
 - `execution`, `mode`, `program`
+
+In session-integrated mode these fields come from session-generated exports under:
+
+- `results/workflows/<session-id>/exports/timeline/`
+- manifest metadata: `results/workflows/<session-id>/exports/timeline/manifest.json`
 
 ## Shared helpers
 

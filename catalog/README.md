@@ -98,6 +98,7 @@ Each session stores:
 - one filtered dataset copy (`data/`) reused by later script runs in that session
 - per-script execution status (`not_run`, `done`, `failed`) plus run metadata
 - script run outputs under `runs/<script>/<timestamp>/`
+- playback-ready timeline exports under `exports/timeline/` (generated on demand)
 - session metadata in `session_state.json` (with legacy mirror `session.json`)
 - a lightweight session config signature for the selected filter config
 
@@ -121,7 +122,27 @@ Runner actions include:
 - run one selected script
 - precompute full workflow (Steps 1-4)
 - precompute workflow up to step N
+- launch web playback for the current session (when playback-ready)
 - show session status / cached outputs
+
+### Session playback integration
+
+The Streamlit playback app (`catalog/webapp/app.py`) is integrated with session outputs.
+
+Playback export location (per session):
+- `results/workflows/<session-id>/exports/timeline/`
+
+Playback-ready session (practical readiness check):
+- session filtered data exists
+
+Notes:
+- playback exports are generated from session-filtered data using shared timeline export/inference helpers
+- if reusable exports already exist for the current session filter signature, they are reused
+
+When you choose **Launch web playback for this session** in the runner:
+- runner validates playback readiness and reports missing requirements if not ready
+- runner prepares timeline exports only when needed (reuses valid cached exports otherwise)
+- runner launches Streamlit preloaded against the session export directory
 
 Default precompute scope includes the standard runner-visible workflow scripts:
 - `machines_active_per_day`

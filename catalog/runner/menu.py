@@ -22,6 +22,12 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 
 from catalog.runner.data_filtering import discover_available_dates, ensure_session_filtered_data
+from catalog.runner.playback import (
+    launch_playback_app_for_session,
+    playback_readiness,
+    prepare_session_playback_exports,
+    session_playback_export_dir,
+)
 from catalog.runner.script_catalog import ScriptOption, discover_runnable_scripts, repo_root
 from catalog.runner.script_exec import copy_repo_catalog_into_workspace, execute_script_for_session
 from catalog.runner.session_store import (
@@ -324,9 +330,10 @@ def main() -> int:
         print("4) Precompute workflow (Steps 1-4)", flush=True)
         print("5) Precompute workflow up to a selected step", flush=True)
         print("6) Show session status", flush=True)
-        print("7) Exit", flush=True)
+        print("7) Launch web playback for this session", flush=True)
+        print("8) Exit", flush=True)
 
-        action = prompt_menu_choice(7, "Choose action: ")
+        action = prompt_menu_choice(8, "Choose action: ")
 
         if action == 1:
             next_step = next_workflow_step_to_run(metadata)
@@ -408,6 +415,26 @@ def main() -> int:
             continue
 
         if action == 7:
+            ready, missing = playback_readiness(session_dir, metadata)
+            if not ready:
+                print("Session is not playback-ready yet.", flush=True)
+                for item in missing:
+                    print(f"  - Missing: {item}", flush=True)
+                print("Complete the missing step(s) and try again.", flush=True)
+                continue
+
+            export_file, status = prepare_session_playback_exports(session_dir, metadata)
+            if status == "cached":
+                print(f"Using cached playback export: {export_file}", flush=True)
+            else:
+                print(f"Prepared playback export: {export_file}", flush=True)
+            print(f"Session playback export directory: {session_playback_export_dir(session_dir, metadata)}", flush=True)
+            exit_code = launch_playback_app_for_session(session_dir, metadata)
+            if exit_code != 0:
+                print(f"Playback app exited with code {exit_code}.", flush=True)
+            continue
+
+        if action == 8:
             print(f"Session saved: {session_dir}", flush=True)
             return 0
 
