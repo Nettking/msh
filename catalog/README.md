@@ -1,74 +1,91 @@
 # Python Script Catalog
 
-This folder contains analysis and ingestion scripts for MTConnect telemetry.  
-The goal of this index is to make it obvious which tools are the normal path, which are exploratory, and which are legacy.
+This folder contains analysis and ingestion scripts for MTConnect telemetry.
+The goal of this index is to provide a **practical first-pass workflow** from raw data to interpretable findings, while keeping existing scripts separate.
 
-## Recommended analysis path
+## Standard analysis workflow (recommended)
 
-For most investigations, run tools in this order:
+Use this sequence for most investigations. Move to the next stage when the current stage no longer answers your question.
 
-1. **Health checks (Simple)**
-   - `machines_active_per_day`
-   - `analyze_missing_sequence_number`
-   - `missing_per_day_by_machine`
-   - `sampling_rate_analysis`
-2. **Raw inspection (Simple)**
-   - `data_pr_day`
-3. **Stop inspection (Simple)**
-   - `find_stops`
-4. **Deeper exploratory analysis (Advanced)**
-   - `data_visualizer`
-   - `data_analysis`
-   - `ml_analysis`
-   - `data_simulator` (interactive exploration)
+### 1) Data health checks (run first)
+Purpose: verify that the dataset is usable before interpretation.
 
-## Tool categories
+Run:
+- `machines_active_per_day`
+- `analyze_missing_sequence_number`
+- `missing_per_day_by_machine`
+- `sampling_rate_analysis`
 
-### Simple (recommended first)
-Quick, practical scripts for routine checks and day-to-day analysis.
-**Runner visibility:** shown in the interactive runner.
+Typical outputs:
+- daily CSV summaries (`*.csv`)
+- quick PNG trends (`*.png`)
+- missing-data and sampling-quality signals
 
-- `machines_active_per_day`: count distinct active machines per day.
-- `analyze_missing_sequence_number`: daily missing-sequence summary.
-- `missing_per_day_by_machine`: missing-sequence summary per machine/day.
-- `sampling_rate_analysis`: average telemetry sampling rate per day.
-- `data_pr_day`: per-machine/day raw telemetry plots.
-- `find_stops`: stop-focused timeline plots.
+Move to stage 2 when:
+- active-day coverage looks plausible
+- missing-sequence patterns are understood well enough to continue
+- sampling rate is acceptable (or at least known)
 
-### Advanced (exploratory)
-Deeper or broader analysis tools that are useful after baseline checks.
+### 2) Raw inspection
+Purpose: look directly at signal behavior per machine/day before applying stop logic.
 
-- `data_visualizer`: reconstruct machine states and export candidate events. *(runner-visible)*
-- `data_analysis`: exploratory batch analysis in the terminal. *(runner-visible)*
-- `data_simulator`: Streamlit playback/simulation view for telemetry. *(Advanced catalog tool, but not a runner tool because it is an interactive Streamlit app rather than a one-shot script)*
-- `ml_analysis`: train and evaluate per-machine stop-prediction models. *(runner-visible)*
+Run:
+- `data_pr_day`
 
-### Legacy (special-case or not recommended as primary workflow)
-Kept for reference and niche use; not the default workflow.
+Typical outputs:
+- per-machine/day raw signal plots under `graphs/<machine>/<YYYY-MM-DD>/`
 
-- `corrolation_machine_pairs`: legacy pairwise stop-correlation heatmap exploration. *(runner-visible)*
-- `interventions`: environment-specific script (hardcoded Windows/WSL path assumptions). *(documented, not runner-visible)*
-- `standalone_recorder`: legacy recorder retained for compatibility. *(documented, not runner-visible)*
-- `auto_connect`: desktop automation helper, not an analysis workflow tool. *(documented, not runner-visible)*
+Move to stage 3 when:
+- you need stop-focused timelines rather than raw traces
+- raw plots suggest likely stop windows worth targeted inspection
+
+### 3) Stop-focused inspection
+Purpose: inspect heuristic stop intervals in a timeline format.
+
+Run:
+- `find_stops`
+
+Typical outputs:
+- hour-bucketed stop timeline plots under `plots/<YYYY-MM-DD>/<machine>/<HH>.png`
+
+Move to stage 4 when:
+- you need broader exploratory interpretation
+- you need candidate events, richer diagnostics, or ML baselines
+
+### 4) Deeper exploratory analysis
+Purpose: explore hypotheses beyond first-pass checks.
+
+Run as needed:
+- `data_visualizer` (state timelines + candidate rows)
+- `data_analysis` (terminal-heavy exploratory diagnostics)
+- `ml_analysis` (per-machine predictive baseline)
+- `data_simulator` (interactive Streamlit exploration)
+
+Typical outputs:
+- timeline images / candidate CSVs
+- richer console reports
+- ML artifacts under `ml_results/`
+
+## Legacy and non-standard workflow tools
+
+- `corrolation_machine_pairs`: **legacy** pairwise stop-correlation heatmap exploration (kept for compatibility/reference).
+- `interventions`: environment-specific script (hardcoded Windows/WSL assumptions).
+- `standalone_recorder`: legacy recorder retained for compatibility.
+- `auto_connect`: desktop automation helper (not an analysis tool).
 
 ## Recorder / ingestion tools
 
-These are ingestion tools, not one-shot analysis tools, so they are documented
-but not part of the interactive runner for normal analysis runs:
+These are ingestion tools, not one-shot analysis scripts:
 
 - **Preferred recorder:** `standalone-recorder_v2`
 - **Legacy recorder:** `standalone_recorder`
 
-## Runner behavior
+## Runner behavior (`catalog/runner/menu.py`)
 
-The interactive runner (`catalog/runner/menu.py`) is for **normal one-shot
-analysis tools** and presents only **runner-visible** scripts in grouped
-categories:
+The interactive runner presents only one-shot analysis scripts and keeps them grouped for navigation:
 
-- **Simple**
-- **Advanced**
-- **Legacy**
+- **Simple — Stage 1–3 first-pass workflow**
+- **Advanced — Stage 4 deeper exploration**
+- **Legacy — compatibility / reference**
 
-This keeps recommended one-shot analysis scripts prominent, keeps runnable
-legacy analysis scripts visible for compatibility, and documents Streamlit,
-recorder, and environment-specific tools separately by design.
+Streamlit, recorder, and environment-specific tools remain documented here but intentionally outside the runner’s default one-shot path.

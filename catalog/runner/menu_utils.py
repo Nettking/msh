@@ -81,48 +81,50 @@ ToolCategory = Literal["Simple", "Advanced", "Legacy"]
 
 # Runner-facing metadata. Keep this conservative and focused on navigation.
 SCRIPT_METADATA: dict[str, dict[str, str | bool]] = {
-    # Simple / first-pass analysis tools.
+    # Stage 1: data health checks (first-pass).
     "machines_active_per_day": {
         "category": "Simple",
-        "description": "Quick health check: count distinct active machines per day.",
+        "description": "Stage 1 (Health): count distinct active machines per day.",
     },
     "analyze_missing_sequence_number": {
         "category": "Simple",
-        "description": "Quick health check: summarize missing sequence numbers per day.",
+        "description": "Stage 1 (Health): summarize missing sequence numbers per day.",
     },
     "missing_per_day_by_machine": {
         "category": "Simple",
-        "description": "Machine-level quality check for missing sequence numbers.",
+        "description": "Stage 1 (Health): per-machine missing sequence summary by day.",
     },
     "sampling_rate_analysis": {
         "category": "Simple",
-        "description": "Quick data-quality check: average telemetry sampling rate per day.",
+        "description": "Stage 1 (Health): average telemetry sampling rate per day.",
     },
+    # Stage 2: raw inspection.
     "data_pr_day": {
         "category": "Simple",
-        "description": "Raw inspection plots per machine and day.",
+        "description": "Stage 2 (Raw): per-machine/day raw signal plots.",
     },
+    # Stage 3: stop-focused inspection.
     "find_stops": {
         "category": "Simple",
-        "description": "Stop inspection timeline plots for day/hour windows.",
+        "description": "Stage 3 (Stops): stop timeline plots for day/hour windows.",
     },
-    # Advanced / exploratory analysis tools.
+    # Stage 4: deeper exploratory analysis.
     "data_visualizer": {
         "category": "Advanced",
-        "description": "Exploratory timeline reconstruction and candidate event export.",
+        "description": "Stage 4 (Explore): state timelines and candidate-event export.",
     },
     "data_analysis": {
         "category": "Advanced",
-        "description": "Exploratory batch analysis with deeper console diagnostics.",
+        "description": "Stage 4 (Explore): deeper terminal diagnostics and exploratory summaries.",
     },
     "ml_analysis": {
         "category": "Advanced",
-        "description": "Model-based stop prediction and machine-level ML artifacts.",
+        "description": "Stage 4 (Explore): per-machine ML baseline for future-stop prediction.",
     },
     # Legacy / no longer a recommended main workflow.
     "corrolation_machine_pairs": {
         "category": "Legacy",
-        "description": "Legacy exploratory heatmap for pairwise machine stop correlation.",
+        "description": "Legacy: pairwise machine stop-correlation heatmap exploration.",
     },
 }
 

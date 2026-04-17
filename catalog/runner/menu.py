@@ -44,7 +44,6 @@ from menu_utils import (
     run_script,
 )
 
-
 def pick_script(script_options: list[ScriptOption]) -> ScriptOption:
     """
     Prompt the user to choose one runnable catalog script.
@@ -60,6 +59,7 @@ def pick_script(script_options: list[ScriptOption]) -> ScriptOption:
         The selected script entry.
     """
     print("\nSelect a script to run:", flush=True)
+    print("Workflow tip: start with Stage 1 health checks unless data quality is already validated.", flush=True)
     current_category = None
     for index, item in enumerate(script_options, start=1):
         if item.category != current_category:
@@ -213,6 +213,11 @@ def main() -> int:
         - non-zero if setup or script execution fails
     """
     print("MSH interactive runner started", flush=True)
+    print(
+        "Standard path: Stage 1 health checks -> Stage 2 raw inspection -> "
+        "Stage 3 stop inspection -> Stage 4 deeper exploration.",
+        flush=True,
+    )
     print(
         "Note: this runner is for normal one-shot analysis scripts. Streamlit, recorder, and "
         "environment-specific tools are documented in catalog/README.md but not listed here.",
