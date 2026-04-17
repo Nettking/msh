@@ -36,11 +36,50 @@ def pick_date_range(available_dates):
         return available_dates[start_index], available_dates[end_index]
 
 
-def confirm_or_exit(script: ScriptOption, start_date, end_date) -> None:
+def pick_hour_range() -> tuple[int, int]:
+    while True:
+        raw_start = input("Choose start hour (0-23): ").strip()
+        if not raw_start.isdigit():
+            print("Please enter a number.", flush=True)
+            continue
+        start_hour = int(raw_start)
+        if 0 <= start_hour <= 23:
+            break
+        print("Please choose a value between 0 and 23.", flush=True)
+
+    while True:
+        raw_end = input("Choose end hour (0-23): ").strip()
+        if not raw_end.isdigit():
+            print("Please enter a number.", flush=True)
+            continue
+        end_hour = int(raw_end)
+        if not 0 <= end_hour <= 23:
+            print("Please choose a value between 0 and 23.", flush=True)
+            continue
+        if end_hour < start_hour:
+            print("End hour must be on or after start hour.", flush=True)
+            continue
+        return start_hour, end_hour
+
+
+def should_limit_by_hour() -> bool:
+    print("\nSelected a single-day run.", flush=True)
+    while True:
+        answer = input("Limit this run to a specific hour range? (y/n): ").strip().lower()
+        if answer in {"y", "yes"}:
+            return True
+        if answer in {"n", "no"}:
+            return False
+        print("Please type y or n.", flush=True)
+
+
+def confirm_or_exit(script: ScriptOption, start_date, end_date, hour_range: tuple[int, int] | None = None) -> None:
     print("\nSelection summary", flush=True)
     print(f"Script: {script.key}", flush=True)
     print(f"Start date: {start_date.isoformat()}", flush=True)
     print(f"End date: {end_date.isoformat()}", flush=True)
+    if hour_range is not None:
+        print(f"Hour range: {hour_range[0]:02d}:00-{hour_range[1]:02d}:59", flush=True)
 
     while True:
         answer = input("Run now? (y/n): ").strip().lower()
@@ -78,12 +117,22 @@ def main() -> int:
 
     script = pick_script(script_options)
     start_date, end_date = pick_date_range(available_dates)
-    confirm_or_exit(script, start_date, end_date)
+    hour_range: tuple[int, int] | None = None
+    if start_date == end_date and should_limit_by_hour():
+        hour_range = pick_hour_range()
+    confirm_or_exit(script, start_date, end_date, hour_range)
 
     workspace = create_run_workspace(output_base_dir)
     filtered_data_dir = workspace / "data"
 
-    matched_records, matched_files = filter_data_by_date_range(data_dir, filtered_data_dir, start_date, end_date)
+    matched_records, matched_files = filter_data_by_date_range(
+        data_dir,
+        filtered_data_dir,
+        start_date,
+        end_date,
+        start_hour=hour_range[0] if hour_range is not None else None,
+        end_hour=hour_range[1] if hour_range is not None else None,
+    )
     if matched_records == 0:
         print("\nNo records found in selected date range. Nothing to run.", flush=True)
         print(f"Filtered data path: {filtered_data_dir}", flush=True)
@@ -97,6 +146,8 @@ def main() -> int:
     print(f"Script path: {script.script_path}", flush=True)
     print(f"Selected start date: {start_date.isoformat()}", flush=True)
     print(f"Selected end date: {end_date.isoformat()}", flush=True)
+    if hour_range is not None:
+        print(f"Selected hour range: {hour_range[0]:02d}:00-{hour_range[1]:02d}:59", flush=True)
     print(f"Filtered dataset path: {filtered_data_dir}", flush=True)
     print(f"Matched records: {matched_records}", flush=True)
     print(f"Matched files: {matched_files}", flush=True)
