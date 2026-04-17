@@ -84,6 +84,14 @@ These are ingestion tools, not one-shot analysis scripts:
 
 The interactive runner now uses **file-based analysis sessions** under `results/workflows/<session-id>/`.
 
+Runner internals are split into focused modules under `catalog/runner/`:
+- `script_catalog.py`: script discovery and runner-visible script metadata
+- `session_store.py`: session metadata lifecycle, normalization, and stale output invalidation
+- `data_filtering.py`: date discovery/cache plus session filtered-data creation/reuse
+- `script_exec.py`: run workspace preparation and subprocess execution semantics
+- `ui.py`: numbered menu rendering and input helpers
+
+
 Each session stores:
 - selected date range (and optional same-day hour range)
 - one filtered dataset copy (`data/`) reused by later script runs in that session
