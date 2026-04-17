@@ -34,3 +34,4 @@ All entrypoints changed to `catalog/...`. Existing commands must be updated to t
 - Shared JSONL and timestamp parsing helpers now live in `catalog/common/`:
   - `catalog/common/data_loading.py`
   - `catalog/common/time_utils.py`
+- Runner date discovery now keeps a small JSON cache at `catalog/runner/.data_index.json` to avoid reparsing unchanged JSONL files on repeated runs.

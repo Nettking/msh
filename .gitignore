@@ -35,3 +35,6 @@ env/
 # OS/editor noise
 .DS_Store
 Thumbs.db
+
+# Runner local cache
+/catalog/runner/.data_index.json

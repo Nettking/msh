@@ -9,6 +9,7 @@ import ast
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
+from tempfile import NamedTemporaryFile
 from tempfile import mkdtemp
 from typing import Iterable
 
@@ -27,6 +28,9 @@ DEFAULT_SCRIPT_EXCLUSIONS = {
     "standalone_recorder",
     "standalone-recorder_v2",
 }
+
+DATA_INDEX_VERSION = 1
+DATA_INDEX_FILE = Path(__file__).resolve().parent / ".data_index.json"
 
 
 @dataclass(frozen=True)
@@ -92,20 +96,40 @@ def discover_runnable_scripts(catalog_dir: Path) -> list[ScriptOption]:
 
 def discover_available_dates(data_dir: Path) -> list[date]:
     dates: set[date] = set()
+    data_root = data_dir.resolve()
+    index_data = _load_data_index()
+    cached_root_entries = _load_cached_root_entries(index_data, data_root)
+    updated_root_entries: dict[str, dict] = {}
 
     for file_path in iter_jsonl_files(data_dir, recursive=True):
-        file_has_timestamp_date = False
+        relative_path = file_path.resolve().relative_to(data_root).as_posix()
+        stat_result = file_path.stat()
+        file_size = stat_result.st_size
+        file_mtime_ns = stat_result.st_mtime_ns
+        cache_entry = cached_root_entries.get(relative_path)
 
-        for record in iter_jsonl_records(file_path):
-            record_date = parse_timestamp_to_date(str(record.get("timestamp", "")))
-            if record_date is not None:
-                file_has_timestamp_date = True
-                dates.add(record_date)
+        if (
+            cache_entry is not None
+            and cache_entry.get("size") == file_size
+            and cache_entry.get("mtime_ns") == file_mtime_ns
+        ):
+            file_dates = _deserialize_dates(cache_entry.get("dates", []))
+            date_source = str(cache_entry.get("date_source", "none"))
+            has_timestamp_date = bool(cache_entry.get("has_timestamp_date", False))
+        else:
+            file_dates, date_source, has_timestamp_date = _discover_dates_for_file(file_path)
 
-        if not file_has_timestamp_date:
-            fallback = date_from_filename(file_path)
-            if fallback is not None:
-                dates.add(fallback)
+        dates.update(file_dates)
+        updated_root_entries[relative_path] = {
+            "size": file_size,
+            "mtime_ns": file_mtime_ns,
+            "dates": _serialize_dates(file_dates),
+            "date_source": date_source,
+            "has_timestamp_date": has_timestamp_date,
+        }
+
+    _store_cached_root_entries(index_data, data_root, updated_root_entries)
+    _write_data_index(index_data)
 
     return sorted(dates)
 
@@ -197,3 +221,93 @@ def copy_repo_catalog_into_workspace(workspace_dir: Path) -> None:
     if target_catalog.exists():
         shutil.rmtree(target_catalog)
     shutil.copytree(source_catalog, target_catalog)
+
+
+def _discover_dates_for_file(file_path: Path) -> tuple[set[date], str, bool]:
+    file_dates: set[date] = set()
+    file_has_timestamp_date = False
+
+    for record in iter_jsonl_records(file_path):
+        record_date = parse_timestamp_to_date(str(record.get("timestamp", "")))
+        if record_date is not None:
+            file_has_timestamp_date = True
+            file_dates.add(record_date)
+
+    if file_has_timestamp_date:
+        return file_dates, "timestamp", True
+
+    fallback = date_from_filename(file_path)
+    if fallback is not None:
+        return {fallback}, "filename_fallback", False
+
+    return set(), "none", False
+
+
+def _serialize_dates(dates: set[date]) -> list[str]:
+    return sorted(day.isoformat() for day in dates)
+
+
+def _deserialize_dates(serialized_dates: object) -> set[date]:
+    parsed_dates: set[date] = set()
+    if not isinstance(serialized_dates, list):
+        return parsed_dates
+
+    for value in serialized_dates:
+        if not isinstance(value, str):
+            continue
+        try:
+            parsed_dates.add(date.fromisoformat(value))
+        except ValueError:
+            continue
+    return parsed_dates
+
+
+def _load_data_index() -> dict:
+    if not DATA_INDEX_FILE.exists():
+        return {"version": DATA_INDEX_VERSION, "roots": {}}
+
+    try:
+        parsed = json.loads(DATA_INDEX_FILE.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {"version": DATA_INDEX_VERSION, "roots": {}}
+
+    if not isinstance(parsed, dict):
+        return {"version": DATA_INDEX_VERSION, "roots": {}}
+    if parsed.get("version") != DATA_INDEX_VERSION:
+        return {"version": DATA_INDEX_VERSION, "roots": {}}
+    if not isinstance(parsed.get("roots"), dict):
+        return {"version": DATA_INDEX_VERSION, "roots": {}}
+    return parsed
+
+
+def _load_cached_root_entries(index_data: dict, data_root: Path) -> dict[str, dict]:
+    roots = index_data.get("roots")
+    if not isinstance(roots, dict):
+        return {}
+
+    root_entry = roots.get(str(data_root))
+    if not isinstance(root_entry, dict):
+        return {}
+
+    files = root_entry.get("files")
+    if not isinstance(files, dict):
+        return {}
+
+    return {key: value for key, value in files.items() if isinstance(key, str) and isinstance(value, dict)}
+
+
+def _store_cached_root_entries(index_data: dict, data_root: Path, file_entries: dict[str, dict]) -> None:
+    roots = index_data.setdefault("roots", {})
+    if not isinstance(roots, dict):
+        index_data["roots"] = {}
+        roots = index_data["roots"]
+    roots[str(data_root)] = {"files": file_entries}
+
+
+def _write_data_index(index_data: dict) -> None:
+    DATA_INDEX_FILE.parent.mkdir(parents=True, exist_ok=True)
+    with NamedTemporaryFile("w", encoding="utf-8", dir=DATA_INDEX_FILE.parent, delete=False) as tmp:
+        json.dump(index_data, tmp, ensure_ascii=False, indent=2, sort_keys=True)
+        tmp.write("\n")
+        temp_path = Path(tmp.name)
+    temp_path.replace(DATA_INDEX_FILE)
