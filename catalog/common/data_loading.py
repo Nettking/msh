@@ -201,3 +201,20 @@ def iter_records_with_parsed_timestamps(
 
         record[timestamp_key] = parsed_timestamp
         yield file_path, record
+
+
+def load_jsonl_dataframe(
+    file_path: Path | str,
+    *,
+    on_malformed_json: Callable[[str], None] | None = None,
+):
+    """Load one JSONL file into a pandas ``DataFrame``.
+
+    This is a convenience wrapper for scripts that still operate primarily on
+    dataframes. It preserves the tolerant parsing behavior used by
+    :func:`iter_jsonl_records`.
+    """
+    import pandas as pd
+
+    rows = list(iter_jsonl_records(file_path, on_malformed_json=on_malformed_json))
+    return pd.DataFrame(rows)

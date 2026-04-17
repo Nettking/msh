@@ -1,124 +1,39 @@
 """
 Generate hourly stop-timeline plots from JSONL telemetry data.
 
-This script reads telemetry files from ``data/``, identifies rows that likely
-represent stopped machine states, groups nearby stop rows into stop intervals,
-and saves one hourly plot per machine.
-
-Pipeline
---------
-1. Load JSONL telemetry files
-2. Parse timestamps and sort rows chronologically
-3. Identify likely stop rows using execution state and numeric signal values
-4. Merge nearby stop rows into stop intervals
-5. Group intervals by day, machine, and start hour
-6. Save one plot per machine/hour
-
-Outputs
--------
-Plots are written under:
-
-    plots/<YYYY-MM-DD>/<machine>/<HH>.png
-
-Each plot shows stop intervals for one machine during one hour window.
-
-Important
----------
-This is an exploratory visualization utility. “Stop” is inferred heuristically
-from execution state and selected numeric signals, not observed directly.
+This script keeps plotting/output responsibilities local while reusing shared
+loading and telemetry-preparation helpers so stop heuristics can evolve as
+reusable DT foundation logic.
 """
 
-import json
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from catalog.common.data_loading import iter_jsonl_files, load_jsonl_dataframe
 from catalog.common.stops import find_stop_rows, group_stop_rows
 from catalog.common.telemetry_prep import prepare_timestamp_column
 
-# Directory containing input JSONL telemetry files.
 DATA_DIR = Path("data")
-
-# Base directory for generated plots.
 OUTPUT_DIR = Path("plots")
-
-# Execution states treated as explicitly stopped.
 STOPPED_STATES = ["STOPPED"]
-
-# Maximum allowed gap (seconds) between consecutive stopped rows before they are
-# treated as separate stop intervals.
 MAX_GAP_SECONDS = 2
 
 
-def load_jsonl(file_path):
-    """
-    Load one JSONL file into a DataFrame.
-
-    Malformed JSON lines are skipped. Files without any valid rows, or without a
-    timestamp column, are treated as unusable and return an empty DataFrame.
-
-    Parameters
-    ----------
-    file_path : pathlib.Path
-        Path to the JSONL file.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Parsed telemetry data with timestamps converted to datetime and sorted
-        chronologically, or an empty DataFrame if the file is unusable.
-    """
-    records = []
-    with open(file_path, "r") as f:
-        for line in f:
-            try:
-                records.append(json.loads(line))
-            except json.JSONDecodeError:
-                continue
-
-    if not records:
+def load_telemetry(file_path: Path) -> pd.DataFrame:
+    """Load and timestamp-normalize one telemetry JSONL file."""
+    df = load_jsonl_dataframe(
+        file_path,
+        on_malformed_json=lambda msg: print(f"[WARNING] {msg}"),
+    )
+    if df.empty or "timestamp" not in df.columns:
         return pd.DataFrame()
-
-    df = pd.DataFrame(records)
-    if "timestamp" not in df.columns:
-        return pd.DataFrame()
-
-    df = prepare_timestamp_column(df, time_col="timestamp", drop_invalid=True, sort=True)
-    return df
+    return prepare_timestamp_column(df, time_col="timestamp", drop_invalid=True, sort=True)
 
 
-def find_stops(df):
-    """
-    Identify rows that likely correspond to stopped machine states.
-
-    A row is marked as stopped when:
-    - ``execution`` is in ``STOPPED_STATES``, and
-    - at least half of the available activity-related numeric columns are zero
-
-    Numeric columns considered when present:
-    - ``Srpm``
-    - ``Fact``
-    - ``Xfrt``
-    - ``Yfrt``
-    - ``Zfrt``
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Input telemetry data.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Subset of rows classified as stopped, containing timestamp and selected
-        context columns.
-
-    Notes
-    -----
-    This is a heuristic detector. It approximates stopped behavior rather than
-    providing a guaranteed operational truth.
-    """
+def find_stops(df: pd.DataFrame) -> pd.DataFrame:
+    """Identify rows likely representing machine stops."""
     numeric_cols = ["Srpm", "Fact", "Xfrt", "Yfrt", "Zfrt"]
     stop_rows, available_cols = find_stop_rows(
         df,
@@ -131,63 +46,18 @@ def find_stops(df):
         return pd.DataFrame(columns=["timestamp", "execution", "mode", "machine"])
 
     subset_cols = ["timestamp", "execution", "mode"]
-    if "machine" in df.columns:
+    if "machine" in stop_rows.columns:
         subset_cols.append("machine")
 
     return stop_rows.loc[:, [col for col in subset_cols if col in stop_rows.columns]].copy()
 
 
-def group_stops(df, max_gap_seconds=MAX_GAP_SECONDS):
-    """
-    Merge nearby stopped rows into stop intervals.
-
-    Consecutive stopped rows for the same machine are combined into a single
-    interval when the gap between them does not exceed ``max_gap_seconds``.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        DataFrame of stop rows.
-    max_gap_seconds : float, default=MAX_GAP_SECONDS
-        Maximum gap allowed between rows in the same stop interval.
-
-    Returns
-    -------
-    pandas.DataFrame
-        Interval table with columns:
-        - ``machine``
-        - ``start``
-        - ``end``
-        - ``duration_s``
-
-    Notes
-    -----
-    If no machine column is present, rows are grouped under ``"UNKNOWN"``.
-    """
-    # Uses shared grouping helper; interval semantics remain unchanged.
+def group_stops(df: pd.DataFrame, max_gap_seconds: float = MAX_GAP_SECONDS) -> pd.DataFrame:
+    """Merge nearby stop rows into machine-specific intervals."""
     return group_stop_rows(df, max_gap_seconds=max_gap_seconds)
 
 
 def plot_hour(machine, hour_df, hour_label, out_path):
-    """
-    Plot stop intervals for one machine within one hour bucket.
-
-    Parameters
-    ----------
-    machine : str
-        Machine identifier used in the plot title.
-    hour_df : pandas.DataFrame
-        Stop intervals assigned to the hour bucket.
-    hour_label : str
-        Human-readable label for the plotted hour window.
-    out_path : pathlib.Path
-        Output PNG path.
-
-    Notes
-    -----
-    Intervals are drawn as horizontal red line segments. This is a compact
-    timeline visualization, not a duration histogram.
-    """
     if hour_df.empty:
         return
 
@@ -206,10 +76,7 @@ def plot_hour(machine, hour_df, hour_label, out_path):
 
 
 def main():
-    """
-    Run the full hourly stop-plot pipeline across all JSONL files in ``data/``.
-    """
-    all_files = sorted(DATA_DIR.glob("*.jsonl"))
+    all_files = list(iter_jsonl_files(DATA_DIR, recursive=False))
     if not all_files:
         print("No JSONL files found.")
         return
@@ -217,7 +84,7 @@ def main():
     print(f"Analyzing {len(all_files)} files in {DATA_DIR}...\n")
 
     for file_path in all_files:
-        df = load_jsonl(file_path)
+        df = load_telemetry(file_path)
         if df.empty:
             continue
 
@@ -229,8 +96,6 @@ def main():
         grouped["day"] = grouped["start"].dt.date
         grouped["hour"] = grouped["start"].dt.hour
 
-        # Each interval is assigned to the hour containing its start time.
-        # Intervals are not split if they cross an hour boundary.
         for (day, machine, hour), hdf in grouped.groupby(["day", "machine", "hour"]):
             day_dir = OUTPUT_DIR / str(day) / machine
             out_path = day_dir / f"{hour:02d}.png"
