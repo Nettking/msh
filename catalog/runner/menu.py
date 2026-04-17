@@ -59,9 +59,15 @@ def pick_script(script_options: list[ScriptOption]) -> ScriptOption:
     ScriptOption
         The selected script entry.
     """
-    labels = [f"{item.key} — {item.description}" for item in script_options]
-    print_numbered_menu("Select a script to run:", labels)
-    choice = prompt_menu_choice(len(script_options), f"Enter script number (1-{len(script_options)}): ")
+    print("\nSelect a script to run:", flush=True)
+    current_category = None
+    for index, item in enumerate(script_options, start=1):
+        if item.category != current_category:
+            current_category = item.category
+            print(f"\n[{current_category}]", flush=True)
+        print(f"{index}) {item.key} — {item.description}", flush=True)
+
+    choice = prompt_menu_choice(len(script_options), f"\nEnter script number (1-{len(script_options)}): ")
     return script_options[choice - 1]
 
 
@@ -178,7 +184,7 @@ def confirm_or_exit(
         Optional whole-hour range used only for same-day runs.
     """
     print("\nSelection summary", flush=True)
-    print(f"Script: {script.key}", flush=True)
+    print(f"Script: {script.key} [{script.category}]", flush=True)
     print(f"Start date: {start_date.isoformat()}", flush=True)
     print(f"End date: {end_date.isoformat()}", flush=True)
 
@@ -207,6 +213,11 @@ def main() -> int:
         - non-zero if setup or script execution fails
     """
     print("MSH interactive runner started", flush=True)
+    print(
+        "Note: this runner is for normal one-shot analysis scripts. Streamlit, recorder, and "
+        "environment-specific tools are documented in catalog/README.md but not listed here.",
+        flush=True,
+    )
 
     root = repo_root()
     catalog_dir = root / "catalog"
