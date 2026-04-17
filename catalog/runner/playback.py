@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import subprocess
 import sys
 from datetime import datetime
@@ -142,16 +143,16 @@ def launch_playback_app_for_session(session_dir: Path, metadata: dict[str, Any])
     """Launch the Streamlit playback app preloaded with session exports."""
     export_dir = session_playback_export_dir(session_dir, metadata)
     root = repo_root()
-    command = [
-        sys.executable,
-        "-m",
-        "streamlit",
+    resolved_export_dir = export_dir.resolve()
+    streamlit_args = [
         "run",
         "catalog/webapp/app.py",
         "--",
         "--session-export-dir",
-        str(export_dir.resolve()),
+        str(resolved_export_dir),
     ]
+    command = ["streamlit", *streamlit_args]
+    fallback_command = [sys.executable, "-m", "streamlit", *streamlit_args]
     env = dict(os.environ)
     existing_pythonpath = env.get("PYTHONPATH", "")
     root_str = str(root)
@@ -159,7 +160,24 @@ def launch_playback_app_for_session(session_dir: Path, metadata: dict[str, Any])
         env["PYTHONPATH"] = f"{root_str}{os.pathsep}{existing_pythonpath}"
     else:
         env["PYTHONPATH"] = root_str
+    pythonpath_prefix = env["PYTHONPATH"].split(os.pathsep)[0]
     print("\nLaunching Streamlit playback app...", flush=True)
     print(f"Command: {' '.join(command)}", flush=True)
+    print(f"Repo root: {root}", flush=True)
+    print(f"Session export dir: {resolved_export_dir}", flush=True)
+    print(f"PYTHONPATH prefix: {pythonpath_prefix}", flush=True)
     print("Stop Streamlit with Ctrl+C to return to runner.", flush=True)
-    return subprocess.run(command, cwd=root, env=env).returncode
+    if shutil.which("streamlit") is None:
+        print("'streamlit' executable not found on PATH; falling back to python -m streamlit.", flush=True)
+        command = fallback_command
+        print(f"Fallback command: {' '.join(command)}", flush=True)
+
+    try:
+        result = subprocess.run(command, cwd=root, env=env)
+    except FileNotFoundError as exc:
+        print(f"Failed to launch playback command ({exc}); retrying with python -m streamlit.", flush=True)
+        result = subprocess.run(fallback_command, cwd=root, env=env)
+
+    if result.returncode != 0:
+        print(f"Streamlit playback launch failed with return code {result.returncode}.", flush=True)
+    return result.returncode
