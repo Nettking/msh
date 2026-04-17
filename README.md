@@ -13,7 +13,12 @@ Script-first repository for recording and analyzing MTConnect machine telemetry.
 │   ├── README.md
 │   ├── runner/
 │   │   ├── menu.py
-│   │   └── menu_utils.py
+│   │   ├── menu_utils.py
+│   │   ├── script_catalog.py
+│   │   ├── session_store.py
+│   │   ├── data_filtering.py
+│   │   ├── script_exec.py
+│   │   └── ui.py
 │   └── <script-folder>/
 │       ├── <script>.py
 │       └── README.md
@@ -92,7 +97,7 @@ Discovery includes scripts under `catalog/` matching:
 
 Discovery excludes:
 - `catalog/runner/*`
-- helper-style files (`menu.py`, `menu_utils.py`, `__init__.py`)
+- helper-style runner files (`menu.py`, `menu_utils.py`, and internal modules under `catalog/runner/`)
 - known environment-specific/incompatible folders:
   - `auto_connect`
   - `data_simulator`
