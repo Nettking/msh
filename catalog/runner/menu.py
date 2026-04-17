@@ -102,22 +102,33 @@ def summarize_session(session_id: str, metadata: dict) -> None:
         f"Filtered data: records={filter_result.get('matched_records')}, files={filter_result.get('matched_files')}",
         flush=True,
     )
+    if metadata.get("session_config_signature"):
+        print(f"Session config signature: {metadata['session_config_signature']}", flush=True)
 
     print("\nWorkflow progress:", flush=True)
     for step_name, step_scripts in WORKFLOW_STEPS:
         step_state = workflow_step_status(metadata, step_scripts)
         marker = {
-            "complete": "[DONE]",
-            "partial": "[PARTIAL]",
-            "failed": "[FAILED]",
-            "not_run": "[TODO]",
-        }.get(step_state, "[TODO]")
-        print(f"  {marker} {step_name}", flush=True)
+            "complete": "✔ done",
+            "partial": "◐ partial",
+            "failed": "✖ failed",
+            "not_run": "○ not run",
+        }.get(step_state, "○ not run")
+        print(f"  {step_name:<32} [{marker}]", flush=True)
         for script_key in step_scripts:
             entry = metadata.get("scripts", {}).get(script_key, {})
             status = entry.get("status", "not_run")
+            last_run_at = entry.get("last_run_at")
+            duration_seconds = entry.get("duration_seconds")
             output_path = entry.get("output_path")
-            suffix = f" -> {output_path}" if output_path else ""
+            details = []
+            if last_run_at:
+                details.append(f"last_run_at={last_run_at}")
+            if duration_seconds is not None:
+                details.append(f"duration={duration_seconds}s")
+            if output_path:
+                details.append(f"output={output_path}")
+            suffix = f" ({', '.join(details)})" if details else ""
             print(f"      - {script_key}: {status}{suffix}", flush=True)
 
     legacy_entries = [
@@ -160,7 +171,8 @@ def run_script_batch(
     session_dir: Path,
     metadata: dict,
     force_rerun: bool,
-) -> None:
+    stop_on_failure: bool,
+) -> bool:
     script_index = {item.key: item for item in script_options}
     for key in script_keys:
         script = script_index.get(key)
@@ -174,13 +186,20 @@ def run_script_batch(
             script=script,
             force_rerun=force_rerun,
         )
-        if state == "skipped_done":
-            print(f"Skipped {script.key}: already done (use rerun to force).", flush=True)
+        if state == "skipped_cached":
+            print(f"Skipped {script.key}: already done (cached).", flush=True)
             continue
         if exit_code == 0:
-            print(f"Completed {script.key}.", flush=True)
+            if state == "reran":
+                print(f"Completed {script.key} (recomputed).", flush=True)
+            else:
+                print(f"Completed {script.key}.", flush=True)
         else:
             print(f"Failed {script.key} with exit code {exit_code}.", flush=True)
+            if stop_on_failure:
+                print("Stopping this batch on first failure.", flush=True)
+                return False
+    return True
 
 
 def choose_or_create_session(
@@ -202,8 +221,16 @@ def choose_or_create_session(
         labels = []
         for item in sessions:
             filter_cfg = item.metadata.get("filter", {})
+            workflow_keys = set(WORKFLOW_SCRIPT_ORDER)
+            completed_scripts = sum(
+                1
+                for key, value in item.metadata.get("scripts", {}).items()
+                if key in workflow_keys and value.get("status") == "done"
+            )
+            updated_at = item.metadata.get("updated_at", "unknown")
             labels.append(
-                f"{item.session_id} ({filter_cfg.get('start_date')}..{filter_cfg.get('end_date')})"
+                f"{item.session_id} ({filter_cfg.get('start_date')}..{filter_cfg.get('end_date')}, "
+                f"completed={completed_scripts}/{len(WORKFLOW_SCRIPT_ORDER)}, updated={updated_at})"
             )
         print_numbered_menu("\nAvailable sessions:", labels)
         selected = sessions[prompt_menu_choice(len(sessions), "Choose session number: ") - 1]
@@ -266,7 +293,7 @@ def main() -> int:
     )
 
     print(f"\nUsing session: {session_id}", flush=True)
-    matched_records, matched_files = ensure_session_filtered_data(
+    matched_records, matched_files, filter_status = ensure_session_filtered_data(
         source_data_dir=data_dir,
         session_dir=session_dir,
         metadata=metadata,
@@ -275,10 +302,11 @@ def main() -> int:
         print("No records found for this session filter. Nothing to run.", flush=True)
         return 0
 
-    print(
-        f"Session filtered data ready at {session_dir / 'data'} (records={matched_records}, files={matched_files})",
-        flush=True,
-    )
+    if filter_status == "cached":
+        print(f"Using cached filtered dataset ({matched_records} records).", flush=True)
+    else:
+        print(f"Created filtered dataset ({matched_records} records across {matched_files} files).", flush=True)
+    print(f"Session filtered data path: {session_dir / 'data'}", flush=True)
     copy_repo_catalog_into_workspace(session_dir)
 
     while True:
@@ -287,8 +315,8 @@ def main() -> int:
         print("1) Run next workflow step", flush=True)
         print("2) Run selected workflow step", flush=True)
         print("3) Run selected script", flush=True)
-        print("4) Precompute all workflow scripts", flush=True)
-        print("5) Precompute selected scripts", flush=True)
+        print("4) Precompute workflow (Steps 1-4)", flush=True)
+        print("5) Precompute workflow up to a selected step", flush=True)
         print("6) Show session status", flush=True)
         print("7) Exit", flush=True)
 
@@ -307,6 +335,7 @@ def main() -> int:
                 session_dir=session_dir,
                 metadata=metadata,
                 force_rerun=False,
+                stop_on_failure=True,
             )
             continue
 
@@ -321,6 +350,7 @@ def main() -> int:
                 session_dir=session_dir,
                 metadata=metadata,
                 force_rerun=rerun,
+                stop_on_failure=True,
             )
             continue
 
@@ -333,6 +363,7 @@ def main() -> int:
                 session_dir=session_dir,
                 metadata=metadata,
                 force_rerun=rerun,
+                stop_on_failure=False,
             )
             continue
 
@@ -344,24 +375,18 @@ def main() -> int:
                 session_dir=session_dir,
                 metadata=metadata,
                 force_rerun=rerun,
+                stop_on_failure=True,
             )
             continue
 
         if action == 5:
-            print("\nSelect scripts for precompute (comma-separated numbers).", flush=True)
-            workflow_scripts = [item for item in script_options if item.key in WORKFLOW_SCRIPT_ORDER]
-            for idx, item in enumerate(workflow_scripts, start=1):
-                print(f"{idx}) {item.key} — {item.description}", flush=True)
-            raw = input("Numbers: ").strip()
+            labels = [name for name, _ in WORKFLOW_STEPS]
+            print_numbered_menu("\nPrecompute up to step:", labels)
+            max_step_index = prompt_menu_choice(len(WORKFLOW_STEPS), "Choose step: ")
             picked: list[str] = []
-            for part in [token.strip() for token in raw.split(",") if token.strip()]:
-                if part.isdigit():
-                    value = int(part)
-                    if 1 <= value <= len(workflow_scripts):
-                        picked.append(workflow_scripts[value - 1].key)
-            if not picked:
-                print("No valid scripts selected.", flush=True)
-                continue
+            for idx, (_, step_scripts) in enumerate(WORKFLOW_STEPS, start=1):
+                if idx <= max_step_index:
+                    picked.extend(step_scripts)
             rerun = input("Rerun scripts already completed? (y/n): ").strip().lower() in {"y", "yes"}
             run_script_batch(
                 script_keys=picked,
@@ -369,6 +394,7 @@ def main() -> int:
                 session_dir=session_dir,
                 metadata=metadata,
                 force_rerun=rerun,
+                stop_on_failure=True,
             )
             continue
 
