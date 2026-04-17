@@ -60,6 +60,7 @@ Run as needed:
 - `data_analysis` (terminal-heavy exploratory diagnostics)
 - `ml_analysis` (per-machine predictive baseline)
 - `data_simulator` (interactive Streamlit exploration)
+- `webapp` (timeline/state playback view for processed exports)
 
 Typical outputs:
 - timeline images / candidate CSVs
