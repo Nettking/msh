@@ -34,7 +34,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
-from catalog.common.telemetry_prep import prepare_timestamp_column, to_numeric
+from catalog.common.stops import find_stop_rows, group_stop_rows
+from catalog.common.telemetry_prep import prepare_timestamp_column
 
 # Directory containing input JSONL telemetry files.
 DATA_DIR = Path("data")
@@ -119,24 +120,21 @@ def find_stops(df):
     providing a guaranteed operational truth.
     """
     numeric_cols = ["Srpm", "Fact", "Xfrt", "Yfrt", "Zfrt"]
-    available_cols = [c for c in numeric_cols if c in df.columns]
-
-    for col in available_cols:
-        df[col] = to_numeric(df[col])
+    stop_rows, available_cols = find_stop_rows(
+        df,
+        stopped_states=STOPPED_STATES,
+        numeric_cols=numeric_cols,
+        execution_col="execution",
+    )
 
     if not available_cols or "execution" not in df.columns:
         return pd.DataFrame(columns=["timestamp", "execution", "mode", "machine"])
-
-    stopped_mask = (
-        (df["execution"].isin(STOPPED_STATES))
-        & ((df[available_cols] == 0).sum(axis=1) >= max(1, len(available_cols) // 2))
-    )
 
     subset_cols = ["timestamp", "execution", "mode"]
     if "machine" in df.columns:
         subset_cols.append("machine")
 
-    return df.loc[stopped_mask, subset_cols].copy()
+    return stop_rows.loc[:, [col for col in subset_cols if col in stop_rows.columns]].copy()
 
 
 def group_stops(df, max_gap_seconds=MAX_GAP_SECONDS):
@@ -166,32 +164,8 @@ def group_stops(df, max_gap_seconds=MAX_GAP_SECONDS):
     -----
     If no machine column is present, rows are grouped under ``"UNKNOWN"``.
     """
-    if df.empty:
-        return pd.DataFrame(columns=["machine", "start", "end", "duration_s"])
-
-    df = df.sort_values("timestamp")
-    df["machine"] = df.get("machine", "UNKNOWN")
-
-    grouped = []
-    for machine, mdf in df.groupby("machine"):
-        start, last = None, None
-
-        for t in mdf["timestamp"]:
-            if start is None:
-                start, last = t, t
-                continue
-
-            gap = (t - last).total_seconds()
-            if gap <= max_gap_seconds:
-                last = t
-            else:
-                grouped.append([machine, start, last, (last - start).total_seconds()])
-                start, last = t, t
-
-        if start is not None:
-            grouped.append([machine, start, last, (last - start).total_seconds()])
-
-    return pd.DataFrame(grouped, columns=["machine", "start", "end", "duration_s"])
+    # Uses shared grouping helper; interval semantics remain unchanged.
+    return group_stop_rows(df, max_gap_seconds=max_gap_seconds)
 
 
 def plot_hour(machine, hour_df, hour_label, out_path):
