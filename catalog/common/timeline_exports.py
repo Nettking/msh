@@ -167,6 +167,12 @@ def build_state_interval_export(
 
 def load_timeline_export(path: str | Path) -> pd.DataFrame:
     """Load a timeline export from CSV/Parquet/JSONL/JSON and normalize schema."""
+    rows, _, _ = load_timeline_export_with_schema_info(path)
+    return rows
+
+
+def load_timeline_export_with_schema_info(path: str | Path) -> tuple[pd.DataFrame, set[str], set[str]]:
+    """Load timeline export and report which normalized columns were injected."""
     source = Path(path)
     suffix = source.suffix.lower()
 
@@ -181,7 +187,10 @@ def load_timeline_export(path: str | Path) -> pd.DataFrame:
     else:
         raise ValueError(f"Unsupported timeline file extension: {suffix}")
 
-    return _ensure_timeline_columns(df)
+    source_columns = set(df.columns)
+    normalized = _ensure_timeline_columns(df)
+    injected_columns = set(normalized.columns).difference(source_columns)
+    return normalized, source_columns, injected_columns
 
 
 def export_timeline_for_machine_day(
