@@ -1,51 +1,99 @@
-import os
-import json
+"""
+Batch analysis of JSONL telemetry files.
+
+This script performs three exploratory analyses on machine telemetry stored in
+JSONL files:
+
+1. Dataset audit
+   - checks timestamp quality and ordering
+   - summarizes column availability
+   - identifies columns that appear numeric
+   - reports frequent values for selected context fields
+
+2. Active-segment discovery
+   - uses simple heuristics to estimate active machine periods
+   - segments the data into active/inactive runs
+   - summarizes duration, point counts, and selected signal statistics
+
+3. Candidate event discovery
+   - detects rows that may correspond to operator interventions or notable
+     state changes
+   - combines multiple rule-based triggers into an event score
+   - groups nearby candidate rows into broader event windows
+
+The script is intended as an exploratory utility, not as a validated detection
+pipeline. Its thresholds and rules are heuristic and should be interpreted with
+care.
+"""
+
 import glob
+import json
+import os
+
 import numpy as np
 import pandas as pd
 
-# ============================================================
-# CONFIG
-# ============================================================
+# Folder containing input JSONL files.
+FOLDER = r"./data"
 
-FOLDER = r"./data"   # change this to your folder
+# File name pattern for telemetry input files.
 FILE_PATTERN = "*.jsonl"
 
-# Signals we will try to use if present
+# Core numeric signals expected to be useful for machine-state interpretation.
 CORE_NUMERIC_SIGNALS = [
     "Srpm", "Sovr", "Sload", "Stemp",
     "Xabs", "Yabs", "Zabs",
-    "Fact", "Fovr", "Frapidovr"
+    "Fact", "Fovr", "Frapidovr",
 ]
 
+# Context fields that may help interpret execution state.
 CORE_CONTEXT_SIGNALS = [
-    "execution", "mode", "program", "Tool_number", "Tool_group"
+    "execution", "mode", "program", "Tool_number", "Tool_group",
 ]
 
-# Heuristics for active segment discovery
+# Heuristics for active segment discovery.
+#
+# These values are not machine-independent truths; they are pragmatic defaults
+# chosen for exploratory analysis of dense telemetry streams.
 DENSE_DT_THRESHOLD_SEC = 5.0
 LONG_IDLE_DT_THRESHOLD_SEC = 30.0
 MIN_ACTIVE_POINTS = 5
 
-# Heuristics for event grouping
+# Maximum time gap for grouping nearby candidate rows into one event.
 MAX_EVENT_GAP_SEC = 10.0
 
 
-# ============================================================
-# HELPERS
-# ============================================================
-
 def print_header(title, char="="):
+    """Print a full-width section header for console reports."""
     print("\n" + char * 80)
     print(title)
     print(char * 80)
 
+
 def print_subheader(title):
+    """Print a subsection header for console reports."""
     print("\n" + "-" * 80)
     print(title)
     print("-" * 80)
 
+
 def load_jsonl(path):
+    """
+    Load a JSONL file into a DataFrame.
+
+    Blank lines are skipped. Malformed JSON lines are reported and ignored
+    rather than aborting the full file load.
+
+    Parameters
+    ----------
+    path : str
+        Path to the JSONL file.
+
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame containing all successfully parsed rows.
+    """
     rows = []
     with open(path, "r", encoding="utf-8") as f:
         for i, line in enumerate(f, start=1):
@@ -58,23 +106,63 @@ def load_jsonl(path):
                 print(f"[WARNING] Failed to parse line {i} in {path}: {e}")
     return pd.DataFrame(rows)
 
+
 def replace_unavailable_with_nan(series):
+    """
+    Replace string-based 'UNAVAILABLE' values with NaN.
+
+    This keeps availability checks and numeric conversion more consistent
+    across telemetry columns that mix valid values with sentinel strings.
+    """
     if series.dtype == object:
         return series.replace("UNAVAILABLE", np.nan)
     return series
 
+
 def try_convert_numeric(series):
+    """
+    Convert a series to numeric values where possible.
+
+    Non-numeric values are coerced to NaN after first replacing the
+    'UNAVAILABLE' sentinel when relevant.
+    """
     s = replace_unavailable_with_nan(series)
     return pd.to_numeric(s, errors="coerce")
 
+
 def availability_fraction(series):
+    """
+    Compute the fraction of non-missing values in a series.
+
+    'UNAVAILABLE' values are treated as missing.
+    """
     s = replace_unavailable_with_nan(series)
     return s.notna().mean()
 
+
 def group_boolean_events(df, event_mask, time_col="timestamp", max_gap_sec=10.0):
     """
-    Groups nearby candidate rows into event windows.
-    Returns a dataframe with one row per grouped event.
+    Group nearby event-marked rows into broader event windows.
+
+    Rows marked True in ``event_mask`` are sorted by time and merged into the
+    same event when the gap between successive rows does not exceed
+    ``max_gap_sec``.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Input dataframe containing timestamps.
+    event_mask : pandas.Series or array-like
+        Boolean mask identifying candidate event rows.
+    time_col : str, default="timestamp"
+        Timestamp column used for grouping.
+    max_gap_sec : float, default=10.0
+        Maximum allowed time gap between rows in the same grouped event.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per grouped event with start, end, point count, and duration.
     """
     event_rows = df.loc[event_mask].copy()
     if event_rows.empty:
@@ -83,8 +171,8 @@ def group_boolean_events(df, event_mask, time_col="timestamp", max_gap_sec=10.0)
     event_rows = event_rows.sort_values(time_col).reset_index()
     event_rows["dt_from_prev"] = event_rows[time_col].diff().dt.total_seconds()
     event_rows["new_group"] = (
-        event_rows["dt_from_prev"].isna() |
-        (event_rows["dt_from_prev"] > max_gap_sec)
+        event_rows["dt_from_prev"].isna()
+        | (event_rows["dt_from_prev"] > max_gap_sec)
     ).astype(int)
     event_rows["event_group"] = event_rows["new_group"].cumsum()
 
@@ -101,11 +189,23 @@ def group_boolean_events(df, event_mask, time_col="timestamp", max_gap_sec=10.0)
     return grouped
 
 
-# ============================================================
-# ANALYSIS 1: DATASET AUDIT
-# ============================================================
-
 def dataset_audit(df):
+    """
+    Perform a basic audit of the dataset structure and column usability.
+
+    This analysis checks:
+    - whether timestamps exist and parse cleanly
+    - whether timestamps are monotonic after sorting
+    - time-gap statistics between rows
+    - per-column availability
+    - which columns appear numerically interpretable
+    - common values in selected context fields
+
+    Returns
+    -------
+    dict
+        Dictionary of summary objects and tables for reporting.
+    """
     result = {
         "shape": df.shape,
         "timestamp_ok": False,
@@ -139,21 +239,25 @@ def dataset_audit(df):
     for col in df.columns:
         s = df[col]
         avail = availability_fraction(s)
-        availability.append({
-            "column": col,
-            "available_fraction": round(avail, 4),
-            "missing_fraction": round(1 - avail, 4),
-            "dtype": str(s.dtype),
-        })
+        availability.append(
+            {
+                "column": col,
+                "available_fraction": round(avail, 4),
+                "missing_fraction": round(1 - avail, 4),
+                "dtype": str(s.dtype),
+            }
+        )
 
         if col != "timestamp":
             numeric = try_convert_numeric(s)
             frac_numeric = numeric.notna().mean()
             if frac_numeric > 0:
-                candidate_numeric.append({
-                    "column": col,
-                    "numeric_fraction": round(frac_numeric, 4),
-                })
+                candidate_numeric.append(
+                    {
+                        "column": col,
+                        "numeric_fraction": round(frac_numeric, 4),
+                    }
+                )
 
     availability_df = pd.DataFrame(availability).sort_values(
         "available_fraction", ascending=False
@@ -189,15 +293,31 @@ def dataset_audit(df):
     return result
 
 
-# ============================================================
-# ANALYSIS 2: ACTIVE SEGMENT DISCOVERY
-# ============================================================
-
 def active_segment_analysis(df):
+    """
+    Estimate active machine segments using simple telemetry heuristics.
+
+    A row is considered potentially active if at least one of the following
+    holds:
+    - time gaps are dense enough
+    - spindle RPM is above zero
+    - spindle load is above zero
+
+    Consecutive rows with the same active/inactive state are grouped into
+    segments. This is a heuristic approximation, not a validated activity model.
+
+    Returns
+    -------
+    dict
+        Contains:
+        - all discovered segments
+        - filtered active segments
+        - a short numeric summary
+    """
     result = {
         "segments_df": None,
         "active_segments_df": None,
-        "summary": {}
+        "summary": {},
     }
 
     if "timestamp" not in df.columns:
@@ -256,8 +376,8 @@ def active_segment_analysis(df):
     segments["duration_sec"] = (segments["end"] - segments["start"]).dt.total_seconds()
 
     active_segments = segments[
-        (segments["active"] == True) &
-        (segments["points"] >= MIN_ACTIVE_POINTS)
+        (segments["active"] == True)
+        & (segments["points"] >= MIN_ACTIVE_POINTS)
     ].copy()
 
     result["segments_df"] = segments
@@ -272,17 +392,32 @@ def active_segment_analysis(df):
     return result
 
 
-# ============================================================
-# ANALYSIS 3: CANDIDATE EVENT DISCOVERY
-# ============================================================
 def candidate_event_analysis(df):
-    result = {  
+    """
+    Detect rows and grouped windows that may correspond to notable events.
+
+    This function combines several heuristic trigger types:
+    - state/context changes (execution, mode, program)
+    - rapid numeric changes
+    - abrupt override drops
+    - RPM/load collapse
+    - transition from active to inactive
+
+    Triggered rules are combined into a weighted event score. Rows meeting the
+    score threshold are treated as candidate event rows and may then be grouped
+    into larger event windows.
+
+    Important:
+    This is a heuristic ranking mechanism for inspection, not a ground-truth
+    event detector.
+    """
+    result = {
         "rate_summary": None,
         "thresholds": {},
         "trigger_counts": {},
         "candidate_rows_df": None,
         "grouped_events_df": None,
-        "summary": {}
+        "summary": {},
     }
 
     if "timestamp" not in df.columns:
@@ -293,12 +428,10 @@ def candidate_event_analysis(df):
     df = df.sort_values("timestamp").reset_index(drop=True)
     df["dt_sec"] = df["timestamp"].diff().dt.total_seconds()
 
-    # Convert numeric signals
     for col in ["Srpm", "Sovr", "Sload", "Stemp", "Fovr", "Frapidovr"]:
         if col in df.columns:
             df[col] = try_convert_numeric(df[col])
 
-    # Clean text/context columns
     if "execution" in df.columns:
         df["execution_clean"] = replace_unavailable_with_nan(df["execution"])
     if "mode" in df.columns:
@@ -306,19 +439,23 @@ def candidate_event_analysis(df):
     if "program" in df.columns:
         df["program_clean"] = replace_unavailable_with_nan(df["program"])
 
-    # Only trust dt within a reasonable range
+    # Restrict rate estimates to plausible telemetry step sizes.
     valid_dt = df["dt_sec"].between(0.1, 30)
 
-    # Basic active machining approximation
-    rpm_active = df["Srpm"].fillna(0) > 0 if "Srpm" in df.columns else pd.Series(False, index=df.index)
-    load_active = df["Sload"].fillna(0) > 0 if "Sload" in df.columns else pd.Series(False, index=df.index)
+    rpm_active = (
+        df["Srpm"].fillna(0) > 0
+        if "Srpm" in df.columns
+        else pd.Series(False, index=df.index)
+    )
+    load_active = (
+        df["Sload"].fillna(0) > 0
+        if "Sload" in df.columns
+        else pd.Series(False, index=df.index)
+    )
     machining_active = rpm_active | load_active
 
     events = pd.DataFrame(index=df.index)
 
-    # --------------------------------------------------------
-    # 1) Context/state changes
-    # --------------------------------------------------------
     if "execution_clean" in df.columns:
         events["execution_change"] = df["execution_clean"] != df["execution_clean"].shift(1)
 
@@ -328,9 +465,6 @@ def candidate_event_analysis(df):
     if "program_clean" in df.columns:
         events["program_change"] = df["program_clean"] != df["program_clean"].shift(1)
 
-    # --------------------------------------------------------
-    # 2) Numeric rate changes
-    # --------------------------------------------------------
     for col in ["Srpm", "Sovr", "Sload", "Fovr", "Frapidovr"]:
         if col in df.columns:
             df[f"d_{col}"] = df[col].diff()
@@ -340,20 +474,15 @@ def candidate_event_analysis(df):
     if rate_cols:
         result["rate_summary"] = df[rate_cols].describe()
 
-    # Adaptive but less extreme thresholds
+    # Thresholds are adaptive and intentionally less extreme than a pure
+    # tail-only strategy; this favors exploratory recall over strict precision.
     for col in ["rate_Sovr", "rate_Srpm", "rate_Sload", "rate_Fovr", "rate_Frapidovr"]:
         if col in df.columns and df[col].notna().sum() > 20:
             thr95 = df[col].abs().quantile(0.95)
-            thr99 = df[col].abs().quantile(0.99)
-            threshold = max(thr95, 1e-9)  # less strict than 0.99
+            threshold = max(thr95, 1e-9)
             result["thresholds"][col] = float(threshold)
             events[f"{col}_jump"] = df[col].abs() > threshold
 
-    # --------------------------------------------------------
-    # 3) Specific intervention-like patterns
-    # --------------------------------------------------------
-
-    # Sudden override drop
     if "Sovr" in df.columns:
         df["d_Sovr"] = df["Sovr"].diff()
         events["sovr_drop"] = df["d_Sovr"] <= -10
@@ -362,34 +491,28 @@ def candidate_event_analysis(df):
         df["d_Fovr"] = df["Fovr"].diff()
         events["fovr_drop"] = df["d_Fovr"] <= -10
 
-    # RPM collapse while machine was active
     if "Srpm" in df.columns:
         prev_rpm = df["Srpm"].shift(1)
         events["rpm_collapse"] = (
-            machining_active.shift(1).fillna(False) &
-            prev_rpm.notna() &
-            df["Srpm"].notna() &
-            (prev_rpm > 0) &
-            (df["Srpm"] < 0.5 * prev_rpm)
+            machining_active.shift(1).fillna(False)
+            & prev_rpm.notna()
+            & df["Srpm"].notna()
+            & (prev_rpm > 0)
+            & (df["Srpm"] < 0.5 * prev_rpm)
         )
 
-    # Load collapse while machine was active
     if "Sload" in df.columns:
         prev_load = df["Sload"].shift(1)
         events["load_collapse"] = (
-            machining_active.shift(1).fillna(False) &
-            prev_load.notna() &
-            df["Sload"].notna() &
-            (prev_load > 0) &
-            (df["Sload"] < 0.5 * prev_load)
+            machining_active.shift(1).fillna(False)
+            & prev_load.notna()
+            & df["Sload"].notna()
+            & (prev_load > 0)
+            & (df["Sload"] < 0.5 * prev_load)
         )
 
-    # Stop/idle transition from active state
     events["active_to_inactive"] = machining_active.shift(1).fillna(False) & (~machining_active)
 
-    # --------------------------------------------------------
-    # 4) Clean up and inspect trigger counts
-    # --------------------------------------------------------
     events = events.fillna(False)
     if len(events) > 0:
         events.iloc[0] = False
@@ -397,7 +520,6 @@ def candidate_event_analysis(df):
     for col in events.columns:
         result["trigger_counts"][col] = int(events[col].sum())
 
-    # Weighted score instead of simple >=2 rule
     weights = {
         "execution_change": 2,
         "mode_change": 2,
@@ -416,13 +538,12 @@ def candidate_event_analysis(df):
         w = weights.get(col, 1)
         events["event_score"] += events[col].astype(int) * w
 
-    # Less strict than before
     candidate_mask = events["event_score"] >= 2
 
     candidate_cols = ["timestamp", "dt_sec"]
     for col in [
         "Srpm", "Sovr", "Sload", "Fovr", "Frapidovr",
-        "execution", "mode", "program"
+        "execution", "mode", "program",
     ]:
         if col in df.columns:
             candidate_cols.append(col)
@@ -430,7 +551,6 @@ def candidate_event_analysis(df):
     candidate_rows = df.loc[candidate_mask, candidate_cols].copy()
     candidate_rows["event_score"] = events.loc[candidate_mask, "event_score"].values
 
-    # Add which rules fired
     fired_rules = []
     event_cols = [c for c in events.columns if c != "event_score"]
     for idx in candidate_rows.index:
@@ -442,23 +562,29 @@ def candidate_event_analysis(df):
         df,
         candidate_mask,
         time_col="timestamp",
-        max_gap_sec=MAX_EVENT_GAP_SEC
+        max_gap_sec=MAX_EVENT_GAP_SEC,
     )
 
     result["candidate_rows_df"] = candidate_rows
     result["grouped_events_df"] = grouped_events
     result["summary"] = {
         "n_candidate_rows": len(candidate_rows),
-        "n_grouped_events": 0 if grouped_events is None or grouped_events.empty else len(grouped_events)
+        "n_grouped_events": 0 if grouped_events is None or grouped_events.empty else len(grouped_events),
     }
 
     return result
 
-# ============================================================
-# PER-FILE REPORT
-# ============================================================
 
 def analyze_file(path):
+    """
+    Run the full analysis pipeline for one telemetry file and print a report.
+
+    The report contains:
+    1. dataset audit
+    2. active-segment discovery
+    3. candidate-event discovery
+    4. short combined summary
+    """
     print_header(f"FILE: {os.path.basename(path)}")
 
     try:
@@ -471,11 +597,7 @@ def analyze_file(path):
         print("[WARNING] File is empty or unreadable.")
         return
 
-    # --------------------------------------------------------
-    # 1) DATASET AUDIT
-    # --------------------------------------------------------
     print_subheader("1) DATASET AUDIT")
-
     audit = dataset_audit(df)
 
     print(f"Shape: {audit['shape']}")
@@ -506,11 +628,7 @@ def analyze_file(path):
         print("\nprogram values:")
         print(audit["program_counts"].head(20).to_string())
 
-    # --------------------------------------------------------
-    # 2) ACTIVE SEGMENT DISCOVERY
-    # --------------------------------------------------------
     print_subheader("2) ACTIVE-SEGMENT DISCOVERY")
-
     seg = active_segment_analysis(df)
 
     print("Segment summary:")
@@ -526,11 +644,7 @@ def analyze_file(path):
     else:
         print("\nNo active segments detected with current heuristics.")
 
-    # --------------------------------------------------------
-    # 3) CANDIDATE EVENT DISCOVERY
-    # --------------------------------------------------------
     print_subheader("3) CANDIDATE-EVENT DISCOVERY")
-
     ev = candidate_event_analysis(df)
 
     if ev["rate_summary"] is not None:
@@ -559,9 +673,6 @@ def analyze_file(path):
     else:
         print("\nNo grouped events detected.")
 
-    # --------------------------------------------------------
-    # COMBINED SUMMARY
-    # --------------------------------------------------------
     print_subheader("4) COMBINED SHORT SUMMARY")
 
     usable_cols = []
@@ -571,7 +682,10 @@ def analyze_file(path):
 
         for col in CORE_NUMERIC_SIGNALS:
             if col in avail.index and col in numlike.index:
-                if avail.loc[col, "available_fraction"] >= 0.8 and numlike.loc[col, "numeric_fraction"] >= 0.8:
+                if (
+                    avail.loc[col, "available_fraction"] >= 0.8
+                    and numlike.loc[col, "numeric_fraction"] >= 0.8
+                ):
                     usable_cols.append(col)
 
     print(f"Likely usable numeric/core signals: {usable_cols}")
@@ -579,11 +693,10 @@ def analyze_file(path):
     print(f"Candidate grouped events found: {ev['summary'].get('n_grouped_events', 0)}")
 
 
-# ============================================================
-# MAIN
-# ============================================================
-
 def main():
+    """
+    Run the full batch analysis over all matching JSONL files in the input folder.
+    """
     print_header("BATCH ANALYSIS OF JSONL TELEMETRY FILES")
 
     files = sorted(glob.glob(os.path.join(FOLDER, FILE_PATTERN)))
@@ -594,6 +707,7 @@ def main():
     print(f"Found {len(files)} files.\n")
     for path in files:
         analyze_file(path)
+
 
 if __name__ == "__main__":
     main()
