@@ -1,17 +1,56 @@
+"""
+Utility functions for the interactive catalog runner.
+
+This module supports the CLI runner by providing functionality for:
+
+- discovering runnable catalog scripts
+- discovering available data dates from JSONL telemetry files
+- caching per-file date discovery results
+- filtering source telemetry into a temporary run workspace
+- copying catalog code into the workspace
+- executing the selected script in isolation
+
+Key behavior
+------------
+Date discovery:
+- scans JSONL files recursively
+- prefers dates parsed from record timestamps
+- falls back to dates extracted from filenames only when a file has no usable
+  timestamp-derived dates
+- caches per-file date discovery results in a local JSON index to speed up
+  repeated runs
+
+Filtering:
+- normal runs filter by date only
+- same-day runs may optionally filter by whole-hour range
+- hour-filtered runs require parseable timestamps and do not use filename-only
+  fallback, because filenames cannot determine hour-of-day
+
+Execution:
+- each run is executed in its own temporary workspace under ``results/menu_runs/``
+- the selected script runs against a filtered copy of the data
+- the catalog source is copied into the workspace before execution
+
+Notes
+-----
+The cache is used only for date discovery, not for record inclusion/exclusion
+during filtering. This is an intentional safety choice to avoid skipping data
+based on incomplete or ambiguous cached state.
+"""
+
 from __future__ import annotations
 
+import ast
 import json
 import os
 import re
 import shutil
 import subprocess
 import sys
-import ast
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
-from tempfile import NamedTemporaryFile
-from tempfile import mkdtemp
+from tempfile import NamedTemporaryFile, mkdtemp
 from typing import Iterable
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -21,6 +60,7 @@ if str(ROOT_DIR) not in sys.path:
 from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
 from catalog.common.time_utils import date_from_filename, parse_iso_timestamp, parse_timestamp_to_date
 
+# Catalog folders excluded from runnable-script discovery.
 DEFAULT_SCRIPT_EXCLUSIONS = {
     "runner",
     "auto_connect",
@@ -30,12 +70,27 @@ DEFAULT_SCRIPT_EXCLUSIONS = {
     "standalone-recorder_v2",
 }
 
+# Versioned JSON cache used only for date discovery.
 DATA_INDEX_VERSION = 1
 DATA_INDEX_FILE = ROOT_DIR / "results" / "runner" / "data_index.json"
 
 
 @dataclass(frozen=True)
 class ScriptOption:
+    """
+    Description of one runnable catalog script.
+
+    Attributes
+    ----------
+    number : int
+        Display number used in the runner menu.
+    key : str
+        Script key, typically derived from the folder name.
+    script_path : pathlib.Path
+        Relative path to the script within the repository.
+    description : str
+        Short human-readable description, usually derived from the module docstring.
+    """
     number: int
     key: str
     script_path: Path
@@ -43,11 +98,33 @@ class ScriptOption:
 
 
 def repo_root() -> Path:
-    # catalog/runner/menu_utils.py -> repo root is two parents up
+    """
+    Return the repository root directory.
+
+    Returns
+    -------
+    pathlib.Path
+        Repository root based on the location of ``catalog/runner/menu_utils.py``.
+    """
     return Path(__file__).resolve().parents[2]
 
 
 def _script_description(script_path: Path, fallback: str) -> str:
+    """
+    Extract a short script description from the first line of a module docstring.
+
+    Parameters
+    ----------
+    script_path : pathlib.Path
+        Path to the candidate Python script.
+    fallback : str
+        Description used if no readable docstring is available.
+
+    Returns
+    -------
+    str
+        First line of the module docstring, or the fallback string.
+    """
     try:
         source = script_path.read_text(encoding="utf-8")
         module = ast.parse(source)
@@ -63,6 +140,27 @@ def _script_description(script_path: Path, fallback: str) -> str:
 
 
 def discover_runnable_scripts(catalog_dir: Path) -> list[ScriptOption]:
+    """
+    Discover runnable catalog scripts from catalog subdirectories.
+
+    A folder is considered runnable when it contains either:
+    - ``<folder_name>.py``, or
+    - ``main.py``
+
+    Parameters
+    ----------
+    catalog_dir : pathlib.Path
+        Path to the top-level ``catalog/`` directory.
+
+    Returns
+    -------
+    list[ScriptOption]
+        Sorted list of runnable script definitions.
+
+    Notes
+    -----
+    Certain folders are explicitly excluded via ``DEFAULT_SCRIPT_EXCLUSIONS``.
+    """
     script_items: list[tuple[str, Path, str]] = []
 
     for folder in sorted(catalog_dir.iterdir()):
@@ -96,14 +194,43 @@ def discover_runnable_scripts(catalog_dir: Path) -> list[ScriptOption]:
 
 
 def discover_available_dates(data_dir: Path) -> list[date]:
+    """
+    Discover all available dates present in the source dataset.
+
+    Parameters
+    ----------
+    data_dir : pathlib.Path
+        Root directory containing JSONL telemetry files.
+
+    Returns
+    -------
+    list[date]
+        Sorted list of available dates.
+
+    Behavior
+    --------
+    - JSONL files are scanned recursively.
+    - For unchanged files, previously cached date results are reused.
+    - For new or changed files, dates are reparsed from the file.
+    - Timestamp-derived dates are preferred.
+    - Filename-based dates are used only when a file has no usable timestamp dates.
+
+    Notes
+    -----
+    The cache is used only for date discovery, not for filtering records.
+    """
     dates: set[date] = set()
     data_root = data_dir.resolve()
     index_data = _load_data_index()
+
     print(f"[runner] Loaded date cache from {DATA_INDEX_FILE}", flush=True)
+
     cached_root_entries = _load_cached_root_entries(index_data, data_root)
     updated_root_entries: dict[str, dict] = {}
+
     jsonl_files = list(iter_jsonl_files(data_dir, recursive=True))
     print(f"[runner] Found {len(jsonl_files)} JSONL files for date discovery", flush=True)
+
     reused_from_cache = 0
     reparsed_files = 0
 
@@ -140,7 +267,9 @@ def discover_available_dates(data_dir: Path) -> list[date]:
         f"[runner] Date discovery reused {reused_from_cache} cached files and reparsed {reparsed_files} files",
         flush=True,
     )
+
     _store_cached_root_entries(index_data, data_root, updated_root_entries)
+
     print(f"[runner] Writing date cache to {DATA_INDEX_FILE}", flush=True)
     _write_data_index(index_data)
 
@@ -156,13 +285,58 @@ def filter_data_by_date_range(
     start_hour: int | None = None,
     end_hour: int | None = None,
 ) -> tuple[int, int]:
+    """
+    Filter JSONL records into a destination directory based on date or hour range.
+
+    Parameters
+    ----------
+    source_data_dir : pathlib.Path
+        Source directory containing JSONL files.
+    destination_data_dir : pathlib.Path
+        Destination directory for filtered JSONL files.
+    start_date : date
+        Inclusive start date.
+    end_date : date
+        Inclusive end date.
+    start_hour : int | None, optional
+        Inclusive start hour for same-day hour-filtered runs.
+    end_hour : int | None, optional
+        Inclusive end hour for same-day hour-filtered runs.
+
+    Returns
+    -------
+    tuple[int, int]
+        ``(matched_records, written_files)``
+
+    Behavior
+    --------
+    Date mode:
+    - records are included when their parsed date falls within the selected range
+    - if a file has no parseable timestamp dates at all, filename-based date
+      fallback may be used
+
+    Hour mode:
+    - enabled only when start/end date are the same and both hours are provided
+    - records are included only if their parsed timestamp falls within the hour range
+    - filename-only fallback is not used in hour mode
+
+    Notes
+    -----
+    The full file content is read during filtering. Cache-based skipping is
+    intentionally not used here for safety.
+    """
     destination_data_dir.mkdir(parents=True, exist_ok=True)
     use_hour_filter = start_date == end_date and start_hour is not None and end_hour is not None
+
     matched_records = 0
     written_files = 0
     processed_files = 0
+
     source_files = list(iter_jsonl_files(source_data_dir, recursive=True))
-    print(f"[runner] Filtering {len(source_files)} files for range {start_date.isoformat()}..{end_date.isoformat()}", flush=True)
+    print(
+        f"[runner] Filtering {len(source_files)} files for range {start_date.isoformat()}..{end_date.isoformat()}",
+        flush=True,
+    )
 
     for source_file in source_files:
         relative_path = source_file.relative_to(source_data_dir)
@@ -175,6 +349,7 @@ def filter_data_by_date_range(
 
         parsed_records: list[dict] = []
         file_has_timestamp = False
+
         for record in iter_jsonl_records(source_file):
             parsed_records.append(record)
             if parse_timestamp_to_date(str(record.get("timestamp", ""))) is not None:
@@ -211,6 +386,7 @@ def filter_data_by_date_range(
             written_files += 1
         else:
             destination_file.unlink(missing_ok=True)
+
         processed_files += 1
         if processed_files % 25 == 0:
             print(
@@ -229,12 +405,30 @@ def filter_data_by_date_range(
 
 
 def _parse_timestamp_to_datetime(timestamp: str | None) -> datetime | None:
+    """
+    Parse a timestamp string into a datetime for hour-level filtering.
+
+    Parameters
+    ----------
+    timestamp : str | None
+        Input timestamp string.
+
+    Returns
+    -------
+    datetime | None
+        Parsed datetime if successful, otherwise None.
+
+    Notes
+    -----
+    This helper first tries the shared ISO parser with ``allow_z_suffix=True``.
+    If that fails, it falls back to extracting a basic date/time pattern from
+    MTConnect-style strings.
+    """
     parsed = parse_iso_timestamp(timestamp, allow_z_suffix=True)
     if parsed is not None:
         return parsed
 
     value = str(timestamp).strip() if timestamp is not None else ""
-    # fallback for common MTConnect format: 2026-03-01T12:00:00.0000000Z
     match = re.search(r"(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2}):(\d{2})", value)
     if not match:
         return None
@@ -253,30 +447,91 @@ def _parse_timestamp_to_datetime(timestamp: str | None) -> datetime | None:
 
 
 def print_numbered_menu(title: str, options: Iterable[str]) -> None:
+    """
+    Print a numbered menu to stdout.
+
+    Parameters
+    ----------
+    title : str
+        Menu heading.
+    options : Iterable[str]
+        Menu option labels.
+    """
     print(f"\n{title}", flush=True)
     for index, option in enumerate(options, start=1):
         print(f"{index}) {option}", flush=True)
 
 
 def prompt_menu_choice(max_choice: int, prompt: str) -> int:
+    """
+    Prompt the user for a numeric menu choice.
+
+    Parameters
+    ----------
+    max_choice : int
+        Maximum valid menu value.
+    prompt : str
+        Prompt shown to the user.
+
+    Returns
+    -------
+    int
+        Validated menu choice in the inclusive range ``1..max_choice``.
+    """
     while True:
         raw = input(prompt).strip()
         if not raw.isdigit():
             print("Please enter a number.", flush=True)
             continue
+
         value = int(raw)
         if 1 <= value <= max_choice:
             return value
+
         print(f"Please choose a value between 1 and {max_choice}.", flush=True)
 
 
 def create_run_workspace(output_base_dir: Path) -> Path:
+    """
+    Create a temporary workspace directory for one runner execution.
+
+    Parameters
+    ----------
+    output_base_dir : pathlib.Path
+        Base directory under which run workspaces are created.
+
+    Returns
+    -------
+    pathlib.Path
+        Newly created workspace path.
+    """
     output_base_dir.mkdir(parents=True, exist_ok=True)
     path = Path(mkdtemp(prefix="menu_run_", dir=output_base_dir))
     return path
 
 
 def run_script(script_path: Path, workspace_dir: Path) -> int:
+    """
+    Execute a selected catalog script inside a workspace directory.
+
+    Parameters
+    ----------
+    script_path : pathlib.Path
+        Path to the script to execute.
+    workspace_dir : pathlib.Path
+        Working directory for the subprocess.
+
+    Returns
+    -------
+    int
+        Subprocess return code.
+
+    Notes
+    -----
+    The subprocess runs with:
+    - ``PYTHONUNBUFFERED=1`` for immediate output visibility
+    - ``MPLBACKEND=Agg`` by default to avoid interactive Matplotlib requirements
+    """
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
     env.setdefault("MPLBACKEND", "Agg")
@@ -290,14 +545,45 @@ def run_script(script_path: Path, workspace_dir: Path) -> int:
 
 
 def copy_repo_catalog_into_workspace(workspace_dir: Path) -> None:
+    """
+    Copy the repository's ``catalog/`` directory into a run workspace.
+
+    Parameters
+    ----------
+    workspace_dir : pathlib.Path
+        Workspace receiving the copied catalog tree.
+    """
     source_catalog = repo_root() / "catalog"
     target_catalog = workspace_dir / "catalog"
+
     if target_catalog.exists():
         shutil.rmtree(target_catalog)
+
     shutil.copytree(source_catalog, target_catalog)
 
 
 def _discover_dates_for_file(file_path: Path) -> tuple[set[date], str, bool]:
+    """
+    Discover all dates represented by one JSONL file.
+
+    Parameters
+    ----------
+    file_path : pathlib.Path
+        Source JSONL file.
+
+    Returns
+    -------
+    tuple[set[date], str, bool]
+        ``(dates, date_source, has_timestamp_date)`` where:
+        - ``dates`` is the set of discovered dates
+        - ``date_source`` is ``"timestamp"``, ``"filename_fallback"``, or ``"none"``
+        - ``has_timestamp_date`` indicates whether any date came from timestamps
+
+    Behavior
+    --------
+    - timestamp-derived dates are preferred
+    - filename fallback is used only when no timestamp-derived date exists
+    """
     file_dates: set[date] = set()
     file_has_timestamp_date = False
 
@@ -318,10 +604,26 @@ def _discover_dates_for_file(file_path: Path) -> tuple[set[date], str, bool]:
 
 
 def _serialize_dates(dates: set[date]) -> list[str]:
+    """
+    Convert a set of dates into sorted ISO strings for JSON cache storage.
+    """
     return sorted(day.isoformat() for day in dates)
 
 
 def _deserialize_dates(serialized_dates: object) -> set[date]:
+    """
+    Convert cached ISO date strings back into ``date`` objects.
+
+    Parameters
+    ----------
+    serialized_dates : object
+        JSON-decoded value expected to contain a list of ISO-format date strings.
+
+    Returns
+    -------
+    set[date]
+        Parsed dates. Invalid entries are ignored.
+    """
     parsed_dates: set[date] = set()
     if not isinstance(serialized_dates, list):
         return parsed_dates
@@ -333,10 +635,41 @@ def _deserialize_dates(serialized_dates: object) -> set[date]:
             parsed_dates.add(date.fromisoformat(value))
         except ValueError:
             continue
+
     return parsed_dates
 
 
 def _load_data_index() -> dict:
+    """
+    Load the runner date-discovery cache from disk.
+
+    Returns
+    -------
+    dict
+        Parsed cache structure, or a clean empty structure if the cache is
+        missing, malformed, or version-incompatible.
+
+    Notes
+    -----
+    Cache structure:
+
+    {
+      "version": int,
+      "roots": {
+        "<absolute_data_root>": {
+          "files": {
+            "<relative_path>": {
+              "size": int,
+              "mtime_ns": int,
+              "dates": ["YYYY-MM-DD", ...],
+              "date_source": "timestamp" | "filename_fallback" | "none",
+              "has_timestamp_date": bool
+            }
+          }
+        }
+      }
+    }
+    """
     if not DATA_INDEX_FILE.exists():
         return {"version": DATA_INDEX_VERSION, "roots": {}}
 
@@ -351,10 +684,26 @@ def _load_data_index() -> dict:
         return {"version": DATA_INDEX_VERSION, "roots": {}}
     if not isinstance(parsed.get("roots"), dict):
         return {"version": DATA_INDEX_VERSION, "roots": {}}
+
     return parsed
 
 
 def _load_cached_root_entries(index_data: dict, data_root: Path) -> dict[str, dict]:
+    """
+    Extract cached file entries for one data root.
+
+    Parameters
+    ----------
+    index_data : dict
+        Loaded cache structure.
+    data_root : pathlib.Path
+        Absolute root directory used as the cache key.
+
+    Returns
+    -------
+    dict[str, dict]
+        Mapping from relative file path to cached metadata.
+    """
     roots = index_data.get("roots")
     if not isinstance(roots, dict):
         return {}
@@ -371,17 +720,44 @@ def _load_cached_root_entries(index_data: dict, data_root: Path) -> dict[str, di
 
 
 def _store_cached_root_entries(index_data: dict, data_root: Path, file_entries: dict[str, dict]) -> None:
+    """
+    Store updated cached file entries for one data root.
+
+    Parameters
+    ----------
+    index_data : dict
+        Mutable cache structure.
+    data_root : pathlib.Path
+        Absolute root directory used as the cache key.
+    file_entries : dict[str, dict]
+        Updated per-file cache metadata.
+    """
     roots = index_data.setdefault("roots", {})
     if not isinstance(roots, dict):
         index_data["roots"] = {}
         roots = index_data["roots"]
+
     roots[str(data_root)] = {"files": file_entries}
 
 
 def _write_data_index(index_data: dict) -> None:
+    """
+    Write the runner date-discovery cache to disk atomically.
+
+    Parameters
+    ----------
+    index_data : dict
+        Cache structure to persist.
+
+    Notes
+    -----
+    The cache is written via a temporary file and then replaced atomically to
+    reduce the chance of corruption.
+    """
     DATA_INDEX_FILE.parent.mkdir(parents=True, exist_ok=True)
     with NamedTemporaryFile("w", encoding="utf-8", dir=DATA_INDEX_FILE.parent, delete=False) as tmp:
         json.dump(index_data, tmp, ensure_ascii=False, indent=2, sort_keys=True)
         tmp.write("\n")
         temp_path = Path(tmp.name)
+
     temp_path.replace(DATA_INDEX_FILE)
