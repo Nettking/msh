@@ -90,6 +90,7 @@ Each session stores:
 - per-script execution status (`not_run`, `done`, `failed`) plus run metadata
 - script run outputs under `runs/<script>/<timestamp>/`
 - session metadata in `session.json`
+- a lightweight session config signature for the selected filter config
 
 Workflow guidance remains step-based:
 - **Step 1:** health checks
@@ -101,14 +102,16 @@ Execution and caching are script-level:
 - step completion is derived from script statuses
 - completed scripts are skipped by default unless rerun is requested
 - failed scripts are visible in session status and can be rerun
+- script status view includes `last_run_at`, `duration`, and output path
+- skipped runs are shown as cached; forced reruns are shown as recomputed
 
 Runner actions include:
-- create or reuse a session
+- create a new session or resume an existing session (with date range, completed count, last updated timestamp)
 - run next workflow step
-- run a selected workflow step
+- run a selected workflow step (batch run stops on first failure)
 - run one selected script
-- precompute all workflow scripts
-- precompute selected workflow scripts
+- precompute full workflow (Steps 1-4)
+- precompute workflow up to step N
 - show session status / cached outputs
 
 Default precompute scope includes the standard runner-visible workflow scripts:
@@ -125,3 +128,17 @@ Default precompute scope includes the standard runner-visible workflow scripts:
 Intentionally excluded from default precompute/workflow path:
 - legacy `corrolation_machine_pairs` (still runnable explicitly)
 - Streamlit and environment/recorder tools (`data_simulator`, `interventions`, recorders, `auto_connect`)
+
+### What is cached vs not cached
+
+Cached per session:
+- the filtered dataset under `results/workflows/<session-id>/data/`
+- script execution metadata in `session.json` (status, timing, output path, last run timestamp)
+- script outputs under `runs/<script>/<timestamp>/`
+
+Not cached (by design):
+- script correctness/validity checks against changed code or changed source data
+- cache invalidation decisions beyond explicit rerun requests
+- pipeline scheduling/dependency logic (this runner is workflow-guided, not a workflow engine)
+
+Precompute is intended to front-load script execution so later interactive review is fast, but it uses the same synchronous script runner and same session cache model as manual step/script runs.

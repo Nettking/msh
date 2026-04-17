@@ -42,6 +42,7 @@ based on incomplete or ambiguous cached state.
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import os
 import re
@@ -132,7 +133,7 @@ SCRIPT_METADATA: dict[str, dict[str, str | bool]] = {
 
 CATEGORY_ORDER: dict[str, int] = {"Simple": 0, "Advanced": 1, "Legacy": 2}
 
-SESSION_VERSION = 1
+SESSION_VERSION = 2
 WORKFLOW_STEPS: list[tuple[str, list[str]]] = [
     (
         "Step 1: Health checks",
@@ -687,17 +688,22 @@ def initialize_session_metadata(
         }
 
     now = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    filter_payload = {
+        "start_date": start_date.isoformat(),
+        "end_date": end_date.isoformat(),
+        "start_hour": start_hour,
+        "end_hour": end_hour,
+    }
+    session_config_signature = hashlib.sha256(
+        json.dumps(filter_payload, sort_keys=True).encode("utf-8")
+    ).hexdigest()[:12]
     return {
         "version": SESSION_VERSION,
         "session_id": session_id,
         "created_at": now,
         "updated_at": now,
-        "filter": {
-            "start_date": start_date.isoformat(),
-            "end_date": end_date.isoformat(),
-            "start_hour": start_hour,
-            "end_hour": end_hour,
-        },
+        "session_config_signature": session_config_signature,
+        "filter": filter_payload,
         "paths": {
             "filtered_data_dir": "data",
             "runs_dir": "runs",
@@ -729,7 +735,7 @@ def ensure_session_filtered_data(
     source_data_dir: Path,
     session_dir: Path,
     metadata: dict[str, Any],
-) -> tuple[int, int]:
+) -> tuple[int, int, str]:
     """
     Ensure the session-scoped filtered dataset exists, creating it once.
     """
@@ -740,7 +746,7 @@ def ensure_session_filtered_data(
         and filter_result.get("matched_records") is not None
         and filter_result.get("matched_files") is not None
     ):
-        return int(filter_result["matched_records"]), int(filter_result["matched_files"])
+        return int(filter_result["matched_records"]), int(filter_result["matched_files"]), "cached"
 
     if filtered_data_dir.exists():
         shutil.rmtree(filtered_data_dir)
@@ -758,7 +764,7 @@ def ensure_session_filtered_data(
     filter_result["matched_files"] = matched_files
     filter_result["generated_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     write_session_metadata(session_dir, metadata)
-    return matched_records, matched_files
+    return matched_records, matched_files, "created"
 
 
 def execute_script_for_session(
@@ -776,7 +782,7 @@ def execute_script_for_session(
         return "not_tracked", None
 
     if script_entry.get("status") == "done" and not force_rerun:
-        return "skipped_done", int(script_entry["exit_code"]) if script_entry.get("exit_code") is not None else 0
+        return "skipped_cached", int(script_entry["exit_code"]) if script_entry.get("exit_code") is not None else 0
 
     runs_dir = session_dir / str(metadata["paths"]["runs_dir"])
     runs_dir.mkdir(parents=True, exist_ok=True)
@@ -799,12 +805,15 @@ def execute_script_for_session(
     exit_code = run_script(script_to_run, run_dir)
     duration_seconds = round(perf_counter() - started, 3)
 
+    previous_status = str(script_entry.get("status", "not_run"))
     script_entry["status"] = "done" if exit_code == 0 else "failed"
     script_entry["output_path"] = run_dir.relative_to(session_dir).as_posix()
     script_entry["last_run_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     script_entry["duration_seconds"] = duration_seconds
     script_entry["exit_code"] = exit_code
     write_session_metadata(session_dir, metadata)
+    if force_rerun and previous_status == "done":
+        return "reran", exit_code
     return "ran", exit_code
 
 
