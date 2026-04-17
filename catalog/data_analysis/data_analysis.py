@@ -26,13 +26,14 @@ pipeline. Its thresholds and rules are heuristic and should be interpreted with
 care.
 """
 
-import glob
-import json
 import os
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
 
+from catalog.common.data_loading import iter_jsonl_files, load_jsonl_dataframe
+from catalog.common.state_inference import group_boolean_events
 from catalog.common.telemetry_prep import (
     prepare_timestamp_column,
     replace_unavailable,
@@ -40,7 +41,7 @@ from catalog.common.telemetry_prep import (
 )
 
 # Folder containing input JSONL files.
-FOLDER = r"./data"
+FOLDER = Path("./data")
 
 # File name pattern for telemetry input files.
 FILE_PATTERN = "*.jsonl"
@@ -84,33 +85,11 @@ def print_subheader(title):
 
 
 def load_jsonl(path):
-    """
-    Load a JSONL file into a DataFrame.
-
-    Blank lines are skipped. Malformed JSON lines are reported and ignored
-    rather than aborting the full file load.
-
-    Parameters
-    ----------
-    path : str
-        Path to the JSONL file.
-
-    Returns
-    -------
-    pandas.DataFrame
-        DataFrame containing all successfully parsed rows.
-    """
-    rows = []
-    with open(path, "r", encoding="utf-8") as f:
-        for i, line in enumerate(f, start=1):
-            line = line.strip()
-            if not line:
-                continue
-            try:
-                rows.append(json.loads(line))
-            except Exception as e:
-                print(f"[WARNING] Failed to parse line {i} in {path}: {e}")
-    return pd.DataFrame(rows)
+    """Load a JSONL file into a DataFrame using shared tolerant parsing."""
+    return load_jsonl_dataframe(
+        path,
+        on_malformed_json=lambda msg: print(f"[WARNING] {msg}"),
+    )
 
 
 def availability_fraction(series):
@@ -121,55 +100,6 @@ def availability_fraction(series):
     """
     s = replace_unavailable(series)
     return s.notna().mean()
-
-
-def group_boolean_events(df, event_mask, time_col="timestamp", max_gap_sec=10.0):
-    """
-    Group nearby event-marked rows into broader event windows.
-
-    Rows marked True in ``event_mask`` are sorted by time and merged into the
-    same event when the gap between successive rows does not exceed
-    ``max_gap_sec``.
-
-    Parameters
-    ----------
-    df : pandas.DataFrame
-        Input dataframe containing timestamps.
-    event_mask : pandas.Series or array-like
-        Boolean mask identifying candidate event rows.
-    time_col : str, default="timestamp"
-        Timestamp column used for grouping.
-    max_gap_sec : float, default=10.0
-        Maximum allowed time gap between rows in the same grouped event.
-
-    Returns
-    -------
-    pandas.DataFrame
-        One row per grouped event with start, end, point count, and duration.
-    """
-    event_rows = df.loc[event_mask].copy()
-    if event_rows.empty:
-        return pd.DataFrame()
-
-    event_rows = event_rows.sort_values(time_col).reset_index()
-    event_rows["dt_from_prev"] = event_rows[time_col].diff().dt.total_seconds()
-    event_rows["new_group"] = (
-        event_rows["dt_from_prev"].isna()
-        | (event_rows["dt_from_prev"] > max_gap_sec)
-    ).astype(int)
-    event_rows["event_group"] = event_rows["new_group"].cumsum()
-
-    grouped = (
-        event_rows.groupby("event_group")
-        .agg(
-            start=(time_col, "min"),
-            end=(time_col, "max"),
-            n_points=("index", "size"),
-        )
-        .reset_index(drop=True)
-    )
-    grouped["duration_sec"] = (grouped["end"] - grouped["start"]).dt.total_seconds()
-    return grouped
 
 
 def dataset_audit(df):
@@ -678,14 +608,14 @@ def main():
     """
     print_header("BATCH ANALYSIS OF JSONL TELEMETRY FILES")
 
-    files = sorted(glob.glob(os.path.join(FOLDER, FILE_PATTERN)))
+    files = list(iter_jsonl_files(FOLDER, recursive=False))
     if not files:
         print(f"No files found in folder: {FOLDER!r} with pattern {FILE_PATTERN!r}")
         return
 
     print(f"Found {len(files)} files.\n")
     for path in files:
-        analyze_file(path)
+        analyze_file(str(path))
 
 
 if __name__ == "__main__":
