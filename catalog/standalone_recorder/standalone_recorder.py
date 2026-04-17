@@ -49,7 +49,7 @@ import requests
 # Keys are machine names recorded in the output JSONL rows.
 SOURCES = {
     "QuickTurn": "http://192.168.200.249:5000/current",
-    "IG500": "http://192.168.200.249:5000/current",
+    "IG500": "http://192.168.200.251:5000/current",
     "VTC": "http://192.168.200.252:5000/current",
 }
 
