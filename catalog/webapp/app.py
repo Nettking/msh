@@ -20,7 +20,7 @@ if not __package__:
     if repo_root_str not in sys.path:
         sys.path.insert(0, repo_root_str)
 
-from catalog.common.timeline_exports import build_state_interval_export, load_timeline_export
+from catalog.common.timeline_exports import build_state_interval_export, load_timeline_export_with_schema_info
 
 STATE_COLORS = {
     "active": "#16a34a",
@@ -36,24 +36,53 @@ REQUIRED_PLAYBACK_COLUMNS = {"timestamp", "machine_id", "state"}
 
 
 @st.cache_data(show_spinner=False)
-def _load_data_from_path(path: str) -> pd.DataFrame:
-    return load_timeline_export(path)
+def _load_data_from_path(path: str) -> tuple[pd.DataFrame, set[str], set[str]]:
+    return load_timeline_export_with_schema_info(path)
 
 
 @st.cache_data(show_spinner=False)
-def _load_data_from_upload(content: bytes, suffix: str) -> pd.DataFrame:
+def _load_data_from_upload(content: bytes, suffix: str) -> tuple[pd.DataFrame, set[str], set[str]]:
     with tempfile.NamedTemporaryFile(prefix="timeline_upload_", suffix=suffix, delete=False) as handle:
         handle.write(content)
         tmp_path = Path(handle.name)
     try:
-        return load_timeline_export(tmp_path)
+        return load_timeline_export_with_schema_info(tmp_path)
     finally:
         if tmp_path.exists():
             tmp_path.unlink()
 
-def _validate_playback_export_schema(df: pd.DataFrame) -> tuple[bool, list[str]]:
-    missing = sorted(REQUIRED_PLAYBACK_COLUMNS.difference(df.columns))
-    return not missing, missing
+
+def _has_non_empty_values(series: pd.Series) -> bool:
+    cleaned = series.astype("string").str.strip()
+    return cleaned.replace("", pd.NA).notna().any()
+
+
+def _validate_playback_export_schema(
+    df: pd.DataFrame,
+    *,
+    source_columns: set[str],
+) -> tuple[bool, str]:
+    missing = sorted(REQUIRED_PLAYBACK_COLUMNS.difference(source_columns))
+    if missing:
+        return (
+            False,
+            "This file does not match the playback-export schema. "
+            f"Missing required source columns: {', '.join(missing)}. "
+            "It may be a raw telemetry file. "
+            "Please launch playback from a workflow session or load a generated export from "
+            "results/workflows/<session-id>/exports/timeline/.",
+        )
+
+    if not pd.to_datetime(df["timestamp"], errors="coerce").notna().any():
+        return False, "Playback export columns are present, but 'timestamp' has no parseable values."
+
+    if not _has_non_empty_values(df["machine_id"]):
+        return False, "Playback export columns are present, but 'machine_id' has no non-empty values."
+
+    if not _has_non_empty_values(df["state"]):
+        return False, "Playback export columns are present, but 'state' has no non-empty values."
+
+    return True, ""
 
 def _filter_machine_day(df: pd.DataFrame, machine_id: str, day) -> pd.DataFrame:
     rows = df[(df["machine_id"] == str(machine_id)) & (df["date"] == day)].copy()
@@ -226,25 +255,23 @@ def main():
             st.caption(f"Prefilled source: {source_hint}")
 
     df: pd.DataFrame | None = None
+    source_columns: set[str] = set()
     if uploaded is not None:
         suffix = Path(uploaded.name).suffix or ".csv"
-        df = _load_data_from_upload(uploaded.getvalue(), suffix)
+        df, source_columns, _ = _load_data_from_upload(uploaded.getvalue(), suffix)
     elif local_path.strip():
-        df = _load_data_from_path(local_path.strip())
+        df, source_columns, _ = _load_data_from_path(local_path.strip())
 
     if df is None:
         st.info("Load a playback export file (CSV/Parquet/JSONL/JSON) to begin playback.")
         return
 
-    valid_schema, missing_columns = _validate_playback_export_schema(df)
+    valid_schema, validation_message = _validate_playback_export_schema(
+        df,
+        source_columns=source_columns,
+    )
     if not valid_schema:
-        st.warning(
-            "This file does not match the playback-export schema. "
-            f"Missing required columns: {', '.join(missing_columns)}. "
-            "It may be a raw telemetry file. "
-            "Please launch playback from a workflow session or load a generated export from "
-            "results/workflows/<session-id>/exports/timeline/."
-        )
+        st.warning(validation_message)
         return
 
     machines = sorted(df["machine_id"].dropna().astype(str).unique().tolist())
