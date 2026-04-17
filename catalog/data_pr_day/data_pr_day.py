@@ -31,8 +31,7 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from catalog.common.data_loading import iter_records_in_dir
-from catalog.common.time_utils import parse_iso_timestamp
+from catalog.common.data_loading import iter_records_with_parsed_timestamps
 
 # Folder containing input JSONL files.
 DATA_DIR = "data"
@@ -51,29 +50,25 @@ def _warn_malformed_json(message: str) -> None:
     print(f"Error parsing line: {message}")
 
 
+def _warn_invalid_timestamp(file_path: Path, raw_timestamp: object) -> None:
+    """
+    Report records whose timestamp cannot be parsed.
+    """
+    print(f"Error parsing line in {file_path.name}: Invalid isoformat string: {raw_timestamp}")
+
+
 records = []
 
 # Read top-level JSONL files only. This preserves the script's original behavior
 # and avoids unexpectedly traversing nested directories.
-for file_path, entry in iter_records_in_dir(
+for _, entry in iter_records_with_parsed_timestamps(
     DATA_DIR,
     recursive=False,
+    allow_z_suffix=True,
     on_malformed_json=_warn_malformed_json,
+    on_invalid_timestamp=_warn_invalid_timestamp,
 ):
-    try:
-        parsed_timestamp = parse_iso_timestamp(
-            entry.get("timestamp"),
-            allow_z_suffix=True,
-        )
-        if parsed_timestamp is None:
-            raise ValueError(f"Invalid isoformat string: {entry.get('timestamp')}")
-
-        entry["timestamp"] = parsed_timestamp
-        records.append(entry)
-
-    except Exception as e:
-        # Invalid records are skipped rather than halting the full plotting run.
-        print(f"Error parsing line in {file_path.name}: {e}")
+    records.append(entry)
 
 if not records:
     raise SystemExit("No valid records found in data folder.")

@@ -20,6 +20,8 @@ Notes
 -----
 - This script reads only top-level JSONL files in ``data/``.
 - Rows with malformed JSON or invalid timestamps are skipped.
+- Error messages for malformed/invalid rows are now emitted through shared
+  loader callbacks, so wording may differ slightly from older ad hoc prints.
 - The sampling rate is estimated as ``1 / time_gap_s`` between consecutive rows.
 - If multiple machines or streams are mixed together, the estimated rate may not
   reflect the true sampling rate of any single source.
@@ -27,12 +29,17 @@ Notes
   exploratory indicator rather than a strict acquisition-system metric.
 """
 
-import json
-import os
-from datetime import datetime
+import sys
+from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from catalog.common.data_loading import iter_records_with_parsed_timestamps
 
 # Folder containing input JSONL files.
 DATA_DIR = "data"
@@ -48,22 +55,30 @@ OUTPUT_PLOT = "daily_sampling_rate.png"
 FREQUENCY_THRESHOLD = 4.9
 
 
+def _warn_malformed_json(message: str) -> None:
+    """
+    Report malformed JSONL lines encountered during loading.
+    """
+    print(f"Error parsing line: {message}")
+
+
+def _warn_invalid_timestamp(file_path: Path, raw_timestamp: object) -> None:
+    """
+    Report records whose timestamp cannot be parsed.
+    """
+    print(f"Error parsing line in {file_path.name}: Invalid isoformat string: {raw_timestamp}")
+
+
 records = []
 
 # Preserve original behavior by reading only top-level JSONL files.
-for filename in sorted(os.listdir(DATA_DIR)):
-    if filename.endswith(".jsonl"):
-        filepath = os.path.join(DATA_DIR, filename)
-        with open(filepath, "r") as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        entry = json.loads(line)
-                        entry["timestamp"] = datetime.fromisoformat(entry["timestamp"])
-                        records.append(entry)
-                    except Exception as e:
-                        # Invalid rows are skipped instead of halting the full run.
-                        print(f"Error parsing line in {filename}: {e}")
+for _, entry in iter_records_with_parsed_timestamps(
+    DATA_DIR,
+    recursive=False,
+    on_malformed_json=_warn_malformed_json,
+    on_invalid_timestamp=_warn_invalid_timestamp,
+):
+    records.append(entry)
 
 if not records:
     raise SystemExit("No valid records found.")
