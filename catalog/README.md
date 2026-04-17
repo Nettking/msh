@@ -29,3 +29,8 @@ This catalog documents behavior from **static code inspection** for each script 
 
 ## Compatibility note (path migration)
 All entrypoints changed to `catalog/...`. Existing commands must be updated to the new paths.
+
+## Shared utility helpers
+- Shared JSONL and timestamp parsing helpers now live in `catalog/common/`:
+  - `catalog/common/data_loading.py`
+  - `catalog/common/time_utils.py`
