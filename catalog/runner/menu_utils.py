@@ -134,6 +134,8 @@ SCRIPT_METADATA: dict[str, dict[str, str | bool]] = {
 CATEGORY_ORDER: dict[str, int] = {"Simple": 0, "Advanced": 1, "Legacy": 2}
 
 SESSION_VERSION = 2
+SESSION_STATE_FILE = "session_state.json"
+LEGACY_SESSION_FILE = "session.json"
 WORKFLOW_STEPS: list[tuple[str, list[str]]] = [
     (
         "Step 1: Health checks",
@@ -651,7 +653,9 @@ def list_sessions(workflows_root: Path) -> list[SessionInfo]:
     for item in sorted(workflows_root.iterdir(), key=lambda path: path.name, reverse=True):
         if not item.is_dir():
             continue
-        metadata_path = item / "session.json"
+        metadata_path = item / SESSION_STATE_FILE
+        if not metadata_path.exists():
+            metadata_path = item / LEGACY_SESSION_FILE
         if not metadata_path.exists():
             continue
         try:
@@ -694,9 +698,7 @@ def initialize_session_metadata(
         "start_hour": start_hour,
         "end_hour": end_hour,
     }
-    session_config_signature = hashlib.sha256(
-        json.dumps(filter_payload, sort_keys=True).encode("utf-8")
-    ).hexdigest()[:12]
+    session_config_signature = _filter_signature(filter_payload)
     return {
         "version": SESSION_VERSION,
         "session_id": session_id,
@@ -709,6 +711,7 @@ def initialize_session_metadata(
             "runs_dir": "runs",
         },
         "filter_result": {
+            "filtered_data_path": "data",
             "matched_records": None,
             "matched_files": None,
             "generated_at": None,
@@ -717,17 +720,157 @@ def initialize_session_metadata(
     }
 
 
+def _filter_signature(filter_payload: dict[str, Any]) -> str:
+    """
+    Compute the stable config signature used for session cache reuse.
+    """
+    return hashlib.sha256(json.dumps(filter_payload, sort_keys=True).encode("utf-8")).hexdigest()[:12]
+
+
+def normalize_session_metadata(
+    session_dir: Path,
+    metadata: dict[str, Any],
+    script_options: list[ScriptOption],
+) -> tuple[dict[str, Any], bool]:
+    """
+    Fill missing session fields and add new script entries for backward compatibility.
+    """
+    changed = False
+
+    paths = metadata.setdefault("paths", {})
+    if "filtered_data_dir" not in paths:
+        paths["filtered_data_dir"] = "data"
+        changed = True
+    if "runs_dir" not in paths:
+        paths["runs_dir"] = "runs"
+        changed = True
+
+    filter_payload = metadata.setdefault("filter", {})
+    expected_signature = _filter_signature(
+        {
+            "start_date": filter_payload.get("start_date"),
+            "end_date": filter_payload.get("end_date"),
+            "start_hour": filter_payload.get("start_hour"),
+            "end_hour": filter_payload.get("end_hour"),
+        }
+    )
+    if metadata.get("session_config_signature") != expected_signature:
+        metadata["session_config_signature"] = expected_signature
+        changed = True
+
+    filter_result = metadata.setdefault("filter_result", {})
+    if "filtered_data_path" not in filter_result:
+        filter_result["filtered_data_path"] = "data"
+        changed = True
+
+    scripts = metadata.setdefault("scripts", {})
+    for item in script_options:
+        entry = scripts.get(item.key)
+        if entry is None:
+            scripts[item.key] = {
+                "script_name": item.key,
+                "category": item.category,
+                "workflow_step": workflow_step_for_script(item.key),
+                "status": "not_run",
+                "output_path": None,
+                "last_run_at": None,
+                "duration_seconds": None,
+                "exit_code": None,
+            }
+            changed = True
+            continue
+
+        defaults = {
+            "script_name": item.key,
+            "category": item.category,
+            "workflow_step": workflow_step_for_script(item.key),
+            "status": "not_run",
+            "output_path": None,
+            "last_run_at": None,
+            "duration_seconds": None,
+            "exit_code": None,
+        }
+        for key, value in defaults.items():
+            if key not in entry:
+                entry[key] = value
+                changed = True
+
+    if refresh_script_cache_status(session_dir, metadata):
+        changed = True
+    return metadata, changed
+
+
 def write_session_metadata(session_dir: Path, metadata: dict[str, Any]) -> None:
     """
     Persist session metadata atomically.
     """
     metadata["updated_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
-    target = session_dir / "session.json"
-    with NamedTemporaryFile("w", encoding="utf-8", dir=session_dir, delete=False) as tmp:
-        json.dump(metadata, tmp, ensure_ascii=False, indent=2, sort_keys=True)
-        tmp.write("\n")
-        temp_path = Path(tmp.name)
-    temp_path.replace(target)
+    for file_name in (SESSION_STATE_FILE, LEGACY_SESSION_FILE):
+        target = session_dir / file_name
+        with NamedTemporaryFile("w", encoding="utf-8", dir=session_dir, delete=False) as tmp:
+            json.dump(metadata, tmp, ensure_ascii=False, indent=2, sort_keys=True)
+            tmp.write("\n")
+            temp_path = Path(tmp.name)
+        temp_path.replace(target)
+
+
+def _script_output_exists(session_dir: Path, script_entry: dict[str, Any]) -> bool:
+    output_path = script_entry.get("output_path")
+    if not isinstance(output_path, str) or not output_path:
+        return False
+    return (session_dir / output_path).exists()
+
+
+def refresh_script_cache_status(session_dir: Path, metadata: dict[str, Any]) -> bool:
+    """
+    Invalidate cached script status if metadata claims done but outputs are missing.
+    """
+    changed = False
+    for script_entry in metadata.get("scripts", {}).values():
+        if script_entry.get("status") != "done":
+            continue
+        if _script_output_exists(session_dir, script_entry):
+            continue
+        script_entry["status"] = "not_run"
+        script_entry["output_path"] = None
+        script_entry["exit_code"] = None
+        script_entry["last_run_at"] = None
+        script_entry["duration_seconds"] = None
+        changed = True
+    return changed
+
+
+def _filtered_data_looks_usable(filtered_data_dir: Path, *, expect_files: bool) -> bool:
+    """
+    Perform a lightweight sanity check that cached filtered data is usable.
+    """
+    if not filtered_data_dir.exists() or not filtered_data_dir.is_dir():
+        return False
+    if not expect_files:
+        return True
+    return any(filtered_data_dir.rglob("*.jsonl"))
+
+
+def _session_filter_cache_is_valid(session_dir: Path, metadata: dict[str, Any]) -> bool:
+    filtered_data_dir = session_dir / str(metadata.get("paths", {}).get("filtered_data_dir", "data"))
+    filter_result = metadata.get("filter_result", {})
+    if not filtered_data_dir.exists():
+        return False
+    if filter_result.get("matched_records") is None or filter_result.get("matched_files") is None:
+        return False
+    matched_files = int(filter_result.get("matched_files", 0))
+    if not _filtered_data_looks_usable(filtered_data_dir, expect_files=matched_files > 0):
+        return False
+    filter_payload = metadata.get("filter", {})
+    expected_signature = _filter_signature(
+        {
+            "start_date": filter_payload.get("start_date"),
+            "end_date": filter_payload.get("end_date"),
+            "start_hour": filter_payload.get("start_hour"),
+            "end_hour": filter_payload.get("end_hour"),
+        }
+    )
+    return str(metadata.get("session_config_signature", "")) == expected_signature
 
 
 def ensure_session_filtered_data(
@@ -741,11 +884,7 @@ def ensure_session_filtered_data(
     """
     filtered_data_dir = session_dir / str(metadata["paths"]["filtered_data_dir"])
     filter_result = metadata.setdefault("filter_result", {})
-    if (
-        filtered_data_dir.exists()
-        and filter_result.get("matched_records") is not None
-        and filter_result.get("matched_files") is not None
-    ):
+    if _session_filter_cache_is_valid(session_dir, metadata):
         return int(filter_result["matched_records"]), int(filter_result["matched_files"]), "cached"
 
     if filtered_data_dir.exists():
@@ -762,6 +901,7 @@ def ensure_session_filtered_data(
     )
     filter_result["matched_records"] = matched_records
     filter_result["matched_files"] = matched_files
+    filter_result["filtered_data_path"] = metadata["paths"]["filtered_data_dir"]
     filter_result["generated_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     write_session_metadata(session_dir, metadata)
     return matched_records, matched_files, "created"
@@ -781,7 +921,7 @@ def execute_script_for_session(
     if script_entry is None:
         return "not_tracked", None
 
-    if script_entry.get("status") == "done" and not force_rerun:
+    if script_entry.get("status") == "done" and not force_rerun and _script_output_exists(session_dir, script_entry):
         return "skipped_cached", int(script_entry["exit_code"]) if script_entry.get("exit_code") is not None else 0
 
     runs_dir = session_dir / str(metadata["paths"]["runs_dir"])
