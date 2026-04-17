@@ -51,7 +51,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile, mkdtemp
-from typing import Iterable
+from typing import Iterable, Literal
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
@@ -60,19 +60,73 @@ if str(ROOT_DIR) not in sys.path:
 from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
 from catalog.common.time_utils import date_from_filename, parse_iso_timestamp, parse_timestamp_to_date
 
-# Catalog folders excluded from runnable-script discovery.
-DEFAULT_SCRIPT_EXCLUSIONS = {
-    "runner",
-    "auto_connect",
-    "data_simulator",
-    "interventions",
-    "standalone_recorder",
-    "standalone-recorder_v2",
+# Catalog folders intentionally hidden from the interactive runner.
+#
+# These remain documented in catalog/README.md, but they are not part of the
+# default "pick script + date range" analysis flow.
+RUNNER_HIDDEN_FOLDERS = {
+    "runner",  # runner implementation internals
+    "auto_connect",  # desktop automation helper
+    "data_simulator",  # streamlit app, not a one-shot CLI analysis run
+    "interventions",  # environment-specific script
+    "standalone_recorder",  # ingestion tool (legacy)
+    "standalone-recorder_v2",  # ingestion tool (preferred recorder)
 }
 
 # Versioned JSON cache used only for date discovery.
 DATA_INDEX_VERSION = 1
 DATA_INDEX_FILE = ROOT_DIR / "results" / "runner" / "data_index.json"
+
+ToolCategory = Literal["Simple", "Advanced", "Legacy"]
+
+# Runner-facing metadata. Keep this conservative and focused on navigation.
+SCRIPT_METADATA: dict[str, dict[str, str | bool]] = {
+    # Simple / first-pass analysis tools.
+    "machines_active_per_day": {
+        "category": "Simple",
+        "description": "Quick health check: count distinct active machines per day.",
+    },
+    "analyze_missing_sequence_number": {
+        "category": "Simple",
+        "description": "Quick health check: summarize missing sequence numbers per day.",
+    },
+    "missing_per_day_by_machine": {
+        "category": "Simple",
+        "description": "Machine-level quality check for missing sequence numbers.",
+    },
+    "sampling_rate_analysis": {
+        "category": "Simple",
+        "description": "Quick data-quality check: average telemetry sampling rate per day.",
+    },
+    "data_pr_day": {
+        "category": "Simple",
+        "description": "Raw inspection plots per machine and day.",
+    },
+    "find_stops": {
+        "category": "Simple",
+        "description": "Stop inspection timeline plots for day/hour windows.",
+    },
+    # Advanced / exploratory analysis tools.
+    "data_visualizer": {
+        "category": "Advanced",
+        "description": "Exploratory timeline reconstruction and candidate event export.",
+    },
+    "data_analysis": {
+        "category": "Advanced",
+        "description": "Exploratory batch analysis with deeper console diagnostics.",
+    },
+    "ml_analysis": {
+        "category": "Advanced",
+        "description": "Model-based stop prediction and machine-level ML artifacts.",
+    },
+    # Legacy / no longer a recommended main workflow.
+    "corrolation_machine_pairs": {
+        "category": "Legacy",
+        "description": "Legacy exploratory heatmap for pairwise machine stop correlation.",
+    },
+}
+
+CATEGORY_ORDER: dict[str, int] = {"Simple": 0, "Advanced": 1, "Legacy": 2}
 
 
 @dataclass(frozen=True)
@@ -90,11 +144,14 @@ class ScriptOption:
         Relative path to the script within the repository.
     description : str
         Short human-readable description, usually derived from the module docstring.
+    category : ToolCategory
+        Runner category label used for grouped presentation.
     """
     number: int
     key: str
     script_path: Path
     description: str
+    category: ToolCategory
 
 
 def repo_root() -> Path:
@@ -159,14 +216,15 @@ def discover_runnable_scripts(catalog_dir: Path) -> list[ScriptOption]:
 
     Notes
     -----
-    Certain folders are explicitly excluded via ``DEFAULT_SCRIPT_EXCLUSIONS``.
+    Certain folders are intentionally hidden via ``RUNNER_HIDDEN_FOLDERS`` to
+    keep the runner focused on one-shot analysis scripts.
     """
-    script_items: list[tuple[str, Path, str]] = []
+    script_items: list[tuple[str, Path, str, ToolCategory]] = []
 
     for folder in sorted(catalog_dir.iterdir()):
         if not folder.is_dir():
             continue
-        if folder.name in DEFAULT_SCRIPT_EXCLUSIONS:
+        if folder.name in RUNNER_HIDDEN_FOLDERS:
             continue
 
         convention_script = folder / f"{folder.name}.py"
@@ -182,14 +240,20 @@ def discover_runnable_scripts(catalog_dir: Path) -> list[ScriptOption]:
         else:
             continue
 
+        metadata = SCRIPT_METADATA.get(key, {})
         fallback_description = key.replace("_", " ").replace("-", " ")
-        description = _script_description(selected_script, fallback_description)
-        script_items.append((key, selected_script.relative_to(repo_root()), description))
+        description = str(metadata.get("description")) if metadata.get("description") else _script_description(
+            selected_script, fallback_description
+        )
+        category = str(metadata.get("category", "Advanced"))
+        if category not in CATEGORY_ORDER:
+            category = "Advanced"
+        script_items.append((key, selected_script.relative_to(repo_root()), description, category))
 
-    script_items.sort(key=lambda item: item[0].lower())
+    script_items.sort(key=lambda item: (CATEGORY_ORDER[item[3]], item[0].lower()))
     return [
-        ScriptOption(number=index, key=key, script_path=script_path, description=description)
-        for index, (key, script_path, description) in enumerate(script_items, start=1)
+        ScriptOption(number=index, key=key, script_path=script_path, description=description, category=category)
+        for index, (key, script_path, description, category) in enumerate(script_items, start=1)
     ]
 
 
