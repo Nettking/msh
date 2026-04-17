@@ -86,7 +86,7 @@ def main():
         return
 
     df = pd.concat(all_intervals, ignore_index=True)
-    df["hour"] = df["start"].dt.floor("H")
+    df["hour"] = df["start"].dt.floor("h")
 
     # aggregate total stop time per machine per hour
     pivot = (
