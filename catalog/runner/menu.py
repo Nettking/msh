@@ -29,6 +29,7 @@ from menu_utils import (
     execute_script_for_session,
     initialize_session_metadata,
     list_sessions,
+    normalize_session_metadata,
     print_numbered_menu,
     prompt_menu_choice,
     repo_root,
@@ -234,7 +235,14 @@ def choose_or_create_session(
             )
         print_numbered_menu("\nAvailable sessions:", labels)
         selected = sessions[prompt_menu_choice(len(sessions), "Choose session number: ") - 1]
-        return selected.session_id, selected.session_dir, selected.metadata
+        normalized, changed = normalize_session_metadata(
+            selected.session_dir,
+            selected.metadata,
+            script_options,
+        )
+        if changed:
+            write_session_metadata(selected.session_dir, normalized)
+        return selected.session_id, selected.session_dir, normalized
 
     start_date, end_date = pick_date_range(available_dates)
     hour_range: tuple[int, int] | None = None

@@ -89,7 +89,7 @@ Each session stores:
 - one filtered dataset copy (`data/`) reused by later script runs in that session
 - per-script execution status (`not_run`, `done`, `failed`) plus run metadata
 - script run outputs under `runs/<script>/<timestamp>/`
-- session metadata in `session.json`
+- session metadata in `session_state.json` (with legacy mirror `session.json`)
 - a lightweight session config signature for the selected filter config
 
 Workflow guidance remains step-based:
@@ -133,7 +133,7 @@ Intentionally excluded from default precompute/workflow path:
 
 Cached per session:
 - the filtered dataset under `results/workflows/<session-id>/data/`
-- script execution metadata in `session.json` (status, timing, output path, last run timestamp)
+- script execution metadata in `session_state.json` (status, timing, output path, last run timestamp)
 - script outputs under `runs/<script>/<timestamp>/`
 
 Not cached (by design):
