@@ -30,7 +30,7 @@ DEFAULT_SCRIPT_EXCLUSIONS = {
 }
 
 DATA_INDEX_VERSION = 1
-DATA_INDEX_FILE = Path(__file__).resolve().parent / ".data_index.json"
+DATA_INDEX_FILE = ROOT_DIR / "results" / "runner" / "data_index.json"
 
 
 @dataclass(frozen=True)
@@ -98,10 +98,15 @@ def discover_available_dates(data_dir: Path) -> list[date]:
     dates: set[date] = set()
     data_root = data_dir.resolve()
     index_data = _load_data_index()
+    print(f"[runner] Loaded date cache from {DATA_INDEX_FILE}", flush=True)
     cached_root_entries = _load_cached_root_entries(index_data, data_root)
     updated_root_entries: dict[str, dict] = {}
+    jsonl_files = list(iter_jsonl_files(data_dir, recursive=True))
+    print(f"[runner] Found {len(jsonl_files)} JSONL files for date discovery", flush=True)
+    reused_from_cache = 0
+    reparsed_files = 0
 
-    for file_path in iter_jsonl_files(data_dir, recursive=True):
+    for file_path in jsonl_files:
         relative_path = file_path.resolve().relative_to(data_root).as_posix()
         stat_result = file_path.stat()
         file_size = stat_result.st_size
@@ -116,8 +121,10 @@ def discover_available_dates(data_dir: Path) -> list[date]:
             file_dates = _deserialize_dates(cache_entry.get("dates", []))
             date_source = str(cache_entry.get("date_source", "none"))
             has_timestamp_date = bool(cache_entry.get("has_timestamp_date", False))
+            reused_from_cache += 1
         else:
             file_dates, date_source, has_timestamp_date = _discover_dates_for_file(file_path)
+            reparsed_files += 1
 
         dates.update(file_dates)
         updated_root_entries[relative_path] = {
@@ -128,7 +135,12 @@ def discover_available_dates(data_dir: Path) -> list[date]:
             "has_timestamp_date": has_timestamp_date,
         }
 
+    print(
+        f"[runner] Date discovery reused {reused_from_cache} cached files and reparsed {reparsed_files} files",
+        flush=True,
+    )
     _store_cached_root_entries(index_data, data_root, updated_root_entries)
+    print(f"[runner] Writing date cache to {DATA_INDEX_FILE}", flush=True)
     _write_data_index(index_data)
 
     return sorted(dates)
@@ -138,8 +150,11 @@ def filter_data_by_date_range(source_data_dir: Path, destination_data_dir: Path,
     destination_data_dir.mkdir(parents=True, exist_ok=True)
     matched_records = 0
     written_files = 0
+    processed_files = 0
+    source_files = list(iter_jsonl_files(source_data_dir, recursive=True))
+    print(f"[runner] Filtering {len(source_files)} files for range {start_date.isoformat()}..{end_date.isoformat()}", flush=True)
 
-    for source_file in iter_jsonl_files(source_data_dir, recursive=True):
+    for source_file in source_files:
         relative_path = source_file.relative_to(source_data_dir)
         destination_file = destination_data_dir / relative_path
         destination_file.parent.mkdir(parents=True, exist_ok=True)
@@ -174,6 +189,19 @@ def filter_data_by_date_range(source_data_dir: Path, destination_data_dir: Path,
             written_files += 1
         else:
             destination_file.unlink(missing_ok=True)
+        processed_files += 1
+        if processed_files % 25 == 0:
+            print(
+                f"[runner] Filter progress: processed {processed_files}/{len(source_files)} files "
+                f"(matched files: {written_files}, matched records: {matched_records})",
+                flush=True,
+            )
+
+    print(
+        f"[runner] Filter complete: processed {processed_files} files, wrote {written_files} files, "
+        f"matched {matched_records} records",
+        flush=True,
+    )
 
     return matched_records, written_files
 
