@@ -34,6 +34,8 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from catalog.common.telemetry_prep import prepare_timestamp_column, to_numeric
+
 # Directory containing input JSONL telemetry files.
 DATA_DIR = Path("data")
 
@@ -81,8 +83,7 @@ def load_jsonl(file_path):
     if "timestamp" not in df.columns:
         return pd.DataFrame()
 
-    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    df = df.dropna(subset=["timestamp"]).sort_values("timestamp")
+    df = prepare_timestamp_column(df, time_col="timestamp", drop_invalid=True, sort=True)
     return df
 
 
@@ -121,7 +122,7 @@ def find_stops(df):
     available_cols = [c for c in numeric_cols if c in df.columns]
 
     for col in available_cols:
-        df[col] = pd.to_numeric(df[col], errors="coerce")
+        df[col] = to_numeric(df[col])
 
     if not available_cols or "execution" not in df.columns:
         return pd.DataFrame(columns=["timestamp", "execution", "mode", "machine"])

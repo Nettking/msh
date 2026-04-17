@@ -33,6 +33,12 @@ import os
 import numpy as np
 import pandas as pd
 
+from catalog.common.telemetry_prep import (
+    prepare_timestamp_column,
+    replace_unavailable,
+    to_numeric,
+)
+
 # Folder containing input JSONL files.
 FOLDER = r"./data"
 
@@ -107,36 +113,13 @@ def load_jsonl(path):
     return pd.DataFrame(rows)
 
 
-def replace_unavailable_with_nan(series):
-    """
-    Replace string-based 'UNAVAILABLE' values with NaN.
-
-    This keeps availability checks and numeric conversion more consistent
-    across telemetry columns that mix valid values with sentinel strings.
-    """
-    if series.dtype == object:
-        return series.replace("UNAVAILABLE", np.nan)
-    return series
-
-
-def try_convert_numeric(series):
-    """
-    Convert a series to numeric values where possible.
-
-    Non-numeric values are coerced to NaN after first replacing the
-    'UNAVAILABLE' sentinel when relevant.
-    """
-    s = replace_unavailable_with_nan(series)
-    return pd.to_numeric(s, errors="coerce")
-
-
 def availability_fraction(series):
     """
     Compute the fraction of non-missing values in a series.
 
     'UNAVAILABLE' values are treated as missing.
     """
-    s = replace_unavailable_with_nan(series)
+    s = replace_unavailable(series)
     return s.notna().mean()
 
 
@@ -225,7 +208,7 @@ def dataset_audit(df):
     df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
     result["timestamp_ok"] = df["timestamp"].notna().all()
 
-    df = df.sort_values("timestamp").reset_index(drop=True)
+    df = prepare_timestamp_column(df, time_col="timestamp", drop_invalid=False, sort=True, reset_index=True)
     result["timestamp_monotonic"] = df["timestamp"].is_monotonic_increasing
 
     df["dt_sec"] = df["timestamp"].diff().dt.total_seconds()
@@ -249,7 +232,7 @@ def dataset_audit(df):
         )
 
         if col != "timestamp":
-            numeric = try_convert_numeric(s)
+            numeric = to_numeric(s)
             frac_numeric = numeric.notna().mean()
             if frac_numeric > 0:
                 candidate_numeric.append(
@@ -271,21 +254,21 @@ def dataset_audit(df):
 
     if "execution" in df.columns:
         result["execution_counts"] = (
-            replace_unavailable_with_nan(df["execution"])
+            replace_unavailable(df["execution"])
             .value_counts(dropna=False)
             .head(20)
         )
 
     if "mode" in df.columns:
         result["mode_counts"] = (
-            replace_unavailable_with_nan(df["mode"])
+            replace_unavailable(df["mode"])
             .value_counts(dropna=False)
             .head(20)
         )
 
     if "program" in df.columns:
         result["program_counts"] = (
-            replace_unavailable_with_nan(df["program"])
+            replace_unavailable(df["program"])
             .value_counts(dropna=False)
             .head(20)
         )
@@ -323,14 +306,12 @@ def active_segment_analysis(df):
     if "timestamp" not in df.columns:
         return result
 
-    df = df.copy()
-    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    df = df.sort_values("timestamp").reset_index(drop=True)
+    df = prepare_timestamp_column(df, time_col="timestamp", drop_invalid=False, sort=True, reset_index=True)
     df["dt_sec"] = df["timestamp"].diff().dt.total_seconds()
 
     for col in CORE_NUMERIC_SIGNALS:
         if col in df.columns:
-            df[col] = try_convert_numeric(df[col])
+            df[col] = to_numeric(df[col])
 
     df["dense_time"] = df["dt_sec"].fillna(999999) < DENSE_DT_THRESHOLD_SEC
     df["long_idle_gap"] = df["dt_sec"].fillna(0) > LONG_IDLE_DT_THRESHOLD_SEC
@@ -423,21 +404,19 @@ def candidate_event_analysis(df):
     if "timestamp" not in df.columns:
         return result
 
-    df = df.copy()
-    df["timestamp"] = pd.to_datetime(df["timestamp"], errors="coerce")
-    df = df.sort_values("timestamp").reset_index(drop=True)
+    df = prepare_timestamp_column(df, time_col="timestamp", drop_invalid=False, sort=True, reset_index=True)
     df["dt_sec"] = df["timestamp"].diff().dt.total_seconds()
 
     for col in ["Srpm", "Sovr", "Sload", "Stemp", "Fovr", "Frapidovr"]:
         if col in df.columns:
-            df[col] = try_convert_numeric(df[col])
+            df[col] = to_numeric(df[col])
 
     if "execution" in df.columns:
-        df["execution_clean"] = replace_unavailable_with_nan(df["execution"])
+        df["execution_clean"] = replace_unavailable(df["execution"])
     if "mode" in df.columns:
-        df["mode_clean"] = replace_unavailable_with_nan(df["mode"])
+        df["mode_clean"] = replace_unavailable(df["mode"])
     if "program" in df.columns:
-        df["program_clean"] = replace_unavailable_with_nan(df["program"])
+        df["program_clean"] = replace_unavailable(df["program"])
 
     # Restrict rate estimates to plausible telemetry step sizes.
     valid_dt = df["dt_sec"].between(0.1, 30)
