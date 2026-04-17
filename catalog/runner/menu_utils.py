@@ -978,10 +978,19 @@ def run_script(script_path: Path, workspace_dir: Path) -> int:
     The subprocess runs with:
     - ``PYTHONUNBUFFERED=1`` for immediate output visibility
     - ``MPLBACKEND=Agg`` by default to avoid interactive Matplotlib requirements
+    - ``PYTHONPATH`` extended with the workspace root so copied package-style
+      imports (for example ``catalog.common.*``) resolve during session runs
     """
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
     env.setdefault("MPLBACKEND", "Agg")
+    workspace_import_root = str(workspace_dir.resolve())
+    existing_pythonpath = env.get("PYTHONPATH")
+    env["PYTHONPATH"] = (
+        os.pathsep.join([workspace_import_root, existing_pythonpath])
+        if existing_pythonpath
+        else workspace_import_root
+    )
 
     command = [sys.executable, str(script_path)]
     print(f"\nRunning: {' '.join(command)}", flush=True)
