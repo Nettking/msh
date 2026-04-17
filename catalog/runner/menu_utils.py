@@ -2,18 +2,23 @@ from __future__ import annotations
 
 import json
 import os
-import re
 import shutil
 import subprocess
 import sys
 import ast
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from pathlib import Path
 from tempfile import mkdtemp
 from typing import Iterable
 
-DATE_IN_NAME = re.compile(r"(\d{4}-\d{2}-\d{2}|\d{8})")
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
+from catalog.common.time_utils import date_from_filename, parse_timestamp_to_date
+
 DEFAULT_SCRIPT_EXCLUSIONS = {
     "runner",
     "auto_connect",
@@ -35,45 +40,6 @@ class ScriptOption:
 def repo_root() -> Path:
     # catalog/runner/menu_utils.py -> repo root is two parents up
     return Path(__file__).resolve().parents[2]
-
-
-def parse_timestamp_to_date(timestamp: str) -> date | None:
-    if not timestamp:
-        return None
-
-    value = timestamp.strip()
-    if not value:
-        return None
-
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00")).date()
-    except ValueError:
-        pass
-
-    # fallback for common MTConnect format: 2026-03-01T12:00:00.0000000Z
-    mtconnect_date = re.search(r"(\d{4}-\d{2}-\d{2})", value)
-    if mtconnect_date:
-        try:
-            return date.fromisoformat(mtconnect_date.group(1))
-        except ValueError:
-            return None
-
-    return None
-
-
-def _date_from_filename(path: Path) -> date | None:
-    match = DATE_IN_NAME.search(path.name)
-    if not match:
-        return None
-
-    token = match.group(1)
-    if len(token) == 8:
-        token = f"{token[0:4]}-{token[4:6]}-{token[6:8]}"
-
-    try:
-        return date.fromisoformat(token)
-    except ValueError:
-        return None
 
 
 def _script_description(script_path: Path, fallback: str) -> str:
@@ -127,26 +93,17 @@ def discover_runnable_scripts(catalog_dir: Path) -> list[ScriptOption]:
 def discover_available_dates(data_dir: Path) -> list[date]:
     dates: set[date] = set()
 
-    for file_path in sorted(data_dir.rglob("*.jsonl")):
+    for file_path in iter_jsonl_files(data_dir, recursive=True):
         file_has_timestamp_date = False
 
-        with file_path.open("r", encoding="utf-8") as handle:
-            for raw_line in handle:
-                line = raw_line.strip()
-                if not line:
-                    continue
-                try:
-                    record = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-
-                record_date = parse_timestamp_to_date(str(record.get("timestamp", "")))
-                if record_date is not None:
-                    file_has_timestamp_date = True
-                    dates.add(record_date)
+        for record in iter_jsonl_records(file_path):
+            record_date = parse_timestamp_to_date(str(record.get("timestamp", "")))
+            if record_date is not None:
+                file_has_timestamp_date = True
+                dates.add(record_date)
 
         if not file_has_timestamp_date:
-            fallback = _date_from_filename(file_path)
+            fallback = date_from_filename(file_path)
             if fallback is not None:
                 dates.add(fallback)
 
@@ -158,29 +115,21 @@ def filter_data_by_date_range(source_data_dir: Path, destination_data_dir: Path,
     matched_records = 0
     written_files = 0
 
-    for source_file in sorted(source_data_dir.rglob("*.jsonl")):
+    for source_file in iter_jsonl_files(source_data_dir, recursive=True):
         relative_path = source_file.relative_to(source_data_dir)
         destination_file = destination_data_dir / relative_path
         destination_file.parent.mkdir(parents=True, exist_ok=True)
 
         file_matched = 0
-        fallback_file_date = _date_from_filename(source_file)
+        fallback_file_date = date_from_filename(source_file)
         file_in_fallback_window = fallback_file_date is not None and start_date <= fallback_file_date <= end_date
 
         parsed_records: list[dict] = []
         file_has_timestamp = False
-        with source_file.open("r", encoding="utf-8") as src:
-            for raw_line in src:
-                line = raw_line.strip()
-                if not line:
-                    continue
-                try:
-                    record = json.loads(line)
-                except json.JSONDecodeError:
-                    continue
-                parsed_records.append(record)
-                if parse_timestamp_to_date(str(record.get("timestamp", ""))) is not None:
-                    file_has_timestamp = True
+        for record in iter_jsonl_records(source_file):
+            parsed_records.append(record)
+            if parse_timestamp_to_date(str(record.get("timestamp", ""))) is not None:
+                file_has_timestamp = True
 
         with destination_file.open("w", encoding="utf-8") as dst:
             for record in parsed_records:

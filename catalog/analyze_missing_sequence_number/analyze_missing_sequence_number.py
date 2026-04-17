@@ -1,8 +1,15 @@
-import os
-import json
+import sys
+from pathlib import Path
+
 import pandas as pd
 import matplotlib.pyplot as plt
-from datetime import datetime
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from catalog.common.data_loading import iter_records_in_dir
+from catalog.common.time_utils import parse_iso_timestamp
 
 # === CONFIGURATION ===
 DATA_DIR = "data"  # Folder containing your .jsonl files
@@ -10,19 +17,20 @@ OUTPUT_SUMMARY_CSV = "missing_per_day.csv"
 OUTPUT_BAR_PLOT = "missing_per_day.png"
 
 # === READ AND COMBINE JSONL FILES ===
+def _warn_malformed_json(message: str) -> None:
+    print(f"Error parsing line: {message}")
+
+
 records = []
-for filename in sorted(os.listdir(DATA_DIR)):
-    if filename.endswith(".jsonl"):
-        filepath = os.path.join(DATA_DIR, filename)
-        with open(filepath, "r") as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        entry = json.loads(line)
-                        entry["timestamp"] = datetime.fromisoformat(entry["timestamp"])
-                        records.append(entry)
-                    except Exception as e:
-                        print(f"Error parsing line in {filename}: {e}")
+for file_path, entry in iter_records_in_dir(DATA_DIR, recursive=False, on_malformed_json=_warn_malformed_json):
+    try:
+        parsed_timestamp = parse_iso_timestamp(entry.get("timestamp"), allow_z_suffix=True)
+        if parsed_timestamp is None:
+            raise ValueError(f"Invalid isoformat string: {entry.get('timestamp')}")
+        entry["timestamp"] = parsed_timestamp
+        records.append(entry)
+    except Exception as e:
+        print(f"Error parsing line in {file_path.name}: {e}")
 
 if not records:
     print("No valid records found in data folder.")
