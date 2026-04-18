@@ -189,7 +189,8 @@ def load_timeline_export_with_schema_info(path: str | Path) -> tuple[pd.DataFram
 
     raw_loaded_df = df.copy(deep=True)
     source_columns = set(raw_loaded_df.columns)
-    normalized = _ensure_timeline_columns(raw_loaded_df.copy(deep=True))
+    normalized_input = raw_loaded_df.copy(deep=True)
+    normalized = _ensure_timeline_columns(normalized_input)
     injected_columns = set(normalized.columns).difference(source_columns)
     return normalized, raw_loaded_df, source_columns, injected_columns
 
