@@ -66,11 +66,11 @@ def _validate_playback_export_schema(
     if missing:
         return (
             False,
-            "This file does not match the playback-export schema. "
+            "This file is not a playback export. Expected a timeline_rows export with columns "
+            "like timestamp, machine_id, and state. "
             f"Missing required source columns: {', '.join(missing)}. "
-            "It may be a raw telemetry file. "
-            "Please launch playback from a workflow session or load a generated export from "
-            "results/workflows/<session-id>/exports/timeline/.",
+            "Derived outputs such as intervention/event summary CSVs (for example "
+            "intervention_states.csv or override_changes.csv) are not valid playback inputs.",
         )
 
     if not pd.to_datetime(raw_source_df["timestamp"], errors="coerce").notna().any():
