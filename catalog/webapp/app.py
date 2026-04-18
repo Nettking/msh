@@ -36,12 +36,12 @@ REQUIRED_PLAYBACK_COLUMNS = {"timestamp", "machine_id", "state"}
 
 
 @st.cache_data(show_spinner=False)
-def _load_data_from_path(path: str) -> tuple[pd.DataFrame, set[str], set[str]]:
+def _load_data_from_path(path: str) -> tuple[pd.DataFrame, pd.DataFrame, set[str], set[str]]:
     return load_timeline_export_with_schema_info(path)
 
 
 @st.cache_data(show_spinner=False)
-def _load_data_from_upload(content: bytes, suffix: str) -> tuple[pd.DataFrame, set[str], set[str]]:
+def _load_data_from_upload(content: bytes, suffix: str) -> tuple[pd.DataFrame, pd.DataFrame, set[str], set[str]]:
     with tempfile.NamedTemporaryFile(prefix="timeline_upload_", suffix=suffix, delete=False) as handle:
         handle.write(content)
         tmp_path = Path(handle.name)
@@ -58,7 +58,7 @@ def _has_non_empty_values(series: pd.Series) -> bool:
 
 
 def _validate_playback_export_schema(
-    df: pd.DataFrame,
+    raw_source_df: pd.DataFrame,
     *,
     source_columns: set[str],
 ) -> tuple[bool, str]:
@@ -73,13 +73,13 @@ def _validate_playback_export_schema(
             "results/workflows/<session-id>/exports/timeline/.",
         )
 
-    if not pd.to_datetime(df["timestamp"], errors="coerce").notna().any():
+    if not pd.to_datetime(raw_source_df["timestamp"], errors="coerce").notna().any():
         return False, "Playback export columns are present, but 'timestamp' has no parseable values."
 
-    if not _has_non_empty_values(df["machine_id"]):
+    if not _has_non_empty_values(raw_source_df["machine_id"]):
         return False, "Playback export columns are present, but 'machine_id' has no non-empty values."
 
-    if not _has_non_empty_values(df["state"]):
+    if not _has_non_empty_values(raw_source_df["state"]):
         return False, "Playback export columns are present, but 'state' has no non-empty values."
 
     return True, ""
@@ -255,19 +255,20 @@ def main():
             st.caption(f"Prefilled source: {source_hint}")
 
     df: pd.DataFrame | None = None
+    raw_source_df: pd.DataFrame | None = None
     source_columns: set[str] = set()
     if uploaded is not None:
         suffix = Path(uploaded.name).suffix or ".csv"
-        df, source_columns, _ = _load_data_from_upload(uploaded.getvalue(), suffix)
+        df, raw_source_df, source_columns, _ = _load_data_from_upload(uploaded.getvalue(), suffix)
     elif local_path.strip():
-        df, source_columns, _ = _load_data_from_path(local_path.strip())
+        df, raw_source_df, source_columns, _ = _load_data_from_path(local_path.strip())
 
     if df is None or raw_source_df is None:
         st.info("Load a playback export file (CSV/Parquet/JSONL/JSON) to begin playback.")
         return
 
     valid_schema, validation_message = _validate_playback_export_schema(
-        df,
+        raw_source_df,
         source_columns=source_columns,
     )
     if not valid_schema:
