@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import json
 import os
 import sys
 import time
 import tempfile
 from pathlib import Path
 
+import altair as alt
 import matplotlib.dates as mdates
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -29,6 +31,8 @@ STATE_COLORS = {
     "intervention_candidate": "#ef4444",
     "stopped": "#7c3aed",
 }
+DEFAULT_HIST_COLOR = "#334155"
+MAX_EXPLORATION_PLOT_ROWS = 15000
 
 SIGNALS = ["Srpm", "Sload", "Sovr", "Fovr", "Frapidovr"]
 DEFAULT_EXPORT_CANDIDATES = ["timeline_rows.csv", "timeline_rows.parquet", "timeline_rows.jsonl", "timeline_rows.json"]
@@ -83,6 +87,44 @@ def _validate_playback_export_schema(
         return False, "Playback export columns are present, but 'state' has no non-empty values."
 
     return True, ""
+
+
+def _read_table(path: str | Path) -> pd.DataFrame:
+    source = Path(path)
+    suffix = source.suffix.lower()
+    if suffix == ".csv":
+        return pd.read_csv(source)
+    if suffix in {".parquet", ".pq"}:
+        return pd.read_parquet(source)
+    if suffix == ".jsonl":
+        rows: list[dict] = []
+        with source.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if line:
+                    rows.append(json.loads(line))
+        return pd.DataFrame(rows)
+    if suffix == ".json":
+        return pd.read_json(source)
+    raise ValueError(f"Unsupported file extension: {suffix}")
+
+
+@st.cache_data(show_spinner=False)
+def _load_table_from_path(path: str) -> pd.DataFrame:
+    return _read_table(path)
+
+
+@st.cache_data(show_spinner=False)
+def _load_table_from_upload(content: bytes, suffix: str) -> pd.DataFrame:
+    with tempfile.NamedTemporaryFile(prefix="table_upload_", suffix=suffix, delete=False) as handle:
+        handle.write(content)
+        tmp_path = Path(handle.name)
+    try:
+        return _read_table(tmp_path)
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink()
+
 
 def _filter_machine_day(df: pd.DataFrame, machine_id: str, day) -> pd.DataFrame:
     rows = df[(df["machine_id"] == str(machine_id)) & (df["date"] == day)].copy()
@@ -241,39 +283,41 @@ def _resolve_bootstrap_source() -> tuple[str, str]:
     return "", ""
 
 
-def main():
-    st.set_page_config(page_title="Telemetry Playback", layout="wide")
-    st.title("Machine Telemetry Playback")
-    st.caption("Replay processed state outputs over time for quick operator-support review.")
-
-    with st.sidebar:
-        st.header("Data source")
-        uploaded = st.file_uploader("Upload playback export", type=["csv", "parquet", "pq", "jsonl", "json"])
-        default_source, source_hint = _resolve_bootstrap_source()
-        local_path = st.text_input("or local path", value=default_source)
-        if source_hint:
-            st.caption(f"Prefilled source: {source_hint}")
-
+def _load_source_frames(uploaded, local_path: str) -> tuple[pd.DataFrame | None, pd.DataFrame | None, set[str], str]:
+    """Load selected source once in main(), returning playback-normalized and raw data."""
     df: pd.DataFrame | None = None
     raw_source_df: pd.DataFrame | None = None
     source_columns: set[str] = set()
+    load_error = ""
+
     if uploaded is not None:
         suffix = Path(uploaded.name).suffix or ".csv"
-        df, raw_source_df, source_columns, _ = _load_data_from_upload(uploaded.getvalue(), suffix)
+        try:
+            df, raw_source_df, source_columns, _ = _load_data_from_upload(uploaded.getvalue(), suffix)
+        except Exception as exc:
+            load_error = str(exc)
+            try:
+                raw_source_df = _load_table_from_upload(uploaded.getvalue(), suffix)
+                source_columns = set(raw_source_df.columns)
+            except Exception:
+                raw_source_df = None
     elif local_path.strip():
-        df, raw_source_df, source_columns, _ = _load_data_from_path(local_path.strip())
+        try:
+            df, raw_source_df, source_columns, _ = _load_data_from_path(local_path.strip())
+        except Exception as exc:
+            load_error = str(exc)
+            try:
+                raw_source_df = _load_table_from_path(local_path.strip())
+                source_columns = set(raw_source_df.columns)
+            except Exception:
+                raw_source_df = None
 
-    if df is None or raw_source_df is None:
-        st.info("Load a playback export file (CSV/Parquet/JSONL/JSON) to begin playback.")
-        return
+    return df, raw_source_df, source_columns, load_error
 
-    valid_schema, validation_message = _validate_playback_export_schema(
-        raw_source_df,
-        source_columns=source_columns,
-    )
-    if not valid_schema:
-        st.warning(validation_message)
-        return
+
+def _render_playback_mode(df: pd.DataFrame):
+    """Render playback UI only for an already loaded/validated playback dataframe."""
+    st.success("Mode: Playback mode (valid timeline_rows export detected)")
 
     machines = sorted(df["machine_id"].dropna().astype(str).unique().tolist())
     if not machines:
@@ -349,6 +393,191 @@ def main():
 
             time.sleep(wait_sec)
             st.rerun()
+
+
+def _render_exploration_mode(raw_source_df: pd.DataFrame, validation_message: str):
+    st.info("Mode: CSV exploration mode")
+    st.warning(
+        "Playback mode is unavailable for this file. "
+        f"{validation_message}"
+    )
+
+    if raw_source_df.empty:
+        st.warning("The file loaded but has no rows to inspect.")
+        return
+
+    st.subheader("Preview")
+    st.dataframe(raw_source_df.head(200), use_container_width=True)
+
+    st.subheader("Detected columns")
+    meta = pd.DataFrame({"column": raw_source_df.columns.tolist(), "dtype": raw_source_df.dtypes.astype(str).tolist()})
+    st.dataframe(meta, hide_index=True, use_container_width=True)
+
+    st.subheader("Column mapping")
+    column_options = ["(none)"] + raw_source_df.columns.tolist()
+    default_ts_idx = column_options.index("timestamp") if "timestamp" in raw_source_df.columns else 0
+    default_machine_idx = column_options.index("machine_id") if "machine_id" in raw_source_df.columns else 0
+    default_state_idx = column_options.index("state") if "state" in raw_source_df.columns else 0
+
+    map_col1, map_col2, map_col3 = st.columns(3)
+    ts_col = map_col1.selectbox("Timestamp column", column_options, index=default_ts_idx)
+    machine_col = map_col2.selectbox("Machine ID column", column_options, index=default_machine_idx)
+    state_col = map_col3.selectbox("State / status column", column_options, index=default_state_idx)
+
+    work_df = raw_source_df.copy()
+    parsed_timestamp = pd.Series([pd.NaT] * len(work_df))
+    has_parsed_timestamp = False
+    if ts_col != "(none)":
+        parsed_timestamp = pd.to_datetime(work_df[ts_col], errors="coerce")
+        has_parsed_timestamp = parsed_timestamp.notna().any()
+        if has_parsed_timestamp:
+            work_df = work_df.assign(_parsed_timestamp=parsed_timestamp).sort_values("_parsed_timestamp")
+        else:
+            st.warning("Selected timestamp column has no parseable values. Time-based plots are disabled.")
+
+    if machine_col != "(none)":
+        machine_values = work_df[machine_col].dropna().astype(str)
+        machines = sorted(machine_values.unique().tolist())
+        if machines:
+            selected_machine = st.selectbox("Filter by machine", ["(all)"] + machines)
+            if selected_machine != "(all)":
+                work_df = work_df[work_df[machine_col].astype(str) == selected_machine]
+
+    if ts_col != "(none)" and has_parsed_timestamp:
+        day_series = work_df["_parsed_timestamp"].dt.date.dropna()
+        unique_days = sorted(day_series.unique().tolist())
+        if unique_days:
+            selected_day = st.selectbox("Filter by day", ["(all)"] + [str(day) for day in unique_days])
+            if selected_day != "(all)":
+                day_value = pd.to_datetime(selected_day).date()
+                work_df = work_df[work_df["_parsed_timestamp"].dt.date == day_value]
+
+    st.subheader("Filtered rows")
+    st.caption(f"Rows after filters: {len(work_df):,}")
+    st.dataframe(work_df.head(500), use_container_width=True)
+
+    numeric_candidates = [col for col in work_df.columns if pd.to_numeric(work_df[col], errors="coerce").notna().any()]
+    if "_parsed_timestamp" in numeric_candidates:
+        numeric_candidates.remove("_parsed_timestamp")
+
+    st.subheader("Graph browsing")
+    if not numeric_candidates:
+        st.info("No numeric columns detected for plotting.")
+    else:
+        selected_numeric = st.multiselect(
+            "Numeric columns to plot",
+            options=numeric_candidates,
+            default=numeric_candidates[: min(3, len(numeric_candidates))],
+        )
+        chart_type = st.radio("Chart type", ["line", "scatter", "histogram"], horizontal=True)
+        plot_df = work_df.copy()
+        for col in selected_numeric:
+            plot_df[col] = pd.to_numeric(plot_df[col], errors="coerce")
+        plot_df = plot_df.reset_index(drop=True)
+        plot_df["_row_index"] = plot_df.index
+
+        x_field = "_parsed_timestamp" if has_parsed_timestamp else "_row_index"
+        if selected_numeric:
+            if chart_type == "histogram":
+                hist_col = st.selectbox("Histogram column", options=selected_numeric)
+                fig, ax = plt.subplots(figsize=(9, 3.2))
+                ax.hist(plot_df[hist_col].dropna(), bins=30, color=DEFAULT_HIST_COLOR, alpha=0.85)
+                ax.set_xlabel(hist_col)
+                ax.set_ylabel("Count")
+                ax.set_title(f"Distribution of {hist_col}")
+                ax.grid(alpha=0.2)
+                st.pyplot(fig, use_container_width=True)
+            else:
+                if len(plot_df) > MAX_EXPLORATION_PLOT_ROWS:
+                    st.caption(
+                        f"Large dataset detected; plotting a sampled subset of {MAX_EXPLORATION_PLOT_ROWS:,} rows "
+                        f"out of {len(plot_df):,} for responsiveness."
+                    )
+                    plot_df = plot_df.iloc[:MAX_EXPLORATION_PLOT_ROWS].copy()
+                long_df = plot_df.melt(
+                    id_vars=[x_field] + ([machine_col] if machine_col != "(none)" else []) + ([state_col] if state_col != "(none)" else []),
+                    value_vars=selected_numeric,
+                    var_name="signal",
+                    value_name="value",
+                ).dropna(subset=["value"])
+
+                if long_df.empty:
+                    st.info("No numeric values available after filtering for selected columns.")
+                else:
+                    color_key = "signal"
+                    if machine_col != "(none)":
+                        color_key = machine_col
+                    elif state_col != "(none)":
+                        color_key = state_col
+
+                    mark = alt.Chart(long_df).mark_line() if chart_type == "line" else alt.Chart(long_df).mark_circle(size=40)
+                    chart = (
+                        mark.encode(
+                            x=alt.X(f"{x_field}:T" if x_field == "_parsed_timestamp" else f"{x_field}:Q", title="Time" if x_field == "_parsed_timestamp" else "Row index"),
+                            y=alt.Y("value:Q", title="Value"),
+                            color=alt.Color(f"{color_key}:N", title="Series"),
+                            tooltip=[x_field, "signal", "value"] + ([machine_col] if machine_col != "(none)" else []) + ([state_col] if state_col != "(none)" else []),
+                        )
+                        .properties(height=360)
+                        .interactive()
+                    )
+                    st.altair_chart(chart, use_container_width=True)
+
+    if state_col != "(none)":
+        st.subheader("State-oriented browsing")
+        state_counts = work_df[state_col].astype("string").fillna("unknown").value_counts(dropna=False).rename_axis("state").reset_index(name="count")
+        st.write("Counts by state/status")
+        st.dataframe(state_counts, use_container_width=True, hide_index=True)
+
+        if has_parsed_timestamp:
+            tmp = work_df[[state_col, "_parsed_timestamp"]].copy()
+            tmp[state_col] = tmp[state_col].astype("string").fillna("unknown")
+            tmp["_hour"] = tmp["_parsed_timestamp"].dt.floor("h")
+            state_over_time = (
+                tmp.groupby(["_hour", state_col], dropna=False)
+                .size()
+                .reset_index(name="count")
+                .sort_values(["_hour", "count"], ascending=[True, False])
+            )
+            st.write("State over time (hourly counts)")
+            st.dataframe(state_over_time, use_container_width=True, hide_index=True)
+
+
+def main():
+    st.set_page_config(page_title="Telemetry Playback + CSV Explorer", layout="wide")
+    st.title("Machine Telemetry Playback + CSV Explorer")
+    st.caption("Replay valid timeline exports, or inspect and graph generic CSV/table data.")
+
+    with st.sidebar:
+        st.header("Data source")
+        uploaded = st.file_uploader("Upload CSV/Parquet/JSONL/JSON", type=["csv", "parquet", "pq", "jsonl", "json"])
+        default_source, source_hint = _resolve_bootstrap_source()
+        local_path = st.text_input("or local path", value=default_source)
+        if source_hint:
+            st.caption(f"Prefilled source: {source_hint}")
+
+    df, raw_source_df, source_columns, load_error = _load_source_frames(uploaded, local_path)
+
+    if raw_source_df is None:
+        st.info("Load a file (CSV/Parquet/JSONL/JSON) to begin playback or CSV exploration.")
+        if load_error:
+            st.error(f"Unable to load file: {load_error}")
+        return
+
+    valid_schema, validation_message = _validate_playback_export_schema(
+        raw_source_df,
+        source_columns=source_columns,
+    )
+
+    if valid_schema and df is not None and not df.empty:
+        _render_playback_mode(df)
+    else:
+        message = validation_message
+        if not message and load_error:
+            message = f"Playback-specific normalization failed: {load_error}"
+        if not message:
+            message = "This file does not satisfy playback export requirements."
+        _render_exploration_mode(raw_source_df, message)
 
 
 if __name__ == "__main__":
