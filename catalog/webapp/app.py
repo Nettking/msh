@@ -262,7 +262,7 @@ def main():
     elif local_path.strip():
         df, source_columns, _ = _load_data_from_path(local_path.strip())
 
-    if df is None:
+    if df is None or raw_source_df is None:
         st.info("Load a playback export file (CSV/Parquet/JSONL/JSON) to begin playback.")
         return
 
