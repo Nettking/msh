@@ -1,48 +1,19 @@
-# MSH Digital Twin Web App
+# MSH Streamlit Web App (Legacy/Transitional)
 
-The web app is now the **primary workspace** for this repository.
-It continuously scans configured folders, indexes analysis outputs, and exposes playback + analysis inspection directly in the UI.
+This Streamlit app is now **legacy**.
 
-## Run
+- Primary web interface has moved to Flask (`catalog/flask_app/`).
+- This Streamlit implementation remains temporarily for transition only.
+- No further architectural expansion should target this module.
 
-```bash
-streamlit run catalog/webapp/app.py
-```
-
-## Always-on behavior
-
-- The app starts as a long-running Streamlit service.
-- On startup it scans data/result folders (defaults: `results,data`).
-- It rescans periodically via auto-refresh.
-- It tracks playback-compatible exports separately from generic tabular outputs.
-
-Configure scan roots:
+If you need the new default workflow, use:
 
 ```bash
-MSH_SCAN_DIRS=results,data streamlit run catalog/webapp/app.py
+python -m catalog.flask_app.app
 ```
 
-## UI sections
+or:
 
-- **System status**: scan roots, indexed artifacts, playback-capable count, read errors.
-- **Overview**: compact catalog of discovered analysis outputs.
-- **Analyses**: analysis browser with metadata + direct dataset inspection.
-- **Machine view**: machine/day trends when machine columns are available.
-- **Playback**: timeline replay for valid playback exports.
-- **Exploration**: generic tabular exploration (including manual upload/path as secondary mode).
-
-## Playback bootstrap compatibility
-
-The app still supports existing playback bootstrap inputs:
-
-- `--session-export-dir`
-- `--source-path`
-- `MSH_PLAYBACK_SOURCE_PATH`
-- `MSH_PLAYBACK_EXPORT_DIR`
-
-Session export auto-discovery filenames:
-
-- `timeline_rows.csv`
-- `timeline_rows.parquet`
-- `timeline_rows.jsonl`
-- `timeline_rows.json`
+```bash
+docker compose up --build webapp
+```

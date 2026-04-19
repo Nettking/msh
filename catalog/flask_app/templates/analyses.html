@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% block body %}
+<h2>Analyses browser</h2>
+<form>
+<select name="path">
+  <option value="">Select artifact</option>
+  {% for a in artifacts %}<option value="{{ a.path }}" {% if selected and selected.path==a.path %}selected{% endif %}>{{ a.analysis_name }} :: {{ a.file_name }}</option>{% endfor %}
+</select>
+<button type="submit">Open</button>
+</form>
+{% if selected %}
+<p><strong>{{ selected.analysis_name }}</strong> - {{ selected.description }}</p>
+{% if load_error %}<p>{{ load_error }}</p>{% endif %}
+{% if frame is not none %}
+<p>Rows: {{ frame|length }} | Columns: {{ frame.columns|length }}</p>
+<div class="pre">{{ frame.head(30).to_html(classes='table', index=False) | safe }}</div>
+<canvas id="machineTrend"></canvas>
+<script>
+new Chart(document.getElementById('machineTrend'), {
+  type: 'line',
+  data: {labels: {{ trend.labels|tojson }}, datasets: {{ trend.series|tojson }}},
+  options: {responsive: true}
+});
+</script>
+{% endif %}
+{% endif %}
+{% endblock %}

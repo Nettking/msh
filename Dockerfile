@@ -11,6 +11,6 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY . /app
 
-EXPOSE 8501
+EXPOSE 5000
 
-ENTRYPOINT ["streamlit", "run", "catalog/webapp/app.py", "--server.address=0.0.0.0"]
+ENTRYPOINT ["python", "-m", "catalog.flask_app.app"]

@@ -1,9 +1,5 @@
 services:
   # Secondary interactive one-shot analysis container (CLI runner), not a persistent service.
-  # Intended workflow:
-  #   1) Build image: docker compose build msh
-  #   2) Run runner: docker compose run --rm msh
-  # `docker compose up` / `docker compose up --build` is not the intended entrypoint for normal use.
   msh:
     build:
       context: .
@@ -14,13 +10,15 @@ services:
       - ./data:/app/data
       - ./results:/app/results
 
-  # Primary always-on digital twin workspace.
+  # Primary always-on digital twin workspace (Flask).
   webapp:
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "8501:8501"
+      - "5000:5000"
+    environment:
+      - MSH_SCAN_DIRS=results,data
     volumes:
       - ./results:/app/results
       - ./data:/app/data
