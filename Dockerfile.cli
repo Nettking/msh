@@ -11,4 +11,4 @@ RUN pip install --no-cache-dir -r /app/requirements.txt
 
 COPY . /app
 
-ENTRYPOINT ["python", "catalog/runner/menu.py"]
+ENTRYPOINT ["python", "-m", "catalog.orchestrator.cli"]

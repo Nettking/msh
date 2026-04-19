@@ -81,9 +81,11 @@ These are ingestion tools, not one-shot analysis scripts:
 - **Preferred recorder:** `standalone-recorder_v2`
 - **Legacy recorder:** `standalone_recorder`
 
-## Runner behavior (`catalog/runner/menu.py`)
+## Orchestration behavior (default)
 
-The interactive runner now uses **file-based analysis sessions** under `results/workflows/<session-id>/`.
+The default runtime now uses **automatic orchestration** under `catalog/orchestrator/` and file-based sessions under `results/workflows/<session-id>`.
+
+This orchestrator is currently an automatic wrapper over existing `catalog/runner/*` filtering/session/script-execution primitives (not a full runner-internals rewrite yet).
 
 Runner internals are split into focused modules under `catalog/runner/`:
 - `script_catalog.py`: script discovery and runner-visible script metadata
@@ -115,15 +117,18 @@ Execution and caching are script-level:
 - script status view includes `last_run_at`, `duration`, and output path
 - skipped runs are shown as cached; forced reruns are shown as recomputed
 
-Runner actions include:
-- create a new session or resume an existing session (with date range, completed count, last updated timestamp)
-- run next workflow step
-- run a selected workflow step (batch run stops on first failure)
-- run one selected script
-- precompute full workflow (Steps 1-4)
-- precompute workflow up to step N
-- launch web playback for the current session (when playback-ready)
-- show session status / cached outputs
+Automatic orchestration actions include:
+- apply full discovered source-date range as the default session filter policy
+- execute scripts in best-effort mode (continue after failures)
+- hand off to Flask even when some scripts fail (partial-prep visibility over hard stop)
+- scan configured roots (`results`, `data`, plus `MSH_SCAN_DIRS`)
+- discover available dates from source data
+- create/reuse a deterministic auto session
+- prepare filtered session data
+- run standard workflow scripts in order
+- skip already-fresh outputs when script cache is valid
+- generate/reuse playback timeline exports
+- hand off to Flask as the primary interface
 
 ### Session playback integration
 
@@ -139,10 +144,10 @@ Notes:
 - playback exports are generated from session-filtered data using shared timeline export/inference helpers
 - if reusable exports already exist for the current session filter signature, they are reused
 
-When you choose **Launch web playback for this session** in the runner:
-- runner validates playback readiness and reports missing requirements if not ready
-- runner prepares timeline exports only when needed (reuses valid cached exports otherwise)
-- runner launches Streamlit preloaded against the session export directory
+When orchestration prepares playback exports:
+- readiness is validated from session-filtered data
+- timeline exports are generated only when needed (reused if still valid)
+- Flask playback views can consume scan-discovered playback-compatible outputs
 
 Default precompute scope includes the standard runner-visible workflow scripts:
 - `machines_active_per_day`
@@ -172,3 +177,9 @@ Not cached (by design):
 - pipeline scheduling/dependency logic (this runner is workflow-guided, not a workflow engine)
 
 Precompute is intended to front-load script execution so later interactive review is fast, but it uses the same synchronous script runner and same session cache model as manual step/script runs.
+
+
+## Deprecated menu path
+
+`catalog/runner/menu.py` is now deprecated and retained only for backward compatibility messaging.
+It is no longer the primary operational path.
