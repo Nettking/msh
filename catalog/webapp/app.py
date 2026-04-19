@@ -1,4 +1,4 @@
-"""Streamlit app for replaying processed machine telemetry/state timelines."""
+"""Main Streamlit digital twin workspace for playback, analyses, and data exploration."""
 
 from __future__ import annotations
 
@@ -23,6 +23,7 @@ if not __package__:
         sys.path.insert(0, repo_root_str)
 
 from catalog.common.timeline_exports import build_state_interval_export, load_timeline_export_with_schema_info
+from catalog.webapp.analysis_registry import configured_scan_dirs, load_artifact_frame, scan_artifacts
 
 STATE_COLORS = {
     "active": "#16a34a",
@@ -56,6 +57,17 @@ def _load_data_from_upload(content: bytes, suffix: str) -> tuple[pd.DataFrame, p
             tmp_path.unlink()
 
 
+@st.cache_data(show_spinner=False)
+def _scan_registry(scan_dirs: tuple[str, ...], scan_nonce: int, refresh_bucket: int) -> tuple[list[dict], list[str]]:
+    _ = refresh_bucket
+    return scan_artifacts(list(scan_dirs))
+
+
+@st.cache_data(show_spinner=False)
+def _load_registry_frame(path: str) -> pd.DataFrame:
+    return load_artifact_frame(path)
+
+
 def _has_non_empty_values(series: pd.Series) -> bool:
     cleaned = series.astype("string").str.strip()
     return cleaned.replace("", pd.NA).notna().any()
@@ -68,23 +80,16 @@ def _validate_playback_export_schema(
 ) -> tuple[bool, str]:
     missing = sorted(REQUIRED_PLAYBACK_COLUMNS.difference(source_columns))
     if missing:
-        return (
-            False,
-            "This file is not a playback export. Expected a timeline_rows export with columns "
-            "like timestamp, machine_id, and state. "
-            f"Missing required source columns: {', '.join(missing)}. "
-            "Derived outputs such as intervention/event summary CSVs (for example "
-            "intervention_states.csv or override_changes.csv) are not valid playback inputs.",
-        )
+        return False, f"Missing required source columns: {', '.join(missing)}"
 
     if not pd.to_datetime(raw_source_df["timestamp"], errors="coerce").notna().any():
-        return False, "Playback export columns are present, but 'timestamp' has no parseable values."
+        return False, "'timestamp' has no parseable values."
 
     if not _has_non_empty_values(raw_source_df["machine_id"]):
-        return False, "Playback export columns are present, but 'machine_id' has no non-empty values."
+        return False, "'machine_id' has no non-empty values."
 
     if not _has_non_empty_values(raw_source_df["state"]):
-        return False, "Playback export columns are present, but 'state' has no non-empty values."
+        return False, "'state' has no non-empty values."
 
     return True, ""
 
@@ -199,7 +204,6 @@ def _playback_controls(n_rows: int):
         st.session_state.frame_index = 0
     if "is_playing" not in st.session_state:
         st.session_state.is_playing = False
-
     if "playback_mode" not in st.session_state:
         st.session_state.playback_mode = "row"
 
@@ -208,13 +212,10 @@ def _playback_controls(n_rows: int):
     if col1.button("⏮ Step -", use_container_width=True):
         st.session_state.frame_index = max(st.session_state.frame_index - 1, 0)
         st.session_state.is_playing = False
-
     if col2.button("▶ Play", use_container_width=True):
         st.session_state.is_playing = True
-
     if col3.button("⏸ Pause", use_container_width=True):
         st.session_state.is_playing = False
-
     if col4.button("Step + ⏭", use_container_width=True):
         st.session_state.frame_index = min(st.session_state.frame_index + 1, n_rows - 1)
         st.session_state.is_playing = False
@@ -235,11 +236,6 @@ def _playback_controls(n_rows: int):
     )
 
     return speed, st.session_state.playback_mode
-
-
-def _state_badge(state: str):
-    color = STATE_COLORS.get(state, "#64748b")
-    return f"<span style='padding:4px 10px;border-radius:999px;background:{color};color:white;font-weight:600'>{state}</span>"
 
 
 def _parse_bootstrap_args() -> argparse.Namespace:
@@ -283,42 +279,7 @@ def _resolve_bootstrap_source() -> tuple[str, str]:
     return "", ""
 
 
-def _load_source_frames(uploaded, local_path: str) -> tuple[pd.DataFrame | None, pd.DataFrame | None, set[str], str]:
-    """Load selected source once in main(), returning playback-normalized and raw data."""
-    df: pd.DataFrame | None = None
-    raw_source_df: pd.DataFrame | None = None
-    source_columns: set[str] = set()
-    load_error = ""
-
-    if uploaded is not None:
-        suffix = Path(uploaded.name).suffix or ".csv"
-        try:
-            df, raw_source_df, source_columns, _ = _load_data_from_upload(uploaded.getvalue(), suffix)
-        except Exception as exc:
-            load_error = str(exc)
-            try:
-                raw_source_df = _load_table_from_upload(uploaded.getvalue(), suffix)
-                source_columns = set(raw_source_df.columns)
-            except Exception:
-                raw_source_df = None
-    elif local_path.strip():
-        try:
-            df, raw_source_df, source_columns, _ = _load_data_from_path(local_path.strip())
-        except Exception as exc:
-            load_error = str(exc)
-            try:
-                raw_source_df = _load_table_from_path(local_path.strip())
-                source_columns = set(raw_source_df.columns)
-            except Exception:
-                raw_source_df = None
-
-    return df, raw_source_df, source_columns, load_error
-
-
 def _render_playback_mode(df: pd.DataFrame):
-    """Render playback UI only for an already loaded/validated playback dataframe."""
-    st.success("Mode: Playback mode (valid timeline_rows export detected)")
-
     machines = sorted(df["machine_id"].dropna().astype(str).unique().tolist())
     if not machines:
         st.warning("Playback export looks valid, but it contains no machine IDs.")
@@ -326,7 +287,6 @@ def _render_playback_mode(df: pd.DataFrame):
 
     c1, c2 = st.columns([1, 1])
     selected_machine = c1.selectbox("Machine", options=machines)
-
     machine_days = sorted(df[df["machine_id"] == selected_machine]["date"].dropna().unique().tolist())
     selected_day = c2.selectbox("Day", options=machine_days)
 
@@ -340,38 +300,20 @@ def _render_playback_mode(df: pd.DataFrame):
     idx = min(st.session_state.frame_index, len(rows) - 1)
     current = rows.iloc[idx]
     current_ts = pd.to_datetime(current["timestamp"])
-
     intervals = build_state_interval_export(rows)
 
     timeline_col, panel_col = st.columns([2.6, 1.4], gap="large")
-
     with timeline_col:
         st.pyplot(_plot_state_timeline(intervals, current_ts), use_container_width=True)
         st.pyplot(_plot_signals(rows, current_ts), use_container_width=True)
 
     with panel_col:
         st.subheader("Current playback point")
-        st.markdown(_state_badge(str(current.get("state", "unknown"))), unsafe_allow_html=True)
+        st.markdown(f"**state:** `{str(current.get('state', 'unknown'))}`")
         st.write("timestamp", current_ts)
         st.write("machine_id", str(current.get("machine_id", "")))
         st.write("event_score", float(current.get("event_score", 0) or 0))
         st.write("fired_rules", str(current.get("fired_rules", "")) or "-")
-
-        st.markdown("**Signals and context**")
-        inspect_cols = [
-            "Srpm",
-            "Sload",
-            "Sovr",
-            "Fovr",
-            "Frapidovr",
-            "execution",
-            "mode",
-            "program",
-        ]
-        panel_df = pd.DataFrame({"field": inspect_cols})
-        panel_df["value"] = [current.get(col, pd.NA) for col in inspect_cols]
-        st.dataframe(panel_df, use_container_width=True, hide_index=True)
-
         candidate_count = int(rows["intervention_candidate"].sum())
         stopped_count = int(rows["stopped"].sum()) if "stopped" in rows.columns else 0
         st.metric("Intervention-candidate points", candidate_count)
@@ -390,194 +332,276 @@ def _render_playback_mode(df: pd.DataFrame):
                 wait_sec = max(0.02, min(frame_gap_sec / float(speed), 1.2))
             else:
                 wait_sec = max(0.08, 0.35 / float(speed))
-
             time.sleep(wait_sec)
             st.rerun()
 
 
-def _render_exploration_mode(raw_source_df: pd.DataFrame, validation_message: str):
-    st.info("Mode: CSV exploration mode")
-    st.warning(
-        "Playback mode is unavailable for this file. "
-        f"{validation_message}"
-    )
-
-    if raw_source_df.empty:
-        st.warning("The file loaded but has no rows to inspect.")
+def _render_machine_view(df: pd.DataFrame):
+    if "machine_id" not in df.columns:
+        st.info("No machine_id column in selected dataset.")
         return
 
-    st.subheader("Preview")
-    st.dataframe(raw_source_df.head(200), use_container_width=True)
+    machine_counts = (
+        df.assign(machine_id=df["machine_id"].astype("string"))
+        .groupby("machine_id", dropna=False)
+        .size()
+        .reset_index(name="rows")
+        .sort_values("rows", ascending=False)
+    )
+    st.subheader("Rows by machine")
+    st.dataframe(machine_counts, use_container_width=True, hide_index=True)
 
-    st.subheader("Detected columns")
-    meta = pd.DataFrame({"column": raw_source_df.columns.tolist(), "dtype": raw_source_df.dtypes.astype(str).tolist()})
-    st.dataframe(meta, hide_index=True, use_container_width=True)
-
-    st.subheader("Column mapping")
-    column_options = ["(none)"] + raw_source_df.columns.tolist()
-    default_ts_idx = column_options.index("timestamp") if "timestamp" in raw_source_df.columns else 0
-    default_machine_idx = column_options.index("machine_id") if "machine_id" in raw_source_df.columns else 0
-    default_state_idx = column_options.index("state") if "state" in raw_source_df.columns else 0
-
-    map_col1, map_col2, map_col3 = st.columns(3)
-    ts_col = map_col1.selectbox("Timestamp column", column_options, index=default_ts_idx)
-    machine_col = map_col2.selectbox("Machine ID column", column_options, index=default_machine_idx)
-    state_col = map_col3.selectbox("State / status column", column_options, index=default_state_idx)
-
-    work_df = raw_source_df.copy()
-    parsed_timestamp = pd.Series([pd.NaT] * len(work_df))
-    has_parsed_timestamp = False
-    if ts_col != "(none)":
-        parsed_timestamp = pd.to_datetime(work_df[ts_col], errors="coerce")
-        has_parsed_timestamp = parsed_timestamp.notna().any()
-        if has_parsed_timestamp:
-            work_df = work_df.assign(_parsed_timestamp=parsed_timestamp).sort_values("_parsed_timestamp")
-        else:
-            st.warning("Selected timestamp column has no parseable values. Time-based plots are disabled.")
-
-    if machine_col != "(none)":
-        machine_values = work_df[machine_col].dropna().astype(str)
-        machines = sorted(machine_values.unique().tolist())
-        if machines:
-            selected_machine = st.selectbox("Filter by machine", ["(all)"] + machines)
-            if selected_machine != "(all)":
-                work_df = work_df[work_df[machine_col].astype(str) == selected_machine]
-
-    if ts_col != "(none)" and has_parsed_timestamp:
-        day_series = work_df["_parsed_timestamp"].dt.date.dropna()
-        unique_days = sorted(day_series.unique().tolist())
-        if unique_days:
-            selected_day = st.selectbox("Filter by day", ["(all)"] + [str(day) for day in unique_days])
-            if selected_day != "(all)":
-                day_value = pd.to_datetime(selected_day).date()
-                work_df = work_df[work_df["_parsed_timestamp"].dt.date == day_value]
-
-    st.subheader("Filtered rows")
-    st.caption(f"Rows after filters: {len(work_df):,}")
-    st.dataframe(work_df.head(500), use_container_width=True)
-
-    numeric_candidates = [col for col in work_df.columns if pd.to_numeric(work_df[col], errors="coerce").notna().any()]
-    if "_parsed_timestamp" in numeric_candidates:
-        numeric_candidates.remove("_parsed_timestamp")
-
-    st.subheader("Graph browsing")
-    if not numeric_candidates:
-        st.info("No numeric columns detected for plotting.")
-    else:
-        selected_numeric = st.multiselect(
-            "Numeric columns to plot",
-            options=numeric_candidates,
-            default=numeric_candidates[: min(3, len(numeric_candidates))],
-        )
-        chart_type = st.radio("Chart type", ["line", "scatter", "histogram"], horizontal=True)
-        plot_df = work_df.copy()
-        for col in selected_numeric:
-            plot_df[col] = pd.to_numeric(plot_df[col], errors="coerce")
-        plot_df = plot_df.reset_index(drop=True)
-        plot_df["_row_index"] = plot_df.index
-
-        x_field = "_parsed_timestamp" if has_parsed_timestamp else "_row_index"
-        if selected_numeric:
-            if chart_type == "histogram":
-                hist_col = st.selectbox("Histogram column", options=selected_numeric)
-                fig, ax = plt.subplots(figsize=(9, 3.2))
-                ax.hist(plot_df[hist_col].dropna(), bins=30, color=DEFAULT_HIST_COLOR, alpha=0.85)
-                ax.set_xlabel(hist_col)
-                ax.set_ylabel("Count")
-                ax.set_title(f"Distribution of {hist_col}")
-                ax.grid(alpha=0.2)
-                st.pyplot(fig, use_container_width=True)
-            else:
-                if len(plot_df) > MAX_EXPLORATION_PLOT_ROWS:
-                    st.caption(
-                        f"Large dataset detected; plotting a sampled subset of {MAX_EXPLORATION_PLOT_ROWS:,} rows "
-                        f"out of {len(plot_df):,} for responsiveness."
-                    )
-                    plot_df = plot_df.iloc[:MAX_EXPLORATION_PLOT_ROWS].copy()
-                long_df = plot_df.melt(
-                    id_vars=[x_field] + ([machine_col] if machine_col != "(none)" else []) + ([state_col] if state_col != "(none)" else []),
-                    value_vars=selected_numeric,
-                    var_name="signal",
-                    value_name="value",
-                ).dropna(subset=["value"])
-
-                if long_df.empty:
-                    st.info("No numeric values available after filtering for selected columns.")
-                else:
-                    color_key = "signal"
-                    if machine_col != "(none)":
-                        color_key = machine_col
-                    elif state_col != "(none)":
-                        color_key = state_col
-
-                    mark = alt.Chart(long_df).mark_line() if chart_type == "line" else alt.Chart(long_df).mark_circle(size=40)
-                    chart = (
-                        mark.encode(
-                            x=alt.X(f"{x_field}:T" if x_field == "_parsed_timestamp" else f"{x_field}:Q", title="Time" if x_field == "_parsed_timestamp" else "Row index"),
-                            y=alt.Y("value:Q", title="Value"),
-                            color=alt.Color(f"{color_key}:N", title="Series"),
-                            tooltip=[x_field, "signal", "value"] + ([machine_col] if machine_col != "(none)" else []) + ([state_col] if state_col != "(none)" else []),
-                        )
-                        .properties(height=360)
-                        .interactive()
-                    )
-                    st.altair_chart(chart, use_container_width=True)
-
-    if state_col != "(none)":
-        st.subheader("State-oriented browsing")
-        state_counts = work_df[state_col].astype("string").fillna("unknown").value_counts(dropna=False).rename_axis("state").reset_index(name="count")
-        st.write("Counts by state/status")
-        st.dataframe(state_counts, use_container_width=True, hide_index=True)
-
-        if has_parsed_timestamp:
-            tmp = work_df[[state_col, "_parsed_timestamp"]].copy()
-            tmp[state_col] = tmp[state_col].astype("string").fillna("unknown")
-            tmp["_hour"] = tmp["_parsed_timestamp"].dt.floor("h")
-            state_over_time = (
-                tmp.groupby(["_hour", state_col], dropna=False)
+    if "timestamp" in df.columns:
+        ts = pd.to_datetime(df["timestamp"], errors="coerce")
+        tdf = df.assign(_ts=ts).dropna(subset=["_ts"])
+        if not tdf.empty:
+            tdf["day"] = tdf["_ts"].dt.date.astype(str)
+            machine_day = (
+                tdf.groupby(["day", "machine_id"], dropna=False)
                 .size()
-                .reset_index(name="count")
-                .sort_values(["_hour", "count"], ascending=[True, False])
+                .reset_index(name="rows")
+                .sort_values(["day", "rows"], ascending=[True, False])
             )
-            st.write("State over time (hourly counts)")
-            st.dataframe(state_over_time, use_container_width=True, hide_index=True)
+            st.subheader("Machine/day trends")
+            st.altair_chart(
+                alt.Chart(machine_day)
+                .mark_line(point=True)
+                .encode(x="day:T", y="rows:Q", color="machine_id:N", tooltip=["day", "machine_id", "rows"])
+                .properties(height=350)
+                .interactive(),
+                use_container_width=True,
+            )
+
+
+def _render_dataset_views(df: pd.DataFrame, title: str):
+    st.subheader(title)
+    st.caption(f"Rows: {len(df):,} | Columns: {len(df.columns):,}")
+
+    if df.empty:
+        st.warning("Dataset is empty.")
+        return
+
+    st.dataframe(df.head(400), use_container_width=True)
+
+    numeric_candidates = [col for col in df.columns if pd.to_numeric(df[col], errors="coerce").notna().any()]
+    parsed_ts = None
+    if "timestamp" in df.columns:
+        parsed_ts = pd.to_datetime(df["timestamp"], errors="coerce")
+
+    if numeric_candidates:
+        st.markdown("**Graph view**")
+        left, right = st.columns([2, 1])
+        selected_numeric = left.multiselect(
+            "Numeric columns", options=numeric_candidates, default=numeric_candidates[: min(3, len(numeric_candidates))], key=f"num_{title}"
+        )
+        chart_type = right.radio("Chart", ["line", "scatter", "histogram", "bar(counts)"], key=f"ctype_{title}")
+
+        plot_df = df.copy().reset_index(drop=True)
+        plot_df["_row"] = plot_df.index
+        if parsed_ts is not None and parsed_ts.notna().any():
+            plot_df["_ts"] = parsed_ts
+        if len(plot_df) > MAX_EXPLORATION_PLOT_ROWS:
+            plot_df = plot_df.iloc[:MAX_EXPLORATION_PLOT_ROWS].copy()
+
+        if chart_type == "histogram" and selected_numeric:
+            col = st.selectbox("Histogram column", selected_numeric, key=f"hist_{title}")
+            fig, ax = plt.subplots(figsize=(9, 3.2))
+            ax.hist(pd.to_numeric(plot_df[col], errors="coerce").dropna(), bins=30, color=DEFAULT_HIST_COLOR, alpha=0.85)
+            ax.set_title(f"Distribution of {col}")
+            st.pyplot(fig, use_container_width=True)
+        elif chart_type == "bar(counts)":
+            category_cols = [c for c in df.columns if df[c].astype("string").nunique(dropna=True) <= 30]
+            if not category_cols:
+                st.info("No low-cardinality categorical columns for count bars.")
+            else:
+                cat = st.selectbox("Category column", category_cols, key=f"bar_{title}")
+                counts = df[cat].astype("string").fillna("unknown").value_counts().reset_index()
+                counts.columns = [cat, "count"]
+                st.altair_chart(
+                    alt.Chart(counts).mark_bar().encode(x=alt.X(f"{cat}:N", sort="-y"), y="count:Q", tooltip=[cat, "count"]).properties(height=320),
+                    use_container_width=True,
+                )
+        elif selected_numeric:
+            long_df = plot_df.melt(id_vars=["_ts"] if "_ts" in plot_df.columns else ["_row"], value_vars=selected_numeric, var_name="metric", value_name="value")
+            long_df["value"] = pd.to_numeric(long_df["value"], errors="coerce")
+            long_df = long_df.dropna(subset=["value"])
+            if not long_df.empty:
+                x_encoding = "_ts:T" if "_ts" in long_df.columns else "_row:Q"
+                mark = alt.Chart(long_df).mark_line() if chart_type == "line" else alt.Chart(long_df).mark_circle(size=35)
+                st.altair_chart(
+                    mark.encode(x=alt.X(x_encoding, title="Time" if "_ts" in long_df.columns else "Row"), y="value:Q", color="metric:N", tooltip=["metric", "value"]).properties(height=360).interactive(),
+                    use_container_width=True,
+                )
+
+
+def _render_system_status(artifacts: list[dict], warnings: list[str], scan_dirs: tuple[str, ...], scan_started: float):
+    st.subheader("System status")
+    ready = [a for a in artifacts if a["status"] == "ready"]
+    playback = [a for a in artifacts if a["playback_compatible"]]
+    errors = [a for a in artifacts if a["status"] != "ready"]
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Scan roots", len(scan_dirs))
+    c2.metric("Indexed artifacts", len(artifacts))
+    c3.metric("Playback-compatible", len(playback))
+    c4.metric("Read errors", len(errors))
+
+    st.caption(f"Last scan completed in {time.time() - scan_started:.2f}s")
+    st.caption("Configured scan roots: " + ", ".join(scan_dirs))
+    if warnings:
+        for warning in warnings[:10]:
+            st.warning(warning)
+
+    if errors:
+        err_df = pd.DataFrame(errors)[["analysis_name", "path", "load_error", "modified_at"]]
+        st.dataframe(err_df, use_container_width=True, hide_index=True)
+
+
+def _render_analyses_browser(artifacts: list[dict]):
+    st.subheader("Analyses")
+    if not artifacts:
+        st.info("No tabular artifacts found in configured scan directories.")
+        return None
+
+    frame = pd.DataFrame(artifacts)
+    st.dataframe(
+        frame[["analysis_name", "file_name", "kind", "status", "modified_at", "path", "supported_views"]],
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    options = [f"{row['analysis_name']} :: {row['file_name']}" for _, row in frame.iterrows()]
+    selected_label = st.selectbox("Inspect analysis output", options=options)
+    selected = frame.iloc[options.index(selected_label)].to_dict()
+
+    st.markdown(f"**Description:** {selected['description']}")
+    st.markdown(f"**Path:** `{selected['path']}`")
+    st.markdown(f"**Status:** `{selected['status']}` | **Views:** `{', '.join(selected['supported_views'])}`")
+    return selected
+
+
+def _render_exploration_mode(uploaded, local_path: str, artifacts: list[dict]):
+    st.subheader("Exploration")
+    st.caption("Generic table/CSV exploration remains available for arbitrary datasets.")
+
+    discovered_paths = [a["path"] for a in artifacts]
+    selected_discovered = st.selectbox("Discovered dataset (optional)", options=["(none)"] + discovered_paths)
+
+    raw_source_df = None
+    if selected_discovered != "(none)":
+        try:
+            raw_source_df = _load_registry_frame(selected_discovered)
+        except Exception as exc:  # noqa: BLE001
+            st.error(f"Unable to load selected discovered dataset: {exc}")
+            return
+    elif uploaded is not None:
+        suffix = Path(uploaded.name).suffix or ".csv"
+        raw_source_df = _load_table_from_upload(uploaded.getvalue(), suffix)
+    elif local_path.strip():
+        raw_source_df = _load_table_from_path(local_path.strip())
+
+    if raw_source_df is None:
+        st.info("Select a discovered dataset, upload a file, or provide a local path.")
+        return
+
+    _render_dataset_views(raw_source_df, "Exploration dataset")
 
 
 def main():
-    st.set_page_config(page_title="Telemetry Playback + CSV Explorer", layout="wide")
-    st.title("Machine Telemetry Playback + CSV Explorer")
-    st.caption("Replay valid timeline exports, or inspect and graph generic CSV/table data.")
+    st.set_page_config(page_title="MSH Digital Twin Workspace", layout="wide")
+    st.title("MSH Digital Twin Workspace")
+    st.caption("Always-on web workspace for system status, analyses, playback, and exploration.")
 
+    scan_nonce = st.session_state.get("scan_nonce", 0)
     with st.sidebar:
-        st.header("Data source")
+        st.header("Runtime")
+        if st.button("Rescan now"):
+            st.session_state.scan_nonce = scan_nonce + 1
+            scan_nonce = st.session_state.scan_nonce
+
+        auto_refresh = st.checkbox("Auto-refresh", value=True)
+        refresh_sec = st.slider("Refresh every (seconds)", min_value=10, max_value=300, value=45, step=5)
+
+        st.header("Manual/secondary data source")
         uploaded = st.file_uploader("Upload CSV/Parquet/JSONL/JSON", type=["csv", "parquet", "pq", "jsonl", "json"])
         default_source, source_hint = _resolve_bootstrap_source()
         local_path = st.text_input("or local path", value=default_source)
         if source_hint:
             st.caption(f"Prefilled source: {source_hint}")
 
-    df, raw_source_df, source_columns, load_error = _load_source_frames(uploaded, local_path)
+    scan_dirs = tuple(configured_scan_dirs())
+    scan_started = time.time()
+    refresh_bucket = int(time.time() // refresh_sec) if auto_refresh else 0
+    artifacts, warnings = _scan_registry(scan_dirs, scan_nonce, refresh_bucket)
 
-    if raw_source_df is None:
-        st.info("Load a file (CSV/Parquet/JSONL/JSON) to begin playback or CSV exploration.")
-        if load_error:
-            st.error(f"Unable to load file: {load_error}")
-        return
+    tabs = st.tabs(["System status", "Overview", "Analyses", "Machine view", "Playback", "Exploration"])
 
-    valid_schema, validation_message = _validate_playback_export_schema(
-        raw_source_df,
-        source_columns=source_columns,
-    )
+    with tabs[0]:
+        _render_system_status(artifacts, warnings, scan_dirs, scan_started)
 
-    if valid_schema and df is not None and not df.empty:
-        _render_playback_mode(df)
-    else:
-        message = validation_message
-        if not message and load_error:
-            message = f"Playback-specific normalization failed: {load_error}"
-        if not message:
-            message = "This file does not satisfy playback export requirements."
-        _render_exploration_mode(raw_source_df, message)
+    selected_artifact = None
+    with tabs[1]:
+        st.subheader("Overview")
+        if artifacts:
+            overview_df = pd.DataFrame(artifacts)
+            st.dataframe(
+                overview_df[["analysis_name", "kind", "status", "row_count", "machine_count", "day_count", "modified_at"]],
+                use_container_width=True,
+                hide_index=True,
+            )
+        else:
+            st.info("No datasets indexed yet.")
+
+    with tabs[2]:
+        selected_artifact = _render_analyses_browser(artifacts)
+        if selected_artifact and selected_artifact["status"] == "ready":
+            try:
+                analysis_df = _load_registry_frame(selected_artifact["path"])
+                _render_dataset_views(analysis_df, f"Analysis output: {selected_artifact['file_name']}")
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"Failed to render analysis dataset: {exc}")
+
+    with tabs[3]:
+        machine_source = selected_artifact["path"] if selected_artifact and selected_artifact["status"] == "ready" else None
+        if machine_source:
+            try:
+                machine_df = _load_registry_frame(machine_source)
+                _render_machine_view(machine_df)
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"Failed to render machine view from selected analysis: {exc}")
+        else:
+            st.info("Select a ready analysis in the Analyses tab to drive machine-level view.")
+
+    with tabs[4]:
+        st.subheader("Playback")
+        playback_sources = [a for a in artifacts if a["playback_compatible"] and a["status"] == "ready"]
+        playback_path = ""
+        if playback_sources:
+            label_map = {f"{a['file_name']} ({a['analysis_name']})": a["path"] for a in playback_sources}
+            selected = st.selectbox("Playback dataset from scan", options=list(label_map.keys()))
+            playback_path = label_map[selected]
+        else:
+            st.info("No playback-compatible artifacts discovered. You can still use manual source input from sidebar.")
+            playback_path = local_path
+
+        if playback_path:
+            try:
+                df, raw_source_df, source_columns, _ = _load_data_from_path(playback_path)
+            except Exception as exc:  # noqa: BLE001
+                st.error(f"Unable to load playback source: {exc}")
+            else:
+                valid_schema, message = _validate_playback_export_schema(raw_source_df, source_columns=source_columns)
+                if valid_schema and not df.empty:
+                    _render_playback_mode(df)
+                else:
+                    st.warning(f"Selected file is not playback-compatible: {message}")
+
+    with tabs[5]:
+        _render_exploration_mode(uploaded, local_path, artifacts)
+
+    if auto_refresh and not st.session_state.get("is_playing", False):
+        time.sleep(float(refresh_sec))
+        st.rerun()
 
 
 if __name__ == "__main__":
