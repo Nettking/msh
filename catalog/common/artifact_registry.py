@@ -13,6 +13,7 @@ import pandas as pd
 
 SUPPORTED_SUFFIXES = {".csv", ".parquet", ".pq", ".jsonl", ".json"}
 REQUIRED_PLAYBACK_COLUMNS = {"timestamp", "machine_id", "state"}
+INTERNAL_METADATA_FILES = {"runtime_state.json", "session_state.json"}
 
 KEYWORD_RULES: list[tuple[tuple[str, ...], tuple[str, str, str]]] = [
     (("timeline", "playback"), ("Timeline Playback", "Playback-compatible timeline rows for machine state replay.", "playback")),
@@ -44,6 +45,10 @@ class DataArtifact:
     timestamp_min: str | None
     timestamp_max: str | None
     load_error: str | None
+    category: str
+    visibility: str
+    dedupe_key: str | None
+    is_internal: bool
 
     def to_record(self) -> dict[str, Any]:
         return {
@@ -66,6 +71,10 @@ class DataArtifact:
             "timestamp_max": self.timestamp_max,
             "load_error": self.load_error,
             "playback_compatible": self.kind == "playback",
+            "category": self.category,
+            "visibility": self.visibility,
+            "dedupe_key": self.dedupe_key,
+            "is_internal": self.is_internal,
         }
 
 
@@ -193,7 +202,58 @@ def _views_for_kind(kind: str, columns: set[str]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(views))
 
 
-def _build_artifact(path: Path, source_dir: str) -> DataArtifact:
+def _source_root_for(path: Path, roots: list[str]) -> str:
+    path_resolved = path.resolve()
+    for root in roots:
+        root_path = Path(root).expanduser()
+        try:
+            if path_resolved.is_relative_to(root_path.resolve()):
+                return root_path.name.lower()
+        except Exception:  # noqa: BLE001
+            continue
+    return path.parts[0].lower() if path.parts else ""
+
+
+def _relative_to_root(path: Path, source_dir: str) -> Path:
+    source_root = Path(source_dir).expanduser()
+    try:
+        return path.resolve().relative_to(source_root.resolve())
+    except Exception:  # noqa: BLE001
+        return path
+
+
+def _artifact_category(path: Path, source_dir: str, roots: list[str]) -> str:
+    root_name = _source_root_for(path, roots)
+    rel = _relative_to_root(path, source_dir)
+    lower_parts = [part.lower() for part in rel.parts]
+
+    if path.name in INTERNAL_METADATA_FILES:
+        return "internal_metadata"
+    if root_name == "data":
+        return "source_data"
+    if "workflows" in lower_parts and "data" in lower_parts:
+        return "workflow_data_copy"
+    return "derived_output"
+
+
+def _artifact_visibility(category: str) -> str:
+    if category == "internal_metadata":
+        return "internal"
+    if category == "workflow_data_copy":
+        return "hidden_default"
+    return "default"
+
+
+def _dedupe_key(path: Path, category: str) -> str | None:
+    if category not in {"source_data", "workflow_data_copy"}:
+        return None
+    try:
+        return path.stem
+    except Exception:  # noqa: BLE001
+        return None
+
+
+def _build_artifact(path: Path, source_dir: str, roots: list[str]) -> DataArtifact:
     stat = path.stat()
     signature = hashlib.sha1(f"{path}:{stat.st_size}:{stat.st_mtime_ns}".encode("utf-8")).hexdigest()[:12]
     modified = pd.to_datetime(stat.st_mtime, unit="s", utc=True).tz_convert(None)
@@ -224,6 +284,10 @@ def _build_artifact(path: Path, source_dir: str) -> DataArtifact:
         machine_count = int(frame["machine_id"].astype("string").str.strip().replace("", pd.NA).dropna().nunique())
 
     status = "ready" if load_error is None else "read_error"
+    category = _artifact_category(path, source_dir, roots)
+    visibility = _artifact_visibility(category)
+    dedupe_key = _dedupe_key(path, category)
+    is_internal = category == "internal_metadata"
 
     return DataArtifact(
         path=str(path),
@@ -244,6 +308,10 @@ def _build_artifact(path: Path, source_dir: str) -> DataArtifact:
         timestamp_min=timestamp_min,
         timestamp_max=timestamp_max,
         load_error=load_error,
+        category=category,
+        visibility=visibility,
+        dedupe_key=dedupe_key,
+        is_internal=is_internal,
     )
 
 
@@ -262,7 +330,7 @@ def scan_artifacts(scan_dirs: list[str] | None = None) -> tuple[list[dict[str, A
             if not path.is_file() or path.suffix.lower() not in SUPPORTED_SUFFIXES:
                 continue
             try:
-                artifact = _build_artifact(path, source_dir=str(root))
+                artifact = _build_artifact(path, source_dir=str(root), roots=roots)
                 artifacts.append(artifact.to_record())
             except Exception as exc:  # noqa: BLE001
                 warnings.append(f"Failed indexing {path}: {exc}")
