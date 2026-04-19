@@ -1,6 +1,7 @@
-# Telemetry Playback Web App
+# MSH Digital Twin Web App
 
-A lightweight Streamlit page for replaying processed telemetry/state exports over time.
+The web app is now the **primary workspace** for this repository.
+It continuously scans configured folders, indexes analysis outputs, and exposes playback + analysis inspection directly in the UI.
 
 ## Run
 
@@ -8,60 +9,40 @@ A lightweight Streamlit page for replaying processed telemetry/state exports ove
 streamlit run catalog/webapp/app.py
 ```
 
-### Launch preloaded from a workflow session export directory
+## Always-on behavior
+
+- The app starts as a long-running Streamlit service.
+- On startup it scans data/result folders (defaults: `results,data`).
+- It rescans periodically via auto-refresh.
+- It tracks playback-compatible exports separately from generic tabular outputs.
+
+Configure scan roots:
 
 ```bash
-streamlit run catalog/webapp/app.py -- --session-export-dir results/workflows/<session-id>/exports/timeline
+MSH_SCAN_DIRS=results,data streamlit run catalog/webapp/app.py
 ```
 
-You can also preload via environment variable:
+## UI sections
 
-```bash
-MSH_PLAYBACK_EXPORT_DIR=results/workflows/<session-id>/exports/timeline streamlit run catalog/webapp/app.py
-```
+- **System status**: scan roots, indexed artifacts, playback-capable count, read errors.
+- **Overview**: compact catalog of discovered analysis outputs.
+- **Analyses**: analysis browser with metadata + direct dataset inspection.
+- **Machine view**: machine/day trends when machine columns are available.
+- **Playback**: timeline replay for valid playback exports.
+- **Exploration**: generic tabular exploration (including manual upload/path as secondary mode).
 
-The app will automatically look for session export files named:
+## Playback bootstrap compatibility
+
+The app still supports existing playback bootstrap inputs:
+
+- `--session-export-dir`
+- `--source-path`
+- `MSH_PLAYBACK_SOURCE_PATH`
+- `MSH_PLAYBACK_EXPORT_DIR`
+
+Session export auto-discovery filenames:
 
 - `timeline_rows.csv`
 - `timeline_rows.parquet`
 - `timeline_rows.jsonl`
 - `timeline_rows.json`
-
-## Expected input
-
-Provide a timeline export (`.csv`, `.parquet`, `.jsonl`, or `.json`) containing row-level fields such as:
-
-- `timestamp`
-- `machine_id`
-- `date`
-- `state`
-- `active`
-- `dense_idle`
-- `intervention_candidate`
-- `stopped` (optional)
-- `event_score`
-- `fired_rules`
-- `Srpm`, `Sload`, `Sovr`, `Fovr`, `Frapidovr`
-- `execution`, `mode`, `program`
-
-In session-integrated mode these fields come from session-generated exports under:
-
-- `results/workflows/<session-id>/exports/timeline/`
-- manifest metadata: `results/workflows/<session-id>/exports/timeline/manifest.json`
-
-## Shared helpers
-
-`catalog/common/timeline_exports.py` provides:
-
-- `infer_timeline_rows` to generate row-level timeline state outputs from telemetry
-- `build_state_interval_export` for interval-level state bands
-- `load_timeline_export` for robust loading/normalization
-
-## Playback behavior
-
-The player supports:
-
-- **Row-based** playback (uniform stepping)
-- **Time-based** playback (sleep duration scaled by actual timestamp gaps)
-
-Time-based mode is still discrete per row, but better reflects real telemetry spacing.
