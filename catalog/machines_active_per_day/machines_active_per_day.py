@@ -99,6 +99,6 @@ plt.ylabel("Number of Machines Active")
 plt.title("Active Machines per Day")
 plt.tight_layout()
 plt.savefig(OUTPUT_PLOT)
-plt.show()
+plt.close()
 
 print(f"Saved bar chart to: {OUTPUT_PLOT}")

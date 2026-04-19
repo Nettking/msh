@@ -108,6 +108,6 @@ plt.ylabel("Missing Sequence Numbers")
 plt.title("Missing Sequence Numbers per Day")
 plt.tight_layout()
 plt.savefig(OUTPUT_BAR_PLOT)
-plt.show()
+plt.close()
 
 print(f"Saved bar chart to: {OUTPUT_BAR_PLOT}")

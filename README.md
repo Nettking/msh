@@ -28,6 +28,7 @@ Current defaults are intentional:
 Open http://localhost:5000.
 
 Terminal output is status-oriented (discovery, processing, skipped/ran steps, outputs, failures, Flask readiness).
+Workflow subprocesses run with stdin disabled (non-interactive by default) and now stream both stdout/stderr into orchestration logs for clearer failure diagnosis.
 
 Implementation note: orchestration currently reuses substantial `catalog/runner/*` execution/session components under a non-interactive wrapper, rather than replacing all runner internals yet.
 

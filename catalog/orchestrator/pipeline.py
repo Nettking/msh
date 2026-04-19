@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+import traceback
 
 from catalog.common.artifact_registry import configured_scan_dirs, scan_artifacts
 from catalog.runner.data_filtering import discover_available_dates, ensure_session_filtered_data
@@ -158,12 +159,22 @@ def run_orchestration() -> OrchestrationResult:
             status.warn(f"workflow script not discovered: {script_key}")
             continue
         status.info(f"running analysis step: {script_key}")
-        state, exit_code = execute_script_for_session(
-            session_dir=session_dir,
-            metadata=metadata,
-            script=script,
-            force_rerun=False,
-        )
+        try:
+            state, exit_code = execute_script_for_session(
+                session_dir=session_dir,
+                metadata=metadata,
+                script=script,
+                force_rerun=False,
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging path
+            failed_scripts.append(script_key)
+            script_results.append({"script": script_key, "state": "crashed", "exit_code": None})
+            status.warn(
+                f"{script_key} crashed before completion: {exc.__class__.__name__}: {exc}. "
+                f"continuing due to execution policy {EXECUTION_POLICY_BEST_EFFORT}"
+            )
+            status.warn("stack trace follows:\n" + "".join(traceback.format_exception(exc)))
+            continue
         script_results.append({"script": script_key, "state": state, "exit_code": exit_code})
         if state == "skipped_cached":
             status.info(f"skipping {script_key}: output is up to date")
@@ -172,6 +183,11 @@ def run_orchestration() -> OrchestrationResult:
             status.info(f"completed {script_key}")
         else:
             failed_scripts.append(script_key)
+            if exit_code == 1:
+                status.warn(
+                    f"{script_key} returned exit code 1. "
+                    "If stderr contains EOF/EOFError, this indicates legacy interactive behavior."
+                )
             status.warn(
                 f"{script_key} failed with exit code {exit_code}; continuing due to "
                 f"execution policy {EXECUTION_POLICY_BEST_EFFORT}"
