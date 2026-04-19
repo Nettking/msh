@@ -1,4 +1,4 @@
-"""Main Streamlit digital twin workspace orchestrator for playback, analyses, and exploration."""
+"""Thin Streamlit page orchestrator for the MSH digital twin workspace."""
 
 from __future__ import annotations
 
