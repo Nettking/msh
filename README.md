@@ -2,57 +2,66 @@
 
 Flask-first repository for recording, scanning, and inspecting MTConnect telemetry analyses through a continuous digital twin interface.
 
-## Primary web application (Flask)
+## Default workflow (automatic orchestration + Flask)
 
-The primary web interface now lives in `catalog/flask_app/` and is organized into:
-
-- `app.py`: Flask app factory + runtime startup
-- `routes.py`: page routes + rescan endpoint
-- `services/`: scanning/index, playback validation, chart data prep
-- `templates/`: overview, analyses, machine view, playback, exploration, status
-- `static/`: lightweight CSS
-
-### Run locally
+Run one command:
 
 ```bash
 python -m catalog.flask_app.app
 ```
 
+The startup flow is now non-interactive and automatic (with explicit default policies):
+
+1. scans configured roots from `MSH_SCAN_DIRS` (default `results,data`)
+2. discovers available dates in `data/`
+3. creates/reuses an auto session under `results/workflows/`
+4. prepares filtered session data
+5. runs the standard analysis pipeline in workflow order (skipping cached outputs when fresh)
+6. prepares playback exports for web views
+7. starts Flask on port 5000
+
+Current defaults are intentional:
+- **date policy:** full discovered range in `data/`
+- **execution policy:** best-effort pipeline (continue after individual script failures)
+- **handoff policy:** Flask still starts after orchestration, including partial-failure cases
+
 Open http://localhost:5000.
 
-Configured scan roots come from `MSH_SCAN_DIRS` (default: `results,data`).
-Shared backend logic is in `catalog/common/artifact_registry.py` so Flask is not coupled to Streamlit modules.
+Terminal output is status-oriented (discovery, processing, skipped/ran steps, outputs, failures, Flask readiness).
 
-### Docker quick start (recommended)
+Implementation note: orchestration currently reuses substantial `catalog/runner/*` execution/session components under a non-interactive wrapper, rather than replacing all runner internals yet.
+
+## Docker quick start (recommended)
 
 ```bash
 docker compose up --build webapp
 ```
 
-Open http://localhost:5000.
+This now runs **prepare + serve** automatically (no menu interaction).
 
-Note: Docker currently runs the Flask **development server** for a practical first iteration.
+Optional prep-only one-shot run:
 
-The `webapp` service mounts:
+```bash
+docker compose run --rm prep
+```
 
-- `./results:/app/results`
-- `./data:/app/data`
+## Deprecated path: interactive runner menu
+
+The old numeric menu runner (`catalog/runner/menu.py`) is deprecated as an operational path.
+It no longer serves as the primary decision UI and now only prints deprecation guidance plus orchestration fallback behavior.
+
+## Flask app structure
+
+The primary web interface lives in `catalog/flask_app/` and is organized into:
+
+- `app.py`: Flask app factory + orchestration-aware startup
+- `routes.py`: page routes + rescan endpoint
+- `services/`: scanning/index, playback validation, chart data prep
+- `templates/`: overview, analyses, machine view, playback, exploration, status
+- `static/`: lightweight CSS
+
+Shared backend logic is in `catalog/common/artifact_registry.py`.
 
 ## Legacy Streamlit app (transitional only)
 
-The old Streamlit app remains at `catalog/webapp/app.py` only for transition/backward compatibility. It is now legacy and no longer the primary architectural direction.
-
-## Secondary workflow: CLI runner (`msh`)
-
-Build and run the interactive script runner:
-
-```bash
-docker compose build msh
-docker compose run --rm msh
-```
-
-## Notes
-
-- Flask pages explicitly distinguish playback-compatible datasets vs general tabular datasets.
-- Scanning is practical and explicit (`/rescan` endpoint/button) and independent from Streamlit rerun/session-state patterns.
-- Invalid files are reported as read errors and should not crash the app.
+The old Streamlit app remains at `catalog/webapp/app.py` only for transition/backward compatibility.

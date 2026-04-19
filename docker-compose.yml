@@ -1,16 +1,16 @@
 services:
-  # Secondary interactive one-shot analysis container (CLI runner), not a persistent service.
-  msh:
+  # Optional one-shot orchestration run (prep only).
+  prep:
     build:
       context: .
       dockerfile: Dockerfile.cli
-    stdin_open: true
-    tty: true
+    environment:
+      - MSH_SCAN_DIRS=results,data
     volumes:
       - ./data:/app/data
       - ./results:/app/results
 
-  # Primary always-on digital twin workspace (Flask).
+  # Primary always-on digital twin workspace (auto-prepare + Flask).
   webapp:
     build:
       context: .
