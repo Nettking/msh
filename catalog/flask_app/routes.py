@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from flask import Blueprint, current_app, redirect, render_template, request, url_for
+from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 
 from catalog.orchestrator.pipeline import get_runtime_manager
 
 from .services.catalog_service import ArtifactCatalog, safe_load_artifact_frame
 from .services.chart_service import category_columns, category_counts, histogram_data, line_or_scatter_data, machine_day_trend, numeric_columns
+from .services.control_service import get_control_panel_service
 from .services.playback_service import interval_rows, playback_context, playback_subset, summarize_intervals, validate_playback_frame, validate_playback_source
 
 web = Blueprint("web", __name__)
@@ -206,6 +207,26 @@ def exploration():
         hist_payload=hist_payload,
     )
 
+
+@web.route("/control")
+def control():
+    panel = get_control_panel_service().snapshot()
+    return render_template("control.html", panel=panel)
+
+
+@web.post("/control/action")
+def control_action():
+    action = request.form.get("action", "")
+    ok, message = get_control_panel_service().trigger_action(action)
+    flash(message, "success" if ok else "error")
+    return redirect(url_for("web.control"))
+
+
+@web.post("/control/script/<script_key>/run")
+def run_script_control(script_key: str):
+    ok, message = get_control_panel_service().trigger_action("run_script", script_key=script_key)
+    flash(message, "success" if ok else "error")
+    return redirect(url_for("web.control"))
 
 @web.post("/rescan")
 def rescan():

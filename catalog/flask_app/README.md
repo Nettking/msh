@@ -10,7 +10,10 @@ Primary web interface for browsing scanned artifacts, playback-capable datasets,
 - `/playback` playback-compatible inspection
 - `/exploration` generic table exploration with charts
 - `/status` scan/system status
+- `/control` runtime + workflow + script control panel
 - `POST /rescan` explicit rescan trigger
+- `POST /control/action` trigger runtime/workflow actions
+- `POST /control/script/<script_key>/run` trigger individual scripts
 
 ## Runtime (prepare + serve)
 
@@ -48,3 +51,30 @@ Overview (`/`) shows only default-visible artifacts (`source_data` + `derived_ou
 ## Startup coupling note
 
 By default, Flask startup runs a minimal bootstrap orchestration first. This is intentional and keeps startup bounded to the latest day. Incremental updates continue in the background and runtime state is persisted in `results/workflows/runtime_state.json` for status visibility. Set `MSH_SKIP_ORCHESTRATION=1` to skip that pre-start phase when needed.
+
+## Operator control panel (terminal controls moved to web)
+
+`/control` is now the primary operator surface for analysis control. It replaces the old terminal/menu control flow with explicit web actions:
+
+- runtime state visibility (mode, processed range, update-running, last refresh/failure)
+- active/latest workflow session metadata visibility
+- explicit workflow actions:
+  - Run refresh now
+  - Run startup-safe health checks
+  - Re-run latest session workflow scripts (reruns scripts in latest existing session)
+- script-level manual run buttons with status/last-run/output path
+- recent control activity history (action, timing, status, message, output path)
+
+Automatic bootstrap + incremental background updates still run at Flask startup; the control panel adds manual operator overrides without reintroducing terminal prompts.
+
+## Current MVP limits
+
+The control panel is intentionally lightweight:
+
+- execution model is single-process + in-process background threads
+- actions are best-effort and are not a durable job queue
+- recent control activity is held in memory only (not persisted across process restart)
+- recent stdout/stderr snippets are truncated, practical diagnostics rather than full logs
+- manual script/workflow actions may refresh filtered session data and playback exports as part of a run
+
+This is an initial web operator surface and not yet a full distributed control system.

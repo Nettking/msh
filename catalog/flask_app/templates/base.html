@@ -18,6 +18,7 @@
         <a href="{{ url_for('web.playback') }}">Playback</a>
         <a href="{{ url_for('web.exploration') }}">Exploration</a>
         <a href="{{ url_for('web.status') }}">System status</a>
+        <a href="{{ url_for('web.control') }}">Control panel</a>
       </nav>
       <form method="post" action="{{ url_for('web.rescan') }}">
         <input type="hidden" name="next" value="{{ request.path }}{% if request.query_string %}?{{ request.query_string.decode('utf-8') }}{% endif %}">
@@ -25,6 +26,15 @@
       </form>
     </header>
     <main>
+      {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <ul class="flash-list">
+        {% for category, message in messages %}
+        <li class="flash flash-{{ category }}">{{ message }}</li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% endwith %}
       {% block body %}{% endblock %}
     </main>
   </body>
