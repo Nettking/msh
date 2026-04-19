@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>MSH Flask Webapp</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  </head>
+  <body>
+    <header>
+      <h1>MSH Webapp (Flask Primary)</h1>
+      <nav>
+        <a href="{{ url_for('web.overview') }}">Overview</a>
+        <a href="{{ url_for('web.analyses') }}">Analyses</a>
+        <a href="{{ url_for('web.machine_view') }}">Machine view</a>
+        <a href="{{ url_for('web.playback') }}">Playback</a>
+        <a href="{{ url_for('web.exploration') }}">Exploration</a>
+        <a href="{{ url_for('web.status') }}">System status</a>
+      </nav>
+      <form method="post" action="{{ url_for('web.rescan') }}">
+        <input type="hidden" name="next" value="{{ request.path }}{% if request.query_string %}?{{ request.query_string.decode('utf-8') }}{% endif %}">
+        <button type="submit">Rescan</button>
+      </form>
+    </header>
+    <main>
+      {% block body %}{% endblock %}
+    </main>
+  </body>
+</html>

@@ -1,0 +1,12 @@
+{% extends 'base.html' %}
+{% block body %}
+<h2>System status</h2>
+<p>Configured roots: {{ scan_dirs|join(', ') }}</p>
+<p>Artifacts: {{ snapshot.artifacts|length }} | Warnings: {{ snapshot.warnings|length }}</p>
+<table>
+  <tr><th>File</th><th>Kind</th><th>Status</th><th>Modified</th></tr>
+  {% for a in snapshot.artifacts %}
+  <tr><td>{{ a.file_name }}</td><td>{{ a.kind }}</td><td>{{ a.status }}</td><td>{{ a.modified_at }}</td></tr>
+  {% endfor %}
+</table>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+{% block body %}
+<h2>Generic dataset exploration</h2>
+<form>
+<select name="path">
+  <option value="">Select artifact</option>
+  {% for a in artifacts %}<option value="{{ a.path }}" {% if selected and selected.path==a.path %}selected{% endif %}>{{ a.file_name }}</option>{% endfor %}
+</select>
+<select name="chart">
+  {% for ct in ['line','scatter','histogram','bar'] %}<option value="{{ ct }}" {% if chart_type==ct %}selected{% endif %}>{{ ct }}</option>{% endfor %}
+</select>
+{% for col in numeric %}
+<label><input type="checkbox" name="num" value="{{ col }}" {% if col in chosen_numeric %}checked{% endif %}>{{ col }}</label>
+{% endfor %}
+{% if chart_type == 'histogram' and numeric %}
+<select name="hist_col">
+  {% for col in numeric %}<option value="{{ col }}" {% if col == hist_col %}selected{% endif %}>Histogram: {{ col }}</option>{% endfor %}
+</select>
+{% endif %}
+{% if chart_type == 'bar' and categorical %}
+<select name="cat_col">
+  {% for col in categorical %}<option value="{{ col }}" {% if col == cat_col %}selected{% endif %}>Category: {{ col }}</option>{% endfor %}
+</select>
+{% endif %}
+<button type="submit">Render</button>
+</form>
+{% if error %}<p>{{ error }}</p>{% endif %}
+{% if frame is not none %}
+<p>Rows: {{ frame|length }} | Cols: {{ frame.columns|length }}</p>
+<div class="pre">{{ frame.head(40).to_html(classes='table', index=False) | safe }}</div>
+<canvas id="mainChart"></canvas>
+<script>
+const chartType = {{ chart_type|tojson }};
+const xIsTime = {{ chart_payload.x_is_time|tojson }};
+let cfg = {type: 'line', data: {labels: {{ chart_payload.labels|tojson }}, datasets: {{ chart_payload.datasets|tojson }}}, options: {responsive:true}};
+if (chartType === 'scatter') {
+  cfg = {
+    type:'scatter',
+    data:{datasets: {{ chart_payload.datasets|tojson }}},
+    options:{
+      responsive:true,
+      scales:{x:{type: xIsTime ? 'time' : 'linear', time:{tooltipFormat:'yyyy-MM-dd HH:mm:ss'}}}
+    }
+  };
+}
+if (chartType === 'histogram') { cfg = {type:'bar', data:{labels: {{ hist_payload.labels|tojson }}, datasets:[{label:'count', data: {{ hist_payload.counts|tojson }}}]}}; }
+if (chartType === 'bar') { cfg = {type:'bar', data:{labels: {{ category_payload.labels|tojson }}, datasets:[{label:'count', data: {{ category_payload.counts|tojson }}}]}}; }
+new Chart(document.getElementById('mainChart'), cfg);
+</script>
+{% endif %}
+{% endblock %}

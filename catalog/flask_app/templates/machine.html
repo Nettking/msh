@@ -1,0 +1,20 @@
+{% extends 'base.html' %}
+{% block body %}
+<h2>Machine/day trends</h2>
+<form>
+<select name="path">
+  <option value="">Select artifact</option>
+  {% for a in artifacts if 'machine-filter' in a.supported_views %}<option value="{{ a.path }}" {% if selected and selected.path==a.path %}selected{% endif %}>{{ a.file_name }}</option>{% endfor %}
+</select>
+<button type="submit">Show</button>
+</form>
+{% if error %}<p>{{ error }}</p>{% endif %}
+<canvas id="machineView"></canvas>
+<script>
+new Chart(document.getElementById('machineView'), {
+  type: 'line',
+  data: {labels: {{ trend.labels|tojson }}, datasets: {{ trend.series|tojson }}},
+  options: {responsive: true}
+});
+</script>
+{% endblock %}
