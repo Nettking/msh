@@ -1,9 +1,5 @@
 """
-Summarize missing sequence numbers per day from JSONL telemetry data.
-
-This script reads top-level JSONL files from ``data/``, extracts only the
-fields needed for this analysis, sorts by timestamp, estimates positive sequence
-number gaps, and aggregates missing counts by calendar day.
+Summarize missing sequence numbers per day from compact derived telemetry metrics.
 
 Outputs:
 - ``missing_per_day.csv``: daily missing-count summary
@@ -13,6 +9,7 @@ Outputs:
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -22,64 +19,41 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from catalog.common.data_loading import iter_records_with_parsed_timestamps
+from catalog.common.basic_metrics import iter_basic_metrics_rows
 
-DATA_DIR = "data"
+DATA_DIR = Path("data")
 OUTPUT_SUMMARY_CSV = "missing_per_day.csv"
 OUTPUT_BAR_PLOT = "missing_per_day.png"
 
 
-def _warn_malformed_json(message: str) -> None:
-    print(f"Error parsing line: {message}")
-
-
-def _warn_invalid_timestamp(file_path: Path, raw_timestamp: object) -> None:
-    print(f"Error parsing line in {file_path.name}: Invalid isoformat string: {raw_timestamp}")
-
-
-def _to_int_sequence(raw_value: object) -> int | None:
-    if raw_value is None:
-        return None
-    try:
-        return int(raw_value)
-    except (TypeError, ValueError):
-        return None
-
-
 def main() -> None:
-    rows: list[tuple[pd.Timestamp, int]] = []
+    previous_sequence: int | None = None
     skipped_sequence = 0
+    parsed_rows = 0
+    missing_by_day: defaultdict[object, int] = defaultdict(int)
 
-    for _, entry in iter_records_with_parsed_timestamps(
-        DATA_DIR,
-        recursive=False,
-        allow_z_suffix=True,
-        on_malformed_json=_warn_malformed_json,
-        on_invalid_timestamp=_warn_invalid_timestamp,
-    ):
-        seq = _to_int_sequence(entry.get("sequence"))
-        if seq is None:
+    for timestamp, _, sequence in iter_basic_metrics_rows(DATA_DIR):
+        parsed_rows += 1
+        if sequence is None:
             skipped_sequence += 1
             continue
-        rows.append((entry["timestamp"], seq))
 
-    if not rows:
+        if previous_sequence is not None:
+            gap = sequence - previous_sequence
+            if gap > 1:
+                missing_by_day[timestamp.date()] += gap - 1
+        previous_sequence = sequence
+
+    if not missing_by_day and parsed_rows == skipped_sequence:
         raise SystemExit("No valid records with timestamp+sequence found in data folder.")
 
-    df = pd.DataFrame(rows, columns=["timestamp", "sequence"])
-    df.sort_values("timestamp", inplace=True)
-    df.reset_index(drop=True, inplace=True)
+    missing_rows = [
+        {"date": day, "missing_count": int(count)}
+        for day, count in sorted(missing_by_day.items())
+    ]
+    missing_per_day = pd.DataFrame(missing_rows or [{"date": None, "missing_count": 0}]).dropna()
 
-    df["sequence_gap"] = df["sequence"].diff().fillna(1)
-    # Keep only positive forward gaps; negative/zero jumps are not "missing"
-    # values in this simple stream-based estimator.
-    df["missing_count"] = (df["sequence_gap"] - 1).clip(lower=0)
-
-    df["date"] = df["timestamp"].dt.date
-    missing_per_day = df.groupby("date", as_index=False)["missing_count"].sum()
-    missing_per_day["missing_count"] = missing_per_day["missing_count"].astype(int)
-
-    print(f"Parsed {len(df)} timestamp+sequence rows; skipped {skipped_sequence} rows missing sequence.")
+    print(f"Parsed {parsed_rows} rows; skipped {skipped_sequence} rows missing sequence.")
     print("\nMissing sequence numbers per day:")
     print(missing_per_day)
 
@@ -99,6 +73,7 @@ def main() -> None:
     plt.savefig(OUTPUT_BAR_PLOT)
     plt.close()
 
+    del missing_per_day
     print(f"Saved bar chart to: {OUTPUT_BAR_PLOT}")
 
 
