@@ -2,17 +2,10 @@
 
 from __future__ import annotations
 
-import argparse
-import json
-import os
 import sys
 import time
-import tempfile
 from pathlib import Path
 
-import altair as alt
-import matplotlib.dates as mdates
-import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
@@ -25,15 +18,6 @@ if not __package__:
 from catalog.common.timeline_exports import build_state_interval_export, load_timeline_export_with_schema_info
 from catalog.webapp.analysis_registry import configured_scan_dirs, load_artifact_frame, scan_artifacts
 
-STATE_COLORS = {
-    "active": "#16a34a",
-    "dense_idle": "#f59e0b",
-    "idle": "#94a3b8",
-    "intervention_candidate": "#ef4444",
-    "stopped": "#7c3aed",
-}
-DEFAULT_HIST_COLOR = "#334155"
-MAX_EXPLORATION_PLOT_ROWS = 15000
 
 SIGNALS = ["Srpm", "Sload", "Sovr", "Fovr", "Frapidovr"]
 DEFAULT_EXPORT_CANDIDATES = ["timeline_rows.csv", "timeline_rows.parquet", "timeline_rows.jsonl", "timeline_rows.json"]
@@ -271,13 +255,22 @@ def _resolve_bootstrap_source() -> tuple[str, str]:
     if env_source:
         return env_source, "MSH_PLAYBACK_SOURCE_PATH"
 
-    env_export_dir = os.getenv("MSH_PLAYBACK_EXPORT_DIR", "").strip()
-    from_env_export = _resolve_session_export_file(env_export_dir)
-    if from_env_export:
-        return from_env_export, f"MSH_PLAYBACK_EXPORT_DIR ({env_export_dir})"
+    scan_nonce = st.session_state.get("scan_nonce", 0)
+    with st.sidebar:
+        st.header("Runtime")
+        if st.button("Rescan now"):
+            st.session_state.scan_nonce = scan_nonce + 1
+            scan_nonce = st.session_state.scan_nonce
 
-    return "", ""
+        auto_refresh = st.checkbox("Auto-refresh", value=True)
+        refresh_sec = st.slider("Refresh every (seconds)", min_value=10, max_value=300, value=45, step=5)
 
+        st.header("Manual/secondary data source")
+        uploaded = st.file_uploader("Upload CSV/Parquet/JSONL/JSON", type=["csv", "parquet", "pq", "jsonl", "json"])
+        default_source, source_hint = resolve_bootstrap_source()
+        local_path = st.text_input("or local path", value=default_source)
+        if source_hint:
+            st.caption(f"Prefilled source: {source_hint}")
 
 def _render_playback_mode(df: pd.DataFrame):
     machines = sorted(df["machine_id"].dropna().astype(str).unique().tolist())
