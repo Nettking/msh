@@ -104,11 +104,8 @@ Each session stores:
 - session metadata in `session_state.json` (with legacy mirror `session.json`)
 - a lightweight session config signature for the selected filter config
 
-Workflow guidance remains step-based:
-- **Step 1:** health checks
-- **Step 2:** raw inspection
-- **Step 3:** stop-focused inspection
-- **Step 4:** deeper exploratory analysis
+Workflow guidance for unattended startup is now deliberately narrow:
+- **Step 1:** startup-safe health checks
 
 Execution and caching are script-level:
 - step completion is derived from script statuses
@@ -151,18 +148,14 @@ When orchestration prepares playback exports:
 - timeline exports are generated only when needed (reused if still valid)
 - Flask playback views can consume scan-discovered playback-compatible outputs
 
-Default precompute scope includes the standard runner-visible workflow scripts:
+Default precompute scope is limited to startup-safe scripts:
 - `machines_active_per_day`
 - `analyze_missing_sequence_number`
 - `missing_per_day_by_machine`
 - `sampling_rate_analysis`
-- `data_pr_day`
-- `find_stops`
-- `data_visualizer`
-- `data_analysis`
-- `ml_analysis`
 
-Intentionally excluded from default precompute/workflow path:
+Intentionally excluded from unattended default precompute/workflow path:
+- heavier exploratory scripts (`data_pr_day`, `find_stops`, `data_visualizer`, `data_analysis`, `ml_analysis`)
 - legacy `corrolation_machine_pairs` (still runnable explicitly)
 - Streamlit and environment/recorder tools (`data_simulator`, `interventions`, recorders, `auto_connect`)
 

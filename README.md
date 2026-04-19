@@ -16,7 +16,7 @@ The startup flow is now non-interactive and automatic (with explicit default pol
 2. discovers available dates in `data/`
 3. creates/reuses an auto session under `results/workflows/`
 4. prepares filtered session data
-5. runs the standard analysis pipeline in workflow order (skipping cached outputs when fresh)
+5. runs startup-safe health-check analyses in workflow order (skipping cached outputs when fresh)
 6. prepares playback exports for web views
 7. starts Flask on port 5000
 
@@ -26,6 +26,15 @@ Current defaults are intentional:
 - **handoff policy:** Flask still starts after orchestration, including partial-failure cases
 
 Open http://localhost:5000.
+
+Default startup scope is intentionally limited to startup-safe health checks:
+- `machines_active_per_day`
+- `analyze_missing_sequence_number`
+- `missing_per_day_by_machine`
+- `sampling_rate_analysis`
+
+Heavier exploratory scripts remain available for explicit/manual execution, but are excluded from automatic startup so `docker compose up --build webapp` remains reliable in unattended environments.
+
 
 Terminal output is status-oriented (discovery, processing, skipped/ran steps, outputs, failures, Flask readiness).
 Workflow subprocesses run with stdin disabled (non-interactive by default) and now stream both stdout/stderr into orchestration logs for clearer failure diagnosis.
