@@ -14,16 +14,18 @@ The startup flow is now non-interactive and automatic (with explicit default pol
 
 1. scans configured roots from `MSH_SCAN_DIRS` (default `results,data`)
 2. discovers available dates in `data/`
-3. creates/reuses an auto session under `results/workflows/`
-4. prepares filtered session data
-5. runs startup-safe health-check analyses in workflow order (skipping cached outputs when fresh)
+3. bootstraps only the **latest discovered day** into an auto session under `results/workflows/`
+4. prepares filtered session data + derived metrics for that bootstrap slice
+5. runs startup-safe health-check analyses only for the bootstrap slice
 6. prepares playback exports for web views
 7. starts Flask on port 5000
+8. continues polling for new data and incrementally processes only newly discovered days
 
 Current defaults are intentional:
-- **date policy:** full discovered range in `data/`
+- **startup date policy:** latest discovered day only (`latest_discovered_day_only`)
 - **execution policy:** best-effort pipeline (continue after individual script failures)
-- **handoff policy:** Flask still starts after orchestration, including partial-failure cases
+- **handoff policy:** Flask still starts after bootstrap orchestration, including partial-failure cases
+- **update policy:** local polling loop (`poll_for_new_data_then_process_new_slice`) that avoids full historical recomputation
 
 Open http://localhost:5000.
 
@@ -31,9 +33,18 @@ Default startup scope is intentionally limited to startup-safe health checks:
 - `machines_active_per_day`
 - `sampling_rate_analysis`
 
-To avoid repeated full JSONL scans during startup, orchestration now builds one compact shared dataset at `results/workflows/<session>/data/_derived/basic_metrics.csv` (timestamp, machine, sequence) and startup scripts read from that file.
+To avoid repeated full JSONL scans during startup, orchestration builds one compact shared dataset at `results/workflows/<session>/data/_derived/basic_metrics.csv` (timestamp, machine, sequence) and startup scripts read from that file.
+
+Runtime update state is persisted at `results/workflows/runtime_state.json` so the app can surface:
+- bootstrap mode and policy
+- current processed range
+- last successful refresh
+- running/idle update state
+- new-data detection and failures
 
 Heavier exploratory scripts remain available for explicit/manual execution, but are excluded from automatic startup so `docker compose up --build webapp` remains reliable in unattended environments.
+
+Full historical rebuild is now a deliberate/manual operation rather than the default web startup path.
 
 
 Terminal output is status-oriented (discovery, processing, skipped/ran steps, outputs, failures, Flask readiness).
