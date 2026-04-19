@@ -29,6 +29,10 @@ Current defaults are intentional:
 
 Open http://localhost:5000.
 
+Primary operator controls are now available in the Flask UI at `/control` (runtime refresh/workflow reruns/script runs/recent control history), replacing the deprecated terminal menu as the main control surface.
+
+The `/control` panel is currently an MVP: single-process threaded execution, best-effort action handling, and in-memory recent activity/log snippets (not restart-persistent).
+
 Default startup scope is intentionally limited to startup-safe health checks:
 - `machines_active_per_day`
 - `sampling_rate_analysis`

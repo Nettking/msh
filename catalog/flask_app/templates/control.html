@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+{% block body %}
+<h2>Runtime control panel</h2>
+<p>This is an MVP operator control surface: single-process, best-effort, and in-memory activity history (not persisted across restart).</p>
+
+<h3>Runtime and orchestration status</h3>
+<p>Mode: {{ panel.runtime_state.mode }}</p>
+<p>Bootstrap policy: {{ panel.runtime_state.bootstrap_policy }}</p>
+<p>Processed range: {{ panel.runtime_state.current_range_start or 'n/a' }} .. {{ panel.runtime_state.current_range_end or 'n/a' }}</p>
+<p>Update running: {{ panel.runtime_state.update_running }}</p>
+<p>Last successful refresh: {{ panel.runtime_state.last_successful_refresh or 'n/a' }}</p>
+<p>Last failure: {{ panel.runtime_state.last_failure or 'none' }}</p>
+<p>Active/latest workflow session: {{ panel.latest_session.session_id if panel.latest_session else 'none yet' }}</p>
+<p>Current active control run id: {{ panel.active_run_id or 'none' }}</p>
+
+<h3>Workflow controls</h3>
+<form method="post" action="{{ url_for('web.control_action') }}">
+  <input type="hidden" name="action" value="refresh_now">
+  <button type="submit">Run refresh now</button>
+</form>
+<form method="post" action="{{ url_for('web.control_action') }}">
+  <input type="hidden" name="action" value="startup_health">
+  <button type="submit">Run startup-safe health checks</button>
+</form>
+<form method="post" action="{{ url_for('web.control_action') }}">
+  <input type="hidden" name="action" value="rerun_latest_session_workflow">
+  <button type="submit">Re-run latest session workflow scripts</button>
+</form>
+
+<p><em>Note: "Re-run latest session workflow scripts" re-runs workflow scripts against the latest existing session; it does not create a new historical rebuild session.</em></p>
+<p><em>Manual script/workflow actions may refresh filtered session data and playback exports before returning.</em></p>
+
+{% if panel.workflow_rows %}
+<h4>Workflow step status (latest session)</h4>
+<table>
+  <tr><th>Step</th><th>Scripts</th><th>Status</th></tr>
+  {% for row in panel.workflow_rows %}
+  <tr><td>{{ row.step }}</td><td>{{ row.scripts }}</td><td>{{ row.status }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h3>Script controls</h3>
+<table>
+  <tr><th>Script</th><th>Workflow step</th><th>Category</th><th>Last status</th><th>Last run</th><th>Output</th><th>Action</th></tr>
+  {% for row in panel.script_rows %}
+  <tr>
+    <td>{{ row.name }}</td>
+    <td>{{ row.workflow_step }}</td>
+    <td>{{ row.category }}</td>
+    <td>{{ row.status }}{% if row.exit_code is not none %} (exit={{ row.exit_code }}){% endif %}</td>
+    <td>{{ row.last_run_at }}</td>
+    <td>{{ row.output_path or 'n/a' }}</td>
+    <td>
+      <form method="post" action="{{ url_for('web.run_script_control', script_key=row.name) }}">
+        <button type="submit">Run</button>
+      </form>
+    </td>
+  </tr>
+  {% endfor %}
+</table>
+
+<h3>Recent control activity</h3>
+<table>
+  <tr><th>Action</th><th>Started</th><th>Finished</th><th>Status</th><th>Session</th><th>Output path</th><th>Message</th><th>stdout snippet</th><th>stderr snippet</th></tr>
+  {% for run in panel.recent_runs %}
+  <tr>
+    <td>{{ run.action }}{% if run.target %} ({{ run.target }}){% endif %}</td>
+    <td>{{ run.started_at }}</td>
+    <td>{{ run.finished_at or 'running' }}</td>
+    <td>{{ run.status }}</td>
+    <td>{{ run.session_id or 'n/a' }}</td>
+    <td>{{ run.output_path or 'n/a' }}</td>
+    <td>{{ run.message }}</td>
+    <td>{% if run.stdout_snippet %}<div class="pre">{{ run.stdout_snippet }}</div>{% else %}n/a{% endif %}</td>
+    <td>{% if run.stderr_snippet %}<div class="pre">{{ run.stderr_snippet }}</div>{% else %}n/a{% endif %}</td>
+  </tr>
+  {% endfor %}
+</table>
+{% endblock %}

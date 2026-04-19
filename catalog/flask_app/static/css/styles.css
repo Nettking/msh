@@ -7,3 +7,7 @@ main { padding: 16px 20px; }
 table { width: 100%; border-collapse: collapse; margin-top: 8px; background: white; }
 th, td { border: 1px solid #cbd5e1; padding: 6px; text-align: left; font-size: 14px; }
 .pre { overflow-x: auto; max-height: 420px; }
+.flash-list { list-style: none; padding: 0; margin: 0 0 12px 0; }
+.flash { padding: 8px 10px; border-radius: 6px; margin-bottom: 6px; }
+.flash-success { background: #dcfce7; border: 1px solid #86efac; }
+.flash-error { background: #fee2e2; border: 1px solid #fca5a5; }
