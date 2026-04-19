@@ -1,6 +1,21 @@
 {% extends 'base.html' %}
 {% block body %}
 <h2>System status</h2>
+<h3>Runtime update state</h3>
+<p>Bootstrap policy: {{ runtime_state.bootstrap_policy }}</p>
+<p>Mode: {{ runtime_state.mode }}</p>
+<p>Processed range: {{ runtime_state.current_range_start or 'n/a' }} .. {{ runtime_state.current_range_end or 'n/a' }}</p>
+<p>Last bootstrap day: {{ runtime_state.last_bootstrap_date or 'n/a' }}</p>
+<p>Last successful refresh: {{ runtime_state.last_successful_refresh or 'n/a' }}</p>
+<p>Last update check: {{ runtime_state.last_update_check_at or 'n/a' }}</p>
+<p>Update running: {{ runtime_state.update_running }}</p>
+<p>New data detected: {{ runtime_state.new_data_detected }}</p>
+<p>Last failure: {{ runtime_state.last_failure or 'none' }}</p>
+<form method="post" action="{{ url_for('web.refresh') }}">
+  <input type="hidden" name="next" value="{{ request.path }}">
+  <button type="submit">Run refresh now</button>
+</form>
+
 <p>Configured roots: {{ scan_dirs|join(', ') }}</p>
 <p>Artifacts: {{ snapshot.artifacts|length }} | Warnings: {{ snapshot.warnings|length }}</p>
 <table>

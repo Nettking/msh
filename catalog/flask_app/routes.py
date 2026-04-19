@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from flask import Blueprint, current_app, redirect, render_template, request, url_for
 
+from catalog.orchestrator.pipeline import get_runtime_manager
+
 from .services.catalog_service import ArtifactCatalog, safe_load_artifact_frame
 from .services.chart_service import category_columns, category_counts, histogram_data, line_or_scatter_data, machine_day_trend, numeric_columns
 from .services.playback_service import interval_rows, playback_context, playback_subset, summarize_intervals, validate_playback_frame, validate_playback_source
@@ -34,7 +36,8 @@ def overview():
 @web.route("/status")
 def status():
     snap = _catalog().ensure_scanned()
-    return render_template("status.html", snapshot=snap, scan_dirs=_catalog().scan_dirs)
+    runtime_state = get_runtime_manager().state_snapshot()
+    return render_template("status.html", snapshot=snap, scan_dirs=_catalog().scan_dirs, runtime_state=runtime_state)
 
 
 @web.route("/analyses")
@@ -183,4 +186,12 @@ def exploration():
 def rescan():
     _catalog().rescan()
     target = request.form.get("next") or url_for("web.overview")
+    return redirect(target)
+
+
+@web.post("/refresh")
+def refresh():
+    get_runtime_manager().request_refresh()
+    _catalog().rescan()
+    target = request.form.get("next") or url_for("web.status")
     return redirect(target)

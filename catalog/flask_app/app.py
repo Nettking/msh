@@ -20,7 +20,7 @@ def create_app() -> Flask:
 
 if __name__ == "__main__":
     if os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1":
-        print("[orchestrator] pre-start orchestration enabled (default coupling)", flush=True)
+        print("[orchestrator] bootstrap orchestration enabled (latest-day + incremental updates)", flush=True)
         orchestration_result = run_orchestration()
         print(
             f"[orchestrator] Flask startup handoff (session={orchestration_result.session_id}, "

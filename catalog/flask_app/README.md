@@ -21,11 +21,12 @@ MSH_SCAN_DIRS=results,data python -m catalog.flask_app.app
 Startup now performs automatic orchestration before Flask serve:
 
 - scan configured roots
-- discover source dates in `data/`
-- create/reuse auto workflow session
-- run analysis preparation pipeline with cache-aware skips
+- discover source dates in `data/` and bootstrap only the latest day
+- create/reuse per-day auto workflow session
+- run startup-safe analysis preparation for that bootstrap slice
 - prepare playback exports
-- start Flask
+- start Flask quickly
+- continue polling for newly available data and process only new slices incrementally
 
 Open http://localhost:5000.
 
@@ -34,4 +35,4 @@ Implementation note: shared registry/data logic is centralized in `catalog/commo
 
 ## Startup coupling note
 
-By default, Flask startup runs orchestration first. This is intentional and means startup time/failure context includes preparation work. Set `MSH_SKIP_ORCHESTRATION=1` to skip that pre-start phase when needed.
+By default, Flask startup runs a minimal bootstrap orchestration first. This is intentional and keeps startup bounded to the latest day. Incremental updates continue in the background and runtime state is persisted in `results/workflows/runtime_state.json` for status visibility. Set `MSH_SKIP_ORCHESTRATION=1` to skip that pre-start phase when needed.
