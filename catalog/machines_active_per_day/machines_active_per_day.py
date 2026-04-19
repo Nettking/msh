@@ -1,9 +1,9 @@
 """
 Summarize how many distinct machines appear in telemetry data per day.
 
-This script scans top-level JSONL files in ``data/`` and counts unique machine
-IDs for each calendar day. It avoids materializing full records/DataFrames so it
-can run safely in unattended Docker startup workflows.
+This script reads the compact derived dataset in ``data/_derived/basic_metrics.csv``
+when available (generated during orchestration) so startup avoids re-parsing every
+JSONL payload repeatedly.
 
 Outputs:
 - ``machines_active_per_day.csv``: daily summary of distinct machine counts
@@ -23,37 +23,21 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from catalog.common.data_loading import iter_records_with_parsed_timestamps
+from catalog.common.basic_metrics import iter_basic_metrics_rows
 
-DATA_DIR = "data"
+DATA_DIR = Path("data")
 OUTPUT_SUMMARY_CSV = "machines_active_per_day.csv"
 OUTPUT_PLOT = "machines_active_per_day.png"
-
-
-def _warn_malformed_json(message: str) -> None:
-    print(f"Error parsing line: {message}")
-
-
-def _warn_invalid_timestamp(file_path: Path, raw_timestamp: object) -> None:
-    print(f"Error parsing line in {file_path.name}: Invalid isoformat string: {raw_timestamp}")
 
 
 def main() -> None:
     machines_by_day: defaultdict[object, set[str]] = defaultdict(set)
     parsed_rows = 0
 
-    for _, entry in iter_records_with_parsed_timestamps(
-        DATA_DIR,
-        recursive=False,
-        allow_z_suffix=True,
-        on_malformed_json=_warn_malformed_json,
-        on_invalid_timestamp=_warn_invalid_timestamp,
-    ):
-        machine = entry.get("machine")
-        timestamp = entry.get("timestamp")
-        if machine is None or timestamp is None:
+    for timestamp, machine, _ in iter_basic_metrics_rows(DATA_DIR):
+        if machine is None:
             continue
-        machines_by_day[timestamp.date()].add(str(machine))
+        machines_by_day[timestamp.date()].add(machine)
         parsed_rows += 1
 
     if not machines_by_day:
@@ -85,6 +69,7 @@ def main() -> None:
     plt.savefig(OUTPUT_PLOT)
     plt.close()
 
+    del machines_active_per_day
     print(f"Saved bar chart to: {OUTPUT_PLOT}")
 
 

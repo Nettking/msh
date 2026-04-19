@@ -12,8 +12,6 @@ Purpose: verify that the dataset is usable before interpretation.
 
 Run:
 - `machines_active_per_day`
-- `analyze_missing_sequence_number`
-- `missing_per_day_by_machine`
 - `sampling_rate_analysis`
 
 Typical outputs:
@@ -150,9 +148,9 @@ When orchestration prepares playback exports:
 
 Default precompute scope is limited to startup-safe scripts:
 - `machines_active_per_day`
-- `analyze_missing_sequence_number`
-- `missing_per_day_by_machine`
 - `sampling_rate_analysis`
+
+Startup precompute first writes a compact shared dataset at `results/workflows/<session-id>/data/_derived/basic_metrics.csv` and startup-safe scripts consume this artifact instead of re-parsing full JSONL payloads in separate passes.
 
 Intentionally excluded from unattended default precompute/workflow path:
 - heavier exploratory scripts (`data_pr_day`, `find_stops`, `data_visualizer`, `data_analysis`, `ml_analysis`)

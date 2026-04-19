@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -12,62 +13,41 @@ ROOT_DIR = Path(__file__).resolve().parents[2]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from catalog.common.data_loading import iter_records_with_parsed_timestamps
+from catalog.common.basic_metrics import iter_basic_metrics_rows
 
-DATA_DIR = "data"
+DATA_DIR = Path("data")
 OUTPUT_SUMMARY_CSV = "missing_per_day_by_machine.csv"
 OUTPUT_DIR_PLOTS = Path("plots_per_machine")
 OUTPUT_DIR_PLOTS.mkdir(exist_ok=True)
 
 
-def _warn_malformed_json(message: str) -> None:
-    print(f"Error parsing line: {message}")
-
-
-def _warn_invalid_timestamp(file_path: Path, raw_timestamp: object) -> None:
-    print(f"Error parsing line in {file_path.name}: Invalid isoformat string: {raw_timestamp}")
-
-
-def _to_int_sequence(raw_value: object) -> int | None:
-    if raw_value is None:
-        return None
-    try:
-        return int(raw_value)
-    except (TypeError, ValueError):
-        return None
-
-
 def main() -> None:
-    rows: list[tuple[str, pd.Timestamp, int]] = []
+    prev_by_machine: dict[str, int] = {}
+    missing_by_machine_day: defaultdict[tuple[str, object], int] = defaultdict(int)
+    parsed_rows = 0
 
-    for _, entry in iter_records_with_parsed_timestamps(
-        DATA_DIR,
-        recursive=False,
-        allow_z_suffix=True,
-        on_malformed_json=_warn_malformed_json,
-        on_invalid_timestamp=_warn_invalid_timestamp,
-    ):
-        machine = entry.get("machine")
-        seq = _to_int_sequence(entry.get("sequence"))
-        if machine is None or seq is None:
+    for timestamp, machine, sequence in iter_basic_metrics_rows(DATA_DIR):
+        parsed_rows += 1
+        if machine is None or sequence is None:
             continue
-        rows.append((str(machine), entry["timestamp"], seq))
 
-    if not rows:
+        prev_sequence = prev_by_machine.get(machine)
+        if prev_sequence is not None:
+            gap = sequence - prev_sequence
+            if gap > 1:
+                missing_by_machine_day[(machine, timestamp.date())] += gap - 1
+        prev_by_machine[machine] = sequence
+
+    if not prev_by_machine:
         raise SystemExit("No valid records with timestamp+machine+sequence found in data folder.")
 
-    df = pd.DataFrame(rows, columns=["machine", "timestamp", "sequence"])
-    df.sort_values(["machine", "timestamp"], inplace=True)
-    df.reset_index(drop=True, inplace=True)
-    df["sequence_gap"] = df.groupby("machine")["sequence"].diff().fillna(1)
-    df["missing_count"] = (df["sequence_gap"] - 1).clip(lower=0)
-    df["date"] = df["timestamp"].dt.date
+    rows = [
+        {"machine": machine, "date": day, "missing_count": int(count)}
+        for (machine, day), count in sorted(missing_by_machine_day.items())
+    ]
+    missing_per_day_machine = pd.DataFrame(rows, columns=["machine", "date", "missing_count"])
 
-    missing_per_day_machine = (
-        df.groupby(["machine", "date"], as_index=False)["missing_count"].sum().sort_values(["machine", "date"])
-    )
-    missing_per_day_machine["missing_count"] = missing_per_day_machine["missing_count"].astype(int)
-
+    print(f"Parsed {parsed_rows} rows.")
     print("\nMissing sequence numbers per day per machine:")
     print(missing_per_day_machine)
     missing_per_day_machine.to_csv(OUTPUT_SUMMARY_CSV, index=False)
@@ -84,6 +64,8 @@ def main() -> None:
         plt.savefig(out_path)
         plt.close()
         print(f"Saved bar chart for {machine} to: {out_path}")
+
+    del missing_per_day_machine
 
 
 if __name__ == "__main__":

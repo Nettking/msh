@@ -20,8 +20,6 @@ WORKFLOW_STEPS: list[tuple[str, list[str]]] = [
         "Step 1: Startup-safe health checks",
         [
             "machines_active_per_day",
-            "analyze_missing_sequence_number",
-            "missing_per_day_by_machine",
             "sampling_rate_analysis",
         ],
     ),

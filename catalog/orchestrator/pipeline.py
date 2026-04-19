@@ -7,6 +7,7 @@ from typing import Any
 import traceback
 
 from catalog.common.artifact_registry import configured_scan_dirs, scan_artifacts
+from catalog.common.basic_metrics import basic_metrics_path, build_basic_metrics_dataset
 from catalog.runner.data_filtering import discover_available_dates, ensure_session_filtered_data
 from catalog.runner.playback import playback_readiness, prepare_session_playback_exports
 from catalog.runner.script_catalog import discover_runnable_scripts, repo_root
@@ -148,6 +149,14 @@ def run_orchestration() -> OrchestrationResult:
         status.info(f"skipping filter step (up-to-date): {matched_records} records across {matched_files} files")
     else:
         status.info(f"prepared filtered session data: {matched_records} records across {matched_files} files")
+
+    filtered_data_dir = session_dir / str(metadata["paths"]["filtered_data_dir"])
+    derived_dataset = basic_metrics_path(filtered_data_dir)
+    if filter_status == "cached" and derived_dataset.exists():
+        status.info(f"reusing derived metrics dataset: {derived_dataset}")
+    else:
+        derived_path, derived_rows = build_basic_metrics_dataset(filtered_data_dir)
+        status.info(f"prepared derived metrics dataset: {derived_rows} rows at {derived_path}")
 
     script_index = {item.key: item for item in script_options}
     script_results: list[dict[str, Any]] = []

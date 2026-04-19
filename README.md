@@ -29,9 +29,9 @@ Open http://localhost:5000.
 
 Default startup scope is intentionally limited to startup-safe health checks:
 - `machines_active_per_day`
-- `analyze_missing_sequence_number`
-- `missing_per_day_by_machine`
 - `sampling_rate_analysis`
+
+To avoid repeated full JSONL scans during startup, orchestration now builds one compact shared dataset at `results/workflows/<session>/data/_derived/basic_metrics.csv` (timestamp, machine, sequence) and startup scripts read from that file.
 
 Heavier exploratory scripts remain available for explicit/manual execution, but are excluded from automatic startup so `docker compose up --build webapp` remains reliable in unattended environments.
 
