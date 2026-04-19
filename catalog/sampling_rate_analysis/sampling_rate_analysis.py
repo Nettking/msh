@@ -134,6 +134,6 @@ plt.grid(True)
 plt.legend()
 plt.tight_layout()
 plt.savefig(OUTPUT_PLOT)
-plt.show()
+plt.close()
 
 print(f"Saved plot to: {OUTPUT_PLOT}")

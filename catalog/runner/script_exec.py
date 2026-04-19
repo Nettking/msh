@@ -88,7 +88,21 @@ def run_script(script_path: Path, workspace_dir: Path) -> int:
     print(f"\nRunning: {' '.join(command)}", flush=True)
     print(f"Working directory: {workspace_dir}", flush=True)
 
-    completed = subprocess.run(command, cwd=workspace_dir, env=env)
+    completed = subprocess.run(
+        command,
+        cwd=workspace_dir,
+        env=env,
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+    )
+    if completed.stdout:
+        print("[script stdout]", flush=True)
+        print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n", flush=True)
+    if completed.stderr:
+        print("[script stderr]", flush=True)
+        print(completed.stderr, end="" if completed.stderr.endswith("\n") else "\n", flush=True)
     return completed.returncode
 
 

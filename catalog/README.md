@@ -126,9 +126,11 @@ Automatic orchestration actions include:
 - create/reuse a deterministic auto session
 - prepare filtered session data
 - run standard workflow scripts in order
+- execute workflow scripts with non-interactive subprocess stdin (Docker-safe unattended execution)
 - skip already-fresh outputs when script cache is valid
 - generate/reuse playback timeline exports
 - hand off to Flask as the primary interface
+- capture script stdout/stderr in orchestration logs for clearer failure context
 
 ### Session playback integration
 

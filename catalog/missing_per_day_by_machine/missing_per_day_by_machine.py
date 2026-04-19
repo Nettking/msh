@@ -121,6 +121,6 @@ for machine, chunk in missing_per_day_machine.groupby("machine"):
 
     out_path = OUTPUT_DIR_PLOTS / f"missing_per_day_{machine}.png"
     plt.savefig(out_path)
-    plt.show()
+    plt.close()
 
     print(f"Saved bar chart for {machine} to: {out_path}")
