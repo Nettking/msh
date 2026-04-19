@@ -32,6 +32,18 @@ Open http://localhost:5000.
 
 Implementation note: shared registry/data logic is centralized in `catalog/common/artifact_registry.py`.
 
+## Artifact visibility defaults
+
+The scanner classifies each indexed file into one of three user-facing categories:
+
+- `source_data`: primary source files under `data/`
+- `derived_output`: analysis outputs meant for inspection (summaries, plots tables, playback exports, etc.)
+- `internal_metadata`: runtime/session state files (for example `runtime_state.json` and `session_state.json`)
+
+Additionally, copied workflow raw-data files under workflow-internal `.../data/...` folders are tagged as `workflow_data_copy` and hidden from the default overview to reduce duplicate noise versus the original source file.
+
+Overview (`/`) shows only default-visible artifacts (`source_data` + `derived_output`), while runtime/session metadata remains visible on `/status`.
+
 
 ## Startup coupling note
 

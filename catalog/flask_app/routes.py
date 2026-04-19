@@ -19,12 +19,21 @@ def _catalog() -> ArtifactCatalog:
 def overview():
     snap = _catalog().ensure_scanned()
     artifacts = snap.artifacts
-    playback_count = len([a for a in artifacts if a.get("playback_compatible")])
-    read_errors = len([a for a in artifacts if a.get("status") != "ready"])
+    overview_artifacts = [a for a in artifacts if a.get("visibility") == "default"]
+    source_artifacts = [a for a in overview_artifacts if a.get("category") == "source_data"]
+    derived_artifacts = [a for a in overview_artifacts if a.get("category") == "derived_output"]
+    hidden_workflow_copies = len([a for a in artifacts if a.get("category") == "workflow_data_copy"])
+    hidden_internal_metadata = len([a for a in artifacts if a.get("category") == "internal_metadata"])
+    playback_count = len([a for a in overview_artifacts if a.get("playback_compatible")])
+    read_errors = len([a for a in overview_artifacts if a.get("status") != "ready"])
     return render_template(
         "overview.html",
-        artifacts=artifacts[:25],
-        total=len(artifacts),
+        artifacts=overview_artifacts[:25],
+        total=len(overview_artifacts),
+        source_total=len(source_artifacts),
+        derived_total=len(derived_artifacts),
+        hidden_workflow_copies=hidden_workflow_copies,
+        hidden_internal_metadata=hidden_internal_metadata,
         playback_count=playback_count,
         read_errors=read_errors,
         warnings=snap.warnings,
@@ -37,14 +46,24 @@ def overview():
 def status():
     snap = _catalog().ensure_scanned()
     runtime_state = get_runtime_manager().state_snapshot()
-    return render_template("status.html", snapshot=snap, scan_dirs=_catalog().scan_dirs, runtime_state=runtime_state)
+    internal_artifacts = [a for a in snap.artifacts if a.get("is_internal")]
+    return render_template(
+        "status.html",
+        snapshot=snap,
+        scan_dirs=_catalog().scan_dirs,
+        runtime_state=runtime_state,
+        internal_artifacts=internal_artifacts,
+    )
 
 
 @web.route("/analyses")
 def analyses():
     snap = _catalog().ensure_scanned()
+    visible_artifacts = [a for a in snap.artifacts if a.get("visibility") == "default"]
     selected_path = request.args.get("path", "")
     selected = _catalog().artifact_by_path(selected_path) if selected_path else None
+    if selected and selected.get("visibility") != "default":
+        selected = None
     frame = None
     load_error = None
     trend = {"labels": [], "series": []}
@@ -54,7 +73,7 @@ def analyses():
             trend = machine_day_trend(frame)
     return render_template(
         "analyses.html",
-        artifacts=snap.artifacts,
+        artifacts=visible_artifacts,
         selected=selected,
         frame=frame,
         load_error=load_error,
@@ -65,21 +84,24 @@ def analyses():
 @web.route("/machine")
 def machine_view():
     snap = _catalog().ensure_scanned()
+    visible_artifacts = [a for a in snap.artifacts if a.get("visibility") == "default"]
     selected_path = request.args.get("path", "")
     selected = _catalog().artifact_by_path(selected_path) if selected_path else None
+    if selected and selected.get("visibility") != "default":
+        selected = None
     trend = {"labels": [], "series": []}
     error = None
     if selected:
         frame, error = safe_load_artifact_frame(selected_path)
         if frame is not None:
             trend = machine_day_trend(frame)
-    return render_template("machine.html", artifacts=snap.artifacts, selected=selected, trend=trend, error=error)
+    return render_template("machine.html", artifacts=visible_artifacts, selected=selected, trend=trend, error=error)
 
 
 @web.route("/playback")
 def playback():
     snap = _catalog().ensure_scanned()
-    playback_artifacts = [a for a in snap.artifacts if a.get("playback_compatible")]
+    playback_artifacts = [a for a in snap.artifacts if a.get("playback_compatible") and a.get("visibility") == "default"]
     selected_path = request.args.get("path", playback_artifacts[0]["path"] if playback_artifacts else "")
     machine = request.args.get("machine", "")
     day = request.args.get("day", "")
@@ -132,9 +154,12 @@ def playback():
 @web.route("/exploration")
 def exploration():
     snap = _catalog().ensure_scanned()
+    visible_artifacts = [a for a in snap.artifacts if a.get("visibility") == "default"]
     selected_path = request.args.get("path", "")
     chart_type = request.args.get("chart", "line")
     selected = _catalog().artifact_by_path(selected_path) if selected_path else None
+    if selected and selected.get("visibility") != "default":
+        selected = None
 
     frame = None
     error = None
@@ -166,7 +191,7 @@ def exploration():
 
     return render_template(
         "exploration.html",
-        artifacts=snap.artifacts,
+        artifacts=visible_artifacts,
         selected=selected,
         frame=frame,
         error=error,

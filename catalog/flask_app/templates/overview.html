@@ -3,15 +3,22 @@
 <h2>Overview</h2>
 <p>Scan roots: {{ scan_dirs|join(', ') }}</p>
 <div class="metrics">
-  <div><strong>{{ total }}</strong><span>Indexed artifacts</span></div>
+  <div><strong>{{ total }}</strong><span>User-facing artifacts</span></div>
+  <div><strong>{{ derived_total }}</strong><span>Derived outputs</span></div>
+  <div><strong>{{ source_total }}</strong><span>Source data files</span></div>
   <div><strong>{{ playback_count }}</strong><span>Playback compatible</span></div>
   <div><strong>{{ read_errors }}</strong><span>Read errors</span></div>
 </div>
+<p>
+  Hidden by default:
+  {{ hidden_workflow_copies }} workflow data copies,
+  {{ hidden_internal_metadata }} internal metadata files.
+</p>
 {% if warnings %}<ul>{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
 <table>
-  <tr><th>Analysis</th><th>File</th><th>Kind</th><th>Status</th><th>Path</th></tr>
+  <tr><th>Category</th><th>Analysis</th><th>File</th><th>Kind</th><th>Status</th><th>Path</th></tr>
   {% for a in artifacts %}
-  <tr><td>{{ a.analysis_name }}</td><td>{{ a.file_name }}</td><td>{{ a.kind }}</td><td>{{ a.status }}</td><td>{{ a.path }}</td></tr>
+  <tr><td>{{ a.category }}</td><td>{{ a.analysis_name }}</td><td>{{ a.file_name }}</td><td>{{ a.kind }}</td><td>{{ a.status }}</td><td>{{ a.path }}</td></tr>
   {% endfor %}
 </table>
 {% endblock %}

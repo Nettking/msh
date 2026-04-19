@@ -17,11 +17,21 @@
 </form>
 
 <p>Configured roots: {{ scan_dirs|join(', ') }}</p>
-<p>Artifacts: {{ snapshot.artifacts|length }} | Warnings: {{ snapshot.warnings|length }}</p>
+<p>Indexed artifacts: {{ snapshot.artifacts|length }} | Warnings: {{ snapshot.warnings|length }}</p>
+<p>Internal metadata artifacts: {{ internal_artifacts|length }}</p>
 <table>
-  <tr><th>File</th><th>Kind</th><th>Status</th><th>Modified</th></tr>
+  <tr><th>File</th><th>Category</th><th>Kind</th><th>Status</th><th>Modified</th></tr>
   {% for a in snapshot.artifacts %}
-  <tr><td>{{ a.file_name }}</td><td>{{ a.kind }}</td><td>{{ a.status }}</td><td>{{ a.modified_at }}</td></tr>
+  <tr><td>{{ a.file_name }}</td><td>{{ a.category }}</td><td>{{ a.kind }}</td><td>{{ a.status }}</td><td>{{ a.modified_at }}</td></tr>
   {% endfor %}
 </table>
+{% if internal_artifacts %}
+<h3>Internal runtime/session metadata</h3>
+<table>
+  <tr><th>File</th><th>Status</th><th>Path</th></tr>
+  {% for a in internal_artifacts %}
+  <tr><td>{{ a.file_name }}</td><td>{{ a.status }}</td><td>{{ a.path }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
 {% endblock %}
