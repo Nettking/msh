@@ -12,8 +12,8 @@ Primary web interface for browsing scanned artifacts, playback-capable datasets,
 - `/status` scan/system status
 - `/control` runtime + workflow + script control panel
 - `POST /rescan` explicit rescan trigger
-- `POST /control/action` trigger runtime/workflow actions
-- `POST /control/script/<script_key>/run` trigger individual scripts
+- `POST /control/action` trigger runtime/workflow actions with explicit target session scope
+- `POST /control/script/<script_key>/run` trigger individual scripts against selected/created session scope
 
 ## Runtime (prepare + serve)
 
@@ -60,12 +60,24 @@ By default, Flask startup runs a minimal bootstrap orchestration first. This is 
 - active/latest workflow session metadata visibility
 - explicit workflow actions:
   - Run refresh now
-  - Run startup-safe health checks
-  - Re-run latest session workflow scripts (reruns scripts in latest existing session)
-- script-level manual run buttons with status/last-run/output path
-- recent control activity history (action, timing, status, message, output path)
+  - Rerun latest bootstrap session workflow
+  - Run startup-safe health checks for selected session
+  - Run workflow for selected session
+  - Create/reuse session for latest day, selected day, custom range, or full-range rebuild and run workflow
+- session inventory table (session id, processed date range, updated timestamp, workflow status summary) with selectable target
+- script-level manual run buttons that target the selected session/scope
+- recent control activity history (action, target session id, target range, status, message, output path, stdout/stderr snippets)
 
 Automatic bootstrap + incremental background updates still run at Flask startup; the control panel adds manual operator overrides without reintroducing terminal prompts.
+
+Manual historical processing now works directly in `/control`: choose a session from the inventory or choose a preset scope (latest day, selected day, custom range, full range), submit, and the app will create/reuse `results/workflows/<session>/`, prepare filtered data for that scope if needed, then run workflow/scripts against that selected session.
+
+Action validation/targeting notes:
+
+- Selected-session actions now require an explicit existing session id (no silent fallback to latest).
+- Scope actions validate date inputs (`YYYY-MM-DD`, required fields, and end date not before start date).
+- After submitting an action, `/control` redirects to the actual resolved/created target session so the UI reflects what the run is operating on.
+- Full-range actions are explicitly marked as manual and potentially slow.
 
 ## Current MVP limits
 

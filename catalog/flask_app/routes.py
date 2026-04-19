@@ -210,23 +210,48 @@ def exploration():
 
 @web.route("/control")
 def control():
-    panel = get_control_panel_service().snapshot()
+    selected_session_id = request.args.get("session_id")
+    panel = get_control_panel_service().snapshot(selected_session_id=selected_session_id)
     return render_template("control.html", panel=panel)
 
 
 @web.post("/control/action")
 def control_action():
     action = request.form.get("action", "")
-    ok, message = get_control_panel_service().trigger_action(action)
+    selected_session_id = request.form.get("selected_session_id")
+    scope_mode = request.form.get("scope_mode")
+    start_date = request.form.get("start_date")
+    end_date = request.form.get("end_date")
+    ok, message, target_session_id = get_control_panel_service().trigger_action(
+        action,
+        selected_session_id=selected_session_id,
+        scope_mode=scope_mode,
+        start_date=start_date,
+        end_date=end_date,
+    )
     flash(message, "success" if ok else "error")
-    return redirect(url_for("web.control"))
+    target_session = target_session_id or selected_session_id or ""
+    return redirect(url_for("web.control", session_id=target_session))
 
 
 @web.post("/control/script/<script_key>/run")
 def run_script_control(script_key: str):
-    ok, message = get_control_panel_service().trigger_action("run_script", script_key=script_key)
+    selected_session_id = request.form.get("selected_session_id")
+    scope_mode = request.form.get("scope_mode")
+    start_date = request.form.get("start_date")
+    end_date = request.form.get("end_date")
+    ok, message, target_session_id = get_control_panel_service().trigger_action(
+        "run_script",
+        script_key=script_key,
+        selected_session_id=selected_session_id,
+        scope_mode=scope_mode,
+        start_date=start_date,
+        end_date=end_date,
+    )
     flash(message, "success" if ok else "error")
-    return redirect(url_for("web.control"))
+    target_session = target_session_id or selected_session_id or ""
+    return redirect(url_for("web.control", session_id=target_session))
+
 
 @web.post("/rescan")
 def rescan():

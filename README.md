@@ -29,7 +29,7 @@ Current defaults are intentional:
 
 Open http://localhost:5000.
 
-Primary operator controls are now available in the Flask UI at `/control` (runtime refresh/workflow reruns/script runs/recent control history), replacing the deprecated terminal menu as the main control surface.
+Primary operator controls are now available in the Flask UI at `/control` (runtime refresh/session-aware workflow runs/script runs/recent control history), replacing the deprecated terminal menu as the main control surface.
 
 The `/control` panel is currently an MVP: single-process threaded execution, best-effort action handling, and in-memory recent activity/log snippets (not restart-persistent).
 
@@ -49,6 +49,14 @@ Runtime update state is persisted at `results/workflows/runtime_state.json` so t
 Heavier exploratory scripts remain available for explicit/manual execution, but are excluded from automatic startup so `docker compose up --build webapp` remains reliable in unattended environments.
 
 Full historical rebuild is now a deliberate/manual operation rather than the default web startup path.
+
+`/control` now supports explicit manual scope selection beyond bootstrap latest-day behavior:
+- select an existing workflow session from inventory
+- create/reuse a session for latest day, selected day, or custom date range
+- run an explicit full historical range session (manual heavy operation)
+- run startup-safe checks, full workflow, or individual scripts against the chosen session scope
+- validate scope inputs (required dates, ISO format, and start/end ordering) before dispatch
+- redirect back to the actual resolved/created target session after control actions
 
 
 Terminal output is status-oriented (discovery, processing, skipped/ran steps, outputs, failures, Flask readiness).
