@@ -17,7 +17,7 @@ SESSION_STATE_FILE = "session_state.json"
 LEGACY_SESSION_FILE = "session.json"
 WORKFLOW_STEPS: list[tuple[str, list[str]]] = [
     (
-        "Step 1: Health checks",
+        "Step 1: Startup-safe health checks",
         [
             "machines_active_per_day",
             "analyze_missing_sequence_number",
@@ -25,9 +25,6 @@ WORKFLOW_STEPS: list[tuple[str, list[str]]] = [
             "sampling_rate_analysis",
         ],
     ),
-    ("Step 2: Raw inspection", ["data_pr_day"]),
-    ("Step 3: Stop-focused inspection", ["find_stops"]),
-    ("Step 4: Deeper exploratory analysis", ["data_visualizer", "data_analysis", "ml_analysis"]),
 ]
 WORKFLOW_SCRIPT_ORDER: list[str] = [script for _, scripts in WORKFLOW_STEPS for script in scripts]
 

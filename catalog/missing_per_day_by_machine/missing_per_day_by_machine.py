@@ -1,126 +1,90 @@
-"""
-Summarize missing sequence numbers per day for each machine.
+"""Summarize missing sequence numbers per day for each machine."""
 
-This script reads top-level JSONL telemetry files from ``data/``, parses
-timestamps, and estimates missing sequence values separately for each machine.
-It then aggregates the missing counts by machine and day, writes a CSV summary,
-and saves one bar chart per machine.
+from __future__ import annotations
 
-A sequence gap is interpreted as follows:
-- gap == 1  -> no missing sequence values
-- gap == n  -> ``n - 1`` missing sequence values
-
-Important
----------
-Sequence gaps are computed within each machine independently. This avoids
-artificial missing counts caused by transitions between different machines in a
-mixed dataset.
-
-Outputs
--------
-- ``missing_per_day_by_machine.csv``:
-    daily missing-count summary per machine
-- ``plots_per_machine/missing_per_day_<machine>.png``:
-    one bar chart per machine
-
-Notes
------
-- This script reads only top-level JSONL files in ``data/``.
-- Rows with invalid JSON or invalid timestamps are skipped.
-- The result still depends on the assumption that sequence values are
-  meaningful within each machine stream after chronological sorting.
-"""
-
-import json
-import os
-from datetime import datetime
+import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
-# Folder containing input JSONL files.
+ROOT_DIR = Path(__file__).resolve().parents[2]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from catalog.common.data_loading import iter_records_with_parsed_timestamps
+
 DATA_DIR = "data"
-
-# Output CSV containing daily missing counts per machine.
 OUTPUT_SUMMARY_CSV = "missing_per_day_by_machine.csv"
-
-# Directory for per-machine plots.
 OUTPUT_DIR_PLOTS = Path("plots_per_machine")
 OUTPUT_DIR_PLOTS.mkdir(exist_ok=True)
 
 
-records = []
+def _warn_malformed_json(message: str) -> None:
+    print(f"Error parsing line: {message}")
 
-# Preserve original behavior by reading only top-level JSONL files.
-for filename in sorted(os.listdir(DATA_DIR)):
-    if filename.endswith(".jsonl"):
-        filepath = os.path.join(DATA_DIR, filename)
 
-        with open(filepath, "r") as f:
-            for line in f:
-                if line.strip():
-                    try:
-                        entry = json.loads(line)
-                        entry["timestamp"] = datetime.fromisoformat(entry["timestamp"])
-                        records.append(entry)
-                    except Exception as e:
-                        # Invalid lines are skipped rather than stopping the full run.
-                        print(f"Error parsing line in {filename}: {e}")
+def _warn_invalid_timestamp(file_path: Path, raw_timestamp: object) -> None:
+    print(f"Error parsing line in {file_path.name}: Invalid isoformat string: {raw_timestamp}")
 
-if not records:
-    raise SystemExit("No valid records found in data folder.")
 
-df = pd.DataFrame(records)
+def _to_int_sequence(raw_value: object) -> int | None:
+    if raw_value is None:
+        return None
+    try:
+        return int(raw_value)
+    except (TypeError, ValueError):
+        return None
 
-# These columns are required to compute sequence gaps per machine over time.
-required_cols = {"timestamp", "sequence", "machine"}
-missing_cols = required_cols - set(df.columns)
-if missing_cols:
-    raise ValueError(f"Missing required columns: {missing_cols}")
 
-# Sort within machine/time order before computing sequence differences.
-df.sort_values(["machine", "timestamp"], inplace=True)
-df.reset_index(drop=True, inplace=True)
+def main() -> None:
+    rows: list[tuple[str, pd.Timestamp, int]] = []
 
-# Estimate missing sequence values separately for each machine.
-#
-# Example:
-# - diff == 1  -> no missing sequence values
-# - diff == 4  -> three missing sequence values
-#
-# Grouping by machine is essential here; otherwise cross-machine transitions
-# would produce meaningless sequence gaps.
-df["sequence_gap"] = df.groupby("machine")["sequence"].diff().fillna(1).astype(int)
-df["missing_count"] = df["sequence_gap"].clip(lower=1) - 1
+    for _, entry in iter_records_with_parsed_timestamps(
+        DATA_DIR,
+        recursive=False,
+        allow_z_suffix=True,
+        on_malformed_json=_warn_malformed_json,
+        on_invalid_timestamp=_warn_invalid_timestamp,
+    ):
+        machine = entry.get("machine")
+        seq = _to_int_sequence(entry.get("sequence"))
+        if machine is None or seq is None:
+            continue
+        rows.append((str(machine), entry["timestamp"], seq))
 
-# Aggregate by machine and calendar day.
-df["date"] = df["timestamp"].dt.date
-missing_per_day_machine = (
-    df.groupby(["machine", "date"], as_index=False)["missing_count"].sum()
-    .sort_values(["machine", "date"])
-)
+    if not rows:
+        raise SystemExit("No valid records with timestamp+machine+sequence found in data folder.")
 
-print("\nMissing sequence numbers per day per machine:")
-print(missing_per_day_machine)
+    df = pd.DataFrame(rows, columns=["machine", "timestamp", "sequence"])
+    df.sort_values(["machine", "timestamp"], inplace=True)
+    df.reset_index(drop=True, inplace=True)
+    df["sequence_gap"] = df.groupby("machine")["sequence"].diff().fillna(1)
+    df["missing_count"] = (df["sequence_gap"] - 1).clip(lower=0)
+    df["date"] = df["timestamp"].dt.date
 
-missing_per_day_machine.to_csv(OUTPUT_SUMMARY_CSV, index=False)
-print(f"\nSaved daily summary to: {OUTPUT_SUMMARY_CSV}")
+    missing_per_day_machine = (
+        df.groupby(["machine", "date"], as_index=False)["missing_count"].sum().sort_values(["machine", "date"])
+    )
+    missing_per_day_machine["missing_count"] = missing_per_day_machine["missing_count"].astype(int)
 
-# Save one bar chart per machine for easier comparison over time.
-for machine, chunk in missing_per_day_machine.groupby("machine"):
-    plt.figure(figsize=(10, 5))
-    x = chunk["date"].astype(str)
-    y = chunk["missing_count"]
+    print("\nMissing sequence numbers per day per machine:")
+    print(missing_per_day_machine)
+    missing_per_day_machine.to_csv(OUTPUT_SUMMARY_CSV, index=False)
+    print(f"\nSaved daily summary to: {OUTPUT_SUMMARY_CSV}")
 
-    plt.bar(x, y)
-    plt.xticks(rotation=45, ha="right")
-    plt.ylabel("Missing Sequence Numbers")
-    plt.title(f"Missing Sequence Numbers per Day — {machine}")
-    plt.tight_layout()
+    for machine, chunk in missing_per_day_machine.groupby("machine"):
+        plt.figure(figsize=(10, 5))
+        plt.bar(chunk["date"].astype(str), chunk["missing_count"])
+        plt.xticks(rotation=45, ha="right")
+        plt.ylabel("Missing Sequence Numbers")
+        plt.title(f"Missing Sequence Numbers per Day — {machine}")
+        plt.tight_layout()
+        out_path = OUTPUT_DIR_PLOTS / f"missing_per_day_{machine}.png"
+        plt.savefig(out_path)
+        plt.close()
+        print(f"Saved bar chart for {machine} to: {out_path}")
 
-    out_path = OUTPUT_DIR_PLOTS / f"missing_per_day_{machine}.png"
-    plt.savefig(out_path)
-    plt.close()
 
-    print(f"Saved bar chart for {machine} to: {out_path}")
+if __name__ == "__main__":
+    main()
