@@ -9,18 +9,21 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   </head>
   <body>
-    <header>
-      <h1>MSH Webapp (Flask Primary)</h1>
-      <nav>
-        <a href="{{ url_for('web.overview') }}">Overview</a>
-        <a href="{{ url_for('web.analyses') }}">Analyses</a>
-        <a href="{{ url_for('web.machine_view') }}">Machine view</a>
-        <a href="{{ url_for('web.playback') }}">Playback</a>
-        <a href="{{ url_for('web.exploration') }}">Exploration</a>
-        <a href="{{ url_for('web.status') }}">System status</a>
-        <a href="{{ url_for('web.control') }}">Control panel</a>
+    <header class="site-header">
+      <div class="site-header__identity">
+        <h1>MSH Webapp</h1>
+        <p>Flask control-room interface</p>
+      </div>
+      <nav class="site-nav" aria-label="Primary">
+        <a class="{% if request.endpoint == 'web.overview' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Overview</a>
+        <a class="{% if request.endpoint == 'web.analyses' %}is-active{% endif %}" href="{{ url_for('web.analyses') }}">Analyses</a>
+        <a class="{% if request.endpoint == 'web.machine_view' %}is-active{% endif %}" href="{{ url_for('web.machine_view') }}">Machine view</a>
+        <a class="{% if request.endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
+        <a class="{% if request.endpoint == 'web.exploration' %}is-active{% endif %}" href="{{ url_for('web.exploration') }}">Exploration</a>
+        <a class="{% if request.endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">System status</a>
+        <a class="{% if request.endpoint == 'web.control' %}is-active{% endif %}" href="{{ url_for('web.control') }}">Control panel</a>
       </nav>
-      <form method="post" action="{{ url_for('web.rescan') }}">
+      <form class="rescan-form" method="post" action="{{ url_for('web.rescan') }}">
         <input type="hidden" name="next" value="{{ request.path }}{% if request.query_string %}?{{ request.query_string.decode('utf-8') }}{% endif %}">
         <button type="submit">Rescan</button>
       </form>
