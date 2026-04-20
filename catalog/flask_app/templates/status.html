@@ -1,71 +1,118 @@
 {% extends 'base.html' %}
 {% block body %}
-<h2>System status</h2>
-<h3>Runtime update state</h3>
-<p><strong>{{ phase_message }}</strong></p>
-<p>Webapp started at: {{ runtime_state.app_started_at or 'n/a' }}</p>
-<p>Runtime started at: {{ runtime_state.runtime_started_at or 'n/a' }}</p>
-<p>Discovery started at: {{ runtime_state.discovery_started_at or 'n/a' }}</p>
-<p>Discovery complete: {{ runtime_state.discovery_complete }}</p>
-<p>Bootstrap started at: {{ runtime_state.bootstrap_started_at or 'n/a' }}</p>
-<p>Bootstrap complete: {{ runtime_state.bootstrap_complete }}</p>
-<p>Historical catch-up started at: {{ runtime_state.historical_catch_up_started_at or 'n/a' }}</p>
-<p>Historical catch-up complete: {{ runtime_state.historical_catch_up_complete }}</p>
-<p>Current processing phase: {{ runtime_state.current_processing_phase }}</p>
-<p>Currently processing date: {{ runtime_state.currently_processing_date or 'n/a' }}</p>
-<p>Last completed step: {{ runtime_state.last_completed_step or 'n/a' }}</p>
-<p>Last completed date: {{ runtime_state.last_completed_date or 'n/a' }}</p>
-<p>Next queued date: {{ runtime_state.next_queued_date or 'none' }}</p>
-<p>Bootstrap policy: {{ runtime_state.bootstrap_policy }}</p>
-<p>Catch-up policy: {{ runtime_state.catch_up_policy }}</p>
-<p>Processed-days truth model: {{ runtime_state.processed_dates_truth_model }}</p>
-<p>Automatic coverage contract: {{ runtime_state.automatic_coverage_contract }}</p>
-<p>Mode: {{ runtime_state.mode }}</p>
-<p>Phase: {{ runtime_state.phase }}</p>
-<p>Processed range: {{ runtime_state.current_range_start or 'n/a' }} .. {{ runtime_state.current_range_end or 'n/a' }}</p>
-<p>Bootstrap complete for: {{ runtime_state.bootstrap_date or runtime_state.last_bootstrap_date or 'n/a' }}</p>
-<p>Last bootstrap day: {{ runtime_state.last_bootstrap_date or 'n/a' }}</p>
-<p>Source range discovered: {{ runtime_state.earliest_available_source_date or 'n/a' }} .. {{ runtime_state.latest_available_source_date or 'n/a' }}</p>
-<p>Historical catch-up (verified outputs): {{ runtime_state.fully_processed_days_count or runtime_state.processed_days_count or 0 }} / {{ runtime_state.total_available_days or 0 }} days processed</p>
-<p>Remaining unprocessed days: {{ runtime_state.pending_dates_count or 0 }}</p>
-<p>Next queued day: {{ runtime_state.next_planned_date or 'none' }}</p>
-<p>Catch-up status: {{ runtime_state.catch_up_status }}{% if runtime_state.catch_up_complete %} (complete){% endif %}</p>
-<p>Last successful catch-up step: {{ runtime_state.last_catchup_success_at or 'n/a' }}</p>
-<p>Last successful refresh: {{ runtime_state.last_successful_refresh or 'n/a' }}</p>
-<p>Last update check: {{ runtime_state.last_update_check_at or 'n/a' }}</p>
-<p>Update running: {{ runtime_state.update_running }}</p>
-<p>New data detected: {{ runtime_state.new_data_detected }}</p>
-<p>Last failure: {{ runtime_state.last_failure or 'none' }}</p>
-{% if runtime_state.view_contracts %}
-<h3>View readiness contracts</h3>
-<table>
-  <tr><th>View/contract</th><th>State</th><th>Message</th></tr>
-  {% for name, item in runtime_state.view_contracts.items() %}
-  <tr><td>{{ name }}</td><td>{{ item.state }}</td><td>{{ item.message }}</td></tr>
-  {% endfor %}
-</table>
-{% endif %}
-<form method="post" action="{{ url_for('web.refresh') }}">
-  <input type="hidden" name="next" value="{{ request.path }}">
-  <button type="submit">Run next incremental day now</button>
-</form>
+<section class="page-intro">
+  <h2>System status</h2>
+  <p>Runtime dashboard for processing state, catch-up progress, update health, and view readiness.</p>
+</section>
 
-<p>Configured roots: {{ scan_dirs|join(', ') }}</p>
-<p>Indexed artifacts: {{ snapshot.artifacts|length }} | Warnings: {{ snapshot.warnings|length }}</p>
-<p>Internal metadata artifacts: {{ internal_artifacts|length }}</p>
-<table>
-  <tr><th>File</th><th>Category</th><th>Kind</th><th>Status</th><th>Modified</th></tr>
-  {% for a in snapshot.artifacts %}
-  <tr><td>{{ a.file_name }}</td><td>{{ a.category }}</td><td>{{ a.kind }}</td><td>{{ a.status }}</td><td>{{ a.modified_at }}</td></tr>
-  {% endfor %}
-</table>
-{% if internal_artifacts %}
-<h3>Internal runtime/session metadata</h3>
-<table>
-  <tr><th>File</th><th>Status</th><th>Path</th></tr>
-  {% for a in internal_artifacts %}
-  <tr><td>{{ a.file_name }}</td><td>{{ a.status }}</td><td>{{ a.path }}</td></tr>
-  {% endfor %}
-</table>
+<section class="section-block section-block--primary">
+  <h3>Runtime now</h3>
+  <p><strong>{{ phase_message }}</strong></p>
+  <div class="metrics metrics-grid">
+    {% set phase = runtime_state.current_processing_phase or 'runtime_not_started' %}
+    {% set phase_label = phase.replace('_', ' ')|title %}
+    <article class="metric-card metric-card--info">
+      <span class="metric-label">Current phase</span>
+      <span class="metric-value">{{ phase_label }}</span>
+    </article>
+    <article class="metric-card {% if runtime_state.update_running %}metric-card--warning{% else %}metric-card--success{% endif %}">
+      <span class="metric-label">Update state</span>
+      <span class="metric-value">{{ 'Running' if runtime_state.update_running else 'Idle' }}</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Current processing date</span>
+      <span class="metric-value">{{ runtime_state.currently_processing_date or 'n/a' }}</span>
+    </article>
+    <article class="metric-card {% if runtime_state.last_failure %}metric-card--danger{% endif %}">
+      <span class="metric-label">Last failure</span>
+      <span class="metric-value metric-value--long">{{ runtime_state.last_failure or 'None' }}</span>
+    </article>
+  </div>
+</section>
+
+<section class="section-block section-block--runtime">
+  <h3>Processing progress</h3>
+  <dl class="kv-grid">
+    <div class="kv-row">
+      <dt>Catch-up progress</dt>
+      <dd>{{ runtime_state.fully_processed_days_count or runtime_state.processed_days_count or 0 }} / {{ runtime_state.total_available_days or 0 }} days</dd>
+    </div>
+    <div class="kv-row">
+      <dt>Catch-up status</dt>
+      <dd>
+        {% if runtime_state.historical_catch_up_complete or runtime_state.catch_up_complete %}
+          Complete
+        {% elif runtime_state.catch_up_status %}
+          {{ runtime_state.catch_up_status.replace('_', ' ')|title }}
+        {% else %}
+          In progress / waiting
+        {% endif %}
+      </dd>
+    </div>
+    <div class="kv-row">
+      <dt>Source range discovered</dt>
+      <dd>{{ runtime_state.earliest_available_source_date or 'n/a' }} .. {{ runtime_state.latest_available_source_date or 'n/a' }}</dd>
+    </div>
+    <div class="kv-row">
+      <dt>Processed range</dt>
+      <dd>{{ runtime_state.current_range_start or 'n/a' }} .. {{ runtime_state.current_range_end or 'n/a' }}</dd>
+    </div>
+    <div class="kv-row">
+      <dt>Last completed step/date</dt>
+      <dd>{{ runtime_state.last_completed_step or 'n/a' }} · {{ runtime_state.last_completed_date or 'n/a' }}</dd>
+    </div>
+    <div class="kv-row">
+      <dt>Next queued date</dt>
+      <dd>{{ runtime_state.next_queued_date or runtime_state.next_planned_date or 'none' }}</dd>
+    </div>
+  </dl>
+</section>
+
+<section class="section-block">
+  <h3>Update and runtime health</h3>
+  <dl class="kv-grid">
+    <div class="kv-row"><dt>Webapp started</dt><dd>{{ runtime_state.app_started_at or 'n/a' }}</dd></div>
+    <div class="kv-row"><dt>Runtime started</dt><dd>{{ runtime_state.runtime_started_at or 'n/a' }}</dd></div>
+    <div class="kv-row"><dt>Last successful refresh</dt><dd>{{ runtime_state.last_successful_refresh or 'n/a' }}</dd></div>
+    <div class="kv-row"><dt>Last update check</dt><dd>{{ runtime_state.last_update_check_at or 'n/a' }}</dd></div>
+    <div class="kv-row"><dt>Last successful catch-up step</dt><dd>{{ runtime_state.last_catchup_success_at or 'n/a' }}</dd></div>
+    <div class="kv-row"><dt>Remaining unprocessed days</dt><dd>{{ runtime_state.pending_dates_count or 0 }}</dd></div>
+  </dl>
+</section>
+
+{% if runtime_state.view_contracts %}
+<section class="section-block section-block--readiness">
+  <h3>View readiness contracts</h3>
+  <table>
+    <tr><th>View/contract</th><th>State</th><th>Message</th></tr>
+    {% for name, item in runtime_state.view_contracts.items() %}
+    {% set state = item.state or 'waiting' %}
+    <tr>
+      <td>{{ name }}</td>
+      <td><span class="status-badge status-{{ state }}">{{ state.replace('_', ' ')|title }}</span></td>
+      <td>{{ item.message }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</section>
 {% endif %}
+
+<section class="section-block section-block--actions">
+  <h3>Runtime actions</h3>
+  <form method="post" action="{{ url_for('web.refresh') }}">
+    <input type="hidden" name="next" value="{{ request.path }}">
+    <button type="submit">Run next incremental day now</button>
+  </form>
+</section>
+
+<section class="section-block">
+  <h3>Artifact/debug visibility</h3>
+  <p>Artifact inventory and deep file inspection were moved out of status for faster runtime scanning. Use <a href="{{ url_for('web.analyses') }}">/analyses</a> or <a href="{{ url_for('web.exploration') }}">/exploration</a> for file-level inspection.</p>
+  <dl class="kv-grid">
+    <div class="kv-row"><dt>Configured roots</dt><dd>{{ scan_dirs|join(', ') }}</dd></div>
+    <div class="kv-row"><dt>Indexed artifacts</dt><dd>{{ snapshot.artifacts|length }}</dd></div>
+    <div class="kv-row"><dt>Catalog warnings</dt><dd>{{ snapshot.warnings|length }}</dd></div>
+    <div class="kv-row"><dt>Internal metadata artifacts</dt><dd>{{ internal_artifacts|length }}</dd></div>
+  </dl>
+</section>
 {% endblock %}
