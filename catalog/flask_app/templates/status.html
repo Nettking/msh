@@ -3,9 +3,20 @@
 <h2>System status</h2>
 <h3>Runtime update state</h3>
 <p>Bootstrap policy: {{ runtime_state.bootstrap_policy }}</p>
+<p>Catch-up policy: {{ runtime_state.catch_up_policy }}</p>
+<p>Processed-days truth model: {{ runtime_state.processed_dates_truth_model }}</p>
+<p>Automatic coverage contract: {{ runtime_state.automatic_coverage_contract }}</p>
 <p>Mode: {{ runtime_state.mode }}</p>
+<p>Phase: {{ runtime_state.phase }}</p>
 <p>Processed range: {{ runtime_state.current_range_start or 'n/a' }} .. {{ runtime_state.current_range_end or 'n/a' }}</p>
+<p>Bootstrap complete for: {{ runtime_state.bootstrap_date or runtime_state.last_bootstrap_date or 'n/a' }}</p>
 <p>Last bootstrap day: {{ runtime_state.last_bootstrap_date or 'n/a' }}</p>
+<p>Source range discovered: {{ runtime_state.earliest_available_source_date or 'n/a' }} .. {{ runtime_state.latest_available_source_date or 'n/a' }}</p>
+<p>Historical catch-up (verified outputs): {{ runtime_state.processed_days_count or 0 }} / {{ runtime_state.total_available_days or 0 }} days processed</p>
+<p>Remaining unprocessed days: {{ runtime_state.pending_dates_count or 0 }}</p>
+<p>Next queued day: {{ runtime_state.next_planned_date or 'none' }}</p>
+<p>Catch-up status: {{ runtime_state.catch_up_status }}{% if runtime_state.catch_up_complete %} (complete){% endif %}</p>
+<p>Last successful catch-up step: {{ runtime_state.last_catchup_success_at or 'n/a' }}</p>
 <p>Last successful refresh: {{ runtime_state.last_successful_refresh or 'n/a' }}</p>
 <p>Last update check: {{ runtime_state.last_update_check_at or 'n/a' }}</p>
 <p>Update running: {{ runtime_state.update_running }}</p>
@@ -13,7 +24,7 @@
 <p>Last failure: {{ runtime_state.last_failure or 'none' }}</p>
 <form method="post" action="{{ url_for('web.refresh') }}">
   <input type="hidden" name="next" value="{{ request.path }}">
-  <button type="submit">Run refresh now</button>
+  <button type="submit">Run next incremental day now</button>
 </form>
 
 <p>Configured roots: {{ scan_dirs|join(', ') }}</p>
