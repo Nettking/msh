@@ -6,6 +6,7 @@ import os
 import threading
 import csv
 from dataclasses import dataclass
+import re
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -57,6 +58,9 @@ BOOTSTRAP_REFRESH_POLICY = "always_refresh_latest_day_on_startup"
 AUTO_COVERAGE_CONTRACT = "startup_safe_automatic_outputs"
 AUTO_COVERAGE_SCRIPT_KEYS: tuple[str, ...] = tuple(WORKFLOW_STEPS[0][1]) if WORKFLOW_STEPS else tuple(WORKFLOW_SCRIPT_ORDER)
 DEFAULT_POLL_INTERVAL_SECONDS = 60
+STARTUP_MODE_PENDING = "pending_choice"
+STARTUP_MODE_CONTINUE = "continue_existing"
+STARTUP_MODE_CLEAN = "start_clean"
 
 
 class StatusPrinter:
@@ -113,6 +117,9 @@ class RuntimeState:
     failed_scripts: list[str]
     processed_dates_truth_model: str
     automatic_coverage_contract: str
+    startup_mode: str
+    startup_decision_source: str
+    active_runtime_namespace: str
 
 
 def _canonical_scan_roots() -> list[str]:
@@ -124,12 +131,18 @@ def _canonical_scan_roots() -> list[str]:
     return roots
 
 
-def _auto_session_id(start_date: str, end_date: str) -> str:
-    return f"auto_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
+def _safe_namespace(namespace: str) -> str:
+    cleaned = re.sub(r"[^a-zA-Z0-9_\-]", "_", namespace.strip())
+    return cleaned[:48] if cleaned else "default"
 
 
-def _load_or_create_auto_session(*, workflows_root: Path, start_date, end_date, script_options):
-    session_id = _auto_session_id(start_date.isoformat(), end_date.isoformat())
+def _auto_session_id(start_date: str, end_date: str, *, runtime_namespace: str) -> str:
+    namespace = _safe_namespace(runtime_namespace)
+    return f"auto_{namespace}_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
+
+
+def _load_or_create_auto_session(*, workflows_root: Path, start_date, end_date, script_options, runtime_namespace: str):
+    session_id = _auto_session_id(start_date.isoformat(), end_date.isoformat(), runtime_namespace=runtime_namespace)
     session_dir = workflows_root / session_id
     if session_dir.exists():
         metadata_path = session_dir / "session_state.json"
@@ -149,6 +162,7 @@ def _load_or_create_auto_session(*, workflows_root: Path, start_date, end_date, 
         end_date,
         start_hour=None,
         end_hour=None,
+        runtime_namespace=runtime_namespace,
         script_options=script_options,
     )
     write_session_metadata(session_dir, metadata)
@@ -203,12 +217,14 @@ def _run_for_date_slice(
     data_dir: Path,
     script_options,
     target_day: date,
+    runtime_namespace: str,
 ) -> OrchestrationResult:
     session_id, session_dir, metadata, session_mode = _load_or_create_auto_session(
         workflows_root=workflows_root,
         start_date=target_day,
         end_date=target_day,
         script_options=script_options,
+        runtime_namespace=runtime_namespace,
     )
     status.info(f"{session_mode} bootstrap/update session: {session_id} ({target_day.isoformat()})")
 
@@ -293,11 +309,23 @@ class RuntimeOrchestrator:
         self.workflows_root = self.root / "results" / "workflows"
         self.workflows_root.mkdir(parents=True, exist_ok=True)
         self.state_path = self.workflows_root / "runtime_state.json"
+        self.startup_state_path = self.workflows_root / "startup_state.json"
         self.poll_interval_seconds = max(int(poll_interval_seconds), 10)
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._state = self._load_state()
+        env_mode = self._load_startup_mode_from_env()
+        if env_mode:
+            with self._lock:
+                self._apply_startup_mode(env_mode, source="env")
+        else:
+            context = self._startup_decision_context()
+            if context.get("requires_choice"):
+                self._state.startup_mode = STARTUP_MODE_PENDING
+                self._state.startup_decision_source = "pending_user_choice"
+                self._state.active_runtime_namespace = "default"
+                self._persist_state()
 
     def _default_state(self) -> RuntimeState:
         return RuntimeState(
@@ -345,6 +373,9 @@ class RuntimeOrchestrator:
             failed_scripts=[],
             processed_dates_truth_model="verified_session_outputs",
             automatic_coverage_contract=AUTO_COVERAGE_CONTRACT,
+            startup_mode=STARTUP_MODE_CONTINUE,
+            startup_decision_source="default",
+            active_runtime_namespace="default",
         )
 
     def _load_state(self) -> RuntimeState:
@@ -365,6 +396,84 @@ class RuntimeOrchestrator:
         if state.bootstrap_date is None:
             state.bootstrap_date = state.last_bootstrap_date
         return state
+
+    def _startup_decision_context(self) -> dict[str, Any]:
+        sessions = list_sessions(self.workflows_root)
+        has_runtime_state = self.state_path.exists()
+        return {
+            "requires_choice": bool(sessions or has_runtime_state),
+            "existing_sessions_count": len(sessions),
+            "has_runtime_state": has_runtime_state,
+            "startup_state_path": str(self.startup_state_path),
+        }
+
+    def _load_startup_mode_from_env(self) -> str | None:
+        raw = str(os.getenv("MSH_STARTUP_MODE", "")).strip().lower()
+        if raw in {"continue", "continue_existing", "resume"}:
+            return STARTUP_MODE_CONTINUE
+        if raw in {"clean", "start_clean", "fresh"}:
+            return STARTUP_MODE_CLEAN
+        return None
+
+    def _apply_startup_mode(self, mode: str, *, source: str) -> None:
+        namespace = "default"
+        if mode == STARTUP_MODE_CLEAN:
+            namespace = f"clean_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}"
+
+        app_started_at = self._state.app_started_at
+        runtime_started_at = self._state.runtime_started_at
+        base = self._default_state()
+        base.app_started_at = app_started_at
+        base.runtime_started_at = runtime_started_at
+        base.startup_mode = mode
+        base.startup_decision_source = source
+        base.active_runtime_namespace = namespace
+
+        if mode == STARTUP_MODE_CONTINUE and self.state_path.exists():
+            loaded = self._load_state()
+            loaded.startup_mode = mode
+            loaded.startup_decision_source = source
+            loaded.active_runtime_namespace = loaded.active_runtime_namespace or "default"
+            self._state = loaded
+        else:
+            self._state = base
+
+        payload = {
+            "chosen_at": _utc_now_iso(),
+            "mode": mode,
+            "source": source,
+            "active_runtime_namespace": self._state.active_runtime_namespace,
+        }
+        self.startup_state_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        self._persist_state()
+
+    def startup_decision_snapshot(self) -> dict[str, Any]:
+        context = self._startup_decision_context()
+        state = self.state_snapshot()
+        state.update(context)
+        return state
+
+    def requires_startup_choice(self) -> bool:
+        with self._lock:
+            if self._state.startup_mode != STARTUP_MODE_PENDING:
+                return False
+        return self._startup_decision_context().get("requires_choice", False)
+
+    def choose_startup_mode(self, mode: str) -> tuple[bool, str]:
+        resolved = mode.strip().lower()
+        mapped = {
+            "continue": STARTUP_MODE_CONTINUE,
+            "continue_existing": STARTUP_MODE_CONTINUE,
+            "start_clean": STARTUP_MODE_CLEAN,
+            "clean": STARTUP_MODE_CLEAN,
+        }.get(resolved)
+        if not mapped:
+            return False, "Unsupported startup mode selection."
+
+        with self._lock:
+            self._apply_startup_mode(mapped, source="ui")
+        self.start_background_updates()
+        return True, f"Startup mode set to {mapped.replace('_', ' ')}."
 
     def _persist_state(self) -> None:
         self.state_path.write_text(json.dumps(self._state.__dict__, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -432,17 +541,24 @@ class RuntimeOrchestrator:
         return result
 
     def start_background_updates(self) -> None:
+        if self.requires_startup_choice():
+            self.status.info("runtime start deferred until startup mode is chosen in /startup")
+            return
         if self._thread is not None and self._thread.is_alive():
             return
         self._mark_runtime_started()
         self._thread = threading.Thread(target=self._poll_loop, name="msh-runtime-poller", daemon=True)
         self._thread.start()
 
-    def request_refresh(self) -> None:
+    def request_refresh(self) -> bool:
         with self._lock:
+            if self._state.startup_mode == STARTUP_MODE_PENDING:
+                self.status.warn("refresh request ignored: startup mode choice is still pending")
+                return False
             if self._state.update_running:
-                return
+                return False
         threading.Thread(target=self._run_update, kwargs={"bootstrap": False}, daemon=True).start()
+        return True
 
     def _poll_loop(self) -> None:
         self.status.info(
@@ -474,6 +590,10 @@ class RuntimeOrchestrator:
             metadata, changed = normalize_session_metadata(session.session_dir, dict(session.metadata), script_options)
             if changed:
                 write_session_metadata(session.session_dir, metadata)
+            runtime_payload = metadata.get("runtime") if isinstance(metadata.get("runtime"), dict) else {}
+            session_namespace = str(runtime_payload.get("runtime_namespace") or "default")
+            if session_namespace != str(self._state.active_runtime_namespace or "default"):
+                continue
             filter_payload = metadata.get("filter", {})
             start_date = filter_payload.get("start_date")
             end_date = filter_payload.get("end_date")
@@ -531,6 +651,8 @@ class RuntimeOrchestrator:
 
     def _run_update(self, *, bootstrap: bool) -> OrchestrationResult:
         with self._lock:
+            if self._state.startup_mode == STARTUP_MODE_PENDING:
+                return OrchestrationResult("none", self.workflows_root, [], [], [], [])
             if self._state.update_running and not bootstrap:
                 return OrchestrationResult("none", self.workflows_root, [], [], [], [])
             now = _utc_now_iso()
@@ -643,6 +765,7 @@ class RuntimeOrchestrator:
                     data_dir=self.data_dir,
                     script_options=script_options,
                     target_day=day,
+                    runtime_namespace=str(self._state.active_runtime_namespace or "default"),
                 )
                 failed.extend(final_result.failed_scripts)
             with self._lock:

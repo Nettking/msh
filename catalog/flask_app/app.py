@@ -26,8 +26,12 @@ if __name__ == "__main__":
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
 
     if os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1":
-        print("[orchestrator] webapp-first startup: Flask available immediately, runtime starts in background", flush=True)
-        start_runtime_background()
+        runtime_manager = get_runtime_manager()
+        if runtime_manager.requires_startup_choice():
+            print("[orchestrator] startup mode selection required at /startup before runtime processing begins", flush=True)
+        else:
+            print("[orchestrator] webapp-first startup: Flask available immediately, runtime starts in background", flush=True)
+            start_runtime_background()
     else:
         print("[orchestrator] orchestration skipped; runtime manager will remain idle", flush=True)
 

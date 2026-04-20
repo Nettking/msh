@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% block body %}
 <h2>Playback-compatible datasets</h2>
+<p>Global operator scope: <strong>{{ operator_scope.label }}</strong></p>
 <form>
 <select name="path">
   {% for a in playback_artifacts %}<option value="{{ a.path }}" {% if selected_path==a.path %}selected{% endif %}>{{ a.file_name }}</option>{% endfor %}
@@ -20,6 +21,23 @@
 {% if rows is not none %}
 <p>Rows: {{ rows|length }}</p>
 <div class="pre">{{ rows.head(50).to_html(classes='table', index=False) | safe }}</div>
+
+<h3>Timeline density (events per minute)</h3>
+{% if timeline_payload.labels %}
+<canvas id="timelineDensityChart"></canvas>
+<script>
+new Chart(document.getElementById('timelineDensityChart'), {
+  type: 'line',
+  data: {
+    labels: {{ timeline_payload.labels|tojson }},
+    datasets: [{label: 'Events/min', data: {{ timeline_payload.counts|tojson }} }]
+  },
+  options: {responsive: true}
+});
+</script>
+{% else %}
+<p>No timeline points for selected machine/day.</p>
+{% endif %}
 
 <h3>Interval duration summary</h3>
 {% if interval_summary.totals %}

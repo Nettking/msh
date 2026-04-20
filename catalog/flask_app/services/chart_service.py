@@ -4,6 +4,77 @@ import numpy as np
 import pandas as pd
 
 
+def _is_date_only(value: str) -> bool:
+    return len(value) == 10 and value[4:5] == "-" and value[7:8] == "-"
+
+
+def _windowed_frame(
+    df: pd.DataFrame,
+    *,
+    window_start: str | None,
+    window_end: str | None,
+    window_preset: str | None,
+) -> tuple[pd.DataFrame, pd.Series | None]:
+    if "timestamp" not in df.columns:
+        return df.copy(), None
+    rows = df.copy()
+    ts = pd.to_datetime(rows["timestamp"], errors="coerce", utc=True)
+    valid_ts = ts.dropna()
+    if valid_ts.empty:
+        return rows, ts
+
+    end = pd.to_datetime(window_end, errors="coerce", utc=True) if window_end else valid_ts.max()
+    end_is_day_boundary = bool(window_end and _is_date_only(window_end))
+    if end_is_day_boundary and end is not pd.NaT:
+        end = end + pd.Timedelta(days=1)
+    start = pd.to_datetime(window_start, errors="coerce", utc=True) if window_start else None
+    if start is None and window_preset and window_preset != "full":
+        deltas = {
+            "1d": pd.Timedelta(days=1),
+            "6h": pd.Timedelta(hours=6),
+            "1h": pd.Timedelta(hours=1),
+            "15m": pd.Timedelta(minutes=15),
+            "5m": pd.Timedelta(minutes=5),
+        }
+        delta = deltas.get(window_preset)
+        if delta is not None and end is not pd.NaT:
+            start = end - delta
+
+    if end is pd.NaT:
+        end = valid_ts.max()
+    if start is not None and start is not pd.NaT and start > end:
+        start, end = end, start
+
+    mask = ts.notna()
+    if start is not None and start is not pd.NaT:
+        mask &= ts >= start
+    if end is not None and end is not pd.NaT:
+        if end_is_day_boundary:
+            mask &= ts < end
+        else:
+            mask &= ts <= end
+    return rows.loc[mask].copy(), ts.loc[mask].copy()
+
+
+def _aggregate_time_frame(rows: pd.DataFrame, *, aggregation: str) -> tuple[pd.DataFrame, pd.Series | None]:
+    if "timestamp" not in rows.columns:
+        return rows, None
+    ts = pd.to_datetime(rows["timestamp"], errors="coerce", utc=True)
+    rows = rows.assign(_timestamp=ts).dropna(subset=["_timestamp"])
+    if rows.empty:
+        return rows, rows.get("_timestamp")
+
+    if aggregation == "day":
+        rows["_bucket"] = rows["_timestamp"].dt.floor("D")
+    elif aggregation == "hour":
+        rows["_bucket"] = rows["_timestamp"].dt.floor("H")
+    elif aggregation == "minute":
+        rows["_bucket"] = rows["_timestamp"].dt.floor("T")
+    else:
+        rows["_bucket"] = rows["_timestamp"]
+    return rows, rows["_bucket"]
+
+
 def numeric_columns(df: pd.DataFrame) -> list[str]:
     cols: list[str] = []
     for col in df.columns:
@@ -20,9 +91,39 @@ def category_columns(df: pd.DataFrame, max_unique: int = 40) -> list[str]:
     return cols
 
 
-def line_or_scatter_data(df: pd.DataFrame, y_cols: list[str], *, mode: str = "line", limit: int = 5000) -> dict:
-    rows = df.copy().head(limit)
-    ts = pd.to_datetime(rows["timestamp"], errors="coerce") if "timestamp" in rows.columns else None
+def line_or_scatter_data(
+    df: pd.DataFrame,
+    y_cols: list[str],
+    *,
+    mode: str = "line",
+    limit: int = 5000,
+    window_start: str | None = None,
+    window_end: str | None = None,
+    window_preset: str | None = None,
+    aggregation: str = "auto",
+) -> dict:
+    rows, ts = _windowed_frame(df, window_start=window_start, window_end=window_end, window_preset=window_preset)
+    if len(rows) > limit:
+        rows = rows.head(limit)
+        ts = ts.head(limit) if ts is not None else None
+
+    if aggregation == "auto":
+        if len(rows) > 3000:
+            aggregation = "hour"
+        elif len(rows) > 1200:
+            aggregation = "minute"
+        else:
+            aggregation = "raw"
+
+    rows, bucket = _aggregate_time_frame(rows, aggregation=aggregation)
+    if bucket is not None and aggregation in {"day", "hour", "minute"}:
+        grouping = rows.assign(_bucket=bucket)
+        agg_payload = {col: "mean" for col in y_cols if col in grouping.columns}
+        if agg_payload:
+            rows = grouping.groupby("_bucket", as_index=False).agg(agg_payload).rename(columns={"_bucket": "timestamp"})
+            ts = pd.to_datetime(rows["timestamp"], errors="coerce", utc=True)
+        else:
+            ts = pd.to_datetime(rows["timestamp"], errors="coerce", utc=True) if "timestamp" in rows.columns else None
 
     if mode == "scatter":
         if ts is not None and ts.notna().any():
@@ -47,7 +148,7 @@ def line_or_scatter_data(df: pd.DataFrame, y_cols: list[str], *, mode: str = "li
     for col in y_cols:
         series = pd.to_numeric(rows[col], errors="coerce")
         datasets.append({"label": col, "data": [None if pd.isna(v) else float(v) for v in series.tolist()]})
-    return {"labels": labels, "datasets": datasets, "x_is_time": False}
+    return {"labels": labels, "datasets": datasets, "x_is_time": ts is not None and ts.notna().any()}
 
 
 def histogram_data(df: pd.DataFrame, col: str, bins: int = 20) -> dict:

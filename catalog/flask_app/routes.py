@@ -12,14 +12,41 @@ from .services.catalog_service import ArtifactCatalog, safe_load_artifact_frame
 from .services.chart_service import category_columns, category_counts, histogram_data, line_or_scatter_data, machine_day_trend, numeric_columns
 from .services.control_service import get_control_panel_service
 from .services.operator_page_cache import get_operator_page_cache
+from .services.operator_scope_service import get_operator_scope_service
 from .services.playback_service import interval_rows, playback_context, playback_subset, summarize_intervals, validate_playback_frame, validate_playback_source
 from .services.workflow_session_index import get_workflow_session_index
 
 web = Blueprint("web", __name__)
 
 
+@web.before_app_request
+def startup_mode_gate():
+    endpoint = request.endpoint or ""
+    if endpoint.startswith("static"):
+        return None
+    allowed = {"web.startup", "web.choose_startup_mode", "web.status", "web.rescan"}
+    if endpoint in allowed:
+        return None
+    if get_runtime_manager().requires_startup_choice():
+        return redirect(url_for("web.startup", next=request.full_path if request.query_string else request.path))
+    return None
+
+
 def _catalog() -> ArtifactCatalog:
     return current_app.config["ARTIFACT_CATALOG"]
+
+
+def _session_range(session) -> tuple[str | None, str | None]:
+    metadata = getattr(session, "metadata", {}) or {}
+    filter_payload = metadata.get("filter") if isinstance(metadata.get("filter"), dict) else {}
+    return filter_payload.get("start_date"), filter_payload.get("end_date")
+
+
+def _session_matches_scope(session, *, start_date: str, end_date: str) -> bool:
+    session_start, session_end = _session_range(session)
+    if not session_start or not session_end:
+        return False
+    return not (session_end < start_date or session_start > end_date)
 
 
 def _machine_day_csv_for_session(session_id: str) -> Path:
@@ -150,6 +177,7 @@ def overview():
 def status():
     snap = _catalog().ensure_scanned()
     runtime_state = get_runtime_manager().state_snapshot()
+    operator_scope = get_operator_scope_service().get()
     internal_artifacts = [a for a in snap.artifacts if a.get("is_internal")]
     phase_messages = {
         "runtime_not_started": "Webapp started. Runtime has not started yet.",
@@ -167,7 +195,26 @@ def status():
         runtime_state=runtime_state,
         internal_artifacts=internal_artifacts,
         phase_message=phase_messages.get(current_phase, "Runtime state is available below."),
+        operator_scope=operator_scope,
     )
+
+
+@web.route("/startup")
+def startup():
+    next_path = request.args.get("next", "/")
+    startup_state = get_runtime_manager().startup_decision_snapshot()
+    return render_template("startup.html", startup_state=startup_state, next_path=next_path)
+
+
+@web.post("/startup/choose")
+def choose_startup_mode():
+    mode = request.form.get("mode", "")
+    next_path = request.form.get("next") or url_for("web.overview")
+    ok, message = get_runtime_manager().choose_startup_mode(mode)
+    flash(message, "success" if ok else "error")
+    if ok:
+        return redirect(next_path)
+    return redirect(url_for("web.startup", next=next_path))
 
 
 @web.route("/analyses")
@@ -202,9 +249,13 @@ def machine_view():
     runtime_state = get_runtime_manager().state_snapshot()
     readiness = [_machine_day_readiness_for_session(item.session_id) for item in sessions]
     readiness_by_session = {item["session_id"]: item for item in readiness}
+    scope = get_operator_scope_service().get()
     requested_session_id = request.args.get("session_id", "").strip()
     selected_session = next((item for item in sessions if item.session_id == requested_session_id), None) if requested_session_id else None
-    if not requested_session_id and sessions:
+    if not requested_session_id and scope.is_active and sessions:
+        scoped_sessions = [item for item in sessions if _session_matches_scope(item, start_date=str(scope.start_date), end_date=str(scope.end_date))]
+        selected_session = scoped_sessions[0] if scoped_sessions else None
+    if not requested_session_id and selected_session is None and sessions:
         selected_session = sessions[0]
 
     trend = {"labels": [], "series": []}
@@ -245,6 +296,7 @@ def machine_view():
         chart_type=chart_type,
         y_axis_label="Row count",
         runtime_state=runtime_state,
+        operator_scope=scope,
     )
 
 
@@ -255,6 +307,7 @@ def playback():
     selected_path = request.args.get("path", playback_artifacts[0]["path"] if playback_artifacts else "")
     machine = request.args.get("machine", "")
     day = request.args.get("day", "")
+    scope = get_operator_scope_service().get()
 
     selected = _catalog().artifact_by_path(selected_path) if selected_path else None
     frame = None
@@ -264,6 +317,7 @@ def playback():
     intervals = []
     interval_summary = {"totals": [], "table": []}
     error = None
+    timeline_payload = {"labels": [], "counts": []}
 
     if selected:
         source_validation = validate_playback_source(selected_path)
@@ -275,6 +329,8 @@ def playback():
             validation = validate_playback_frame(frame)
             if validation.is_valid:
                 context = playback_context(frame)
+                if scope.is_active:
+                    context["days"] = [item for item in context["days"] if str(scope.start_date) <= item <= str(scope.end_date)]
                 if not machine and context["machines"]:
                     machine = context["machines"][0]
                 if not day and context["days"]:
@@ -283,6 +339,17 @@ def playback():
                     rows = playback_subset(frame, machine, day)
                     intervals = interval_rows(rows)
                     interval_summary = summarize_intervals(intervals)
+                    if not rows.empty:
+                        timeline = rows.copy()
+                        timeline["timestamp"] = pd.to_datetime(timeline["timestamp"], errors="coerce")
+                        timeline = timeline.dropna(subset=["timestamp"])
+                        if not timeline.empty:
+                            timeline["bucket"] = timeline["timestamp"].dt.floor("T")
+                            grouped = timeline.groupby("bucket").size().reset_index(name="count")
+                            timeline_payload = {
+                                "labels": grouped["bucket"].dt.strftime("%Y-%m-%d %H:%M:%S").tolist(),
+                                "counts": grouped["count"].astype(int).tolist(),
+                            }
             else:
                 validation_reason = validation.reason
 
@@ -296,6 +363,8 @@ def playback():
         rows=rows,
         intervals=intervals,
         interval_summary=interval_summary,
+        timeline_payload=timeline_payload,
+        operator_scope=scope,
         validation_reason=validation_reason,
         error=error,
     )
@@ -321,6 +390,15 @@ def exploration():
     chart_payload = {"labels": [], "datasets": [], "x_is_time": False}
     category_payload = {"labels": [], "counts": []}
     hist_payload = {"labels": [], "counts": []}
+    scope = get_operator_scope_service().get()
+    window_start = request.args.get("window_start", "")
+    window_end = request.args.get("window_end", "")
+    window_preset = request.args.get("window_preset", "full")
+    aggregation = request.args.get("aggregation", "auto")
+    if scope.is_active and not window_start:
+        window_start = f"{scope.start_date}T00:00"
+    if scope.is_active and not window_end:
+        window_end = f"{scope.end_date}T23:59"
 
     if selected:
         frame, error = safe_load_artifact_frame(selected_path)
@@ -329,7 +407,15 @@ def exploration():
             categorical = category_columns(frame)
             chosen_numeric = request.args.getlist("num") or numeric[: min(3, len(numeric))]
             if chart_type in {"line", "scatter"} and chosen_numeric:
-                chart_payload = line_or_scatter_data(frame, chosen_numeric, mode=chart_type)
+                chart_payload = line_or_scatter_data(
+                    frame,
+                    chosen_numeric,
+                    mode=chart_type,
+                    window_start=window_start or None,
+                    window_end=window_end or None,
+                    window_preset=window_preset,
+                    aggregation=aggregation,
+                )
             if chart_type == "histogram" and numeric:
                 hist_col = request.args.get("hist_col", numeric[0])
                 if hist_col in numeric:
@@ -354,6 +440,11 @@ def exploration():
         chart_payload=chart_payload,
         category_payload=category_payload,
         hist_payload=hist_payload,
+        window_start=window_start,
+        window_end=window_end,
+        window_preset=window_preset,
+        aggregation=aggregation,
+        operator_scope=scope,
     )
 
 
@@ -372,7 +463,25 @@ def control():
         total_ms,
         selected_session_id or "",
     )
-    return render_template("control.html", panel=panel)
+    operator_scope = get_operator_scope_service().get()
+    return render_template("control.html", panel=panel, operator_scope=operator_scope)
+
+
+@web.post("/control/scope")
+def control_scope():
+    start_date = (request.form.get("start_date") or "").strip()
+    end_date = (request.form.get("end_date") or "").strip()
+    selected_session_id = (request.form.get("selected_session_id") or "").strip() or None
+    if not start_date or not end_date:
+        get_operator_scope_service().clear()
+        flash("Cleared shared operator scope.", "success")
+    elif end_date < start_date:
+        flash("End date must be greater than or equal to start date.", "error")
+    else:
+        get_operator_scope_service().set(start_date=start_date, end_date=end_date, selected_session_id=selected_session_id)
+        flash(f"Shared operator scope set to {start_date}..{end_date}.", "success")
+    get_operator_page_cache().invalidate_all()
+    return redirect(url_for("web.control"))
 
 
 @web.post("/control/action")
@@ -428,6 +537,9 @@ def rescan():
 
 @web.post("/refresh")
 def refresh():
+    if get_runtime_manager().requires_startup_choice():
+        flash("Choose startup mode (Continue vs Start clean) before running refresh.", "error")
+        return redirect(url_for("web.startup", next=url_for("web.status")))
     get_runtime_manager().request_refresh()
     _catalog().rescan()
     get_workflow_session_index().invalidate()

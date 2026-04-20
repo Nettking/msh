@@ -13,6 +13,10 @@
       <span class="metric-label">Current phase</span>
       <span class="metric-value">{{ phase.replace('_', ' ')|title }}</span>
     </article>
+    <article class="metric-card">
+      <span class="metric-label">Startup mode</span>
+      <span class="metric-value">{{ (panel.runtime_state.startup_mode or 'unknown').replace('_', ' ')|title }}</span>
+    </article>
     <article class="metric-card {% if panel.runtime_state.update_running %}metric-card--warning{% else %}metric-card--success{% endif %}">
       <span class="metric-label">Update state</span>
       <span class="metric-value">{{ 'Running' if panel.runtime_state.update_running else 'Idle' }}</span>
@@ -24,6 +28,10 @@
     <article class="metric-card">
       <span class="metric-label">Freshest session in index</span>
       <span class="metric-value metric-value--long">{{ panel.latest_session.session_id if panel.latest_session else 'None yet' }}</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Active runtime namespace</span>
+      <span class="metric-value metric-value--long">{{ panel.runtime_state.active_runtime_namespace or 'default' }}</span>
     </article>
     <article class="metric-card {% if panel.runtime_state.last_failure %}metric-card--danger{% endif %}">
       <span class="metric-label">Last failure</span>
@@ -37,7 +45,21 @@
   <div class="control-focus__header">
     <h3>1) Select target and scope · 2) Run action</h3>
     <p>Available source-data date range: {{ panel.available_start or 'n/a' }} .. {{ panel.available_end or 'n/a' }}</p>
+    <p>Global operator scope: <strong>{{ operator_scope.label }}</strong>{% if operator_scope.updated_at %} (updated {{ operator_scope.updated_at }}){% endif %}</p>
   </div>
+
+  <form method="post" action="{{ url_for('web.control_scope') }}" class="control-form control-card">
+    <h4>Global shared range scope (multi-day first)</h4>
+    <p>This is a global scope (shared across operators for this app/runtime) and is reused by machine/playback/exploration pages when no page-specific scope is selected.</p>
+    <label for="scope_start">Scope start date:</label>
+    <input id="scope_start" type="date" name="start_date" value="{{ operator_scope.start_date or '' }}">
+    <label for="scope_end">Scope end date:</label>
+    <input id="scope_end" type="date" name="end_date" value="{{ operator_scope.end_date or '' }}">
+    <label for="scope_session_id">Optional preferred session id:</label>
+    <input id="scope_session_id" type="text" name="selected_session_id" value="{{ operator_scope.selected_session_id or '' }}">
+    <button class="button-primary" type="submit">Save shared scope</button>
+    <button type="submit" onclick="this.form.start_date.value=''; this.form.end_date.value=''; this.form.selected_session_id.value='';">Clear shared scope</button>
+  </form>
 
   {% if panel.selected_session_missing %}
   <p><strong>Requested session was not found.</strong> Choose a valid session from inventory before running selected-session actions.</p>

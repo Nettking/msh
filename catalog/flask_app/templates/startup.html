@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="section-block section-block--primary">
+  <h2>Startup mode required</h2>
+  <p>Prior workflow state was detected. Choose how this boot should initialize runtime state before processing starts.</p>
+  <ul>
+    <li>Existing sessions: <strong>{{ startup_state.existing_sessions_count }}</strong></li>
+    <li>Runtime state file present: <strong>{{ 'yes' if startup_state.has_runtime_state else 'no' }}</strong></li>
+  </ul>
+</section>
+
+<section class="section-block section-block--actions">
+  <h3>Choose startup behavior</h3>
+  <div class="control-action-grid">
+    <form method="post" action="{{ url_for('web.choose_startup_mode') }}">
+      <input type="hidden" name="mode" value="continue_existing">
+      <input type="hidden" name="next" value="{{ next_path }}">
+      <button class="button-primary" type="submit">Continue from existing state</button>
+      <p>Reuse existing runtime/session progress and continue normal catch-up behavior.</p>
+    </form>
+    <form method="post" action="{{ url_for('web.choose_startup_mode') }}">
+      <input type="hidden" name="mode" value="start_clean">
+      <input type="hidden" name="next" value="{{ next_path }}">
+      <button type="submit">Start clean (new runtime namespace)</button>
+      <p>Start fresh without reusing prior runtime catch-up/session state as active state. Existing files stay on disk.</p>
+    </form>
+  </div>
+</section>
+{% endblock %}

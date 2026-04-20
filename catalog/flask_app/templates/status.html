@@ -15,6 +15,10 @@
       <span class="metric-label">Current phase</span>
       <span class="metric-value">{{ phase_label }}</span>
     </article>
+    <article class="metric-card">
+      <span class="metric-label">Startup mode</span>
+      <span class="metric-value">{{ (runtime_state.startup_mode or 'unknown').replace('_', ' ')|title }}</span>
+    </article>
     <article class="metric-card {% if runtime_state.update_running %}metric-card--warning{% else %}metric-card--success{% endif %}">
       <span class="metric-label">Update state</span>
       <span class="metric-value">{{ 'Running' if runtime_state.update_running else 'Idle' }}</span>
@@ -32,6 +36,7 @@
 
 <section class="section-block section-block--runtime">
   <h3>Processing progress</h3>
+  <p>Global operator scope: <strong>{{ operator_scope.label }}</strong>{% if operator_scope.updated_at %} (updated {{ operator_scope.updated_at }}){% endif %}</p>
   <dl class="kv-grid">
     <div class="kv-row">
       <dt>Catch-up progress</dt>
@@ -73,6 +78,8 @@
   <dl class="kv-grid">
     <div class="kv-row"><dt>Webapp started</dt><dd>{{ runtime_state.app_started_at or 'n/a' }}</dd></div>
     <div class="kv-row"><dt>Runtime started</dt><dd>{{ runtime_state.runtime_started_at or 'n/a' }}</dd></div>
+    <div class="kv-row"><dt>Active runtime namespace</dt><dd>{{ runtime_state.active_runtime_namespace or 'default' }}</dd></div>
+    <div class="kv-row"><dt>Startup decision source</dt><dd>{{ runtime_state.startup_decision_source or 'n/a' }}</dd></div>
     <div class="kv-row"><dt>Last successful refresh</dt><dd>{{ runtime_state.last_successful_refresh or 'n/a' }}</dd></div>
     <div class="kv-row"><dt>Last update check</dt><dd>{{ runtime_state.last_update_check_at or 'n/a' }}</dd></div>
     <div class="kv-row"><dt>Last successful catch-up step</dt><dd>{{ runtime_state.last_catchup_success_at or 'n/a' }}</dd></div>
