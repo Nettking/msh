@@ -67,6 +67,12 @@ State tracks discovered source range, processed day set, pending count, next que
 
 Verification uses the bounded automatic coverage contract (`startup_safe_automatic_outputs`): only the startup-safe scripts used by automatic incremental catch-up are required for a day to count as covered. This avoids requiring manual/heavier workflow outputs for automatic progress.
 
+`data_pr_day` is **not** part of that automatic coverage contract. The `/machine` page is tied specifically to `analyses/data_pr_day/machine_day_summary.csv`, so `/machine` now treats machine/day-readiness separately from session existence:
+
+- all workflow sessions remain selectable in the session picker
+- selecting a non-ready session reports an explicit readiness reason inline (not generated, invalid CSV/schema, or no usable rows)
+- ready sessions render the machine/day chart from the canonical `data_pr_day` CSV path
+
 Runtime reconciliation checks session metadata and required automatic-coverage outputs on disk; if a previously tracked day is missing/corrupt/incomplete for that automatic contract, it is automatically re-queued in historical catch-up.
 
 Set `MSH_SKIP_ORCHESTRATION=1` to skip that pre-start phase when needed.

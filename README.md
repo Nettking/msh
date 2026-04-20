@@ -37,6 +37,8 @@ Default startup scope is intentionally limited to startup-safe health checks:
 - `machines_active_per_day`
 - `sampling_rate_analysis`
 
+`data_pr_day` remains a manual/heavier workflow output (not automatic startup coverage). The `/machine` page therefore only treats sessions with a valid `results/workflows/<session>/analyses/data_pr_day/machine_day_summary.csv` as machine/day-ready, and reports explicit readiness reasons for sessions where that artifact is missing/invalid.
+
 To avoid repeated full JSONL scans during startup, orchestration builds one compact shared dataset at `results/workflows/<session>/data/_derived/basic_metrics.csv` (timestamp, machine, sequence) and startup scripts read from that file.
 
 Runtime update state is persisted at `results/workflows/runtime_state.json` so the app can surface:
