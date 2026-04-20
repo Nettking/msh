@@ -1,35 +1,29 @@
 """
-Generate per-machine, per-day time-series plots from JSONL telemetry data.
-
-This script reads flat JSONL files from ``data/``, parses each record's timestamp,
-groups records by machine and calendar day, and writes one PNG plot per numeric
-signal under ``graphs/<machine>/<date>/``.
+Generate canonical machine/day CSV data and optional signal plots from JSONL telemetry.
 
 Behavior:
 - Reads JSONL files only from the top level of ``data/`` (non-recursive).
-- Skips malformed JSON lines, printing an error message for visibility.
-- Skips records whose timestamps cannot be parsed.
-- Requires at least the ``timestamp`` and ``machine`` fields.
-- Plots all numeric columns except those explicitly excluded (currently ``sequence``).
+- Skips malformed JSON lines with visible warnings.
+- Requires ``timestamp`` and ``machine`` fields.
 
-Outputs:
-- One PNG file per numeric column, per machine, per day.
-- Output directory structure: ``graphs/<machine>/<YYYY-MM-DD>/<column>.png``
-
-Notes:
-- This is a raw visualization utility, not a statistical analysis step.
-- The script loads all valid records into memory before plotting.
+Output contract:
+- Canonical CSV path:
+  ``results/workflows/<session>/analyses/data_pr_day/machine_day_summary.csv``
+- Canonical CSV columns (minimum): ``date``, ``machine``, ``value``
+- Optional diagnostic plots:
+  ``graphs/<machine>/<YYYY-MM-DD>/<column>.png``
 """
 
+import os
 import sys
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import pandas as pd
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
+SCRIPT_ROOT = Path(__file__).resolve().parents[2]
+if str(SCRIPT_ROOT) not in sys.path:
+    sys.path.insert(0, str(SCRIPT_ROOT))
 
 from catalog.common.data_loading import iter_records_with_parsed_timestamps
 
@@ -38,6 +32,40 @@ DATA_DIR = "data"
 
 # Base output folder for generated plots.
 GRAPH_BASE_DIR = Path("graphs")
+
+
+def _resolve_session_dir() -> Path:
+    from_env = os.getenv("MSH_SESSION_DIR", "").strip()
+    if from_env:
+        return Path(from_env).expanduser().resolve()
+
+    cwd = Path.cwd().resolve()
+    parts = cwd.parts
+    if "workflows" in parts:
+        idx = parts.index("workflows")
+        if idx + 1 < len(parts):
+            return Path(*parts[: idx + 2])
+    return cwd
+
+
+def _resolve_machine_day_output_csv() -> Path:
+    session_dir = _resolve_session_dir()
+    target = session_dir / "analyses" / "data_pr_day" / "machine_day_summary.csv"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    return target
+
+
+def _build_machine_day_summary(frame: pd.DataFrame) -> pd.DataFrame:
+    summary = (
+        frame.assign(date=frame["timestamp"].dt.date.astype(str), machine=frame["machine"].astype("string"))
+        .groupby(["date", "machine"], dropna=False)
+        .size()
+        .reset_index(name="value")
+        .sort_values(["date", "machine"])
+    )
+    summary["machine"] = summary["machine"].fillna("unknown").astype(str)
+    summary["value"] = summary["value"].astype(int)
+    return summary[["date", "machine", "value"]]
 
 
 def _warn_malformed_json(message: str) -> None:
@@ -83,6 +111,10 @@ if not required_cols.issubset(df.columns):
 # Group by calendar day rather than full timestamp.
 df["date"] = df["timestamp"].dt.date
 
+summary = _build_machine_day_summary(df)
+summary_path = _resolve_machine_day_output_csv()
+summary.to_csv(summary_path, index=False)
+
 for machine in df["machine"].unique():
     df_machine = df[df["machine"] == machine]
 
@@ -114,4 +146,5 @@ for machine in df["machine"].unique():
             plt.savefig(plot_path)
             plt.close()
 
+print("Machine/day summary generated at:", summary_path)
 print("Graphs generated in:", GRAPH_BASE_DIR)

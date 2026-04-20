@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from pathlib import Path
+
+import pandas as pd
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 
 from catalog.orchestrator.pipeline import get_runtime_manager
+from catalog.runner.session_store import list_sessions
 
 from .services.catalog_service import ArtifactCatalog, safe_load_artifact_frame
 from .services.chart_service import category_columns, category_counts, histogram_data, line_or_scatter_data, machine_day_trend, numeric_columns
@@ -14,6 +18,39 @@ web = Blueprint("web", __name__)
 
 def _catalog() -> ArtifactCatalog:
     return current_app.config["ARTIFACT_CATALOG"]
+
+
+def _machine_day_csv_for_session(session_id: str) -> Path:
+    return Path("results") / "workflows" / session_id / "analyses" / "data_pr_day" / "machine_day_summary.csv"
+
+
+def _machine_day_chart_payload(frame: pd.DataFrame) -> tuple[dict, str]:
+    required = {"date", "machine", "value"}
+    if not required.issubset(frame.columns):
+        return {"labels": [], "series": []}, "Machine/day data is missing required columns: date, machine, value."
+
+    prepared = frame.copy()
+    prepared["date"] = pd.to_datetime(prepared["date"], errors="coerce")
+    prepared["machine"] = prepared["machine"].astype("string").fillna("unknown").astype(str)
+    prepared["value"] = pd.to_numeric(prepared["value"], errors="coerce")
+    prepared = prepared.dropna(subset=["date", "value"])
+    if prepared.empty:
+        return {"labels": [], "series": []}, "No machine/day data available."
+
+    grouped = (
+        prepared.groupby([prepared["date"].dt.strftime("%Y-%m-%d"), "machine"], dropna=False)["value"]
+        .sum()
+        .reset_index()
+        .rename(columns={"date": "date"})
+        .sort_values(["date", "machine"])
+    )
+    labels = grouped["date"].drop_duplicates().tolist()
+    machines = sorted(grouped["machine"].dropna().astype(str).unique().tolist())
+    series = []
+    for machine in machines:
+        machine_rows = grouped[grouped["machine"] == machine].set_index("date")["value"].to_dict()
+        series.append({"label": machine, "data": [float(machine_rows.get(day, 0)) for day in labels]})
+    return {"labels": labels, "series": series}, ""
 
 
 @web.route("/")
@@ -84,19 +121,44 @@ def analyses():
 
 @web.route("/machine")
 def machine_view():
-    snap = _catalog().ensure_scanned()
-    visible_artifacts = [a for a in snap.artifacts if a.get("visibility") == "default"]
-    selected_path = request.args.get("path", "")
-    selected = _catalog().artifact_by_path(selected_path) if selected_path else None
-    if selected and selected.get("visibility") != "default":
-        selected = None
+    workflows_root = Path("results") / "workflows"
+    sessions = list_sessions(workflows_root)
+    requested_session_id = request.args.get("session_id", "").strip()
+    selected_session = next((item for item in sessions if item.session_id == requested_session_id), None) if requested_session_id else None
+    if not requested_session_id and sessions:
+        selected_session = sessions[0]
+
     trend = {"labels": [], "series": []}
-    error = None
-    if selected:
-        frame, error = safe_load_artifact_frame(selected_path)
-        if frame is not None:
-            trend = machine_day_trend(frame)
-    return render_template("machine.html", artifacts=visible_artifacts, selected=selected, trend=trend, error=error)
+    error = ""
+    source_path = ""
+    if requested_session_id and selected_session is None:
+        error = f"Selected session was not found: {requested_session_id}"
+    elif selected_session is None:
+        error = "No machine/day data available."
+    else:
+        csv_path = _machine_day_csv_for_session(selected_session.session_id)
+        source_path = str(csv_path)
+        if not csv_path.exists():
+            error = "No machine/day data available."
+        else:
+            frame, load_error = safe_load_artifact_frame(str(csv_path))
+            if frame is None:
+                error = load_error or "No machine/day data available."
+            else:
+                trend, payload_error = _machine_day_chart_payload(frame)
+                error = payload_error
+
+    chart_type = "bar" if len(trend["labels"]) <= 1 else "line"
+    return render_template(
+        "machine.html",
+        sessions=sessions,
+        selected_session=selected_session,
+        source_path=source_path,
+        trend=trend,
+        error=error,
+        chart_type=chart_type,
+        y_axis_label="Row count",
+    )
 
 
 @web.route("/playback")
