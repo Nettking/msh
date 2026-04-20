@@ -29,7 +29,8 @@ Startup now performs automatic orchestration before Flask serve:
 - run startup-safe analysis preparation for that bootstrap slice
 - prepare playback exports
 - start Flask quickly
-- continue polling for newly available data and process only new slices incrementally
+- continue background historical catch-up one day at a time (reverse chronological) until all discovered dates are covered
+- after catch-up completes, keep polling for newly arriving dates and process one new day per cycle
 
 Open http://localhost:5000.
 
@@ -50,13 +51,31 @@ Overview (`/`) shows only default-visible artifacts (`source_data` + `derived_ou
 
 ## Startup coupling note
 
-By default, Flask startup runs a minimal bootstrap orchestration first. This is intentional and keeps startup bounded to the latest day. Incremental updates continue in the background and runtime state is persisted in `results/workflows/runtime_state.json` for status visibility. Set `MSH_SKIP_ORCHESTRATION=1` to skip that pre-start phase when needed.
+By default, Flask startup runs a minimal bootstrap orchestration first. This is intentional and keeps startup bounded to the latest day. Incremental updates continue in the background and runtime state is persisted in `results/workflows/runtime_state.json` for status visibility.
+
+Runtime phases are explicit:
+
+- **Bootstrap phase**: process only the latest discovered source day first.
+- **Historical catch-up phase**: process exactly one pending day per poll cycle, in reverse chronological order.
+- **Steady incremental phase**: once historical catch-up is complete, continue polling for newly arriving days and process them one day per cycle.
+
+Bootstrap behavior is explicitly **refresh-latest-on-startup**: even when latest day was previously processed, startup still re-runs that day to keep newest data fresh while remaining bounded to one day.
+
+State tracks discovered source range, processed day set, pending count, next queued day, last catch-up success timestamp, and completion status so progress survives restart and is visible in `/status` and `/control`.
+
+`processed_dates` reflects **verified processed outputs**, not just attempted runs.
+
+Verification uses the bounded automatic coverage contract (`startup_safe_automatic_outputs`): only the startup-safe scripts used by automatic incremental catch-up are required for a day to count as covered. This avoids requiring manual/heavier workflow outputs for automatic progress.
+
+Runtime reconciliation checks session metadata and required automatic-coverage outputs on disk; if a previously tracked day is missing/corrupt/incomplete for that automatic contract, it is automatically re-queued in historical catch-up.
+
+Set `MSH_SKIP_ORCHESTRATION=1` to skip that pre-start phase when needed.
 
 ## Operator control panel (terminal controls moved to web)
 
 `/control` is now the primary operator surface for analysis control. It replaces the old terminal/menu control flow with explicit web actions:
 
-- runtime state visibility (mode, processed range, update-running, last refresh/failure)
+- runtime state visibility (bootstrap vs catch-up phase, discovered source range, processed/pending progress, next queued day, catch-up status, last refresh/failure)
 - active/latest workflow session metadata visibility
 - explicit workflow actions:
   - Run refresh now
