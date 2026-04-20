@@ -360,3 +360,32 @@ th, td {
   .action-meta { width: 100%; justify-content: space-between; }
   .now-grid { grid-template-columns: 1fr; }
 }
+
+
+.control-action-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.section-block form {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.section-block input,
+.section-block select,
+.section-block button {
+  font: inherit;
+}
+
+.section-block button {
+  justify-self: start;
+  padding: 7px 12px;
+  border: 1px solid #b8c8e6;
+  border-radius: 8px;
+  background: #fff;
+  cursor: pointer;
+}
