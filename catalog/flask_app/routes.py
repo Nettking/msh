@@ -11,6 +11,7 @@ from catalog.runner.session_store import list_sessions
 from .services.catalog_service import ArtifactCatalog, safe_load_artifact_frame
 from .services.chart_service import category_columns, category_counts, histogram_data, line_or_scatter_data, machine_day_trend, numeric_columns
 from .services.control_service import get_control_panel_service
+from .services.overview_service import build_overview_snapshot
 from .services.playback_service import interval_rows, playback_context, playback_subset, summarize_intervals, validate_playback_frame, validate_playback_source
 
 web = Blueprint("web", __name__)
@@ -126,28 +127,11 @@ def _machine_day_chart_payload(frame: pd.DataFrame) -> tuple[dict, str]:
 
 @web.route("/")
 def overview():
-    snap = _catalog().ensure_scanned()
-    artifacts = snap.artifacts
-    overview_artifacts = [a for a in artifacts if a.get("visibility") == "default"]
-    source_artifacts = [a for a in overview_artifacts if a.get("category") == "source_data"]
-    derived_artifacts = [a for a in overview_artifacts if a.get("category") == "derived_output"]
-    hidden_workflow_copies = len([a for a in artifacts if a.get("category") == "workflow_data_copy"])
-    hidden_internal_metadata = len([a for a in artifacts if a.get("category") == "internal_metadata"])
-    playback_count = len([a for a in overview_artifacts if a.get("playback_compatible")])
-    read_errors = len([a for a in overview_artifacts if a.get("status") != "ready"])
+    overview_snapshot = build_overview_snapshot(_catalog())
     return render_template(
         "overview.html",
-        artifacts=overview_artifacts[:25],
-        total=len(overview_artifacts),
-        source_total=len(source_artifacts),
-        derived_total=len(derived_artifacts),
-        hidden_workflow_copies=hidden_workflow_copies,
-        hidden_internal_metadata=hidden_internal_metadata,
-        playback_count=playback_count,
-        read_errors=read_errors,
-        warnings=snap.warnings,
+        overview=overview_snapshot,
         scan_dirs=_catalog().scan_dirs,
-        scanned_at_epoch=snap.scanned_at_epoch,
     )
 
 

@@ -1,10 +1,10 @@
 # MSH Flask Web App
 
-Primary web interface for browsing scanned artifacts, playback-capable datasets, and generic data exploration.
+Primary Flask operator interface for runtime visibility, dashboard-style overview, playback-capable datasets, and generic data exploration.
 
 ## Routes
 
-- `/` overview
+- `/` operator overview dashboard (current activity + runtime progress + readiness + next actions)
 - `/analyses` analysis browser
 - `/machine` machine/day trends
 - `/playback` playback-compatible inspection
@@ -14,6 +14,28 @@ Primary web interface for browsing scanned artifacts, playback-capable datasets,
 - `POST /rescan` explicit rescan trigger
 - `POST /control/action` trigger runtime/workflow actions with explicit target session scope
 - `POST /control/script/<script_key>/run` trigger individual scripts against selected/created session scope
+
+
+## Overview dashboard model (`/`)
+
+The overview page is intentionally an **operator-facing system dashboard** rather than a file browser.
+
+It now renders a compact `overview snapshot` assembled at request time by `catalog/flask_app/services/overview_service.py` with five sections:
+
+1. headline summary (runtime phase, processed progress, catch-up completion, queue/failure)
+   - includes inventory counters in the snapshot contract (`visible/source_artifacts/derived_artifacts/playback_compatible_count/read_error_count + hidden-by-default counts`) rendered from `overview.headline.*`
+2. what is happening now (latest known timestamp + machine last-seen/freshness when derivable)
+3. runtime progress summary (phase/date/progress/next/last step/failure)
+4. view readiness (`/machine`, `/playback`, `/analyses`, plus startup-safe `/status` and `/control`)
+5. next actions / open views (navigation with readiness hints)
+
+The snapshot intentionally reuses existing runtime manager state (`state_snapshot`) and existing artifact scans.
+Machine/activity signals on `/` are metadata-driven to keep the landing page cheap and predictable under frequent refresh.
+The overview intentionally avoids dataframe loading for “what is happening now”; detailed per-machine last-seen data remains available in dedicated downstream views.
+Readiness and activity now prefer the runtime/current session context; when only historical artifacts exist, the dashboard labels that explicitly as historical fallback instead of presenting it as current-session readiness.
+When runtime session id is unavailable, fallback session selection is deterministic (sorted by session metadata freshness signals such as `updated_at`/`created_at`, then session id) and the UI messages explicitly call out that fallback provenance.
+
+This keeps `/` useful before discovery/session outputs exist, during catch-up, and after data is fully processed, without duplicating the full debug detail shown on `/status`.
 
 ## Runtime (prepare + serve)
 
