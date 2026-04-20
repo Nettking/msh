@@ -110,11 +110,16 @@ def _execute_script_for_session_core(
         shutil.copytree(session_data_dir, run_data_dir)
 
     script_to_run = run_dir / script.script_path
+    runtime_env = {
+        "MSH_SESSION_ID": session_dir.name,
+        "MSH_SESSION_DIR": str(session_dir.resolve()),
+        "MSH_RUN_DIR": str(run_dir.resolve()),
+    }
     started = perf_counter()
     if capture_output:
-        exit_code, stdout_text, stderr_text = run_script_with_output(script_to_run, run_dir)
+        exit_code, stdout_text, stderr_text = run_script_with_output(script_to_run, run_dir, runtime_env=runtime_env)
     else:
-        exit_code = run_script(script_to_run, run_dir)
+        exit_code = run_script(script_to_run, run_dir, runtime_env=runtime_env)
         stdout_text = None
         stderr_text = None
     duration_seconds = round(perf_counter() - started, 3)
@@ -138,9 +143,9 @@ def _execute_script_for_session_core(
     }
 
 
-def run_script(script_path: Path, workspace_dir: Path) -> int:
+def run_script(script_path: Path, workspace_dir: Path, *, runtime_env: dict[str, str] | None = None) -> int:
     """Execute a selected catalog script inside a workspace directory."""
-    completed = _run_script_subprocess(script_path, workspace_dir)
+    completed = _run_script_subprocess(script_path, workspace_dir, runtime_env=runtime_env)
     if completed.stdout:
         print("[script stdout]", flush=True)
         print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n", flush=True)
@@ -150,9 +155,14 @@ def run_script(script_path: Path, workspace_dir: Path) -> int:
     return completed.returncode
 
 
-def run_script_with_output(script_path: Path, workspace_dir: Path) -> tuple[int, str | None, str | None]:
+def run_script_with_output(
+    script_path: Path,
+    workspace_dir: Path,
+    *,
+    runtime_env: dict[str, str] | None = None,
+) -> tuple[int, str | None, str | None]:
     """Execute script and return full stdout/stderr (still echoed to parent logs)."""
-    completed = _run_script_subprocess(script_path, workspace_dir)
+    completed = _run_script_subprocess(script_path, workspace_dir, runtime_env=runtime_env)
     if completed.stdout:
         print("[script stdout]", flush=True)
         print(completed.stdout, end="" if completed.stdout.endswith("\n") else "\n", flush=True)
@@ -162,7 +172,12 @@ def run_script_with_output(script_path: Path, workspace_dir: Path) -> tuple[int,
     return completed.returncode, completed.stdout or None, completed.stderr or None
 
 
-def _run_script_subprocess(script_path: Path, workspace_dir: Path) -> subprocess.CompletedProcess[str]:
+def _run_script_subprocess(
+    script_path: Path,
+    workspace_dir: Path,
+    *,
+    runtime_env: dict[str, str] | None = None,
+) -> subprocess.CompletedProcess[str]:
     env = dict(os.environ)
     env["PYTHONUNBUFFERED"] = "1"
     env.setdefault("MPLBACKEND", "Agg")
@@ -173,6 +188,8 @@ def _run_script_subprocess(script_path: Path, workspace_dir: Path) -> subprocess
         if existing_pythonpath
         else workspace_import_root
     )
+    if runtime_env:
+        env.update(runtime_env)
 
     command = [sys.executable, str(script_path)]
     print(f"\nRunning: {' '.join(command)}", flush=True)

@@ -231,6 +231,8 @@ def _artifact_category(path: Path, source_dir: str, roots: list[str]) -> str:
         return "internal_metadata"
     if root_name == "data":
         return "source_data"
+    if "workflows" in lower_parts and "analyses" in lower_parts:
+        return "derived_output"
     if "workflows" in lower_parts and "data" in lower_parts:
         return "workflow_data_copy"
     return "derived_output"

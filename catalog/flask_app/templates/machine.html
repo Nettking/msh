@@ -2,19 +2,31 @@
 {% block body %}
 <h2>Machine/day trends</h2>
 <form>
-<select name="path">
-  <option value="">Select artifact</option>
-  {% for a in artifacts if 'machine-filter' in a.supported_views %}<option value="{{ a.path }}" {% if selected and selected.path==a.path %}selected{% endif %}>{{ a.file_name }}</option>{% endfor %}
+<label for="session_id">Session:</label>
+<select id="session_id" name="session_id">
+  {% for session in sessions %}
+  <option value="{{ session.session_id }}" {% if selected_session and selected_session.session_id == session.session_id %}selected{% endif %}>{{ session.session_id }}</option>
+  {% endfor %}
 </select>
-<button type="submit">Show</button>
+<button type="submit">Load machine/day view</button>
 </form>
+<p>Source: <strong>data_pr_day</strong> (machine/day aggregation){% if source_path %} — <code>{{ source_path }}</code>{% endif %}</p>
 {% if error %}<p>{{ error }}</p>{% endif %}
+{% if trend.labels and trend.series %}
 <canvas id="machineView"></canvas>
 <script>
 new Chart(document.getElementById('machineView'), {
-  type: 'line',
+  type: {{ chart_type|tojson }},
   data: {labels: {{ trend.labels|tojson }}, datasets: {{ trend.series|tojson }}},
-  options: {responsive: true}
+  options: {
+    responsive: true,
+    scales: {
+      y: {
+        title: {display: true, text: {{ y_axis_label|tojson }}}
+      }
+    }
+  }
 });
 </script>
+{% endif %}
 {% endblock %}

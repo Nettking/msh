@@ -8,7 +8,12 @@
 
 ## Behavior observed via static code inspection
 - Reads `data/*.jsonl` and requires `timestamp` + `machine` fields.
-- Writes plots under `graphs/` (`GRAPH_BASE_DIR = Path("graphs")`).
+- Writes canonical machine/day summary CSV to:
+  `results/workflows/<session>/analyses/data_pr_day/machine_day_summary.csv`
+  with at least columns: `date`, `machine`, `value`.
+  Session location is resolved from runtime session context (`MSH_SESSION_DIR`) or
+  inferred from the current workflow run path.
+- Writes optional plots under `graphs/` (`GRAPH_BASE_DIR = Path("graphs")`).
 
 ## Runtime/path assumptions (not runtime-tested)
 - Relative `data/` and `graphs/` paths are root-based.
