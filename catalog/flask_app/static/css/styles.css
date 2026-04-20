@@ -389,3 +389,131 @@ th, td {
   background: #fff;
   cursor: pointer;
 }
+
+.control-summary-strip .metric-card {
+  min-width: 160px;
+  padding: 10px 12px;
+}
+
+.control-focus__header {
+  margin-bottom: 12px;
+}
+
+.control-focus__grid {
+  display: grid;
+  grid-template-columns: 1.35fr 1fr;
+  gap: 12px;
+}
+
+.control-card {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.control-form {
+  margin-top: 0;
+}
+
+.control-form h4,
+.control-quick-actions h4 {
+  margin-bottom: 8px;
+}
+
+.button-primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: #1e40af;
+  font-weight: 600;
+}
+
+.control-action-grid--stacked {
+  grid-template-columns: 1fr;
+  margin-top: 0;
+}
+
+.session-compact-list {
+  display: grid;
+  gap: 8px;
+}
+
+.session-compact-item {
+  border: 1px solid var(--border);
+  background: var(--surface-muted);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.session-compact-item--selected {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.session-compact-id {
+  font-weight: 700;
+  color: var(--text);
+}
+
+.disclosure-block {
+  margin-top: 10px;
+}
+
+.disclosure-block summary {
+  cursor: pointer;
+  color: #1e3a8a;
+  font-weight: 600;
+}
+
+.script-groups {
+  display: grid;
+  gap: 12px;
+}
+
+.script-group {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  background: #fcfdff;
+}
+
+.script-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.script-item {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: flex-start;
+}
+
+.script-item--muted {
+  opacity: 0.72;
+  background: #f8fafc;
+}
+
+.script-item__name {
+  font-weight: 700;
+  color: var(--text);
+}
+
+@media (max-width: 980px) {
+  .control-focus__grid {
+    grid-template-columns: 1fr;
+  }
+
+  .script-item,
+  .session-compact-item {
+    flex-direction: column;
+  }
+}

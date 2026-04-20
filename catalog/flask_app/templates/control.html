@@ -1,13 +1,13 @@
 {% extends 'base.html' %}
 {% block body %}
 <section class="page-intro">
-  <h2>Runtime control panel</h2>
-  <p>Operator action surface for session targeting, workflow/script execution, and recent control activity.</p>
+  <h2>Operator control panel</h2>
+  <p>Task-focused controls for selecting a target session/scope, running workflow actions, and checking recent operator activity.</p>
 </section>
 
 <section class="section-block section-block--primary">
   <h3>Operator summary</h3>
-  <div class="metrics metrics-grid">
+  <div class="metrics metrics-grid control-summary-strip">
     {% set phase = panel.runtime_state.current_processing_phase or 'runtime_not_started' %}
     <article class="metric-card metric-card--info">
       <span class="metric-label">Current phase</span>
@@ -18,11 +18,11 @@
       <span class="metric-value">{{ 'Running' if panel.runtime_state.update_running else 'Idle' }}</span>
     </article>
     <article class="metric-card">
-      <span class="metric-label">Selected session</span>
+      <span class="metric-label">Target session for actions</span>
       <span class="metric-value metric-value--long">{{ panel.selected_session.session_id if panel.selected_session else 'None selected' }}</span>
     </article>
     <article class="metric-card">
-      <span class="metric-label">Latest workflow session</span>
+      <span class="metric-label">Freshest session in index</span>
       <span class="metric-value metric-value--long">{{ panel.latest_session.session_id if panel.latest_session else 'None yet' }}</span>
     </article>
     <article class="metric-card {% if panel.runtime_state.last_failure %}metric-card--danger{% endif %}">
@@ -30,92 +30,82 @@
       <span class="metric-value metric-value--long">{{ panel.runtime_state.last_failure or 'None' }}</span>
     </article>
   </div>
-  <p><a href="{{ url_for('web.status') }}">Open /status</a> for full runtime/system details and readiness contracts.</p>
+  <p><a href="{{ url_for('web.status') }}">Open /status</a> for full runtime/system details, catch-up state, and readiness contracts.</p>
 </section>
 
-<section class="section-block">
-  <h3>Session inventory</h3>
+<section class="section-block section-block--actions control-focus">
+  <div class="control-focus__header">
+    <h3>1) Select target and scope · 2) Run action</h3>
+    <p>Available source-data date range: {{ panel.available_start or 'n/a' }} .. {{ panel.available_end or 'n/a' }}</p>
+  </div>
+
   {% if panel.selected_session_missing %}
   <p><strong>Requested session was not found.</strong> Choose a valid session from inventory before running selected-session actions.</p>
   {% endif %}
-  {% if panel.sessions %}
-  <table>
-    <tr><th>Session id</th><th>Processed range</th><th>Last updated</th><th>Workflow/script summary</th><th>Select</th></tr>
-    {% for row in panel.sessions %}
-    <tr>
-      <td>{{ row.session_id }}</td>
-      <td>{{ row.range }}</td>
-      <td>{{ row.updated_at }}</td>
-      <td>{{ row.status_summary }}</td>
-      <td><a href="{{ url_for('web.control', session_id=row.session_id) }}">Use as target</a></td>
-    </tr>
-    {% endfor %}
-  </table>
-  {% else %}
-  <p>No workflow sessions are available yet.</p>
-  {% endif %}
-</section>
 
-<section class="section-block section-block--actions">
-  <h3>Session scope and workflow actions</h3>
-  <p>Available source-data date range: {{ panel.available_start or 'n/a' }} .. {{ panel.available_end or 'n/a' }}</p>
-  <form method="post" action="{{ url_for('web.control_action') }}">
-    <input type="hidden" name="action" value="run_selected_session_workflow">
-    <label for="selected_session_id">Target session:</label>
-    <select id="selected_session_id" name="selected_session_id">
-      {% for row in panel.sessions %}
-      <option value="{{ row.session_id }}" {% if panel.selected_session and panel.selected_session.session_id == row.session_id %}selected{% endif %}>{{ row.session_id }} ({{ row.range }})</option>
-      {% endfor %}
-    </select>
-
-    <label for="scope_mode">Scope mode:</label>
-    <select id="scope_mode" name="scope_mode">
-      <option value="selected_session" selected>Use selected existing session</option>
-      <option value="latest_existing">Latest existing session</option>
-      <option value="latest_day">Create/reuse latest day session</option>
-      <option value="selected_day">Create/reuse selected day session</option>
-      <option value="custom_range">Create/reuse custom range session</option>
-      <option value="full_range">Full historical rebuild (manual, potentially slow)</option>
-    </select>
-
-    <label for="start_date">Start date:</label>
-    <input id="start_date" type="date" name="start_date">
-
-    <label for="end_date">End date:</label>
-    <input id="end_date" type="date" name="end_date">
-
-    <div>
-      <button type="submit">Create/reuse scope and run full workflow</button>
-    </div>
-  </form>
-
-  <div class="control-action-grid">
-    <form method="post" action="{{ url_for('web.control_action') }}">
-      <input type="hidden" name="action" value="refresh_now">
-      <button type="submit">Run next catch-up day now</button>
-    </form>
-    <form method="post" action="{{ url_for('web.control_action') }}">
-      <input type="hidden" name="action" value="startup_health">
-      <input type="hidden" name="selected_session_id" value="{{ panel.selected_session.session_id if panel.selected_session else '' }}">
-      <input type="hidden" name="scope_mode" value="selected_session">
-      <button type="submit">Run startup-safe health checks</button>
-    </form>
-    <form method="post" action="{{ url_for('web.control_action') }}">
-      <input type="hidden" name="action" value="rerun_latest_session_workflow">
-      <button type="submit">Rerun latest bootstrap workflow</button>
-    </form>
-    <form method="post" action="{{ url_for('web.control_action') }}">
+  <div class="control-focus__grid">
+    <form method="post" action="{{ url_for('web.control_action') }}" class="control-form control-card">
       <input type="hidden" name="action" value="run_selected_session_workflow">
-      <input type="hidden" name="selected_session_id" value="{{ panel.selected_session.session_id if panel.selected_session else '' }}">
-      <input type="hidden" name="scope_mode" value="selected_session">
-      <button type="submit">Run selected-session workflow</button>
+      <h4>Target selection</h4>
+
+      <label for="selected_session_id">Target session (existing):</label>
+      <select id="selected_session_id" name="selected_session_id">
+        {% for row in panel.sessions %}
+        <option value="{{ row.session_id }}" {% if panel.selected_session and panel.selected_session.session_id == row.session_id %}selected{% endif %}>{{ row.session_id }} ({{ row.range }})</option>
+        {% endfor %}
+      </select>
+
+      <label for="scope_mode">Scope mode:</label>
+      <select id="scope_mode" name="scope_mode">
+        <option value="selected_session" selected>Use selected existing session</option>
+        <option value="latest_existing">Use freshest existing session in index</option>
+        <option value="latest_day">Create/reuse latest-day session</option>
+        <option value="selected_day">Create/reuse selected-day session</option>
+        <option value="custom_range">Create/reuse custom-range session</option>
+        <option value="full_range">Full historical rebuild (manual, potentially slow)</option>
+      </select>
+
+      <label for="start_date">Start date:</label>
+      <input id="start_date" type="date" name="start_date">
+
+      <label for="end_date">End date:</label>
+      <input id="end_date" type="date" name="end_date">
+
+      <button class="button-primary" type="submit">Create/reuse scope and run full workflow</button>
     </form>
+
+    <div class="control-card control-quick-actions">
+      <h4>Primary operator actions</h4>
+      <div class="control-action-grid control-action-grid--stacked">
+        <form method="post" action="{{ url_for('web.control_action') }}">
+          <input type="hidden" name="action" value="run_selected_session_workflow">
+          <input type="hidden" name="selected_session_id" value="{{ panel.selected_session.session_id if panel.selected_session else '' }}">
+          <input type="hidden" name="scope_mode" value="selected_session">
+          <button class="button-primary" type="submit">Run target-session workflow</button>
+        </form>
+        <form method="post" action="{{ url_for('web.control_action') }}">
+          <input type="hidden" name="action" value="startup_health">
+          <input type="hidden" name="selected_session_id" value="{{ panel.selected_session.session_id if panel.selected_session else '' }}">
+          <input type="hidden" name="scope_mode" value="selected_session">
+          <button type="submit">Run startup-safe health checks</button>
+        </form>
+        <form method="post" action="{{ url_for('web.control_action') }}">
+          <input type="hidden" name="action" value="refresh_now">
+          <button type="submit">Run next catch-up day now</button>
+        </form>
+        <form method="post" action="{{ url_for('web.control_action') }}">
+          <input type="hidden" name="action" value="rerun_latest_session_workflow">
+          <button type="submit">Rerun freshest-session workflow</button>
+        </form>
+      </div>
+    </div>
   </div>
 </section>
 
 {% if panel.workflow_rows %}
 <section class="section-block">
-  <h3>Selected-session workflow step status</h3>
+  <h3>Selected target workflow state</h3>
+  <p>Workflow-step status for the currently targeted session.</p>
   <table>
     <tr><th>Step</th><th>Scripts</th><th>Status</th></tr>
     {% for row in panel.workflow_rows %}
@@ -126,27 +116,69 @@
 {% endif %}
 
 <section class="section-block">
-  <h3>Script controls</h3>
-  <table>
-    <tr><th>Script</th><th>Workflow step</th><th>Category</th><th>Last status</th><th>Last run</th><th>Output</th><th>Action</th></tr>
-    {% for row in panel.script_rows %}
-    <tr>
-      <td>{{ row.name }}</td>
-      <td>{{ row.workflow_step.replace('_', ' ')|title }}</td>
-      <td>{{ row.category.replace('_', ' ')|title }}</td>
-      <td>{{ row.status.replace('_', ' ')|title }}{% if row.exit_code is not none %} (exit={{ row.exit_code }}){% endif %}</td>
-      <td>{{ row.last_run_at }}</td>
-      <td>{{ row.output_path or 'n/a' }}</td>
-      <td>
-        <form method="post" action="{{ url_for('web.run_script_control', script_key=row.name) }}">
-          <input type="hidden" name="selected_session_id" value="{{ panel.selected_session.session_id if panel.selected_session else '' }}">
-          <input type="hidden" name="scope_mode" value="selected_session">
-          <button type="submit">Run on selected session</button>
-        </form>
-      </td>
-    </tr>
+  <h3>Session inventory (compact)</h3>
+  {% if panel.sessions %}
+    <div class="session-compact-list">
+      {% for row in panel.sessions[:5] %}
+      <article class="session-compact-item {% if panel.selected_session and panel.selected_session.session_id == row.session_id %}session-compact-item--selected{% endif %}">
+        <div>
+          <p class="session-compact-id">{{ row.session_id }}</p>
+          <p>{{ row.range }} · {{ row.updated_at }} · {{ row.status_summary }}</p>
+        </div>
+        <a href="{{ url_for('web.control', session_id=row.session_id) }}">Use as target</a>
+      </article>
+      {% endfor %}
+    </div>
+
+    {% if panel.sessions|length > 5 %}
+    <details class="disclosure-block">
+      <summary>Show all sessions ({{ panel.sessions|length }})</summary>
+      <table>
+        <tr><th>Session id</th><th>Processed range</th><th>Last updated</th><th>Workflow/script summary</th><th>Select</th></tr>
+        {% for row in panel.sessions %}
+        <tr>
+          <td>{{ row.session_id }}</td>
+          <td>{{ row.range }}</td>
+          <td>{{ row.updated_at }}</td>
+          <td>{{ row.status_summary }}</td>
+          <td><a href="{{ url_for('web.control', session_id=row.session_id) }}">Use as target</a></td>
+        </tr>
+        {% endfor %}
+      </table>
+    </details>
+    {% endif %}
+  {% else %}
+  <p>No workflow sessions are available yet.</p>
+  {% endif %}
+</section>
+
+<section class="section-block">
+  <h3>Script controls by workflow step</h3>
+  <p>Scripts are grouped to reduce scanning overhead. Entries with no runs yet are visually muted.</p>
+  <div class="script-groups">
+    {% for group in panel.script_rows|groupby('workflow_step') %}
+    <section class="script-group">
+      <h4>{{ group.grouper.replace('_', ' ')|title }}</h4>
+      <div class="script-list">
+        {% for row in group.list %}
+        <article class="script-item {% if row.status == 'not_run' %}script-item--muted{% endif %}">
+          <div>
+            <p class="script-item__name">{{ row.name }}</p>
+            <p>Category: {{ row.category.replace('_', ' ')|title }}</p>
+            <p>Status: {{ row.status.replace('_', ' ')|title }}{% if row.exit_code is not none %} (exit={{ row.exit_code }}){% endif %}</p>
+            <p>Last run: {{ row.last_run_at }} · Output: {{ row.output_path or 'n/a' }}</p>
+          </div>
+          <form method="post" action="{{ url_for('web.run_script_control', script_key=row.name) }}">
+            <input type="hidden" name="selected_session_id" value="{{ panel.selected_session.session_id if panel.selected_session else '' }}">
+            <input type="hidden" name="scope_mode" value="selected_session">
+            <button type="submit">Run on target session</button>
+          </form>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
     {% endfor %}
-  </table>
+  </div>
 </section>
 
 <section class="section-block">
@@ -154,7 +186,7 @@
   {% if panel.recent_runs %}
   <table>
     <tr><th>Action</th><th>Started</th><th>Finished</th><th>Status</th><th>Session</th><th>Target range</th><th>Output path</th><th>Message</th><th>stdout snippet</th><th>stderr snippet</th></tr>
-    {% for run in panel.recent_runs %}
+    {% for run in panel.recent_runs[:8] %}
     <tr>
       <td>{{ run.action }}{% if run.target %} ({{ run.target }}){% endif %}</td>
       <td>{{ run.started_at }}</td>
@@ -169,6 +201,26 @@
     </tr>
     {% endfor %}
   </table>
+  {% if panel.recent_runs|length > 8 %}
+  <details class="disclosure-block">
+    <summary>Show older activity ({{ panel.recent_runs|length - 8 }} more)</summary>
+    <table>
+      <tr><th>Action</th><th>Started</th><th>Finished</th><th>Status</th><th>Session</th><th>Target range</th><th>Output path</th><th>Message</th></tr>
+      {% for run in panel.recent_runs[8:] %}
+      <tr>
+        <td>{{ run.action }}{% if run.target %} ({{ run.target }}){% endif %}</td>
+        <td>{{ run.started_at }}</td>
+        <td>{{ run.finished_at or 'running' }}</td>
+        <td>{{ run.status.replace('_', ' ')|title }}</td>
+        <td>{{ run.session_id or 'n/a' }}</td>
+        <td>{{ run.target_range or 'n/a' }}</td>
+        <td>{{ run.output_path or 'n/a' }}</td>
+        <td>{{ run.message }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </details>
+  {% endif %}
   {% else %}
   <p>No control actions have been recorded yet for this process lifetime.</p>
   {% endif %}
