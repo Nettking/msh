@@ -3,6 +3,7 @@ from __future__ import annotations
 import threading
 import traceback
 from collections import deque
+from copy import deepcopy
 from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from typing import Any
@@ -22,6 +23,8 @@ from catalog.runner.session_store import (
     workflow_step_status,
     write_session_metadata,
 )
+
+from .workflow_session_index import get_workflow_session_index
 
 
 @dataclass
@@ -49,11 +52,28 @@ class ControlPanelService:
         self._active_run_id: int | None = None
         self._run_sequence = 0
         self._recent_runs: deque[ControlRun] = deque(maxlen=30)
+        self._script_options = discover_runnable_scripts(self.root / "catalog")
+        self._available_dates_cache: tuple[float, str | None, str | None] | None = None
+        self._available_dates_ttl_seconds = 10.0
 
-    def snapshot(self, *, selected_session_id: str | None = None) -> dict[str, Any]:
-        runtime_state = get_runtime_manager().state_snapshot()
-        script_options = discover_runnable_scripts(self.root / "catalog")
-        sessions = list_sessions(self.workflows_root)
+    def cache_signature(self) -> tuple[int | None, int, int | None]:
+        with self._lock:
+            active_run = self._active_run_id
+            recent_count = len(self._recent_runs)
+            latest_run_id = self._recent_runs[-1].run_id if self._recent_runs else None
+        return active_run, recent_count, latest_run_id
+
+    def snapshot(
+        self,
+        *,
+        selected_session_id: str | None = None,
+        runtime_state: dict[str, Any] | None = None,
+        sessions: list[Any] | None = None,
+    ) -> dict[str, Any]:
+        runtime_state = runtime_state or get_runtime_manager().state_snapshot()
+        script_options = self._script_options
+        sessions = sessions if sessions is not None else get_workflow_session_index().get_sessions(self.workflows_root).sessions
+        # Session index guarantees deterministic freshness ordering (latest first).
         latest_session = sessions[0] if sessions else None
 
         selected_session = _resolve_selected_session(
@@ -67,22 +87,13 @@ class ControlPanelService:
 
         session_rows: list[dict[str, Any]] = []
         for session in sessions:
-            metadata, changed = normalize_session_metadata(session.session_dir, dict(session.metadata), script_options)
-            if changed:
-                write_session_metadata(session.session_dir, metadata)
-            session_rows.append(_session_row(session.session_id, metadata))
+            session_rows.append(_session_row(session.session_id, session.metadata))
 
         selected_metadata = None
         workflow_rows: list[dict[str, str]] = []
         script_rows: list[dict[str, Any]] = []
         if selected_session is not None:
-            selected_metadata, changed = normalize_session_metadata(
-                selected_session.session_dir,
-                dict(selected_session.metadata),
-                script_options,
-            )
-            if changed:
-                write_session_metadata(selected_session.session_dir, selected_metadata)
+            selected_metadata = _normalized_metadata_view(selected_session, script_options)
 
             for step_name, step_scripts in WORKFLOW_STEPS:
                 workflow_rows.append(
@@ -125,9 +136,7 @@ class ControlPanelService:
             active_run = self._active_run_id
             recent_runs = [asdict(item) for item in self._recent_runs]
 
-        available_dates = discover_available_dates(self.data_root)
-        available_start = available_dates[0].isoformat() if available_dates else None
-        available_end = available_dates[-1].isoformat() if available_dates else None
+        available_start, available_end = self._available_date_bounds()
 
         return {
             "runtime_state": runtime_state,
@@ -143,6 +152,19 @@ class ControlPanelService:
             "available_start": available_start,
             "available_end": available_end,
         }
+
+    def _available_date_bounds(self) -> tuple[str | None, str | None]:
+        now = datetime.utcnow().timestamp()
+        with self._lock:
+            cached = self._available_dates_cache
+            if cached and (now - cached[0]) <= self._available_dates_ttl_seconds:
+                return cached[1], cached[2]
+        available_dates = discover_available_dates(self.data_root)
+        available_start = available_dates[0].isoformat() if available_dates else None
+        available_end = available_dates[-1].isoformat() if available_dates else None
+        with self._lock:
+            self._available_dates_cache = (datetime.utcnow().timestamp(), available_start, available_end)
+        return available_start, available_end
 
     def trigger_action(
         self,
@@ -307,7 +329,7 @@ class ControlPanelService:
         start_date: str | None,
         end_date: str | None,
     ) -> tuple[str, Any, str]:
-        script_options = discover_runnable_scripts(self.root / "catalog")
+        script_options = self._script_options
         sessions = list_sessions(self.workflows_root)
 
         if scope_mode in {None, "", "selected_session"}:
@@ -372,7 +394,7 @@ class ControlPanelService:
         script_keys: list[str],
     ) -> tuple[str, str, str | None, str | None, str | None, str | None, str | None]:
         session_id, session_dir, target_range = target_session
-        script_options = discover_runnable_scripts(self.root / "catalog")
+        script_options = self._script_options
         script_index: dict[str, ScriptOption] = {item.key: item for item in script_options}
         metadata = _load_normalized_session_metadata(session_dir, script_options)
         if metadata is None:
@@ -454,6 +476,8 @@ class ControlPanelService:
                 )
                 break
             self._active_run_id = None
+            self._available_dates_cache = None
+        get_workflow_session_index().invalidate(self.workflows_root)
 
 
 def _utc_now_iso() -> str:
@@ -562,6 +586,12 @@ def _session_row(session_id: str, metadata: dict[str, Any]) -> dict[str, Any]:
         "updated_at": metadata.get("updated_at") or metadata.get("created_at") or "n/a",
         "status_summary": "; ".join(status_parts) if status_parts else "n/a",
     }
+
+
+def _normalized_metadata_view(session: Any, script_options: list[ScriptOption]) -> dict[str, Any]:
+    metadata = deepcopy(dict(session.metadata))
+    normalized, _ = normalize_session_metadata(session.session_dir, metadata, script_options)
+    return normalized
 
 
 _CONTROL_PANEL_SERVICE: ControlPanelService | None = None

@@ -11,8 +11,9 @@ from catalog.runner.session_store import list_sessions
 from .services.catalog_service import ArtifactCatalog, safe_load_artifact_frame
 from .services.chart_service import category_columns, category_counts, histogram_data, line_or_scatter_data, machine_day_trend, numeric_columns
 from .services.control_service import get_control_panel_service
-from .services.overview_service import build_overview_snapshot
+from .services.operator_page_cache import get_operator_page_cache
 from .services.playback_service import interval_rows, playback_context, playback_subset, summarize_intervals, validate_playback_frame, validate_playback_source
+from .services.workflow_session_index import get_workflow_session_index
 
 web = Blueprint("web", __name__)
 
@@ -127,7 +128,17 @@ def _machine_day_chart_payload(frame: pd.DataFrame) -> tuple[dict, str]:
 
 @web.route("/")
 def overview():
-    overview_snapshot = build_overview_snapshot(_catalog())
+    route_started = pd.Timestamp.utcnow()
+    overview_build_started = pd.Timestamp.utcnow()
+    overview_snapshot, cache_state = get_operator_page_cache().get_overview_snapshot(_catalog())
+    build_ms = max((pd.Timestamp.utcnow() - overview_build_started).total_seconds() * 1000.0, 0.0)
+    total_ms = max((pd.Timestamp.utcnow() - route_started).total_seconds() * 1000.0, 0.0)
+    current_app.logger.info(
+        "overview GET cache=%s snapshot_ms=%.2f route_ms=%.2f",
+        cache_state,
+        build_ms,
+        total_ms,
+    )
     return render_template(
         "overview.html",
         overview=overview_snapshot,
@@ -348,8 +359,19 @@ def exploration():
 
 @web.route("/control")
 def control():
+    route_started = pd.Timestamp.utcnow()
     selected_session_id = request.args.get("session_id")
-    panel = get_control_panel_service().snapshot(selected_session_id=selected_session_id)
+    control_build_started = pd.Timestamp.utcnow()
+    panel, cache_state = get_operator_page_cache().get_control_snapshot(selected_session_id=selected_session_id)
+    build_ms = max((pd.Timestamp.utcnow() - control_build_started).total_seconds() * 1000.0, 0.0)
+    total_ms = max((pd.Timestamp.utcnow() - route_started).total_seconds() * 1000.0, 0.0)
+    current_app.logger.info(
+        "control GET cache=%s snapshot_ms=%.2f route_ms=%.2f selected_session=%s",
+        cache_state,
+        build_ms,
+        total_ms,
+        selected_session_id or "",
+    )
     return render_template("control.html", panel=panel)
 
 
@@ -367,6 +389,8 @@ def control_action():
         start_date=start_date,
         end_date=end_date,
     )
+    get_workflow_session_index().invalidate()
+    get_operator_page_cache().invalidate_all()
     flash(message, "success" if ok else "error")
     target_session = target_session_id or selected_session_id or ""
     return redirect(url_for("web.control", session_id=target_session))
@@ -386,6 +410,8 @@ def run_script_control(script_key: str):
         start_date=start_date,
         end_date=end_date,
     )
+    get_workflow_session_index().invalidate()
+    get_operator_page_cache().invalidate_all()
     flash(message, "success" if ok else "error")
     target_session = target_session_id or selected_session_id or ""
     return redirect(url_for("web.control", session_id=target_session))
@@ -394,6 +420,8 @@ def run_script_control(script_key: str):
 @web.post("/rescan")
 def rescan():
     _catalog().rescan()
+    get_workflow_session_index().invalidate()
+    get_operator_page_cache().invalidate_overview()
     target = request.form.get("next") or url_for("web.overview")
     return redirect(target)
 
@@ -402,5 +430,7 @@ def rescan():
 def refresh():
     get_runtime_manager().request_refresh()
     _catalog().rescan()
+    get_workflow_session_index().invalidate()
+    get_operator_page_cache().invalidate_all()
     target = request.form.get("next") or url_for("web.status")
     return redirect(target)

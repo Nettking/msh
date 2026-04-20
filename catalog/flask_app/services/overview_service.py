@@ -23,11 +23,17 @@ class OverviewSnapshot:
     warnings: list[str]
 
 
-def build_overview_snapshot(catalog: ArtifactCatalog) -> OverviewSnapshot:
-    scan = catalog.ensure_scanned()
-    runtime_state = get_runtime_manager().state_snapshot()
+def build_overview_snapshot(
+    catalog: ArtifactCatalog,
+    *,
+    scan: ScanSnapshot | None = None,
+    runtime_state: dict[str, Any] | None = None,
+    sessions: list[Any] | None = None,
+) -> OverviewSnapshot:
+    scan = scan or catalog.ensure_scanned()
+    runtime_state = runtime_state or get_runtime_manager().state_snapshot()
     visible = [item for item in scan.artifacts if item.get("visibility") == "default"]
-    sessions = list_sessions(Path("results") / "workflows")
+    sessions = sessions if sessions is not None else list_sessions(Path("results") / "workflows")
     session_context = _resolve_session_context(runtime_state, sessions)
 
     machine_activity = _machine_activity(scan, session_context)
