@@ -24,6 +24,77 @@ def _machine_day_csv_for_session(session_id: str) -> Path:
     return Path("results") / "workflows" / session_id / "analyses" / "data_pr_day" / "machine_day_summary.csv"
 
 
+def _machine_day_readiness_for_session(session_id: str) -> dict:
+    csv_path = _machine_day_csv_for_session(session_id)
+    base = {"session_id": session_id, "source_path": str(csv_path)}
+    if not csv_path.exists():
+        return {
+            **base,
+            "status": "missing",
+            "message": "Machine/day aggregation has not been generated for this session.",
+        }
+    return {
+        **base,
+        "status": "artifact_present",
+        "message": "",
+    }
+
+
+def _machine_day_detail_for_session(session_id: str) -> dict:
+    csv_path = _machine_day_csv_for_session(session_id)
+    base = {"session_id": session_id, "source_path": str(csv_path)}
+    if not csv_path.exists():
+        return {
+            **base,
+            "status": "missing",
+            "message": "Machine/day aggregation has not been generated for this session.",
+            "frame": None,
+        }
+
+    frame, load_error = safe_load_artifact_frame(str(csv_path))
+    if frame is None:
+        return {
+            **base,
+            "status": "invalid_csv",
+            "message": f"Machine/day CSV exists but is invalid: {load_error}",
+            "frame": None,
+        }
+
+    required = {"date", "machine", "value"}
+    missing_columns = sorted(required - set(frame.columns))
+    if missing_columns:
+        return {
+            **base,
+            "status": "invalid_schema",
+            "message": (
+                "Machine/day CSV exists but is invalid: missing required columns "
+                + ", ".join(missing_columns)
+                + "."
+            ),
+            "frame": None,
+        }
+
+    prepared = frame.copy()
+    prepared["date"] = pd.to_datetime(prepared["date"], errors="coerce")
+    prepared["machine"] = prepared["machine"].astype("string").fillna("unknown").astype(str)
+    prepared["value"] = pd.to_numeric(prepared["value"], errors="coerce")
+    prepared = prepared.dropna(subset=["date", "value"])
+    if prepared.empty:
+        return {
+            **base,
+            "status": "empty_rows",
+            "message": "Machine/day CSV exists but contains no usable rows.",
+            "frame": None,
+        }
+
+    return {
+        **base,
+        "status": "ready",
+        "message": "",
+        "frame": frame,
+    }
+
+
 def _machine_day_chart_payload(frame: pd.DataFrame) -> tuple[dict, str]:
     required = {"date", "machine", "value"}
     if not required.issubset(frame.columns):
@@ -123,6 +194,8 @@ def analyses():
 def machine_view():
     workflows_root = Path("results") / "workflows"
     sessions = list_sessions(workflows_root)
+    readiness = [_machine_day_readiness_for_session(item.session_id) for item in sessions]
+    readiness_by_session = {item["session_id"]: item for item in readiness}
     requested_session_id = request.args.get("session_id", "").strip()
     selected_session = next((item for item in sessions if item.session_id == requested_session_id), None) if requested_session_id else None
     if not requested_session_id and sessions:
@@ -131,28 +204,31 @@ def machine_view():
     trend = {"labels": [], "series": []}
     error = ""
     source_path = ""
-    if requested_session_id and selected_session is None:
+    if requested_session_id and requested_session_id not in readiness_by_session:
         error = f"Selected session was not found: {requested_session_id}"
     elif selected_session is None:
-        error = "No machine/day data available."
+        error = "No workflow sessions were found."
     else:
-        csv_path = _machine_day_csv_for_session(selected_session.session_id)
-        source_path = str(csv_path)
-        if not csv_path.exists():
-            error = "No machine/day data available."
+        selected_readiness = _machine_day_detail_for_session(selected_session.session_id)
+        readiness_by_session[selected_session.session_id] = {
+            "session_id": selected_readiness["session_id"],
+            "source_path": selected_readiness["source_path"],
+            "status": selected_readiness["status"],
+            "message": selected_readiness["message"],
+        }
+        source_path = selected_readiness["source_path"]
+        if selected_readiness["status"] != "ready":
+            error = selected_readiness["message"]
         else:
-            frame, load_error = safe_load_artifact_frame(str(csv_path))
-            if frame is None:
-                error = load_error or "No machine/day data available."
-            else:
-                trend, payload_error = _machine_day_chart_payload(frame)
-                error = payload_error
+            trend, payload_error = _machine_day_chart_payload(selected_readiness["frame"])
+            error = payload_error
 
     chart_type = "bar" if len(trend["labels"]) <= 1 else "line"
     return render_template(
         "machine.html",
         sessions=sessions,
         selected_session=selected_session,
+        readiness_by_session=readiness_by_session,
         source_path=source_path,
         trend=trend,
         error=error,

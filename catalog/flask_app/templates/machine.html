@@ -4,8 +4,14 @@
 <form>
 <label for="session_id">Session:</label>
 <select id="session_id" name="session_id">
+  {% if not sessions %}
+  <option value="">(no workflow sessions)</option>
+  {% endif %}
   {% for session in sessions %}
-  <option value="{{ session.session_id }}" {% if selected_session and selected_session.session_id == session.session_id %}selected{% endif %}>{{ session.session_id }}</option>
+  {% set readiness = readiness_by_session.get(session.session_id) %}
+  <option value="{{ session.session_id }}" {% if selected_session and selected_session.session_id == session.session_id %}selected{% endif %}>
+    {{ session.session_id }}{% if readiness and readiness.status == 'missing' %} (machine/day not generated){% endif %}
+  </option>
   {% endfor %}
 </select>
 <button type="submit">Load machine/day view</button>
