@@ -85,6 +85,7 @@ def initialize_session_metadata(
     *,
     start_hour: int | None,
     end_hour: int | None,
+    runtime_namespace: str | None = None,
     script_options: list[ScriptOption],
 ) -> dict[str, Any]:
     """Build a new session metadata payload."""
@@ -126,6 +127,9 @@ def initialize_session_metadata(
             "matched_records": None,
             "matched_files": None,
             "generated_at": None,
+        },
+        "runtime": {
+            "runtime_namespace": runtime_namespace or "default",
         },
         "scripts": scripts,
     }
@@ -206,6 +210,11 @@ def normalize_session_metadata(
                 changed = True
 
     if refresh_script_cache_status(session_dir, metadata):
+        changed = True
+
+    runtime_payload = metadata.setdefault("runtime", {})
+    if "runtime_namespace" not in runtime_payload:
+        runtime_payload["runtime_namespace"] = "default"
         changed = True
     return metadata, changed
 

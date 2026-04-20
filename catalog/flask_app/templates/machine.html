@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% block body %}
 <h2>Machine/day trends</h2>
+<p>Global operator scope: <strong>{{ operator_scope.label }}</strong></p>
 <p>Runtime phase: {{ runtime_state.current_processing_phase }}</p>
 {% if runtime_state.current_processing_phase == 'discovery_pending' %}
 <p>Webapp started. Background discovery is running.</p>

@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% block body %}
 <h2>Generic dataset exploration</h2>
+<p>Global operator scope: <strong>{{ operator_scope.label }}</strong></p>
 <form>
 <select name="path">
   <option value="">Select artifact</option>
@@ -9,6 +10,16 @@
 <select name="chart">
   {% for ct in ['line','scatter','histogram','bar'] %}<option value="{{ ct }}" {% if chart_type==ct %}selected{% endif %}>{{ ct }}</option>{% endfor %}
 </select>
+{% if chart_type in ['line', 'scatter'] %}
+<select name="window_preset">
+  {% for p in ['full','1d','6h','1h','15m','5m'] %}<option value="{{ p }}" {% if window_preset==p %}selected{% endif %}>{{ p }}</option>{% endfor %}
+</select>
+<label>Window start <input type="datetime-local" name="window_start" value="{{ window_start }}"></label>
+<label>Window end <input type="datetime-local" name="window_end" value="{{ window_end }}"></label>
+<select name="aggregation">
+  {% for a in ['auto','day','hour','minute','raw'] %}<option value="{{ a }}" {% if aggregation==a %}selected{% endif %}>{{ a }}</option>{% endfor %}
+</select>
+{% endif %}
 {% for col in numeric %}
 <label><input type="checkbox" name="num" value="{{ col }}" {% if col in chosen_numeric %}checked{% endif %}>{{ col }}</label>
 {% endfor %}
@@ -33,6 +44,12 @@
 const chartType = {{ chart_type|tojson }};
 const xIsTime = {{ chart_payload.x_is_time|tojson }};
 let cfg = {type: 'line', data: {labels: {{ chart_payload.labels|tojson }}, datasets: {{ chart_payload.datasets|tojson }}}, options: {responsive:true}};
+if (chartType === 'line') {
+  cfg.options = {
+    responsive: true,
+    scales:{x:{type: xIsTime ? 'time' : 'category', time:{tooltipFormat:'yyyy-MM-dd HH:mm:ss'}}}
+  };
+}
 if (chartType === 'scatter') {
   cfg = {
     type:'scatter',
