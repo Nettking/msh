@@ -21,16 +21,14 @@ Primary web interface for browsing scanned artifacts, playback-capable datasets,
 MSH_SCAN_DIRS=results,data python -m catalog.flask_app.app
 ```
 
-Startup now performs automatic orchestration before Flask serve:
+Startup now performs **webapp-first runtime**:
 
-- scan configured roots
-- discover source dates in `data/` and bootstrap only the latest day
-- create/reuse per-day auto workflow session
-- run startup-safe analysis preparation for that bootstrap slice
-- prepare playback exports
-- start Flask quickly
-- continue background historical catch-up one day at a time (reverse chronological) until all discovered dates are covered
-- after catch-up completes, keep polling for newly arriving dates and process one new day per cycle
+- Flask starts immediately
+- runtime manager starts in background (non-blocking)
+- background discovery scans source dates in `data/`
+- bootstrap latest day runs in background
+- historical catch-up continues one day per cycle (reverse chronological)
+- after catch-up completes, runtime keeps polling for new days and processes them incrementally
 
 Open http://localhost:5000.
 
@@ -49,9 +47,21 @@ Additionally, copied workflow raw-data files under workflow-internal `.../data/.
 Overview (`/`) shows only default-visible artifacts (`source_data` + `derived_output`), while runtime/session metadata remains visible on `/status`.
 
 
-## Startup coupling note
+## Availability vs readiness model
 
-By default, Flask startup runs a minimal bootstrap orchestration first. This is intentional and keeps startup bounded to the latest day. Incremental updates continue in the background and runtime state is persisted in `results/workflows/runtime_state.json` for status visibility.
+Flask availability and processed-data readiness are intentionally separate:
+
+- webapp availability: app process up + pages render
+- runtime readiness: background orchestrator status/progress
+- view readiness: artifact-specific contracts (for example `data_pr_day` for `/machine`)
+
+Runtime state now explicitly tracks:
+
+- `app_started_at`, `runtime_started_at`
+- `discovery_complete`, `bootstrap_complete`, `historical_catch_up_complete`
+- `current_processing_phase`, `currently_processing_date`
+- `last_completed_step`, `last_completed_date`, `next_queued_date`
+- `fully_processed_days_count`, `total_available_days`
 
 Runtime phases are explicit:
 
@@ -93,7 +103,7 @@ Set `MSH_SKIP_ORCHESTRATION=1` to skip that pre-start phase when needed.
 - script-level manual run buttons that target the selected session/scope
 - recent control activity history (action, target session id, target range, status, message, output path, stdout/stderr snippets)
 
-Automatic bootstrap + incremental background updates still run at Flask startup; the control panel adds manual operator overrides without reintroducing terminal prompts.
+Automatic bootstrap + incremental background updates run after Flask startup in background threads; the control panel adds manual operator overrides without reintroducing terminal prompts.
 
 Manual historical processing now works directly in `/control`: choose a session from the inventory or choose a preset scope (latest day, selected day, custom range, full range), submit, and the app will create/reuse `results/workflows/<session>/`, prepare filtered data for that scope if needed, then run workflow/scripts against that selected session.
 

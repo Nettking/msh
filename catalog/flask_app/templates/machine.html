@@ -1,6 +1,16 @@
 {% extends 'base.html' %}
 {% block body %}
 <h2>Machine/day trends</h2>
+<p>Runtime phase: {{ runtime_state.current_processing_phase }}</p>
+{% if runtime_state.current_processing_phase == 'discovery_pending' %}
+<p>Webapp started. Background discovery is running.</p>
+{% elif runtime_state.current_processing_phase == 'bootstrap_minimal_processing' %}
+<p>Bootstrap processing has not completed yet.</p>
+{% elif runtime_state.current_processing_phase == 'historical_catch_up' %}
+<p>Background processing is still running. Historical catch-up: {{ runtime_state.fully_processed_days_count or runtime_state.processed_days_count or 0 }} / {{ runtime_state.total_available_days or 0 }} days fully processed.</p>
+{% elif runtime_state.current_processing_phase == 'polling_new_data' %}
+<p>Historical catch-up completed. Runtime is polling for new days automatically.</p>
+{% endif %}
 <form>
 <label for="session_id">Session:</label>
 <select id="session_id" name="session_id">
@@ -10,7 +20,7 @@
   {% for session in sessions %}
   {% set readiness = readiness_by_session.get(session.session_id) %}
   <option value="{{ session.session_id }}" {% if selected_session and selected_session.session_id == session.session_id %}selected{% endif %}>
-    {{ session.session_id }}{% if readiness and readiness.status == 'missing' %} (machine/day not generated){% endif %}
+    {{ session.session_id }}{% if readiness and readiness.status == 'missing' %} (waiting for data_pr_day){% endif %}
   </option>
   {% endfor %}
 </select>

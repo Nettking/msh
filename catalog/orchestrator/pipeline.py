@@ -4,6 +4,7 @@ import hashlib
 import json
 import os
 import threading
+import csv
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -72,6 +73,19 @@ class RuntimeState:
     phase: str
     bootstrap_policy: str
     catch_up_policy: str
+    app_started_at: str | None
+    runtime_started_at: str | None
+    discovery_started_at: str | None
+    discovery_complete: bool
+    bootstrap_started_at: str | None
+    bootstrap_complete: bool
+    historical_catch_up_started_at: str | None
+    historical_catch_up_complete: bool
+    current_processing_phase: str
+    currently_processing_date: str | None
+    last_completed_step: str | None
+    last_completed_date: str | None
+    next_queued_date: str | None
     current_range_start: str | None
     current_range_end: str | None
     bootstrap_date: str | None
@@ -82,6 +96,7 @@ class RuntimeState:
     latest_available_source_date: str | None
     processed_dates: list[str]
     processed_days_count: int
+    fully_processed_days_count: int
     total_available_days: int
     pending_dates_count: int
     next_planned_date: str | None
@@ -152,6 +167,33 @@ def _source_signature(data_dir: Path) -> str:
         digest.update(str(stat_result.st_mtime_ns).encode("utf-8"))
         digest.update(str(stat_result.st_size).encode("utf-8"))
     return digest.hexdigest()[:16]
+
+
+def _machine_day_summary_path(workflows_root: Path, session_id: str) -> Path:
+    return workflows_root / session_id / "analyses" / "data_pr_day" / "machine_day_summary.csv"
+
+
+def _machine_contract_state(workflows_root: Path, session_id: str | None) -> tuple[str, str]:
+    if not session_id:
+        return "waiting", "Machine/day aggregation is waiting for a workflow session."
+    csv_path = _machine_day_summary_path(workflows_root, session_id)
+    if not csv_path.exists():
+        return "waiting", "Machine/day aggregation is manual and not generated yet for the selected session."
+    try:
+        with csv_path.open("r", encoding="utf-8", newline="") as handle:
+            reader = csv.DictReader(handle)
+            if reader.fieldnames is None:
+                return "failed", "Machine/day aggregation CSV is invalid: missing header row."
+            required = {"date", "machine", "value"}
+            missing = sorted(required - set(reader.fieldnames))
+            if missing:
+                return "failed", "Machine/day aggregation CSV is invalid: missing " + ", ".join(missing) + "."
+            first_row = next(reader, None)
+            if first_row is None:
+                return "failed", "Machine/day aggregation CSV is empty."
+    except OSError as exc:
+        return "failed", f"Machine/day aggregation exists but could not be read: {exc.__class__.__name__}."
+    return "ready", "Machine/day artifact is available for the selected session."
 
 
 def _run_for_date_slice(
@@ -259,10 +301,23 @@ class RuntimeOrchestrator:
 
     def _default_state(self) -> RuntimeState:
         return RuntimeState(
-            mode="bootstrap_only",
-            phase="bootstrap",
+            mode="app_started_runtime_pending",
+            phase="runtime_not_started",
             bootstrap_policy=DATE_POLICY_BOOTSTRAP_LATEST_DAY,
             catch_up_policy=HISTORICAL_CATCH_UP_POLICY,
+            app_started_at=None,
+            runtime_started_at=None,
+            discovery_started_at=None,
+            discovery_complete=False,
+            bootstrap_started_at=None,
+            bootstrap_complete=False,
+            historical_catch_up_started_at=None,
+            historical_catch_up_complete=False,
+            current_processing_phase="runtime_not_started",
+            currently_processing_date=None,
+            last_completed_step=None,
+            last_completed_date=None,
+            next_queued_date=None,
             current_range_start=None,
             current_range_end=None,
             bootstrap_date=None,
@@ -273,6 +328,7 @@ class RuntimeOrchestrator:
             latest_available_source_date=None,
             processed_dates=[],
             processed_days_count=0,
+            fully_processed_days_count=0,
             total_available_days=0,
             pending_dates_count=0,
             next_planned_date=None,
@@ -315,13 +371,62 @@ class RuntimeOrchestrator:
 
     def state_snapshot(self) -> dict[str, Any]:
         with self._lock:
-            return dict(self._state.__dict__)
+            snapshot = dict(self._state.__dict__)
+        snapshot["view_contracts"] = self._view_contracts(snapshot)
+        return snapshot
+
+    def mark_app_started(self) -> None:
+        with self._lock:
+            if not self._state.app_started_at:
+                self._state.app_started_at = _utc_now_iso()
+            if self._state.phase == "runtime_not_started":
+                self._state.mode = "webapp_available"
+            self._persist_state()
+
+    def _mark_runtime_started(self) -> None:
+        with self._lock:
+            if not self._state.runtime_started_at:
+                self._state.runtime_started_at = _utc_now_iso()
+            self._state.mode = "runtime_background_active"
+            self._state.phase = "runtime_background_active"
+            self._state.current_processing_phase = "discovery_pending"
+            self._persist_state()
+
+    def _view_contracts(self, snapshot: dict[str, Any]) -> dict[str, dict[str, str]]:
+        running = bool(snapshot.get("runtime_started_at"))
+        discovery_complete = bool(snapshot.get("discovery_complete"))
+        catch_up_complete = bool(snapshot.get("historical_catch_up_complete"))
+        machine_state, machine_message = _machine_contract_state(self.workflows_root, snapshot.get("session_id"))
+
+        return {
+            "status": {
+                "state": "ready",
+                "message": "Status page is startup-safe and available immediately.",
+            },
+            "control": {
+                "state": "ready",
+                "message": "Control page is startup-safe and available immediately.",
+            },
+            "machine": {
+                "state": machine_state,
+                "message": machine_message,
+            },
+            "historical_catch_up": {
+                "state": "complete" if catch_up_complete else ("running" if running and discovery_complete else "waiting"),
+                "message": "Historical catch-up is complete. Runtime is polling for new days."
+                if catch_up_complete
+                else "Historical catch-up is running in the background one day at a time."
+                if discovery_complete and running
+                else "Historical catch-up will begin after discovery completes.",
+            },
+        }
 
     def bootstrap(self) -> OrchestrationResult:
         with self._lock:
             self._state.mode = "bootstrap_running"
             self._state.phase = "bootstrap"
             self._state.update_running = True
+            self._state.bootstrap_started_at = self._state.bootstrap_started_at or _utc_now_iso()
             self._persist_state()
         result = self._run_update(bootstrap=True)
         return result
@@ -329,6 +434,7 @@ class RuntimeOrchestrator:
     def start_background_updates(self) -> None:
         if self._thread is not None and self._thread.is_alive():
             return
+        self._mark_runtime_started()
         self._thread = threading.Thread(target=self._poll_loop, name="msh-runtime-poller", daemon=True)
         self._thread.start()
 
@@ -340,22 +446,25 @@ class RuntimeOrchestrator:
 
     def _poll_loop(self) -> None:
         self.status.info(
-            "incremental update loop enabled "
+            "runtime background loop enabled "
             f"({UPDATE_POLICY_INCREMENTAL}; catch-up={HISTORICAL_CATCH_UP_POLICY}; "
             f"bootstrap={BOOTSTRAP_REFRESH_POLICY}; "
             f"auto_coverage={AUTO_COVERAGE_CONTRACT}:{','.join(AUTO_COVERAGE_SCRIPT_KEYS) or 'none'}; "
             f"interval={self.poll_interval_seconds}s)"
         )
+        run_bootstrap_once = True
         while not self._stop.is_set():
             try:
-                self._run_update(bootstrap=False)
+                self._run_update(bootstrap=run_bootstrap_once)
+                run_bootstrap_once = False
             except Exception as exc:  # pragma: no cover
                 with self._lock:
                     self._state.last_failure = f"{exc.__class__.__name__}: {exc}"
                     self._state.update_running = False
+                    self._state.current_processing_phase = "failed"
                     self._persist_state()
                 self.status.warn(f"background update loop failure: {exc}")
-            self._stop.wait(self.poll_interval_seconds)
+            self._stop.wait(1 if run_bootstrap_once else self.poll_interval_seconds)
 
     def _verified_processed_dates(self, *, script_options) -> set[str]:
         # Verification matches the bounded automatic catch-up contract only.
@@ -404,10 +513,13 @@ class RuntimeOrchestrator:
         pending_desc = [item for item in reversed(available_dates) if item.isoformat() not in processed_set]
         self._state.processed_dates = sorted(processed_set)
         self._state.processed_days_count = len(processed_set)
+        self._state.fully_processed_days_count = self._state.processed_days_count
         self._state.total_available_days = len(available_dates)
         self._state.pending_dates_count = len(pending_desc)
         self._state.next_planned_date = pending_desc[0].isoformat() if pending_desc else None
+        self._state.next_queued_date = self._state.next_planned_date
         self._state.catch_up_complete = len(pending_desc) == 0
+        self._state.historical_catch_up_complete = self._state.catch_up_complete
         self._state.catch_up_status = "complete" if self._state.catch_up_complete else "running"
         if processed_desc:
             self._state.current_range_start = processed_desc[-1]
@@ -421,10 +533,18 @@ class RuntimeOrchestrator:
         with self._lock:
             if self._state.update_running and not bootstrap:
                 return OrchestrationResult("none", self.workflows_root, [], [], [], [])
+            now = _utc_now_iso()
             self._state.update_running = True
             self._state.phase = "bootstrap" if bootstrap else "historical_catch_up"
             self._state.mode = "bootstrap_running" if bootstrap else "incremental_refresh_running"
-            self._state.last_update_check_at = _utc_now_iso()
+            self._state.current_processing_phase = "bootstrap_minimal_processing" if bootstrap else "historical_catch_up"
+            self._state.last_update_check_at = now
+            self._state.discovery_started_at = self._state.discovery_started_at or now
+            self._state.currently_processing_date = None
+            if bootstrap:
+                self._state.bootstrap_started_at = self._state.bootstrap_started_at or now
+            else:
+                self._state.historical_catch_up_started_at = self._state.historical_catch_up_started_at or now
             self._persist_state()
 
         artifacts, warnings = scan_artifacts(_canonical_scan_roots())
@@ -434,6 +554,8 @@ class RuntimeOrchestrator:
                 self._state.update_running = False
                 self._state.phase = "idle"
                 self._state.mode = "scan_only"
+                self._state.discovery_complete = True
+                self._state.current_processing_phase = "idle_no_data_dir"
                 self._persist_state()
             return OrchestrationResult("none", self.workflows_root, artifacts, warnings, [], [])
 
@@ -445,6 +567,8 @@ class RuntimeOrchestrator:
                 self._state.phase = "idle"
                 self._state.mode = "idle_no_data"
                 self._state.catch_up_status = "idle"
+                self._state.discovery_complete = True
+                self._state.current_processing_phase = "idle_no_discovered_dates"
                 self._persist_state()
             return OrchestrationResult("none", self.workflows_root, artifacts, warnings, [], [])
 
@@ -455,6 +579,8 @@ class RuntimeOrchestrator:
                 self._state.update_running = False
                 self._state.phase = "idle"
                 self._state.mode = "idle_no_scripts"
+                self._state.discovery_complete = True
+                self._state.current_processing_phase = "idle_no_scripts"
                 self._persist_state()
             return OrchestrationResult("none", self.workflows_root, artifacts, warnings, [], [])
 
@@ -467,6 +593,8 @@ class RuntimeOrchestrator:
             self._state.earliest_available_source_date = earliest.isoformat()
             self._state.latest_available_source_date = latest.isoformat()
             self._state.last_source_signature = source_sig
+            self._state.discovery_complete = True
+            self._state.current_processing_phase = "bootstrap_minimal_processing" if bootstrap else "historical_catch_up"
             _, pending_desc, _, dropped_unverified = self._apply_progress_state(
                 available_dates=available_dates,
                 verified_processed_dates=verified_processed_dates,
@@ -506,6 +634,9 @@ class RuntimeOrchestrator:
             final_result = OrchestrationResult("none", self.workflows_root, artifacts, warnings, [], [])
             failed: list[str] = []
             for day in target_days:
+                with self._lock:
+                    self._state.currently_processing_date = day.isoformat()
+                    self._persist_state()
                 final_result = _run_for_date_slice(
                     status=self.status,
                     workflows_root=self.workflows_root,
@@ -521,9 +652,15 @@ class RuntimeOrchestrator:
                 self._state.processed_dates = sorted(processed)
                 self._state.session_id = final_result.session_id
                 self._state.last_processed_date = target_days[-1].isoformat()
+                self._state.last_completed_date = target_days[-1].isoformat()
+                completed_scripts = ",".join(AUTO_COVERAGE_SCRIPT_KEYS) or "none"
+                self._state.last_completed_step = (
+                    f"automatic_coverage[{completed_scripts}] for {target_days[-1].isoformat()}"
+                )
                 if bootstrap:
                     self._state.bootstrap_date = target_days[-1].isoformat()
                     self._state.last_bootstrap_date = target_days[-1].isoformat()
+                    self._state.bootstrap_complete = True
                 else:
                     self._state.last_catchup_success_at = _utc_now_iso()
                 self._state.last_successful_refresh = _utc_now_iso()
@@ -563,6 +700,8 @@ class RuntimeOrchestrator:
             self._state.update_running = False
             self._state.phase = "idle"
             self._state.mode = "idle_incremental"
+            self._state.currently_processing_date = None
+            self._state.current_processing_phase = "polling_new_data" if self._state.catch_up_complete else "historical_catch_up"
             self._persist_state()
         return final_result
 
@@ -578,21 +717,30 @@ def get_runtime_manager() -> RuntimeOrchestrator:
     return _RUNTIME_MANAGER
 
 
-def run_orchestration() -> OrchestrationResult:
+def start_runtime_background() -> None:
     status = StatusPrinter()
     manager = get_runtime_manager()
     scan_roots = _canonical_scan_roots()
     status.info(f"scanning roots: {', '.join(scan_roots)}")
     status.info(
-        "orchestration policy: "
+        "runtime startup policy: "
         f"date={DATE_POLICY_BOOTSTRAP_LATEST_DAY}, "
         f"bootstrap_refresh={BOOTSTRAP_REFRESH_POLICY}, "
         f"catch_up={HISTORICAL_CATCH_UP_POLICY}, "
         f"auto_coverage={AUTO_COVERAGE_CONTRACT}:{','.join(AUTO_COVERAGE_SCRIPT_KEYS) or 'none'}, "
         f"execution={EXECUTION_POLICY_BEST_EFFORT}, "
-        f"handoff={FLASK_HANDOFF_POLICY_ALWAYS}, "
+        f"handoff=webapp_first_data_later, "
         f"updates={UPDATE_POLICY_INCREMENTAL}"
     )
+    manager.start_background_updates()
+    status.info(f"runtime manager started in background at {_utc_now_iso()}")
+
+
+def run_orchestration() -> OrchestrationResult:
+    """Legacy blocking path used by CLI prep commands."""
+    status = StatusPrinter()
+    manager = get_runtime_manager()
+    manager.mark_app_started()
     result = manager.bootstrap()
     manager.start_background_updates()
     status.info(f"orchestration bootstrap completed at {_utc_now_iso()} (failed scripts: {len(result.failed_scripts)})")

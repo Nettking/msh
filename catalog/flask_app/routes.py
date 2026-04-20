@@ -31,7 +31,7 @@ def _machine_day_readiness_for_session(session_id: str) -> dict:
         return {
             **base,
             "status": "missing",
-            "message": "Machine/day aggregation has not been generated for this session.",
+            "message": "Machine/day aggregation has not been generated yet for this session.",
         }
     return {
         **base,
@@ -47,7 +47,7 @@ def _machine_day_detail_for_session(session_id: str) -> dict:
         return {
             **base,
             "status": "missing",
-            "message": "Machine/day aggregation has not been generated for this session.",
+            "message": "Machine/day aggregation has not been generated yet for this session.",
             "frame": None,
         }
 
@@ -156,12 +156,22 @@ def status():
     snap = _catalog().ensure_scanned()
     runtime_state = get_runtime_manager().state_snapshot()
     internal_artifacts = [a for a in snap.artifacts if a.get("is_internal")]
+    phase_messages = {
+        "runtime_not_started": "Webapp started. Runtime has not started yet.",
+        "discovery_pending": "Webapp started. Background discovery is running.",
+        "bootstrap_minimal_processing": "Bootstrap/minimal processing is running in the background.",
+        "historical_catch_up": "Historical catch-up is running one day at a time.",
+        "polling_new_data": "Historical processing is complete. Polling for newly arriving days.",
+        "failed": "Background runtime encountered a failure. Check last failure details below.",
+    }
+    current_phase = runtime_state.get("current_processing_phase", "runtime_not_started")
     return render_template(
         "status.html",
         snapshot=snap,
         scan_dirs=_catalog().scan_dirs,
         runtime_state=runtime_state,
         internal_artifacts=internal_artifacts,
+        phase_message=phase_messages.get(current_phase, "Runtime state is available below."),
     )
 
 
@@ -194,6 +204,7 @@ def analyses():
 def machine_view():
     workflows_root = Path("results") / "workflows"
     sessions = list_sessions(workflows_root)
+    runtime_state = get_runtime_manager().state_snapshot()
     readiness = [_machine_day_readiness_for_session(item.session_id) for item in sessions]
     readiness_by_session = {item["session_id"]: item for item in readiness}
     requested_session_id = request.args.get("session_id", "").strip()
@@ -207,7 +218,11 @@ def machine_view():
     if requested_session_id and requested_session_id not in readiness_by_session:
         error = f"Selected session was not found: {requested_session_id}"
     elif selected_session is None:
-        error = "No workflow sessions were found."
+        runtime_phase = runtime_state.get("current_processing_phase")
+        if runtime_phase in {"runtime_not_started", "discovery_pending"}:
+            error = "No workflow sessions yet. Webapp is up; background discovery is still running."
+        else:
+            error = "No workflow sessions were found yet. Background processing may still be running."
     else:
         selected_readiness = _machine_day_detail_for_session(selected_session.session_id)
         readiness_by_session[selected_session.session_id] = {
@@ -234,6 +249,7 @@ def machine_view():
         error=error,
         chart_type=chart_type,
         y_axis_label="Row count",
+        runtime_state=runtime_state,
     )
 
 
