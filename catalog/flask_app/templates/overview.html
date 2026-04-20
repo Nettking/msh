@@ -1,24 +1,64 @@
 {% extends 'base.html' %}
 {% block body %}
-<h2>Overview</h2>
-<p>Scan roots: {{ scan_dirs|join(', ') }}</p>
+<h2>System overview dashboard</h2>
+<p>Control-room summary for current runtime state, machine activity, readiness, and operator entry points.</p>
+
+<h3>Headline summary</h3>
 <div class="metrics">
-  <div><strong>{{ total }}</strong><span>User-facing artifacts</span></div>
-  <div><strong>{{ derived_total }}</strong><span>Derived outputs</span></div>
-  <div><strong>{{ source_total }}</strong><span>Source data files</span></div>
-  <div><strong>{{ playback_count }}</strong><span>Playback compatible</span></div>
-  <div><strong>{{ read_errors }}</strong><span>Read errors</span></div>
+  <div><strong>{{ overview.headline.phase_label }}</strong><span>Current phase</span></div>
+  <div><strong>{{ overview.headline.processed_days }} / {{ overview.headline.total_days }}</strong><span>Processed days</span></div>
+  <div><strong>{{ 'yes' if overview.headline.catch_up_complete else 'no' }}</strong><span>Catch-up complete</span></div>
+  <div><strong>{{ overview.headline.next_queued_date }}</strong><span>Next queued day</span></div>
+  <div><strong>{{ overview.headline.last_failure }}</strong><span>Last failure</span></div>
 </div>
-<p>
-  Hidden by default:
-  {{ hidden_workflow_copies }} workflow data copies,
-  {{ hidden_internal_metadata }} internal metadata files.
-</p>
-{% if warnings %}<ul>{% for w in warnings %}<li>{{ w }}</li>{% endfor %}</ul>{% endif %}
+<p>Scan roots: {{ scan_dirs|join(', ') }}</p>
+<p>Artifact inventory snapshot: {{ overview.headline.visible_artifact_count }} visible ({{ overview.headline.source_artifacts }} source, {{ overview.headline.derived_artifacts }} derived), {{ overview.headline.playback_compatible_count }} playback-compatible, {{ overview.headline.read_error_count }} read-error artifact(s).</p>
+<p>Hidden by default: {{ overview.headline.hidden_workflow_copy_count }} workflow copies, {{ overview.headline.hidden_internal_metadata_count }} internal metadata file(s).</p>
+
+<h3>What is happening now</h3>
+<p><strong>Latest known timestamp:</strong> {{ overview.activity.latest_known_timestamp }}</p>
+<p>{{ overview.activity.summary }}</p>
+<p>Per-machine last-seen rows are intentionally omitted on this dashboard to keep `/` lightweight; use Machine view for detailed machine timelines.</p>
+
+<h3>Runtime progress</h3>
 <table>
-  <tr><th>Category</th><th>Analysis</th><th>File</th><th>Kind</th><th>Status</th><th>Path</th></tr>
-  {% for a in artifacts %}
-  <tr><td>{{ a.category }}</td><td>{{ a.analysis_name }}</td><td>{{ a.file_name }}</td><td>{{ a.kind }}</td><td>{{ a.status }}</td><td>{{ a.path }}</td></tr>
+  <tr><th>Field</th><th>Value</th></tr>
+  <tr><td>Current processing phase</td><td>{{ overview.runtime.current_phase }}</td></tr>
+  <tr><td>Currently processing date</td><td>{{ overview.runtime.currently_processing_date }}</td></tr>
+  <tr><td>Processed days / total days</td><td>{{ overview.runtime.processed_days }} / {{ overview.runtime.total_days }}</td></tr>
+  <tr><td>Next queued date</td><td>{{ overview.runtime.next_queued_date }}</td></tr>
+  <tr><td>Last completed step</td><td>{{ overview.runtime.last_completed_step }}</td></tr>
+  <tr><td>Last completed date</td><td>{{ overview.runtime.last_completed_date }}</td></tr>
+  <tr><td>Catch-up complete</td><td>{{ overview.runtime.catch_up_complete }}</td></tr>
+  <tr><td>Last failure</td><td>{{ overview.runtime.last_failure }}</td></tr>
+</table>
+
+<h3>View readiness</h3>
+<table>
+  <tr><th>View</th><th>Status</th><th>Summary</th></tr>
+  {% for item in overview.readiness %}
+  <tr><td>{{ item.view }}</td><td>{{ item.state }}</td><td>{{ item.message }}</td></tr>
   {% endfor %}
 </table>
+
+<h3>Next actions / open views</h3>
+<table>
+  <tr><th>Action</th><th>Readiness</th><th>Hint</th></tr>
+  {% for item in overview.quick_links %}
+  <tr>
+    <td><a href="{{ item.href }}">{{ item.label }}</a></td>
+    <td>{{ item.state }}</td>
+    <td>{{ item.hint }}</td>
+  </tr>
+  {% endfor %}
+</table>
+
+{% if overview.warnings %}
+<h3>Scan warnings</h3>
+<ul>
+  {% for warning in overview.warnings %}
+  <li>{{ warning }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
 {% endblock %}
