@@ -2,6 +2,20 @@
 {% block body %}
 <h2>System status</h2>
 <h3>Runtime update state</h3>
+<p><strong>{{ phase_message }}</strong></p>
+<p>Webapp started at: {{ runtime_state.app_started_at or 'n/a' }}</p>
+<p>Runtime started at: {{ runtime_state.runtime_started_at or 'n/a' }}</p>
+<p>Discovery started at: {{ runtime_state.discovery_started_at or 'n/a' }}</p>
+<p>Discovery complete: {{ runtime_state.discovery_complete }}</p>
+<p>Bootstrap started at: {{ runtime_state.bootstrap_started_at or 'n/a' }}</p>
+<p>Bootstrap complete: {{ runtime_state.bootstrap_complete }}</p>
+<p>Historical catch-up started at: {{ runtime_state.historical_catch_up_started_at or 'n/a' }}</p>
+<p>Historical catch-up complete: {{ runtime_state.historical_catch_up_complete }}</p>
+<p>Current processing phase: {{ runtime_state.current_processing_phase }}</p>
+<p>Currently processing date: {{ runtime_state.currently_processing_date or 'n/a' }}</p>
+<p>Last completed step: {{ runtime_state.last_completed_step or 'n/a' }}</p>
+<p>Last completed date: {{ runtime_state.last_completed_date or 'n/a' }}</p>
+<p>Next queued date: {{ runtime_state.next_queued_date or 'none' }}</p>
 <p>Bootstrap policy: {{ runtime_state.bootstrap_policy }}</p>
 <p>Catch-up policy: {{ runtime_state.catch_up_policy }}</p>
 <p>Processed-days truth model: {{ runtime_state.processed_dates_truth_model }}</p>
@@ -12,7 +26,7 @@
 <p>Bootstrap complete for: {{ runtime_state.bootstrap_date or runtime_state.last_bootstrap_date or 'n/a' }}</p>
 <p>Last bootstrap day: {{ runtime_state.last_bootstrap_date or 'n/a' }}</p>
 <p>Source range discovered: {{ runtime_state.earliest_available_source_date or 'n/a' }} .. {{ runtime_state.latest_available_source_date or 'n/a' }}</p>
-<p>Historical catch-up (verified outputs): {{ runtime_state.processed_days_count or 0 }} / {{ runtime_state.total_available_days or 0 }} days processed</p>
+<p>Historical catch-up (verified outputs): {{ runtime_state.fully_processed_days_count or runtime_state.processed_days_count or 0 }} / {{ runtime_state.total_available_days or 0 }} days processed</p>
 <p>Remaining unprocessed days: {{ runtime_state.pending_dates_count or 0 }}</p>
 <p>Next queued day: {{ runtime_state.next_planned_date or 'none' }}</p>
 <p>Catch-up status: {{ runtime_state.catch_up_status }}{% if runtime_state.catch_up_complete %} (complete){% endif %}</p>
@@ -22,6 +36,15 @@
 <p>Update running: {{ runtime_state.update_running }}</p>
 <p>New data detected: {{ runtime_state.new_data_detected }}</p>
 <p>Last failure: {{ runtime_state.last_failure or 'none' }}</p>
+{% if runtime_state.view_contracts %}
+<h3>View readiness contracts</h3>
+<table>
+  <tr><th>View/contract</th><th>State</th><th>Message</th></tr>
+  {% for name, item in runtime_state.view_contracts.items() %}
+  <tr><td>{{ name }}</td><td>{{ item.state }}</td><td>{{ item.message }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
 <form method="post" action="{{ url_for('web.refresh') }}">
   <input type="hidden" name="next" value="{{ request.path }}">
   <button type="submit">Run next incremental day now</button>

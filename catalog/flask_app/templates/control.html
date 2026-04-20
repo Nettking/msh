@@ -4,6 +4,15 @@
 <p>This is an MVP operator control surface: single-process, best-effort, and in-memory activity history (not persisted across restart).</p>
 
 <h3>Runtime and orchestration status</h3>
+<p>Webapp started at: {{ panel.runtime_state.app_started_at or 'n/a' }}</p>
+<p>Runtime started at: {{ panel.runtime_state.runtime_started_at or 'n/a' }}</p>
+<p>Discovery complete: {{ panel.runtime_state.discovery_complete }}</p>
+<p>Bootstrap complete: {{ panel.runtime_state.bootstrap_complete }}</p>
+<p>Current processing phase: {{ panel.runtime_state.current_processing_phase }}</p>
+<p>Currently processing date: {{ panel.runtime_state.currently_processing_date or 'n/a' }}</p>
+<p>Last completed step: {{ panel.runtime_state.last_completed_step or 'n/a' }}</p>
+<p>Last completed date: {{ panel.runtime_state.last_completed_date or 'n/a' }}</p>
+<p>Next queued date: {{ panel.runtime_state.next_queued_date or 'none' }}</p>
 <p>Mode: {{ panel.runtime_state.mode }}</p>
 <p>Phase: {{ panel.runtime_state.phase }}</p>
 <p>Bootstrap policy: {{ panel.runtime_state.bootstrap_policy }}</p>
@@ -13,7 +22,7 @@
 <p>Bootstrap complete for: {{ panel.runtime_state.bootstrap_date or panel.runtime_state.last_bootstrap_date or 'n/a' }}</p>
 <p>Source date range: {{ panel.runtime_state.earliest_available_source_date or 'n/a' }} .. {{ panel.runtime_state.latest_available_source_date or 'n/a' }}</p>
 <p>Processed range: {{ panel.runtime_state.current_range_start or 'n/a' }} .. {{ panel.runtime_state.current_range_end or 'n/a' }}</p>
-<p>Historical catch-up progress (verified outputs): {{ panel.runtime_state.processed_days_count or 0 }} / {{ panel.runtime_state.total_available_days or 0 }} days</p>
+<p>Historical catch-up progress (verified outputs): {{ panel.runtime_state.fully_processed_days_count or panel.runtime_state.processed_days_count or 0 }} / {{ panel.runtime_state.total_available_days or 0 }} days</p>
 <p>Remaining unprocessed days: {{ panel.runtime_state.pending_dates_count or 0 }}</p>
 <p>Next queued day: {{ panel.runtime_state.next_planned_date or 'none' }}</p>
 <p>Catch-up status: {{ panel.runtime_state.catch_up_status }}{% if panel.runtime_state.catch_up_complete %} (complete){% endif %}</p>
@@ -23,6 +32,15 @@
 <p>Last failure: {{ panel.runtime_state.last_failure or 'none' }}</p>
 <p>Latest workflow session: {{ panel.latest_session.session_id if panel.latest_session else 'none yet' }}</p>
 <p>Current active control run id: {{ panel.active_run_id or 'none' }}</p>
+{% if panel.runtime_state.view_contracts %}
+<h4>View readiness contracts</h4>
+<table>
+  <tr><th>View/contract</th><th>State</th><th>Message</th></tr>
+  {% for name, item in panel.runtime_state.view_contracts.items() %}
+  <tr><td>{{ name }}</td><td>{{ item.state }}</td><td>{{ item.message }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
 
 <h3>Session inventory</h3>
 {% if panel.selected_session_missing %}
