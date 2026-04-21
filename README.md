@@ -66,6 +66,33 @@ Workflow subprocesses run with stdin disabled (non-interactive by default) and n
 
 Implementation note: orchestration currently reuses substantial `catalog/runner/*` execution/session components under a non-interactive wrapper, rather than replacing all runner internals yet.
 
+## Host-side Windows startup helper (VPN monitor + existing startup)
+
+For Windows host operation, use:
+
+```powershell
+./ops/start-system.ps1
+```
+
+This helper is **host-side only** and intentionally small in scope:
+- checks `ops/vpn/reconnect-vpn.ps1` exists
+- starts `ops/vpn/reconnect-vpn.ps1` in a separate PowerShell process first (unless already running)
+- then runs the current recommended startup command by default: `docker compose up --build webapp`
+
+Why Docker default in this wrapper?
+- this aligns with the repository's documented **recommended quick start**
+- if needed, operators can override startup command components via script parameters (`-StartupExecutable`, `-StartupArguments`)
+
+Lifecycle notes:
+- VPN monitor is launched as a separate background host process and continues running if the main startup command exits
+- stop it explicitly when needed (for example with `Stop-Process -Id <pid>`)
+- re-running `./ops/start-system.ps1` will reuse existing monitor process(es) instead of starting duplicates
+
+Out of scope for this change:
+- VPN profile configuration or embedding secrets
+- moving VPN handling into Docker
+- adding record/live orchestration or redesigning startup architecture
+
 ## Docker quick start (recommended)
 
 ```bash
