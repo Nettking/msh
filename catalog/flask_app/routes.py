@@ -15,6 +15,7 @@ from .services.operator_page_cache import get_operator_page_cache
 from .services.operator_scope_service import get_operator_scope_service
 from .services.playback_service import (
     interval_rows,
+    playback_field_groups,
     playback_context,
     playback_days_by_machine,
     playback_subset,
@@ -329,6 +330,7 @@ def playback():
     selected_machine_days: list[str] = []
     row_payload: list[dict] = []
     signal_columns: list[str] = []
+    field_groups: dict[str, list[str]] = {"Signals": [], "State/context": [], "Detection/diagnostics": [], "Other": []}
     timeline_payload = {"labels": [], "counts": []}
 
     if selected:
@@ -360,12 +362,12 @@ def playback():
                     intervals = interval_rows(rows)
                     interval_summary = summarize_intervals(intervals)
                     if not rows.empty:
-                        exclude = {"timestamp", "machine_id", "state", "day"}
-                        signal_columns = [col for col in rows.columns if col not in exclude]
-                        limited_signals = signal_columns[:8]
-                        payload_frame = rows[["timestamp", "state", *limited_signals]].copy()
+                        base_columns = [col for col in rows.columns if col != "day"]
+                        payload_frame = rows[base_columns].copy()
                         payload_frame["timestamp"] = pd.to_datetime(payload_frame["timestamp"], errors="coerce").dt.strftime("%Y-%m-%d %H:%M:%S")
                         row_payload = payload_frame.fillna("").to_dict("records")
+                        signal_columns = [col for col in rows.columns if col not in {"timestamp", "machine_id", "state", "day"}]
+                        field_groups = playback_field_groups([col for col in payload_frame.columns if col != "timestamp"])
                         timeline = rows.copy()
                         timeline["timestamp"] = pd.to_datetime(timeline["timestamp"], errors="coerce")
                         timeline = timeline.dropna(subset=["timestamp"])
@@ -391,6 +393,7 @@ def playback():
         rows=rows,
         row_payload=row_payload,
         signal_columns=signal_columns,
+        field_groups=field_groups,
         intervals=intervals,
         interval_summary=interval_summary,
         timeline_payload=timeline_payload,

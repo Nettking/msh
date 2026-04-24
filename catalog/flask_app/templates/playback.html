@@ -1,11 +1,24 @@
 {% extends 'base.html' %}
 {% block body %}
-<section class="section-block section-block--primary">
-  <h2>Playback</h2>
-  <p>Global operator scope: <strong>{{ operator_scope.label }}</strong></p>
-  <form class="playback-form" method="get">
+<section class="section-block section-block--primary playback-header">
+  <div>
+    <h2>Playback</h2>
+    <p class="playback-subtitle">Sample playback for telemetry rows from the selected machine/day.</p>
+  </div>
+  <p class="scope-chip">Global operator scope: <strong>{{ operator_scope.label }}</strong></p>
+</section>
+
+{% if not playback_artifacts %}
+<section class="section-block playback-empty-state">
+  <h3>No playback-compatible exports</h3>
+  <p>Playback-compatible timeline exports were not found. Generate or scan compatible artifacts, then return to this page.</p>
+</section>
+{% else %}
+<section class="section-block playback-selection-card">
+  <h3>Selection</h3>
+  <form class="playback-form playback-form--card" method="get">
     <label>
-      Timeline export
+      Dataset
       <select name="path" onchange="this.form.submit()">
         {% for a in playback_artifacts %}
         <option value="{{ a.path }}" {% if selected_path==a.path %}selected{% endif %}>{{ a.file_name }}</option>
@@ -30,20 +43,26 @@
         {% endfor %}
       </select>
     </label>
-    <button type="submit">Load playback</button>
+    <button type="submit">Load</button>
   </form>
 </section>
+{% endif %}
 
 {% if error %}<p class="flash flash-error">{{ error }}</p>{% endif %}
 {% if validation_reason %}<p class="flash flash-error">{{ validation_reason }}</p>{% endif %}
 
 {% if row_payload %}
-<section class="section-block">
-  <h3>Playback controls</h3>
-  <div class="playback-controls">
-    <button type="button" id="playBtn">Play</button>
-    <button type="button" id="pauseBtn">Pause</button>
-    <button type="button" id="resetBtn">Reset</button>
+<section class="section-block playback-console">
+  <h3>Playback console</h3>
+  <p class="inline-note">Row playback. Replay samples from the selected machine/day.</p>
+  <div class="playback-controls playback-controls--console">
+    <div class="playback-buttons">
+      <button type="button" id="playBtn">Play</button>
+      <button type="button" id="pauseBtn">Pause</button>
+      <button type="button" id="resetBtn">Reset</button>
+      <button type="button" id="stepBackBtn">Step -1</button>
+      <button type="button" id="stepForwardBtn">Step +1</button>
+    </div>
     <label>
       Speed
       <select id="speedSelect">
@@ -52,32 +71,153 @@
         <option value="1" selected>1x</option>
         <option value="2">2x</option>
         <option value="4">4x</option>
+        <option value="8">8x</option>
+        <option value="16">16x</option>
       </select>
     </label>
+    <p class="playback-index">Row <strong id="rowIndexText">1</strong> / <span id="rowTotalText">{{ row_payload|length }}</span></p>
   </div>
-  <div class="playback-now">
-    <p><strong>Timestamp:</strong> <span id="nowTimestamp">-</span></p>
-    <p><strong>State:</strong> <span id="nowState">-</span></p>
-    <div id="signalGrid" class="info-grid"></div>
+  <label class="playback-slider-label" for="rowSlider">Progress</label>
+  <input id="rowSlider" class="playback-slider" type="range" min="0" max="{{ (row_payload|length) - 1 }}" value="0" step="1">
+</section>
+
+<section class="section-block">
+  <h3>Current sample</h3>
+  <div class="playback-current-grid">
+    <article class="info-card">
+      <h4>Timestamp</h4>
+      <p id="nowTimestamp">-</p>
+    </article>
+    <article class="info-card">
+      <h4>State</h4>
+      <p><span id="stateBadge" class="status-badge">-</span></p>
+    </article>
+    <article class="info-card">
+      <h4>Machine</h4>
+      <p id="nowMachine">{{ machine or '-' }}</p>
+    </article>
+    <article class="info-card">
+      <h4>Selected day</h4>
+      <p id="nowDay">{{ day or '-' }}</p>
+    </article>
+    <article class="info-card">
+      <h4>Current row index</h4>
+      <p id="nowIndex">0</p>
+    </article>
   </div>
 </section>
 
 <section class="section-block">
-  <h3>Timeline</h3>
-  <canvas id="timelineDensityChart"></canvas>
+  <h3>Grouped row fields</h3>
+  <div id="groupedFields" class="grouped-fields"></div>
+</section>
+
+<section class="section-block playback-timeline-panel">
+  <div class="playback-timeline-header">
+    <h3>Timeline</h3>
+    <p>Current timestamp: <strong id="timelineCurrentTs">-</strong></p>
+  </div>
+  <div class="playback-chart-shell">
+    <canvas id="timelineDensityChart"></canvas>
+  </div>
+</section>
+
+<section class="section-block">
+  <details>
+    <summary>Raw selected row</summary>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr><th>Field</th><th>Value</th></tr>
+        </thead>
+        <tbody id="rawRowTableBody"></tbody>
+      </table>
+    </div>
+  </details>
 </section>
 
 <script>
 const playbackRows = {{ row_payload|tojson }};
-const signalColumns = {{ signal_columns|tojson }};
+const fieldGroups = {{ field_groups|tojson }};
+
 let currentIndex = 0;
 let timer = null;
 let speed = 1;
+const BASE_INTERVAL_MS = 500;
+const MIN_INTERVAL_MS = 60;
 
 const nowTimestamp = document.getElementById('nowTimestamp');
-const nowState = document.getElementById('nowState');
-const signalGrid = document.getElementById('signalGrid');
+const nowMachine = document.getElementById('nowMachine');
+const nowDay = document.getElementById('nowDay');
+const nowIndex = document.getElementById('nowIndex');
+const rowIndexText = document.getElementById('rowIndexText');
+const rowTotalText = document.getElementById('rowTotalText');
+const stateBadge = document.getElementById('stateBadge');
+const timelineCurrentTs = document.getElementById('timelineCurrentTs');
+const groupedFields = document.getElementById('groupedFields');
+const rawRowTableBody = document.getElementById('rawRowTableBody');
+const rowSlider = document.getElementById('rowSlider');
 const speedSelect = document.getElementById('speedSelect');
+
+function stopPlayback() {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+}
+
+function stateBadgeClass(state) {
+  const normalized = String(state || '').toLowerCase();
+  if (normalized.includes('run') || normalized.includes('active')) return 'status-ready';
+  if (normalized.includes('idle')) return 'status-waiting';
+  if (normalized.includes('warn')) return 'status-partial';
+  if (normalized.includes('stop') || normalized.includes('fault') || normalized.includes('error')) return 'status-error';
+  return '';
+}
+
+function valueText(value) {
+  if (value === null || value === undefined || value === '') return '-';
+  return String(value);
+}
+
+function renderGroups(row) {
+  groupedFields.innerHTML = '';
+  Object.entries(fieldGroups).forEach(([groupName, fields]) => {
+    if (!fields || !fields.length) return;
+    const wrapper = document.createElement(groupName === 'Other' ? 'details' : 'section');
+    wrapper.className = 'field-group';
+    if (groupName === 'Other') {
+      wrapper.open = false;
+      const summary = document.createElement('summary');
+      summary.textContent = `Other fields (${fields.length})`;
+      wrapper.appendChild(summary);
+    } else {
+      const title = document.createElement('h4');
+      title.textContent = groupName;
+      wrapper.appendChild(title);
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'group-grid';
+    fields.forEach((field) => {
+      const card = document.createElement('article');
+      card.className = 'info-card';
+      card.innerHTML = `<h4>${field}</h4><p>${valueText(row[field])}</p>`;
+      grid.appendChild(card);
+    });
+    wrapper.appendChild(grid);
+    groupedFields.appendChild(wrapper);
+  });
+}
+
+function renderRawRow(row) {
+  rawRowTableBody.innerHTML = '';
+  Object.entries(row).forEach(([key, value]) => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${key}</td><td>${valueText(value)}</td>`;
+    rawRowTableBody.appendChild(tr);
+  });
+}
 
 const cursorPlugin = {
   id: 'cursorPlugin',
@@ -86,14 +226,12 @@ const cursorPlugin = {
     if (!meta || !meta.data || !meta.data[currentIndex]) return;
     const ctx = chart.ctx;
     const point = meta.data[currentIndex];
-    const topY = chart.chartArea.top;
-    const bottomY = chart.chartArea.bottom;
     ctx.save();
     ctx.strokeStyle = '#dc2626';
     ctx.lineWidth = 2;
     ctx.beginPath();
-    ctx.moveTo(point.x, topY);
-    ctx.lineTo(point.x, bottomY);
+    ctx.moveTo(point.x, chart.chartArea.top);
+    ctx.lineTo(point.x, chart.chartArea.bottom);
     ctx.stroke();
     ctx.restore();
   }
@@ -102,20 +240,25 @@ const cursorPlugin = {
 const timelineChart = new Chart(document.getElementById('timelineDensityChart'), {
   type: 'line',
   data: {
-    labels: playbackRows.map(row => row.timestamp),
+    labels: playbackRows.map((row) => row.timestamp || '-'),
     datasets: [{
-      label: 'State samples',
-      data: playbackRows.map((_, idx) => idx),
-      pointRadius: 2,
+      label: 'Sample sequence',
+      data: playbackRows.map((_, idx) => idx + 1),
+      pointRadius: 1.5,
       borderColor: '#1d4ed8',
-      tension: 0.15,
+      borderWidth: 2,
+      tension: 0.1,
+      fill: false,
     }]
   },
   options: {
     responsive: true,
     animation: false,
     scales: {
-      y: { title: { display: true, text: 'Sequence index' } }
+      y: { title: { display: true, text: 'Row number' } }
+    },
+    plugins: {
+      legend: { display: false }
     }
   },
   plugins: [cursorPlugin],
@@ -124,51 +267,70 @@ const timelineChart = new Chart(document.getElementById('timelineDensityChart'),
 function renderCurrentRow() {
   const row = playbackRows[currentIndex];
   if (!row) return;
-  nowTimestamp.textContent = row.timestamp || '-';
-  nowState.textContent = row.state || '-';
-  signalGrid.innerHTML = '';
-  signalColumns.forEach((column) => {
-    const value = row[column];
-    const card = document.createElement('article');
-    card.className = 'info-card';
-    card.innerHTML = `<h4>${column}</h4><p>${value === '' ? '-' : value}</p>`;
-    signalGrid.appendChild(card);
-  });
+  nowTimestamp.textContent = valueText(row.timestamp);
+  timelineCurrentTs.textContent = valueText(row.timestamp);
+  stateBadge.textContent = valueText(row.state);
+  stateBadge.className = `status-badge ${stateBadgeClass(row.state)}`.trim();
+  nowMachine.textContent = valueText(row.machine_id || '{{ machine }}');
+  nowDay.textContent = '{{ day }}' || '-';
+  nowIndex.textContent = String(currentIndex);
+  rowIndexText.textContent = String(currentIndex + 1);
+  rowTotalText.textContent = String(playbackRows.length);
+  rowSlider.value = String(currentIndex);
+  renderGroups(row);
+  renderRawRow(row);
   timelineChart.update();
 }
 
 function tickPlayback() {
-  currentIndex += 1;
-  if (currentIndex >= playbackRows.length) {
-    currentIndex = playbackRows.length - 1;
-    clearInterval(timer);
-    timer = null;
+  const finalIndex = playbackRows.length - 1;
+  const nextIndex = Math.min(currentIndex + 1, finalIndex);
+  if (nextIndex === currentIndex) {
+    stopPlayback();
+    return;
   }
+  // Move exactly one row per tick, render it, then stop after rendering the final row.
+  currentIndex = nextIndex;
   renderCurrentRow();
+  if (currentIndex === finalIndex) stopPlayback();
 }
 
 function restartTimer() {
-  if (timer) clearInterval(timer);
-  timer = setInterval(tickPlayback, Math.max(80, 600 / speed));
+  stopPlayback();
+  const delay = Math.max(MIN_INTERVAL_MS, Math.round(BASE_INTERVAL_MS / speed));
+  timer = setInterval(tickPlayback, delay);
 }
 
 document.getElementById('playBtn').addEventListener('click', () => {
-  if (!timer) restartTimer();
+  if (currentIndex >= playbackRows.length - 1) currentIndex = 0;
+  restartTimer();
 });
 
 document.getElementById('pauseBtn').addEventListener('click', () => {
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
-  }
+  stopPlayback();
 });
 
 document.getElementById('resetBtn').addEventListener('click', () => {
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
-  }
+  stopPlayback();
   currentIndex = 0;
+  renderCurrentRow();
+});
+
+document.getElementById('stepBackBtn').addEventListener('click', () => {
+  stopPlayback();
+  currentIndex = Math.max(0, currentIndex - 1);
+  renderCurrentRow();
+});
+
+document.getElementById('stepForwardBtn').addEventListener('click', () => {
+  stopPlayback();
+  currentIndex = Math.min(playbackRows.length - 1, currentIndex + 1);
+  renderCurrentRow();
+});
+
+rowSlider.addEventListener('input', () => {
+  stopPlayback();
+  currentIndex = Number(rowSlider.value || 0);
   renderCurrentRow();
 });
 

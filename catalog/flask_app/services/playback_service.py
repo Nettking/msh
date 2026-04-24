@@ -114,3 +114,74 @@ def summarize_intervals(intervals: list[dict]) -> dict:
         })
     totals_rows = [{"state": k, "duration_sec": round(v, 3)} for k, v in sorted(totals.items(), key=lambda kv: kv[1], reverse=True)]
     return {"totals": totals_rows, "table": table}
+
+
+def playback_field_groups(columns: list[str]) -> dict[str, list[str]]:
+    lowered_to_original = {column.lower(): column for column in columns}
+    grouped: dict[str, list[str]] = {
+        "Signals": [],
+        "State/context": [],
+        "Detection/diagnostics": [],
+        "Other": [],
+    }
+
+    signal_priority = [
+        "srpm",
+        "sload",
+        "sovr",
+        "fovr",
+        "frapidovr",
+        "xabs",
+        "yabs",
+        "zabs",
+        "fact",
+        "fcmd",
+    ]
+    state_priority = [
+        "execution",
+        "mode",
+        "program",
+        "tool_number",
+        "tool_group",
+        "state",
+        "active",
+        "dense_idle",
+        "idle",
+        "stopped",
+    ]
+
+    used: set[str] = set()
+    for key in signal_priority:
+        column = lowered_to_original.get(key)
+        if column and column not in used:
+            grouped["Signals"].append(column)
+            used.add(column)
+
+    for key in state_priority:
+        column = lowered_to_original.get(key)
+        if column and column not in used:
+            grouped["State/context"].append(column)
+            used.add(column)
+
+    for column in columns:
+        if column in used:
+            continue
+        normalized = column.lower()
+        if any(token in normalized for token in ("score", "rule", "candidate", "anomaly", "warning", "stop")):
+            grouped["Detection/diagnostics"].append(column)
+            used.add(column)
+
+    for column in columns:
+        if column in used:
+            continue
+        normalized = column.lower()
+        if any(token in normalized for token in ("rpm", "load", "ovr", "abs", "cmd", "act", "axis", "feed", "speed", "temp", "pressure", "power", "torque")):
+            grouped["Signals"].append(column)
+            used.add(column)
+            continue
+        if any(token in normalized for token in ("execution", "mode", "program", "tool", "state", "active", "idle", "running", "stopped", "status")):
+            grouped["State/context"].append(column)
+            used.add(column)
+
+    grouped["Other"] = [column for column in columns if column not in used]
+    return grouped
