@@ -381,7 +381,7 @@ def playback():
                         timeline["timestamp"] = pd.to_datetime(timeline["timestamp"], errors="coerce")
                         timeline = timeline.dropna(subset=["timestamp"])
                         if not timeline.empty:
-                            timeline["bucket"] = timeline["timestamp"].dt.floor("T")
+                            timeline["bucket"] = timeline["timestamp"].dt.floor("min")
                             grouped = timeline.groupby("bucket").size().reset_index(name="count")
                             timeline_payload = {
                                 "labels": grouped["bucket"].dt.strftime("%Y-%m-%d %H:%M:%S").tolist(),

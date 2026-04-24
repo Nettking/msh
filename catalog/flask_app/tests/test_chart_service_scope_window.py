@@ -37,3 +37,26 @@ def test_line_window_includes_full_end_day_for_date_only_bounds() -> None:
     assert len(values) == 3
     assert values[-1] == 3.0
     assert bool(payload["x_is_time"]) is True
+
+
+def test_minute_aggregation_buckets_by_minute_without_deprecated_alias() -> None:
+    frame = pd.DataFrame(
+        {
+            "timestamp": [
+                "2026-03-12T13:30:01Z",
+                "2026-03-12T13:30:45Z",
+                "2026-03-12T13:31:10Z",
+            ],
+            "value": [1.0, 3.0, 5.0],
+        }
+    )
+
+    payload = line_or_scatter_data(
+        frame,
+        ["value"],
+        mode="line",
+        aggregation="minute",
+    )
+
+    assert payload["labels"] == ["2026-03-12 13:30:00", "2026-03-12 13:31:00"]
+    assert payload["datasets"][0]["data"] == [2.0, 5.0]

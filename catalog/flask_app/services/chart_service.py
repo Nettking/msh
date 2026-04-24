@@ -69,7 +69,7 @@ def _aggregate_time_frame(rows: pd.DataFrame, *, aggregation: str) -> tuple[pd.D
     elif aggregation == "hour":
         rows["_bucket"] = rows["_timestamp"].dt.floor("H")
     elif aggregation == "minute":
-        rows["_bucket"] = rows["_timestamp"].dt.floor("T")
+        rows["_bucket"] = rows["_timestamp"].dt.floor("min")
     else:
         rows["_bucket"] = rows["_timestamp"]
     return rows, rows["_bucket"]
