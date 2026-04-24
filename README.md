@@ -36,7 +36,7 @@ Default startup scope is intentionally limited to startup-safe health checks:
 - `machines_active_per_day`
 - `sampling_rate_analysis`
 
-`data_pr_day` remains a manual/heavier workflow output (not automatic startup coverage). The `/machine` page therefore only treats sessions with a valid `results/workflows/<session>/analyses/data_pr_day/machine_day_summary.csv` as machine/day-ready, and reports explicit readiness reasons for sessions where that artifact is missing/invalid.
+`data_pr_day` remains a manual/heavier workflow output (not automatic startup coverage). Machine/day diagnostics from `data_pr_day` remain available for debugging, but playback is now the primary operator workflow.
 
 To avoid repeated full JSONL scans during startup, orchestration builds one compact shared dataset at `results/workflows/<session>/data/_derived/basic_metrics.csv` (timestamp, machine, sequence) and startup scripts read from that file.
 
@@ -46,9 +46,9 @@ Runtime update state is persisted at `results/workflows/runtime_state.json` so t
 - currently processing date, next queued date, and last completed step/date
 - verified processed-day counts vs total discovered days
 - last successful refresh and last failure
-- view contract readiness (`/status`, `/control`, `/machine`, catch-up contract)
+- view contract readiness (`/status`, `/control`, `/playback`, catch-up contract)
 
-Heavier exploratory scripts remain available for explicit/manual execution, but are excluded from automatic startup so `docker compose up --build webapp` remains reliable in unattended environments.
+Heavier exploratory scripts remain available for explicit/manual execution, but are excluded from automatic startup so `docker compose up --build flask` remains reliable in unattended environments.
 
 Full historical rebuild is now a deliberate/manual operation rather than the default web startup path.
 
@@ -77,7 +77,7 @@ For Windows host operation, use:
 This helper is **host-side only** and intentionally small in scope:
 - checks `ops/vpn/reconnect-vpn.ps1` exists
 - starts `ops/vpn/reconnect-vpn.ps1` in a separate PowerShell process first (unless already running)
-- then runs the current recommended startup command by default: `docker compose up --build webapp`
+- then runs the current recommended startup command by default: `docker compose up --build flask`
 
 Why Docker default in this wrapper?
 - this aligns with the repository's documented **recommended quick start**
@@ -96,7 +96,7 @@ Out of scope for this change:
 ## Docker quick start (recommended)
 
 ```bash
-docker compose up --build webapp
+docker compose up --build flask
 ```
 
 This now runs **prepare + serve** automatically (no menu interaction).
@@ -119,11 +119,11 @@ The primary web interface lives in `catalog/flask_app/` and is organized into:
 - `app.py`: Flask app factory + orchestration-aware startup
 - `routes.py`: page routes + rescan endpoint
 - `services/`: scanning/index, playback validation, chart data prep
-- `templates/`: overview, analyses, machine view, playback, exploration, status
+- `templates/`: overview, status, control, playback
 - `static/`: lightweight CSS
 
 Shared backend logic is in `catalog/common/artifact_registry.py`.
 
-## Legacy Streamlit app (transitional only)
+## Legacy Streamlit app (archived only)
 
-The old Streamlit app remains at `catalog/webapp/app.py` only for transition/backward compatibility.
+The old Streamlit workspace under `catalog/webapp/` is archived for source reference only and is out of the runtime path.

@@ -13,7 +13,15 @@ from .services.chart_service import category_columns, category_counts, histogram
 from .services.control_service import get_control_panel_service
 from .services.operator_page_cache import get_operator_page_cache
 from .services.operator_scope_service import get_operator_scope_service
-from .services.playback_service import interval_rows, playback_context, playback_subset, summarize_intervals, validate_playback_frame, validate_playback_source
+from .services.playback_service import (
+    interval_rows,
+    playback_context,
+    playback_days_by_machine,
+    playback_subset,
+    summarize_intervals,
+    validate_playback_frame,
+    validate_playback_source,
+)
 from .services.workflow_session_index import get_workflow_session_index
 
 web = Blueprint("web", __name__)
@@ -317,6 +325,10 @@ def playback():
     intervals = []
     interval_summary = {"totals": [], "table": []}
     error = None
+    machine_days: dict[str, list[str]] = {}
+    selected_machine_days: list[str] = []
+    row_payload: list[dict] = []
+    signal_columns: list[str] = []
     timeline_payload = {"labels": [], "counts": []}
 
     if selected:
@@ -329,17 +341,31 @@ def playback():
             validation = validate_playback_frame(frame)
             if validation.is_valid:
                 context = playback_context(frame)
+                machine_days = playback_days_by_machine(frame)
                 if scope.is_active:
                     context["days"] = [item for item in context["days"] if str(scope.start_date) <= item <= str(scope.end_date)]
+                    machine_days = {
+                        machine_id: [item for item in days if str(scope.start_date) <= item <= str(scope.end_date)]
+                        for machine_id, days in machine_days.items()
+                    }
                 if not machine and context["machines"]:
                     machine = context["machines"][0]
-                if not day and context["days"]:
-                    day = context["days"][0]
+                selected_machine_days = machine_days.get(machine, [])
+                if day and day not in selected_machine_days:
+                    day = ""
+                if not day and selected_machine_days:
+                    day = selected_machine_days[0]
                 if machine and day:
                     rows = playback_subset(frame, machine, day)
                     intervals = interval_rows(rows)
                     interval_summary = summarize_intervals(intervals)
                     if not rows.empty:
+                        exclude = {"timestamp", "machine_id", "state", "day"}
+                        signal_columns = [col for col in rows.columns if col not in exclude]
+                        limited_signals = signal_columns[:8]
+                        payload_frame = rows[["timestamp", "state", *limited_signals]].copy()
+                        payload_frame["timestamp"] = pd.to_datetime(payload_frame["timestamp"], errors="coerce").dt.strftime("%Y-%m-%d %H:%M:%S")
+                        row_payload = payload_frame.fillna("").to_dict("records")
                         timeline = rows.copy()
                         timeline["timestamp"] = pd.to_datetime(timeline["timestamp"], errors="coerce")
                         timeline = timeline.dropna(subset=["timestamp"])
@@ -360,7 +386,11 @@ def playback():
         machine=machine,
         day=day,
         context=context,
+        machine_days=machine_days,
+        selected_machine_days=selected_machine_days,
         rows=rows,
+        row_payload=row_payload,
+        signal_columns=signal_columns,
         intervals=intervals,
         interval_summary=interval_summary,
         timeline_payload=timeline_payload,

@@ -318,6 +318,42 @@ p { margin: 0; color: var(--text-muted); }
   gap: 10px;
 }
 
+.playback-form {
+  margin-top: 12px;
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.playback-form label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.9rem;
+}
+
+.playback-form select,
+.playback-controls select,
+.playback-controls button {
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.playback-controls {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+  margin: 10px 0 14px;
+}
+
+.playback-now {
+  display: grid;
+  gap: 8px;
+}
+
 .subtle-link {
   color: var(--text-muted);
   font-size: 0.88rem;

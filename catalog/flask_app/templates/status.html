@@ -114,7 +114,7 @@
 
 <section class="section-block">
   <h3>Artifact/debug visibility</h3>
-  <p>Artifact inventory and deep file inspection were moved out of status for faster runtime scanning. Use <a href="{{ url_for('web.analyses') }}">/analyses</a> or <a href="{{ url_for('web.exploration') }}">/exploration</a> for file-level inspection.</p>
+  <p>Status now prioritizes operator runtime health and inventory counts. Detailed artifact exploration is intentionally de-emphasized from the primary workflow.</p>
   <dl class="kv-grid">
     <div class="kv-row"><dt>Configured roots</dt><dd>{{ scan_dirs|join(', ') }}</dd></div>
     <div class="kv-row"><dt>Indexed artifacts</dt><dd>{{ snapshot.artifacts|length }}</dd></div>

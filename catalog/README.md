@@ -58,7 +58,7 @@ Run as needed:
 - `data_analysis` (terminal-heavy exploratory diagnostics)
 - `ml_analysis` (per-machine predictive baseline)
 - `data_simulator` (interactive Streamlit exploration)
-- `webapp` (timeline/state playback view for processed exports)
+- `webapp` (archived Streamlit workspace; reference only)
 
 Typical outputs:
 - timeline images / candidate CSVs
@@ -129,7 +129,7 @@ Automatic orchestration actions include:
 
 ### Session playback integration
 
-The Streamlit playback app (`catalog/webapp/app.py`) is integrated with session outputs.
+The Flask playback view (`catalog/flask_app` -> `/playback`) is integrated with session outputs.
 
 Playback export location (per session):
 - `results/workflows/<session-id>/exports/timeline/`
