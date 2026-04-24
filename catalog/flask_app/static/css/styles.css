@@ -326,6 +326,34 @@ p { margin: 0; color: var(--text-muted); }
   align-items: end;
 }
 
+.playback-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.playback-subtitle {
+  margin-top: 6px;
+}
+
+.scope-chip {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e3a8a;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+}
+
+.playback-empty-state h3 {
+  margin-bottom: 8px;
+}
+
+.playback-form--card {
+  margin-top: 10px;
+}
+
 .playback-form label {
   display: grid;
   gap: 6px;
@@ -349,9 +377,88 @@ p { margin: 0; color: var(--text-muted); }
   margin: 10px 0 14px;
 }
 
+.playback-controls--console {
+  justify-content: space-between;
+}
+
+.playback-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.playback-index {
+  font-size: 0.92rem;
+}
+
+.playback-slider-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 0.9rem;
+  color: var(--text-muted);
+}
+
+.playback-slider {
+  width: 100%;
+}
+
 .playback-now {
   display: grid;
   gap: 8px;
+}
+
+.playback-current-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 10px;
+}
+
+.grouped-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.field-group {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  background: #fafcff;
+}
+
+.field-group > h4 {
+  margin-bottom: 10px;
+}
+
+.field-group summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #334155;
+}
+
+.group-grid {
+  margin-top: 10px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 8px;
+}
+
+.playback-timeline-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  align-items: baseline;
+}
+
+.playback-chart-shell {
+  margin-top: 8px;
+  border: 1px solid #bfdbfe;
+  border-radius: 12px;
+  padding: 10px;
+  background: #f8fbff;
+}
+
+.table-wrap {
+  overflow-x: auto;
 }
 
 .subtle-link {
@@ -395,6 +502,9 @@ th, td {
   .stack-row { flex-direction: column; }
   .action-meta { width: 100%; justify-content: space-between; }
   .now-grid { grid-template-columns: 1fr; }
+  .playback-header { flex-direction: column; }
+  .playback-controls--console { flex-direction: column; align-items: flex-start; }
+  .playback-timeline-header { flex-direction: column; }
 }
 
 
