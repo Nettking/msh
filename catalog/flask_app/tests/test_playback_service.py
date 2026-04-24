@@ -23,9 +23,12 @@ _ARTIFACT_MOD = importlib.util.module_from_spec(_ARTIFACT_SPEC)
 sys.modules[_ARTIFACT_SPEC.name] = _ARTIFACT_MOD
 _ARTIFACT_SPEC.loader.exec_module(_ARTIFACT_MOD)
 
+default_live_signal_columns = _PLAYBACK_MOD.default_live_signal_columns
 load_playback_frame = _PLAYBACK_MOD.load_playback_frame
 playback_context = _PLAYBACK_MOD.playback_context
+playback_day_counts_by_machine = _PLAYBACK_MOD.playback_day_counts_by_machine
 playback_days_by_machine = _PLAYBACK_MOD.playback_days_by_machine
+playback_field_groups = _PLAYBACK_MOD.playback_field_groups
 prepare_playback_frame = _PLAYBACK_MOD.prepare_playback_frame
 validate_playback_frame = _PLAYBACK_MOD.validate_playback_frame
 validate_playback_source = _PLAYBACK_MOD.validate_playback_source
@@ -114,3 +117,59 @@ def test_invalid_timestamp_rows_are_ignored() -> None:
     assert len(prepared) == 1
     assert prepared.iloc[0]["day"] == "2026-03-01"
     assert machine_days == {"M1": ["2026-03-01"]}
+
+
+def test_playback_field_groups_are_deterministically_ordered() -> None:
+    grouped = playback_field_groups(
+        [
+            "event_score",
+            "Sload",
+            "state",
+            "intervention_candidate",
+            "custom_field",
+            "Srpm",
+            "execution",
+        ]
+    )
+
+    assert list(grouped.keys()) == ["Signals", "State/context", "Detection/diagnostics", "Other fields"]
+    assert grouped["Signals"][:2] == ["Srpm", "Sload"]
+    assert grouped["State/context"] == ["execution", "state"]
+    assert grouped["Detection/diagnostics"] == ["event_score", "intervention_candidate"]
+    assert grouped["Other fields"] == ["custom_field"]
+
+
+def test_day_counts_by_machine_uses_only_playable_rows() -> None:
+    frame = pd.DataFrame(
+        {
+            "timestamp": ["bad", "2026-03-01T10:00:00Z", "2026-03-01T11:00:00Z", "2026-03-02T08:00:00Z"],
+            "machine_id": ["M1", "M1", "M1", "M2"],
+            "state": ["run", "idle", "run", "run"],
+        }
+    )
+
+    day_counts = playback_day_counts_by_machine(frame)
+
+    assert day_counts == {
+        "M1": {"2026-03-01": 2},
+        "M2": {"2026-03-02": 1},
+    }
+
+
+def test_default_live_signal_columns_only_returns_numeric_core_signals() -> None:
+    frame = pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z", "2026-03-01T10:00:01Z"],
+            "machine_id": ["M1", "M1"],
+            "state": ["run", "run"],
+            "Srpm": ["1200", "1210"],
+            "Sload": [10.5, 11.0],
+            "Sovr": ["-", "-"],
+            "Fovr": [None, None],
+            "Frapidovr": ["95", "97"],
+            "execution": ["AUTO", "AUTO"],
+            "intervention_candidate": [False, True],
+        }
+    )
+
+    assert default_live_signal_columns(frame) == ["Srpm", "Sload", "Frapidovr"]
