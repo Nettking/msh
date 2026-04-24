@@ -16,7 +16,7 @@ REQUIRED_PLAYBACK_COLUMNS = {"timestamp", "machine_id", "state"}
 INTERNAL_METADATA_FILES = {"runtime_state.json", "session_state.json"}
 
 KEYWORD_RULES: list[tuple[tuple[str, ...], tuple[str, str, str]]] = [
-    (("timeline", "playback"), ("Timeline Playback", "Playback-compatible timeline rows for machine state replay.", "playback")),
+    (("timeline", "playback"), ("Timeline Export", "Timeline-oriented export rows; playback compatibility depends on schema.", "analysis")),
     (("intervention",), ("Interventions", "Intervention-related rows and summaries.", "analysis")),
     (("override",), ("Override Changes", "Override and feed/speed override change outputs.", "analysis")),
     (("missing",), ("Missing Data", "Missing data and sequence-number quality analyses.", "analysis")),

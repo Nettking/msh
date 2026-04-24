@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import pandas as pd
 
+from catalog.common.artifact_registry import read_raw_table
 from catalog.common.artifact_registry import read_table_columns
 from catalog.common.timeline_exports import build_state_interval_export
 
@@ -31,6 +32,28 @@ def validate_playback_source(path: str) -> PlaybackValidation:
         return PlaybackValidation(False, f"Missing required source columns: {', '.join(missing)}")
     return PlaybackValidation(True, "")
 
+
+def load_playback_frame(path: str) -> tuple[pd.DataFrame | None, str | None]:
+    try:
+        frame = read_raw_table(path)
+    except Exception as exc:  # noqa: BLE001
+        return None, f"Could not load '{path}': {exc}"
+    if not isinstance(frame, pd.DataFrame):
+        return None, f"Could not load '{path}': source did not produce a table."
+    return frame, None
+
+
+def prepare_playback_frame(df: pd.DataFrame) -> pd.DataFrame:
+    frame = df.copy()
+    frame["timestamp"] = pd.to_datetime(frame["timestamp"], errors="coerce")
+    frame["machine_id"] = frame["machine_id"].astype("string").str.strip()
+    frame["state"] = frame["state"].astype("string").str.strip()
+    frame = frame.dropna(subset=["timestamp", "machine_id", "state"])
+    frame = frame[(frame["machine_id"] != "") & (frame["state"] != "")]
+    frame["day"] = frame["timestamp"].dt.date.astype(str)
+    return frame.reset_index(drop=True)
+
+
 def validate_playback_frame(df: pd.DataFrame) -> PlaybackValidation:
     missing = sorted(REQUIRED_PLAYBACK_COLUMNS.difference(df.columns))
     if missing:
@@ -46,33 +69,20 @@ def validate_playback_frame(df: pd.DataFrame) -> PlaybackValidation:
 
 
 def playback_subset(df: pd.DataFrame, machine_id: str, day: str) -> pd.DataFrame:
-    base = df.copy()
-    base["timestamp"] = pd.to_datetime(base["timestamp"], errors="coerce")
-    base = base.dropna(subset=["timestamp"])
-    base["machine_id"] = base["machine_id"].astype("string")
-    base["day"] = base["timestamp"].dt.date.astype(str)
+    base = prepare_playback_frame(df)
     rows = base[(base["machine_id"] == str(machine_id)) & (base["day"] == str(day))]
     return rows.sort_values("timestamp").reset_index(drop=True)
 
 
 def playback_context(df: pd.DataFrame) -> dict:
-    frame = df.copy()
-    frame["timestamp"] = pd.to_datetime(frame["timestamp"], errors="coerce")
-    frame = frame.dropna(subset=["timestamp"])
-    frame["machine_id"] = frame["machine_id"].astype("string")
-    frame["day"] = frame["timestamp"].dt.date.astype(str)
-
+    frame = prepare_playback_frame(df)
     machines = sorted(frame["machine_id"].dropna().unique().tolist())
     days = sorted(frame["day"].dropna().unique().tolist())
     return {"machines": machines, "days": days}
 
 
 def playback_days_by_machine(df: pd.DataFrame) -> dict[str, list[str]]:
-    frame = df.copy()
-    frame["timestamp"] = pd.to_datetime(frame["timestamp"], errors="coerce")
-    frame = frame.dropna(subset=["timestamp"])
-    frame["machine_id"] = frame["machine_id"].astype("string")
-    frame["day"] = frame["timestamp"].dt.date.astype(str)
+    frame = prepare_playback_frame(df)
     grouped = frame.groupby("machine_id", dropna=True)["day"]
     return {
         str(machine): sorted(series.dropna().unique().tolist())

@@ -15,9 +15,11 @@ from .services.operator_page_cache import get_operator_page_cache
 from .services.operator_scope_service import get_operator_scope_service
 from .services.playback_service import (
     interval_rows,
+    load_playback_frame,
     playback_field_groups,
     playback_context,
     playback_days_by_machine,
+    prepare_playback_frame,
     playback_subset,
     summarize_intervals,
     validate_playback_frame,
@@ -320,6 +322,7 @@ def playback():
 
     selected = _catalog().artifact_by_path(selected_path) if selected_path else None
     frame = None
+    prepared_frame = None
     validation_reason = None
     context = {"machines": [], "days": []}
     rows = None
@@ -338,27 +341,33 @@ def playback():
         if not source_validation.is_valid:
             validation_reason = source_validation.reason
         else:
-            frame, error = safe_load_artifact_frame(selected_path)
+            frame, error = load_playback_frame(selected_path)
         if frame is not None:
             validation = validate_playback_frame(frame)
             if validation.is_valid:
-                context = playback_context(frame)
-                machine_days = playback_days_by_machine(frame)
+                prepared_frame = prepare_playback_frame(frame)
+                context = playback_context(prepared_frame)
+                machine_days = playback_days_by_machine(prepared_frame)
                 if scope.is_active:
                     context["days"] = [item for item in context["days"] if str(scope.start_date) <= item <= str(scope.end_date)]
                     machine_days = {
                         machine_id: [item for item in days if str(scope.start_date) <= item <= str(scope.end_date)]
                         for machine_id, days in machine_days.items()
                     }
+                context["machines"] = [m for m in context["machines"] if machine_days.get(m)]
+                if prepared_frame.empty:
+                    validation_reason = "This playback export exists, but contains no playable rows."
                 if not machine and context["machines"]:
                     machine = context["machines"][0]
+                if machine and machine not in context["machines"]:
+                    machine = context["machines"][0] if context["machines"] else ""
                 selected_machine_days = machine_days.get(machine, [])
                 if day and day not in selected_machine_days:
                     day = ""
                 if not day and selected_machine_days:
                     day = selected_machine_days[0]
                 if machine and day:
-                    rows = playback_subset(frame, machine, day)
+                    rows = playback_subset(prepared_frame, machine, day)
                     intervals = interval_rows(rows)
                     interval_summary = summarize_intervals(intervals)
                     if not rows.empty:
@@ -380,6 +389,8 @@ def playback():
                             }
             else:
                 validation_reason = validation.reason
+    elif not playback_artifacts:
+        validation_reason = "No playback-ready timeline exports were found. Run or refresh the workflow to generate playback data."
 
     return render_template(
         "playback.html",
