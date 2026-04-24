@@ -277,9 +277,8 @@ def _quick_links(readiness: list[dict[str, str]]) -> list[dict[str, str]]:
         }
 
     return [
-        _entry("/machine", "Open machine view"),
         _entry("/playback", "Open playback"),
-        _entry("/analyses", "Open analyses"),
         _entry("/status", "Open status"),
         _entry("/control", "Open control"),
+        _entry("/", "Refresh overview"),
     ]

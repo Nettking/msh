@@ -50,7 +50,7 @@
 
   <form method="post" action="{{ url_for('web.control_scope') }}" class="control-form control-card">
     <h4>Global shared range scope (multi-day first)</h4>
-    <p>This is a global scope (shared across operators for this app/runtime) and is reused by machine/playback/exploration pages when no page-specific scope is selected.</p>
+    <p>This is a global scope (shared across operators for this app/runtime) and is reused by overview/status/playback views when no page-specific scope is selected.</p>
     <label for="scope_start">Scope start date:</label>
     <input id="scope_start" type="date" name="start_date" value="{{ operator_scope.start_date or '' }}">
     <label for="scope_end">Scope end date:</label>

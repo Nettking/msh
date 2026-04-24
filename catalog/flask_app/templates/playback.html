@@ -1,74 +1,185 @@
 {% extends 'base.html' %}
 {% block body %}
-<h2>Playback-compatible datasets</h2>
-<p>Global operator scope: <strong>{{ operator_scope.label }}</strong></p>
-<form>
-<select name="path">
-  {% for a in playback_artifacts %}<option value="{{ a.path }}" {% if selected_path==a.path %}selected{% endif %}>{{ a.file_name }}</option>{% endfor %}
-</select>
-<select name="machine">
-  <option value="">Machine</option>
-  {% for m in context.machines %}<option value="{{ m }}" {% if machine==m %}selected{% endif %}>{{ m }}</option>{% endfor %}
-</select>
-<select name="day">
-  <option value="">Day</option>
-  {% for d in context.days %}<option value="{{ d }}" {% if day==d %}selected{% endif %}>{{ d }}</option>{% endfor %}
-</select>
-<button type="submit">Inspect</button>
-</form>
-{% if error %}<p>{{ error }}</p>{% endif %}
-{% if validation_reason %}<p>{{ validation_reason }}</p>{% endif %}
-{% if rows is not none %}
-<p>Rows: {{ rows|length }}</p>
-<div class="pre">{{ rows.head(50).to_html(classes='table', index=False) | safe }}</div>
+<section class="section-block section-block--primary">
+  <h2>Playback</h2>
+  <p>Global operator scope: <strong>{{ operator_scope.label }}</strong></p>
+  <form class="playback-form" method="get">
+    <label>
+      Timeline export
+      <select name="path" onchange="this.form.submit()">
+        {% for a in playback_artifacts %}
+        <option value="{{ a.path }}" {% if selected_path==a.path %}selected{% endif %}>{{ a.file_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Machine
+      <select name="machine" onchange="this.form.submit()">
+        <option value="">Select machine</option>
+        {% for m in context.machines %}
+        <option value="{{ m }}" {% if machine==m %}selected{% endif %}>{{ m }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      Day
+      <select name="day">
+        <option value="">Select day</option>
+        {% for d in selected_machine_days %}
+        <option value="{{ d }}" {% if day==d %}selected{% endif %}>{{ d }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <button type="submit">Load playback</button>
+  </form>
+</section>
 
-<h3>Timeline density (events per minute)</h3>
-{% if timeline_payload.labels %}
-<canvas id="timelineDensityChart"></canvas>
+{% if error %}<p class="flash flash-error">{{ error }}</p>{% endif %}
+{% if validation_reason %}<p class="flash flash-error">{{ validation_reason }}</p>{% endif %}
+
+{% if row_payload %}
+<section class="section-block">
+  <h3>Playback controls</h3>
+  <div class="playback-controls">
+    <button type="button" id="playBtn">Play</button>
+    <button type="button" id="pauseBtn">Pause</button>
+    <button type="button" id="resetBtn">Reset</button>
+    <label>
+      Speed
+      <select id="speedSelect">
+        <option value="0.25">0.25x</option>
+        <option value="0.5">0.5x</option>
+        <option value="1" selected>1x</option>
+        <option value="2">2x</option>
+        <option value="4">4x</option>
+      </select>
+    </label>
+  </div>
+  <div class="playback-now">
+    <p><strong>Timestamp:</strong> <span id="nowTimestamp">-</span></p>
+    <p><strong>State:</strong> <span id="nowState">-</span></p>
+    <div id="signalGrid" class="info-grid"></div>
+  </div>
+</section>
+
+<section class="section-block">
+  <h3>Timeline</h3>
+  <canvas id="timelineDensityChart"></canvas>
+</section>
+
 <script>
-new Chart(document.getElementById('timelineDensityChart'), {
+const playbackRows = {{ row_payload|tojson }};
+const signalColumns = {{ signal_columns|tojson }};
+let currentIndex = 0;
+let timer = null;
+let speed = 1;
+
+const nowTimestamp = document.getElementById('nowTimestamp');
+const nowState = document.getElementById('nowState');
+const signalGrid = document.getElementById('signalGrid');
+const speedSelect = document.getElementById('speedSelect');
+
+const cursorPlugin = {
+  id: 'cursorPlugin',
+  afterDraw(chart) {
+    const meta = chart.getDatasetMeta(0);
+    if (!meta || !meta.data || !meta.data[currentIndex]) return;
+    const ctx = chart.ctx;
+    const point = meta.data[currentIndex];
+    const topY = chart.chartArea.top;
+    const bottomY = chart.chartArea.bottom;
+    ctx.save();
+    ctx.strokeStyle = '#dc2626';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(point.x, topY);
+    ctx.lineTo(point.x, bottomY);
+    ctx.stroke();
+    ctx.restore();
+  }
+};
+
+const timelineChart = new Chart(document.getElementById('timelineDensityChart'), {
   type: 'line',
   data: {
-    labels: {{ timeline_payload.labels|tojson }},
-    datasets: [{label: 'Events/min', data: {{ timeline_payload.counts|tojson }} }]
+    labels: playbackRows.map(row => row.timestamp),
+    datasets: [{
+      label: 'State samples',
+      data: playbackRows.map((_, idx) => idx),
+      pointRadius: 2,
+      borderColor: '#1d4ed8',
+      tension: 0.15,
+    }]
   },
-  options: {responsive: true}
+  options: {
+    responsive: true,
+    animation: false,
+    scales: {
+      y: { title: { display: true, text: 'Sequence index' } }
+    }
+  },
+  plugins: [cursorPlugin],
 });
-</script>
-{% else %}
-<p>No timeline points for selected machine/day.</p>
-{% endif %}
 
-<h3>Interval duration summary</h3>
-{% if interval_summary.totals %}
-<table>
-  <tr><th>State</th><th>Total duration (sec)</th></tr>
-  {% for row in interval_summary.totals %}<tr><td>{{ row.state }}</td><td>{{ row.duration_sec }}</td></tr>{% endfor %}
-</table>
-<canvas id="stateDurationChart"></canvas>
-<script>
-new Chart(document.getElementById('stateDurationChart'), {
-  type: 'bar',
-  data: {
-    labels: {{ interval_summary.totals | map(attribute='state') | list | tojson }},
-    datasets: [{label: 'Duration (sec)', data: {{ interval_summary.totals | map(attribute='duration_sec') | list | tojson }} }]
+function renderCurrentRow() {
+  const row = playbackRows[currentIndex];
+  if (!row) return;
+  nowTimestamp.textContent = row.timestamp || '-';
+  nowState.textContent = row.state || '-';
+  signalGrid.innerHTML = '';
+  signalColumns.forEach((column) => {
+    const value = row[column];
+    const card = document.createElement('article');
+    card.className = 'info-card';
+    card.innerHTML = `<h4>${column}</h4><p>${value === '' ? '-' : value}</p>`;
+    signalGrid.appendChild(card);
+  });
+  timelineChart.update();
+}
+
+function tickPlayback() {
+  currentIndex += 1;
+  if (currentIndex >= playbackRows.length) {
+    currentIndex = playbackRows.length - 1;
+    clearInterval(timer);
+    timer = null;
+  }
+  renderCurrentRow();
+}
+
+function restartTimer() {
+  if (timer) clearInterval(timer);
+  timer = setInterval(tickPlayback, Math.max(80, 600 / speed));
+}
+
+document.getElementById('playBtn').addEventListener('click', () => {
+  if (!timer) restartTimer();
+});
+
+document.getElementById('pauseBtn').addEventListener('click', () => {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
   }
 });
-</script>
-{% else %}
-<p>No interval durations available.</p>
-{% endif %}
 
-<h3>Intervals table</h3>
-{% if interval_summary.table %}
-<table>
-  <tr><th>State</th><th>Start</th><th>End</th><th>Duration (sec)</th></tr>
-  {% for row in interval_summary.table[:250] %}
-  <tr><td>{{ row.state }}</td><td>{{ row.start }}</td><td>{{ row.end }}</td><td>{{ row.duration_sec }}</td></tr>
-  {% endfor %}
-</table>
-{% else %}
-<p>No intervals available for the selected machine/day.</p>
-{% endif %}
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (timer) {
+    clearInterval(timer);
+    timer = null;
+  }
+  currentIndex = 0;
+  renderCurrentRow();
+});
+
+speedSelect.addEventListener('change', () => {
+  speed = Number(speedSelect.value || 1);
+  if (timer) restartTimer();
+});
+
+renderCurrentRow();
+</script>
+{% elif rows is not none %}
+<p>No playback rows found for this machine/day selection.</p>
 {% endif %}
 {% endblock %}

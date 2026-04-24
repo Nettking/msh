@@ -16,12 +16,9 @@
       </div>
       <nav class="site-nav" aria-label="Primary">
         <a class="{% if request.endpoint == 'web.overview' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Overview</a>
-        <a class="{% if request.endpoint == 'web.analyses' %}is-active{% endif %}" href="{{ url_for('web.analyses') }}">Analyses</a>
-        <a class="{% if request.endpoint == 'web.machine_view' %}is-active{% endif %}" href="{{ url_for('web.machine_view') }}">Machine view</a>
+        <a class="{% if request.endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Status</a>
+        <a class="{% if request.endpoint == 'web.control' %}is-active{% endif %}" href="{{ url_for('web.control') }}">Control</a>
         <a class="{% if request.endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
-        <a class="{% if request.endpoint == 'web.exploration' %}is-active{% endif %}" href="{{ url_for('web.exploration') }}">Exploration</a>
-        <a class="{% if request.endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">System status</a>
-        <a class="{% if request.endpoint == 'web.control' %}is-active{% endif %}" href="{{ url_for('web.control') }}">Control panel</a>
       </nav>
       <form class="rescan-form" method="post" action="{{ url_for('web.rescan') }}">
         <input type="hidden" name="next" value="{{ request.path }}{% if request.query_string %}?{{ request.query_string.decode('utf-8') }}{% endif %}">

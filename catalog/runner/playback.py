@@ -1,12 +1,8 @@
-"""Session playback export preparation and Streamlit launch helpers."""
+"""Session playback export preparation and Flask playback guidance helpers."""
 
 from __future__ import annotations
 
 import json
-import os
-import shutil
-import subprocess
-import sys
 from datetime import datetime
 from pathlib import Path
 from typing import Any
@@ -15,8 +11,6 @@ import pandas as pd
 
 from catalog.common.data_loading import iter_jsonl_files, load_jsonl_dataframe
 from catalog.common.timeline_exports import TIMELINE_COLUMNS, export_timeline_rows
-from catalog.runner.script_catalog import repo_root
-
 PLAYBACK_EXPORT_FILE = "timeline_rows.csv"
 PLAYBACK_MANIFEST_FILE = "manifest.json"
 
@@ -140,44 +134,10 @@ def prepare_session_playback_exports(session_dir: Path, metadata: dict[str, Any]
 
 
 def launch_playback_app_for_session(session_dir: Path, metadata: dict[str, Any]) -> int:
-    """Launch the Streamlit playback app preloaded with session exports."""
+    """Report Flask playback route details for the prepared session export."""
     export_dir = session_playback_export_dir(session_dir, metadata)
-    root = repo_root()
     resolved_export_dir = export_dir.resolve()
-    streamlit_args = [
-        "run",
-        "catalog/webapp/app.py",
-        "--",
-        "--session-export-dir",
-        str(resolved_export_dir),
-    ]
-    command = ["streamlit", *streamlit_args]
-    fallback_command = [sys.executable, "-m", "streamlit", *streamlit_args]
-    env = dict(os.environ)
-    existing_pythonpath = env.get("PYTHONPATH", "")
-    root_str = str(root)
-    if existing_pythonpath:
-        env["PYTHONPATH"] = f"{root_str}{os.pathsep}{existing_pythonpath}"
-    else:
-        env["PYTHONPATH"] = root_str
-    pythonpath_prefix = env["PYTHONPATH"].split(os.pathsep)[0]
-    print("\nLaunching Streamlit playback app...", flush=True)
-    print(f"Command: {' '.join(command)}", flush=True)
-    print(f"Repo root: {root}", flush=True)
+    print("\nPlayback export is ready for Flask UI.", flush=True)
     print(f"Session export dir: {resolved_export_dir}", flush=True)
-    print(f"PYTHONPATH prefix: {pythonpath_prefix}", flush=True)
-    print("Stop Streamlit with Ctrl+C to return to runner.", flush=True)
-    if shutil.which("streamlit") is None:
-        print("'streamlit' executable not found on PATH; falling back to python -m streamlit.", flush=True)
-        command = fallback_command
-        print(f"Fallback command: {' '.join(command)}", flush=True)
-
-    try:
-        result = subprocess.run(command, cwd=root, env=env)
-    except FileNotFoundError as exc:
-        print(f"Failed to launch playback command ({exc}); retrying with python -m streamlit.", flush=True)
-        result = subprocess.run(fallback_command, cwd=root, env=env)
-
-    if result.returncode != 0:
-        print(f"Streamlit playback launch failed with return code {result.returncode}.", flush=True)
-    return result.returncode
+    print("Open http://localhost:5000/playback and select a playback-compatible export.", flush=True)
+    return 0

@@ -1,14 +1,14 @@
 # MSH Flask Web App
 
-Primary Flask operator interface for runtime visibility, dashboard-style overview, playback-capable datasets, and generic data exploration.
+Primary Flask operator interface for runtime visibility and operator playback workflows.
 
 ## Routes
 
 - `/` operator overview dashboard (current activity + runtime progress + readiness + next actions)
-- `/analyses` analysis browser
-- `/machine` machine/day trends
+- `/analyses` archived/debug-only analysis browser (non-primary)
+- `/machine` archived/debug-only machine/day trends (non-primary)
 - `/playback` playback-compatible inspection
-- `/exploration` generic table exploration with charts
+- `/exploration` archived/debug-only generic exploration (non-primary)
 - `/status` scan/system status
 - `/control` runtime + workflow + script control panel
 - `POST /rescan` explicit rescan trigger
@@ -26,7 +26,7 @@ It now renders a compact `overview snapshot` assembled at request time by `catal
    - includes inventory counters in the snapshot contract (`visible/source_artifacts/derived_artifacts/playback_compatible_count/read_error_count + hidden-by-default counts`) rendered from `overview.headline.*`
 2. what is happening now (latest known timestamp + machine last-seen/freshness when derivable)
 3. runtime progress summary (phase/date/progress/next/last step/failure)
-4. view readiness (`/machine`, `/playback`, `/analyses`, plus startup-safe `/status` and `/control`)
+4. view readiness (`/playback`, plus startup-safe `/status` and `/control`)
 5. next actions / open views (navigation with readiness hints)
 
 The snapshot intentionally reuses existing runtime manager state (`state_snapshot`) and existing artifact scans.

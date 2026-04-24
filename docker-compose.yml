@@ -11,7 +11,7 @@ services:
       - ./results:/app/results
 
   # Primary always-on digital twin workspace (auto-prepare + Flask).
-  webapp:
+  flask:
     build:
       context: .
       dockerfile: Dockerfile

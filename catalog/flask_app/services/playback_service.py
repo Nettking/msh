@@ -67,6 +67,20 @@ def playback_context(df: pd.DataFrame) -> dict:
     return {"machines": machines, "days": days}
 
 
+def playback_days_by_machine(df: pd.DataFrame) -> dict[str, list[str]]:
+    frame = df.copy()
+    frame["timestamp"] = pd.to_datetime(frame["timestamp"], errors="coerce")
+    frame = frame.dropna(subset=["timestamp"])
+    frame["machine_id"] = frame["machine_id"].astype("string")
+    frame["day"] = frame["timestamp"].dt.date.astype(str)
+    grouped = frame.groupby("machine_id", dropna=True)["day"]
+    return {
+        str(machine): sorted(series.dropna().unique().tolist())
+        for machine, series in grouped
+        if str(machine).strip()
+    }
+
+
 def interval_rows(rows: pd.DataFrame) -> list[dict]:
     if rows.empty:
         return []
