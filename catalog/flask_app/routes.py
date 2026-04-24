@@ -14,8 +14,10 @@ from .services.control_service import get_control_panel_service
 from .services.operator_page_cache import get_operator_page_cache
 from .services.operator_scope_service import get_operator_scope_service
 from .services.playback_service import (
+    default_live_signal_columns,
     interval_rows,
     load_playback_frame,
+    playback_day_counts_by_machine,
     playback_field_groups,
     playback_context,
     playback_days_by_machine,
@@ -330,10 +332,12 @@ def playback():
     interval_summary = {"totals": [], "table": []}
     error = None
     machine_days: dict[str, list[str]] = {}
+    machine_day_counts: dict[str, dict[str, int]] = {}
     selected_machine_days: list[str] = []
+    selected_machine_day_counts: dict[str, int] = {}
     row_payload: list[dict] = []
     signal_columns: list[str] = []
-    field_groups: dict[str, list[str]] = {"Signals": [], "State/context": [], "Detection/diagnostics": [], "Other": []}
+    field_groups: dict[str, list[str]] = {"Signals": [], "State/context": [], "Detection/diagnostics": [], "Other fields": []}
     timeline_payload = {"labels": [], "counts": []}
 
     if selected:
@@ -348,11 +352,20 @@ def playback():
                 prepared_frame = prepare_playback_frame(frame)
                 context = playback_context(prepared_frame)
                 machine_days = playback_days_by_machine(prepared_frame)
+                machine_day_counts = playback_day_counts_by_machine(prepared_frame)
                 if scope.is_active:
                     context["days"] = [item for item in context["days"] if str(scope.start_date) <= item <= str(scope.end_date)]
                     machine_days = {
                         machine_id: [item for item in days if str(scope.start_date) <= item <= str(scope.end_date)]
                         for machine_id, days in machine_days.items()
+                    }
+                    machine_day_counts = {
+                        machine_id: {
+                            machine_day: count
+                            for machine_day, count in day_counts.items()
+                            if str(scope.start_date) <= machine_day <= str(scope.end_date)
+                        }
+                        for machine_id, day_counts in machine_day_counts.items()
                     }
                 context["machines"] = [m for m in context["machines"] if machine_days.get(m)]
                 if prepared_frame.empty:
@@ -362,6 +375,7 @@ def playback():
                 if machine and machine not in context["machines"]:
                     machine = context["machines"][0] if context["machines"] else ""
                 selected_machine_days = machine_days.get(machine, [])
+                selected_machine_day_counts = machine_day_counts.get(machine, {})
                 if day and day not in selected_machine_days:
                     day = ""
                 if not day and selected_machine_days:
@@ -375,7 +389,7 @@ def playback():
                         payload_frame = rows[base_columns].copy()
                         payload_frame["timestamp"] = pd.to_datetime(payload_frame["timestamp"], errors="coerce").dt.strftime("%Y-%m-%d %H:%M:%S")
                         row_payload = payload_frame.fillna("").to_dict("records")
-                        signal_columns = [col for col in rows.columns if col not in {"timestamp", "machine_id", "state", "day"}]
+                        signal_columns = default_live_signal_columns(rows)
                         field_groups = playback_field_groups([col for col in payload_frame.columns if col != "timestamp"])
                         timeline = rows.copy()
                         timeline["timestamp"] = pd.to_datetime(timeline["timestamp"], errors="coerce")
@@ -400,7 +414,9 @@ def playback():
         day=day,
         context=context,
         machine_days=machine_days,
+        machine_day_counts=machine_day_counts,
         selected_machine_days=selected_machine_days,
+        selected_machine_day_counts=selected_machine_day_counts,
         rows=rows,
         row_payload=row_payload,
         signal_columns=signal_columns,

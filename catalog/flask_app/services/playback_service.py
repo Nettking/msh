@@ -9,6 +9,7 @@ from catalog.common.artifact_registry import read_table_columns
 from catalog.common.timeline_exports import build_state_interval_export
 
 REQUIRED_PLAYBACK_COLUMNS = {"timestamp", "machine_id", "state"}
+DEFAULT_LIVE_SIGNAL_COLUMNS = ["Srpm", "Sload", "Sovr", "Fovr", "Frapidovr"]
 
 
 @dataclass
@@ -91,6 +92,25 @@ def playback_days_by_machine(df: pd.DataFrame) -> dict[str, list[str]]:
     }
 
 
+def playback_day_counts_by_machine(df: pd.DataFrame) -> dict[str, dict[str, int]]:
+    frame = prepare_playback_frame(df)
+    grouped = frame.groupby(["machine_id", "day"], dropna=True).size()
+    day_counts: dict[str, dict[str, int]] = {}
+    for (machine_id, day), count in grouped.items():
+        machine_key = str(machine_id).strip()
+        day_key = str(day).strip()
+        if not machine_key or not day_key:
+            continue
+        day_counts.setdefault(machine_key, {})[day_key] = int(count)
+
+    for machine_id in list(day_counts.keys()):
+        day_counts[machine_id] = {
+            day: day_counts[machine_id][day]
+            for day in sorted(day_counts[machine_id].keys())
+        }
+    return day_counts
+
+
 def interval_rows(rows: pd.DataFrame) -> list[dict]:
     if rows.empty:
         return []
@@ -132,7 +152,7 @@ def playback_field_groups(columns: list[str]) -> dict[str, list[str]]:
         "Signals": [],
         "State/context": [],
         "Detection/diagnostics": [],
-        "Other": [],
+        "Other fields": [],
     }
 
     signal_priority = [
@@ -193,5 +213,16 @@ def playback_field_groups(columns: list[str]) -> dict[str, list[str]]:
             grouped["State/context"].append(column)
             used.add(column)
 
-    grouped["Other"] = [column for column in columns if column not in used]
+    grouped["Other fields"] = [column for column in columns if column not in used]
     return grouped
+
+
+def default_live_signal_columns(df: pd.DataFrame) -> list[str]:
+    selected: list[str] = []
+    for column in DEFAULT_LIVE_SIGNAL_COLUMNS:
+        if column not in df.columns:
+            continue
+        numeric_series = pd.to_numeric(df[column], errors="coerce")
+        if numeric_series.notna().any():
+            selected.append(column)
+    return selected

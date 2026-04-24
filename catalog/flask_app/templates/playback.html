@@ -39,7 +39,9 @@
       <select name="day">
         <option value="">Select day</option>
         {% for d in selected_machine_days %}
-        <option value="{{ d }}" {% if day==d %}selected{% endif %}>{{ d }}</option>
+        <option value="{{ d }}" {% if day==d %}selected{% endif %}>
+          {{ d }}{% if selected_machine_day_counts.get(d) %} ({{ "{:,}".format(selected_machine_day_counts.get(d)) }} rows){% endif %}
+        </option>
         {% endfor %}
       </select>
     </label>
@@ -101,8 +103,12 @@
       <p id="nowDay">{{ day or '-' }}</p>
     </article>
     <article class="info-card">
-      <h4>Current row index</h4>
-      <p id="nowIndex">0</p>
+      <h4>Current row</h4>
+      <p id="nowIndex">1</p>
+    </article>
+    <article class="info-card info-card--wide">
+      <h4>Interpretation summary</h4>
+      <p id="sampleSummary">-</p>
     </article>
   </div>
 </section>
@@ -114,12 +120,33 @@
 
 <section class="section-block playback-timeline-panel">
   <div class="playback-timeline-header">
-    <h3>Timeline</h3>
+    <h3>Sample sequence timeline</h3>
     <p>Current timestamp: <strong id="timelineCurrentTs">-</strong></p>
   </div>
+  <p class="inline-note">The cursor marks the currently selected telemetry row.</p>
   <div class="playback-chart-shell">
     <canvas id="timelineDensityChart"></canvas>
   </div>
+</section>
+
+<section class="section-block playback-timeline-panel">
+  <div class="playback-timeline-header">
+    <h3>Live signal trends</h3>
+    <p>X-axis: sample/row sequence.</p>
+  </div>
+  <div class="playback-chart-shell">
+    <canvas id="defaultSignalsChart"></canvas>
+  </div>
+  <p id="defaultSignalsEmpty" class="inline-note" hidden>No default numeric signal columns were available for this playback export.</p>
+</section>
+
+<section class="section-block">
+  <details>
+    <summary>Advanced display options</summary>
+    <p class="inline-note">Default columns shown above: Srpm, Sload, Sovr, Fovr, Frapidovr (when numeric data exists).</p>
+    <p class="inline-note">Available numeric fields in this selection: <span id="numericFieldList">None detected</span>.</p>
+    <p class="inline-note">Custom field selection can be added in a follow-up change without affecting default playback behavior.</p>
+  </details>
 </section>
 
 <section class="section-block">
@@ -139,6 +166,7 @@
 <script>
 const playbackRows = {{ row_payload|tojson }};
 const fieldGroups = {{ field_groups|tojson }};
+const defaultSignalColumns = {{ signal_columns|tojson }};
 
 let currentIndex = 0;
 let timer = null;
@@ -150,6 +178,7 @@ const nowTimestamp = document.getElementById('nowTimestamp');
 const nowMachine = document.getElementById('nowMachine');
 const nowDay = document.getElementById('nowDay');
 const nowIndex = document.getElementById('nowIndex');
+const sampleSummary = document.getElementById('sampleSummary');
 const rowIndexText = document.getElementById('rowIndexText');
 const rowTotalText = document.getElementById('rowTotalText');
 const stateBadge = document.getElementById('stateBadge');
@@ -158,6 +187,8 @@ const groupedFields = document.getElementById('groupedFields');
 const rawRowTableBody = document.getElementById('rawRowTableBody');
 const rowSlider = document.getElementById('rowSlider');
 const speedSelect = document.getElementById('speedSelect');
+const defaultSignalsEmpty = document.getElementById('defaultSignalsEmpty');
+const numericFieldList = document.getElementById('numericFieldList');
 
 function stopPlayback() {
   if (timer) {
@@ -184,9 +215,9 @@ function renderGroups(row) {
   groupedFields.innerHTML = '';
   Object.entries(fieldGroups).forEach(([groupName, fields]) => {
     if (!fields || !fields.length) return;
-    const wrapper = document.createElement(groupName === 'Other' ? 'details' : 'section');
+    const wrapper = document.createElement(groupName === 'Other fields' ? 'details' : 'section');
     wrapper.className = 'field-group';
-    if (groupName === 'Other') {
+    if (groupName === 'Other fields') {
       wrapper.open = false;
       const summary = document.createElement('summary');
       summary.textContent = `Other fields (${fields.length})`;
@@ -219,6 +250,40 @@ function renderRawRow(row) {
   });
 }
 
+function isPresent(value) {
+  return !(value === null || value === undefined || value === '' || value === '-');
+}
+
+function parseNumeric(value) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  const parsed = Number(String(value ?? '').trim());
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function summarizeCurrentSample(row) {
+  const parts = [];
+  if (isPresent(row.machine_id)) parts.push(`Machine ${row.machine_id}`);
+  if (isPresent(row.state)) {
+    parts.push(`is ${String(row.state).toLowerCase()}`);
+  } else if (isPresent(row.execution)) {
+    parts.push(`execution ${row.execution}`);
+  }
+  if (isPresent(row.timestamp)) parts.push(`at ${row.timestamp}`);
+
+  const extras = [];
+  if (String(row.intervention_candidate).toLowerCase() === 'true') {
+    extras.push('Intervention candidate detected.');
+  } else if (isPresent(row.intervention_candidate)) {
+    extras.push('No intervention candidate.');
+  }
+  const eventScore = parseNumeric(row.event_score);
+  if (eventScore !== null) extras.push(`Event score ${eventScore.toFixed(3)}.`);
+  if (isPresent(row.fired_rules)) extras.push(`Fired rules: ${row.fired_rules}.`);
+
+  const sentence = parts.length ? `${parts.join(' ')}.` : 'Current sample loaded.';
+  return `${sentence} ${extras.join(' ')}`.trim();
+}
+
 const cursorPlugin = {
   id: 'cursorPlugin',
   afterDraw(chart) {
@@ -236,6 +301,14 @@ const cursorPlugin = {
     ctx.restore();
   }
 };
+
+const fallbackPalette = ['#1d4ed8', '#15803d', '#a16207', '#7c3aed', '#be123c'];
+const numericColumns = Object.keys(playbackRows[0] || {}).filter((column) => {
+  return playbackRows.some((row) => parseNumeric(row[column]) !== null);
+});
+numericFieldList.textContent = numericColumns.length ? numericColumns.join(', ') : 'None detected';
+
+const selectedDefaultSignalColumns = defaultSignalColumns;
 
 const timelineChart = new Chart(document.getElementById('timelineDensityChart'), {
   type: 'line',
@@ -255,7 +328,7 @@ const timelineChart = new Chart(document.getElementById('timelineDensityChart'),
     responsive: true,
     animation: false,
     scales: {
-      y: { title: { display: true, text: 'Row number' } }
+      y: { title: { display: true, text: 'Sample/row number' } }
     },
     plugins: {
       legend: { display: false }
@@ -263,6 +336,47 @@ const timelineChart = new Chart(document.getElementById('timelineDensityChart'),
   },
   plugins: [cursorPlugin],
 });
+
+const defaultSignalsChart = new Chart(document.getElementById('defaultSignalsChart'), {
+  type: 'line',
+  data: {
+    labels: playbackRows.map((_, idx) => idx + 1),
+    datasets: selectedDefaultSignalColumns.map((column, index) => ({
+      label: column,
+      data: playbackRows.map((row) => parseNumeric(row[column])),
+      borderColor: fallbackPalette[index % fallbackPalette.length],
+      pointRadius: 0,
+      borderWidth: 1.6,
+      tension: 0.12,
+      fill: false,
+      spanGaps: true,
+    })),
+  },
+  options: {
+    responsive: true,
+    animation: false,
+    interaction: { mode: 'index', intersect: false },
+    scales: {
+      x: { title: { display: true, text: 'Sample/row number' } },
+    },
+    plugins: {
+      tooltip: {
+        callbacks: {
+          title(items) {
+            const idx = items?.[0]?.dataIndex ?? 0;
+            const row = playbackRows[idx] || {};
+            return `Row ${idx + 1}${row.timestamp ? ` • ${row.timestamp}` : ''}`;
+          },
+        },
+      },
+    },
+  },
+  plugins: [cursorPlugin],
+});
+if (!selectedDefaultSignalColumns.length) {
+  defaultSignalsEmpty.hidden = false;
+  document.getElementById('defaultSignalsChart').closest('.playback-chart-shell').hidden = true;
+}
 
 function renderCurrentRow() {
   const row = playbackRows[currentIndex];
@@ -273,13 +387,15 @@ function renderCurrentRow() {
   stateBadge.className = `status-badge ${stateBadgeClass(row.state)}`.trim();
   nowMachine.textContent = valueText(row.machine_id || '{{ machine }}');
   nowDay.textContent = '{{ day }}' || '-';
-  nowIndex.textContent = String(currentIndex);
+  nowIndex.textContent = String(currentIndex + 1);
+  sampleSummary.textContent = summarizeCurrentSample(row);
   rowIndexText.textContent = String(currentIndex + 1);
   rowTotalText.textContent = String(playbackRows.length);
   rowSlider.value = String(currentIndex);
   renderGroups(row);
   renderRawRow(row);
-  timelineChart.update();
+  timelineChart.update('none');
+  defaultSignalsChart.update('none');
 }
 
 function tickPlayback() {
