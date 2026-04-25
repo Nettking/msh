@@ -191,19 +191,17 @@ const fieldGroups = {{ field_groups|tojson }};
 const defaultSignalColumns = {{ signal_columns|tojson }};
 
 let currentIndex = 0;
-let timer = null;
-let speed = 1;
-const PLAYBACK_CLOCK_REFRESH_MS = 50;
+let animationFrameId = null;
+let speedFactor = 1;
 const TIMELINE_TICK_MS = 200;
-let playbackClockRealStart = 0;
-let playbackClockSimulatedStart = 0;
-let currentSimulatedTimestampMs = 0;
+const MAX_TICKS_PER_FRAME = 3;
+let lastFrameTime = null;
+let accumulatedSimulatedMs = 0;
 let isPlaying = false;
 const timestampMs = playbackRows.map((row) => {
   const parsed = Date.parse(row.timestamp || '');
   return Number.isFinite(parsed) ? parsed : NaN;
 });
-const playbackStartTimestampMs = timestampMs.find((value) => Number.isFinite(value)) || 0;
 
 const nowTimestamp = document.getElementById('nowTimestamp');
 const nowMachine = document.getElementById('nowMachine');
@@ -224,10 +222,11 @@ const defaultSignalsEmpty = document.getElementById('defaultSignalsEmpty');
 const numericFieldList = document.getElementById('numericFieldList');
 
 function stopPlayback() {
-  if (timer) {
-    clearInterval(timer);
-    timer = null;
+  if (animationFrameId !== null) {
+    cancelAnimationFrame(animationFrameId);
+    animationFrameId = null;
   }
+  lastFrameTime = null;
   isPlaying = false;
 }
 
@@ -418,7 +417,6 @@ if (!selectedDefaultSignalColumns.length) {
 function renderCurrentRow() {
   const row = playbackRows[currentIndex];
   if (!row) return;
-  currentSimulatedTimestampMs = timestampMs[currentIndex] || currentSimulatedTimestampMs;
   nowTimestamp.textContent = valueText(row.timestamp);
   timelineCurrentTs.textContent = valueText(row.timestamp);
   stateBadge.textContent = valueText(row.state);
@@ -440,28 +438,47 @@ function renderCurrentRow() {
 
 function tickPlayback() {
   if (!isPlaying) return;
-  const elapsedRealMs = performance.now() - playbackClockRealStart;
-  const simulatedElapsedMs = elapsedRealMs * speed;
-  const simulatedTimestampMs = playbackClockSimulatedStart + simulatedElapsedMs;
-  const nextIndex = findIndexAtOrBefore(simulatedTimestampMs);
-  if (nextIndex < 0) {
+  const now = performance.now();
+  if (lastFrameTime === null) {
+    lastFrameTime = now;
+  }
+  const realDeltaMs = now - lastFrameTime;
+  lastFrameTime = now;
+  accumulatedSimulatedMs += realDeltaMs * speedFactor;
+
+  let consumedTicks = 0;
+  let indexChanged = false;
+  while (currentIndex < playbackRows.length - 1 && consumedTicks < MAX_TICKS_PER_FRAME) {
+    const currentTimestamp = timestampMs[currentIndex];
+    const nextTimestamp = timestampMs[currentIndex + 1];
+    const nextDeltaMsRaw = nextTimestamp - currentTimestamp;
+    const nextDeltaMs = Number.isFinite(nextDeltaMsRaw) && nextDeltaMsRaw > 0
+      ? nextDeltaMsRaw
+      : TIMELINE_TICK_MS;
+    if (accumulatedSimulatedMs < nextDeltaMs) break;
+
+    currentIndex += 1;
+    accumulatedSimulatedMs -= nextDeltaMs;
+    consumedTicks += 1;
+    indexChanged = true;
+  }
+
+  if (indexChanged) {
+    renderCurrentRow();
+  }
+
+  if (currentIndex >= playbackRows.length - 1) {
     stopPlayback();
     return;
   }
-  if (nextIndex !== currentIndex) {
-    currentIndex = nextIndex;
-    renderCurrentRow();
-  }
-  if (currentIndex >= playbackRows.length - 1) stopPlayback();
+  animationFrameId = requestAnimationFrame(tickPlayback);
 }
 
-function restartTimerFromCurrentRow() {
-  stopPlayback();
-  playbackClockRealStart = performance.now();
-  playbackClockSimulatedStart = timestampMs[currentIndex] || playbackStartTimestampMs;
-  currentSimulatedTimestampMs = playbackClockSimulatedStart;
+function startPlaybackFromCurrentRow() {
+  if (isPlaying) return;
   isPlaying = true;
-  timer = setInterval(tickPlayback, Math.max(20, PLAYBACK_CLOCK_REFRESH_MS));
+  lastFrameTime = null;
+  animationFrameId = requestAnimationFrame(tickPlayback);
 }
 
 function findIndexAtOrBefore(targetTimestampMs) {
@@ -487,7 +504,7 @@ function findIndexAtOrBefore(targetTimestampMs) {
 
 document.getElementById('playBtn').addEventListener('click', () => {
   if (currentIndex >= playbackRows.length - 1) currentIndex = 0;
-  restartTimerFromCurrentRow();
+  startPlaybackFromCurrentRow();
 });
 
 document.getElementById('pauseBtn').addEventListener('click', () => {
@@ -497,33 +514,34 @@ document.getElementById('pauseBtn').addEventListener('click', () => {
 document.getElementById('resetBtn').addEventListener('click', () => {
   stopPlayback();
   currentIndex = 0;
+  accumulatedSimulatedMs = 0;
   renderCurrentRow();
 });
 
 document.getElementById('stepBackBtn').addEventListener('click', () => {
   stopPlayback();
   currentIndex = Math.max(0, currentIndex - 1);
+  accumulatedSimulatedMs = 0;
   renderCurrentRow();
 });
 
 document.getElementById('stepForwardBtn').addEventListener('click', () => {
   stopPlayback();
-  const currentTs = timestampMs[currentIndex] || playbackStartTimestampMs;
-  const targetTs = currentTs + TIMELINE_TICK_MS;
-  const nextIndex = findIndexAtOrBefore(targetTs);
-  currentIndex = Math.max(currentIndex, Math.min(playbackRows.length - 1, nextIndex));
+  currentIndex = Math.min(playbackRows.length - 1, currentIndex + 1);
+  accumulatedSimulatedMs = 0;
   renderCurrentRow();
 });
 
 rowSlider.addEventListener('input', () => {
   stopPlayback();
   currentIndex = Number(rowSlider.value || 0);
+  accumulatedSimulatedMs = 0;
   renderCurrentRow();
 });
 
 speedSelect.addEventListener('change', () => {
-  speed = Number(speedSelect.value || 1);
-  if (timer) restartTimerFromCurrentRow();
+  speedFactor = Number(speedSelect.value || 1);
+  if (isPlaying) lastFrameTime = performance.now();
 });
 
 renderCurrentRow();
