@@ -388,6 +388,12 @@ def playback():
                         base_columns = [col for col in rows.columns if col != "day"]
                         payload_frame = rows[base_columns].copy()
                         payload_frame["timestamp"] = pd.to_datetime(payload_frame["timestamp"], errors="coerce").dt.strftime("%Y-%m-%d %H:%M:%S")
+                        if "source_timestamp" in payload_frame.columns:
+                            payload_frame["source_timestamp"] = pd.to_datetime(
+                                payload_frame["source_timestamp"], errors="coerce"
+                            ).dt.strftime("%Y-%m-%d %H:%M:%S")
+                        if "is_synthetic_tick" in payload_frame.columns:
+                            payload_frame["is_synthetic_tick"] = payload_frame["is_synthetic_tick"].fillna(False).astype(bool)
                         row_payload = payload_frame.fillna("").to_dict("records")
                         signal_columns = default_live_signal_columns(rows)
                         field_groups = playback_field_groups([col for col in payload_frame.columns if col != "timestamp"])
