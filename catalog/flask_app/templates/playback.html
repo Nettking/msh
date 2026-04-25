@@ -14,39 +14,56 @@
   <p>No playback-ready timeline exports were found. Run or refresh the workflow to generate playback data.</p>
 </section>
 {% else %}
+{% set selection_incomplete = not selected_path or not machine or not day %}
+{% set selection_has_error = error or validation_reason %}
+{% set expand_setup = selection_incomplete or selection_has_error %}
+{% set selected_dataset = namespace(label='-') %}
+{% for a in playback_artifacts %}
+  {% if selected_path == a.path %}
+    {% set selected_dataset.label = a.file_name %}
+  {% endif %}
+{% endfor %}
 <section class="section-block playback-selection-card">
-  <h3>Selection</h3>
-  <form class="playback-form playback-form--card" method="get">
-    <label>
-      Dataset
-      <select name="path" onchange="this.form.submit()">
-        {% for a in playback_artifacts %}
-        <option value="{{ a.path }}" {% if selected_path==a.path %}selected{% endif %}>{{ a.file_name }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>
-      Machine
-      <select name="machine" onchange="this.form.submit()">
-        <option value="">Select machine</option>
-        {% for m in context.machines %}
-        <option value="{{ m }}" {% if machine==m %}selected{% endif %}>{{ m }}</option>
-        {% endfor %}
-      </select>
-    </label>
-    <label>
-      Day
-      <select name="day">
-        <option value="">Select day</option>
-        {% for d in selected_machine_days %}
-        <option value="{{ d }}" {% if day==d %}selected{% endif %}>
-          {{ d }}{% if selected_machine_day_counts.get(d) %} ({{ "{:,}".format(selected_machine_day_counts.get(d)) }} rows){% endif %}
-        </option>
-        {% endfor %}
-      </select>
-    </label>
-    <button type="submit">Load</button>
-  </form>
+  <h3>Playback setup</h3>
+  <p class="playback-selection-summary">
+    <strong>Dataset:</strong> {{ selected_dataset.label }} |
+    <strong>Machine:</strong> {{ machine or '-' }} |
+    <strong>Day:</strong> {{ day or '-' }}
+  </p>
+  <details class="playback-setup-toggle" {% if expand_setup %}open{% endif %}>
+    <summary>Change selection</summary>
+    <form class="playback-form playback-form--card" method="get">
+      <label>
+        Dataset
+        <select name="path" onchange="this.form.submit()">
+          {% for a in playback_artifacts %}
+          <option value="{{ a.path }}" {% if selected_path==a.path %}selected{% endif %}>{{ a.file_name }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Machine
+        <select name="machine" onchange="this.form.submit()">
+          <option value="">Select machine</option>
+          {% for m in context.machines %}
+          <option value="{{ m }}" {% if machine==m %}selected{% endif %}>{{ m }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      <label>
+        Day
+        <select name="day">
+          <option value="">Select day</option>
+          {% for d in selected_machine_days %}
+          <option value="{{ d }}" {% if day==d %}selected{% endif %}>
+            {{ d }}{% if selected_machine_day_counts.get(d) %} ({{ "{:,}".format(selected_machine_day_counts.get(d)) }} rows){% endif %}
+          </option>
+          {% endfor %}
+        </select>
+      </label>
+      <button type="submit">Load</button>
+    </form>
+  </details>
 </section>
 {% endif %}
 
