@@ -92,46 +92,37 @@
       </select>
     </label>
     <p class="playback-index">Row <strong id="rowIndexText">1</strong> / <span id="rowTotalText">{{ row_payload|length }}</span></p>
+    <label class="playback-slider-label" for="rowSlider">Progress</label>
+    <input id="rowSlider" class="playback-slider" type="range" min="0" max="{{ (row_payload|length) - 1 }}" value="0" step="1">
   </div>
-  <label class="playback-slider-label" for="rowSlider">Progress</label>
-  <input id="rowSlider" class="playback-slider" type="range" min="0" max="{{ (row_payload|length) - 1 }}" value="0" step="1">
 </section>
 
 <section class="section-block">
   <h3>Current sample</h3>
-  <div class="playback-current-grid">
-    <article class="info-card">
-      <h4>Timestamp</h4>
-      <p id="nowTimestamp">-</p>
-    </article>
-    <article class="info-card">
-      <h4>State</h4>
-      <p><span id="stateBadge" class="status-badge">-</span></p>
-    </article>
-    <article class="info-card">
-      <h4>Machine</h4>
-      <p id="nowMachine">{{ machine or '-' }}</p>
-    </article>
-    <article class="info-card">
-      <h4>Selected day</h4>
-      <p id="nowDay">{{ day or '-' }}</p>
-    </article>
-    <article class="info-card">
-      <h4>Current row</h4>
-      <p id="nowIndex">1</p>
-    </article>
-    <article class="info-card">
-      <h4>Tick type</h4>
-      <p id="tickType">-</p>
-    </article>
-    <article class="info-card">
-      <h4>Source timestamp</h4>
-      <p id="sourceTimestamp">-</p>
-    </article>
-    <article class="info-card info-card--wide">
-      <h4>Interpretation summary</h4>
-      <p id="sampleSummary">-</p>
-    </article>
+  <div class="playback-current-inline">
+    <span class="playback-item-label">Timestamp</span>
+    <span id="nowTimestamp">-</span>
+    <span class="playback-item-sep">•</span>
+    <span class="playback-item-label">State</span>
+    <span id="stateBadge" class="status-badge">-</span>
+    <span class="playback-item-sep">•</span>
+    <span class="playback-item-label">Machine</span>
+    <span id="nowMachine">{{ machine or '-' }}</span>
+    <span class="playback-item-sep">•</span>
+    <span class="playback-item-label">Day</span>
+    <span id="nowDay">{{ day or '-' }}</span>
+    <span class="playback-item-sep">•</span>
+    <span class="playback-item-label">Row</span>
+    <span id="nowIndex">1</span>
+    <span class="playback-item-sep">•</span>
+    <span class="playback-item-label">Tick</span>
+    <span id="tickType">-</span>
+    <span class="playback-item-sep">•</span>
+    <span class="playback-item-label">Source</span>
+    <span id="sourceTimestamp">-</span>
+    <span class="playback-item-sep">•</span>
+    <span class="playback-item-label">Summary</span>
+    <span id="sampleSummary" class="playback-summary-text">-</span>
   </div>
 </section>
 
