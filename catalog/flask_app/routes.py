@@ -313,6 +313,11 @@ def machine_view():
     )
 
 
+def _serialize_playback_timestamp(series: pd.Series) -> pd.Series:
+    parsed = pd.to_datetime(series, errors="coerce", utc=True)
+    return parsed.dt.strftime("%Y-%m-%dT%H:%M:%S.%f").str.slice(stop=-3) + "Z"
+
+
 @web.route("/playback")
 def playback():
     snap = _catalog().ensure_scanned()
@@ -387,11 +392,9 @@ def playback():
                     if not rows.empty:
                         base_columns = [col for col in rows.columns if col != "day"]
                         payload_frame = rows[base_columns].copy()
-                        payload_frame["timestamp"] = pd.to_datetime(payload_frame["timestamp"], errors="coerce").dt.strftime("%Y-%m-%d %H:%M:%S")
+                        payload_frame["timestamp"] = _serialize_playback_timestamp(payload_frame["timestamp"])
                         if "source_timestamp" in payload_frame.columns:
-                            payload_frame["source_timestamp"] = pd.to_datetime(
-                                payload_frame["source_timestamp"], errors="coerce"
-                            ).dt.strftime("%Y-%m-%d %H:%M:%S")
+                            payload_frame["source_timestamp"] = _serialize_playback_timestamp(payload_frame["source_timestamp"])
                         if "is_synthetic_tick" in payload_frame.columns:
                             payload_frame["is_synthetic_tick"] = payload_frame["is_synthetic_tick"].fillna(False).astype(bool)
                         row_payload = payload_frame.fillna("").to_dict("records")
