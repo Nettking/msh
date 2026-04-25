@@ -68,13 +68,10 @@
     <label>
       Speed
       <select id="speedSelect">
-        <option value="0.25">0.25x</option>
-        <option value="0.5">0.5x</option>
         <option value="1" selected>1x</option>
         <option value="2">2x</option>
         <option value="4">4x</option>
-        <option value="8">8x</option>
-        <option value="16">16x</option>
+        <option value="10">10x</option>
       </select>
     </label>
     <p class="playback-index">Row <strong id="rowIndexText">1</strong> / <span id="rowTotalText">{{ row_payload|length }}</span></p>
@@ -105,6 +102,14 @@
     <article class="info-card">
       <h4>Current row</h4>
       <p id="nowIndex">1</p>
+    </article>
+    <article class="info-card">
+      <h4>Tick type</h4>
+      <p id="tickType">-</p>
+    </article>
+    <article class="info-card">
+      <h4>Source timestamp</h4>
+      <p id="sourceTimestamp">-</p>
     </article>
     <article class="info-card info-card--wide">
       <h4>Interpretation summary</h4>
@@ -171,13 +176,24 @@ const defaultSignalColumns = {{ signal_columns|tojson }};
 let currentIndex = 0;
 let timer = null;
 let speed = 1;
-const BASE_INTERVAL_MS = 500;
-const MIN_INTERVAL_MS = 60;
+const PLAYBACK_CLOCK_REFRESH_MS = 50;
+const TIMELINE_TICK_MS = 200;
+let playbackClockRealStart = 0;
+let playbackClockSimulatedStart = 0;
+let currentSimulatedTimestampMs = 0;
+let isPlaying = false;
+const timestampMs = playbackRows.map((row) => {
+  const parsed = Date.parse(row.timestamp || '');
+  return Number.isFinite(parsed) ? parsed : NaN;
+});
+const playbackStartTimestampMs = timestampMs.find((value) => Number.isFinite(value)) || 0;
 
 const nowTimestamp = document.getElementById('nowTimestamp');
 const nowMachine = document.getElementById('nowMachine');
 const nowDay = document.getElementById('nowDay');
 const nowIndex = document.getElementById('nowIndex');
+const tickType = document.getElementById('tickType');
+const sourceTimestamp = document.getElementById('sourceTimestamp');
 const sampleSummary = document.getElementById('sampleSummary');
 const rowIndexText = document.getElementById('rowIndexText');
 const rowTotalText = document.getElementById('rowTotalText');
@@ -195,6 +211,7 @@ function stopPlayback() {
     clearInterval(timer);
     timer = null;
   }
+  isPlaying = false;
 }
 
 function stateBadgeClass(state) {
@@ -269,6 +286,9 @@ function summarizeCurrentSample(row) {
     parts.push(`execution ${row.execution}`);
   }
   if (isPresent(row.timestamp)) parts.push(`at ${row.timestamp}`);
+  if (row.is_synthetic_tick === true) {
+    parts.push('(filled synthetic tick)');
+  }
 
   const extras = [];
   if (String(row.intervention_candidate).toLowerCase() === 'true') {
@@ -381,6 +401,7 @@ if (!selectedDefaultSignalColumns.length) {
 function renderCurrentRow() {
   const row = playbackRows[currentIndex];
   if (!row) return;
+  currentSimulatedTimestampMs = timestampMs[currentIndex] || currentSimulatedTimestampMs;
   nowTimestamp.textContent = valueText(row.timestamp);
   timelineCurrentTs.textContent = valueText(row.timestamp);
   stateBadge.textContent = valueText(row.state);
@@ -388,6 +409,8 @@ function renderCurrentRow() {
   nowMachine.textContent = valueText(row.machine_id || '{{ machine }}');
   nowDay.textContent = '{{ day }}' || '-';
   nowIndex.textContent = String(currentIndex + 1);
+  tickType.textContent = row.is_synthetic_tick === true ? 'Synthetic / filled tick' : 'Source-aligned tick';
+  sourceTimestamp.textContent = valueText(row.source_timestamp);
   sampleSummary.textContent = summarizeCurrentSample(row);
   rowIndexText.textContent = String(currentIndex + 1);
   rowTotalText.textContent = String(playbackRows.length);
@@ -399,27 +422,55 @@ function renderCurrentRow() {
 }
 
 function tickPlayback() {
-  const finalIndex = playbackRows.length - 1;
-  const nextIndex = Math.min(currentIndex + 1, finalIndex);
-  if (nextIndex === currentIndex) {
+  if (!isPlaying) return;
+  const elapsedRealMs = performance.now() - playbackClockRealStart;
+  const simulatedElapsedMs = elapsedRealMs * speed;
+  const simulatedTimestampMs = playbackClockSimulatedStart + simulatedElapsedMs;
+  const nextIndex = findIndexAtOrBefore(simulatedTimestampMs);
+  if (nextIndex < 0) {
     stopPlayback();
     return;
   }
-  // Move exactly one row per tick, render it, then stop after rendering the final row.
-  currentIndex = nextIndex;
-  renderCurrentRow();
-  if (currentIndex === finalIndex) stopPlayback();
+  if (nextIndex !== currentIndex) {
+    currentIndex = nextIndex;
+    renderCurrentRow();
+  }
+  if (currentIndex >= playbackRows.length - 1) stopPlayback();
 }
 
-function restartTimer() {
+function restartTimerFromCurrentRow() {
   stopPlayback();
-  const delay = Math.max(MIN_INTERVAL_MS, Math.round(BASE_INTERVAL_MS / speed));
-  timer = setInterval(tickPlayback, delay);
+  playbackClockRealStart = performance.now();
+  playbackClockSimulatedStart = timestampMs[currentIndex] || playbackStartTimestampMs;
+  currentSimulatedTimestampMs = playbackClockSimulatedStart;
+  isPlaying = true;
+  timer = setInterval(tickPlayback, Math.max(20, PLAYBACK_CLOCK_REFRESH_MS));
+}
+
+function findIndexAtOrBefore(targetTimestampMs) {
+  let low = 0;
+  let high = timestampMs.length - 1;
+  let answer = -1;
+  while (low <= high) {
+    const mid = Math.floor((low + high) / 2);
+    const value = timestampMs[mid];
+    if (!Number.isFinite(value)) {
+      low = mid + 1;
+      continue;
+    }
+    if (value <= targetTimestampMs) {
+      answer = mid;
+      low = mid + 1;
+    } else {
+      high = mid - 1;
+    }
+  }
+  return answer;
 }
 
 document.getElementById('playBtn').addEventListener('click', () => {
   if (currentIndex >= playbackRows.length - 1) currentIndex = 0;
-  restartTimer();
+  restartTimerFromCurrentRow();
 });
 
 document.getElementById('pauseBtn').addEventListener('click', () => {
@@ -440,7 +491,10 @@ document.getElementById('stepBackBtn').addEventListener('click', () => {
 
 document.getElementById('stepForwardBtn').addEventListener('click', () => {
   stopPlayback();
-  currentIndex = Math.min(playbackRows.length - 1, currentIndex + 1);
+  const currentTs = timestampMs[currentIndex] || playbackStartTimestampMs;
+  const targetTs = currentTs + TIMELINE_TICK_MS;
+  const nextIndex = findIndexAtOrBefore(targetTs);
+  currentIndex = Math.max(currentIndex, Math.min(playbackRows.length - 1, nextIndex));
   renderCurrentRow();
 });
 
@@ -452,7 +506,7 @@ rowSlider.addEventListener('input', () => {
 
 speedSelect.addEventListener('change', () => {
   speed = Number(speedSelect.value || 1);
-  if (timer) restartTimer();
+  if (timer) restartTimerFromCurrentRow();
 });
 
 renderCurrentRow();

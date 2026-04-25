@@ -10,6 +10,7 @@ from catalog.common.timeline_exports import build_state_interval_export
 
 REQUIRED_PLAYBACK_COLUMNS = {"timestamp", "machine_id", "state"}
 DEFAULT_LIVE_SIGNAL_COLUMNS = ["Srpm", "Sload", "Sovr", "Fovr", "Frapidovr"]
+PLAYBACK_TICK_FREQUENCY = "200ms"
 
 
 @dataclass
@@ -72,7 +73,56 @@ def validate_playback_frame(df: pd.DataFrame) -> PlaybackValidation:
 def playback_subset(df: pd.DataFrame, machine_id: str, day: str) -> pd.DataFrame:
     base = prepare_playback_frame(df)
     rows = base[(base["machine_id"] == str(machine_id)) & (base["day"] == str(day))]
-    return rows.sort_values("timestamp").reset_index(drop=True)
+    return resample_playback_timeline(rows).reset_index(drop=True)
+
+
+def resample_playback_timeline(df: pd.DataFrame, frequency: str = PLAYBACK_TICK_FREQUENCY) -> pd.DataFrame:
+    if df.empty:
+        return df.copy()
+
+    frame = prepare_playback_frame(df)
+    if frame.empty:
+        return frame
+
+    resampled_parts: list[pd.DataFrame] = []
+    for machine_id, machine_rows in frame.groupby("machine_id", dropna=False):
+        if pd.isna(machine_id) or str(machine_id).strip() == "":
+            continue
+        ordered = machine_rows.sort_values("timestamp").copy()
+        ordered = ordered.drop_duplicates(subset=["timestamp"], keep="last")
+        if ordered.empty:
+            continue
+
+        grid_start = ordered["timestamp"].min()
+        grid_end = ordered["timestamp"].max()
+        timeline_grid = pd.DataFrame(
+            {
+                "timestamp": pd.date_range(start=grid_start, end=grid_end, freq=frequency),
+                "machine_id": str(machine_id),
+            }
+        )
+        source_rows = ordered.rename(columns={"timestamp": "source_timestamp"})
+        timeline_grid["machine_id"] = timeline_grid["machine_id"].astype("string")
+        source_rows["machine_id"] = source_rows["machine_id"].astype("string")
+        merged = pd.merge_asof(
+            timeline_grid.sort_values("timestamp"),
+            source_rows.sort_values("source_timestamp"),
+            left_on="timestamp",
+            right_on="source_timestamp",
+            by="machine_id",
+            direction="backward",
+        )
+        merged = merged.dropna(subset=["source_timestamp", "state"])
+        if merged.empty:
+            continue
+        merged["is_synthetic_tick"] = merged["timestamp"] != merged["source_timestamp"]
+        merged["day"] = merged["timestamp"].dt.date.astype(str)
+        resampled_parts.append(merged)
+
+    if not resampled_parts:
+        return frame.iloc[0:0].copy()
+
+    return pd.concat(resampled_parts, ignore_index=True).sort_values(["machine_id", "timestamp"]).reset_index(drop=True)
 
 
 def playback_context(df: pd.DataFrame) -> dict:

@@ -30,6 +30,7 @@ playback_day_counts_by_machine = _PLAYBACK_MOD.playback_day_counts_by_machine
 playback_days_by_machine = _PLAYBACK_MOD.playback_days_by_machine
 playback_field_groups = _PLAYBACK_MOD.playback_field_groups
 prepare_playback_frame = _PLAYBACK_MOD.prepare_playback_frame
+resample_playback_timeline = _PLAYBACK_MOD.resample_playback_timeline
 validate_playback_frame = _PLAYBACK_MOD.validate_playback_frame
 validate_playback_source = _PLAYBACK_MOD.validate_playback_source
 scan_artifacts = _ARTIFACT_MOD.scan_artifacts
@@ -173,3 +174,77 @@ def test_default_live_signal_columns_only_returns_numeric_core_signals() -> None
     )
 
     assert default_live_signal_columns(frame) == ["Srpm", "Sload", "Frapidovr"]
+
+
+def test_resample_playback_timeline_adds_200ms_ticks_and_marks_synthetic_rows() -> None:
+    frame = pd.DataFrame(
+        {
+            "timestamp": [
+                "2026-03-01T10:00:00.000Z",
+                "2026-03-01T10:00:00.400Z",
+            ],
+            "machine_id": ["M1", "M1"],
+            "state": ["run", "idle"],
+            "execution": ["AUTO", "MDI"],
+            "Srpm": [1200, 1300],
+        }
+    )
+
+    resampled = resample_playback_timeline(frame)
+
+    assert resampled["timestamp"].dt.strftime("%H:%M:%S.%f").str[:-3].tolist() == [
+        "10:00:00.000",
+        "10:00:00.200",
+        "10:00:00.400",
+    ]
+    assert resampled["is_synthetic_tick"].tolist() == [False, True, False]
+    assert resampled["source_timestamp"].dt.strftime("%H:%M:%S.%f").str[:-3].tolist() == [
+        "10:00:00.000",
+        "10:00:00.000",
+        "10:00:00.400",
+    ]
+    assert resampled["state"].tolist() == ["run", "run", "idle"]
+    assert resampled["execution"].tolist() == ["AUTO", "AUTO", "MDI"]
+
+
+def test_playback_subset_returns_resampled_timeline() -> None:
+    frame = pd.DataFrame(
+        {
+            "timestamp": [
+                "2026-03-01T10:00:00.000Z",
+                "2026-03-01T10:00:01.000Z",
+            ],
+            "machine_id": ["M1", "M1"],
+            "state": ["run", "run"],
+        }
+    )
+
+    subset = _PLAYBACK_MOD.playback_subset(frame, machine_id="M1", day="2026-03-01")
+
+    assert len(subset) == 6
+    assert subset["is_synthetic_tick"].sum() == 4
+
+
+def test_resample_playback_timeline_does_not_pad_before_first_or_after_last_sample() -> None:
+    frame = pd.DataFrame(
+        {
+            "timestamp": [
+                "2026-03-01T10:00:00.050Z",
+                "2026-03-01T10:00:00.450Z",
+            ],
+            "machine_id": ["M1", "M1"],
+            "state": ["run", "idle"],
+        }
+    )
+
+    resampled = resample_playback_timeline(frame)
+
+    assert resampled["timestamp"].dt.strftime("%H:%M:%S.%f").str[:-3].tolist() == [
+        "10:00:00.050",
+        "10:00:00.250",
+        "10:00:00.450",
+    ]
+    assert resampled.iloc[0]["source_timestamp"] == pd.Timestamp("2026-03-01T10:00:00.050Z")
+    assert resampled.iloc[-1]["source_timestamp"] == pd.Timestamp("2026-03-01T10:00:00.450Z")
+    assert bool(resampled.iloc[0]["is_synthetic_tick"]) is False
+    assert bool(resampled.iloc[-1]["is_synthetic_tick"]) is False
