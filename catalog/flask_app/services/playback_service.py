@@ -11,12 +11,38 @@ from catalog.common.timeline_exports import build_state_interval_export
 REQUIRED_PLAYBACK_COLUMNS = {"timestamp", "machine_id", "state"}
 DEFAULT_LIVE_SIGNAL_COLUMNS = ["Srpm", "Sload", "Sovr", "Fovr", "Frapidovr"]
 PLAYBACK_TICK_FREQUENCY = "200ms"
+DEFAULT_FALLBACK_PLAYBACK_DELAY_SECONDS = 0.2
+DEFAULT_MAX_PLAYBACK_DELAY_SECONDS = 5.0
 
 
 @dataclass
 class PlaybackValidation:
     is_valid: bool
     reason: str = ""
+
+
+def compute_playback_delay(
+    previous_timestamp,
+    current_timestamp,
+    speed: float,
+    fallback_delay: float = DEFAULT_FALLBACK_PLAYBACK_DELAY_SECONDS,
+    max_delay: float = DEFAULT_MAX_PLAYBACK_DELAY_SECONDS,
+) -> float:
+    previous = pd.to_datetime(previous_timestamp, errors="coerce", utc=True)
+    current = pd.to_datetime(current_timestamp, errors="coerce", utc=True)
+    safe_fallback = fallback_delay if pd.notna(fallback_delay) and float(fallback_delay) > 0 else 0.05
+    safe_max_delay = max_delay if pd.notna(max_delay) and float(max_delay) > 0 else safe_fallback
+    safe_speed = float(speed) if pd.notna(speed) and float(speed) > 0 else 1.0
+
+    if pd.isna(previous) or pd.isna(current):
+        return min(safe_fallback, safe_max_delay)
+
+    delta_seconds = (current - previous).total_seconds()
+    if delta_seconds <= 0:
+        return min(safe_fallback, safe_max_delay)
+
+    scaled = delta_seconds / safe_speed
+    return max(0.0, min(scaled, safe_max_delay))
 
 
 def _has_non_empty_values(series: pd.Series) -> bool:
@@ -73,7 +99,12 @@ def validate_playback_frame(df: pd.DataFrame) -> PlaybackValidation:
 def playback_subset(df: pd.DataFrame, machine_id: str, day: str) -> pd.DataFrame:
     base = prepare_playback_frame(df)
     rows = base[(base["machine_id"] == str(machine_id)) & (base["day"] == str(day))]
-    return resample_playback_timeline(rows).reset_index(drop=True)
+    if rows.empty:
+        return rows.reset_index(drop=True)
+    ordered = rows.sort_values("timestamp").drop_duplicates(subset=["timestamp"], keep="last").copy()
+    ordered["source_timestamp"] = ordered["timestamp"]
+    ordered["is_synthetic_tick"] = False
+    return ordered.reset_index(drop=True)
 
 
 def resample_playback_timeline(df: pd.DataFrame, frequency: str = PLAYBACK_TICK_FREQUENCY) -> pd.DataFrame:

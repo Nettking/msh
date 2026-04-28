@@ -3,7 +3,7 @@
 <section class="section-block section-block--primary playback-header">
   <div>
     <h2>Playback</h2>
-    <p class="playback-subtitle">Sample playback for telemetry rows from the selected machine/day.</p>
+    <p class="playback-subtitle">Sample playback for telemetry rows from the selected machine/day, timed from source timestamps (1x = real elapsed time).</p>
   </div>
   <p class="scope-chip">Global operator scope: <strong>{{ operator_scope.label }}</strong></p>
 </section>
@@ -184,7 +184,10 @@ const defaultSignalColumns = {{ signal_columns|tojson }};
 let currentIndex = 0;
 let animationFrameId = null;
 let speedFactor = 1;
-const TIMELINE_TICK_MS = 200;
+// Fallback when timestamp deltas are invalid/non-monotonic.
+const FALLBACK_PLAYBACK_DELAY_MS = 200;
+// Prevent UI freezes on sparse data with very large timestamp gaps.
+const MAX_PLAYBACK_DELAY_MS = 5000;
 const MAX_TICKS_PER_FRAME = 3;
 let lastFrameTime = null;
 let accumulatedSimulatedMs = 0;
@@ -435,17 +438,18 @@ function tickPlayback() {
   }
   const realDeltaMs = now - lastFrameTime;
   lastFrameTime = now;
-  accumulatedSimulatedMs += realDeltaMs * speedFactor;
+  accumulatedSimulatedMs += realDeltaMs;
 
   let consumedTicks = 0;
   let indexChanged = false;
   while (currentIndex < playbackRows.length - 1 && consumedTicks < MAX_TICKS_PER_FRAME) {
-    const currentTimestamp = timestampMs[currentIndex];
-    const nextTimestamp = timestampMs[currentIndex + 1];
-    const nextDeltaMsRaw = nextTimestamp - currentTimestamp;
-    const nextDeltaMs = Number.isFinite(nextDeltaMsRaw) && nextDeltaMsRaw > 0
-      ? nextDeltaMsRaw
-      : TIMELINE_TICK_MS;
+    const nextDeltaMs = computePlaybackDelayMs(
+      playbackRows[currentIndex]?.timestamp,
+      playbackRows[currentIndex + 1]?.timestamp,
+      speedFactor,
+      FALLBACK_PLAYBACK_DELAY_MS,
+      MAX_PLAYBACK_DELAY_MS,
+    );
     if (accumulatedSimulatedMs < nextDeltaMs) break;
 
     currentIndex += 1;
@@ -463,6 +467,22 @@ function tickPlayback() {
     return;
   }
   animationFrameId = requestAnimationFrame(tickPlayback);
+}
+
+function computePlaybackDelayMs(previousTimestamp, currentTimestamp, speed, fallbackDelayMs, maxDelayMs) {
+  const parsedPrevious = Date.parse(previousTimestamp || '');
+  const parsedCurrent = Date.parse(currentTimestamp || '');
+  const speedMultiplier = Number(speed);
+  const safeSpeed = Number.isFinite(speedMultiplier) && speedMultiplier > 0 ? speedMultiplier : 1;
+  const safeFallbackMs = Number.isFinite(fallbackDelayMs) && fallbackDelayMs > 0 ? fallbackDelayMs : 50;
+  const safeMaxMs = Number.isFinite(maxDelayMs) && maxDelayMs > 0 ? maxDelayMs : safeFallbackMs;
+  const rawDeltaMs = parsedCurrent - parsedPrevious;
+  if (!Number.isFinite(rawDeltaMs) || rawDeltaMs <= 0) {
+    return Math.min(safeFallbackMs, safeMaxMs);
+  }
+  const scaledDelayMs = rawDeltaMs / safeSpeed;
+  const boundedDelayMs = Math.min(scaledDelayMs, safeMaxMs);
+  return Math.max(0, boundedDelayMs);
 }
 
 function startPlaybackFromCurrentRow() {
