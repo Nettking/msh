@@ -54,6 +54,8 @@ Startup now performs **webapp-first runtime**:
 
 Open http://localhost:5000.
 
+Playback timing semantics: operator playback pacing is timestamp-based. At `1x`, rows advance using the real elapsed time between consecutive sample timestamps; speed multipliers scale that elapsed delay (for example `2x` halves delay), with a bounded max-delay cap to avoid UI freezes on very large gaps.
+
 Implementation note: shared registry/data logic is centralized in `catalog/common/artifact_registry.py`.
 
 ## Artifact visibility defaults

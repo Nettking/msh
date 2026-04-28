@@ -33,6 +33,7 @@ prepare_playback_frame = _PLAYBACK_MOD.prepare_playback_frame
 resample_playback_timeline = _PLAYBACK_MOD.resample_playback_timeline
 validate_playback_frame = _PLAYBACK_MOD.validate_playback_frame
 validate_playback_source = _PLAYBACK_MOD.validate_playback_source
+compute_playback_delay = _PLAYBACK_MOD.compute_playback_delay
 scan_artifacts = _ARTIFACT_MOD.scan_artifacts
 
 
@@ -207,7 +208,7 @@ def test_resample_playback_timeline_adds_200ms_ticks_and_marks_synthetic_rows() 
     assert resampled["execution"].tolist() == ["AUTO", "AUTO", "MDI"]
 
 
-def test_playback_subset_returns_resampled_timeline() -> None:
+def test_playback_subset_preserves_source_timestamps_for_timestamp_based_playback() -> None:
     frame = pd.DataFrame(
         {
             "timestamp": [
@@ -221,8 +222,59 @@ def test_playback_subset_returns_resampled_timeline() -> None:
 
     subset = _PLAYBACK_MOD.playback_subset(frame, machine_id="M1", day="2026-03-01")
 
-    assert len(subset) == 6
-    assert subset["is_synthetic_tick"].sum() == 4
+    assert len(subset) == 2
+    assert subset["is_synthetic_tick"].sum() == 0
+    assert subset["source_timestamp"].equals(subset["timestamp"])
+
+
+def test_compute_playback_delay_uses_real_elapsed_time_at_1x() -> None:
+    delay = compute_playback_delay(
+        "2026-03-01T10:00:00Z",
+        "2026-03-01T10:00:01Z",
+        speed=1.0,
+        fallback_delay=0.2,
+        max_delay=5.0,
+    )
+    assert delay == 1.0
+
+
+def test_compute_playback_delay_scales_by_speed_multiplier() -> None:
+    delay = compute_playback_delay(
+        "2026-03-01T10:00:00Z",
+        "2026-03-01T10:00:10Z",
+        speed=2.0,
+        fallback_delay=0.2,
+        max_delay=10.0,
+    )
+    assert delay == 5.0
+
+
+def test_compute_playback_delay_supports_half_speed() -> None:
+    delay = compute_playback_delay(
+        "2026-03-01T10:00:00Z",
+        "2026-03-01T10:00:10Z",
+        speed=0.5,
+        fallback_delay=0.2,
+        max_delay=30.0,
+    )
+    assert delay == 20.0
+
+
+def test_compute_playback_delay_uses_fallback_for_non_monotonic_or_invalid_timestamps() -> None:
+    assert compute_playback_delay("2026-03-01T10:00:00Z", "2026-03-01T10:00:00Z", speed=1.0, fallback_delay=0.2, max_delay=5.0) == 0.2
+    assert compute_playback_delay("2026-03-01T10:00:01Z", "2026-03-01T10:00:00Z", speed=1.0, fallback_delay=0.2, max_delay=5.0) == 0.2
+    assert compute_playback_delay("bad", "2026-03-01T10:00:00Z", speed=1.0, fallback_delay=0.2, max_delay=5.0) == 0.2
+
+
+def test_compute_playback_delay_caps_large_gaps() -> None:
+    delay = compute_playback_delay(
+        "2026-03-01T10:00:00Z",
+        "2026-03-01T10:10:00Z",
+        speed=1.0,
+        fallback_delay=0.2,
+        max_delay=3.0,
+    )
+    assert delay == 3.0
 
 
 def test_resample_playback_timeline_does_not_pad_before_first_or_after_last_sample() -> None:
