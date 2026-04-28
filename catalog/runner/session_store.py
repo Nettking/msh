@@ -20,7 +20,30 @@ WORKFLOW_STEPS: list[tuple[str, list[str]]] = [
         "Step 1: Startup-safe health checks",
         [
             "machines_active_per_day",
+            "analyze_missing_sequence_number",
+            "missing_per_day_by_machine",
             "sampling_rate_analysis",
+        ],
+    ),
+    (
+        "Step 2: Raw day aggregates",
+        [
+            "data_pr_day",
+        ],
+    ),
+    (
+        "Step 3: Stop detection and timelines",
+        [
+            "find_stops",
+        ],
+    ),
+    (
+        "Step 4: Deep analysis (manual heavy options)",
+        [
+            "data_visualizer",
+            "data_analysis",
+            "ml_analysis",
+            "corrolation_machine_pairs",
         ],
     ),
 ]
