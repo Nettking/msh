@@ -16,7 +16,6 @@ Run:
 
 Typical outputs:
 - daily CSV summaries (`*.csv`)
-- quick PNG trends (`*.png`)
 - missing-data and sampling-quality signals
 
 Move to stage 2 when:
@@ -31,11 +30,12 @@ Run:
 - `data_pr_day`
 
 Typical outputs:
-- per-machine/day raw signal plots under `graphs/<machine>/<YYYY-MM-DD>/`
+- canonical machine/day summary CSV under
+  `results/workflows/<session>/analyses/data_pr_day/machine_day_summary.csv`
 
 Move to stage 3 when:
 - you need stop-focused timelines rather than raw traces
-- raw plots suggest likely stop windows worth targeted inspection
+- machine/day summary trends suggest likely stop windows worth targeted inspection
 
 ### 3) Stop-focused inspection
 Purpose: inspect heuristic stop intervals in a timeline format.
@@ -44,7 +44,7 @@ Run:
 - `find_stops`
 
 Typical outputs:
-- hour-bucketed stop timeline plots under `plots/<YYYY-MM-DD>/<machine>/<HH>.png`
+- hour-bucketed stop interval rows in `results/find_stops/hourly_stop_intervals.csv`
 
 Move to stage 4 when:
 - you need broader exploratory interpretation
@@ -61,13 +61,13 @@ Run as needed:
 - `webapp` (archived Streamlit workspace; reference only)
 
 Typical outputs:
-- timeline images / candidate CSVs
+- timeline interval/candidate CSVs
 - richer console reports
 - ML artifacts under `ml_results/`
 
 ## Legacy and non-standard workflow tools
 
-- `corrolation_machine_pairs`: **legacy** pairwise stop-correlation heatmap exploration (kept for compatibility/reference).
+- `corrolation_machine_pairs`: **legacy** pairwise stop-correlation CSV exploration (kept for compatibility/reference).
 - `interventions`: environment-specific script (hardcoded Windows/WSL assumptions).
 - `standalone_recorder`: legacy recorder retained for compatibility.
 - `auto_connect`: desktop automation helper (not an analysis tool).

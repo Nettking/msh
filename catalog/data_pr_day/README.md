@@ -13,10 +13,10 @@
   with at least columns: `date`, `machine`, `value`.
   Session location is resolved from runtime session context (`MSH_SESSION_DIR`) or
   inferred from the current workflow run path.
-- Writes optional plots under `graphs/` (`GRAPH_BASE_DIR = Path("graphs")`).
+- Outputs the canonical summary CSV only.
 
 ## Runtime/path assumptions (not runtime-tested)
-- Relative `data/` and `graphs/` paths are root-based.
+- Relative `data/` paths are root-based.
 - Recommended invocation: `python catalog/data_pr_day/data_pr_day.py`
 
 ## Inspection scope

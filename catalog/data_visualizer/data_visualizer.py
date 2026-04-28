@@ -1,4 +1,4 @@
-"""Infer machine states and generate per-day timeline plots.
+"""Infer machine states and export structured timeline/candidate data.
 
 This script focuses on I/O, diagnostics, and visualization while relying on
 shared DT-foundation helpers for loading, telemetry preparation, state/situation
@@ -24,6 +24,7 @@ from catalog.common.telemetry_prep import prepare_machine_telemetry_dataframe
 FOLDER = Path("./data")
 OUTPUT_DIR = Path("./timeline_images")
 CANDIDATE_CSV = Path("./candidate_events.csv")
+INTERVAL_CSV = Path("./timeline_intervals.csv")
 
 MACHINE_ID_CANDIDATES = [
     "machine",
@@ -49,7 +50,7 @@ FRAPIDOVR_COL = "Frapidovr"
 MERGE_GAP_SEC = 30.0
 FIG_WIDTH = 18
 ROW_HEIGHT = 0.8
-SAVE_FIGURES = True
+SAVE_FIGURES = False
 SHOW_FIGURES = False
 
 INFERENCE_CONFIG = StateInferenceConfig(
@@ -166,7 +167,8 @@ def plot_day_timeline(interval_df_day, output_path=None, show=False):
 
 
 def main():
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    if SAVE_FIGURES:
+        OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     all_frames = load_prepared_frames()
     if not all_frames:
@@ -237,6 +239,8 @@ def main():
             & (interval_df["n_points"] == 1)
         )
     ].copy()
+    interval_df.sort_values(["date", "machine_id", "start", "end"]).to_csv(INTERVAL_CSV, index=False)
+    print(f"Saved interval summary to: {INTERVAL_CSV.resolve()}")
 
     print("\n=== MACHINE SUMMARY BY DAY ===")
     summary = (
@@ -251,17 +255,19 @@ def main():
         print("\n=== FIRST CANDIDATE ROWS ===")
         print(candidate_df.head(50).to_string(index=False))
 
-    unique_days = sorted(interval_df["date"].dropna().unique().tolist())
-    for day_value in unique_days:
-        day_intervals = interval_df[interval_df["date"] == day_value].copy()
-        if day_intervals.empty:
-            continue
+    if SAVE_FIGURES or SHOW_FIGURES:
+        unique_days = sorted(interval_df["date"].dropna().unique().tolist())
+        for day_value in unique_days:
+            day_intervals = interval_df[interval_df["date"] == day_value].copy()
+            if day_intervals.empty:
+                continue
 
-        filename = f"timeline_{day_value}.png"
-        output_path = OUTPUT_DIR / filename
-        plot_day_timeline(day_intervals, output_path=output_path if SAVE_FIGURES else None, show=SHOW_FIGURES)
-
-    print(f"\nDone. Images are in: {OUTPUT_DIR.resolve()}")
+            filename = f"timeline_{day_value}.png"
+            output_path = OUTPUT_DIR / filename
+            plot_day_timeline(day_intervals, output_path=output_path if SAVE_FIGURES else None, show=SHOW_FIGURES)
+        print(f"\nDone. Images are in: {OUTPUT_DIR.resolve()}")
+    else:
+        print("\nTimeline PNG generation disabled; use timeline_intervals.csv and candidate_events.csv.")
 
 
 if __name__ == "__main__":

@@ -7,7 +7,6 @@ JSONL payload repeatedly.
 
 Outputs:
 - ``machines_active_per_day.csv``: daily summary of distinct machine counts
-- ``machines_active_per_day.png``: bar chart of distinct machine counts by day
 """
 
 from __future__ import annotations
@@ -16,7 +15,6 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -27,7 +25,6 @@ from catalog.common.basic_metrics import iter_basic_metrics_rows
 
 DATA_DIR = Path("data")
 OUTPUT_SUMMARY_CSV = "machines_active_per_day.csv"
-OUTPUT_PLOT = "machines_active_per_day.png"
 
 
 def main() -> None:
@@ -56,21 +53,7 @@ def main() -> None:
     machines_active_per_day.to_csv(OUTPUT_SUMMARY_CSV, index=False)
     print(f"\nSaved summary to: {OUTPUT_SUMMARY_CSV}")
 
-    plt.figure(figsize=(10, 5))
-    plt.bar(
-        machines_active_per_day["date"].astype(str),
-        machines_active_per_day["machines_active"],
-        color="seagreen",
-    )
-    plt.xticks(rotation=45, ha="right")
-    plt.ylabel("Number of Machines Active")
-    plt.title("Active Machines per Day")
-    plt.tight_layout()
-    plt.savefig(OUTPUT_PLOT)
-    plt.close()
-
     del machines_active_per_day
-    print(f"Saved bar chart to: {OUTPUT_PLOT}")
 
 
 if __name__ == "__main__":

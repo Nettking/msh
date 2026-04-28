@@ -8,7 +8,8 @@
 
 ## Behavior observed via static code inspection
 - Reads `./data/*.jsonl` (`FOLDER = "./data"`).
-- Writes timeline images to `./timeline_images` and CSV to `./candidate_events.csv`.
+- Writes structured CSV outputs to `./candidate_events.csv` and `./timeline_intervals.csv`.
+- Optional timeline rendering is disabled by default.
 
 ## Runtime/path assumptions (not runtime-tested)
 - Output/input paths are relative to repository root.

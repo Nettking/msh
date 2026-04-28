@@ -3,7 +3,6 @@ Summarize missing sequence numbers per day from compact derived telemetry metric
 
 Outputs:
 - ``missing_per_day.csv``: daily missing-count summary
-- ``missing_per_day.png``: bar chart of missing counts by day
 """
 
 from __future__ import annotations
@@ -12,7 +11,6 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -23,7 +21,6 @@ from catalog.common.basic_metrics import iter_basic_metrics_rows
 
 DATA_DIR = Path("data")
 OUTPUT_SUMMARY_CSV = "missing_per_day.csv"
-OUTPUT_BAR_PLOT = "missing_per_day.png"
 
 
 def main() -> None:
@@ -60,21 +57,7 @@ def main() -> None:
     missing_per_day.to_csv(OUTPUT_SUMMARY_CSV, index=False)
     print(f"\nSaved daily summary to: {OUTPUT_SUMMARY_CSV}")
 
-    plt.figure(figsize=(10, 5))
-    plt.bar(
-        missing_per_day["date"].astype(str),
-        missing_per_day["missing_count"],
-        color="steelblue",
-    )
-    plt.xticks(rotation=45, ha="right")
-    plt.ylabel("Missing Sequence Numbers")
-    plt.title("Missing Sequence Numbers per Day")
-    plt.tight_layout()
-    plt.savefig(OUTPUT_BAR_PLOT)
-    plt.close()
-
     del missing_per_day
-    print(f"Saved bar chart to: {OUTPUT_BAR_PLOT}")
 
 
 if __name__ == "__main__":

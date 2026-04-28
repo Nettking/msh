@@ -1,14 +1,13 @@
 """
-Generate hourly stop-timeline plots from JSONL telemetry data.
+Generate hourly stop-interval summaries from JSONL telemetry data.
 
-This script keeps plotting/output responsibilities local while reusing shared
-loading and telemetry-preparation helpers so stop heuristics can evolve as
-reusable DT foundation logic.
+This script keeps output responsibilities local while reusing shared loading
+and telemetry-preparation helpers so stop heuristics can evolve as reusable DT
+foundation logic.
 """
 
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 from catalog.common.data_loading import iter_jsonl_files, load_jsonl_dataframe
@@ -16,7 +15,8 @@ from catalog.common.stops import find_stop_rows, group_stop_rows
 from catalog.common.telemetry_prep import prepare_timestamp_column
 
 DATA_DIR = Path("data")
-OUTPUT_DIR = Path("plots")
+OUTPUT_DIR = Path("results")
+OUTPUT_CSV = OUTPUT_DIR / "find_stops" / "hourly_stop_intervals.csv"
 STOPPED_STATES = ["STOPPED"]
 MAX_GAP_SECONDS = 2
 
@@ -57,24 +57,6 @@ def group_stops(df: pd.DataFrame, max_gap_seconds: float = MAX_GAP_SECONDS) -> p
     return group_stop_rows(df, max_gap_seconds=max_gap_seconds)
 
 
-def plot_hour(machine, hour_df, hour_label, out_path):
-    if hour_df.empty:
-        return
-
-    plt.figure(figsize=(10, 2))
-    for _, row in hour_df.iterrows():
-        plt.hlines(1, row["start"], row["end"], colors="red", linewidth=6)
-
-    plt.title(f"{machine} – Stops at {hour_label}")
-    plt.yticks([])
-    plt.xlabel("Time")
-    plt.tight_layout()
-
-    out_path.parent.mkdir(parents=True, exist_ok=True)
-    plt.savefig(out_path)
-    plt.close()
-
-
 def main():
     all_files = list(iter_jsonl_files(DATA_DIR, recursive=False))
     if not all_files:
@@ -83,6 +65,7 @@ def main():
 
     print(f"Analyzing {len(all_files)} files in {DATA_DIR}...\n")
 
+    interval_frames: list[pd.DataFrame] = []
     for file_path in all_files:
         df = load_telemetry(file_path)
         if df.empty:
@@ -96,15 +79,20 @@ def main():
         grouped["day"] = grouped["start"].dt.date
         grouped["hour"] = grouped["start"].dt.hour
 
-        for (day, machine, hour), hdf in grouped.groupby(["day", "machine", "hour"]):
-            day_dir = OUTPUT_DIR / str(day) / machine
-            out_path = day_dir / f"{hour:02d}.png"
-            label = f"{day} {hour:02d}:00–{hour + 1:02d}:00"
-            plot_hour(machine, hdf, label, out_path)
+        grouped["source_file"] = file_path.name
+        interval_frames.append(grouped)
+        print(f"{file_path.name}: {len(grouped)} stop intervals summarized.")
 
-        print(f"{file_path.name}: {len(grouped)} stop intervals plotted hourly.")
+    if not interval_frames:
+        print("No stop intervals found.")
+        return
 
-    print(f"\nAll hourly plots saved in: {OUTPUT_DIR.resolve()}")
+    summary = pd.concat(interval_frames, ignore_index=True).sort_values(
+        ["day", "machine", "hour", "start", "end"]
+    )
+    OUTPUT_CSV.parent.mkdir(parents=True, exist_ok=True)
+    summary.to_csv(OUTPUT_CSV, index=False)
+    print(f"\nHourly stop interval summary saved in: {OUTPUT_CSV.resolve()}")
 
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 """
-Generate canonical machine/day CSV data and optional signal plots from JSONL telemetry.
+Generate canonical machine/day CSV data from JSONL telemetry.
 
 Behavior:
 - Reads JSONL files only from the top level of ``data/`` (non-recursive).
@@ -10,15 +10,12 @@ Output contract:
 - Canonical CSV path:
   ``results/workflows/<session>/analyses/data_pr_day/machine_day_summary.csv``
 - Canonical CSV columns (minimum): ``date``, ``machine``, ``value``
-- Optional diagnostic plots:
-  ``graphs/<machine>/<YYYY-MM-DD>/<column>.png``
 """
 
 import os
 import sys
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 SCRIPT_ROOT = Path(__file__).resolve().parents[2]
@@ -29,10 +26,6 @@ from catalog.common.data_loading import iter_records_with_parsed_timestamps
 
 # Folder containing input JSONL files.
 DATA_DIR = "data"
-
-# Base output folder for generated plots.
-GRAPH_BASE_DIR = Path("graphs")
-
 
 def _resolve_session_dir() -> Path:
     from_env = os.getenv("MSH_SESSION_DIR", "").strip()
@@ -103,7 +96,7 @@ if not records:
 
 df = pd.DataFrame(records)
 
-# These columns are the minimum needed for grouping and plotting logic.
+# These columns are the minimum needed for grouping logic.
 required_cols = {"timestamp", "machine"}
 if not required_cols.issubset(df.columns):
     raise ValueError(f"Missing required columns: {required_cols - set(df.columns)}")
@@ -115,36 +108,4 @@ summary = _build_machine_day_summary(df)
 summary_path = _resolve_machine_day_output_csv()
 summary.to_csv(summary_path, index=False)
 
-for machine in df["machine"].unique():
-    df_machine = df[df["machine"] == machine]
-
-    for day in df_machine["date"].unique():
-        df_day = df_machine[df_machine["date"] == day].sort_values("timestamp")
-
-        # Organize plots by machine/day for easier inspection of generated outputs.
-        day_dir = GRAPH_BASE_DIR / machine / str(day)
-        day_dir.mkdir(parents=True, exist_ok=True)
-
-        # Plot only numeric telemetry-style fields. Metadata and identifiers such
-        # as timestamps, machine name, and date are naturally excluded here.
-        numeric_cols = df_day.select_dtypes(include=["number"]).columns
-
-        # Sequence is usually an index/counter rather than a meaningful signal.
-        exclude_cols = {"sequence"}
-        numeric_cols = [c for c in numeric_cols if c not in exclude_cols]
-
-        for col in numeric_cols:
-            plt.figure(figsize=(10, 4))
-            plt.plot(df_day["timestamp"], df_day[col], marker=".", linestyle="-")
-            plt.xlabel("Time")
-            plt.ylabel(col)
-            plt.title(f"{col} — {machine} — {day}")
-            plt.xticks(rotation=45, ha="right")
-            plt.tight_layout()
-
-            plot_path = day_dir / f"{col}.png"
-            plt.savefig(plot_path)
-            plt.close()
-
 print("Machine/day summary generated at:", summary_path)
-print("Graphs generated in:", GRAPH_BASE_DIR)

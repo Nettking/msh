@@ -8,7 +8,7 @@
 
 ## Behavior observed via static code inspection
 - Reads `data/*.jsonl` from `DATA_DIR = "data"`.
-- Writes `missing_per_day.csv` and `missing_per_day.png` in repo root.
+- Writes `missing_per_day.csv` in repo root.
 
 ## Runtime/path assumptions (not runtime-tested)
 - Uses relative paths; run from repository root.

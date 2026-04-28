@@ -8,7 +8,7 @@
 
 ## Behavior observed via static code inspection
 - Reads `data/*.jsonl`; requires `timestamp` and `machine`.
-- Writes `machines_active_per_day.csv` and `machines_active_per_day.png`.
+- Writes `machines_active_per_day.csv`.
 
 ## Runtime/path assumptions (not runtime-tested)
 - Relative paths assume repo root execution.
