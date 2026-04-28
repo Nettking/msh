@@ -236,6 +236,11 @@ def _view_readiness(runtime_state: dict[str, Any], visible: list[dict[str, Any]]
             "message": "Status page is startup-safe and always available.",
         },
         {
+            "view": "/live",
+            "state": "ready",
+            "message": "Live page shows latest recorded telemetry with inferred per-machine state and recent candidate events.",
+        },
+        {
             "view": "/control",
             "state": "ready",
             "message": "Control page is startup-safe and always available.",
@@ -280,5 +285,6 @@ def _quick_links(readiness: list[dict[str, str]]) -> list[dict[str, str]]:
         _entry("/playback", "Open playback"),
         _entry("/status", "Open status"),
         _entry("/control", "Open control"),
+        _entry("/live", "Open live"),
         _entry("/", "Refresh overview"),
     ]

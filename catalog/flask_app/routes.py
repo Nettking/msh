@@ -11,6 +11,7 @@ from catalog.runner.session_store import list_sessions
 from .services.catalog_service import ArtifactCatalog, safe_load_artifact_frame
 from .services.chart_service import category_columns, category_counts, histogram_data, line_or_scatter_data, machine_day_trend, numeric_columns
 from .services.control_service import get_control_panel_service
+from .services.live_service import get_live_telemetry_service
 from .services.operator_page_cache import get_operator_page_cache
 from .services.operator_scope_service import get_operator_scope_service
 from .services.playback_service import (
@@ -184,6 +185,12 @@ def overview():
         overview=overview_snapshot,
         scan_dirs=_catalog().scan_dirs,
     )
+
+
+@web.route("/live")
+def live():
+    snapshot = get_live_telemetry_service().snapshot(_catalog())
+    return render_template("live.html", live=snapshot)
 
 
 @web.route("/status")
