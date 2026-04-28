@@ -16,9 +16,10 @@ The startup flow is now non-interactive and automatic with **webapp-first startu
 2. starts Flask on port 5000 immediately
 3. starts runtime/orchestration manager in the background
 4. discovers available dates in `data/`
-5. bootstraps only the **latest discovered day** into an auto session under `results/workflows/` (background)
-6. runs historical catch-up incrementally one day at a time (background)
-7. keeps polling for newly arriving days after catch-up completes (background)
+5. discovers the latest source-data day and creates/reuses that day’s workflow session
+6. runs a **full initial one-day analysis pass** for that latest day (background)
+7. runs historical catch-up incrementally one day at a time (background)
+8. keeps polling for newly arriving days after catch-up completes (background)
 
 Current defaults are intentional:
 - **startup date policy:** latest discovered day only (`latest_discovered_day_only`)
@@ -32,11 +33,15 @@ Primary operator controls are now available in the Flask UI at `/control` (runti
 
 The `/control` panel is currently an MVP: single-process threaded execution, best-effort action handling, and in-memory recent activity/log snippets (not restart-persistent).
 
-Default startup scope is intentionally limited to startup-safe health checks:
+Initial latest-day bootstrap now runs the full runner-supported analysis script set for that one day before historical catch-up begins.
+
+Automatic **historical catch-up verification** remains intentionally limited to startup-safe health checks:
 - `machines_active_per_day`
+- `analyze_missing_sequence_number`
+- `missing_per_day_by_machine`
 - `sampling_rate_analysis`
 
-`data_pr_day` remains a manual/heavier workflow output (not automatic startup coverage). Machine/day diagnostics from `data_pr_day` remain available for debugging, but playback is now the primary operator workflow.
+Scripts intentionally hidden from runner discovery (`auto_connect`, recorders, simulator, interventions) remain excluded by design.
 
 To avoid repeated full JSONL scans during startup, orchestration builds one compact shared dataset at `results/workflows/<session>/data/_derived/basic_metrics.csv` (timestamp, machine, sequence) and startup scripts read from that file.
 

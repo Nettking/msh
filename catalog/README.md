@@ -102,8 +102,11 @@ Each session stores:
 - session metadata in `session_state.json` (with legacy mirror `session.json`)
 - a lightweight session config signature for the selected filter config
 
-Workflow guidance for unattended startup is now deliberately narrow:
+Workflow guidance keeps staged steps:
 - **Step 1:** startup-safe health checks
+- **Step 2:** raw day aggregates
+- **Step 3:** stop detection and timelines
+- **Step 4:** deep analysis (manual heavy options)
 
 Execution and caching are script-level:
 - step completion is derived from script statuses
@@ -146,15 +149,17 @@ When orchestration prepares playback exports:
 - timeline exports are generated only when needed (reused if still valid)
 - Flask playback views can consume scan-discovered playback-compatible outputs
 
-Default precompute scope is limited to startup-safe scripts:
+Startup bootstrap (latest discovered day only) now runs the full runner-supported staged workflow for that one day before historical catch-up starts.
+
+Historical catch-up verification scope remains limited to startup-safe scripts:
 - `machines_active_per_day`
+- `analyze_missing_sequence_number`
+- `missing_per_day_by_machine`
 - `sampling_rate_analysis`
 
 Startup precompute first writes a compact shared dataset at `results/workflows/<session-id>/data/_derived/basic_metrics.csv` and startup-safe scripts consume this artifact instead of re-parsing full JSONL payloads in separate passes.
 
-Intentionally excluded from unattended default precompute/workflow path:
-- heavier exploratory scripts (`data_pr_day`, `find_stops`, `data_visualizer`, `data_analysis`, `ml_analysis`)
-- legacy `corrolation_machine_pairs` (still runnable explicitly)
+Intentionally excluded from runner workflow discovery/precompute path:
 - Streamlit and environment/recorder tools (`data_simulator`, `interventions`, recorders, `auto_connect`)
 
 ### What is cached vs not cached

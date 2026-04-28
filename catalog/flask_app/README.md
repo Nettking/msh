@@ -48,7 +48,7 @@ Startup now performs **webapp-first runtime**:
 - Flask starts immediately
 - runtime manager starts in background (non-blocking)
 - background discovery scans source dates in `data/`
-- bootstrap latest day runs in background
+- bootstrap latest day runs a full one-day analysis pass in background
 - historical catch-up continues one day per cycle (reverse chronological)
 - after catch-up completes, runtime keeps polling for new days and processes them incrementally
 
@@ -89,7 +89,7 @@ Runtime state now explicitly tracks:
 
 Runtime phases are explicit:
 
-- **Bootstrap phase**: process only the latest discovered source day first.
+- **Bootstrap phase**: process the latest discovered source day first using the full runner-supported one-day script set.
 - **Historical catch-up phase**: process exactly one pending day per poll cycle, in reverse chronological order.
 - **Steady incremental phase**: once historical catch-up is complete, continue polling for newly arriving days and process them one day per cycle.
 
@@ -99,7 +99,7 @@ State tracks discovered source range, processed day set, pending count, next que
 
 `processed_dates` reflects **verified processed outputs**, not just attempted runs.
 
-Verification uses the bounded automatic coverage contract (`startup_safe_automatic_outputs`): only the startup-safe scripts used by automatic incremental catch-up are required for a day to count as covered. This avoids requiring manual/heavier workflow outputs for automatic progress.
+Verification uses the bounded automatic coverage contract (`startup_safe_automatic_outputs`): only startup-safe scripts used by automatic incremental catch-up are required for a day to count as covered. This keeps catch-up practical while still delivering richer latest-day outputs immediately after startup.
 
 `data_pr_day` is **not** part of that automatic coverage contract. The `/machine` page is tied specifically to `analyses/data_pr_day/machine_day_summary.csv`, so `/machine` now treats machine/day-readiness separately from session existence:
 
