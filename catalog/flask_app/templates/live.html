@@ -1,0 +1,92 @@
+{% extends "base.html" %}
+{% block body %}
+<section class="page-intro">
+  <h2>Live analysis (recorded stream)</h2>
+  <p>Latest recorded telemetry per machine with near-real-time state/event inference from recent JSONL tails. Auto-refresh every 5 seconds.</p>
+</section>
+
+<section class="section-block section-block--primary">
+  <p class="inline-note">Generated at <strong>{{ live.generated_at_iso }}</strong>. Freshness threshold: {{ live.stale_after_seconds }}s.</p>
+  <p class="inline-note">{{ live.context_note }}</p>
+</section>
+
+<section class="live-grid">
+  {% for machine in live.machines %}
+  <article class="section-block live-card">
+    <div class="live-card__header">
+      <h3>{{ machine.machine }}</h3>
+      <span class="status-badge status-{{ machine.freshness|replace(' ', '-') }}">{{ machine.freshness }}</span>
+    </div>
+    <dl class="kv-grid">
+      <div class="kv-row"><dt>Last seen</dt><dd>{{ machine.last_seen_clock }}</dd></div>
+      <div class="kv-row"><dt>Age (s)</dt><dd>{{ machine.age_seconds if machine.age_seconds is not none else '-' }}</dd></div>
+      <div class="kv-row"><dt>Status</dt><dd>{{ machine.freshness }}</dd></div>
+      <div class="kv-row"><dt>Inferred state</dt><dd>{{ machine.inferred_state }}</dd></div>
+      <div class="kv-row"><dt>Machine</dt><dd>{{ machine["values"]["machine"] }}</dd></div>
+      <div class="kv-row"><dt>Execution</dt><dd>{{ machine["values"]["execution"] }}</dd></div>
+      <div class="kv-row"><dt>Mode</dt><dd>{{ machine["values"]["mode"] }}</dd></div>
+      <div class="kv-row"><dt>Program</dt><dd>{{ machine["values"]["program"] }}</dd></div>
+      <div class="kv-row"><dt>Tool number</dt><dd>{{ machine["values"]["Tool_number"] }}</dd></div>
+      <div class="kv-row"><dt>Tool group</dt><dd>{{ machine["values"]["Tool_group"] }}</dd></div>
+      <div class="kv-row"><dt>Srpm</dt><dd>{{ machine["values"]["Srpm"] }}</dd></div>
+      <div class="kv-row"><dt>Sload</dt><dd>{{ machine["values"]["Sload"] }}</dd></div>
+      <div class="kv-row"><dt>Sovr</dt><dd>{{ machine["values"]["Sovr"] }}</dd></div>
+      <div class="kv-row"><dt>Fovr</dt><dd>{{ machine["values"]["Fovr"] }}</dd></div>
+      <div class="kv-row"><dt>Frapidovr</dt><dd>{{ machine["values"]["Frapidovr"] }}</dd></div>
+      <div class="kv-row"><dt>Xabs</dt><dd>{{ machine["values"]["Xabs"] }}</dd></div>
+      <div class="kv-row"><dt>Yabs</dt><dd>{{ machine["values"]["Yabs"] }}</dd></div>
+      <div class="kv-row"><dt>Zabs</dt><dd>{{ machine["values"]["Zabs"] }}</dd></div>
+    </dl>
+  </article>
+  {% endfor %}
+</section>
+
+<section class="section-block">
+  <h3>Recent candidate events</h3>
+  <p class="inline-note">Candidate events are inferred from recent recorded telemetry using shared state/event inference rules.</p>
+  {% if live.candidate_events %}
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Machine</th>
+          <th>Event score</th>
+          <th>Fired rules</th>
+          <th>Execution</th>
+          <th>Mode</th>
+          <th>Program</th>
+          <th>Srpm</th>
+          <th>Sload</th>
+          <th>Sovr</th>
+          <th>Fovr</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for event in live.candidate_events %}
+        <tr>
+          <td>{{ event.timestamp }}</td>
+          <td>{{ event.machine }}</td>
+          <td>{{ event.event_score }}</td>
+          <td>{{ event.fired_rules }}</td>
+          <td>{{ event.execution }}</td>
+          <td>{{ event.mode }}</td>
+          <td>{{ event.program }}</td>
+          <td>{{ event.Srpm }}</td>
+          <td>{{ event.Sload }}</td>
+          <td>{{ event.Sovr }}</td>
+          <td>{{ event.Fovr }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <p>No recent candidate events detected in the recent recorded-stream window.</p>
+  {% endif %}
+</section>
+
+<script>
+  window.setTimeout(() => window.location.reload(), 5000);
+</script>
+{% endblock %}

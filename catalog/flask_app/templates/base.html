@@ -18,6 +18,7 @@
         <a class="{% if request.endpoint == 'web.overview' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Overview</a>
         <a class="{% if request.endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Status</a>
         <a class="{% if request.endpoint == 'web.control' %}is-active{% endif %}" href="{{ url_for('web.control') }}">Control</a>
+        <a class="{% if request.endpoint == 'web.live' %}is-active{% endif %}" href="{{ url_for('web.live') }}">Live</a>
         <a class="{% if request.endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
       </nav>
       <form class="rescan-form" method="post" action="{{ url_for('web.rescan') }}">
