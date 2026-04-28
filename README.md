@@ -2,13 +2,17 @@
 
 Flask-first repository for recording, scanning, and inspecting MTConnect telemetry analyses through a continuous digital twin interface.
 
-## Default workflow (automatic orchestration + Flask)
+## Quick start (Docker, recommended)
 
-Run one command:
+From a fresh checkout, run:
 
 ```bash
-python -m catalog.flask_app.app
+docker compose up --build flask
 ```
+
+Open http://localhost:5000.
+
+### What this Docker startup does
 
 The startup flow is now non-interactive and automatic with **webapp-first startup**:
 
@@ -26,8 +30,6 @@ Current defaults are intentional:
 - **execution policy:** best-effort pipeline (continue after individual script failures)
 - **handoff policy:** webapp first, data later (`webapp_first_data_later`)
 - **update policy:** local polling loop (`poll_for_new_data_then_process_new_slice`) that avoids full historical recomputation
-
-Open http://localhost:5000.
 
 Primary operator controls are now available in the Flask UI at `/control` (runtime refresh/session-aware workflow runs/script runs/recent control history), replacing the deprecated terminal menu as the main control surface.
 
@@ -53,9 +55,7 @@ Runtime update state is persisted at `results/workflows/runtime_state.json` so t
 - last successful refresh and last failure
 - view contract readiness (`/status`, `/control`, `/playback`, catch-up contract)
 
-Heavier exploratory scripts remain available for explicit/manual execution, but are excluded from automatic startup so `docker compose up --build flask` remains reliable in unattended environments.
-
-Full historical rebuild is now a deliberate/manual operation rather than the default web startup path.
+Latest-day bootstrap analysis runs automatically at startup; full historical rebuild remains a deliberate/manual operation rather than the default web startup path.
 
 `/control` now supports explicit manual scope selection beyond bootstrap latest-day behavior:
 - select an existing workflow session from inventory
@@ -71,7 +71,22 @@ Workflow subprocesses run with stdin disabled (non-interactive by default) and n
 
 Implementation note: orchestration currently reuses substantial `catalog/runner/*` execution/session components under a non-interactive wrapper, rather than replacing all runner internals yet.
 
-## Host-side Windows startup helper (VPN monitor + existing startup)
+### Useful URLs
+
+- Flask UI: http://localhost:5000
+- Control panel: http://localhost:5000/control
+- Status view: http://localhost:5000/status
+- Playback view: http://localhost:5000/playback
+
+## Optional developer fallback (without Docker)
+
+Use this only for local development/troubleshooting when you explicitly do not want Docker:
+
+```bash
+python -m catalog.flask_app.app
+```
+
+## Optional Windows/PowerShell helper
 
 For Windows host operation, use:
 
@@ -80,31 +95,16 @@ For Windows host operation, use:
 ```
 
 This helper is **host-side only** and intentionally small in scope:
-- checks `ops/vpn/reconnect-vpn.ps1` exists
-- starts `ops/vpn/reconnect-vpn.ps1` in a separate PowerShell process first (unless already running)
-- then runs the current recommended startup command by default: `docker compose up --build flask`
+- runs the current recommended startup command by default: `docker compose up --build flask`
+- requires no VPN script by default
+- optionally starts a VPN monitor script first **only if you pass a valid `-VpnReconnectScript` path**
 
 Why Docker default in this wrapper?
 - this aligns with the repository's documented **recommended quick start**
 - if needed, operators can override startup command components via script parameters (`-StartupExecutable`, `-StartupArguments`)
 
-Lifecycle notes:
-- VPN monitor is launched as a separate background host process and continues running if the main startup command exits
-- stop it explicitly when needed (for example with `Stop-Process -Id <pid>`)
-- re-running `./ops/start-system.ps1` will reuse existing monitor process(es) instead of starting duplicates
-
-Out of scope for this change:
-- VPN profile configuration or embedding secrets
-- moving VPN handling into Docker
-- adding record/live orchestration or redesigning startup architecture
-
-## Docker quick start (recommended)
-
-```bash
-docker compose up --build flask
-```
-
-This now runs **prepare + serve** automatically (no menu interaction).
+Lifecycle note:
+- if you provide `-VpnReconnectScript`, the VPN monitor is launched as a separate background host process and continues running if the main startup command exits
 
 Optional prep-only one-shot run:
 
