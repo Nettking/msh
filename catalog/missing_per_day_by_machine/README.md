@@ -8,7 +8,7 @@
 
 ## Behavior observed via static code inspection
 - Reads `data/*.jsonl`; requires `timestamp`, `sequence`, and `machine`.
-- Writes `missing_per_day_by_machine.csv` and plots under `plots_per_machine/`.
+- Writes `missing_per_day_by_machine.csv`.
 
 ## Runtime/path assumptions (not runtime-tested)
 - Relative paths assume repository root execution.

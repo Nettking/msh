@@ -8,7 +8,7 @@
 
 ## Behavior observed via static code inspection
 - Reads `data/*.jsonl` from `DATA_DIR = Path("data")`.
-- Generates `correlation_heatmap.png` in repo root.
+- Generates `correlation_matrix.csv` in repo root.
 
 ## Runtime/path assumptions (not runtime-tested)
 - Relative path assumes repository root as current working directory.

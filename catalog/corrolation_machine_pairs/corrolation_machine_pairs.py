@@ -4,8 +4,7 @@ Analyze correlations in machine stop patterns across hourly time buckets.
 This script reads JSONL telemetry files, identifies rows that likely represent
 machine stops, groups nearby stopped rows into stop intervals, and then
 aggregates total stop duration per machine per hour. A correlation matrix is
-computed across machines based on those hourly stop-duration profiles and
-visualized as a heatmap.
+computed across machines based on those hourly stop-duration profiles.
 
 Pipeline:
 1. Load JSONL telemetry files from ``data/``
@@ -13,10 +12,10 @@ Pipeline:
 3. Identify likely stop rows using execution state and numeric signal values
 4. Group nearby stop rows into stop intervals
 5. Aggregate total stop duration per machine per hour
-6. Compute and visualize machine-to-machine correlations
+6. Compute machine-to-machine correlations
 
 Outputs:
-- ``correlation_heatmap.png``: heatmap of the machine correlation matrix
+- ``correlation_matrix.csv``: machine correlation matrix
 - console printout of the correlation matrix
 
 Notes:
@@ -28,7 +27,6 @@ Notes:
 import json
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -44,6 +42,7 @@ STOPPED_STATES = ["STOPPED"]
 # Maximum allowed gap (in seconds) between stopped rows before they are split
 # into separate stop intervals.
 MAX_GAP_SECONDS = 2
+OUTPUT_CORRELATION_CSV = Path("correlation_matrix.csv")
 
 
 def load_jsonl(file_path):
@@ -173,7 +172,7 @@ def main():
     - bucket them by hour
     - sum stop duration per machine per hour
     - compute machine correlation matrix
-    - save and display a heatmap
+    - write the correlation matrix to CSV
     """
     all_files = sorted(DATA_DIR.glob("*.jsonl"))
     all_intervals = []
@@ -209,15 +208,8 @@ def main():
     # Compute correlation across machine stop-duration profiles.
     corr = pivot.corr()
 
-    plt.figure(figsize=(6, 5))
-    plt.imshow(corr, cmap="coolwarm", vmin=-1, vmax=1)
-    plt.colorbar(label="Correlation coefficient")
-    plt.xticks(range(len(corr.columns)), corr.columns, rotation=45)
-    plt.yticks(range(len(corr.columns)), corr.index)
-    plt.title("Correlation of stop patterns between machines")
-    plt.tight_layout()
-    plt.savefig("correlation_heatmap.png", dpi=300)
-    plt.show()
+    corr.to_csv(OUTPUT_CORRELATION_CSV, index=True)
+    print(f"\nSaved correlation matrix CSV to: {OUTPUT_CORRELATION_CSV.resolve()}")
 
     print("\nCorrelation matrix:")
     print(corr.round(2))

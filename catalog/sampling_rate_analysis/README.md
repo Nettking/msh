@@ -8,7 +8,7 @@
 
 ## Behavior observed via static code inspection
 - Reads `data/*.jsonl` from `DATA_DIR = "data"`.
-- Writes `sampling_rate_summary.csv` and `daily_sampling_rate.png`.
+- Writes `sampling_rate_summary.csv`.
 
 ## Runtime/path assumptions (not runtime-tested)
 - Relative path resolution expects root execution.

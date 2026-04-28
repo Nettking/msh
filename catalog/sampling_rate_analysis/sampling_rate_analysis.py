@@ -6,7 +6,6 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-import matplotlib.pyplot as plt
 import pandas as pd
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
@@ -17,7 +16,6 @@ from catalog.common.basic_metrics import iter_basic_metrics_rows
 
 DATA_DIR = Path("data")
 OUTPUT_CSV = "sampling_rate_summary.csv"
-OUTPUT_PLOT = "daily_sampling_rate.png"
 FREQUENCY_THRESHOLD = 4.9
 
 
@@ -64,22 +62,7 @@ def main() -> None:
     daily_freq.to_csv(OUTPUT_CSV, index=False)
     print(f"\nSaved summary to: {OUTPUT_CSV}")
 
-    plt.figure(figsize=(10, 5))
-    plt.plot(daily_freq["date"], daily_freq["avg_sampling_rate_hz"], marker="o", label="Avg Frequency")
-    plt.axhline(y=5.0, color="green", linestyle="--", label="Target (5 Hz)")
-    plt.axhline(y=FREQUENCY_THRESHOLD, color="red", linestyle="--", label=f"Threshold ({FREQUENCY_THRESHOLD} Hz)")
-    plt.title("Average Sampling Rate per Day")
-    plt.xlabel("Date")
-    plt.ylabel("Avg Sampling Rate (Hz)")
-    plt.xticks(rotation=45, ha="right")
-    plt.grid(True)
-    plt.legend()
-    plt.tight_layout()
-    plt.savefig(OUTPUT_PLOT)
-    plt.close()
-
     del daily_freq
-    print(f"Saved plot to: {OUTPUT_PLOT}")
 
 
 if __name__ == "__main__":

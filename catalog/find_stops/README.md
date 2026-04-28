@@ -8,7 +8,7 @@
 
 ## Behavior observed via static code inspection
 - Reads `data/*.jsonl` from `DATA_DIR = Path("data")`.
-- Writes plots under `plots/` (`OUTPUT_DIR = Path("plots")`).
+- Writes hourly stop intervals to `results/find_stops/hourly_stop_intervals.csv`.
 
 ## Runtime/path assumptions (not runtime-tested)
 - Relative paths require root-based execution context.

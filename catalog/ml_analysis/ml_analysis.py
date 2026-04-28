@@ -20,7 +20,7 @@ Outputs
 -------
 Under ``ml_results/<machine>/``:
 - ``<machine>_stop_predictor.pkl`` (optional)
-- ``feature_importance.png``
+- ``feature_importance.csv``
 - ``confusion_matrix.txt``
 - ``classification_report.csv``
 
@@ -43,7 +43,6 @@ import json
 from pathlib import Path
 
 import joblib
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from sklearn.ensemble import RandomForestClassifier
@@ -261,12 +260,7 @@ def train_model(df, numeric_features, machine_name):
     out_dir = OUTPUT_DIR / machine_name
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    plt.figure(figsize=(8, 5))
-    imp.head(15).plot(kind="barh")
-    plt.title(f"{machine_name} – Top 15 Feature Importances")
-    plt.tight_layout()
-    plt.savefig(out_dir / "feature_importance.png", dpi=300)
-    plt.close()
+    imp.to_csv(out_dir / "feature_importance.csv", header=["importance"])
 
     if SAVE_MODEL:
         joblib.dump(model, out_dir / f"{machine_name}_stop_predictor.pkl")
