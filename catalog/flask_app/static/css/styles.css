@@ -757,3 +757,97 @@ th, td {
 .status-active { background: var(--success-soft); color: var(--success); border-color: #86efac; }
 .status-inactive { background: var(--danger-soft); color: var(--danger); border-color: #fca5a5; }
 .status-unknown { background: #e2e8f0; color: #334155; border-color: #cbd5e1; }
+
+.strategy-signature {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  overflow-wrap: anywhere;
+}
+
+.strategy-editor-form {
+  display: block;
+}
+
+.strategy-card-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.strategy-card {
+  display: grid;
+  gap: 8px;
+}
+
+.strategy-card__header {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+}
+
+.strategy-card__header h4 {
+  margin: 0;
+}
+
+.strategy-card--new {
+  border-style: dashed;
+}
+
+.strategy-delete,
+.checkbox-row {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-weight: 600;
+}
+
+.strategy-card textarea {
+  font: inherit;
+  resize: vertical;
+}
+
+.field-hint,
+.muted {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+  font-weight: 400;
+}
+
+.validation-list {
+  margin: 8px 0 0;
+  padding-left: 20px;
+}
+
+.validation-list--errors {
+  color: #991b1b;
+}
+
+.validation-list--warnings {
+  color: #92400e;
+}
+
+.status-ok {
+  color: #166534;
+  font-weight: 600;
+}
+
+.label-vocabulary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px;
+}
+
+.label-pill {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+  padding: 10px 12px;
+  display: grid;
+  gap: 4px;
+}
+
+.strategy-save-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}

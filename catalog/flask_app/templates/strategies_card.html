@@ -1,0 +1,7 @@
+<article class="control-card strategy-card">
+  <div class="strategy-card__header">
+    <h4>{{ strategy.id or 'Unnamed strategy' }}</h4>
+    <label class="strategy-delete"><input type="checkbox" name="{{ prefix }}delete" value="1"> Remove</label>
+  </div>
+  {% include 'strategies_fields.html' %}
+</article>

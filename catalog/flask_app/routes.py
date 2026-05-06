@@ -14,6 +14,7 @@ from .services.control_service import get_control_panel_service
 from .services.live_service import get_live_telemetry_service
 from .services.operator_page_cache import get_operator_page_cache
 from .services.operator_scope_service import get_operator_scope_service
+from .services.strategy_config_service import StrategyConfigService
 from .services.playback_service import (
     default_live_signal_columns,
     interval_rows,
@@ -44,6 +45,13 @@ def startup_mode_gate():
     if get_runtime_manager().requires_startup_choice():
         return redirect(url_for("web.startup", next=request.full_path if request.query_string else request.path))
     return None
+
+
+def _strategy_config_service() -> StrategyConfigService:
+    return StrategyConfigService(
+        strategies_path=current_app.config.get("INTERVENTION_STRATEGIES_PATH"),
+        labels_path=current_app.config.get("INTERVENTION_LABELS_PATH"),
+    )
 
 
 def _catalog() -> ArtifactCatalog:
@@ -529,6 +537,43 @@ def exploration():
         aggregation=aggregation,
         operator_scope=scope,
     )
+
+
+@web.get("/strategies")
+def strategies():
+    page = _strategy_config_service().page_model()
+    return render_template("strategies.html", page=page)
+
+
+@web.post("/strategies/save")
+def save_strategies():
+    service = _strategy_config_service()
+    base_page = service.page_model()
+    strategies = service.parse_form(request.form)
+    validation = service.validate(strategies, labels=base_page.labels)
+    if validation.errors:
+        for error in validation.errors:
+            flash(error, "error")
+        page = base_page.__class__(
+            strategies=strategies,
+            labels=base_page.labels,
+            signature=validation.signature,
+            validation_errors=validation.errors,
+            validation_warnings=validation.warnings,
+            summary=service.summary(strategies, validation.signature),
+            supported_types=base_page.supported_types,
+            strategies_path=base_page.strategies_path,
+            labels_path=base_page.labels_path,
+        )
+        return render_template("strategies.html", page=page), 400
+
+    signature = service.save(strategies)
+    flash(f"Strategy config saved. New active strategy signature: {signature}", "success")
+    flash(
+        "Strategy edits invalidate cached candidate outputs; candidate events regenerate the next time playback exports are prepared or rerun.",
+        "info",
+    )
+    return redirect(url_for("web.strategies"))
 
 
 @web.route("/control")
