@@ -110,3 +110,31 @@ def test_playback_route_defaults_to_full_timeline_and_keeps_candidates_flagged(t
     assert "idle" in body
     assert "intervention_candidate" in body
     assert '"intervention_candidate": true' in body
+
+
+def test_playback_route_lists_workflow_timeline_exports(tmp_path: Path, monkeypatch) -> None:
+    workflow_export_dir = tmp_path / "results" / "workflows" / "session-123" / "exports" / "timeline"
+    workflow_export_dir.mkdir(parents=True)
+    timeline_path = workflow_export_dir / "timeline_rows.csv"
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z"],
+            "machine_id": ["M1"],
+            "state": ["active"],
+        }
+    ).to_csv(timeline_path, index=False)
+
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+    assert warnings == []
+    assert [artifact["path"] for artifact in artifacts if artifact["playback_compatible"]] == [str(timeline_path)]
+
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime())
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No playback-compatible exports" not in body
+    assert "<strong>Dataset:</strong> timeline_rows.csv" in body

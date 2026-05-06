@@ -13,6 +13,8 @@ import pandas as pd
 
 SUPPORTED_SUFFIXES = {".csv", ".parquet", ".pq", ".jsonl", ".json"}
 REQUIRED_PLAYBACK_COLUMNS = {"timestamp", "machine_id", "state"}
+PLAYBACK_TIMELINE_FILES = {"timeline_rows.csv"}
+PLAYBACK_AUXILIARY_FILES = {"candidate_events.csv", "strategy_summary.csv"}
 INTERNAL_METADATA_FILES = {"runtime_state.json", "session_state.json"}
 
 KEYWORD_RULES: list[tuple[tuple[str, ...], tuple[str, str, str]]] = [
@@ -183,17 +185,20 @@ def _classify_analysis(path: Path, columns: set[str]) -> tuple[str, str, str]:
     p = str(path).lower()
     file_name = path.name.lower()
 
-    # Candidate-event extracts can contain the minimal playback columns, but they
+    # Candidate-event extracts can contain timestamp and machine fields, but they
     # are sparse event overlays rather than the primary machine-state timeline.
-    # Classify them before the generic playback schema check so /playback defaults
-    # to continuous row-level timeline exports when both files are present.
+    # Strategy summaries are also auxiliary workflow exports. Classify both before
+    # the timeline check so /playback only lists the generated row-level export.
+    if file_name in PLAYBACK_AUXILIARY_FILES:
+        return "Interventions", "Intervention-related rows and summaries.", "analysis"
+
     if "candidate" in file_name or "intervention" in file_name:
         for keywords, result in KEYWORD_RULES:
             if any(keyword in p for keyword in keywords):
                 return result
         return "Interventions", "Intervention-related rows and summaries.", "analysis"
 
-    if REQUIRED_PLAYBACK_COLUMNS.issubset(columns):
+    if file_name in PLAYBACK_TIMELINE_FILES and REQUIRED_PLAYBACK_COLUMNS.issubset(columns):
         return "Timeline Playback", "Playback-compatible timeline rows for machine state replay.", "playback"
 
     for keywords, result in KEYWORD_RULES:
