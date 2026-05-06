@@ -1,7 +1,21 @@
-<article class="control-card strategy-card">
-  <div class="strategy-card__header">
-    <h4>{{ strategy.id or 'Unnamed strategy' }}</h4>
-    <label class="strategy-delete"><input type="checkbox" name="{{ prefix }}delete" value="1"> Remove</label>
+<details class="control-card strategy-card strategy-editor-details">
+  <summary class="strategy-card__summary">
+    <span class="strategy-card__summary-main">
+      <strong>{{ strategy.id or 'Unnamed strategy' }}</strong>
+      <span>{{ strategy.type or 'No type' }}</span>
+      <span>{{ strategy.signal or 'No signal' }}</span>
+    </span>
+    <span class="status-pill {% if strategy.enabled %}status-active{% else %}status-inactive{% endif %}">
+      {% if strategy.enabled %}Enabled{% else %}Disabled{% endif %}
+    </span>
+  </summary>
+  <div class="strategy-card__body">
+    <div class="strategy-remove-area">
+      <label class="strategy-delete" for="{{ prefix }}delete">
+        <input id="{{ prefix }}delete" type="checkbox" name="{{ prefix }}delete" value="1">
+        Mark for removal
+      </label>
+    </div>
+    {% include 'strategies_fields.html' %}
   </div>
-  {% include 'strategies_fields.html' %}
-</article>
+</details>

@@ -213,3 +213,49 @@ def test_saving_threshold_change_changes_strategy_signature(
     )
     assert changed != initial
     assert changed in response.get_data(as_text=True)
+
+
+def test_strategies_page_renders_single_form_and_collapsible_sections(
+    tmp_path: Path, monkeypatch
+) -> None:
+    app, _, _ = _app(tmp_path, monkeypatch)
+
+    response = app.test_client().get("/strategies")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert body.count('<form method="post"') == 1
+    assert "<details" in body
+    assert "Add new strategy" in body
+
+
+def test_strategies_page_renders_each_strategy_zero_field_once(
+    tmp_path: Path, monkeypatch
+) -> None:
+    app, _, _ = _app(tmp_path, monkeypatch)
+
+    response = app.test_client().get("/strategies")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    for field_id in (
+        "strategies-0-enabled",
+        "strategies-0-id",
+        "strategies-0-type",
+        "strategies-0-signal",
+        "strategies-0-companion_signal",
+        "strategies-0-threshold",
+        "strategies-0-ratio_threshold",
+        "strategies-0-window_seconds",
+        "strategies-0-suggested_label",
+        "strategies-0-description",
+    ):
+        assert body.count(f'id="{field_id}"') == 1
+
+
+def test_strategy_card_template_includes_fields_template_once() -> None:
+    source = Path("catalog/flask_app/templates/strategies_card.html").read_text(
+        encoding="utf-8"
+    )
+
+    assert source.count("{% include 'strategies_fields.html' %}") == 1

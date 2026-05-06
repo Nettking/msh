@@ -1,19 +1,25 @@
 {% extends 'base.html' %}
 {% block body %}
-<section class="page-intro">
-  <h2>Intervention strategies</h2>
-  <p>Thin YAML editor for strategy-driven intervention candidate detection. The strategy runner remains the source of truth for validation and execution.</p>
+<section class="page-intro strategies-intro">
+  <div>
+    <h2>Intervention strategies</h2>
+    <p>Thin YAML editor for strategy-driven intervention candidate detection. The strategy runner remains the source of truth for validation and execution.</p>
+  </div>
+  <div class="strategy-paths">
+    <span><strong>Config:</strong> {{ page.strategies_path }}</span>
+    <span><strong>Labels:</strong> {{ page.labels_path }}</span>
+  </div>
 </section>
 
-<section class="section-block section-block--primary">
+<section class="section-block section-block--primary strategy-summary-compact">
   <h3>Strategy summary</h3>
   <div class="metrics metrics-grid control-summary-strip">
     <article class="metric-card metric-card--success">
-      <span class="metric-label">Enabled strategies</span>
+      <span class="metric-label">Enabled</span>
       <span class="metric-value">{{ page.summary.enabled_count }}</span>
     </article>
     <article class="metric-card">
-      <span class="metric-label">Disabled strategies</span>
+      <span class="metric-label">Disabled</span>
       <span class="metric-value">{{ page.summary.disabled_count }}</span>
     </article>
     <article class="metric-card metric-card--info">
@@ -25,36 +31,7 @@
       <span class="metric-value metric-value--long strategy-signature">{{ page.signature or 'Unavailable until config validates' }}</span>
     </article>
   </div>
-  <p><strong>Config:</strong> {{ page.strategies_path }} · <strong>Labels:</strong> {{ page.labels_path }}</p>
   <p class="muted">Saving writes back to <code>catalog/common/intervention_strategies.yaml</code>. Strategy edits invalidate cached candidate outputs; candidate events regenerate the next time playback exports are prepared or rerun.</p>
-</section>
-
-<section class="section-block">
-  <h3>Validation</h3>
-  {% if page.validation_errors %}
-  <ul class="validation-list validation-list--errors">
-    {% for error in page.validation_errors %}<li>{{ error }}</li>{% endfor %}
-  </ul>
-  {% else %}
-  <p class="status-ok">Current strategy config validates successfully.</p>
-  {% endif %}
-  {% if page.validation_warnings %}
-  <ul class="validation-list validation-list--warnings">
-    {% for warning in page.validation_warnings %}<li>{{ warning }}</li>{% endfor %}
-  </ul>
-  {% endif %}
-</section>
-
-<section class="section-block">
-  <h3>Label vocabulary</h3>
-  <div class="label-vocabulary">
-    {% for label_id, payload in page.labels.items() %}
-    <article class="label-pill">
-      <strong>{{ label_id }}</strong>
-      <span>{{ payload.description }}</span>
-    </article>
-    {% endfor %}
-  </div>
 </section>
 
 <form method="post" action="{{ url_for('web.save_strategies') }}" class="strategy-editor-form">
@@ -65,24 +42,100 @@
   {% set _ = indices.append('new') %}
   <input type="hidden" name="strategy_indices" value="{{ indices|join(',') }}">
 
-  <section class="section-block strategy-card-grid">
-    <h3>Edit strategies</h3>
-    {% for strategy in page.strategies %}
-    {% set prefix = 'strategies-' ~ loop.index0 ~ '-' %}
-    {% include 'strategies_card.html' %}
-    {% endfor %}
+  <section class="section-block strategy-overview-section">
+    <h3>Strategy overview</h3>
+    <div class="table-scroll">
+      <table class="strategy-overview-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Type</th>
+            <th>Signal</th>
+            <th>Label</th>
+            <th>Window</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for strategy in page.strategies %}
+          <tr>
+            <td><code>{{ strategy.id or '—' }}</code></td>
+            <td>{{ strategy.type or '—' }}</td>
+            <td>{{ strategy.signal or '—' }}</td>
+            <td>{{ strategy.suggested_label or '—' }}</td>
+            <td>{{ strategy.window_seconds if strategy.window_seconds is defined else '—' }}</td>
+            <td>
+              <span class="status-pill {% if strategy.enabled %}status-active{% else %}status-inactive{% endif %}">
+                {% if strategy.enabled %}Enabled{% else %}Disabled{% endif %}
+              </span>
+            </td>
+          </tr>
+          {% else %}
+          <tr>
+            <td colspan="6" class="muted">No strategies are configured yet.</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
 
+  <section class="section-block strategy-edit-section">
+    <h3>Edit strategies</h3>
+    <p class="muted">Open a strategy to edit its fields. Existing strategies are collapsed by default.</p>
+    <div class="strategy-card-grid">
+      {% for strategy in page.strategies %}
+        {% set prefix = 'strategies-' ~ loop.index0 ~ '-' %}
+        {% include 'strategies_card.html' %}
+      {% endfor %}
+    </div>
+  </section>
+
+  <details class="section-block strategy-add-details">
+    <summary>Add new strategy</summary>
     {% set strategy = {'id': '', 'enabled': false, 'type': 'delta_threshold', 'suggested_label': '', 'signal': '', 'description': '', 'window_seconds': 30} %}
     {% set prefix = 'strategies-new-' %}
-    <article class="control-card strategy-card strategy-card--new">
-      <h4>Add a new strategy</h4>
+    <div class="strategy-card__body strategy-card__body--new">
       {% include 'strategies_fields.html' %}
-    </article>
-  </section>
+    </div>
+  </details>
 
   <section class="section-block strategy-save-bar">
     <button class="button-primary" type="submit">Save strategy YAML</button>
     <a href="{{ url_for('web.strategies') }}">Discard form changes</a>
   </section>
 </form>
+
+<details class="section-block strategy-diagnostics-details">
+  <summary>Diagnostics</summary>
+  <div class="strategy-diagnostics-body">
+    <section class="strategy-diagnostics-panel">
+      <h3>Validation</h3>
+      {% if page.validation_errors %}
+      <ul class="validation-list validation-list--errors">
+        {% for error in page.validation_errors %}<li>{{ error }}</li>{% endfor %}
+      </ul>
+      {% else %}
+      <p class="status-ok">Current strategy config validates successfully.</p>
+      {% endif %}
+      {% if page.validation_warnings %}
+      <ul class="validation-list validation-list--warnings">
+        {% for warning in page.validation_warnings %}<li>{{ warning }}</li>{% endfor %}
+      </ul>
+      {% endif %}
+    </section>
+
+    <section class="strategy-diagnostics-panel">
+      <h3>Label vocabulary</h3>
+      <div class="label-vocabulary">
+        {% for label_id, payload in page.labels.items() %}
+        <article class="label-pill">
+          <strong>{{ label_id }}</strong>
+          <span>{{ payload.description }}</span>
+        </article>
+        {% endfor %}
+      </div>
+    </section>
+  </div>
+</details>
 {% endblock %}
