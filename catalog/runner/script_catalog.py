@@ -44,7 +44,7 @@ SCRIPT_METADATA: dict[str, dict[str, str | bool]] = {
     # Stage 3: manual raw inspection.
     "data_pr_day": {
         "category": "Simple",
-        "description": "Stage 3 (Manual raw): per-machine/day raw signal plots.",
+        "description": "Stage 3 (Manual raw): machine/day summary CSV for /machine.",
     },
     # Stage 2: playback timeline prerequisites.
     "data_visualizer": {
@@ -54,16 +54,16 @@ SCRIPT_METADATA: dict[str, dict[str, str | bool]] = {
     # Stage 4: manual stop-focused inspection.
     "find_stops": {
         "category": "Simple",
-        "description": "Stage 4 (Manual stops): stop timeline plots for day/hour windows.",
+        "description": "Stage 4 (Manual stops): hourly stop-interval summary CSV.",
     },
     # Stage 5: deeper exploratory analysis.
     "data_analysis": {
         "category": "Advanced",
-        "description": "Stage 5 (Explore): deeper terminal diagnostics and exploratory summaries.",
+        "description": "Stage 5 (Deep/exploratory): deeper terminal diagnostics and summaries.",
     },
     "ml_analysis": {
         "category": "Advanced",
-        "description": "Stage 5 (Explore): per-machine ML baseline for future-stop prediction.",
+        "description": "Stage 5 (Deep/exploratory): per-machine ML baseline for future-stop prediction.",
     },
     # Legacy / no longer a recommended main workflow.
     "corrolation_machine_pairs": {

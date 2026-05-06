@@ -1,6 +1,6 @@
 # Data contract
 
-This document describes the data shapes MSH expects and the artifacts it creates. It is descriptive, not a promise that every historical file is clean.
+This document describes the data shapes MSH expects and the artifacts it creates. It is descriptive, not a promise that every historical file is clean. For session lifecycle and cache behavior, see [Workflow sessions](workflow_sessions.md).
 
 ## Raw telemetry input
 
@@ -26,7 +26,7 @@ Shared telemetry preparation normalizes the data enough for scripts to reuse it:
 
 Scripts may still impose their own additional requirements. When adding scripts, prefer using `catalog/common/` helpers instead of reimplementing parsing rules.
 
-## Session-filtered data
+## Workflow session-filtered data
 
 A workflow session stores its filtered raw JSONL copy under:
 
@@ -38,22 +38,22 @@ Filtering is based on `filter.start_date`, `filter.end_date`, and optional same-
 
 ## Derived metrics artifact
 
-Startup orchestration creates a compact shared metrics file under the session data directory:
+Bootstrap/catch-up orchestration creates a compact shared metrics artifact under the workflow session data directory:
 
 ```text
 results/workflows/<session-id>/data/_derived/basic_metrics.csv
 ```
 
-It contains the compact columns needed by startup-safe health scripts: timestamp, machine, and sequence. This avoids repeated full JSONL parsing during bootstrap/catch-up.
+It contains the compact columns needed by automatic health scripts: timestamp, machine, and sequence. This avoids repeated full JSONL parsing during bootstrap/catch-up.
 
 ## Playback-ready contract
 
-A session is practically playback-ready when:
+A workflow session satisfies the playback-ready contract when:
 
 1. `filter_result.matched_records` is greater than zero.
-2. the session filtered data directory exists.
+2. the workflow session filtered data directory exists.
 3. `exports/timeline/timeline_rows.csv` exists or can be generated from the filtered data.
-4. `exports/timeline/manifest.json` matches the session filter signature and filtered-data generation timestamp when reusing cache.
+4. `exports/timeline/manifest.json` matches the workflow session filter signature and filtered-data generation timestamp when reusing cache.
 
 The playback source schema requires at least:
 
@@ -69,6 +69,6 @@ Health scripts often validate raw telemetry availability and sequence behavior. 
 
 ## Limitations
 
-- Cache reuse is based on session metadata signatures, timestamps, and output existence; it is not a full semantic validation of changed source data or changed script code.
+- Cache reuse is based on workflow session metadata signatures, timestamps, and output existence; it is not a full semantic validation of changed source data or changed script code.
 - JSONL records with inconsistent field names may require script-specific handling.
 - Filename-date fallback can include records without timestamps when the whole file has no parseable timestamp and the filename date is in scope.

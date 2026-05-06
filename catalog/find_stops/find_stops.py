@@ -1,10 +1,4 @@
-"""
-Generate hourly stop-interval summaries from JSONL telemetry data.
-
-This script keeps output responsibilities local while reusing shared loading
-and telemetry-preparation helpers so stop heuristics can evolve as reusable DT
-foundation logic.
-"""
+"""Generate hourly stop-interval summaries from JSONL telemetry data."""
 
 from pathlib import Path
 
