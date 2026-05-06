@@ -1,0 +1,48 @@
+strategies:
+  - id: override_drop
+    enabled: true
+    type: delta_threshold
+    suggested_label: operator_override_change
+    signal: Sovr
+    threshold: -10
+    window_seconds: 30
+    description: "Detect row-to-row operator speed override drops."
+  - id: feed_override_drop
+    enabled: true
+    type: delta_threshold
+    suggested_label: feed_adjustment
+    signal: Fovr
+    threshold: -10
+    window_seconds: 30
+    description: "Detect row-to-row feed override drops."
+  - id: rapid_override_drop
+    enabled: true
+    type: delta_threshold
+    suggested_label: feed_adjustment
+    signal: Frapidovr
+    threshold: -10
+    window_seconds: 30
+    description: "Detect row-to-row rapid override drops."
+  - id: spindle_load_collapse
+    enabled: true
+    type: ratio_drop
+    suggested_label: spindle_load_collapse
+    signal: Sload
+    companion_signal: Srpm
+    ratio_threshold: 0.5
+    window_seconds: 30
+    description: "Detect sharp spindle load collapses and include spindle speed as supporting evidence."
+  - id: tool_number_change
+    enabled: true
+    type: value_change
+    suggested_label: tool_change
+    signal: Tool_number
+    window_seconds: 30
+    description: "Detect changes in active tool number."
+  - id: tool_group_change
+    enabled: true
+    type: value_change
+    suggested_label: tool_change
+    signal: Tool_group
+    window_seconds: 30
+    description: "Detect changes in active tool group."

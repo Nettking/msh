@@ -15,6 +15,7 @@ from typing import Any
 import pandas as pd
 
 from catalog.common.data_loading import iter_jsonl_files, load_jsonl_dataframe
+from catalog.common.intervention_strategy_runner import intervention_strategy_config_signature, write_strategy_outputs
 from catalog.common.timeline_exports import TIMELINE_COLUMNS, export_timeline_rows
 PLAYBACK_EXPORT_FILE = "timeline_rows.csv"
 PLAYBACK_MANIFEST_FILE = "manifest.json"
@@ -79,6 +80,15 @@ def playback_exports_are_reusable(session_dir: Path, metadata: dict[str, Any]) -
     if not export_path.exists():
         return False
 
+    for strategy_file in ("candidate_events.csv", "strategy_summary.csv", "strategies_used.yaml"):
+        if not (export_dir / strategy_file).exists():
+            return False
+
+    try:
+        current_strategy_signature = intervention_strategy_config_signature()
+    except (OSError, ValueError):
+        return False
+
     manifest = _read_manifest(export_dir)
     if manifest is None:
         return False
@@ -88,6 +98,9 @@ def playback_exports_are_reusable(session_dir: Path, metadata: dict[str, Any]) -
 
     current_filtered_generated_at = metadata.get("filter_result", {}).get("generated_at")
     if str(manifest.get("filtered_generated_at", "")) != str(current_filtered_generated_at):
+        return False
+
+    if str(manifest.get("strategy_config_signature", "")) != current_strategy_signature:
         return False
 
     if int(manifest.get("row_count", -1)) < 0:
@@ -132,6 +145,9 @@ def prepare_session_playback_exports(session_dir: Path, metadata: dict[str, Any]
         export_timeline_rows(source_df, output_path=export_path)
         row_count = len(pd.read_csv(export_path))
 
+    write_strategy_outputs(source_df, export_dir)
+    strategy_signature = intervention_strategy_config_signature()
+
     _write_manifest(
         export_dir,
         {
@@ -139,6 +155,7 @@ def prepare_session_playback_exports(session_dir: Path, metadata: dict[str, Any]
             "export_file": PLAYBACK_EXPORT_FILE,
             "session_config_signature": metadata.get("session_config_signature"),
             "filtered_generated_at": metadata.get("filter_result", {}).get("generated_at"),
+            "strategy_config_signature": strategy_signature,
             "row_count": row_count,
             "generated_at": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
         },

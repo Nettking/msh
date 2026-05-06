@@ -1,0 +1,15 @@
+labels:
+  operator_override_change:
+    description: "Operator speed override changed sharply enough to merit review."
+  feed_adjustment:
+    description: "Feed override adjustment that may indicate operator tuning."
+  spindle_load_collapse:
+    description: "Spindle load collapsed relative to the prior sample while spindle context remains relevant."
+  tool_change:
+    description: "Tool number or tool group changed during the sampled window."
+  process_stop:
+    description: "Process appears to have stopped or entered an interrupted state."
+  setup_or_adjustment:
+    description: "Setup, probing, or manual adjustment activity may be present."
+  unknown:
+    description: "Candidate requires review before assigning a more specific label."
