@@ -20,8 +20,8 @@ from catalog.runner.playback import playback_readiness, prepare_session_playback
 from catalog.runner.script_catalog import discover_runnable_scripts, repo_root
 from catalog.runner.script_exec import execute_script_for_session
 from catalog.runner.session_store import (
-    WORKFLOW_SCRIPT_ORDER,
-    WORKFLOW_STEPS,
+    AUTOMATIC_RUNTIME_SCRIPT_KEYS,
+    MANUAL_DEEP_SCRIPT_KEYS,
     initialize_session_metadata,
     list_sessions,
     normalize_session_metadata,
@@ -55,10 +55,10 @@ FLASK_HANDOFF_POLICY_ALWAYS = "always_handoff"
 UPDATE_POLICY_INCREMENTAL = "poll_for_new_data_then_process_new_slice"
 HISTORICAL_CATCH_UP_POLICY = "reverse_chronological_one_day_per_cycle"
 BOOTSTRAP_REFRESH_POLICY = "always_refresh_latest_day_on_startup"
-AUTO_COVERAGE_CONTRACT = "startup_safe_automatic_outputs"
-AUTO_COVERAGE_SCRIPT_KEYS: tuple[str, ...] = tuple(WORKFLOW_STEPS[0][1]) if WORKFLOW_STEPS else tuple(WORKFLOW_SCRIPT_ORDER)
-BOOTSTRAP_FULL_ANALYSIS_POLICY = "latest_day_full_analysis_before_catch_up"
-BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS: tuple[str, ...] = ()
+AUTO_COVERAGE_CONTRACT = "runtime_playback_ready_outputs"
+AUTO_COVERAGE_SCRIPT_KEYS: tuple[str, ...] = AUTOMATIC_RUNTIME_SCRIPT_KEYS
+BOOTSTRAP_FULL_ANALYSIS_POLICY = "latest_day_playback_ready_analysis_before_catch_up"
+BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS: tuple[str, ...] = MANUAL_DEEP_SCRIPT_KEYS
 DEFAULT_POLL_INTERVAL_SECONDS = 60
 STARTUP_MODE_PENDING = "pending_choice"
 STARTUP_MODE_CONTINUE = "continue_existing"
@@ -420,6 +420,8 @@ class RuntimeOrchestrator:
         state.processed_dates = sorted({str(item) for item in state.processed_dates})
         if state.bootstrap_date is None:
             state.bootstrap_date = state.last_bootstrap_date
+        state.automatic_coverage_contract = AUTO_COVERAGE_CONTRACT
+        state.bootstrap_full_analysis_excluded_scripts = list(BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS)
         return state
 
     def _startup_decision_context(self) -> dict[str, Any]:
@@ -551,7 +553,7 @@ class RuntimeOrchestrator:
                 if catch_up_complete
                 else "Historical catch-up is running in the background one day at a time."
                 if discovery_complete and running
-                else "Historical catch-up will begin after latest-day full analysis finishes.",
+                else "Historical catch-up will begin after latest-day playback-ready analysis finishes.",
             },
         }
 
@@ -684,7 +686,7 @@ class RuntimeOrchestrator:
             self._state.update_running = True
             self._state.phase = "bootstrap" if bootstrap else "historical_catch_up"
             self._state.mode = "bootstrap_running" if bootstrap else "incremental_refresh_running"
-            self._state.current_processing_phase = "bootstrap_latest_day_full_analysis" if bootstrap else "historical_catch_up"
+            self._state.current_processing_phase = "bootstrap_latest_day_playback_ready_analysis" if bootstrap else "historical_catch_up"
             self._state.last_update_check_at = now
             self._state.discovery_started_at = self._state.discovery_started_at or now
             self._state.currently_processing_date = None
@@ -741,7 +743,7 @@ class RuntimeOrchestrator:
             self._state.latest_available_source_date = latest.isoformat()
             self._state.last_source_signature = source_sig
             self._state.discovery_complete = True
-            self._state.current_processing_phase = "bootstrap_latest_day_full_analysis" if bootstrap else "historical_catch_up"
+            self._state.current_processing_phase = "bootstrap_latest_day_playback_ready_analysis" if bootstrap else "historical_catch_up"
             _, pending_desc, _, dropped_unverified = self._apply_progress_state(
                 available_dates=available_dates,
                 verified_processed_dates=verified_processed_dates,
@@ -760,10 +762,10 @@ class RuntimeOrchestrator:
                 self._state.bootstrap_full_analysis_started_at = self._state.bootstrap_full_analysis_started_at or _utc_now_iso()
                 self._state.bootstrap_full_analysis_scripts = list(bootstrap_script_keys)
                 self._state.bootstrap_full_analysis_excluded_scripts = list(BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS)
-                self._state.current_processing_phase = "bootstrap_latest_day_full_analysis"
+                self._state.current_processing_phase = "bootstrap_latest_day_playback_ready_analysis"
                 self._persist_state()
             self.status.info(
-                "bootstrap phase: running full initial analysis for latest available day "
+                "bootstrap phase: running playback-ready analysis for latest available day "
                 f"{latest.isoformat()} (policy={BOOTSTRAP_FULL_ANALYSIS_POLICY})"
             )
         else:
@@ -798,7 +800,7 @@ class RuntimeOrchestrator:
                     script_options=script_options,
                     target_day=day,
                     script_keys=bootstrap_script_keys if bootstrap else AUTO_COVERAGE_SCRIPT_KEYS,
-                    run_label="bootstrap_latest_day_full_analysis" if bootstrap else "historical_catch_up_day",
+                    run_label="bootstrap_latest_day_playback_ready_analysis" if bootstrap else "historical_catch_up_day",
                     mark_bootstrap_full_analysis_complete=bootstrap,
                     runtime_namespace=str(self._state.active_runtime_namespace or "default"),
                 )
@@ -841,7 +843,7 @@ class RuntimeOrchestrator:
                     f"remaining={len(pending_desc)}, next={self._state.next_planned_date or 'none'}"
                 )
                 if bootstrap:
-                    self.status.info("bootstrap phase: initial full analysis complete; historical catch-up will continue in background")
+                    self.status.info("bootstrap phase: playback-ready analysis complete; historical catch-up will continue in background")
         else:
             final_result = OrchestrationResult("none", self.workflows_root, artifacts, warnings, [], [])
             with self._lock:
@@ -867,10 +869,8 @@ class RuntimeOrchestrator:
         return final_result
 
     def _bootstrap_full_analysis_script_keys(self, script_options) -> tuple[str, ...]:
-        discovered_order = [item.key for item in script_options]
-        excluded = set(BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS)
-        selected = [key for key in discovered_order if key not in excluded]
-        return tuple(selected)
+        discovered = {item.key for item in script_options}
+        return tuple(key for key in AUTO_COVERAGE_SCRIPT_KEYS if key in discovered)
 
 
 _RUNTIME_MANAGER: RuntimeOrchestrator | None = None

@@ -104,9 +104,10 @@ Each session stores:
 
 Workflow guidance keeps staged steps:
 - **Step 1:** startup-safe health checks
-- **Step 2:** raw day aggregates
-- **Step 3:** stop detection and timelines
-- **Step 4:** deep analysis (manual heavy options)
+- **Step 2:** playback/timeline generation
+- **Step 3:** raw day aggregates (manual)
+- **Step 4:** stop detection (manual)
+- **Step 5:** deep/exploratory analysis (manual heavy options)
 
 Execution and caching are script-level:
 - step completion is derived from script statuses
@@ -123,7 +124,7 @@ Automatic orchestration actions include:
 - discover available dates from source data
 - create/reuse a deterministic auto session
 - prepare filtered session data
-- run standard workflow scripts in order
+- run the bounded automatic playback-ready script set in workflow order
 - execute workflow scripts with non-interactive subprocess stdin (Docker-safe unattended execution)
 - skip already-fresh outputs when script cache is valid
 - generate/reuse playback timeline exports
@@ -149,13 +150,14 @@ When orchestration prepares playback exports:
 - timeline exports are generated only when needed (reused if still valid)
 - Flask playback views can consume scan-discovered playback-compatible outputs
 
-Startup bootstrap (latest discovered day only) now runs the full runner-supported staged workflow for that one day before historical catch-up starts.
-
-Historical catch-up verification scope remains limited to startup-safe scripts:
+Startup bootstrap and historical catch-up use the bounded automatic playback-ready contract for each processed day:
 - `machines_active_per_day`
 - `analyze_missing_sequence_number`
 - `missing_per_day_by_machine`
 - `sampling_rate_analysis`
+- `data_visualizer`
+
+Manual/deep scripts such as `data_analysis`, `ml_analysis`, and `corrolation_machine_pairs` are not part of the default automatic contract.
 
 Startup precompute first writes a compact shared dataset at `results/workflows/<session-id>/data/_derived/basic_metrics.csv` and startup-safe scripts consume this artifact instead of re-parsing full JSONL payloads in separate passes.
 
