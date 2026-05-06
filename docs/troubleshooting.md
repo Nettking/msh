@@ -95,6 +95,12 @@ Only one control action can run at a time. Wait for the active action to finish 
 
 If the UI still shows an active action after a restart, check the current process logs rather than deleting workflow session artifacts; run history is not durable state.
 
+## Filtering opens too many files
+
+Filtering uses `results/runner/data_index.json` to prune source JSONL files by cached timestamp bounds before parsing candidate files. The logs show the number of indexed files, how many candidates survived pruning, how many files were opened, and matched file/record counts.
+
+If pruning looks ineffective, the index may contain files with missing timestamp metadata, invalid timestamps, or legacy files that only have filename dates. The runner is intentionally conservative: files with unknown metadata are opened rather than silently skipped, and JSONL remains the canonical input. Let date discovery or filtering complete once after source files change so the incremental index can refresh changed/new files and remove deleted entries.
+
 ## Date range produces no records
 
 Check whether records have parseable `timestamp` values. For same-day hour filtering, records without parseable timestamps are skipped. Filename-date fallback is only for files where no records have timestamps and applies to date-range filtering, not hour filtering.

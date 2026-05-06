@@ -30,6 +30,12 @@ results/workflows/<session-id>/
 
 The legacy `session.json` mirror exists for backward compatibility.
 
+## Source data index
+
+The runner maintains `results/runner/data_index.json` as a lightweight metadata index for source JSONL files. Each entry records file identity metadata such as path, size, mtime, filename-derived date, timestamp bounds, record count, and machine IDs when those values are available while parsing.
+
+Date discovery and session filtering refresh this index incrementally: unchanged files reuse cached metadata, changed or new files are reparsed, and deleted files are removed from the index. During filtering, the runner uses timestamp bounds to prune files that cannot overlap the requested date range before opening/parsing JSONL. If timestamp bounds are unavailable, filename dates may be used as a fallback; files with unknown metadata are still opened conservatively so historical data is not silently dropped. JSONL files remain the canonical input and source of truth.
+
 ## Cache reuse and invalidation
 
 MSH reuses session data and script outputs when metadata says they match the requested scope and the expected output folders still exist. It invalidates stale script statuses when a script is marked `done` but its output path is missing.
