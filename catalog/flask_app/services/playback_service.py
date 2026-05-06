@@ -76,6 +76,8 @@ def prepare_playback_frame(df: pd.DataFrame) -> pd.DataFrame:
     frame["timestamp"] = pd.to_datetime(frame["timestamp"], errors="coerce")
     frame["machine_id"] = frame["machine_id"].astype("string").str.strip()
     frame["state"] = frame["state"].astype("string").str.strip()
+    if "intervention_candidate" not in frame.columns:
+        frame["intervention_candidate"] = frame["state"].str.lower().eq("intervention_candidate")
     frame = frame.dropna(subset=["timestamp", "machine_id", "state"])
     frame = frame[(frame["machine_id"] != "") & (frame["state"] != "")]
     frame["day"] = frame["timestamp"].dt.date.astype(str)

@@ -300,3 +300,68 @@ def test_resample_playback_timeline_does_not_pad_before_first_or_after_last_samp
     assert resampled.iloc[-1]["source_timestamp"] == pd.Timestamp("2026-03-01T10:00:00.450Z")
     assert bool(resampled.iloc[0]["is_synthetic_tick"]) is False
     assert bool(resampled.iloc[-1]["is_synthetic_tick"]) is False
+
+
+def test_playback_subset_includes_full_state_timeline_and_candidate_flag() -> None:
+    frame = pd.DataFrame(
+        {
+            "timestamp": [
+                "2026-03-01T10:00:00Z",
+                "2026-03-01T10:00:01Z",
+                "2026-03-01T10:00:02Z",
+                "2026-03-01T10:00:03Z",
+            ],
+            "machine_id": ["M1", "M1", "M1", "M1"],
+            "state": ["active", "dense_idle", "idle", "intervention_candidate"],
+            "intervention_candidate": [False, False, False, True],
+        }
+    )
+
+    subset = _PLAYBACK_MOD.playback_subset(frame, machine_id="M1", day="2026-03-01")
+
+    assert subset["state"].tolist() == ["active", "dense_idle", "idle", "intervention_candidate"]
+    assert subset["intervention_candidate"].astype(bool).tolist() == [False, False, False, True]
+
+
+def test_prepare_playback_frame_marks_legacy_candidate_state_as_candidate_flag() -> None:
+    frame = pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z", "2026-03-01T10:00:01Z"],
+            "machine_id": ["M1", "M1"],
+            "state": ["active", "intervention_candidate"],
+        }
+    )
+
+    prepared = prepare_playback_frame(frame)
+
+    assert prepared["state"].tolist() == ["active", "intervention_candidate"]
+    assert prepared["intervention_candidate"].astype(bool).tolist() == [False, True]
+
+
+def test_candidate_event_extract_is_not_classified_as_playback_when_timeline_exists(tmp_path: Path) -> None:
+    timeline = tmp_path / "timeline_rows.csv"
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z", "2026-03-01T10:00:01Z"],
+            "machine_id": ["M1", "M1"],
+            "state": ["active", "idle"],
+            "intervention_candidate": [False, False],
+        }
+    ).to_csv(timeline, index=False)
+    candidates = tmp_path / "candidate_events.csv"
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:02Z"],
+            "machine_id": ["M1"],
+            "state": ["intervention_candidate"],
+            "intervention_candidate": [True],
+        }
+    ).to_csv(candidates, index=False)
+
+    artifacts, warnings = scan_artifacts([str(tmp_path)])
+    by_name = {artifact["file_name"]: artifact for artifact in artifacts}
+
+    assert warnings == []
+    assert by_name["timeline_rows.csv"]["playback_compatible"] is True
+    assert by_name["candidate_events.csv"]["playback_compatible"] is False
+    assert by_name["candidate_events.csv"]["analysis_name"] == "Interventions"
