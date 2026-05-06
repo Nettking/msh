@@ -25,6 +25,8 @@ from catalog.runner.session_store import filter_signature, write_session_metadat
 # Versioned JSON cache used for date discovery and conservative file pruning.
 DATA_INDEX_VERSION = 2
 DATA_INDEX_FILE = ROOT_DIR / "results" / "runner" / "data_index.json"
+FILTER_PROGRESS_FILE_INTERVAL = 25
+FILTER_PROGRESS_RECORD_INTERVAL = 100_000
 
 
 def discover_available_dates(data_dir: Path) -> list[date]:
@@ -61,6 +63,8 @@ def filter_data_by_date_range(
     *,
     start_hour: int | None = None,
     end_hour: int | None = None,
+    active_slice: date | str | None = None,
+    remaining_slices: int | None = None,
 ) -> tuple[int, int]:
     """Filter JSONL records into a destination directory based on date or hour range.
 
@@ -86,6 +90,21 @@ def filter_data_by_date_range(
     matched_records = 0
     written_files = 0
     opened_files = 0
+    processed_files = 0
+    progress = _FilterProgressReporter(
+        total_indexed_files=len(root_entries),
+        candidate_files=len(candidate_entries),
+        active_slice=active_slice,
+        remaining_slices=remaining_slices,
+    )
+    progress.report(
+        phase="started",
+        opened_files=opened_files,
+        processed_files=processed_files,
+        matched_files=written_files,
+        matched_records=matched_records,
+        force=True,
+    )
 
     for relative_path, _entry in candidate_entries:
         source_file = source_root / relative_path
@@ -106,13 +125,35 @@ def filter_data_by_date_range(
         # timestamp dates; mixing fallback and timestamp filtering would duplicate
         # or mis-scope partially malformed files.
         opened_files += 1
+        progress.report(
+            phase="opening candidate",
+            opened_files=opened_files,
+            processed_files=processed_files,
+            matched_files=written_files,
+            matched_records=matched_records,
+        )
+        records_scanned = 0
         for record in iter_jsonl_records(source_file):
+            records_scanned += 1
             parsed_records.append(record)
             if parse_timestamp_to_date(str(record.get("timestamp", ""))) is not None:
                 file_has_timestamp = True
+            if records_scanned % FILTER_PROGRESS_RECORD_INTERVAL == 0:
+                progress.report(
+                    phase="reading candidate",
+                    opened_files=opened_files,
+                    processed_files=processed_files,
+                    matched_files=written_files,
+                    matched_records=matched_records,
+                    current_file=relative_path,
+                    file_records=records_scanned,
+                    force=True,
+                )
 
         with destination_file.open("w", encoding="utf-8") as dst:
+            records_processed = 0
             for record in parsed_records:
+                records_processed += 1
                 if use_hour_filter:
                     record_dt = _parse_timestamp_to_datetime(str(record.get("timestamp", "")))
                     if record_dt is None:
@@ -138,21 +179,40 @@ def filter_data_by_date_range(
                     matched_records += 1
                     file_matched += 1
 
+                if records_processed % FILTER_PROGRESS_RECORD_INTERVAL == 0:
+                    progress.report(
+                        phase="processing candidate",
+                        opened_files=opened_files,
+                        processed_files=processed_files,
+                        matched_files=written_files,
+                        matched_records=matched_records,
+                        current_file=relative_path,
+                        file_records=records_processed,
+                        force=True,
+                    )
+
         if file_matched > 0:
             written_files += 1
         else:
             destination_file.unlink(missing_ok=True)
+        processed_files += 1
 
-        if opened_files % 25 == 0:
-            print(
-                f"[runner] Filter progress: opened {opened_files}/{len(candidate_entries)} candidate files "
-                f"(matched files: {written_files}, matched records: {matched_records})",
-                flush=True,
-            )
+        progress.report(
+            phase="processed candidate",
+            opened_files=opened_files,
+            processed_files=processed_files,
+            matched_files=written_files,
+            matched_records=matched_records,
+            force=opened_files == len(candidate_entries),
+        )
 
-    print(
-        f"[runner] Opened {opened_files} files, matched {written_files} files, matched {matched_records} records",
-        flush=True,
+    progress.report(
+        phase="complete",
+        opened_files=opened_files,
+        processed_files=processed_files,
+        matched_files=written_files,
+        matched_records=matched_records,
+        force=True,
     )
 
     return matched_records, written_files
@@ -163,6 +223,8 @@ def ensure_session_filtered_data(
     source_data_dir: Path,
     session_dir: Path,
     metadata: dict,
+    active_slice: date | str | None = None,
+    remaining_slices: int | None = None,
 ) -> tuple[int, int, str]:
     """Ensure the session-scoped filtered dataset exists for current metadata.
 
@@ -186,6 +248,8 @@ def ensure_session_filtered_data(
         date.fromisoformat(str(filter_config["end_date"])),
         start_hour=int(filter_config["start_hour"]) if filter_config.get("start_hour") is not None else None,
         end_hour=int(filter_config["end_hour"]) if filter_config.get("end_hour") is not None else None,
+        active_slice=active_slice,
+        remaining_slices=remaining_slices,
     )
     filter_result["matched_records"] = matched_records
     filter_result["matched_files"] = matched_files
@@ -193,6 +257,71 @@ def ensure_session_filtered_data(
     filter_result["generated_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     write_session_metadata(session_dir, metadata)
     return matched_records, matched_files, "created"
+
+
+class _FilterProgressReporter:
+    """Emit operator-readable filtering progress without per-record log spam."""
+
+    def __init__(
+        self,
+        *,
+        total_indexed_files: int,
+        candidate_files: int,
+        active_slice: date | str | None,
+        remaining_slices: int | None,
+    ) -> None:
+        self.total_indexed_files = total_indexed_files
+        self.candidate_files = candidate_files
+        self.active_slice = _format_progress_value(active_slice)
+        self.remaining_slices = _format_progress_value(remaining_slices)
+        self._last_file_progress_opened = -1
+
+    def report(
+        self,
+        *,
+        phase: str,
+        opened_files: int,
+        processed_files: int,
+        matched_files: int,
+        matched_records: int,
+        current_file: str | None = None,
+        file_records: int | None = None,
+        force: bool = False,
+    ) -> None:
+        if not force and not self._should_report_file_progress(opened_files):
+            return
+        self._last_file_progress_opened = opened_files
+
+        details = [
+            f"phase={phase}",
+            f"total_indexed_files={self.total_indexed_files}",
+            f"candidate_files={self.candidate_files}",
+            f"candidate_files_opened={opened_files}/{self.candidate_files}",
+            f"candidate_files_processed={processed_files}/{self.candidate_files}",
+            f"matched_files={matched_files}",
+            f"matched_records={matched_records}",
+            f"active_slice={self.active_slice}",
+            f"remaining_slices={self.remaining_slices}",
+        ]
+        if current_file is not None:
+            details.append(f"current_file={current_file}")
+        if file_records is not None:
+            details.append(f"file_records_processed={file_records}")
+
+        print("[runner] Filter progress: " + ", ".join(details), flush=True)
+
+    def _should_report_file_progress(self, opened_files: int) -> bool:
+        if opened_files == self._last_file_progress_opened:
+            return False
+        return opened_files == 1 or opened_files % FILTER_PROGRESS_FILE_INTERVAL == 0
+
+
+def _format_progress_value(value: object) -> str:
+    if value is None:
+        return "n/a"
+    if isinstance(value, date):
+        return value.isoformat()
+    return str(value)
 
 
 def _parse_timestamp_to_datetime(timestamp: str | None) -> datetime | None:
@@ -261,7 +390,8 @@ def _refresh_data_index_for_root(data_dir: Path) -> tuple[dict, dict[str, dict],
     reparsed_files = 0
 
     jsonl_files = list(iter_jsonl_files(data_dir, recursive=True))
-    for file_path in jsonl_files:
+    print(f"[runner] Data index refresh: discovered {len(jsonl_files)} JSONL files under {data_root}", flush=True)
+    for file_index, file_path in enumerate(jsonl_files, start=1):
         relative_path = file_path.resolve().relative_to(data_root).as_posix()
         stat_result = file_path.stat()
         cache_entry = cached_root_entries.get(relative_path)
@@ -269,10 +399,22 @@ def _refresh_data_index_for_root(data_dir: Path) -> tuple[dict, dict[str, dict],
         if _cache_entry_matches_file(cache_entry, file_path, stat_result):
             updated_root_entries[relative_path] = dict(cache_entry)
             reused_files += 1
+            _report_index_refresh_progress(
+                file_index=file_index,
+                total_files=len(jsonl_files),
+                reused_files=reused_files,
+                reparsed_files=reparsed_files,
+            )
             continue
 
         updated_root_entries[relative_path] = _index_jsonl_file(file_path, data_root, stat_result)
         reparsed_files += 1
+        _report_index_refresh_progress(
+            file_index=file_index,
+            total_files=len(jsonl_files),
+            reused_files=reused_files,
+            reparsed_files=reparsed_files,
+        )
 
     _store_cached_root_entries(index_data, data_root, updated_root_entries)
     return index_data, updated_root_entries, {
@@ -281,6 +423,24 @@ def _refresh_data_index_for_root(data_dir: Path) -> tuple[dict, dict[str, dict],
         "reparsed_files": reparsed_files,
         "deleted_files": max(0, len(cached_root_entries) - len(updated_root_entries)),
     }
+
+
+def _report_index_refresh_progress(
+    *,
+    file_index: int,
+    total_files: int,
+    reused_files: int,
+    reparsed_files: int,
+) -> None:
+    if file_index != 1 and file_index % FILTER_PROGRESS_FILE_INTERVAL != 0 and file_index != total_files:
+        return
+    print(
+        "[runner] Data index progress: "
+        f"indexed_files={file_index}/{total_files}, "
+        f"reused_files={reused_files}, "
+        f"reparsed_files={reparsed_files}",
+        flush=True,
+    )
 
 
 def _cache_entry_matches_file(cache_entry: object, file_path: Path, stat_result: Any) -> bool:
