@@ -318,6 +318,12 @@ p { margin: 0; color: var(--text-muted); }
   gap: 10px;
 }
 
+
+.playback-candidate-badge {
+  background: #f1f5f9;
+  color: #475569;
+}
+
 .playback-form {
   margin-top: 12px;
   display: flex;

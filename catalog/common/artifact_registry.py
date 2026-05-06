@@ -181,6 +181,18 @@ def read_table_columns(path: str | Path, max_rows: int = 3000) -> tuple[set[str]
 
 def _classify_analysis(path: Path, columns: set[str]) -> tuple[str, str, str]:
     p = str(path).lower()
+    file_name = path.name.lower()
+
+    # Candidate-event extracts can contain the minimal playback columns, but they
+    # are sparse event overlays rather than the primary machine-state timeline.
+    # Classify them before the generic playback schema check so /playback defaults
+    # to continuous row-level timeline exports when both files are present.
+    if "candidate" in file_name or "intervention" in file_name:
+        for keywords, result in KEYWORD_RULES:
+            if any(keyword in p for keyword in keywords):
+                return result
+        return "Interventions", "Intervention-related rows and summaries.", "analysis"
+
     if REQUIRED_PLAYBACK_COLUMNS.issubset(columns):
         return "Timeline Playback", "Playback-compatible timeline rows for machine state replay.", "playback"
 

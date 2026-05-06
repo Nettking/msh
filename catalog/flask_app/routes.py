@@ -329,6 +329,13 @@ def _serialize_playback_timestamp(series: pd.Series) -> pd.Series:
 def playback():
     snap = _catalog().ensure_scanned()
     playback_artifacts = [a for a in snap.artifacts if a.get("playback_compatible") and a.get("visibility") == "default"]
+    playback_artifacts.sort(
+        key=lambda item: (
+            0 if str(item.get("file_name", "")).lower() == "timeline_rows.csv" else 1,
+            str(item.get("file_name", "")).lower(),
+            str(item.get("path", "")),
+        )
+    )
     selected_path = request.args.get("path", playback_artifacts[0]["path"] if playback_artifacts else "")
     machine = request.args.get("machine", "")
     day = request.args.get("day", "")

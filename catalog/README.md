@@ -143,6 +143,8 @@ Playback-ready session (practical readiness check):
 
 Notes:
 - playback exports are generated from session-filtered data using shared timeline export/inference helpers
+- the primary playback export is the full row-level machine-state timeline (`timeline_rows.csv`), including normal states such as `active`, `dense_idle`, `idle`, and `stopped` when inferred
+- candidate events remain present as `intervention_candidate` state/flag rows in the timeline, while sparse `candidate_events.csv` extracts are treated as intervention overlays rather than the primary playback dataset
 - if reusable exports already exist for the current session filter signature, they are reused
 
 When orchestration prepares playback exports:

@@ -118,6 +118,9 @@
     <span class="playback-item-label">Tick</span>
     <span id="tickType">-</span>
     <span class="playback-item-sep">•</span>
+    <span class="playback-item-label">Candidate</span>
+    <span id="candidateBadge" class="status-badge playback-candidate-badge">-</span>
+    <span class="playback-item-sep">•</span>
     <span class="playback-item-label">Source</span>
     <span id="sourceTimestamp">-</span>
     <span class="playback-item-sep">•</span>
@@ -207,6 +210,7 @@ const sampleSummary = document.getElementById('sampleSummary');
 const rowIndexText = document.getElementById('rowIndexText');
 const rowTotalText = document.getElementById('rowTotalText');
 const stateBadge = document.getElementById('stateBadge');
+const candidateBadge = document.getElementById('candidateBadge');
 const timelineCurrentTs = document.getElementById('timelineCurrentTs');
 const groupedFields = document.getElementById('groupedFields');
 const rawRowTableBody = document.getElementById('rawRowTableBody');
@@ -287,6 +291,10 @@ function parseNumeric(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function isCandidateRow(row) {
+  return String(row.intervention_candidate).toLowerCase() === 'true' || String(row.state || '').toLowerCase() === 'intervention_candidate';
+}
+
 function summarizeCurrentSample(row) {
   const parts = [];
   if (isPresent(row.machine_id)) parts.push(`Machine ${row.machine_id}`);
@@ -301,7 +309,7 @@ function summarizeCurrentSample(row) {
   }
 
   const extras = [];
-  if (String(row.intervention_candidate).toLowerCase() === 'true') {
+  if (isCandidateRow(row)) {
     extras.push('Intervention candidate detected.');
   } else if (isPresent(row.intervention_candidate)) {
     extras.push('No intervention candidate.');
@@ -419,6 +427,9 @@ function renderCurrentRow() {
   nowDay.textContent = '{{ day }}' || '-';
   nowIndex.textContent = String(currentIndex + 1);
   tickType.textContent = row.is_synthetic_tick === true ? 'Synthetic / filled tick' : 'Source-aligned tick';
+  const candidate = isCandidateRow(row);
+  candidateBadge.textContent = candidate ? 'Candidate event' : 'No';
+  candidateBadge.className = `status-badge playback-candidate-badge ${candidate ? 'status-error' : ''}`.trim();
   sourceTimestamp.textContent = valueText(row.source_timestamp);
   sampleSummary.textContent = summarizeCurrentSample(row);
   rowIndexText.textContent = String(currentIndex + 1);
