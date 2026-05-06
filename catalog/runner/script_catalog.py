@@ -41,28 +41,29 @@ SCRIPT_METADATA: dict[str, dict[str, str | bool]] = {
         "category": "Simple",
         "description": "Stage 1 (Health): average telemetry sampling rate per day.",
     },
-    # Stage 2: raw inspection.
+    # Stage 3: manual raw inspection.
     "data_pr_day": {
         "category": "Simple",
-        "description": "Stage 2 (Raw): per-machine/day raw signal plots.",
+        "description": "Stage 3 (Manual raw): per-machine/day raw signal plots.",
     },
-    # Stage 3: stop-focused inspection.
+    # Stage 2: playback timeline prerequisites.
+    "data_visualizer": {
+        "category": "Simple",
+        "description": "Stage 2 (Playback): state timelines and candidate-event export.",
+    },
+    # Stage 4: manual stop-focused inspection.
     "find_stops": {
         "category": "Simple",
-        "description": "Stage 3 (Stops): stop timeline plots for day/hour windows.",
+        "description": "Stage 4 (Manual stops): stop timeline plots for day/hour windows.",
     },
-    # Stage 4: deeper exploratory analysis.
-    "data_visualizer": {
-        "category": "Advanced",
-        "description": "Stage 4 (Explore): state timelines and candidate-event export.",
-    },
+    # Stage 5: deeper exploratory analysis.
     "data_analysis": {
         "category": "Advanced",
-        "description": "Stage 4 (Explore): deeper terminal diagnostics and exploratory summaries.",
+        "description": "Stage 5 (Explore): deeper terminal diagnostics and exploratory summaries.",
     },
     "ml_analysis": {
         "category": "Advanced",
-        "description": "Stage 4 (Explore): per-machine ML baseline for future-stop prediction.",
+        "description": "Stage 5 (Explore): per-machine ML baseline for future-stop prediction.",
     },
     # Legacy / no longer a recommended main workflow.
     "corrolation_machine_pairs": {

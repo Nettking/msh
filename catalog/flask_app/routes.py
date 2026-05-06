@@ -202,7 +202,7 @@ def status():
     phase_messages = {
         "runtime_not_started": "Webapp started. Runtime has not started yet.",
         "discovery_pending": "Webapp started. Background discovery is running.",
-        "bootstrap_latest_day_full_analysis": "Running full initial analysis for latest day in the background.",
+        "bootstrap_latest_day_playback_ready_analysis": "Running playback-ready health and timeline analysis for latest day in the background.",
         "historical_catch_up": "Historical catch-up is running one day at a time.",
         "polling_new_data": "Historical processing is complete. Polling for newly arriving days.",
         "failed": "Background runtime encountered a failure. Check last failure details below.",

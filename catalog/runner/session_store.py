@@ -15,36 +15,44 @@ from catalog.runner.script_catalog import ScriptOption
 SESSION_VERSION = 2
 SESSION_STATE_FILE = "session_state.json"
 LEGACY_SESSION_FILE = "session.json"
+HEALTH_CHECK_SCRIPT_KEYS: tuple[str, ...] = (
+    "machines_active_per_day",
+    "analyze_missing_sequence_number",
+    "missing_per_day_by_machine",
+    "sampling_rate_analysis",
+)
+PLAYBACK_TIMELINE_SCRIPT_KEYS: tuple[str, ...] = ("data_visualizer",)
+MANUAL_DEEP_SCRIPT_KEYS: tuple[str, ...] = (
+    "data_analysis",
+    "ml_analysis",
+    "corrolation_machine_pairs",
+)
+AUTOMATIC_RUNTIME_SCRIPT_KEYS: tuple[str, ...] = HEALTH_CHECK_SCRIPT_KEYS + PLAYBACK_TIMELINE_SCRIPT_KEYS
+
 WORKFLOW_STEPS: list[tuple[str, list[str]]] = [
     (
         "Step 1: Startup-safe health checks",
-        [
-            "machines_active_per_day",
-            "analyze_missing_sequence_number",
-            "missing_per_day_by_machine",
-            "sampling_rate_analysis",
-        ],
+        list(HEALTH_CHECK_SCRIPT_KEYS),
     ),
     (
-        "Step 2: Raw day aggregates",
+        "Step 2: Playback/timeline generation",
+        list(PLAYBACK_TIMELINE_SCRIPT_KEYS),
+    ),
+    (
+        "Step 3: Raw day aggregates (manual)",
         [
             "data_pr_day",
         ],
     ),
     (
-        "Step 3: Stop detection and timelines",
+        "Step 4: Stop detection (manual)",
         [
             "find_stops",
         ],
     ),
     (
-        "Step 4: Deep analysis (manual heavy options)",
-        [
-            "data_visualizer",
-            "data_analysis",
-            "ml_analysis",
-            "corrolation_machine_pairs",
-        ],
+        "Step 5: Deep/exploratory analysis (manual heavy options)",
+        list(MANUAL_DEEP_SCRIPT_KEYS),
     ),
 ]
 WORKFLOW_SCRIPT_ORDER: list[str] = [script for _, scripts in WORKFLOW_STEPS for script in scripts]

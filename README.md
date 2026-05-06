@@ -21,7 +21,7 @@ The startup flow is now non-interactive and automatic with **webapp-first startu
 3. starts runtime/orchestration manager in the background
 4. discovers available dates in `data/`
 5. discovers the latest source-data day and creates/reuses that day’s workflow session
-6. runs a **full initial one-day analysis pass** for that latest day (background)
+6. runs the automatic playback-ready one-day analysis pass for that latest day (health checks plus timeline/candidate-event generation) in the background
 7. runs historical catch-up incrementally one day at a time (background)
 8. keeps polling for newly arriving days after catch-up completes (background)
 
@@ -35,13 +35,14 @@ Primary operator controls are now available in the Flask UI at `/control` (runti
 
 The `/control` panel is currently an MVP: single-process threaded execution, best-effort action handling, and in-memory recent activity/log snippets (not restart-persistent).
 
-Initial latest-day bootstrap now runs the full runner-supported analysis script set for that one day before historical catch-up begins.
-
-Automatic **historical catch-up verification** remains intentionally limited to startup-safe health checks:
+Automatic runtime processing now covers the bounded playback-ready contract: startup-safe health checks first, followed by timeline/candidate-event generation for playback. The automatic script set is:
 - `machines_active_per_day`
 - `analyze_missing_sequence_number`
 - `missing_per_day_by_machine`
 - `sampling_rate_analysis`
+- `data_visualizer`
+
+Heavy or exploratory analyses such as `data_analysis`, `ml_analysis`, and `corrolation_machine_pairs` remain manual unless explicitly run from `/control`.
 
 Scripts intentionally hidden from runner discovery (`auto_connect`, recorders, simulator, interventions) remain excluded by design.
 
