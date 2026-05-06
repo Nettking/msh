@@ -365,3 +365,74 @@ def test_candidate_event_extract_is_not_classified_as_playback_when_timeline_exi
     assert by_name["timeline_rows.csv"]["playback_compatible"] is True
     assert by_name["candidate_events.csv"]["playback_compatible"] is False
     assert by_name["candidate_events.csv"]["analysis_name"] == "Interventions"
+
+
+def test_workflow_timeline_export_is_scanned_as_playback_compatible(tmp_path: Path) -> None:
+    workflow_export_dir = tmp_path / "results" / "workflows" / "session-123" / "exports" / "timeline"
+    workflow_export_dir.mkdir(parents=True)
+    timeline = workflow_export_dir / "timeline_rows.csv"
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z", "2026-03-01T10:00:01Z"],
+            "machine_id": ["M1", "M1"],
+            "state": ["active", "idle"],
+        }
+    ).to_csv(timeline, index=False)
+
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+    by_path = {Path(artifact["path"]): artifact for artifact in artifacts}
+
+    assert warnings == []
+    assert by_path[timeline]["file_name"] == "timeline_rows.csv"
+    assert by_path[timeline]["category"] == "derived_output"
+    assert by_path[timeline]["visibility"] == "default"
+    assert by_path[timeline]["playback_compatible"] is True
+    assert "playback" in by_path[timeline]["supported_views"]
+
+
+def test_workflow_playback_auxiliary_exports_are_not_timeline_playback(tmp_path: Path) -> None:
+    workflow_export_dir = tmp_path / "results" / "workflows" / "session-123" / "exports" / "timeline"
+    workflow_export_dir.mkdir(parents=True)
+    for name in ("candidate_events.csv", "strategy_summary.csv"):
+        pd.DataFrame(
+            {
+                "timestamp": ["2026-03-01T10:00:00Z"],
+                "machine_id": ["M1"],
+                "state": ["intervention_candidate"],
+            }
+        ).to_csv(workflow_export_dir / name, index=False)
+
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+    by_name = {artifact["file_name"]: artifact for artifact in artifacts}
+
+    assert warnings == []
+    assert by_name["candidate_events.csv"]["playback_compatible"] is False
+    assert by_name["strategy_summary.csv"]["playback_compatible"] is False
+    assert by_name["candidate_events.csv"]["analysis_name"] == "Interventions"
+    assert by_name["strategy_summary.csv"]["analysis_name"] == "Interventions"
+
+
+def test_overview_inventory_counts_workflow_timeline_export_as_playback(tmp_path: Path) -> None:
+    from catalog.flask_app.services.catalog_service import ScanSnapshot
+    from catalog.flask_app.services.overview_service import build_overview_snapshot
+
+    workflow_export_dir = tmp_path / "results" / "workflows" / "session-123" / "exports" / "timeline"
+    workflow_export_dir.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z"],
+            "machine_id": ["M1"],
+            "state": ["active"],
+        }
+    ).to_csv(workflow_export_dir / "timeline_rows.csv", index=False)
+
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+    snapshot = ScanSnapshot(artifacts=artifacts, warnings=warnings, scanned_at_epoch=1.0)
+    overview = build_overview_snapshot(
+        catalog=None,  # type: ignore[arg-type]
+        scan=snapshot,
+        runtime_state={"current_processing_phase": "runtime_not_started"},
+        sessions=[],
+    )
+
+    assert overview.headline["playback_compatible_count"] == 1
