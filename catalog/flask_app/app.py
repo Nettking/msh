@@ -1,3 +1,5 @@
+"""Flask application factory and webapp-first runtime startup entrypoint."""
+
 from __future__ import annotations
 
 import os

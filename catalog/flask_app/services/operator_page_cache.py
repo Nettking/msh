@@ -1,3 +1,10 @@
+"""Short-lived UI snapshot cache for operator-facing Flask pages.
+
+Overview and control pages combine artifact scans, runtime state, and session
+metadata. This cache reduces repeated filesystem work during browser refreshes
+while using signatures that change when runtime/session state changes.
+"""
+
 from __future__ import annotations
 
 import threading
@@ -25,6 +32,8 @@ class _CacheEntry:
 
 
 class OperatorPageCache:
+    """Cache expensive page snapshots until inputs or short TTLs change."""
+
     def __init__(self, *, overview_ttl_seconds: float = 4.0, control_ttl_seconds: float = 4.0) -> None:
         self.overview_ttl_seconds = float(overview_ttl_seconds)
         self.control_ttl_seconds = float(control_ttl_seconds)
@@ -50,6 +59,7 @@ class OperatorPageCache:
             self._control_entries.clear()
 
     def get_overview_snapshot(self, catalog: ArtifactCatalog) -> tuple[OverviewSnapshot, str]:
+        """Return cached/rebuilt overview snapshot with a cache-state label."""
         scan = catalog.ensure_scanned()
         runtime_state = get_runtime_manager().state_snapshot()
         signature = (
@@ -90,6 +100,7 @@ class OperatorPageCache:
         return rebuilt, "rebuilt"
 
     def get_control_snapshot(self, *, selected_session_id: str | None = None) -> tuple[dict[str, Any], str]:
+        """Return cached/rebuilt control snapshot for the selected session."""
         runtime_state = get_runtime_manager().state_snapshot()
         control_service = get_control_panel_service()
         key = (selected_session_id or "").strip()

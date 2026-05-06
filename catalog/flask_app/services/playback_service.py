@@ -1,3 +1,11 @@
+"""UI-facing validation and shaping helpers for playback timeline artifacts.
+
+Playback views consume already-derived timeline tables rather than raw JSONL.
+The helpers here enforce the minimal table contract, normalize timestamps and
+machine/state fields, and create display-oriented subsets/resampled rows without
+changing the underlying export files.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -17,6 +25,8 @@ DEFAULT_MAX_PLAYBACK_DELAY_SECONDS = 5.0
 
 @dataclass
 class PlaybackValidation:
+    """Validation result for playback source/file contract checks."""
+
     is_valid: bool
     reason: str = ""
 
@@ -28,6 +38,11 @@ def compute_playback_delay(
     fallback_delay: float = DEFAULT_FALLBACK_PLAYBACK_DELAY_SECONDS,
     max_delay: float = DEFAULT_MAX_PLAYBACK_DELAY_SECONDS,
 ) -> float:
+    """Compute a bounded client delay between telemetry samples.
+
+    Bad timestamps, non-positive deltas, or invalid speeds fall back to a short
+    safe delay so playback remains usable instead of stalling the browser.
+    """
     previous = pd.to_datetime(previous_timestamp, errors="coerce", utc=True)
     current = pd.to_datetime(current_timestamp, errors="coerce", utc=True)
     safe_fallback = fallback_delay if pd.notna(fallback_delay) and float(fallback_delay) > 0 else 0.05
@@ -50,8 +65,8 @@ def _has_non_empty_values(series: pd.Series) -> bool:
     return cleaned.replace("", pd.NA).notna().any()
 
 
-
 def validate_playback_source(path: str) -> PlaybackValidation:
+    """Validate a playback file by inspecting columns before loading all rows."""
     columns, load_error = read_table_columns(path)
     if load_error:
         return PlaybackValidation(False, f"Unable to inspect source columns: {load_error}")
@@ -72,6 +87,12 @@ def load_playback_frame(path: str) -> tuple[pd.DataFrame | None, str | None]:
 
 
 def prepare_playback_frame(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize a playback table to rows with timestamp, machine, state, and day.
+
+    Candidate-event-only legacy exports are interpreted as intervention flags
+    when they use ``state == intervention_candidate`` and do not already include
+    an explicit flag column.
+    """
     frame = df.copy()
     frame["timestamp"] = pd.to_datetime(frame["timestamp"], errors="coerce")
     frame["machine_id"] = frame["machine_id"].astype("string").str.strip()
@@ -85,6 +106,7 @@ def prepare_playback_frame(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def validate_playback_frame(df: pd.DataFrame) -> PlaybackValidation:
+    """Validate loaded playback rows against the minimal UI contract."""
     missing = sorted(REQUIRED_PLAYBACK_COLUMNS.difference(df.columns))
     if missing:
         return PlaybackValidation(False, f"Missing required source columns: {', '.join(missing)}")
@@ -99,6 +121,7 @@ def validate_playback_frame(df: pd.DataFrame) -> PlaybackValidation:
 
 
 def playback_subset(df: pd.DataFrame, machine_id: str, day: str) -> pd.DataFrame:
+    """Return source playback rows for one machine/day with duplicate timestamps collapsed."""
     base = prepare_playback_frame(df)
     rows = base[(base["machine_id"] == str(machine_id)) & (base["day"] == str(day))]
     if rows.empty:
@@ -110,6 +133,11 @@ def playback_subset(df: pd.DataFrame, machine_id: str, day: str) -> pd.DataFrame
 
 
 def resample_playback_timeline(df: pd.DataFrame, frequency: str = PLAYBACK_TICK_FREQUENCY) -> pd.DataFrame:
+    """Build a regular playback tick grid using last-observation-carried-forward.
+
+    Synthetic ticks are marked so the UI can distinguish actual telemetry rows
+    from display interpolation.
+    """
     if df.empty:
         return df.copy()
 
@@ -128,6 +156,8 @@ def resample_playback_timeline(df: pd.DataFrame, frequency: str = PLAYBACK_TICK_
 
         grid_start = ordered["timestamp"].min()
         grid_end = ordered["timestamp"].max()
+        # merge_asof preserves the most recent real state for each synthetic UI
+        # tick; this is display interpolation, not a replacement for raw samples.
         timeline_grid = pd.DataFrame(
             {
                 "timestamp": pd.date_range(start=grid_start, end=grid_end, freq=frequency),
@@ -195,6 +225,7 @@ def playback_day_counts_by_machine(df: pd.DataFrame) -> dict[str, dict[str, int]
 
 
 def interval_rows(rows: pd.DataFrame) -> list[dict]:
+    """Convert selected playback rows into state intervals for summary tables."""
     if rows.empty:
         return []
     intervals = build_state_interval_export(rows)
@@ -230,6 +261,7 @@ def summarize_intervals(intervals: list[dict]) -> dict:
 
 
 def playback_field_groups(columns: list[str]) -> dict[str, list[str]]:
+    """Group arbitrary export columns into UI sections using naming heuristics."""
     lowered_to_original = {column.lower(): column for column in columns}
     grouped: dict[str, list[str]] = {
         "Signals": [],

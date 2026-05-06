@@ -1,4 +1,10 @@
-"""Session metadata and workflow status helpers for the runner."""
+"""Session metadata and workflow status helpers for the runner.
+
+Session metadata is the file-based contract between Flask controls, automatic
+orchestration, playback export generation, and standalone script execution. The
+canonical file is ``session_state.json``; ``session.json`` is still written as a
+legacy mirror for older tooling.
+"""
 
 from __future__ import annotations
 
@@ -119,7 +125,11 @@ def initialize_session_metadata(
     runtime_namespace: str | None = None,
     script_options: list[ScriptOption],
 ) -> dict[str, Any]:
-    """Build a new session metadata payload."""
+    """Build a new session metadata payload for a date/hour filter scope.
+
+    All currently discoverable scripts are pre-registered so UI views can show
+    not-run/manual steps before any subprocess has executed.
+    """
     scripts: dict[str, dict[str, Any]] = {}
     for item in script_options:
         scripts[item.key] = {
@@ -176,7 +186,12 @@ def normalize_session_metadata(
     metadata: dict[str, Any],
     script_options: list[ScriptOption],
 ) -> tuple[dict[str, Any], bool]:
-    """Fill missing session fields and add new script entries for backward compatibility."""
+    """Normalize older metadata without changing the intended session scope.
+
+    This lets sessions created by earlier versions remain visible while adding
+    new path fields, script entries, workflow labels, and runtime namespace data.
+    It also performs lightweight stale-output invalidation.
+    """
     changed = False
 
     paths = metadata.setdefault("paths", {})
@@ -271,7 +286,11 @@ def script_output_exists(session_dir: Path, script_entry: dict[str, Any]) -> boo
 
 
 def refresh_script_cache_status(session_dir: Path, metadata: dict[str, Any]) -> bool:
-    """Invalidate cached script status if metadata claims done but outputs are missing."""
+    """Invalidate script cache entries whose recorded output folders disappeared.
+
+    This guards against manual cleanup of ``runs/`` directories. It does not
+    attempt to detect changed script source code or changed raw telemetry.
+    """
     changed = False
     for script_entry in metadata.get("scripts", {}).values():
         if script_entry.get("status") != "done":

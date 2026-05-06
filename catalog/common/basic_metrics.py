@@ -1,3 +1,10 @@
+"""Compact derived metrics shared by startup-safe health analyses.
+
+The automatic runtime builds this once per session so several health scripts can
+read timestamp/machine/sequence rows without repeatedly parsing full JSONL
+payloads. It is a performance artifact, not a replacement for raw telemetry.
+"""
+
 from __future__ import annotations
 
 import csv
@@ -12,13 +19,16 @@ BASIC_METRICS_FILENAME = "basic_metrics.csv"
 
 
 def basic_metrics_path(filtered_data_dir: Path) -> Path:
+    """Return the conventional derived metrics path inside a filtered data dir."""
     return filtered_data_dir / DERIVED_DIRNAME / BASIC_METRICS_FILENAME
 
 
 def build_basic_metrics_dataset(filtered_data_dir: Path) -> tuple[Path, int]:
-    """Create a compact CSV used by startup-safe analyses.
+    """Create the compact CSV consumed by startup-safe analyses.
 
-    The CSV contains only: timestamp, machine, sequence.
+    The CSV intentionally contains only ``timestamp``, ``machine``, and
+    ``sequence``. Analyses requiring richer fields should read the session JSONL
+    data directly rather than expanding this bootstrap artifact.
     """
     output_path = basic_metrics_path(filtered_data_dir)
     output_path.parent.mkdir(parents=True, exist_ok=True)

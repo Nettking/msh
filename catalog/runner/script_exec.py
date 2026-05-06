@@ -1,4 +1,9 @@
-"""Subprocess script execution helpers for workflow sessions."""
+"""Subprocess script execution helpers for workflow sessions.
+
+Scripts are run from isolated timestamped workspaces so their relative-path
+assumptions remain compatible with the old catalog layout while session metadata
+keeps a durable pointer to each run.
+"""
 
 from __future__ import annotations
 
@@ -74,6 +79,7 @@ def _execute_script_for_session_core(
     force_rerun: bool,
     capture_output: bool,
 ) -> dict[str, Any]:
+    """Run or reuse a session script and persist status side effects."""
     script_entry = metadata.get("scripts", {}).get(script.key)
     if script_entry is None:
         return {
@@ -84,6 +90,8 @@ def _execute_script_for_session_core(
             "output_path": None,
         }
 
+    # Script-level cache reuse is intentionally simple: a done status plus an
+    # existing output directory is considered fresh unless the caller forces rerun.
     if script_entry.get("status") == "done" and not force_rerun and script_output_exists(session_dir, script_entry):
         return {
             "state": "skipped_cached",
@@ -107,6 +115,8 @@ def _execute_script_for_session_core(
     try:
         run_data_dir.symlink_to(session_data_dir, target_is_directory=True)
     except OSError:
+        # Some host/container filesystems do not allow symlinks; copying keeps
+        # legacy scripts working at the cost of extra disk usage.
         shutil.copytree(session_data_dir, run_data_dir)
 
     script_to_run = run_dir / script.script_path
@@ -199,6 +209,8 @@ def _run_script_subprocess(
         command,
         cwd=workspace_dir,
         env=env,
+        # Disable stdin so Flask/Docker-triggered scripts cannot hang waiting
+        # for the deprecated interactive menu.
         stdin=subprocess.DEVNULL,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,

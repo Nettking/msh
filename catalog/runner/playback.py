@@ -1,4 +1,9 @@
-"""Session playback export preparation and Flask playback guidance helpers."""
+"""Session playback export preparation and Flask playback guidance helpers.
+
+This module bridges session-filtered JSONL data and the Flask playback UI. It
+uses a manifest beside the export to decide whether timeline rows can be reused
+for the current filter signature and filtered-data generation timestamp.
+"""
 
 from __future__ import annotations
 
@@ -62,7 +67,13 @@ def _write_manifest(export_dir: Path, payload: dict[str, Any]) -> None:
 
 
 def playback_exports_are_reusable(session_dir: Path, metadata: dict[str, Any]) -> bool:
-    """Check whether cached session playback exports look reusable."""
+    """Check whether cached session playback exports match current session data.
+
+    Reuse is intentionally metadata-based: the export file must exist, the
+    manifest must be readable, and both the session config signature and
+    filtered-data timestamp must match. It does not attempt semantic validation
+    of script code changes.
+    """
     export_dir = session_playback_export_dir(session_dir, metadata)
     export_path = _export_path(export_dir)
     if not export_path.exists():
@@ -85,7 +96,7 @@ def playback_exports_are_reusable(session_dir: Path, metadata: dict[str, Any]) -
 
 
 def playback_readiness(session_dir: Path, metadata: dict[str, Any]) -> tuple[bool, list[str]]:
-    """Return playback readiness and missing requirements."""
+    """Return whether session-filtered data satisfies playback preconditions."""
     missing: list[str] = []
     filter_result = metadata.get("filter_result", {})
     matched_records = int(filter_result.get("matched_records", 0) or 0)
@@ -110,6 +121,8 @@ def prepare_session_playback_exports(session_dir: Path, metadata: dict[str, Any]
         return export_path, "cached"
 
     filtered_data_dir = _filtered_data_dir(session_dir, metadata)
+    # Export generation works from the filtered session copy, not raw data, so
+    # playback reflects exactly the operator-selected session scope.
     source_df = _collect_filtered_dataframe(filtered_data_dir)
     export_dir.mkdir(parents=True, exist_ok=True)
     if source_df.empty:
