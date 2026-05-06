@@ -4,12 +4,15 @@ This guide focuses on operating MSH through Flask after the app is running.
 
 ## Core concepts
 
-- **Session** — a date or date/hour-scoped workflow directory under `results/workflows/<session-id>`. A session owns its filtered data, script run status, script outputs, and playback exports.
+- **Workflow session** — a date or date/hour-scoped directory under `results/workflows/<session-id>`. A workflow session owns its filtered data, script run status, script outputs, and playback exports.
 - **Artifact** — a discovered output file, usually CSV/JSON/HTML/PNG, under scanned roots such as `results/`, `data/`, or paths from `MSH_SCAN_DIRS`.
-- **Playback export** — a session artifact under `exports/timeline/` that converts telemetry into row-level machine states consumable by `/playback`.
-- **Orchestration** — the non-interactive runtime that discovers dates, creates/reuses sessions, filters data, runs automatic scripts, writes runtime state, and prepares playback exports.
+- **Playback-ready contract** — the minimum session state needed by `/playback`: non-empty filtered data plus a current `exports/timeline/` manifest/export. See [Data contract](data_contract.md#playback-ready-contract).
 - **Bootstrap** — startup processing for the latest discovered source day.
 - **Catch-up** — background processing that walks older unprocessed days one day at a time after bootstrap.
+- **Automatic script** — startup-safe script included in bootstrap/catch-up and the playback-ready contract.
+- **Manual script** — operator-triggered script available from `/control`, excluded from bootstrap/catch-up.
+- **Deep/exploratory script** — a manual script that may be slower, research-oriented, or less operationally bounded.
+- **Legacy script** — retained for historical or compatibility value, but not recommended as the main workflow path.
 
 ## Recommended daily workflow
 
@@ -19,7 +22,7 @@ This guide focuses on operating MSH through Flask after the app is running.
 4. Wait for latest-day bootstrap to finish if you need playback or health-check artifacts immediately.
 5. Use `/playback` for machine/day timeline review.
 6. Use `/analyses` for generated analysis tables and quick chart previews.
-7. Trigger manual/deep scripts only when needed; they are not part of automatic startup because they can be heavier or exploratory.
+7. Trigger manual scripts only when needed; deep/exploratory scripts are intentionally outside automatic startup.
 
 ## `/status`
 
@@ -51,11 +54,11 @@ Only one control action runs at a time in the current single-process threaded im
 
 ## `/playback`
 
-The playback view uses playback-compatible exports, primarily `timeline_rows.csv`. A practical playback-ready session has non-empty filtered data and a reusable or newly generated export manifest for the current session filter signature.
+The playback view uses playback-compatible exports, primarily `timeline_rows.csv`. A practical playback-ready workflow session follows the [playback-ready contract](data_contract.md#playback-ready-contract).
 
 Normal timeline states such as `active`, `dense_idle`, `idle`, and `stopped` can appear when inference supports them. Candidate intervention rows are retained as `intervention_candidate` flags/states and should be treated as overlays rather than the only playback data.
 
-## Automatic vs manual/deep scripts
+## Script categories
 
 Automatic scripts are startup-safe and support the playback-ready contract:
 
@@ -65,14 +68,22 @@ Automatic scripts are startup-safe and support the playback-ready contract:
 - `sampling_rate_analysis`
 - `data_visualizer`
 
-Manual/deep scripts are available from `/control` but excluded from startup automation:
+Manual scripts are available from `/control` but excluded from bootstrap/catch-up:
+
+- `data_pr_day` — manual raw inspection; writes the machine/day summary CSV used by `/machine`.
+- `find_stops` — manual stop-focused inspection; writes hourly stop-interval summaries.
+
+Deep/exploratory scripts are also manual and may be slower or research-oriented:
 
 - `data_analysis`
 - `ml_analysis`
+
+Legacy scripts are retained for historical compatibility rather than the main workflow path:
+
 - `corrolation_machine_pairs`
-- `data_pr_day`
-- `find_stops`
+
+See [catalog/README.md](../catalog/README.md) for runner-visible script metadata and workflow stages.
 
 ## Hidden and legacy tools
 
-Recorder, simulator, automation, and environment-specific folders are intentionally hidden from runner discovery. They may still be documented in `catalog/README.md`, but they are not part of the default session workflow.
+Recorder, simulator, automation, and environment-specific folders are intentionally hidden from runner discovery. They may still be documented in [catalog/README.md](../catalog/README.md#hidden-or-non-workflow-folders), but they are not part of the default session workflow.

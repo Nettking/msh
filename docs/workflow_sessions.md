@@ -1,6 +1,6 @@
 # Workflow sessions
 
-Workflow sessions are the unit of reproducibility for filtered data, script runs, and playback exports.
+Workflow sessions are the unit of reproducibility for filtered data, script runs, and playback exports. For operator terminology, see the [Operator guide](operator_guide.md#core-concepts).
 
 ## Session layout
 
@@ -46,7 +46,7 @@ Bootstrap prioritizes fast operator visibility:
 
 - Flask starts first.
 - latest-day filtered data is prepared.
-- automatic playback-ready scripts run best-effort.
+- automatic scripts run best-effort to satisfy the playback-ready contract.
 - playback exports are created or reused.
 - failures are recorded while Flask remains available.
 
@@ -64,10 +64,13 @@ From `/control`, operators can:
 - create/reuse a full historical range session.
 - run startup-safe checks, the workflow order, or one script.
 
-Manual/deep scripts are not run by default during bootstrap but are tracked in session metadata when executed.
+Manual scripts, including deep/exploratory scripts, are not run during bootstrap/catch-up but are tracked in session metadata when executed.
 
 ## Script categories
 
-- **Automatic script** — part of the bounded runtime playback-ready contract and safe to run during bootstrap/catch-up.
-- **Manual/deep script** — available on demand, often heavier or exploratory.
+- **Automatic script** — startup-safe and included in bootstrap/catch-up for the bounded playback-ready contract.
+- **Manual script** — available on demand from `/control`, excluded from bootstrap/catch-up.
+- **Deep/exploratory script** — a manual script that may be slower, research-oriented, or less operationally bounded.
 - **Legacy script** — retained for historical or compatibility value but not recommended as the main workflow path.
+
+The canonical script list and stage order live in [catalog/README.md](../catalog/README.md#runner-visible-scripts).

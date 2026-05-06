@@ -1,8 +1,8 @@
 # MSH CNC Telemetry Workbench
 
-MSH is a Flask-first workbench for orchestrating, replaying, and analyzing MTConnect-style CNC telemetry. It grew from standalone analysis scripts into a session-based runtime that can discover JSONL source data, prepare filtered workflow datasets, run a bounded automatic analysis pass, export playback timelines, and expose operator/developer views through Flask.
+MSH is a Flask-first workbench for orchestrating, replaying, and analyzing MTConnect-style CNC telemetry. It grew from standalone analysis scripts into a session-based runtime that can discover JSONL source data, prepare filtered workflow datasets, run bounded automatic scripts, export playback timelines, and expose operator/developer views through Flask.
 
-The repository is intended for practical operation and as a research artifact: raw telemetry remains in `data/`, derived workflow artifacts are written under `results/workflows/`, and reusable analysis scripts live in `catalog/`.
+The repository is intended for practical operation and as a research artifact: raw telemetry remains in `data/`, workflow session artifacts are written under `results/workflows/`, and reusable analysis scripts live in `catalog/`.
 
 ## Quick start
 
@@ -30,8 +30,8 @@ For detailed setup, environment variables, and expected first-run behavior, see 
 
 ## Main Flask URLs
 
-- `/` — operator overview and current runtime/session summary.
-- `/control` — manual refresh, session selection, workflow runs, and individual script runs.
+- `/` — operator overview and current runtime/workflow session summary.
+- `/control` — manual refresh, workflow session selection, workflow runs, and individual script runs.
 - `/status` — runtime milestones, catch-up state, discovered artifacts, and readiness signals.
 - `/playback` — playback-compatible timeline exports and machine/day replay views.
 - `/analyses` — discovered analysis artifacts and basic chart previews.
@@ -41,15 +41,15 @@ For detailed setup, environment variables, and expected first-run behavior, see 
 ## Repository map
 
 - `catalog/flask_app/` — primary Flask application, routes, templates, and UI-facing services.
-- `catalog/orchestrator/` — non-interactive runtime/bootstrap/catch-up orchestration.
-- `catalog/runner/` — session metadata, date filtering, script discovery, script execution, and playback export helpers.
+- `catalog/orchestrator/` — non-interactive bootstrap/catch-up orchestration.
+- `catalog/runner/` — workflow session metadata, date filtering, script discovery/execution, and playback export helpers.
 - `catalog/common/` — shared telemetry loading, normalization, state inference, metrics, and timeline export utilities.
-- `catalog/*/` — runnable analysis scripts and their script-specific README files.
+- `catalog/*/` — runner-visible automatic, manual, deep/exploratory, and legacy scripts plus script-specific README files.
 - `data/` — local raw JSONL telemetry input location; not intended for committed production data.
-- `results/` — generated analysis outputs, workflow sessions, runtime state, and artifact scans.
+- `results/` — generated analysis outputs, workflow sessions, runtime state, and discovered artifacts.
 - `example-data/` — small sample JSONL input for development and documentation.
 - `ops/` — host-side operational helpers.
-- `legacy/` — retained historical notes or deprecated material.
+- `legacy/` — retained historical notes or deprecated material, not the current workflow path.
 
 See [catalog/README.md](catalog/README.md) for the script catalog and analysis workflow.
 

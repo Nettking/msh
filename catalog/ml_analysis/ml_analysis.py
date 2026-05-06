@@ -1,42 +1,9 @@
-"""
-Train per-machine baseline models to predict an upcoming stop event from telemetry.
+"""Train baseline per-machine models for future-stop exploration.
 
-This script loads JSONL telemetry files, separates the data by machine, resamples
-each machine stream to a fixed rate, constructs lag-based features, derives a
-binary future-stop label, and trains one RandomForest classifier per machine.
-
-Pipeline
---------
-1. Load and combine top-level JSONL files from ``data/``
-2. Parse timestamps and sort rows chronologically
-3. Split the dataset by machine
-4. Resample each machine stream to a fixed frequency
-5. Create lagged telemetry features
-6. Derive a binary label indicating whether a stop occurs in a future window
-7. Train and evaluate one model per machine
-8. Save model artifacts and summary metrics
-
-Outputs
--------
-Under ``ml_results/<machine>/``:
-- ``<machine>_stop_predictor.pkl`` (optional)
-- ``feature_importance.csv``
-- ``confusion_matrix.txt``
-- ``classification_report.csv``
-
-Under ``ml_results/``:
-- ``summary.csv`` with one row per trained machine
-
-Important
----------
-This is a baseline predictive pipeline, not a validated production model.
-
-In particular:
-- the stop label is heuristic
-- the prediction horizon is defined in future samples, not absolute time
-- the train/test split is random rather than time-aware
-- forward filling and zero-filling may affect interpretation
-- feature importance from RandomForest should not be treated as causal evidence
+This manual deep/exploratory script builds lag features from telemetry, trains
+one RandomForest classifier per machine, and writes model/evaluation artifacts
+under ``ml_results/``. Labels and evaluation are heuristic; outputs are not a
+validated production predictor.
 """
 
 import json
