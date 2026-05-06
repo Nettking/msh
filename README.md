@@ -58,6 +58,7 @@ See [catalog/README.md](catalog/README.md) for the script catalog and analysis w
 - [Quick start](docs/quick_start.md) — install/run commands and first-run expectations.
 - [Operator guide](docs/operator_guide.md) — daily UI workflow, sessions, playback, and controls.
 - [Data contract](docs/data_contract.md) — raw JSONL assumptions, normalized fields, derived artifacts, and playback-ready contract.
+- [Intervention strategies](docs/intervention_strategies.md) — config-driven candidate event labels, strategies, and review-ready output schema.
 - [Workflow sessions](docs/workflow_sessions.md) — session layout, cache reuse, script status, bootstrap, and catch-up behavior.
 - [Architecture](docs/architecture.md) — system components, dataflow diagram, policies, and design intent.
 - [Troubleshooting](docs/troubleshooting.md) — common startup, data, playback, Docker, and script-run issues.
