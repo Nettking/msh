@@ -1,3 +1,11 @@
+"""Control-panel service for manual runtime/session/script actions.
+
+The service resolves operator-selected scope into workflow sessions, starts one
+background thread per accepted action, captures recent run status/snippets in
+memory, and delegates actual filtering/execution to runner/orchestrator helpers.
+It is intentionally not a durable job queue.
+"""
+
 from __future__ import annotations
 
 import threading
@@ -44,6 +52,8 @@ class ControlRun:
 
 
 class ControlPanelService:
+    """Resolve /control requests into session-scoped background actions."""
+
     def __init__(self) -> None:
         self.root = repo_root()
         self.workflows_root = self.root / "results" / "workflows"
@@ -70,6 +80,7 @@ class ControlPanelService:
         runtime_state: dict[str, Any] | None = None,
         sessions: list[Any] | None = None,
     ) -> dict[str, Any]:
+        """Build the control page model from runtime state, sessions, and scripts."""
         runtime_state = runtime_state or get_runtime_manager().state_snapshot()
         script_options = self._script_options
         sessions = sessions if sessions is not None else get_workflow_session_index().get_sessions(self.workflows_root).sessions
@@ -176,6 +187,7 @@ class ControlPanelService:
         start_date: str | None = None,
         end_date: str | None = None,
     ) -> tuple[bool, str, str]:
+        """Validate a control action, reserve the single worker slot, and start it."""
         resolved_target: tuple[str, Any, str] | None = None
         if action in {"startup_health", "run_selected_session_workflow", "run_script"}:
             try:
@@ -220,6 +232,8 @@ class ControlPanelService:
             self._active_run_id = run_id
             self._recent_runs.append(run)
 
+        # The MVP control plane is single-process: a daemon thread keeps Flask
+        # responsive, while _active_run_id prevents overlapping script work.
         worker = threading.Thread(
             target=self._run_action,
             args=(run_id, action, script_key, selected_session_id, scope_mode, start_date, end_date, resolved_target),
@@ -329,6 +343,7 @@ class ControlPanelService:
         start_date: str | None,
         end_date: str | None,
     ) -> tuple[str, Any, str]:
+        """Map operator scope controls to an existing or newly prepared session."""
         script_options = self._script_options
         sessions = list_sessions(self.workflows_root)
 

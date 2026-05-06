@@ -1,3 +1,10 @@
+"""TTL cache for listing workflow sessions from disk.
+
+Session directories can grow quickly during catch-up. The Flask views only need
+a recent, freshness-sorted list, so this service centralizes the short cache and
+explicit invalidation used after control actions.
+"""
+
 from __future__ import annotations
 
 import threading
@@ -18,6 +25,8 @@ class SessionIndexResult:
 
 
 class WorkflowSessionIndex:
+    """Cache freshness-sorted workflow session listings for Flask views."""
+
     def __init__(self, *, ttl_seconds: float = 4.0) -> None:
         self.ttl_seconds = float(ttl_seconds)
         self._lock = threading.Lock()
@@ -31,6 +40,7 @@ class WorkflowSessionIndex:
             self._entries.pop(str(workflows_root.resolve()), None)
 
     def get_sessions(self, workflows_root: Path) -> SessionIndexResult:
+        """Return sessions sorted by best available freshness timestamp."""
         key = str(workflows_root.resolve())
         now = time.monotonic()
         with self._lock:

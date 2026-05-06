@@ -1,4 +1,10 @@
-"""Date discovery, cache index, and session-filtered data creation."""
+"""Date discovery, cache index, and session-filtered data creation.
+
+The runner treats source JSONL as immutable enough for a size/mtime cache during
+date discovery, then materializes per-session filtered copies. Filtering prefers
+record timestamps but retains a filename-date fallback for older telemetry dumps
+that had no timestamp field.
+"""
 
 from __future__ import annotations
 
@@ -21,7 +27,12 @@ DATA_INDEX_FILE = ROOT_DIR / "results" / "runner" / "data_index.json"
 
 
 def discover_available_dates(data_dir: Path) -> list[date]:
-    """Discover all available dates present in the source dataset."""
+    """Discover all source dates, reusing a per-file cache when size/mtime match.
+
+    The returned dates drive bootstrap and catch-up scheduling, so this function
+    is conservative: changed files are reparsed, unchanged files reuse cached
+    timestamp-derived or filename-fallback dates.
+    """
     dates: set[date] = set()
     data_root = data_dir.resolve()
     index_data = _load_data_index()
@@ -88,7 +99,13 @@ def filter_data_by_date_range(
     start_hour: int | None = None,
     end_hour: int | None = None,
 ) -> tuple[int, int]:
-    """Filter JSONL records into a destination directory based on date or hour range."""
+    """Filter JSONL records into a destination directory based on date or hour range.
+
+    Timestamp-bearing records are validated against their own timestamp. For
+    legacy files with no parseable timestamps at all, filename-date fallback is
+    allowed for date ranges. Hour filtering never uses filename fallback because
+    an hour cannot be inferred safely from the path.
+    """
     destination_data_dir.mkdir(parents=True, exist_ok=True)
     use_hour_filter = start_date == end_date and start_hour is not None and end_hour is not None
 
@@ -114,6 +131,10 @@ def filter_data_by_date_range(
         parsed_records: list[dict] = []
         file_has_timestamp = False
 
+        # First pass determines whether this file has any trustworthy record
+        # timestamps. Filename fallback is only valid when the whole file lacks
+        # timestamp dates; mixing fallback and timestamp filtering would duplicate
+        # or mis-scope partially malformed files.
         for record in iter_jsonl_records(source_file):
             parsed_records.append(record)
             if parse_timestamp_to_date(str(record.get("timestamp", ""))) is not None:
@@ -174,7 +195,12 @@ def ensure_session_filtered_data(
     session_dir: Path,
     metadata: dict,
 ) -> tuple[int, int, str]:
-    """Ensure the session-scoped filtered dataset exists, creating it once."""
+    """Ensure the session-scoped filtered dataset exists for current metadata.
+
+    This is the cache boundary between raw telemetry and session artifacts. If
+    the filter signature and filtered output directory look valid, data is reused;
+    otherwise the old filtered copy is removed and regenerated from source JSONL.
+    """
     filtered_data_dir = session_dir / str(metadata["paths"]["filtered_data_dir"])
     filter_result = metadata.setdefault("filter_result", {})
     if _session_filter_cache_is_valid(session_dir, metadata):
@@ -234,6 +260,7 @@ def _filtered_data_looks_usable(filtered_data_dir: Path, *, expect_files: bool) 
 
 
 def _session_filter_cache_is_valid(session_dir: Path, metadata: dict) -> bool:
+    """Return whether filtered data can be reused for the current filter signature."""
     filtered_data_dir = session_dir / str(metadata.get("paths", {}).get("filtered_data_dir", "data"))
     filter_result = metadata.get("filter_result", {})
     if not filtered_data_dir.exists():
@@ -256,7 +283,11 @@ def _session_filter_cache_is_valid(session_dir: Path, metadata: dict) -> bool:
 
 
 def _discover_dates_for_file(file_path: Path) -> tuple[set[date], str, bool]:
-    """Discover all dates represented by one JSONL file."""
+    """Discover dates represented by one JSONL file.
+
+    Record timestamps win over filename dates. Filename fallback is retained for
+    historical raw dumps where the file path encoded the date but records did not.
+    """
     file_dates: set[date] = set()
     file_has_timestamp_date = False
 

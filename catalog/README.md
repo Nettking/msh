@@ -1,187 +1,92 @@
-# Python Script Catalog
+# Script catalog and analysis workflow
 
-This folder contains analysis and ingestion scripts for MTConnect telemetry.
-The goal of this index is to provide a **practical first-pass workflow** from raw data to interpretable findings, while keeping existing scripts separate.
+`catalog/` contains the analysis scripts and shared helpers used by the Flask-first MSH workflow. This page is intentionally focused on script discovery, script categories, and how analysis outputs fit into a session. Runtime architecture and operator procedures live in the main `docs/` directory.
 
-## Standard analysis workflow (recommended)
+## How scripts are discovered
 
-Use this sequence for most investigations. Move to the next stage when the current stage no longer answers your question.
+Runner-visible scripts follow the directory convention:
 
-### 1) Data health checks (run first)
-Purpose: verify that the dataset is usable before interpretation.
+```text
+catalog/<script_name>/<script_name>.py
+```
 
-Run:
-- `machines_active_per_day`
-- `sampling_rate_analysis`
+or, less commonly:
 
-Typical outputs:
-- daily CSV summaries (`*.csv`)
-- missing-data and sampling-quality signals
+```text
+catalog/<script_name>/main.py
+```
 
-Move to stage 2 when:
-- active-day coverage looks plausible
-- missing-sequence patterns are understood well enough to continue
-- sampling rate is acceptable (or at least known)
+`catalog/runner/script_catalog.py` discovers these folders, applies script metadata, and hides folders that are not safe or meaningful as one-shot analysis scripts.
 
-### 2) Raw inspection
-Purpose: look directly at signal behavior per machine/day before applying stop logic.
+## Workflow stages
 
-Run:
-- `data_pr_day`
+The session workflow is staged so operators can run fast health checks before heavier analysis:
 
-Typical outputs:
-- canonical machine/day summary CSV under
-  `results/workflows/<session>/analyses/data_pr_day/machine_day_summary.csv`
+1. **Health checks** — startup-safe data availability and sequence/sampling diagnostics.
+2. **Playback timeline** — timeline and candidate-event export generation for `/playback`.
+3. **Manual raw inspection** — raw day plots and exploratory inspection.
+4. **Stop-focused inspection** — stop timeline and window review.
+5. **Deep/exploratory analysis** — heavier or research-oriented scripts.
 
-Move to stage 3 when:
-- you need stop-focused timelines rather than raw traces
-- machine/day summary trends suggest likely stop windows worth targeted inspection
+The automatic runtime uses only the bounded playback-ready subset from stages 1 and 2. Operators can run other stages from `/control` when needed.
 
-### 3) Stop-focused inspection
-Purpose: inspect heuristic stop intervals in a timeline format.
+## Runner-visible scripts
 
-Run:
-- `find_stops`
+| Script | Category | Default role |
+| --- | --- | --- |
+| `machines_active_per_day` | Simple | Automatic health check: count distinct active machines per day. |
+| `analyze_missing_sequence_number` | Simple | Automatic health check: summarize missing sequence numbers per day. |
+| `missing_per_day_by_machine` | Simple | Automatic health check: per-machine missing sequence summary by day. |
+| `sampling_rate_analysis` | Simple | Automatic health check: average telemetry sampling rate per day. |
+| `data_visualizer` | Simple | Automatic playback step: state timelines and candidate-event export. |
+| `data_pr_day` | Simple | Manual raw inspection: per-machine/day raw signal plots. |
+| `find_stops` | Simple | Manual stop inspection: stop timeline plots for day/hour windows. |
+| `data_analysis` | Advanced | Manual/deep diagnostics and exploratory summaries. |
+| `ml_analysis` | Advanced | Manual/deep per-machine ML baseline for future-stop prediction. |
+| `corrolation_machine_pairs` | Legacy | Legacy pairwise machine stop-correlation exploration. |
 
-Typical outputs:
-- hour-bucketed stop interval rows in `results/find_stops/hourly_stop_intervals.csv`
+See each script directory's README for script-specific inputs, outputs, and interpretation notes.
 
-Move to stage 4 when:
-- you need broader exploratory interpretation
-- you need candidate events, richer diagnostics, or ML baselines
+## Hidden or non-workflow folders
 
-### 4) Deeper exploratory analysis
-Purpose: explore hypotheses beyond first-pass checks.
+The following folders are intentionally excluded from runner discovery:
 
-Run as needed:
-- `data_visualizer` (state timelines + candidate rows)
-- `data_analysis` (terminal-heavy exploratory diagnostics)
-- `ml_analysis` (per-machine predictive baseline)
-- `data_simulator` (interactive Streamlit exploration)
-- `webapp` (archived Streamlit workspace; reference only)
+- `runner` — runner/session implementation internals.
+- `auto_connect` — desktop automation helper, not telemetry analysis.
+- `data_simulator` — Streamlit/simulation tool, not a one-shot session script.
+- `interventions` — environment-specific helper.
+- `standalone_recorder` — legacy ingestion tool.
+- `standalone-recorder_v2` — preferred ingestion tool, but still not an analysis script.
 
-Typical outputs:
-- timeline interval/candidate CSVs
-- richer console reports
-- ML artifacts under `ml_results/`
+Hidden tools may still be useful, but they should be operated from their own README files rather than from the session workflow.
 
-## Legacy and non-standard workflow tools
+## Script execution model
 
-- `corrolation_machine_pairs`: **legacy** pairwise stop-correlation CSV exploration (kept for compatibility/reference).
-- `interventions`: environment-specific script (hardcoded Windows/WSL assumptions).
-- `standalone_recorder`: legacy recorder retained for compatibility.
-- `auto_connect`: desktop automation helper (not an analysis tool).
+When a script runs for a session, MSH creates an isolated workspace under:
 
-## Recorder / ingestion tools
+```text
+results/workflows/<session-id>/runs/<script>/<timestamp>/
+```
 
-These are ingestion tools, not one-shot analysis scripts:
+The repository `catalog/` tree is copied into that workspace. Session-filtered data is linked or copied into the workspace as `data/`. Environment variables such as `MSH_SESSION_ID`, `MSH_SESSION_DIR`, and `MSH_RUN_DIR` identify the active session and run directory.
 
-- **Preferred recorder:** `standalone-recorder_v2`
-- **Legacy recorder:** `standalone_recorder`
+Scripts should write outputs inside their run workspace unless they intentionally use documented shared paths. Script status, exit code, output path, duration, and last-run time are tracked in `session_state.json`.
 
-## Orchestration behavior (default)
+## Shared helpers for new scripts
 
-The default runtime now uses **automatic orchestration** under `catalog/orchestrator/` and file-based sessions under `results/workflows/<session-id>`.
+Prefer shared modules in `catalog/common/` when creating or maintaining scripts:
 
-This orchestrator is currently an automatic wrapper over existing `catalog/runner/*` filtering/session/script-execution primitives (not a full runner-internals rewrite yet).
+- `data_loading.py` — JSONL/table loading helpers.
+- `telemetry_prep.py` — timestamp, machine, and signal normalization.
+- `basic_metrics.py` — compact timestamp/machine/sequence derived metrics.
+- `state_inference.py` and `state_events.py` — state and candidate-event inference.
+- `timeline_exports.py` — playback-compatible timeline exports.
 
-Runner internals are split into focused modules under `catalog/runner/`:
-- `script_catalog.py`: script discovery and runner-visible script metadata
-- `session_store.py`: session metadata lifecycle, normalization, and stale output invalidation
-- `data_filtering.py`: date discovery/cache plus session filtered-data creation/reuse
-- `script_exec.py`: run workspace preparation and subprocess execution semantics
-- `ui.py`: numbered menu rendering and input helpers
+This keeps script behavior aligned with the data contract and playback views.
 
+## More documentation
 
-Each session stores:
-- selected date range (and optional same-day hour range)
-- one filtered dataset copy (`data/`) reused by later script runs in that session
-- per-script execution status (`not_run`, `done`, `failed`) plus run metadata
-- script run outputs under `runs/<script>/<timestamp>/`
-- playback-ready timeline exports under `exports/timeline/` (generated on demand)
-- session metadata in `session_state.json` (with legacy mirror `session.json`)
-- a lightweight session config signature for the selected filter config
-
-Workflow guidance keeps staged steps:
-- **Step 1:** startup-safe health checks
-- **Step 2:** playback/timeline generation
-- **Step 3:** raw day aggregates (manual)
-- **Step 4:** stop detection (manual)
-- **Step 5:** deep/exploratory analysis (manual heavy options)
-
-Execution and caching are script-level:
-- step completion is derived from script statuses
-- completed scripts are skipped by default unless rerun is requested
-- failed scripts are visible in session status and can be rerun
-- script status view includes `last_run_at`, `duration`, and output path
-- skipped runs are shown as cached; forced reruns are shown as recomputed
-
-Automatic orchestration actions include:
-- apply full discovered source-date range as the default session filter policy
-- execute scripts in best-effort mode (continue after failures)
-- hand off to Flask even when some scripts fail (partial-prep visibility over hard stop)
-- scan configured roots (`results`, `data`, plus `MSH_SCAN_DIRS`)
-- discover available dates from source data
-- create/reuse a deterministic auto session
-- prepare filtered session data
-- run the bounded automatic playback-ready script set in workflow order
-- execute workflow scripts with non-interactive subprocess stdin (Docker-safe unattended execution)
-- skip already-fresh outputs when script cache is valid
-- generate/reuse playback timeline exports
-- hand off to Flask as the primary interface
-- capture script stdout/stderr in orchestration logs for clearer failure context
-
-### Session playback integration
-
-The Flask playback view (`catalog/flask_app` -> `/playback`) is integrated with session outputs.
-
-Playback export location (per session):
-- `results/workflows/<session-id>/exports/timeline/`
-
-Playback-ready session (practical readiness check):
-- session filtered data exists
-
-Notes:
-- playback exports are generated from session-filtered data using shared timeline export/inference helpers
-- the primary playback export is the full row-level machine-state timeline (`timeline_rows.csv`), including normal states such as `active`, `dense_idle`, `idle`, and `stopped` when inferred
-- candidate events remain present as `intervention_candidate` state/flag rows in the timeline, while sparse `candidate_events.csv` extracts are treated as intervention overlays rather than the primary playback dataset
-- if reusable exports already exist for the current session filter signature, they are reused
-
-When orchestration prepares playback exports:
-- readiness is validated from session-filtered data
-- timeline exports are generated only when needed (reused if still valid)
-- Flask playback views can consume scan-discovered playback-compatible outputs
-
-Startup bootstrap and historical catch-up use the bounded automatic playback-ready contract for each processed day:
-- `machines_active_per_day`
-- `analyze_missing_sequence_number`
-- `missing_per_day_by_machine`
-- `sampling_rate_analysis`
-- `data_visualizer`
-
-Manual/deep scripts such as `data_analysis`, `ml_analysis`, and `corrolation_machine_pairs` are not part of the default automatic contract.
-
-Startup precompute first writes a compact shared dataset at `results/workflows/<session-id>/data/_derived/basic_metrics.csv` and startup-safe scripts consume this artifact instead of re-parsing full JSONL payloads in separate passes.
-
-Intentionally excluded from runner workflow discovery/precompute path:
-- Streamlit and environment/recorder tools (`data_simulator`, `interventions`, recorders, `auto_connect`)
-
-### What is cached vs not cached
-
-Cached per session:
-- the filtered dataset under `results/workflows/<session-id>/data/`
-- script execution metadata in `session_state.json` (status, timing, output path, last run timestamp)
-- script outputs under `runs/<script>/<timestamp>/`
-
-Not cached (by design):
-- script correctness/validity checks against changed code or changed source data
-- cache invalidation decisions beyond explicit rerun requests
-- pipeline scheduling/dependency logic (this runner is workflow-guided, not a workflow engine)
-
-Precompute is intended to front-load script execution so later interactive review is fast, but it uses the same synchronous script runner and same session cache model as manual step/script runs.
-
-
-## Deprecated menu path
-
-`catalog/runner/menu.py` is now deprecated and retained only for backward compatibility messaging.
-It is no longer the primary operational path.
+- Runtime architecture: [`docs/architecture.md`](../docs/architecture.md)
+- Workflow sessions and cache behavior: [`docs/workflow_sessions.md`](../docs/workflow_sessions.md)
+- Data contracts and playback schema: [`docs/data_contract.md`](../docs/data_contract.md)
+- Operator workflow: [`docs/operator_guide.md`](../docs/operator_guide.md)

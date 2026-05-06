@@ -1,3 +1,12 @@
+"""Flask-first runtime orchestration for workflow sessions and playback readiness.
+
+This module intentionally coordinates existing runner primitives instead of
+implementing a separate workflow engine. Its contract is operational: start the
+web UI quickly, prepare the latest day for playback, then catch up historical
+days with best-effort script execution while persisting enough state for Flask
+views to explain what is ready.
+"""
+
 from __future__ import annotations
 
 import hashlib
@@ -66,6 +75,8 @@ STARTUP_MODE_CLEAN = "start_clean"
 
 
 class StatusPrinter:
+    """Small stdout logger used before Flask logging is available."""
+
     def info(self, message: str) -> None:
         print(f"[orchestrator] {message}", flush=True)
 
@@ -228,6 +239,14 @@ def _run_for_date_slice(
     mark_bootstrap_full_analysis_complete: bool = False,
     runtime_namespace: str,
 ) -> OrchestrationResult:
+    """Prepare one single-day automatic session and run the requested script contract.
+
+    The runtime uses this for both latest-day bootstrap and historical catch-up.
+    It has side effects: creates/reuses session directories, filters data, writes
+    derived metrics, updates script metadata, may create playback exports, and
+    rescans artifacts. Individual script failures are captured and returned
+    instead of aborting the whole cycle.
+    """
     session_id, session_dir, metadata, session_mode = _load_or_create_auto_session(
         workflows_root=workflows_root,
         start_date=target_day,
@@ -249,6 +268,8 @@ def _run_for_date_slice(
 
     filtered_data_dir = session_dir / str(metadata["paths"]["filtered_data_dir"])
     derived_dataset = basic_metrics_path(filtered_data_dir)
+    # The derived metrics file is the startup/catch-up fast path: health scripts
+    # can read timestamp/machine/sequence without each reparsing every JSONL row.
     if filter_status == "cached" and derived_dataset.exists():
         status.info(f"reusing derived metrics dataset: {derived_dataset}")
     else:
@@ -293,6 +314,8 @@ def _run_for_date_slice(
                 f"execution policy {EXECUTION_POLICY_BEST_EFFORT}"
             )
 
+    # Playback readiness is intentionally modest here: filtered data must exist
+    # before timeline export generation can normalize rows into playback schema.
     ready, missing = playback_readiness(session_dir, metadata)
     if ready:
         export_path, export_state = prepare_session_playback_exports(session_dir, metadata)
@@ -321,7 +344,13 @@ def _run_for_date_slice(
 
 
 class RuntimeOrchestrator:
-    """Bootstrap latest day quickly, then poll for incremental date updates."""
+    """Own the background runtime state machine used by Flask and /control.
+
+    The orchestrator persists progress to JSON so UI views can distinguish
+    availability (Flask is up) from readiness (data/session/playback artifacts are
+    prepared). It is deliberately single-process and best-effort, not a durable
+    job queue.
+    """
 
     def __init__(self, *, poll_interval_seconds: int = DEFAULT_POLL_INTERVAL_SECONDS) -> None:
         self.status = StatusPrinter()
@@ -342,6 +371,8 @@ class RuntimeOrchestrator:
                 self._apply_startup_mode(env_mode, source="env")
         else:
             context = self._startup_decision_context()
+            # Existing sessions/runtime state can represent valuable research artifacts.
+            # Require an explicit UI/env decision before reusing or isolating them.
             if context.get("requires_choice"):
                 self._state.startup_mode = STARTUP_MODE_PENDING
                 self._state.startup_decision_source = "pending_user_choice"
@@ -443,7 +474,10 @@ class RuntimeOrchestrator:
         return None
 
     def _apply_startup_mode(self, mode: str, *, source: str) -> None:
+        """Apply continue-vs-clean startup policy and persist the operator decision."""
         namespace = "default"
+        # Clean starts do not delete old sessions; they move automatic sessions
+        # into a timestamped namespace so prior artifacts remain inspectable.
         if mode == STARTUP_MODE_CLEAN:
             namespace = f"clean_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}"
 
@@ -487,6 +521,7 @@ class RuntimeOrchestrator:
         return self._startup_decision_context().get("requires_choice", False)
 
     def choose_startup_mode(self, mode: str) -> tuple[bool, str]:
+        """Resolve a UI startup choice and start background processing if valid."""
         resolved = mode.strip().lower()
         mapped = {
             "continue": STARTUP_MODE_CONTINUE,
@@ -578,6 +613,7 @@ class RuntimeOrchestrator:
         self._thread.start()
 
     def request_refresh(self) -> bool:
+        """Request an asynchronous catch-up/new-data check from the control panel."""
         with self._lock:
             if self._state.startup_mode == STARTUP_MODE_PENDING:
                 self.status.warn("refresh request ignored: startup mode choice is still pending")
@@ -610,6 +646,12 @@ class RuntimeOrchestrator:
             self._stop.wait(1 if run_bootstrap_once else self.poll_interval_seconds)
 
     def _verified_processed_dates(self, *, script_options) -> set[str]:
+        """Return dates whose on-disk sessions satisfy the automatic contract.
+
+        Runtime state can be stale after interrupted runs or manual file edits, so
+        catch-up progress is reconciled against session metadata plus real output
+        folders before deciding which dates are complete.
+        """
         # Verification matches the bounded automatic catch-up contract only.
         verified: set[str] = set()
         sessions = list_sessions(self.workflows_root)
@@ -649,6 +691,7 @@ class RuntimeOrchestrator:
         available_dates: list[date],
         verified_processed_dates: set[str],
     ) -> tuple[list[date], list[date], set[str], set[str]]:
+        """Reconcile discovered dates with verified outputs and update catch-up counters."""
         state_processed = {item for item in self._state.processed_dates}
         available_iso = [item.isoformat() for item in available_dates]
         available_set = set(available_iso)
@@ -677,6 +720,12 @@ class RuntimeOrchestrator:
         return available_dates, pending_desc, processed_set, dropped_unverified
 
     def _run_update(self, *, bootstrap: bool) -> OrchestrationResult:
+        """Run one bootstrap or incremental catch-up cycle.
+
+        Bootstrap always targets the latest discovered day. Non-bootstrap cycles
+        process at most one pending day so Flask remains responsive and newly
+        arriving days can be picked up by later polling iterations.
+        """
         with self._lock:
             if self._state.startup_mode == STARTUP_MODE_PENDING:
                 return OrchestrationResult("none", self.workflows_root, [], [], [], [])
@@ -756,6 +805,8 @@ class RuntimeOrchestrator:
             )
 
         if bootstrap:
+            # Latest-day first gives operators the freshest playback view quickly;
+            # older source days are handled by the incremental catch-up loop.
             target_days = [latest]
             bootstrap_script_keys = self._bootstrap_full_analysis_script_keys(script_options)
             with self._lock:
@@ -769,6 +820,8 @@ class RuntimeOrchestrator:
                 f"{latest.isoformat()} (policy={BOOTSTRAP_FULL_ANALYSIS_POLICY})"
             )
         else:
+            # Catch-up intentionally advances one day per cycle rather than doing a
+            # full historical recompute on every poll.
             target_days = [pending_desc[0]] if pending_desc else []
             if target_days:
                 self.status.info(
