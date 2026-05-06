@@ -175,3 +175,48 @@ def test_filtered_output_matches_expected_records(tmp_path: Path, isolated_data_
         {"timestamp": "2026-04-11T08:00:00Z", "machine": "A", "value": "match"},
         {"machine": "B", "value": "fallback"},
     ]
+
+
+def test_filter_progress_logs_operational_counters(
+    tmp_path: Path,
+    isolated_data_index: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    data_dir = tmp_path / "data"
+    _write_jsonl(
+        data_dir / "2026-04-11.jsonl",
+        [
+            {"timestamp": "2026-04-11T08:00:00Z", "machine": "A"},
+            {"timestamp": "2026-04-11T09:00:00Z", "machine": "A"},
+            {"timestamp": "2026-04-11T10:00:00Z", "machine": "A"},
+        ],
+    )
+    _write_jsonl(data_dir / "2026-04-12.jsonl", [{"timestamp": "2026-04-12T08:00:00Z", "machine": "B"}])
+    monkeypatch.setattr(data_filtering, "FILTER_PROGRESS_RECORD_INTERVAL", 2)
+
+    matched_records, matched_files = data_filtering.filter_data_by_date_range(
+        data_dir,
+        tmp_path / "filtered",
+        date(2026, 4, 11),
+        date(2026, 4, 11),
+        active_slice=date(2026, 4, 11),
+        remaining_slices=4,
+    )
+
+    assert matched_records == 3
+    assert matched_files == 1
+    output = capsys.readouterr().out
+    assert "[runner] Filtering 2 indexed files for 2026-04-11..2026-04-11" in output
+    assert "[runner] Index pruning selected 1 candidate files" in output
+    assert "[runner] Filter progress: phase=started" in output
+    assert "total_indexed_files=2" in output
+    assert "candidate_files=1" in output
+    assert "candidate_files_opened=1/1" in output
+    assert "candidate_files_processed=1/1" in output
+    assert "matched_files=1" in output
+    assert "matched_records=3" in output
+    assert "active_slice=2026-04-11" in output
+    assert "remaining_slices=4" in output
+    assert "phase=reading candidate" in output
+    assert "file_records_processed=2" in output

@@ -227,6 +227,16 @@ def _machine_contract_state(workflows_root: Path, session_id: str | None) -> tup
     return "ready", "Machine/day artifact is available for the selected session."
 
 
+def _format_filter_progress_context(*, active_slice: date | str | None, remaining_slices: int | None) -> str:
+    """Return generic slice context for filter status logs."""
+    parts = []
+    if active_slice is not None:
+        parts.append(f"active_slice={active_slice.isoformat() if isinstance(active_slice, date) else active_slice}")
+    if remaining_slices is not None:
+        parts.append(f"remaining_slices={remaining_slices}")
+    return "; " + ", ".join(parts) if parts else ""
+
+
 def _run_for_date_slice(
     *,
     status: StatusPrinter,
@@ -238,6 +248,8 @@ def _run_for_date_slice(
     run_label: str,
     mark_bootstrap_full_analysis_complete: bool = False,
     runtime_namespace: str,
+    active_slice: date | str | None = None,
+    remaining_slices: int | None = None,
 ) -> OrchestrationResult:
     """Prepare one single-day automatic session and run the requested script contract.
 
@@ -260,11 +272,23 @@ def _run_for_date_slice(
         source_data_dir=data_dir,
         session_dir=session_dir,
         metadata=metadata,
+        active_slice=active_slice,
+        remaining_slices=remaining_slices,
+    )
+    filter_progress_context = _format_filter_progress_context(
+        active_slice=active_slice,
+        remaining_slices=remaining_slices,
     )
     if filter_status == "cached":
-        status.info(f"skipping filter step (up-to-date): {matched_records} records across {matched_files} files")
+        status.info(
+            "skipping filter step (up-to-date"
+            f"{filter_progress_context}): {matched_records} records across {matched_files} files"
+        )
     else:
-        status.info(f"prepared filtered session data: {matched_records} records across {matched_files} files")
+        status.info(
+            "prepared filtered session data"
+            f"{filter_progress_context}: {matched_records} records across {matched_files} files"
+        )
 
     filtered_data_dir = session_dir / str(metadata["paths"]["filtered_data_dir"])
     derived_dataset = basic_metrics_path(filtered_data_dir)
@@ -826,7 +850,10 @@ class RuntimeOrchestrator:
             if target_days:
                 self.status.info(
                     "historical catch-up phase: processing one pending day "
-                    f"{target_days[0].isoformat()} ({len(pending_desc)} pending before this cycle)"
+                    f"{target_days[0].isoformat()} "
+                    f"(active_slice={target_days[0].isoformat()}, "
+                    f"remaining_slices={max(0, len(pending_desc) - 1)}, "
+                    f"pending_before_cycle={len(pending_desc)})"
                 )
             else:
                 self.status.info("historical catch-up phase: no pending days remain; cycle will idle")
@@ -856,6 +883,8 @@ class RuntimeOrchestrator:
                     run_label="bootstrap_latest_day_playback_ready_analysis" if bootstrap else "historical_catch_up_day",
                     mark_bootstrap_full_analysis_complete=bootstrap,
                     runtime_namespace=str(self._state.active_runtime_namespace or "default"),
+                    active_slice=day,
+                    remaining_slices=max(0, len(pending_desc) - 1),
                 )
                 failed.extend(final_result.failed_scripts)
             with self._lock:
