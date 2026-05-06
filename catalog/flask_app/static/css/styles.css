@@ -764,33 +764,164 @@ th, td {
   overflow-wrap: anywhere;
 }
 
+.strategies-intro {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.strategy-paths {
+  display: grid;
+  gap: 4px;
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.strategy-summary-compact .metrics {
+  margin-bottom: 10px;
+}
+
 .strategy-editor-form {
   display: block;
 }
 
+.table-scroll {
+  overflow-x: auto;
+}
+
+.strategy-overview-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.strategy-overview-table th,
+.strategy-overview-table td {
+  border-bottom: 1px solid var(--border);
+  padding: 8px 10px;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.strategy-overview-table th {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.status-pill {
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
 .strategy-card-grid {
   display: grid;
-  gap: 12px;
+  gap: 10px;
+  margin-top: 12px;
 }
 
-.strategy-card {
-  display: grid;
-  gap: 8px;
+.strategy-editor-details,
+.strategy-add-details,
+.strategy-diagnostics-details {
+  display: block;
 }
 
-.strategy-card__header {
-  display: flex;
-  justify-content: space-between;
-  gap: 12px;
+.strategy-editor-details > summary,
+.strategy-add-details > summary,
+.strategy-diagnostics-details > summary {
+  cursor: pointer;
+  font-weight: 700;
+  list-style-position: outside;
+}
+
+.strategy-card__summary {
   align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
 }
 
-.strategy-card__header h4 {
-  margin: 0;
+.strategy-card__summary-main {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
-.strategy-card--new {
+.strategy-card__summary-main span {
+  color: var(--text-muted);
+  font-size: 0.88rem;
+}
+
+.strategy-card__body {
+  border-top: 1px solid var(--border);
+  display: grid;
+  gap: 12px;
+  margin-top: 12px;
+  padding-top: 12px;
+}
+
+.strategy-card__body--new {
+  border-top: 0;
+}
+
+.strategy-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 12px;
+}
+
+.strategy-field {
+  display: grid;
+  gap: 5px;
+}
+
+.strategy-field label {
+  color: var(--text);
+  font-weight: 700;
+}
+
+.strategy-field--checkbox {
+  align-content: end;
+}
+
+.strategy-field--secondary {
+  opacity: 0.82;
+}
+
+.strategy-field--wide {
+  grid-column: 1 / -1;
+}
+
+.strategy-field input,
+.strategy-field select,
+.strategy-field textarea {
+  width: 100%;
+}
+
+.strategy-remove-area {
+  background: var(--danger-soft);
+  border: 1px solid #fca5a5;
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.strategy-add-details {
   border-style: dashed;
+}
+
+.strategy-add-details > summary,
+.strategy-diagnostics-details > summary {
+  font-size: 1.05rem;
 }
 
 .strategy-delete,
@@ -799,6 +930,11 @@ th, td {
   gap: 6px;
   align-items: center;
   font-weight: 600;
+}
+
+.strategy-delete input,
+.checkbox-row input {
+  width: auto;
 }
 
 .strategy-card textarea {
@@ -829,6 +965,16 @@ th, td {
 .status-ok {
   color: #166534;
   font-weight: 600;
+}
+
+.strategy-diagnostics-body {
+  display: grid;
+  gap: 16px;
+  margin-top: 12px;
+}
+
+.strategy-diagnostics-panel h3 {
+  margin-bottom: 8px;
 }
 
 .label-vocabulary {
