@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro">
+  <h2>Intervention strategies</h2>
+  <p>Thin YAML editor for strategy-driven intervention candidate detection. The strategy runner remains the source of truth for validation and execution.</p>
+</section>
+
+<section class="section-block section-block--primary">
+  <h3>Strategy summary</h3>
+  <div class="metrics metrics-grid control-summary-strip">
+    <article class="metric-card metric-card--success">
+      <span class="metric-label">Enabled strategies</span>
+      <span class="metric-value">{{ page.summary.enabled_count }}</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Disabled strategies</span>
+      <span class="metric-value">{{ page.summary.disabled_count }}</span>
+    </article>
+    <article class="metric-card metric-card--info">
+      <span class="metric-label">Labels in use</span>
+      <span class="metric-value metric-value--long">{{ page.summary.labels_in_use|join(', ') if page.summary.labels_in_use else 'None' }}</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Active strategy signature</span>
+      <span class="metric-value metric-value--long strategy-signature">{{ page.signature or 'Unavailable until config validates' }}</span>
+    </article>
+  </div>
+  <p><strong>Config:</strong> {{ page.strategies_path }} · <strong>Labels:</strong> {{ page.labels_path }}</p>
+  <p class="muted">Saving writes back to <code>catalog/common/intervention_strategies.yaml</code>. Strategy edits invalidate cached candidate outputs; candidate events regenerate the next time playback exports are prepared or rerun.</p>
+</section>
+
+<section class="section-block">
+  <h3>Validation</h3>
+  {% if page.validation_errors %}
+  <ul class="validation-list validation-list--errors">
+    {% for error in page.validation_errors %}<li>{{ error }}</li>{% endfor %}
+  </ul>
+  {% else %}
+  <p class="status-ok">Current strategy config validates successfully.</p>
+  {% endif %}
+  {% if page.validation_warnings %}
+  <ul class="validation-list validation-list--warnings">
+    {% for warning in page.validation_warnings %}<li>{{ warning }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<section class="section-block">
+  <h3>Label vocabulary</h3>
+  <div class="label-vocabulary">
+    {% for label_id, payload in page.labels.items() %}
+    <article class="label-pill">
+      <strong>{{ label_id }}</strong>
+      <span>{{ payload.description }}</span>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<form method="post" action="{{ url_for('web.save_strategies') }}" class="strategy-editor-form">
+  {% set indices = [] %}
+  {% for strategy in page.strategies %}
+    {% set _ = indices.append(loop.index0|string) %}
+  {% endfor %}
+  {% set _ = indices.append('new') %}
+  <input type="hidden" name="strategy_indices" value="{{ indices|join(',') }}">
+
+  <section class="section-block strategy-card-grid">
+    <h3>Edit strategies</h3>
+    {% for strategy in page.strategies %}
+    {% set prefix = 'strategies-' ~ loop.index0 ~ '-' %}
+    {% include 'strategies_card.html' %}
+    {% endfor %}
+
+    {% set strategy = {'id': '', 'enabled': false, 'type': 'delta_threshold', 'suggested_label': '', 'signal': '', 'description': '', 'window_seconds': 30} %}
+    {% set prefix = 'strategies-new-' %}
+    <article class="control-card strategy-card strategy-card--new">
+      <h4>Add a new strategy</h4>
+      {% include 'strategies_fields.html' %}
+    </article>
+  </section>
+
+  <section class="section-block strategy-save-bar">
+    <button class="button-primary" type="submit">Save strategy YAML</button>
+    <a href="{{ url_for('web.strategies') }}">Discard form changes</a>
+  </section>
+</form>
+{% endblock %}

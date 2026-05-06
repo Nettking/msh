@@ -2,7 +2,7 @@
 
 The intervention strategy layer is a small, config-driven detector for operator intervention **candidates** during validation. It lets operators and developers iterate on thresholds, enabled rules, and suggested labels without editing detector code.
 
-This layer does not add UI and does not define ground truth. It writes review-ready candidate rows that can later be validated with `review_status`, `human_label`, and `notes`.
+This layer does not define ground truth. It writes review-ready candidate rows that can later be validated with `review_status`, `human_label`, and `notes`. A small Flask editor is available at `/strategies` for quickly changing the strategy YAML without turning the detector into a full annotation platform.
 
 ## Labels vs. strategies
 
@@ -10,6 +10,14 @@ This layer does not add UI and does not define ground truth. It writes review-re
 - **Strategies** live in `catalog/common/intervention_strategies.yaml` and define enabled rules, signals, thresholds, suggested labels, and short descriptions.
 
 Strategies only suggest a `suggested_label`. Human review can accept, replace, or reject that suggestion later.
+
+## Flask strategy editor
+
+The operator/developer Flask UI exposes `GET /strategies` and `POST /strategies/save` as a thin editor for `catalog/common/intervention_strategies.yaml`. The page shows the current strategy config, label vocabulary from `catalog/common/intervention_labels.yaml`, the active strategy signature, validation messages, and one editable card per strategy.
+
+Use `/strategies` to enable or disable rules, tune thresholds, change suggested labels, update descriptions, add a new strategy, or remove an obsolete strategy. The UI validates form submissions against the same strategy-runner rules before writing YAML, including supported strategy types, known labels, numeric thresholds, non-negative windows, required descriptions, and duplicate enabled IDs.
+
+Saving from the UI only updates the YAML config. It does not run the full workflow automatically. Strategy signatures continue to drive cache invalidation: when thresholds, enabled rules, suggested labels, or other active strategy fields change, cached candidate outputs are considered stale and candidate events regenerate the next time playback exports are prepared or rerun.
 
 ## Supported strategy types
 
@@ -51,6 +59,6 @@ The current active strategy signature is also stored in `manifest.json`; playbac
 
 ## Validation iteration
 
-To iterate on validation strategy behavior, edit `catalog/common/intervention_strategies.yaml` to enable or disable strategies, tune thresholds, or change suggested labels. Keep labels in `catalog/common/intervention_labels.yaml` so candidate output remains consistent across runs.
+To iterate on validation strategy behavior, use `/strategies` or edit `catalog/common/intervention_strategies.yaml` directly to enable or disable strategies, tune thresholds, or change suggested labels. Keep labels in `catalog/common/intervention_labels.yaml` so candidate output remains consistent across runs.
 
 Because candidates are suggestions, a detected row should be read as “review this event” rather than “this event is true.” Ground-truth assignment belongs to later human validation using `review_status`, `human_label`, and `notes`.
