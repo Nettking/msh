@@ -13,9 +13,28 @@
   --warning-soft: #fef3c7;
   --danger: #991b1b;
   --danger-soft: #fee2e2;
+  --button-primary-bg: var(--primary);
+  --button-primary-bg-hover: #1e40af;
+  --button-primary-text: #ffffff;
+  --button-primary-border: #1e40af;
+  --button-secondary-bg: #ffffff;
+  --button-secondary-bg-hover: #eff6ff;
+  --button-secondary-text: #1e3a8a;
+  --button-secondary-border: #b8c8e6;
+  --button-secondary-border-hover: #93b7ed;
 }
 
 * { box-sizing: border-box; }
+
+button {
+  color: var(--button-secondary-text);
+}
+
+button:hover {
+  background: var(--button-secondary-bg-hover);
+  border-color: var(--button-secondary-border-hover);
+  color: var(--button-secondary-text);
+}
 
 body {
   font-family: Inter, "Segoe UI", Roboto, Arial, sans-serif;
@@ -77,9 +96,9 @@ body {
 .rescan-form button {
   padding: 8px 14px;
   border-radius: 8px;
-  border: 1px solid #aac3ef;
-  background: #fff;
-  color: #1e3a8a;
+  border: 1px solid var(--button-secondary-border);
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
   font-weight: 600;
   cursor: pointer;
 }
@@ -391,7 +410,7 @@ p { margin: 0; color: var(--text-muted); }
   padding: 7px 10px;
   border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--button-secondary-bg);
 }
 
 .playback-controls {
@@ -580,9 +599,10 @@ th, td {
 .section-block button {
   justify-self: start;
   padding: 7px 12px;
-  border: 1px solid #b8c8e6;
+  border: 1px solid var(--button-secondary-border);
   border-radius: 8px;
-  background: #fff;
+  background: var(--button-secondary-bg);
+  color: var(--button-secondary-text);
   cursor: pointer;
 }
 
@@ -617,11 +637,19 @@ th, td {
   margin-bottom: 8px;
 }
 
-.button-primary {
-  background: var(--primary);
-  color: #fff;
-  border-color: #1e40af;
+.button-primary,
+button.button-primary {
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  border-color: var(--button-primary-border);
   font-weight: 600;
+}
+
+.button-primary:hover,
+button.button-primary:hover {
+  background: var(--button-primary-bg-hover);
+  color: var(--button-primary-text);
+  border-color: #1e3a8a;
 }
 
 .control-action-grid--stacked {
