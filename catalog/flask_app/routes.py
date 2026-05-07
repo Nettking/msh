@@ -25,6 +25,7 @@ from .services.playback_service import (
     playback_days_by_machine,
     prepare_playback_frame,
     playback_subset,
+    filter_playback_artifacts_for_runtime,
     summarize_intervals,
     validate_playback_frame,
     validate_playback_source,
@@ -336,7 +337,16 @@ def _serialize_playback_timestamp(series: pd.Series) -> pd.Series:
 @web.route("/playback")
 def playback():
     snap = _catalog().ensure_scanned()
-    playback_artifacts = [a for a in snap.artifacts if a.get("playback_compatible") and a.get("visibility") == "default"]
+    runtime_manager = get_runtime_manager()
+    runtime_state = runtime_manager.state_snapshot() if hasattr(runtime_manager, "state_snapshot") else {}
+    requested_path = request.args.get("path", "")
+    discovered_playback_artifacts = [a for a in snap.artifacts if a.get("playback_compatible") and a.get("visibility") == "default"]
+    playback_artifacts = filter_playback_artifacts_for_runtime(
+        discovered_playback_artifacts,
+        runtime_state,
+        selected_path=requested_path,
+        logger=current_app.logger,
+    )
     playback_artifacts.sort(
         key=lambda item: (
             0 if str(item.get("file_name", "")).lower() == "timeline_rows.csv" else 1,
@@ -344,7 +354,8 @@ def playback():
             str(item.get("path", "")),
         )
     )
-    selected_path = request.args.get("path", playback_artifacts[0]["path"] if playback_artifacts else "")
+    visible_paths = {str(artifact.get("path")) for artifact in playback_artifacts}
+    selected_path = requested_path if requested_path in visible_paths else (playback_artifacts[0]["path"] if playback_artifacts else "")
     machine = request.args.get("machine", "")
     day = request.args.get("day", "")
     scope = get_operator_scope_service().get()

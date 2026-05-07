@@ -8,7 +8,9 @@ changing the underlying export files.
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
+from pathlib import Path
 
 import pandas as pd
 
@@ -29,6 +31,89 @@ class PlaybackValidation:
 
     is_valid: bool
     reason: str = ""
+
+
+def _workflow_session_dir_for_artifact(path: str) -> Path | None:
+    """Return the workflow session directory for an artifact path, when present."""
+    artifact_path = Path(path)
+    lowered = [part.lower() for part in artifact_path.parts]
+    for idx, part in enumerate(lowered):
+        if part != "workflows":
+            continue
+        if idx + 1 >= len(artifact_path.parts):
+            return None
+        return Path(*artifact_path.parts[: idx + 2])
+    return None
+
+
+def _session_runtime_namespace(session_dir: Path) -> str:
+    """Read a session runtime namespace, defaulting older metadata to ``default``."""
+    for file_name in ("session_state.json", "session.json"):
+        metadata_path = session_dir / file_name
+        if not metadata_path.exists():
+            continue
+        try:
+            metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return "default"
+        runtime_payload = metadata.get("runtime") if isinstance(metadata.get("runtime"), dict) else {}
+        return str(runtime_payload.get("runtime_namespace") or "default")
+    return "default"
+
+
+def filter_playback_artifacts_for_runtime(
+    artifacts: list[dict],
+    runtime_state: dict | None,
+    *,
+    selected_path: str = "",
+    logger=None,
+) -> list[dict]:
+    """Hide playback exports that do not belong to the active clean runtime.
+
+    Workflow artifacts are always gated by ``runtime.runtime_namespace`` in their
+    session metadata. Clean startup also hides playback-compatible files outside
+    ``results/workflows`` from the automatic `/playback` list, because those files
+    have no session namespace to prove they belong to the new runtime. A
+    non-workflow artifact can still be loaded when explicitly requested by path
+    from manual exploration.
+    """
+    state = runtime_state or {}
+    active_namespace = str(state.get("active_runtime_namespace") or "default")
+    startup_mode = str(state.get("startup_mode") or "")
+    is_clean_startup = startup_mode == "start_clean"
+    visible: list[dict] = []
+    ignored_workflow: list[str] = []
+    ignored_non_workflow: list[str] = []
+
+    for artifact in artifacts:
+        artifact_path = str(artifact.get("path") or "")
+        session_dir = _workflow_session_dir_for_artifact(artifact_path)
+        if session_dir is None:
+            if is_clean_startup and artifact_path != selected_path:
+                ignored_non_workflow.append(artifact_path)
+                continue
+            visible.append(artifact)
+            continue
+        artifact_namespace = _session_runtime_namespace(session_dir)
+        if artifact_namespace == active_namespace:
+            visible.append(artifact)
+        else:
+            ignored_workflow.append(artifact_path)
+
+    if ignored_workflow and logger is not None:
+        logger.info(
+            "Playback runtime filter ignored %d stale workflow playback export(s) outside active runtime namespace '%s': %s",
+            len(ignored_workflow),
+            active_namespace,
+            ", ".join(ignored_workflow[:5]) + (" ..." if len(ignored_workflow) > 5 else ""),
+        )
+    if ignored_non_workflow and logger is not None:
+        logger.info(
+            "Playback runtime filter ignored %d non-workflow playback export(s) during clean startup because they have no active runtime namespace: %s",
+            len(ignored_non_workflow),
+            ", ".join(ignored_non_workflow[:5]) + (" ..." if len(ignored_non_workflow) > 5 else ""),
+        )
+    return visible
 
 
 def compute_playback_delay(
