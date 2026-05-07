@@ -124,19 +124,32 @@ def filter_playback_artifacts_for_runtime(
     is_clean_startup = startup_mode == "start_clean"
     visible: list[dict] = []
 
+    def log_hidden(artifact_path: str, session_dir: Path | None, artifact_namespace: str, reason: str) -> None:
+        if logger is None:
+            return
+        logger.info(
+            "Playback runtime filter hid artifact path=%s session_dir=%s active_namespace=%s "
+            "artifact_namespace=%s startup_mode=%s state_session_id=%s reason=%s",
+            artifact_path,
+            str(session_dir) if session_dir is not None else "",
+            active_namespace,
+            artifact_namespace,
+            startup_mode,
+            str(state.get("session_id") or ""),
+            reason,
+        )
+
     for artifact in artifacts:
         artifact_path = str(artifact.get("path") or "")
         session_dir = _workflow_session_dir_for_artifact(artifact_path)
         if session_dir is None:
             if is_clean_startup and artifact_path != selected_path:
-                if logger is not None:
-                    logger.info(
-                        "Playback runtime filter hid artifact path=%s artifact_namespace=%s active_namespace=%s reason=%s",
-                        artifact_path,
-                        "none",
-                        active_namespace,
-                        "clean_startup_non_workflow_not_explicitly_selected",
-                    )
+                log_hidden(
+                    artifact_path,
+                    None,
+                    "none",
+                    "clean_startup_non_workflow_not_explicitly_selected",
+                )
                 continue
             visible.append(artifact)
             continue
@@ -146,25 +159,19 @@ def filter_playback_artifacts_for_runtime(
             visible.append(artifact)
             continue
 
-        if (
-            namespace.missing
-            and is_clean_startup
-            and _session_is_linked_to_active_runtime(session_dir, state, active_namespace)
-        ):
+        if is_clean_startup and _session_is_linked_to_active_runtime(session_dir, state, active_namespace):
             visible.append(artifact)
             continue
 
         reason = "namespace_mismatch"
         if namespace.missing:
             reason = "missing_namespace_defaults_to_default_without_active_runtime_link"
-        if logger is not None:
-            logger.info(
-                "Playback runtime filter hid artifact path=%s artifact_namespace=%s active_namespace=%s reason=%s",
-                artifact_path,
-                f"{namespace.value} ({namespace.source})",
-                active_namespace,
-                reason,
-            )
+        log_hidden(
+            artifact_path,
+            session_dir,
+            f"{namespace.value} ({namespace.source})",
+            reason,
+        )
 
     return visible
 

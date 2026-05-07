@@ -4,6 +4,7 @@ from dataclasses import dataclass
 import json
 from pathlib import Path
 import sys
+import threading
 
 sys.path.insert(0, str(Path(".").resolve()))
 
@@ -13,6 +14,31 @@ from flask import Flask
 from catalog.common.artifact_registry import scan_artifacts
 from catalog.flask_app.routes import web
 from catalog.flask_app.services.catalog_service import ScanSnapshot
+from catalog.orchestrator.pipeline import RuntimeOrchestrator, STARTUP_MODE_CLEAN
+
+
+class _ActualShapeRuntime:
+    def __init__(
+        self,
+        workflows_root: Path,
+        *,
+        active_runtime_namespace: str,
+        startup_mode: str = STARTUP_MODE_CLEAN,
+        session_id: str | None = None,
+    ) -> None:
+        self._orchestrator = RuntimeOrchestrator.__new__(RuntimeOrchestrator)
+        self._orchestrator._lock = threading.Lock()
+        self._orchestrator.workflows_root = workflows_root
+        self._orchestrator._state = RuntimeOrchestrator._default_state(self._orchestrator)
+        self._orchestrator._state.active_runtime_namespace = active_runtime_namespace
+        self._orchestrator._state.startup_mode = startup_mode
+        self._orchestrator._state.session_id = session_id
+
+    def requires_startup_choice(self) -> bool:
+        return False
+
+    def state_snapshot(self) -> dict[str, object]:
+        return RuntimeOrchestrator.state_snapshot(self._orchestrator)
 
 
 class _FakeRuntime:
@@ -234,6 +260,39 @@ def test_reuse_startup_playback_can_list_default_namespace_exports(tmp_path: Pat
     assert "No playback-compatible exports" not in body
     assert "reused_state" in body
     assert "2026-03-01" in body
+
+
+def test_playback_route_lists_current_clean_workflow_export_with_default_metadata_namespace(
+    tmp_path: Path, monkeypatch
+) -> None:
+    results_root = tmp_path / "results"
+    session_id = "auto_clean_20260302T000000Z_20260302_20260302"
+    session_dir = results_root / "workflows" / session_id
+    _write_session_metadata(session_dir, "default")
+    _write_timeline(session_dir, "2026-03-02", "current_default_metadata_state")
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+
+    monkeypatch.setattr(
+        "catalog.flask_app.routes.get_runtime_manager",
+        lambda: _ActualShapeRuntime(
+            results_root / "workflows",
+            active_runtime_namespace="clean_20260302T000000Z",
+            session_id=session_id,
+        ),
+    )
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No playback-compatible exports" not in body
+    assert "current_default_metadata_state" in body
+    assert "2026-03-02" in body
+    assert "<strong>Dataset:</strong> timeline_rows.csv" in body
 
 
 def test_playback_selected_dataset_is_not_empty_for_current_clean_workflow_export_with_missing_namespace(

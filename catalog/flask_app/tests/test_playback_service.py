@@ -38,6 +38,14 @@ filter_playback_artifacts_for_runtime = _PLAYBACK_MOD.filter_playback_artifacts_
 scan_artifacts = _ARTIFACT_MOD.scan_artifacts
 
 
+class _CaptureLogger:
+    def __init__(self) -> None:
+        self.messages: list[str] = []
+
+    def info(self, message: str, *args: object) -> None:
+        self.messages.append(message % args)
+
+
 def _write_workflow_timeline(session_dir: Path, day: str = "2026-03-01") -> Path:
     export_dir = session_dir / "exports" / "timeline"
     export_dir.mkdir(parents=True, exist_ok=True)
@@ -72,6 +80,58 @@ def test_runtime_filter_includes_current_clean_namespace_workflow_timeline(tmp_p
     assert [artifact["path"] for artifact in visible] == [str(timeline_path)]
 
 
+def test_runtime_filter_includes_current_clean_session_when_metadata_namespace_is_default(tmp_path: Path) -> None:
+    session_id = "auto_clean_20260302T000000Z_20260302_20260302"
+    session_dir = tmp_path / "results" / "workflows" / session_id
+    session_dir.mkdir(parents=True)
+    (session_dir / "session_state.json").write_text(
+        json.dumps({"runtime": {"runtime_namespace": "default"}}) + "\n",
+        encoding="utf-8",
+    )
+    timeline_path = _write_workflow_timeline(session_dir, "2026-03-02")
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+
+    playback_artifacts = [artifact for artifact in artifacts if artifact.get("playback_compatible")]
+    visible = filter_playback_artifacts_for_runtime(
+        playback_artifacts,
+        {
+            "startup_mode": "start_clean",
+            "active_runtime_namespace": "clean_20260302T000000Z",
+            "session_id": session_id,
+        },
+    )
+
+    assert warnings == []
+    assert [artifact["path"] for artifact in visible] == [str(timeline_path)]
+
+
+def test_runtime_filter_includes_current_clean_session_by_safe_namespace_prefix_without_state_session_id(
+    tmp_path: Path,
+) -> None:
+    session_id = "auto_clean_20260302T000000Z_20260302_20260302"
+    session_dir = tmp_path / "results" / "workflows" / session_id
+    session_dir.mkdir(parents=True)
+    (session_dir / "session_state.json").write_text(
+        json.dumps({"runtime": {"runtime_namespace": "default"}}) + "\n",
+        encoding="utf-8",
+    )
+    timeline_path = _write_workflow_timeline(session_dir, "2026-03-02")
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+
+    playback_artifacts = [artifact for artifact in artifacts if artifact.get("playback_compatible")]
+    visible = filter_playback_artifacts_for_runtime(
+        playback_artifacts,
+        {
+            "startup_mode": "start_clean",
+            "active_runtime_namespace": "clean_20260302T000000Z",
+            "session_id": "",
+        },
+    )
+
+    assert warnings == []
+    assert [artifact["path"] for artifact in visible] == [str(timeline_path)]
+
+
 def test_runtime_filter_hides_older_default_namespace_workflow_timeline(tmp_path: Path) -> None:
     stale_session_dir = tmp_path / "results" / "workflows" / "auto_default_20260301_20260301"
     stale_session_dir.mkdir(parents=True)
@@ -90,6 +150,41 @@ def test_runtime_filter_hides_older_default_namespace_workflow_timeline(tmp_path
 
     assert warnings == []
     assert visible == []
+
+
+def test_runtime_filter_logs_hidden_artifact_diagnostics(tmp_path: Path) -> None:
+    stale_session_dir = tmp_path / "results" / "workflows" / "auto_default_20260301_20260301"
+    stale_session_dir.mkdir(parents=True)
+    (stale_session_dir / "session_state.json").write_text(
+        json.dumps({"runtime": {"runtime_namespace": "default"}}) + "\n",
+        encoding="utf-8",
+    )
+    timeline_path = _write_workflow_timeline(stale_session_dir, "2026-03-01")
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+    logger = _CaptureLogger()
+
+    playback_artifacts = [artifact for artifact in artifacts if artifact.get("playback_compatible")]
+    visible = filter_playback_artifacts_for_runtime(
+        playback_artifacts,
+        {
+            "startup_mode": "start_clean",
+            "active_runtime_namespace": "clean_20260302T000000Z",
+            "session_id": "auto_clean_20260302T000000Z_20260302_20260302",
+        },
+        logger=logger,
+    )
+
+    assert warnings == []
+    assert visible == []
+    assert len(logger.messages) == 1
+    message = logger.messages[0]
+    assert f"path={timeline_path}" in message
+    assert f"session_dir={stale_session_dir}" in message
+    assert "active_namespace=clean_20260302T000000Z" in message
+    assert "artifact_namespace=default (session_state.json:runtime.runtime_namespace)" in message
+    assert "startup_mode=start_clean" in message
+    assert "state_session_id=auto_clean_20260302T000000Z_20260302_20260302" in message
+    assert "reason=namespace_mismatch" in message
 
 
 def test_runtime_filter_keeps_missing_namespace_current_clean_session_by_session_id(tmp_path: Path) -> None:
