@@ -34,7 +34,84 @@ resample_playback_timeline = _PLAYBACK_MOD.resample_playback_timeline
 validate_playback_frame = _PLAYBACK_MOD.validate_playback_frame
 validate_playback_source = _PLAYBACK_MOD.validate_playback_source
 compute_playback_delay = _PLAYBACK_MOD.compute_playback_delay
+filter_playback_artifacts_for_runtime = _PLAYBACK_MOD.filter_playback_artifacts_for_runtime
 scan_artifacts = _ARTIFACT_MOD.scan_artifacts
+
+
+def _write_workflow_timeline(session_dir: Path, day: str = "2026-03-01") -> Path:
+    export_dir = session_dir / "exports" / "timeline"
+    export_dir.mkdir(parents=True, exist_ok=True)
+    timeline_path = export_dir / "timeline_rows.csv"
+    pd.DataFrame(
+        {
+            "timestamp": [f"{day}T10:00:00Z"],
+            "machine_id": ["M1"],
+            "state": ["run"],
+        }
+    ).to_csv(timeline_path, index=False)
+    return timeline_path
+
+
+def test_runtime_filter_includes_current_clean_namespace_workflow_timeline(tmp_path: Path) -> None:
+    session_dir = tmp_path / "results" / "workflows" / "auto_clean_20260302T000000Z_20260302_20260302"
+    session_dir.mkdir(parents=True)
+    (session_dir / "session_state.json").write_text(
+        json.dumps({"runtime": {"runtime_namespace": "clean_20260302T000000Z"}}) + "\n",
+        encoding="utf-8",
+    )
+    timeline_path = _write_workflow_timeline(session_dir, "2026-03-02")
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+
+    playback_artifacts = [artifact for artifact in artifacts if artifact.get("playback_compatible")]
+    visible = filter_playback_artifacts_for_runtime(
+        playback_artifacts,
+        {"startup_mode": "start_clean", "active_runtime_namespace": "clean_20260302T000000Z"},
+    )
+
+    assert warnings == []
+    assert [artifact["path"] for artifact in visible] == [str(timeline_path)]
+
+
+def test_runtime_filter_hides_older_default_namespace_workflow_timeline(tmp_path: Path) -> None:
+    stale_session_dir = tmp_path / "results" / "workflows" / "auto_default_20260301_20260301"
+    stale_session_dir.mkdir(parents=True)
+    (stale_session_dir / "session_state.json").write_text(
+        json.dumps({"runtime": {"runtime_namespace": "default"}}) + "\n",
+        encoding="utf-8",
+    )
+    _write_workflow_timeline(stale_session_dir, "2026-03-01")
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+
+    playback_artifacts = [artifact for artifact in artifacts if artifact.get("playback_compatible")]
+    visible = filter_playback_artifacts_for_runtime(
+        playback_artifacts,
+        {"startup_mode": "start_clean", "active_runtime_namespace": "clean_20260302T000000Z"},
+    )
+
+    assert warnings == []
+    assert visible == []
+
+
+def test_runtime_filter_keeps_missing_namespace_current_clean_session_by_session_id(tmp_path: Path) -> None:
+    session_id = "auto_clean_20260302T000000Z_20260302_20260302"
+    session_dir = tmp_path / "results" / "workflows" / session_id
+    session_dir.mkdir(parents=True)
+    (session_dir / "session_state.json").write_text(json.dumps({"runtime": {}}) + "\n", encoding="utf-8")
+    timeline_path = _write_workflow_timeline(session_dir, "2026-03-02")
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+
+    playback_artifacts = [artifact for artifact in artifacts if artifact.get("playback_compatible")]
+    visible = filter_playback_artifacts_for_runtime(
+        playback_artifacts,
+        {
+            "startup_mode": "start_clean",
+            "active_runtime_namespace": "clean_20260302T000000Z",
+            "session_id": session_id,
+        },
+    )
+
+    assert warnings == []
+    assert [artifact["path"] for artifact in visible] == [str(timeline_path)]
 
 
 def test_valid_timeline_csv_is_playback_valid(tmp_path: Path) -> None:
