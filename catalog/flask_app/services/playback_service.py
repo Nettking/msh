@@ -11,6 +11,8 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from functools import lru_cache
+from typing import Any
 from pathlib import Path
 
 import pandas as pd
@@ -41,6 +43,39 @@ class SessionNamespace:
     value: str
     source: str
     missing: bool = False
+
+
+@dataclass(frozen=True)
+class PlaybackArtifactIndexEntry:
+    """Lightweight machine/day index data for one playback artifact."""
+
+    path: str
+    machine_days: tuple[tuple[str, tuple[str, ...]], ...]
+    machine_day_counts: tuple[tuple[str, tuple[tuple[str, int], ...]], ...]
+
+
+@dataclass(frozen=True)
+class PlaybackSelectionIndex:
+    """Combined machine/day choices across visible playback artifacts."""
+
+    context: dict[str, list[str]]
+    machine_days: dict[str, list[str]]
+    machine_day_counts: dict[str, dict[str, int]]
+    entries_by_path: dict[str, PlaybackArtifactIndexEntry]
+
+
+@dataclass(frozen=True)
+class PlaybackSelection:
+    """Resolved playback setup state for the Flask route."""
+
+    selected_path: str
+    machine: str
+    day: str
+    context: dict[str, list[str]]
+    machine_days: dict[str, list[str]]
+    machine_day_counts: dict[str, dict[str, int]]
+    selected_machine_days: list[str]
+    selected_machine_day_counts: dict[str, int]
 
 
 def _workflow_session_dir_for_artifact(path: str) -> Path | None:
@@ -240,6 +275,276 @@ def filter_playback_artifacts_for_runtime(
 
     log_totals("after_filter", len(visible))
     return visible
+
+
+def _active_runtime_namespace(runtime_state: dict | None) -> str:
+    state = runtime_state or {}
+    active_namespace = str(state.get("active_runtime_namespace") or "default")
+    if active_namespace == "default":
+        inferred_namespace = _namespace_from_auto_session_id(str(state.get("session_id") or ""))
+        if inferred_namespace:
+            return inferred_namespace
+    return active_namespace
+
+
+def playback_artifact_runtime_preference(artifact: dict[str, Any], runtime_state: dict | None) -> tuple[int, str, str]:
+    """Return a stable preference tuple for duplicate machine/day artifacts.
+
+    Higher tuples are preferred. Workflow artifacts in the active runtime namespace
+    outrank other artifacts; ties fall back to artifact modified time and path so
+    the newest or lexicographically latest scan entry wins without exposing
+    namespace internals to Flask routes.
+    """
+    active_namespace = _active_runtime_namespace(runtime_state)
+    session_dir = _workflow_session_dir_for_artifact(str(artifact.get("path") or ""))
+    active_workflow = False
+    if session_dir is not None:
+        active_workflow = _session_runtime_namespace(session_dir).value == active_namespace
+    return (
+        1 if active_workflow else 0,
+        str(artifact.get("modified_at") or ""),
+        str(artifact.get("path") or ""),
+    )
+
+
+def _artifact_index_key(artifacts: list[dict[str, Any]]) -> tuple[tuple[str, str, str, str], ...]:
+    return tuple(
+        sorted(
+            (
+                str(artifact.get("path") or ""),
+                str(artifact.get("signature") or ""),
+                str(artifact.get("modified_at") or ""),
+                str(artifact.get("row_count") or ""),
+            )
+            for artifact in artifacts
+            if artifact.get("path")
+        )
+    )
+
+
+def _scope_key(scope) -> tuple[str, str, bool]:
+    return (
+        str(getattr(scope, "start_date", "") or ""),
+        str(getattr(scope, "end_date", "") or ""),
+        bool(getattr(scope, "is_active", False)),
+    )
+
+
+def _read_playback_index_columns(path: str) -> pd.DataFrame:
+    source = Path(path)
+    suffix = source.suffix.lower()
+    columns = ["timestamp", "machine_id"]
+    if suffix == ".csv":
+        return pd.read_csv(source, usecols=columns)
+    if suffix in {".parquet", ".pq"}:
+        try:
+            return pd.read_parquet(source, columns=columns)
+        except TypeError:
+            return pd.read_parquet(source)[columns]
+    if suffix == ".jsonl":
+        rows = []
+        with source.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                record = json.loads(line)
+                if isinstance(record, dict):
+                    rows.append({column: record.get(column) for column in columns})
+        return pd.DataFrame(rows, columns=columns)
+    if suffix == ".json":
+        frame = pd.read_json(source)
+        return frame[columns]
+    raise ValueError(f"Unsupported file extension: {suffix}")
+
+
+def _playback_index_entry_for_path(
+    path: str,
+    scope_start: str,
+    scope_end: str,
+    scope_active: bool,
+) -> PlaybackArtifactIndexEntry | None:
+    try:
+        frame = _read_playback_index_columns(path)
+    except Exception:  # noqa: BLE001
+        return None
+    missing = {"timestamp", "machine_id"}.difference(frame.columns)
+    if missing:
+        return None
+    frame = frame.copy()
+    frame["timestamp"] = pd.to_datetime(frame["timestamp"], errors="coerce")
+    frame["machine_id"] = frame["machine_id"].astype("string").str.strip()
+    frame = frame.dropna(subset=["timestamp", "machine_id"])
+    frame = frame[frame["machine_id"] != ""]
+    if frame.empty:
+        return None
+    frame["day"] = frame["timestamp"].dt.date.astype(str)
+    if scope_active:
+        frame = frame[(frame["day"] >= scope_start) & (frame["day"] <= scope_end)]
+    if frame.empty:
+        return None
+    grouped = frame.groupby(["machine_id", "day"], dropna=True).size()
+    counts_by_machine: dict[str, dict[str, int]] = {}
+    for (machine_id, day), count in grouped.items():
+        machine_key = str(machine_id).strip()
+        day_key = str(day).strip()
+        if not machine_key or not day_key:
+            continue
+        counts_by_machine.setdefault(machine_key, {})[day_key] = int(count)
+    machine_days = tuple(
+        (machine_id, tuple(sorted(day_counts.keys())))
+        for machine_id, day_counts in sorted(counts_by_machine.items())
+    )
+    machine_day_counts = tuple(
+        (machine_id, tuple((day, day_counts[day]) for day in sorted(day_counts.keys())))
+        for machine_id, day_counts in sorted(counts_by_machine.items())
+    )
+    return PlaybackArtifactIndexEntry(path=path, machine_days=machine_days, machine_day_counts=machine_day_counts)
+
+
+@lru_cache(maxsize=32)
+def _cached_playback_selection_index(
+    artifact_key: tuple[tuple[str, str, str, str], ...],
+    scope_start: str,
+    scope_end: str,
+    scope_active: bool,
+) -> PlaybackSelectionIndex:
+    entries: dict[str, PlaybackArtifactIndexEntry] = {}
+    machines: set[str] = set()
+    days_by_machine: dict[str, set[str]] = {}
+    counts_by_machine: dict[str, dict[str, int]] = {}
+
+    for artifact in artifact_key:
+        path = artifact[0]
+        entry = _playback_index_entry_for_path(path, scope_start, scope_end, scope_active)
+        if entry is None:
+            continue
+        entries[path] = entry
+        for machine_id, days in entry.machine_days:
+            if not days:
+                continue
+            machines.add(machine_id)
+            days_by_machine.setdefault(machine_id, set()).update(days)
+        for machine_id, day_counts in entry.machine_day_counts:
+            machine_counts = counts_by_machine.setdefault(machine_id, {})
+            for day, count in day_counts:
+                machine_counts[day] = machine_counts.get(day, 0) + int(count)
+
+    machine_days = {machine_id: sorted(days) for machine_id, days in sorted(days_by_machine.items())}
+    all_days = sorted({day for days in days_by_machine.values() for day in days})
+    sorted_counts = {
+        machine_id: {day: day_counts[day] for day in sorted(day_counts.keys())}
+        for machine_id, day_counts in sorted(counts_by_machine.items())
+    }
+    return PlaybackSelectionIndex(
+        context={"machines": sorted(machines), "days": all_days},
+        machine_days=machine_days,
+        machine_day_counts=sorted_counts,
+        entries_by_path=entries,
+    )
+
+
+def playback_selection_index(artifacts: list[dict[str, Any]], scope) -> PlaybackSelectionIndex:
+    """Return cached lightweight machine/day choices for playback artifacts."""
+    scope_start, scope_end, scope_active = _scope_key(scope)
+    return _cached_playback_selection_index(_artifact_index_key(artifacts), scope_start, scope_end, scope_active)
+
+
+def _entry_machine_days(entry: PlaybackArtifactIndexEntry) -> dict[str, list[str]]:
+    return {machine_id: list(days) for machine_id, days in entry.machine_days}
+
+
+def _entry_machines(entry: PlaybackArtifactIndexEntry) -> list[str]:
+    return [machine_id for machine_id, days in entry.machine_days if days]
+
+
+def _best_artifact_for_machine_day(
+    artifacts_by_path: dict[str, dict[str, Any]],
+    index: PlaybackSelectionIndex,
+    machine: str,
+    day: str,
+    runtime_state: dict | None,
+) -> str:
+    matching_paths = [
+        path
+        for path, entry in index.entries_by_path.items()
+        if day in _entry_machine_days(entry).get(machine, [])
+    ]
+    if not matching_paths:
+        return ""
+    return max(
+        matching_paths,
+        key=lambda path: playback_artifact_runtime_preference(
+            artifacts_by_path.get(path, {"path": path}),
+            runtime_state,
+        ),
+    )
+
+
+def resolve_playback_selection(
+    artifacts: list[dict[str, Any]],
+    runtime_state: dict | None,
+    *,
+    requested_path: str = "",
+    requested_machine: str = "",
+    requested_day: str = "",
+    scope=None,
+) -> PlaybackSelection:
+    """Resolve playback UI machine/day state and internal artifact path.
+
+    The returned context is built from a cached lightweight index. Full playback
+    rows are intentionally not loaded here; callers should load only
+    ``selected_path`` after this resolution step.
+    """
+    index = playback_selection_index(artifacts, scope)
+    artifacts_by_path = {str(artifact.get("path") or ""): artifact for artifact in artifacts}
+    visible_paths = set(artifacts_by_path.keys())
+    machine = str(requested_machine or "")
+    day = str(requested_day or "")
+    selected_path = ""
+
+    requested_entry = index.entries_by_path.get(requested_path) if requested_path in visible_paths else None
+    if requested_entry is not None:
+        selected_path = requested_path
+        requested_machine_days = _entry_machine_days(requested_entry)
+        requested_machines = _entry_machines(requested_entry)
+        if not machine and requested_machines:
+            machine = requested_machines[0]
+        if machine and machine not in requested_machines:
+            machine = requested_machines[0] if requested_machines else ""
+        requested_days = requested_machine_days.get(machine, [])
+        if day and day not in requested_days:
+            day = ""
+        if not day and requested_days:
+            day = requested_days[0]
+    else:
+        if machine and machine not in index.context["machines"]:
+            machine = index.context["machines"][0] if index.context["machines"] else ""
+        if not machine and index.context["machines"]:
+            machine = index.context["machines"][0]
+        selected_machine_days_for_choice = index.machine_days.get(machine, [])
+        if day and day not in selected_machine_days_for_choice:
+            day = ""
+        if not day and selected_machine_days_for_choice:
+            day = selected_machine_days_for_choice[0]
+        selected_path = (
+            _best_artifact_for_machine_day(artifacts_by_path, index, machine, day, runtime_state)
+            if machine and day
+            else ""
+        )
+
+    selected_machine_days = index.machine_days.get(machine, [])
+    selected_machine_day_counts = index.machine_day_counts.get(machine, {})
+    return PlaybackSelection(
+        selected_path=selected_path,
+        machine=machine,
+        day=day,
+        context=index.context,
+        machine_days=index.machine_days,
+        machine_day_counts=index.machine_day_counts,
+        selected_machine_days=selected_machine_days,
+        selected_machine_day_counts=selected_machine_day_counts,
+    )
 
 
 def compute_playback_delay(

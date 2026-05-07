@@ -111,6 +111,28 @@ def _app_with_catalog(catalog) -> Flask:
     return app
 
 
+def _write_session_metadata(session_dir: Path, namespace: str) -> None:
+    (session_dir).mkdir(parents=True, exist_ok=True)
+    (session_dir / "session_state.json").write_text(
+        json.dumps({"runtime": {"runtime_namespace": namespace}}) + "\n",
+        encoding="utf-8",
+    )
+
+
+def _write_timeline(session_dir: Path, day: str, state: str) -> Path:
+    export_dir = session_dir / "exports" / "timeline"
+    export_dir.mkdir(parents=True, exist_ok=True)
+    timeline_path = export_dir / "timeline_rows.csv"
+    pd.DataFrame(
+        {
+            "timestamp": [f"{day}T10:00:00Z"],
+            "machine_id": ["M1"],
+            "state": [state],
+        }
+    ).to_csv(timeline_path, index=False)
+    return timeline_path
+
+
 def test_playback_route_defaults_to_full_timeline_and_keeps_candidates_flagged(tmp_path: Path, monkeypatch) -> None:
     timeline_path = tmp_path / "timeline_rows.csv"
     pd.DataFrame(
@@ -152,7 +174,7 @@ def test_playback_route_defaults_to_full_timeline_and_keeps_candidates_flagged(t
 
     assert response.status_code == 200
     body = response.get_data(as_text=True)
-    assert "<strong>Dataset:</strong> timeline_rows.csv" in body
+    assert "<strong>Machine:</strong> M1" in body
     assert "candidate_events.csv" not in body
     assert "active" in body
     assert "dense_idle" in body
@@ -186,7 +208,132 @@ def test_playback_route_lists_workflow_timeline_exports(tmp_path: Path, monkeypa
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert "No playback-compatible exports" not in body
-    assert "<strong>Dataset:</strong> timeline_rows.csv" in body
+    assert "<strong>Machine:</strong> M1" in body
+
+
+def test_playback_page_does_not_render_visible_dataset_selector(tmp_path: Path, monkeypatch) -> None:
+    timeline_path = tmp_path / "timeline_rows.csv"
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z"],
+            "machine_id": ["M1"],
+            "state": ["active"],
+        }
+    ).to_csv(timeline_path, index=False)
+
+    artifacts, warnings = scan_artifacts([str(tmp_path)])
+    assert warnings == []
+
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime())
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert 'select name="path"' not in body
+    assert "<strong>Dataset:</strong>" not in body
+    assert "<strong>Machine:</strong> M1" in body
+    assert "<strong>Day:</strong> 2026-03-01" in body
+
+
+def test_playback_machine_day_selection_chooses_matching_timeline_artifact(tmp_path: Path, monkeypatch) -> None:
+    results_root = tmp_path / "results"
+    day1_session = results_root / "workflows" / "session-day1"
+    day2_session = results_root / "workflows" / "session-day2"
+    _write_timeline(day1_session, "2026-03-01", "day1_state")
+    _write_timeline(day2_session, "2026-03-02", "day2_state")
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime())
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback", query_string={"machine": "M1", "day": "2026-03-02"})
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "day2_state" in body
+    assert "day1_state" not in body
+    assert "<strong>Day:</strong> 2026-03-02" in body
+
+
+def test_playback_loads_only_selected_artifact_after_machine_day_resolution(tmp_path: Path, monkeypatch) -> None:
+    results_root = tmp_path / "results"
+    day1_session = results_root / "workflows" / "session-day1"
+    day2_session = results_root / "workflows" / "session-day2"
+    day1_path = _write_timeline(day1_session, "2026-03-01", "day1_state")
+    day2_path = _write_timeline(day2_session, "2026-03-02", "day2_state")
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+    load_calls: list[str] = []
+
+    def tracking_load(path: str):
+        load_calls.append(path)
+        return pd.read_csv(path), None
+
+    monkeypatch.setattr("catalog.flask_app.routes.load_playback_frame", tracking_load)
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime())
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback", query_string={"machine": "M1", "day": "2026-03-02"})
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "day2_state" in body
+    assert "day1_state" not in body
+    assert load_calls == [str(day2_path)]
+    assert str(day1_path) not in load_calls
+
+
+def test_playback_combines_days_from_multiple_timeline_artifacts(tmp_path: Path, monkeypatch) -> None:
+    results_root = tmp_path / "results"
+    _write_timeline(results_root / "workflows" / "session-day1", "2026-03-01", "day1_state")
+    _write_timeline(results_root / "workflows" / "session-day2", "2026-03-02", "day2_state")
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime())
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert '<option value="2026-03-01" selected>' in body
+    assert '<option value="2026-03-02"' in body
+    assert 'select name="path"' not in body
+
+
+def test_playback_prefers_active_namespace_artifact_for_duplicate_machine_day(tmp_path: Path, monkeypatch) -> None:
+    results_root = tmp_path / "results"
+    stale_session = results_root / "workflows" / "stale-session"
+    active_session = results_root / "workflows" / "active-session"
+    _write_session_metadata(stale_session, "old_namespace")
+    _write_session_metadata(active_session, "active_namespace")
+    _write_timeline(stale_session, "2026-03-01", "stale_state")
+    _write_timeline(active_session, "2026-03-01", "active_state")
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime("active_namespace"))
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback", query_string={"machine": "M1", "day": "2026-03-01"})
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "active_state" in body
+    assert "stale_state" not in body
 
 
 def test_playback_route_uses_async_catalog_refresh_when_timeline_export_appears(tmp_path: Path, monkeypatch) -> None:
@@ -216,7 +363,7 @@ def test_playback_route_uses_async_catalog_refresh_when_timeline_export_appears(
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert "No playback-compatible exports" in body
-    assert "<strong>Dataset:</strong> timeline_rows.csv" not in body
+    assert "<strong>Machine:</strong> M1" not in body
 
     try:
         register_artifact_catalog_refresh(lambda reason: catalog.start_background_rescan_if_idle(reason=reason))
@@ -232,30 +379,8 @@ def test_playback_route_uses_async_catalog_refresh_when_timeline_export_appears(
     assert response.status_code == 200
     body = response.get_data(as_text=True)
     assert "No playback-compatible exports" not in body
-    assert "<strong>Dataset:</strong> timeline_rows.csv" in body
+    assert "<strong>Machine:</strong> M1" in body
     assert "active" in body
-
-
-def _write_session_metadata(session_dir: Path, namespace: str) -> None:
-    (session_dir).mkdir(parents=True, exist_ok=True)
-    (session_dir / "session_state.json").write_text(
-        json.dumps({"runtime": {"runtime_namespace": namespace}}) + "\n",
-        encoding="utf-8",
-    )
-
-
-def _write_timeline(session_dir: Path, day: str, state: str) -> Path:
-    export_dir = session_dir / "exports" / "timeline"
-    export_dir.mkdir(parents=True, exist_ok=True)
-    timeline_path = export_dir / "timeline_rows.csv"
-    pd.DataFrame(
-        {
-            "timestamp": [f"{day}T10:00:00Z"],
-            "machine_id": ["M1"],
-            "state": [state],
-        }
-    ).to_csv(timeline_path, index=False)
-    return timeline_path
 
 
 def test_clean_startup_playback_hides_stale_workflow_exports_but_scan_still_finds_them(tmp_path: Path, monkeypatch) -> None:
@@ -353,7 +478,7 @@ def test_clean_startup_lists_all_current_runtime_workflow_timeline_exports(
     body = response.get_data(as_text=True)
     assert "No playback-compatible exports" not in body
     assert str(older_path) in body
-    assert str(latest_path) in body
+    assert '<option value="2026-05-04"' in body
     assert str(stale_path) not in body
     assert "stale_default_namespace_state" not in body
 
@@ -394,7 +519,7 @@ def test_clean_startup_actual_runtime_snapshot_lists_all_current_namespace_workf
     body = response.get_data(as_text=True)
     assert "No playback-compatible exports" not in body
     assert str(older_path) in body
-    assert str(latest_path) in body
+    assert '<option value="2026-05-04"' in body
     assert str(stale_path) not in body
     assert "actual_runtime_stale_default_state" not in body
 
@@ -431,7 +556,7 @@ def test_clean_startup_can_load_explicit_older_current_runtime_workflow_export(
     body = response.get_data(as_text=True)
     assert "No playback-compatible exports" not in body
     assert str(older_path) in body
-    assert str(latest_path) in body
+    assert '<option value="2026-05-04"' in body
     assert str(stale_path) not in body
     assert "current_runtime_older_state" in body
     assert "2026-05-03" in body
@@ -492,7 +617,7 @@ def test_playback_route_lists_current_clean_workflow_export_with_default_metadat
     assert "No playback-compatible exports" not in body
     assert "current_default_metadata_state" in body
     assert "2026-03-02" in body
-    assert "<strong>Dataset:</strong> timeline_rows.csv" in body
+    assert "<strong>Machine:</strong> M1" in body
 
 
 def test_playback_selected_dataset_is_not_empty_for_current_clean_workflow_export_with_missing_namespace(
@@ -522,7 +647,7 @@ def test_playback_selected_dataset_is_not_empty_for_current_clean_workflow_expor
     assert "No playback-compatible exports" not in body
     assert "current_missing_namespace_state" in body
     assert "2026-03-02" in body
-    assert "<strong>Dataset:</strong> timeline_rows.csv" in body
+    assert "<strong>Machine:</strong> M1" in body
 
 
 def test_clean_startup_prefers_current_workflow_export_over_stale_non_workflow_timeline(tmp_path: Path, monkeypatch) -> None:
@@ -619,7 +744,7 @@ def test_clean_startup_keeps_non_workflow_timeline_visible_because_it_has_no_run
     body = response.get_data(as_text=True)
     assert "No playback-compatible exports" not in body
     assert "stale_non_workflow_state" in body
-    assert "<strong>Dataset:</strong> timeline_rows.csv" in body
+    assert "<strong>Machine:</strong> M1" in body
 
 
 def test_clean_startup_can_load_explicit_non_workflow_playback_path(tmp_path: Path, monkeypatch) -> None:
@@ -646,4 +771,4 @@ def test_clean_startup_can_load_explicit_non_workflow_playback_path(tmp_path: Pa
     body = response.get_data(as_text=True)
     assert "No playback-compatible exports" not in body
     assert "manual_non_workflow_state" in body
-    assert "<strong>Dataset:</strong> timeline_rows.csv" in body
+    assert "<strong>Machine:</strong> M1" in body
