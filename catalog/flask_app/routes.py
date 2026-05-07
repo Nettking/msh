@@ -336,17 +336,27 @@ def _serialize_playback_timestamp(series: pd.Series) -> pd.Series:
 
 @web.route("/playback")
 def playback():
-    snap = _catalog().ensure_scanned()
+    catalog = _catalog()
+    snap = catalog.ensure_scanned()
     runtime_manager = get_runtime_manager()
     runtime_state = runtime_manager.state_snapshot() if hasattr(runtime_manager, "state_snapshot") else {}
     requested_path = request.args.get("path", "")
-    discovered_playback_artifacts = [a for a in snap.artifacts if a.get("playback_compatible") and a.get("visibility") == "default"]
-    playback_artifacts = filter_playback_artifacts_for_runtime(
-        discovered_playback_artifacts,
-        runtime_state,
-        selected_path=requested_path,
-        logger=current_app.logger,
-    )
+
+    def visible_playback_artifacts(scan_snapshot):
+        discovered = [
+            a for a in scan_snapshot.artifacts if a.get("playback_compatible") and a.get("visibility") == "default"
+        ]
+        return filter_playback_artifacts_for_runtime(
+            discovered,
+            runtime_state,
+            selected_path=requested_path,
+            logger=current_app.logger,
+        )
+
+    playback_artifacts = visible_playback_artifacts(snap)
+    if not playback_artifacts:
+        snap = catalog.ensure_scanned(force_signature_check=True)
+        playback_artifacts = visible_playback_artifacts(snap)
     playback_artifacts.sort(
         key=lambda item: (
             0 if str(item.get("file_name", "")).lower() == "timeline_rows.csv" else 1,

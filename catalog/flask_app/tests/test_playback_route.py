@@ -13,7 +13,7 @@ from flask import Flask
 
 from catalog.common.artifact_registry import scan_artifacts
 from catalog.flask_app.routes import web
-from catalog.flask_app.services.catalog_service import ScanSnapshot
+from catalog.flask_app.services.catalog_service import ArtifactCatalog, ScanSnapshot
 from catalog.orchestrator.pipeline import RuntimeOrchestrator, STARTUP_MODE_CLEAN
 
 
@@ -88,7 +88,7 @@ class _FakeCatalog:
     def __init__(self, artifacts: list[dict[str, object]]) -> None:
         self._snapshot = ScanSnapshot(artifacts=artifacts, warnings=[], scanned_at_epoch=1.0)
 
-    def ensure_scanned(self) -> ScanSnapshot:
+    def ensure_scanned(self, *, force_signature_check: bool = False) -> ScanSnapshot:
         return self._snapshot
 
     def artifact_by_path(self, path: str) -> dict[str, object] | None:
@@ -98,7 +98,7 @@ class _FakeCatalog:
         return None
 
 
-def _app_with_catalog(catalog: _FakeCatalog) -> Flask:
+def _app_with_catalog(catalog) -> Flask:
     app = Flask(__name__, template_folder="../templates", static_folder="../static")
     app.secret_key = "test"
     app.config["ARTIFACT_CATALOG"] = catalog
@@ -182,6 +182,37 @@ def test_playback_route_lists_workflow_timeline_exports(tmp_path: Path, monkeypa
     body = response.get_data(as_text=True)
     assert "No playback-compatible exports" not in body
     assert "<strong>Dataset:</strong> timeline_rows.csv" in body
+
+
+def test_playback_route_auto_refreshes_stale_catalog_when_timeline_export_appears(tmp_path: Path, monkeypatch) -> None:
+    results_root = tmp_path / "results"
+    results_root.mkdir()
+    monkeypatch.setenv("MSH_SCAN_DIRS", str(results_root))
+
+    catalog = ArtifactCatalog()
+    assert catalog.ensure_scanned().artifacts == []
+
+    timeline_path = results_root / "workflows" / "session-123" / "exports" / "timeline" / "timeline_rows.csv"
+    timeline_path.parent.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z"],
+            "machine_id": ["M1"],
+            "state": ["active"],
+        }
+    ).to_csv(timeline_path, index=False)
+
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime())
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(catalog)
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No playback-compatible exports" not in body
+    assert "<strong>Dataset:</strong> timeline_rows.csv" in body
+    assert "active" in body
 
 
 def _write_session_metadata(session_dir: Path, namespace: str) -> None:
