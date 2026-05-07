@@ -22,6 +22,21 @@
         <a class="{% if request.endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
         <a class="{% if request.endpoint in ['web.strategies', 'web.save_strategies'] %}is-active{% endif %}" href="{{ url_for('web.strategies') }}">Strategies</a>
       </nav>
+      {% if artifact_catalog_freshness is defined %}
+      <div class="catalog-freshness {% if artifact_catalog_freshness.stale %}catalog-freshness--stale{% endif %}">
+        <span>Artifact scan:</span>
+        <strong>
+          {% if artifact_catalog_freshness.age_seconds is none %}
+            not scanned yet
+          {% elif artifact_catalog_freshness.age_seconds < 60 %}
+            {{ "%.0f"|format(artifact_catalog_freshness.age_seconds) }}s ago
+          {% else %}
+            {{ "%.1f"|format(artifact_catalog_freshness.age_seconds / 60) }}m ago
+          {% endif %}
+        </strong>
+        {% if artifact_catalog_freshness.scan_in_progress %}<span>Rescan running</span>{% elif artifact_catalog_freshness.stale %}<span>May be stale</span>{% endif %}
+      </div>
+      {% endif %}
       <form class="rescan-form" method="post" action="{{ url_for('web.rescan') }}">
         <input type="hidden" name="next" value="{{ request.path }}{% if request.query_string %}?{{ request.query_string.decode('utf-8') }}{% endif %}">
         <button type="submit">Rescan</button>

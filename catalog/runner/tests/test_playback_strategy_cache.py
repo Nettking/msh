@@ -68,12 +68,39 @@ def test_prepare_session_playback_exports_stores_strategy_signature(tmp_path: Pa
             "strategies_used": output / "strategies_used.yaml",
         }
 
+    refresh_reasons: list[str] = []
     monkeypatch.setattr(playback, "intervention_strategy_config_signature", lambda: "fresh-signature")
     monkeypatch.setattr(playback, "write_strategy_outputs", fake_write_strategy_outputs)
+    monkeypatch.setattr(
+        playback,
+        "request_artifact_catalog_refresh",
+        lambda *, reason: refresh_reasons.append(reason) or True,
+    )
 
     export_path, status = playback.prepare_session_playback_exports(session_dir, metadata)
 
     assert status == "created"
+    assert refresh_reasons == ["playback_export_generated"]
     assert export_path.name == "timeline_rows.csv"
     manifest = json.loads((export_path.parent / "manifest.json").read_text(encoding="utf-8"))
     assert manifest["strategy_config_signature"] == "fresh-signature"
+
+
+def test_prepare_session_playback_exports_does_not_refresh_when_cached(tmp_path: Path, monkeypatch) -> None:
+    session_dir = tmp_path / "session"
+    _write_cached_export(session_dir, "fresh-signature")
+    metadata = _metadata()
+    refresh_reasons: list[str] = []
+
+    monkeypatch.setattr(playback, "intervention_strategy_config_signature", lambda: "fresh-signature")
+    monkeypatch.setattr(
+        playback,
+        "request_artifact_catalog_refresh",
+        lambda *, reason: refresh_reasons.append(reason) or True,
+    )
+
+    export_path, status = playback.prepare_session_playback_exports(session_dir, metadata)
+
+    assert status == "cached"
+    assert export_path.name == "timeline_rows.csv"
+    assert refresh_reasons == []
