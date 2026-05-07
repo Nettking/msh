@@ -504,6 +504,10 @@ class RuntimeOrchestrator:
         # into a timestamped namespace so prior artifacts remain inspectable.
         if mode == STARTUP_MODE_CLEAN:
             namespace = f"clean_{datetime.utcnow().strftime('%Y%m%dT%H%M%SZ')}"
+            self.status.info(
+                "clean startup selected: preserving existing workflow directories but isolating playback "
+                f"to new runtime namespace '{namespace}'; stale exports from prior namespaces will be ignored"
+            )
 
         app_started_at = self._state.app_started_at
         runtime_started_at = self._state.runtime_started_at
