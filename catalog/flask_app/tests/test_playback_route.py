@@ -239,6 +239,30 @@ def test_clean_startup_playback_hides_stale_workflow_exports_but_scan_still_find
     assert raw_data.read_text(encoding="utf-8") == '{"timestamp":"2026-03-01T00:00:00Z"}\n'
 
 
+def test_playback_explicit_stale_workflow_path_does_not_bypass_namespace_filter(tmp_path: Path, monkeypatch) -> None:
+    results_root = tmp_path / "results"
+    stale_session = results_root / "workflows" / "auto_default_20260301_20260301"
+    current_session = results_root / "workflows" / "auto_clean_20260302_20260302"
+    _write_session_metadata(stale_session, "default")
+    _write_session_metadata(current_session, "clean_20260302T000000Z")
+    stale_path = _write_timeline(stale_session, "2026-03-01", "stale_selected_state")
+    _write_timeline(current_session, "2026-03-02", "current_selected_fallback_state")
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime("clean_20260302T000000Z", "start_clean"))
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback", query_string={"path": str(stale_path)})
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No playback-compatible exports" not in body
+    assert "stale_selected_state" not in body
+    assert "current_selected_fallback_state" in body
+
 def test_reuse_startup_playback_can_list_default_namespace_exports(tmp_path: Path, monkeypatch) -> None:
     results_root = tmp_path / "results"
     session_dir = results_root / "workflows" / "auto_default_20260301_20260301"
@@ -325,7 +349,76 @@ def test_playback_selected_dataset_is_not_empty_for_current_clean_workflow_expor
     assert "<strong>Dataset:</strong> timeline_rows.csv" in body
 
 
-def test_clean_startup_does_not_automatically_select_stale_non_workflow_timeline(tmp_path: Path, monkeypatch) -> None:
+def test_clean_startup_prefers_current_workflow_export_over_stale_non_workflow_timeline(tmp_path: Path, monkeypatch) -> None:
+    results_root = tmp_path / "results"
+    current_session = results_root / "workflows" / "auto_clean_20260302_20260302"
+    _write_session_metadata(current_session, "clean_20260302T000000Z")
+    current_path = _write_timeline(current_session, "2026-03-02", "current_workflow_state")
+
+    non_workflow_path = results_root / "timeline_rows.csv"
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z"],
+            "machine_id": ["M1"],
+            "state": ["stale_non_workflow_state"],
+        }
+    ).to_csv(non_workflow_path, index=False)
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+    playback_paths = {artifact["path"] for artifact in artifacts if artifact["playback_compatible"]}
+    assert playback_paths == {str(current_path), str(non_workflow_path)}
+
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime("clean_20260302T000000Z", "start_clean"))
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No playback-compatible exports" not in body
+    assert "current_workflow_state" in body
+    assert "2026-03-02" in body
+    assert "stale_non_workflow_state" not in body
+    assert "2026-03-01" not in body
+
+
+def test_clean_startup_can_load_explicit_non_workflow_path_when_current_workflow_exists(
+    tmp_path: Path, monkeypatch
+) -> None:
+    results_root = tmp_path / "results"
+    current_session = results_root / "workflows" / "auto_clean_20260302_20260302"
+    _write_session_metadata(current_session, "clean_20260302T000000Z")
+    _write_timeline(current_session, "2026-03-02", "current_workflow_state")
+
+    non_workflow_path = results_root / "timeline_rows.csv"
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z"],
+            "machine_id": ["M1"],
+            "state": ["manual_non_workflow_state"],
+        }
+    ).to_csv(non_workflow_path, index=False)
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime("clean_20260302T000000Z", "start_clean"))
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback", query_string={"path": str(non_workflow_path)})
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No playback-compatible exports" not in body
+    assert "manual_non_workflow_state" in body
+    assert "2026-03-01" in body
+    assert "current_workflow_state" not in body
+
+
+def test_clean_startup_keeps_non_workflow_timeline_visible_because_it_has_no_runtime_namespace(tmp_path: Path, monkeypatch) -> None:
     timeline_path = tmp_path / "results" / "timeline_rows.csv"
     timeline_path.parent.mkdir(parents=True)
     pd.DataFrame(
@@ -348,9 +441,9 @@ def test_clean_startup_does_not_automatically_select_stale_non_workflow_timeline
 
     assert response.status_code == 200
     body = response.get_data(as_text=True)
-    assert "No playback-compatible exports" in body
-    assert "stale_non_workflow_state" not in body
-    assert "<strong>Dataset:</strong> timeline_rows.csv" not in body
+    assert "No playback-compatible exports" not in body
+    assert "stale_non_workflow_state" in body
+    assert "<strong>Dataset:</strong> timeline_rows.csv" in body
 
 
 def test_clean_startup_can_load_explicit_non_workflow_playback_path(tmp_path: Path, monkeypatch) -> None:
