@@ -168,6 +168,10 @@ def _load_or_create_auto_session(*, workflows_root: Path, start_date, end_date, 
 
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
             metadata, changed = normalize_session_metadata(session_dir, metadata, script_options)
+            runtime_payload = metadata.setdefault("runtime", {})
+            if runtime_payload.get("runtime_namespace") != runtime_namespace:
+                runtime_payload["runtime_namespace"] = runtime_namespace
+                changed = True
             if changed:
                 write_session_metadata(session_dir, metadata)
             return session_id, session_dir, metadata, "reused"

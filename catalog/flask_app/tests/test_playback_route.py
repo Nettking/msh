@@ -16,15 +16,25 @@ from catalog.flask_app.services.catalog_service import ScanSnapshot
 
 
 class _FakeRuntime:
-    def __init__(self, active_runtime_namespace: str = "default", startup_mode: str = "continue_existing") -> None:
+    def __init__(
+        self,
+        active_runtime_namespace: str = "default",
+        startup_mode: str = "continue_existing",
+        session_id: str | None = None,
+    ) -> None:
         self.active_runtime_namespace = active_runtime_namespace
         self.startup_mode = startup_mode
+        self.session_id = session_id
 
     def requires_startup_choice(self) -> bool:
         return False
 
-    def state_snapshot(self) -> dict[str, str]:
-        return {"active_runtime_namespace": self.active_runtime_namespace, "startup_mode": self.startup_mode}
+    def state_snapshot(self) -> dict[str, str | None]:
+        return {
+            "active_runtime_namespace": self.active_runtime_namespace,
+            "startup_mode": self.startup_mode,
+            "session_id": self.session_id,
+        }
 
 
 @dataclass
@@ -224,6 +234,36 @@ def test_reuse_startup_playback_can_list_default_namespace_exports(tmp_path: Pat
     assert "No playback-compatible exports" not in body
     assert "reused_state" in body
     assert "2026-03-01" in body
+
+
+def test_playback_selected_dataset_is_not_empty_for_current_clean_workflow_export_with_missing_namespace(
+    tmp_path: Path, monkeypatch
+) -> None:
+    results_root = tmp_path / "results"
+    session_id = "auto_clean_20260302T000000Z_20260302_20260302"
+    session_dir = results_root / "workflows" / session_id
+    session_dir.mkdir(parents=True)
+    (session_dir / "session_state.json").write_text(json.dumps({"runtime": {}}) + "\n", encoding="utf-8")
+    _write_timeline(session_dir, "2026-03-02", "current_missing_namespace_state")
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+
+    monkeypatch.setattr(
+        "catalog.flask_app.routes.get_runtime_manager",
+        lambda: _FakeRuntime("clean_20260302T000000Z", "start_clean", session_id),
+    )
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No playback-compatible exports" not in body
+    assert "current_missing_namespace_state" in body
+    assert "2026-03-02" in body
+    assert "<strong>Dataset:</strong> timeline_rows.csv" in body
 
 
 def test_clean_startup_does_not_automatically_select_stale_non_workflow_timeline(tmp_path: Path, monkeypatch) -> None:

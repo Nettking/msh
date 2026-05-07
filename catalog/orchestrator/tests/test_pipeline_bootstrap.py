@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from catalog.orchestrator import pipeline
@@ -46,3 +47,34 @@ def test_bootstrap_analysis_uses_automatic_playback_ready_contract_in_contract_o
         _option(10, "data_analysis"),
     ]
     assert orchestrator._bootstrap_full_analysis_script_keys(script_options) == pipeline.AUTO_COVERAGE_SCRIPT_KEYS
+
+
+def test_reused_auto_session_metadata_is_updated_to_active_runtime_namespace(tmp_path: Path):
+    workflows_root = tmp_path / "workflows"
+    active_namespace = "clean_20260302T000000Z"
+    session_id = pipeline._auto_session_id("2026-03-02", "2026-03-02", runtime_namespace=active_namespace)
+    session_dir = workflows_root / session_id
+    session_dir.mkdir(parents=True)
+    metadata = {
+        "version": 2,
+        "session_id": session_id,
+        "filter": {"start_date": "2026-03-02", "end_date": "2026-03-02", "start_hour": None, "end_hour": None},
+        "paths": {"filtered_data_dir": "data", "runs_dir": "runs", "playback_exports_dir": "exports/timeline"},
+        "filter_result": {"filtered_data_path": "data"},
+        "runtime": {},
+        "scripts": {},
+    }
+    (session_dir / "session_state.json").write_text(pipeline.json.dumps(metadata) + "\n", encoding="utf-8")
+
+    _, _, reused_metadata, session_mode = pipeline._load_or_create_auto_session(
+        workflows_root=workflows_root,
+        start_date=date(2026, 3, 2),
+        end_date=date(2026, 3, 2),
+        script_options=[],
+        runtime_namespace=active_namespace,
+    )
+
+    assert session_mode == "reused"
+    assert reused_metadata["runtime"]["runtime_namespace"] == active_namespace
+    persisted = pipeline.json.loads((session_dir / "session_state.json").read_text(encoding="utf-8"))
+    assert persisted["runtime"]["runtime_namespace"] == active_namespace
