@@ -19,13 +19,11 @@ from .services.playback_service import (
     default_live_signal_columns,
     interval_rows,
     load_playback_frame,
-    playback_day_counts_by_machine,
     playback_field_groups,
-    playback_context,
-    playback_days_by_machine,
     prepare_playback_frame,
     playback_subset,
     filter_playback_artifacts_for_runtime,
+    resolve_playback_selection,
     summarize_intervals,
     validate_playback_frame,
     validate_playback_source,
@@ -334,6 +332,7 @@ def _serialize_playback_timestamp(series: pd.Series) -> pd.Series:
     return parsed.dt.strftime("%Y-%m-%dT%H:%M:%S.%f").str.slice(stop=-3) + "Z"
 
 
+
 @web.route("/playback")
 def playback():
     catalog = _catalog()
@@ -361,97 +360,74 @@ def playback():
             str(item.get("path", "")),
         )
     )
-    visible_paths = {str(artifact.get("path")) for artifact in playback_artifacts}
-    selected_path = requested_path if requested_path in visible_paths else (playback_artifacts[0]["path"] if playback_artifacts else "")
-    machine = request.args.get("machine", "")
-    day = request.args.get("day", "")
     scope = get_operator_scope_service().get()
+    selection = resolve_playback_selection(
+        playback_artifacts,
+        runtime_state,
+        requested_path=requested_path,
+        requested_machine=request.args.get("machine", ""),
+        requested_day=request.args.get("day", ""),
+        scope=scope,
+    )
+    selected_path = selection.selected_path
+    machine = selection.machine
+    day = selection.day
 
     selected = _catalog().artifact_by_path(selected_path) if selected_path else None
-    frame = None
     prepared_frame = None
     validation_reason = None
-    context = {"machines": [], "days": []}
     rows = None
     intervals = []
     interval_summary = {"totals": [], "table": []}
     error = None
-    machine_days: dict[str, list[str]] = {}
-    machine_day_counts: dict[str, dict[str, int]] = {}
-    selected_machine_days: list[str] = []
-    selected_machine_day_counts: dict[str, int] = {}
+    selected_machine_days: list[str] = selection.selected_machine_days
+    selected_machine_day_counts: dict[str, int] = selection.selected_machine_day_counts
     row_payload: list[dict] = []
     signal_columns: list[str] = []
     field_groups: dict[str, list[str]] = {"Signals": [], "State/context": [], "Detection/diagnostics": [], "Other fields": []}
     timeline_payload = {"labels": [], "counts": []}
 
     if selected:
-        source_validation = validate_playback_source(selected_path)
-        if not source_validation.is_valid:
-            validation_reason = source_validation.reason
-        else:
-            frame, error = load_playback_frame(selected_path)
-        if frame is not None:
-            validation = validate_playback_frame(frame)
-            if validation.is_valid:
-                prepared_frame = prepare_playback_frame(frame)
-                context = playback_context(prepared_frame)
-                machine_days = playback_days_by_machine(prepared_frame)
-                machine_day_counts = playback_day_counts_by_machine(prepared_frame)
-                if scope.is_active:
-                    context["days"] = [item for item in context["days"] if str(scope.start_date) <= item <= str(scope.end_date)]
-                    machine_days = {
-                        machine_id: [item for item in days if str(scope.start_date) <= item <= str(scope.end_date)]
-                        for machine_id, days in machine_days.items()
-                    }
-                    machine_day_counts = {
-                        machine_id: {
-                            machine_day: count
-                            for machine_day, count in day_counts.items()
-                            if str(scope.start_date) <= machine_day <= str(scope.end_date)
-                        }
-                        for machine_id, day_counts in machine_day_counts.items()
-                    }
-                context["machines"] = [m for m in context["machines"] if machine_days.get(m)]
-                if prepared_frame.empty:
-                    validation_reason = "This playback export exists, but contains no playable rows."
-                if not machine and context["machines"]:
-                    machine = context["machines"][0]
-                if machine and machine not in context["machines"]:
-                    machine = context["machines"][0] if context["machines"] else ""
-                selected_machine_days = machine_days.get(machine, [])
-                selected_machine_day_counts = machine_day_counts.get(machine, {})
-                if day and day not in selected_machine_days:
-                    day = ""
-                if not day and selected_machine_days:
-                    day = selected_machine_days[0]
-                if machine and day:
-                    rows = playback_subset(prepared_frame, machine, day)
-                    intervals = interval_rows(rows)
-                    interval_summary = summarize_intervals(intervals)
-                    if not rows.empty:
-                        base_columns = [col for col in rows.columns if col != "day"]
-                        payload_frame = rows[base_columns].copy()
-                        payload_frame["timestamp"] = _serialize_playback_timestamp(payload_frame["timestamp"])
-                        if "source_timestamp" in payload_frame.columns:
-                            payload_frame["source_timestamp"] = _serialize_playback_timestamp(payload_frame["source_timestamp"])
-                        if "is_synthetic_tick" in payload_frame.columns:
-                            payload_frame["is_synthetic_tick"] = payload_frame["is_synthetic_tick"].fillna(False).astype(bool)
-                        row_payload = payload_frame.fillna("").to_dict("records")
-                        signal_columns = default_live_signal_columns(rows)
-                        field_groups = playback_field_groups([col for col in payload_frame.columns if col != "timestamp"])
-                        timeline = rows.copy()
-                        timeline["timestamp"] = pd.to_datetime(timeline["timestamp"], errors="coerce")
-                        timeline = timeline.dropna(subset=["timestamp"])
-                        if not timeline.empty:
-                            timeline["bucket"] = timeline["timestamp"].dt.floor("min")
-                            grouped = timeline.groupby("bucket").size().reset_index(name="count")
-                            timeline_payload = {
-                                "labels": grouped["bucket"].dt.strftime("%Y-%m-%d %H:%M:%S").tolist(),
-                                "counts": grouped["count"].astype(int).tolist(),
-                            }
+        if prepared_frame is None:
+            source_validation = validate_playback_source(selected_path)
+            if not source_validation.is_valid:
+                validation_reason = source_validation.reason
             else:
-                validation_reason = validation.reason
+                frame, error = load_playback_frame(selected_path)
+                if frame is not None:
+                    validation = validate_playback_frame(frame)
+                    if validation.is_valid:
+                        prepared_frame = prepare_playback_frame(frame)
+                    else:
+                        validation_reason = validation.reason
+        if prepared_frame is not None:
+            if prepared_frame.empty:
+                validation_reason = "This playback export exists, but contains no playable rows."
+            if machine and day:
+                rows = playback_subset(prepared_frame, machine, day)
+                intervals = interval_rows(rows)
+                interval_summary = summarize_intervals(intervals)
+                if not rows.empty:
+                    base_columns = [col for col in rows.columns if col != "day"]
+                    payload_frame = rows[base_columns].copy()
+                    payload_frame["timestamp"] = _serialize_playback_timestamp(payload_frame["timestamp"])
+                    if "source_timestamp" in payload_frame.columns:
+                        payload_frame["source_timestamp"] = _serialize_playback_timestamp(payload_frame["source_timestamp"])
+                    if "is_synthetic_tick" in payload_frame.columns:
+                        payload_frame["is_synthetic_tick"] = payload_frame["is_synthetic_tick"].fillna(False).astype(bool)
+                    row_payload = payload_frame.fillna("").to_dict("records")
+                    signal_columns = default_live_signal_columns(rows)
+                    field_groups = playback_field_groups([col for col in payload_frame.columns if col != "timestamp"])
+                    timeline = rows.copy()
+                    timeline["timestamp"] = pd.to_datetime(timeline["timestamp"], errors="coerce")
+                    timeline = timeline.dropna(subset=["timestamp"])
+                    if not timeline.empty:
+                        timeline["bucket"] = timeline["timestamp"].dt.floor("min")
+                        grouped = timeline.groupby("bucket").size().reset_index(name="count")
+                        timeline_payload = {
+                            "labels": grouped["bucket"].dt.strftime("%Y-%m-%d %H:%M:%S").tolist(),
+                            "counts": grouped["count"].astype(int).tolist(),
+                        }
     elif not playback_artifacts:
         validation_reason = "No playback-ready timeline exports were found. Run or refresh the workflow to generate playback data."
 
@@ -461,9 +437,9 @@ def playback():
         selected_path=selected_path,
         machine=machine,
         day=day,
-        context=context,
-        machine_days=machine_days,
-        machine_day_counts=machine_day_counts,
+        context=selection.context,
+        machine_days=selection.machine_days,
+        machine_day_counts=selection.machine_day_counts,
         selected_machine_days=selected_machine_days,
         selected_machine_day_counts=selected_machine_day_counts,
         rows=rows,

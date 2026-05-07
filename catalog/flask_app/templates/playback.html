@@ -17,30 +17,15 @@
 {% set selection_incomplete = not selected_path or not machine or not day %}
 {% set selection_has_error = error or validation_reason %}
 {% set expand_setup = selection_incomplete or selection_has_error %}
-{% set selected_dataset = namespace(label='-') %}
-{% for a in playback_artifacts %}
-  {% if selected_path == a.path %}
-    {% set selected_dataset.label = a.file_name %}
-  {% endif %}
-{% endfor %}
 <section class="section-block playback-selection-card">
   <h3>Playback setup</h3>
   <p class="playback-selection-summary">
-    <strong>Dataset:</strong> {{ selected_dataset.label }} |
     <strong>Machine:</strong> {{ machine or '-' }} |
     <strong>Day:</strong> {{ day or '-' }}
   </p>
   <details class="playback-setup-toggle" {% if expand_setup %}open{% endif %}>
     <summary>Change selection</summary>
     <form class="playback-form playback-form--card" method="get">
-      <label>
-        Dataset
-        <select name="path" onchange="this.form.submit()">
-          {% for a in playback_artifacts %}
-          <option value="{{ a.path }}" {% if selected_path==a.path %}selected{% endif %}>{{ a.file_name }}</option>
-          {% endfor %}
-        </select>
-      </label>
       <label>
         Machine
         <select name="machine" onchange="this.form.submit()">
@@ -63,6 +48,12 @@
       </label>
       <button type="submit">Load</button>
     </form>
+    {% if selected_path %}
+    <details class="playback-debug-details">
+      <summary>Advanced/debug dataset details</summary>
+      <p class="inline-note">Selected artifact path: <code>{{ selected_path }}</code></p>
+    </details>
+    {% endif %}
   </details>
 </section>
 {% endif %}
