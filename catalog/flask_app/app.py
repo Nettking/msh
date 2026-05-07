@@ -6,6 +6,7 @@ import os
 
 from flask import Flask
 
+from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
 from .routes import web
@@ -15,7 +16,15 @@ from .services.catalog_service import ArtifactCatalog
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["SECRET_KEY"] = os.getenv("MSH_FLASK_SECRET", "msh-dev")
-    app.config["ARTIFACT_CATALOG"] = ArtifactCatalog()
+    catalog = ArtifactCatalog()
+    app.config["ARTIFACT_CATALOG"] = catalog
+
+    @app.context_processor
+    def inject_catalog_freshness() -> dict[str, object]:
+        return {"artifact_catalog_freshness": catalog.freshness()}
+
+    register_artifact_catalog_refresh(lambda reason: catalog.start_background_rescan_if_idle(reason=reason))
+    catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
     app.register_blueprint(web)
     return app
@@ -38,4 +47,4 @@ if __name__ == "__main__":
         print("[orchestrator] orchestration skipped; runtime manager will remain idle", flush=True)
 
     print(f"[orchestrator] starting Flask app on http://{host}:{port}", flush=True)
-    app.run(host=host, port=port, debug=debug)
+    app.run(host=host, port=port, debug=debug, threaded=True)

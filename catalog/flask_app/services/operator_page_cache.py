@@ -60,7 +60,7 @@ class OperatorPageCache:
 
     def get_overview_snapshot(self, catalog: ArtifactCatalog) -> tuple[OverviewSnapshot, str]:
         """Return cached/rebuilt overview snapshot with a cache-state label."""
-        scan = catalog.ensure_scanned()
+        scan = catalog.cached_snapshot()
         runtime_state = get_runtime_manager().state_snapshot()
         signature = (
             float(scan.scanned_at_epoch),

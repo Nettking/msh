@@ -67,7 +67,7 @@ class LiveTelemetryService:
         self._cache: _CacheEntry | None = None
 
     def snapshot(self, catalog: ArtifactCatalog) -> LiveSnapshot:
-        scan = catalog.ensure_scanned()
+        scan = catalog.cached_snapshot() if hasattr(catalog, "cached_snapshot") else catalog.ensure_scanned()
         source_artifacts = [
             item
             for item in scan.artifacts

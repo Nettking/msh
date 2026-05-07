@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
+import threading
+import time
 
 import pandas as pd
 
@@ -83,3 +85,55 @@ def test_ensure_scanned_reuses_signature_within_ttl(tmp_path: Path, monkeypatch)
     catalog.ensure_scanned()
 
     assert catalog.signature_checks == 1
+
+
+def test_background_rescan_request_during_active_scan_runs_pending_scan(tmp_path: Path, monkeypatch) -> None:
+    results_root = tmp_path / "results"
+    results_root.mkdir()
+    monkeypatch.setenv("MSH_SCAN_DIRS", str(results_root))
+    catalog = ArtifactCatalog()
+    first_scan_started = threading.Event()
+    allow_first_scan_to_finish = threading.Event()
+    scan_calls = 0
+
+    def fake_scan_artifacts(scan_dirs):
+        nonlocal scan_calls
+        scan_calls += 1
+        if scan_calls == 1:
+            first_scan_started.set()
+            assert allow_first_scan_to_finish.wait(timeout=2.0)
+            return [], []
+        return [
+            {
+                "path": str(timeline_path),
+                "file_name": "timeline_rows.csv",
+                "playback_compatible": True,
+                "visibility": "default",
+            }
+        ], []
+
+    monkeypatch.setattr("catalog.flask_app.services.catalog_service.scan_artifacts", fake_scan_artifacts)
+
+    assert catalog.start_background_rescan_if_idle(reason="startup") is True
+    assert first_scan_started.wait(timeout=2.0)
+
+    timeline_path = results_root / "workflows" / "session-123" / "exports" / "timeline" / "timeline_rows.csv"
+    timeline_path.parent.mkdir(parents=True)
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z"],
+            "machine_id": ["M1"],
+            "state": ["active"],
+        }
+    ).to_csv(timeline_path, index=False)
+
+    assert catalog.start_background_rescan_if_idle(reason="playback_export_generated") is True
+    allow_first_scan_to_finish.set()
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and not catalog.cached_snapshot(log_if_stale=False).artifacts:
+        time.sleep(0.01)
+
+    snap = catalog.cached_snapshot(log_if_stale=False)
+    assert scan_calls == 2
+    assert [item["path"] for item in snap.artifacts] == [str(timeline_path)]

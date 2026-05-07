@@ -204,7 +204,7 @@ def live():
 
 @web.route("/status")
 def status():
-    snap = _catalog().ensure_scanned()
+    snap = _catalog().cached_snapshot()
     runtime_state = get_runtime_manager().state_snapshot()
     operator_scope = get_operator_scope_service().get()
     internal_artifacts = [a for a in snap.artifacts if a.get("is_internal")]
@@ -248,7 +248,7 @@ def choose_startup_mode():
 
 @web.route("/analyses")
 def analyses():
-    snap = _catalog().ensure_scanned()
+    snap = _catalog().cached_snapshot()
     visible_artifacts = [a for a in snap.artifacts if a.get("visibility") == "default"]
     selected_path = request.args.get("path", "")
     selected = _catalog().artifact_by_path(selected_path) if selected_path else None
@@ -337,7 +337,7 @@ def _serialize_playback_timestamp(series: pd.Series) -> pd.Series:
 @web.route("/playback")
 def playback():
     catalog = _catalog()
-    snap = catalog.ensure_scanned()
+    snap = catalog.cached_snapshot()
     runtime_manager = get_runtime_manager()
     runtime_state = runtime_manager.state_snapshot() if hasattr(runtime_manager, "state_snapshot") else {}
     requested_path = request.args.get("path", "")
@@ -354,9 +354,6 @@ def playback():
         )
 
     playback_artifacts = visible_playback_artifacts(snap)
-    if not playback_artifacts:
-        snap = catalog.ensure_scanned(force_signature_check=True)
-        playback_artifacts = visible_playback_artifacts(snap)
     playback_artifacts.sort(
         key=lambda item: (
             0 if str(item.get("file_name", "")).lower() == "timeline_rows.csv" else 1,
@@ -484,7 +481,7 @@ def playback():
 
 @web.route("/exploration")
 def exploration():
-    snap = _catalog().ensure_scanned()
+    snap = _catalog().cached_snapshot()
     visible_artifacts = [a for a in snap.artifacts if a.get("visibility") == "default"]
     selected_path = request.args.get("path", "")
     chart_type = request.args.get("chart", "line")

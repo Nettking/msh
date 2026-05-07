@@ -16,6 +16,7 @@ import pandas as pd
 
 from catalog.common.data_loading import iter_jsonl_files, load_jsonl_dataframe
 from catalog.common.intervention_strategy_runner import intervention_strategy_config_signature, write_strategy_outputs
+from catalog.common.artifact_refresh import request_artifact_catalog_refresh
 from catalog.common.timeline_exports import TIMELINE_COLUMNS, export_timeline_rows
 PLAYBACK_EXPORT_FILE = "timeline_rows.csv"
 PLAYBACK_MANIFEST_FILE = "manifest.json"
@@ -160,6 +161,7 @@ def prepare_session_playback_exports(session_dir: Path, metadata: dict[str, Any]
             "generated_at": datetime.utcnow().replace(microsecond=0).isoformat() + "Z",
         },
     )
+    request_artifact_catalog_refresh(reason="playback_export_generated")
     return export_path, "created"
 
 

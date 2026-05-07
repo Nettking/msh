@@ -5,12 +5,14 @@ import json
 from pathlib import Path
 import sys
 import threading
+import time
 
 sys.path.insert(0, str(Path(".").resolve()))
 
 import pandas as pd
 from flask import Flask
 
+from catalog.common.artifact_refresh import register_artifact_catalog_refresh, request_artifact_catalog_refresh
 from catalog.common.artifact_registry import scan_artifacts
 from catalog.flask_app.routes import web
 from catalog.flask_app.services.catalog_service import ArtifactCatalog, ScanSnapshot
@@ -91,7 +93,10 @@ class _FakeCatalog:
     def ensure_scanned(self, *, force_signature_check: bool = False) -> ScanSnapshot:
         return self._snapshot
 
-    def artifact_by_path(self, path: str) -> dict[str, object] | None:
+    def cached_snapshot(self, *, log_if_stale: bool = True) -> ScanSnapshot:
+        return self._snapshot
+
+    def artifact_by_path(self, path: str, *, cached: bool = True) -> dict[str, object] | None:
         for artifact in self._snapshot.artifacts:
             if artifact.get("path") == path:
                 return artifact
@@ -184,7 +189,7 @@ def test_playback_route_lists_workflow_timeline_exports(tmp_path: Path, monkeypa
     assert "<strong>Dataset:</strong> timeline_rows.csv" in body
 
 
-def test_playback_route_auto_refreshes_stale_catalog_when_timeline_export_appears(tmp_path: Path, monkeypatch) -> None:
+def test_playback_route_uses_async_catalog_refresh_when_timeline_export_appears(tmp_path: Path, monkeypatch) -> None:
     results_root = tmp_path / "results"
     results_root.mkdir()
     monkeypatch.setenv("MSH_SCAN_DIRS", str(results_root))
@@ -205,6 +210,22 @@ def test_playback_route_auto_refreshes_stale_catalog_when_timeline_export_appear
     monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime())
     monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
     app = _app_with_catalog(catalog)
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No playback-compatible exports" in body
+    assert "<strong>Dataset:</strong> timeline_rows.csv" not in body
+
+    try:
+        register_artifact_catalog_refresh(lambda reason: catalog.start_background_rescan_if_idle(reason=reason))
+        assert request_artifact_catalog_refresh(reason="playback_export_generated") is True
+        deadline = time.monotonic() + 2.0
+        while time.monotonic() < deadline and not catalog.cached_snapshot(log_if_stale=False).artifacts:
+            time.sleep(0.01)
+    finally:
+        register_artifact_catalog_refresh(None)
 
     response = app.test_client().get("/playback")
 
