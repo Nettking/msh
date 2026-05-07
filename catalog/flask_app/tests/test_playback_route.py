@@ -294,6 +294,130 @@ def test_playback_explicit_stale_workflow_path_does_not_bypass_namespace_filter(
     assert "stale_selected_state" not in body
     assert "current_selected_fallback_state" in body
 
+
+def test_clean_startup_lists_all_current_runtime_workflow_timeline_exports(
+    tmp_path: Path, monkeypatch
+) -> None:
+    results_root = tmp_path / "results"
+    active_namespace = "clean:2026-05-07T00:00:00Z"
+    safe_namespace = "clean_2026-05-07T00_00_00Z"
+    older_session = results_root / "workflows" / f"auto_{safe_namespace}_20260503_20260503"
+    latest_session = results_root / "workflows" / f"auto_{safe_namespace}_20260504_20260504"
+    stale_session = results_root / "workflows" / "auto_default_20260502_20260502"
+    _write_session_metadata(older_session, active_namespace)
+    _write_session_metadata(latest_session, active_namespace)
+    _write_session_metadata(stale_session, "default")
+    older_path = _write_timeline(older_session, "2026-05-03", "current_runtime_older_state")
+    latest_path = _write_timeline(latest_session, "2026-05-04", "current_runtime_latest_state")
+    stale_path = _write_timeline(stale_session, "2026-05-02", "stale_default_namespace_state")
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+    assert {artifact["path"] for artifact in artifacts if artifact["playback_compatible"]} == {
+        str(older_path),
+        str(latest_path),
+        str(stale_path),
+    }
+
+    monkeypatch.setattr(
+        "catalog.flask_app.routes.get_runtime_manager",
+        lambda: _FakeRuntime("default", "start_clean", latest_session.name),
+    )
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No playback-compatible exports" not in body
+    assert str(older_path) in body
+    assert str(latest_path) in body
+    assert str(stale_path) not in body
+    assert "stale_default_namespace_state" not in body
+
+
+def test_clean_startup_actual_runtime_snapshot_lists_all_current_namespace_workflow_exports(
+    tmp_path: Path, monkeypatch
+) -> None:
+    results_root = tmp_path / "results"
+    active_namespace = "clean:2026-05-07T00:00:00Z"
+    safe_namespace = "clean_2026-05-07T00_00_00Z"
+    older_session = results_root / "workflows" / f"auto_{safe_namespace}_20260503_20260503"
+    latest_session = results_root / "workflows" / f"auto_{safe_namespace}_20260504_20260504"
+    stale_session = results_root / "workflows" / "auto_default_20260502_20260502"
+    _write_session_metadata(older_session, "default")
+    _write_session_metadata(latest_session, active_namespace)
+    _write_session_metadata(stale_session, "default")
+    older_path = _write_timeline(older_session, "2026-05-03", "actual_runtime_older_state")
+    latest_path = _write_timeline(latest_session, "2026-05-04", "actual_runtime_latest_state")
+    stale_path = _write_timeline(stale_session, "2026-05-02", "actual_runtime_stale_default_state")
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+
+    monkeypatch.setattr(
+        "catalog.flask_app.routes.get_runtime_manager",
+        lambda: _ActualShapeRuntime(
+            results_root / "workflows",
+            active_runtime_namespace=active_namespace,
+            session_id=latest_session.name,
+        ),
+    )
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No playback-compatible exports" not in body
+    assert str(older_path) in body
+    assert str(latest_path) in body
+    assert str(stale_path) not in body
+    assert "actual_runtime_stale_default_state" not in body
+
+
+def test_clean_startup_can_load_explicit_older_current_runtime_workflow_export(
+    tmp_path: Path, monkeypatch
+) -> None:
+    results_root = tmp_path / "results"
+    active_namespace = "clean:2026-05-07T00:00:00Z"
+    safe_namespace = "clean_2026-05-07T00_00_00Z"
+    older_session = results_root / "workflows" / f"auto_{safe_namespace}_20260503_20260503"
+    latest_session = results_root / "workflows" / f"auto_{safe_namespace}_20260504_20260504"
+    stale_session = results_root / "workflows" / "auto_default_20260502_20260502"
+    _write_session_metadata(older_session, active_namespace)
+    _write_session_metadata(latest_session, active_namespace)
+    _write_session_metadata(stale_session, "default")
+    older_path = _write_timeline(older_session, "2026-05-03", "current_runtime_older_state")
+    latest_path = _write_timeline(latest_session, "2026-05-04", "current_runtime_latest_state")
+    stale_path = _write_timeline(stale_session, "2026-05-02", "stale_default_namespace_state")
+
+    artifacts, warnings = scan_artifacts([str(results_root)])
+    assert warnings == []
+
+    monkeypatch.setattr(
+        "catalog.flask_app.routes.get_runtime_manager",
+        lambda: _FakeRuntime(active_namespace, "start_clean", latest_session.name),
+    )
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback", query_string={"path": str(older_path)})
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No playback-compatible exports" not in body
+    assert str(older_path) in body
+    assert str(latest_path) in body
+    assert str(stale_path) not in body
+    assert "current_runtime_older_state" in body
+    assert "2026-05-03" in body
+    assert "current_runtime_latest_state" not in body
+    assert "stale_default_namespace_state" not in body
+
+
 def test_reuse_startup_playback_can_list_default_namespace_exports(tmp_path: Path, monkeypatch) -> None:
     results_root = tmp_path / "results"
     session_dir = results_root / "workflows" / "auto_default_20260301_20260301"
