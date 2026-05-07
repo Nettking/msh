@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 from pathlib import Path
+import threading
 
 from catalog.orchestrator import pipeline
 from catalog.runner.script_catalog import ScriptOption
@@ -78,3 +79,21 @@ def test_reused_auto_session_metadata_is_updated_to_active_runtime_namespace(tmp
     assert reused_metadata["runtime"]["runtime_namespace"] == active_namespace
     persisted = pipeline.json.loads((session_dir / "session_state.json").read_text(encoding="utf-8"))
     assert persisted["runtime"]["runtime_namespace"] == active_namespace
+
+
+def test_runtime_state_snapshot_exposes_playback_filter_contract_keys(tmp_path: Path):
+    orchestrator = pipeline.RuntimeOrchestrator.__new__(pipeline.RuntimeOrchestrator)
+    orchestrator._lock = threading.Lock()
+    orchestrator.workflows_root = tmp_path / "workflows"
+    orchestrator.workflows_root.mkdir(parents=True)
+    orchestrator._state = pipeline.RuntimeOrchestrator._default_state(orchestrator)
+    orchestrator._state.startup_mode = pipeline.STARTUP_MODE_CLEAN
+    orchestrator._state.active_runtime_namespace = "clean_20260302T000000Z"
+    orchestrator._state.session_id = "auto_clean_20260302T000000Z_20260302_20260302"
+
+    snapshot = pipeline.RuntimeOrchestrator.state_snapshot(orchestrator)
+
+    assert snapshot["startup_mode"] == pipeline.STARTUP_MODE_CLEAN
+    assert snapshot["active_runtime_namespace"] == "clean_20260302T000000Z"
+    assert snapshot["session_id"] == "auto_clean_20260302T000000Z_20260302_20260302"
+    assert "view_contracts" in snapshot

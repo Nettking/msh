@@ -176,16 +176,66 @@ def test_runtime_filter_logs_hidden_artifact_diagnostics(tmp_path: Path) -> None
 
     assert warnings == []
     assert visible == []
-    assert len(logger.messages) == 1
-    message = logger.messages[0]
+    assert len(logger.messages) == 3
+    assert "Playback runtime filter before_filter total=1" in logger.messages[0]
+    assert "Playback runtime filter after_filter total=0" in logger.messages[-1]
+    message = logger.messages[1]
     assert f"path={timeline_path}" in message
     assert f"session_dir={stale_session_dir}" in message
+    assert "session_id=auto_default_20260301_20260301" in message
     assert "active_namespace=clean_20260302T000000Z" in message
     assert "artifact_namespace=default (session_state.json:runtime.runtime_namespace)" in message
     assert "startup_mode=start_clean" in message
     assert "state_session_id=auto_clean_20260302T000000Z_20260302_20260302" in message
     assert "reason=namespace_mismatch" in message
 
+
+def test_runtime_filter_logs_included_artifact_diagnostics(tmp_path: Path) -> None:
+    session_dir = tmp_path / "results" / "workflows" / "auto_clean_20260302T000000Z_20260302_20260302"
+    session_dir.mkdir(parents=True)
+    (session_dir / "session_state.json").write_text(
+        json.dumps({"runtime": {"runtime_namespace": "clean_20260302T000000Z"}}) + "\n",
+        encoding="utf-8",
+    )
+    timeline_path = _write_workflow_timeline(session_dir, "2026-03-02")
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+    logger = _CaptureLogger()
+
+    playback_artifacts = [artifact for artifact in artifacts if artifact.get("playback_compatible")]
+    visible = filter_playback_artifacts_for_runtime(
+        playback_artifacts,
+        {"startup_mode": "start_clean", "active_runtime_namespace": "clean_20260302T000000Z"},
+        logger=logger,
+    )
+
+    assert warnings == []
+    assert [artifact["path"] for artifact in visible] == [str(timeline_path)]
+    assert len(logger.messages) == 3
+    assert "Playback runtime filter before_filter total=1" in logger.messages[0]
+    assert f"Playback runtime filter included artifact path={timeline_path}" in logger.messages[1]
+    assert "reason=workflow_namespace_matches_active_runtime" in logger.messages[1]
+    assert "Playback runtime filter after_filter total=1" in logger.messages[2]
+
+
+def test_selected_explicit_path_does_not_bypass_stale_workflow_namespace_filter(tmp_path: Path) -> None:
+    stale_session_dir = tmp_path / "results" / "workflows" / "auto_default_20260301_20260301"
+    stale_session_dir.mkdir(parents=True)
+    (stale_session_dir / "session_state.json").write_text(
+        json.dumps({"runtime": {"runtime_namespace": "default"}}) + "\n",
+        encoding="utf-8",
+    )
+    stale_path = _write_workflow_timeline(stale_session_dir, "2026-03-01")
+    artifacts, warnings = scan_artifacts([str(tmp_path / "results")])
+
+    playback_artifacts = [artifact for artifact in artifacts if artifact.get("playback_compatible")]
+    visible = filter_playback_artifacts_for_runtime(
+        playback_artifacts,
+        {"startup_mode": "start_clean", "active_runtime_namespace": "clean_20260302T000000Z"},
+        selected_path=str(stale_path),
+    )
+
+    assert warnings == []
+    assert visible == []
 
 def test_runtime_filter_keeps_missing_namespace_current_clean_session_by_session_id(tmp_path: Path) -> None:
     session_id = "auto_clean_20260302T000000Z_20260302_20260302"
