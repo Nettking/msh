@@ -77,7 +77,7 @@ Cache layout:
 data/cache/parquet/machine_id=<machine>/date=<YYYY-MM-DD>/part.parquet
 ```
 
-The cache is safe to delete and rebuild because it is derived entirely from raw JSONL. Existing scripts can continue reading JSONL directly; the cache is a modular helper for analytical reads.
+The cache is safe to delete and rebuild because it is derived entirely from raw JSONL. Existing scripts can continue reading JSONL directly; the cache is a modular helper for analytical reads. Rebuilds also write `data/cache/parquet/_manifest.json` with source JSONL paths, mtimes, sizes, and imported row count so freshness checks can detect changed, renamed, or deleted source files.
 
 ### Rebuild the cache
 

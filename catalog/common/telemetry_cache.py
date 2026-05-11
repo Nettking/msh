@@ -7,6 +7,7 @@ query helpers over that cache.
 
 from __future__ import annotations
 
+import json
 import shutil
 import tempfile
 from dataclasses import dataclass
@@ -54,6 +55,8 @@ STRING_FIELDS: tuple[str, ...] = tuple(field for field in TELEMETRY_FIELDS if fi
 CACHE_DIRNAME = "cache"
 DEFAULT_CACHE_RELATIVE_PATH = Path("cache") / "parquet"
 UNKNOWN_PARTITION = "__unknown__"
+MANIFEST_FILENAME = "_manifest.json"
+MANIFEST_VERSION = 1
 
 
 @dataclass(frozen=True)
@@ -76,6 +79,9 @@ class CacheStatus:
     parquet_file_count: int
     latest_source_mtime: float | None
     latest_cache_mtime: float | None
+    manifest_exists: bool = False
+    manifest_source_file_count: int | None = None
+    manifest_row_count: int | None = None
 
 
 def default_cache_dir(data_dir: Path | str = "data") -> Path:
@@ -149,6 +155,7 @@ def rebuild_cache(data_dir: Path | str = "data", cache_dir: Path | str | None = 
     temp_dir = Path(tempfile.mkdtemp(prefix=f".{output.name}-", dir=output.parent))
     try:
         _write_partitioned_parquet(frame, temp_dir)
+        _write_manifest(temp_dir, data_dir=root, sources=files, row_count=len(frame))
         if output.exists():
             shutil.rmtree(output)
         temp_dir.replace(output)
@@ -160,16 +167,26 @@ def rebuild_cache(data_dir: Path | str = "data", cache_dir: Path | str | None = 
 
 
 def cache_status(data_dir: Path | str = "data", cache_dir: Path | str | None = None) -> CacheStatus:
-    """Return whether the cache exists and is at least as new as raw JSONL."""
+    """Return whether the cache exists and matches the current JSONL source set."""
 
     root = Path(data_dir)
     output = Path(cache_dir) if cache_dir is not None else default_cache_dir(root)
     sources = discover_jsonl_files(root)
     parquet_files = sorted(output.rglob("*.parquet")) if output.exists() else []
+    manifest_path = output / MANIFEST_FILENAME
+    manifest = _read_manifest(manifest_path)
+    manifest_row_count = None if manifest is None else _safe_int(manifest.get("row_count"))
+    manifest_sources = None if manifest is None else manifest.get("sources")
+    manifest_source_file_count = len(manifest_sources) if isinstance(manifest_sources, list) else None
+    cache_files = [*parquet_files, manifest_path] if manifest_path.exists() else parquet_files
     latest_source_mtime = max((path.stat().st_mtime for path in sources), default=None)
-    latest_cache_mtime = max((path.stat().st_mtime for path in parquet_files), default=None)
-    exists = bool(parquet_files)
-    fresh = exists and (latest_source_mtime is None or (latest_cache_mtime is not None and latest_cache_mtime >= latest_source_mtime))
+    latest_cache_mtime = max((path.stat().st_mtime for path in cache_files), default=None)
+    exists = manifest_path.exists() and (bool(parquet_files) or manifest_row_count == 0)
+    manifest_matches_sources = manifest is not None and _manifest_sources_match(
+        manifest,
+        current_sources=_source_manifest_entries(root, sources),
+    )
+    fresh = exists and manifest_matches_sources
     return CacheStatus(
         exists=exists,
         fresh=fresh,
@@ -178,6 +195,9 @@ def cache_status(data_dir: Path | str = "data", cache_dir: Path | str | None = N
         parquet_file_count=len(parquet_files),
         latest_source_mtime=latest_source_mtime,
         latest_cache_mtime=latest_cache_mtime,
+        manifest_exists=manifest_path.exists(),
+        manifest_source_file_count=manifest_source_file_count,
+        manifest_row_count=manifest_row_count,
     )
 
 
@@ -301,6 +321,72 @@ def _write_partitioned_parquet(frame: pd.DataFrame, output_dir: Path) -> None:
         payload = group.loc[:, list(TELEMETRY_FIELDS)]
         table = pa.Table.from_pandas(payload, preserve_index=False)
         pq.write_table(table, partition_dir / "part.parquet")
+
+
+def _write_manifest(cache_dir: Path, *, data_dir: Path, sources: Sequence[Path], row_count: int) -> None:
+    manifest = {
+        "version": MANIFEST_VERSION,
+        "generated_at": datetime.now(timezone.utc).replace(microsecond=0).isoformat(),
+        "row_count": int(row_count),
+        "source_file_count": len(sources),
+        "sources": _source_manifest_entries(data_dir, sources),
+    }
+    (cache_dir / MANIFEST_FILENAME).write_text(json.dumps(manifest, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+
+
+def _read_manifest(manifest_path: Path) -> dict[str, Any] | None:
+    if not manifest_path.exists():
+        return None
+    try:
+        parsed = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+    return parsed if isinstance(parsed, dict) else None
+
+
+def _source_manifest_entries(data_dir: Path, sources: Sequence[Path]) -> list[dict[str, Any]]:
+    entries: list[dict[str, Any]] = []
+    for source in sorted(sources):
+        stat_result = source.stat()
+        try:
+            source_path = source.relative_to(data_dir).as_posix()
+        except ValueError:
+            source_path = source.as_posix()
+        entries.append(
+            {
+                "path": source_path,
+                "mtime": stat_result.st_mtime,
+                "mtime_ns": stat_result.st_mtime_ns,
+                "size": stat_result.st_size,
+            }
+        )
+    return entries
+
+
+def _manifest_sources_match(manifest: dict[str, Any], *, current_sources: list[dict[str, Any]]) -> bool:
+    manifest_sources = manifest.get("sources")
+    if not isinstance(manifest_sources, list):
+        return False
+    return [_source_identity(item) for item in manifest_sources] == [_source_identity(item) for item in current_sources]
+
+
+def _source_identity(item: Any) -> tuple[str, int | None, int | None]:
+    if not isinstance(item, dict):
+        return ("", None, None)
+    mtime_ns = item.get("mtime_ns")
+    if mtime_ns is None and item.get("mtime") is not None:
+        try:
+            mtime_ns = int(float(item["mtime"]) * 1_000_000_000)
+        except (TypeError, ValueError):
+            mtime_ns = None
+    return (str(item.get("path") or ""), _safe_int(item.get("size")), _safe_int(mtime_ns))
+
+
+def _safe_int(value: Any) -> int | None:
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
 
 
 def _partition_value(value: Any) -> str:

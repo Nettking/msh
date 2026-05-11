@@ -103,6 +103,43 @@ def test_repeated_rebuild_does_not_duplicate_rows(tmp_path: Path) -> None:
     assert len(list(second.cache_path.rglob("*.parquet"))) == 1
 
 
+def test_cache_status_uses_manifest_source_set_for_freshness(tmp_path: Path) -> None:
+    _require_cache_dependencies()
+    data_dir = tmp_path / "data"
+    source = data_dir / "telemetry.jsonl"
+    _write_jsonl(source, [{"timestamp": "2026-03-23T08:00:00Z", "machine_id": "QuickTurn"}])
+
+    result = rebuild_cache(data_dir)
+    manifest_path = result.cache_path / "_manifest.json"
+    manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+    fresh_status = cache_status(data_dir, result.cache_path)
+    assert manifest_path.exists()
+    assert manifest["row_count"] == 1
+    assert manifest["sources"][0]["path"] == "telemetry.jsonl"
+    assert fresh_status.exists is True
+    assert fresh_status.fresh is True
+    assert fresh_status.manifest_exists is True
+    assert fresh_status.manifest_row_count == 1
+
+    renamed = data_dir / "renamed.jsonl"
+    source.rename(renamed)
+
+    stale_status = cache_status(data_dir, result.cache_path)
+    assert stale_status.exists is True
+    assert stale_status.fresh is False
+    assert stale_status.source_file_count == 1
+    assert stale_status.manifest_source_file_count == 1
+
+    renamed.unlink()
+
+    deleted_status = cache_status(data_dir, result.cache_path)
+    assert deleted_status.exists is True
+    assert deleted_status.fresh is False
+    assert deleted_status.source_file_count == 0
+    assert deleted_status.manifest_source_file_count == 1
+
+
 def test_cache_absent_queries_are_empty_and_status_reports_missing(tmp_path: Path) -> None:
     data_dir = tmp_path / "data"
     _write_jsonl(data_dir / "telemetry.jsonl", [{"timestamp": "2026-03-23T08:00:00Z", "machine_id": "QuickTurn"}])
