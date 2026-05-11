@@ -396,19 +396,36 @@ p { margin: 0; color: var(--text-muted); }
   margin-bottom: 8px;
 }
 
+.playback-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.playback-selection-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px 12px;
+}
+
 .playback-selection-summary {
-  margin-top: 10px;
-  margin-bottom: 0;
+  margin: 0;
 }
 
 .playback-setup-toggle {
-  margin-top: 10px;
+  color: var(--text-muted);
 }
 
 .playback-setup-toggle > summary {
   cursor: pointer;
   color: var(--primary);
+  font-size: 0.9rem;
   font-weight: 600;
+  list-style-position: inside;
+}
+
+.playback-setup-toggle[open] {
+  flex-basis: 100%;
 }
 
 .playback-setup-toggle[open] > summary {
@@ -439,7 +456,9 @@ p { margin: 0; color: var(--text-muted); }
   gap: 8px;
   flex-wrap: wrap;
   align-items: center;
-  margin: 10px 0 14px;
+  margin: 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
 }
 
 .playback-controls--console {
