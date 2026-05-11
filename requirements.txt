@@ -5,3 +5,5 @@ numpy
 scikit-learn
 joblib
 requests
+duckdb
+pyarrow
