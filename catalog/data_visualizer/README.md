@@ -7,7 +7,7 @@
 `catalog/data_visualizer/data_visualizer.py`
 
 ## Behavior observed via static code inspection
-- Reads `./data/*.jsonl` (`FOLDER = "./data"`).
+- Reads `./data/**/*.jsonl` recursively (`FOLDER = "./data"`), including session-filtered machine subdirectories.
 - Writes structured CSV outputs to `./candidate_events.csv` and `./timeline_intervals.csv`.
 - Optional timeline rendering is disabled by default.
 
