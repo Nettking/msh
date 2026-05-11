@@ -25,6 +25,8 @@ TIMELINE_COLUMNS = [
     "active",
     "dense_idle",
     "intervention_candidate",
+    "operator_intervention_candidate",
+    "process_event_candidate",
     "stopped",
     "event_score",
     "fired_rules",
@@ -76,7 +78,14 @@ def _ensure_timeline_columns(df: pd.DataFrame) -> pd.DataFrame:
         normalized["timestamp"].dt.date
     )
 
-    for col in ("active", "dense_idle", "intervention_candidate", "stopped"):
+    for col in (
+        "active",
+        "dense_idle",
+        "intervention_candidate",
+        "operator_intervention_candidate",
+        "process_event_candidate",
+        "stopped",
+    ):
         normalized[col] = normalized[col].fillna(False).astype(bool)
 
     for col in SIGNAL_COLUMNS + ["event_score"]:
