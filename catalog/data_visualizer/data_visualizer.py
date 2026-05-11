@@ -72,9 +72,9 @@ INFERENCE_CONFIG = StateInferenceConfig(
 
 def load_prepared_frames() -> list[pd.DataFrame]:
     """Load telemetry files and return prepared dataframes."""
-    files = list(iter_jsonl_files(FOLDER, recursive=False))
+    files = list(iter_jsonl_files(FOLDER, recursive=True))
     if not files:
-        raise FileNotFoundError(f"No files found in {FOLDER!r} matching '*.jsonl'")
+        raise FileNotFoundError(f"No files found in {FOLDER!r} recursively matching '*.jsonl'")
 
     frames: list[pd.DataFrame] = []
     for path in files:
@@ -84,7 +84,7 @@ def load_prepared_frames() -> list[pd.DataFrame]:
         )
         prepared = prepare_machine_telemetry_dataframe(
             raw_df,
-            source_name=path.name,
+            source_name=path.relative_to(FOLDER).as_posix(),
             time_col=TIME_COL,
             machine_candidates=MACHINE_ID_CANDIDATES,
             numeric_cols=[RPM_COL, LOAD_COL, OVR_COL, FOVR_COL, FRAPIDOVR_COL, "Stemp"],
