@@ -17,55 +17,48 @@
 {% set selection_incomplete = not selected_path or not machine or not day %}
 {% set selection_has_error = error or validation_reason %}
 {% set expand_setup = selection_incomplete or selection_has_error %}
-<section class="section-block playback-selection-card">
-  <h3>Playback setup</h3>
-  <p class="playback-selection-summary">
-    <strong>Machine:</strong> {{ machine or '-' }} |
-    <strong>Day:</strong> {{ day or '-' }}
-  </p>
-  <details class="playback-setup-toggle" {% if expand_setup %}open{% endif %}>
-    <summary>Change selection</summary>
-    <form class="playback-form playback-form--card" method="get">
-      <label>
-        Machine
-        <select name="machine" onchange="this.form.submit()">
-          <option value="">Select machine</option>
-          {% for m in context.machines %}
-          <option value="{{ m }}" {% if machine==m %}selected{% endif %}>{{ m }}</option>
-          {% endfor %}
-        </select>
-      </label>
-      <label>
-        Day
-        <select name="day">
-          <option value="">Select day</option>
-          {% for d in selected_machine_days %}
-          <option value="{{ d }}" {% if day==d %}selected{% endif %}>
-            {{ d }}{% if selected_machine_day_counts.get(d) %} ({{ "{:,}".format(selected_machine_day_counts.get(d)) }} rows){% endif %}
-          </option>
-          {% endfor %}
-        </select>
-      </label>
-      <button type="submit">Load</button>
-    </form>
-    {% if selected_path %}
-    <details class="playback-debug-details">
-      <summary>Advanced/debug dataset details</summary>
-      <p class="inline-note">Selected artifact path: <code>{{ selected_path }}</code></p>
+<section class="section-block playback-panel">
+  <h3>Playback</h3>
+  <div class="playback-selection-row">
+    <p class="playback-selection-summary">
+      <strong>Machine:</strong> {{ machine or '-' }} |
+      <strong>Day:</strong> {{ day or '-' }}
+    </p>
+    <details class="playback-setup-toggle" {% if expand_setup %}open{% endif %}>
+      <summary>Change selection</summary>
+      <form class="playback-form playback-form--card" method="get">
+        <label>
+          Machine
+          <select name="machine" onchange="this.form.submit()">
+            <option value="">Select machine</option>
+            {% for m in context.machines %}
+            <option value="{{ m }}" {% if machine==m %}selected{% endif %}>{{ m }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>
+          Day
+          <select name="day">
+            <option value="">Select day</option>
+            {% for d in selected_machine_days %}
+            <option value="{{ d }}" {% if day==d %}selected{% endif %}>
+              {{ d }}{% if selected_machine_day_counts.get(d) %} ({{ "{:,}".format(selected_machine_day_counts.get(d)) }} rows){% endif %}
+            </option>
+            {% endfor %}
+          </select>
+        </label>
+        <button type="submit">Load</button>
+      </form>
+      {% if selected_path %}
+      <details class="playback-debug-details">
+        <summary>Advanced/debug dataset details</summary>
+        <p class="inline-note">Selected artifact path: <code>{{ selected_path }}</code></p>
+      </details>
+      {% endif %}
     </details>
-    {% endif %}
-  </details>
-</section>
-{% endif %}
-
-{% if error %}<p class="flash flash-error">{{ error }}</p>{% endif %}
-{% if validation_reason %}<p class="flash flash-error">{{ validation_reason }}</p>{% endif %}
-
-{% if row_payload %}
-<section class="section-block playback-console">
-  <h3>Playback console</h3>
-  <p class="inline-note">Row playback. Replay samples from the selected machine/day.</p>
-  <div class="playback-controls playback-controls--console">
+  </div>
+  {% if row_payload %}
+  <div class="playback-controls playback-controls--console" aria-label="Playback controls">
     <div class="playback-buttons">
       <button type="button" id="playBtn">Play</button>
       <button type="button" id="pauseBtn">Pause</button>
@@ -86,8 +79,14 @@
     <label class="playback-slider-label" for="rowSlider">Progress</label>
     <input id="rowSlider" class="playback-slider" type="range" min="0" max="{{ (row_payload|length) - 1 }}" value="0" step="1">
   </div>
+  {% endif %}
 </section>
+{% endif %}
 
+{% if error %}<p class="flash flash-error">{{ error }}</p>{% endif %}
+{% if validation_reason %}<p class="flash flash-error">{{ validation_reason }}</p>{% endif %}
+
+{% if row_payload %}
 <section class="section-block">
   <h3>Current sample</h3>
   <div class="playback-current-inline">
