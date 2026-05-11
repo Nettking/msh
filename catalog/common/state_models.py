@@ -164,34 +164,64 @@ def infer_states_for_machine(
     active_next = g["active"].shift(-1).fillna(False)
     near_active = active_now | active_prev | active_next
 
-    base_candidate = pd.Series(False, index=g.index, dtype=bool)
-    for col in [
-        "execution_change",
-        "mode_change",
-        "active_to_inactive",
-        "inactive_to_active",
+    strong_event_cols = [
         "ovr_drop",
         "fovr_drop",
+        "mode_change",
+        "execution_change",
+        "program_change",
+    ]
+    weak_event_cols = [
+        "rate_rpm_jump",
+        "rate_load_jump",
+        "rate_ovr_jump",
+        "rate_fovr_jump",
+        "rate_frapidovr_jump",
         "rpm_collapse",
         "load_collapse",
-    ]:
-        base_candidate |= events[col] if col in events.columns else False
+        "active_to_inactive",
+        "inactive_to_active",
+    ]
 
-    numeric_candidate = pd.Series(False, index=g.index, dtype=bool)
-    for col in ["rate_rpm_jump", "rate_load_jump", "rate_ovr_jump", "rate_fovr_jump", "rate_frapidovr_jump"]:
-        numeric_candidate |= events[col] if col in events.columns else False
+    strong_candidate = pd.Series(False, index=g.index, dtype=bool)
+    for col in strong_event_cols:
+        strong_candidate |= events[col] if col in events.columns else False
 
-    g["intervention_candidate"] = near_active & (base_candidate | numeric_candidate)
-    g["state"] = np.where(
-        g["intervention_candidate"],
-        "intervention_candidate",
-        np.where(g["active"], "active", np.where(g["dense_idle"], "dense_idle", "idle")),
+    weak_candidate = pd.Series(False, index=g.index, dtype=bool)
+    for col in weak_event_cols:
+        weak_candidate |= events[col] if col in events.columns else False
+
+    strong_nearby = (
+        strong_candidate
+        | strong_candidate.shift(1).fillna(False)
+        | strong_candidate.shift(-1).fillna(False)
+    )
+    g["operator_intervention_candidate"] = (
+        near_active & (strong_candidate | (weak_candidate & strong_nearby))
+    ).fillna(False)
+    g["process_event_candidate"] = (
+        near_active & weak_candidate & ~g["operator_intervention_candidate"]
+    ).fillna(False)
+    g["intervention_candidate"] = g["operator_intervention_candidate"]
+    g["state"] = np.select(
+        [
+            g["operator_intervention_candidate"],
+            g["process_event_candidate"],
+            g["active"],
+            g["dense_idle"],
+        ],
+        ["intervention_candidate", "process_event_candidate", "active", "dense_idle"],
+        default="idle",
     )
 
     if len(g) > 0:
         first_idx = g.index[0]
-        g.loc[first_idx, "intervention_candidate"] = False
-        if g.loc[first_idx, "state"] == "intervention_candidate":
+        g.loc[first_idx, [
+            "process_event_candidate",
+            "operator_intervention_candidate",
+            "intervention_candidate",
+        ]] = False
+        if g.loc[first_idx, "state"] in {"intervention_candidate", "process_event_candidate"}:
             g.loc[first_idx, "state"] = "active" if bool(g.loc[first_idx, "active"]) else "idle"
 
     g["event_score"] = events["event_score"]

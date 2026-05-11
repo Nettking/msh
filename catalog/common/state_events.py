@@ -119,6 +119,11 @@ def extract_intervention_candidates(
 ) -> pd.DataFrame:
     """Select candidate intervention rows with a stable export schema."""
     cols = [date_col, machine_col, time_col, "state", "event_score", "fired_rules"]
+    cols.extend(
+        col
+        for col in ("operator_intervention_candidate", "process_event_candidate")
+        if col in g.columns
+    )
     cols.extend([col for col in signal_cols if col in g.columns])
     out = g.loc[g["intervention_candidate"], cols].copy()
     return out.rename(columns={time_col: "timestamp"})

@@ -27,6 +27,16 @@ Saving from the UI only updates the YAML config. It does not run the full workfl
 | `ratio_drop` | Detects sharp numeric drops relative to the previous sample, such as `Sload` falling below 50% of the prior value. Optional companion signals, such as `Srpm`, are included in evidence. | `1 - ratio` |
 | `value_change` | Detects categorical or numeric value changes, such as `Tool_number` or `Tool_group`. | `1.0` |
 
+## Row-level candidate states
+
+Row-level state inference separates ambiguous process dynamics from stronger possible operator-action evidence:
+
+- `process_event_candidate` marks an interesting machine/process change, such as a sharp rate jump, collapse, or active/inactive transition near active operation.
+- `operator_intervention_candidate` marks stronger evidence of possible human/operator action, such as override, mode, execution, or program changes, plus weak process events directly adjacent to that stronger evidence.
+- `intervention_candidate` is retained for backward compatibility and maps to `operator_intervention_candidate`. Process-only rows are not exported as intervention candidates unless they also meet operator-intervention criteria.
+
+Neither candidate state is ground truth. Human validation still uses `review_status`, `human_label`, and `notes` to accept, revise, or reject suggestions.
+
 ## Candidate event schema
 
 Strategy output uses a consistent CSV schema:
