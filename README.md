@@ -66,3 +66,62 @@ See [catalog/README.md](catalog/README.md) for the script catalog and analysis w
 ## Deprecated interactive menu
 
 `catalog/runner/menu.py` is retained for backward compatibility, but Flask `/control` is the primary operational surface. New operation and documentation should assume the Flask-first workflow unless explicitly maintaining legacy behavior.
+
+## Telemetry analytics cache (Parquet + DuckDB)
+
+Raw JSONL telemetry files in `data/` remain the source of truth. The project also includes an optional analytical cache that converts those JSONL records into partitioned Parquet files and queries them with DuckDB. This is intended to improve repeated analytical queries over the same telemetry without changing the existing JSONL workflows.
+
+Cache layout:
+
+```text
+data/cache/parquet/machine_id=<machine>/date=<YYYY-MM-DD>/part.parquet
+```
+
+The cache is safe to delete and rebuild because it is derived entirely from raw JSONL. Existing scripts can continue reading JSONL directly; the cache is a modular helper for analytical reads.
+
+### Rebuild the cache
+
+From the host or inside the Flask container, run:
+
+```bash
+python -m catalog.cache.rebuild_telemetry_cache
+```
+
+The command recursively scans `data/**/*.jsonl`, writes partitioned Parquet under `data/cache/parquet/`, prints the imported row count, and prints the output cache path. It rewrites the cache from source JSONL on each run, so it is safe to run multiple times without appending duplicate cache rows.
+
+Custom paths are available for development and tests:
+
+```bash
+python -m catalog.cache.rebuild_telemetry_cache --data-dir data --cache-dir data/cache/parquet
+```
+
+### Docker relationship
+
+The standard Flask startup remains:
+
+```bash
+docker compose up --build flask
+```
+
+The Flask image installs the same Python dependencies as local development, including `duckdb` and `pyarrow`. The existing `docker-compose.yml` Flask service mounts `./data:/app/data`, so raw JSONL and the derived cache remain persistent on the host across container rebuilds.
+
+Cache rebuild is manual-only for now: `docker compose up --build flask` starts Flask and does not automatically refresh `data/cache/parquet/`. Run `python -m catalog.cache.rebuild_telemetry_cache` whenever new raw telemetry should be reflected in DuckDB/Parquet queries.
+
+### Querying the cache
+
+Use `catalog.common.telemetry_cache.TelemetryCache` for DuckDB-backed helper queries:
+
+- latest sample per machine
+- samples by machine and timestamp range
+- samples by date range
+- machine activity summary
+- optional pandas DataFrame output via `as_dataframe=True`
+
+If the Parquet cache is absent, helper queries return empty results rather than failing. Existing JSONL-based code paths remain available as the fallback behavior.
+
+### Limitations and future path
+
+- The cache is rebuilt from JSONL and is not an operational write-ahead store.
+- Freshness is based on source JSONL and Parquet file modification times; rebuild after new raw telemetry arrives.
+- Missing supported fields are stored as NULL, but analytics that require those values still need to handle NULLs.
+- This does not add TimescaleDB, PostgreSQL, Redis, or another live storage service. If future requirements need operational/live telemetry storage, retention policies, concurrent ingestion, or low-latency stateful queries, TimescaleDB/PostgreSQL can be evaluated as a separate architecture path while keeping JSONL export as the source-of-truth archive or interchange layer.
