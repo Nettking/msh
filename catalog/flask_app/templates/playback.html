@@ -2,8 +2,8 @@
 {% block body %}
 <section class="section-block section-block--primary playback-header">
   <div>
-    <h2>Playback</h2>
-    <p class="playback-subtitle">Sample playback for telemetry rows from the selected machine/day, timed from source timestamps (1x = real elapsed time).</p>
+    <h2>Telemetry replay</h2>
+    <p class="playback-subtitle">Event-first playback for telemetry rows from the selected machine/day, timed from source timestamps (1x = real elapsed time).</p>
   </div>
   <p class="scope-chip">Global operator scope: <strong>{{ operator_scope.label }}</strong></p>
 </section>
@@ -18,10 +18,10 @@
 {% set selection_has_error = error or validation_reason %}
 {% set expand_setup = selection_incomplete or selection_has_error %}
 <section class="section-block playback-panel">
-  <h3>Playback</h3>
   <div class="playback-selection-row">
     <p class="playback-selection-summary">
-      <strong>Machine:</strong> {{ machine or '-' }} |
+      <strong>Machine:</strong> {{ machine or '-' }}
+      <span aria-hidden="true">|</span>
       <strong>Day:</strong> {{ day or '-' }}
     </p>
     <details class="playback-setup-toggle" {% if expand_setup %}open{% endif %}>
@@ -51,7 +51,7 @@
       </form>
       {% if selected_path %}
       <details class="playback-debug-details">
-        <summary>Advanced/debug dataset details</summary>
+        <summary>Dataset details</summary>
         <p class="inline-note">Selected artifact path: <code>{{ selected_path }}</code></p>
       </details>
       {% endif %}
@@ -87,85 +87,73 @@
 {% if validation_reason %}<p class="flash flash-error">{{ validation_reason }}</p>{% endif %}
 
 {% if row_payload %}
-<section class="section-block">
-  <h3>Current sample</h3>
-  <div class="playback-current-inline">
-    <span class="playback-item-label">Timestamp</span>
-    <span id="nowTimestamp">-</span>
-    <span class="playback-item-sep">•</span>
-    <span class="playback-item-label">State</span>
-    <span id="stateBadge" class="status-badge">-</span>
-    <span class="playback-item-sep">•</span>
-    <span class="playback-item-label">Machine</span>
-    <span id="nowMachine">{{ machine or '-' }}</span>
-    <span class="playback-item-sep">•</span>
-    <span class="playback-item-label">Day</span>
-    <span id="nowDay">{{ day or '-' }}</span>
-    <span class="playback-item-sep">•</span>
-    <span class="playback-item-label">Row</span>
-    <span id="nowIndex">1</span>
-    <span class="playback-item-sep">•</span>
-    <span class="playback-item-label">Tick</span>
-    <span id="tickType">-</span>
-    <span class="playback-item-sep">•</span>
-    <span class="playback-item-label">Candidate</span>
-    <span id="candidateBadge" class="status-badge playback-candidate-badge">-</span>
-    <span class="playback-item-sep">•</span>
-    <span class="playback-item-label">Source</span>
-    <span id="sourceTimestamp">-</span>
-    <span class="playback-item-sep">•</span>
-    <span class="playback-item-label">Summary</span>
-    <span id="sampleSummary" class="playback-summary-text">-</span>
-  </div>
-</section>
-
-<section class="section-block">
-  <h3>Grouped row fields</h3>
-  <div id="groupedFields" class="grouped-fields"></div>
-</section>
-
-<section class="section-block playback-timeline-panel">
-  <div class="playback-timeline-header">
-    <h3>Sample sequence timeline</h3>
-    <p>Current timestamp: <strong id="timelineCurrentTs">-</strong></p>
-  </div>
-  <p class="inline-note">The cursor marks the currently selected telemetry row.</p>
-  <div class="playback-chart-shell">
-    <canvas id="timelineDensityChart"></canvas>
-  </div>
-</section>
-
-<section class="section-block playback-timeline-panel">
-  <div class="playback-timeline-header">
-    <h3>Live signal trends</h3>
-    <p>X-axis: sample/row sequence.</p>
-  </div>
-  <div class="playback-chart-shell">
-    <canvas id="defaultSignalsChart"></canvas>
-  </div>
-  <p id="defaultSignalsEmpty" class="inline-note" hidden>No default numeric signal columns were available for this playback export.</p>
-</section>
-
-<section class="section-block">
-  <details>
-    <summary>Advanced display options</summary>
-    <p class="inline-note">Default columns shown above: Srpm, Sload, Sovr, Fovr, Frapidovr (when numeric data exists).</p>
-    <p class="inline-note">Available numeric fields in this selection: <span id="numericFieldList">None detected</span>.</p>
-    <p class="inline-note">Custom field selection can be added in a follow-up change without affecting default playback behavior.</p>
-  </details>
-</section>
-
-<section class="section-block">
-  <details>
-    <summary>Raw selected row</summary>
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr><th>Field</th><th>Value</th></tr>
-        </thead>
-        <tbody id="rawRowTableBody"></tbody>
-      </table>
+<section id="interventionStatusCard" class="section-block intervention-card intervention-card--normal" aria-live="polite">
+  <div class="intervention-card__body">
+    <div>
+      <p class="intervention-card__eyebrow">Current state</p>
+      <h3 id="interventionHeadline">Machine state: -</h3>
+      <p id="interventionSummary">No intervention candidate detected</p>
     </div>
+    <span id="interventionBadge" class="status-badge">Normal</span>
+  </div>
+  <dl id="interventionDetails" class="intervention-details"></dl>
+</section>
+
+<section class="section-block playback-events-panel">
+  <div class="playback-timeline-header">
+    <div>
+      <h3>Intervention markers</h3>
+      <p id="eventSummaryText">Scanning playback rows for candidate events…</p>
+    </div>
+    <div class="event-nav-buttons" aria-label="Event navigation">
+      <button type="button" id="previousEventBtn">Previous event</button>
+      <button type="button" id="nextEventBtn">Next event</button>
+    </div>
+  </div>
+  <div id="eventMarkerStrip" class="event-marker-strip" aria-label="Intervention candidate positions"></div>
+</section>
+
+<section class="section-block playback-timeline-panel">
+  <div class="playback-timeline-header">
+    <div>
+      <h3>Telemetry signals</h3>
+      <p>Stacked waveform-style mini-charts share the row/index axis. Current timestamp: <strong id="timelineCurrentTs">-</strong></p>
+    </div>
+    <p class="signal-legend"><span></span> intervention candidate row</p>
+  </div>
+  <div id="signalCharts" class="signal-chart-stack"></div>
+  <p id="chartUnavailable" class="inline-note" hidden>Signal charts are unavailable because Chart.js did not load. Playback controls, event navigation, telemetry snapshot, and diagnostics remain available.</p>
+  <p id="defaultSignalsEmpty" class="inline-note" hidden>No usable signal data was available for Srpm, Sload, Sovr, Fovr, Frapidovr, Xabs, Yabs, or Zabs in this playback export.</p>
+</section>
+
+<section class="section-block telemetry-snapshot">
+  <div class="playback-timeline-header">
+    <h3>Telemetry snapshot</h3>
+    <p>Important values for the current playback row.</p>
+  </div>
+  <div id="telemetrySnapshotGrid" class="telemetry-snapshot-grid"></div>
+</section>
+
+<section class="section-block diagnostics-panel">
+  <details>
+    <summary>Advanced diagnostics</summary>
+    <p class="inline-note">Technical/debug row fields remain available here for deeper investigation.</p>
+    <div id="diagnosticFields" class="diagnostic-fields"></div>
+    <details class="raw-row-details">
+      <summary>Raw selected row</summary>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Field</th><th>Value</th></tr>
+          </thead>
+          <tbody id="rawRowTableBody"></tbody>
+        </table>
+      </div>
+    </details>
+    <details class="raw-row-details">
+      <summary>Signal availability</summary>
+      <p class="inline-note">Available numeric fields in this selection: <span id="numericFieldList">None detected</span>.</p>
+    </details>
   </details>
 </section>
 
@@ -190,24 +178,27 @@ const timestampMs = playbackRows.map((row) => {
   return Number.isFinite(parsed) ? parsed : NaN;
 });
 
-const nowTimestamp = document.getElementById('nowTimestamp');
-const nowMachine = document.getElementById('nowMachine');
-const nowDay = document.getElementById('nowDay');
-const nowIndex = document.getElementById('nowIndex');
-const tickType = document.getElementById('tickType');
-const sourceTimestamp = document.getElementById('sourceTimestamp');
-const sampleSummary = document.getElementById('sampleSummary');
 const rowIndexText = document.getElementById('rowIndexText');
 const rowTotalText = document.getElementById('rowTotalText');
-const stateBadge = document.getElementById('stateBadge');
-const candidateBadge = document.getElementById('candidateBadge');
 const timelineCurrentTs = document.getElementById('timelineCurrentTs');
-const groupedFields = document.getElementById('groupedFields');
 const rawRowTableBody = document.getElementById('rawRowTableBody');
 const rowSlider = document.getElementById('rowSlider');
 const speedSelect = document.getElementById('speedSelect');
+const chartUnavailable = document.getElementById('chartUnavailable');
 const defaultSignalsEmpty = document.getElementById('defaultSignalsEmpty');
 const numericFieldList = document.getElementById('numericFieldList');
+const interventionStatusCard = document.getElementById('interventionStatusCard');
+const interventionHeadline = document.getElementById('interventionHeadline');
+const interventionSummary = document.getElementById('interventionSummary');
+const interventionBadge = document.getElementById('interventionBadge');
+const interventionDetails = document.getElementById('interventionDetails');
+const eventSummaryText = document.getElementById('eventSummaryText');
+const eventMarkerStrip = document.getElementById('eventMarkerStrip');
+const previousEventBtn = document.getElementById('previousEventBtn');
+const nextEventBtn = document.getElementById('nextEventBtn');
+const signalCharts = document.getElementById('signalCharts');
+const telemetrySnapshotGrid = document.getElementById('telemetrySnapshotGrid');
+const diagnosticFields = document.getElementById('diagnosticFields');
 
 function stopPlayback() {
   if (animationFrameId !== null) {
@@ -229,46 +220,9 @@ function stateBadgeClass(state) {
 
 function valueText(value) {
   if (value === null || value === undefined || value === '') return '-';
+  if (Array.isArray(value)) return value.join(', ');
+  if (typeof value === 'object') return JSON.stringify(value);
   return String(value);
-}
-
-function renderGroups(row) {
-  groupedFields.innerHTML = '';
-  Object.entries(fieldGroups).forEach(([groupName, fields]) => {
-    if (!fields || !fields.length) return;
-    const wrapper = document.createElement(groupName === 'Other fields' ? 'details' : 'section');
-    wrapper.className = 'field-group';
-    if (groupName === 'Other fields') {
-      wrapper.open = false;
-      const summary = document.createElement('summary');
-      summary.textContent = `Other fields (${fields.length})`;
-      wrapper.appendChild(summary);
-    } else {
-      const title = document.createElement('h4');
-      title.textContent = groupName;
-      wrapper.appendChild(title);
-    }
-
-    const grid = document.createElement('div');
-    grid.className = 'group-grid';
-    fields.forEach((field) => {
-      const card = document.createElement('article');
-      card.className = 'info-card';
-      card.innerHTML = `<h4>${field}</h4><p>${valueText(row[field])}</p>`;
-      grid.appendChild(card);
-    });
-    wrapper.appendChild(grid);
-    groupedFields.appendChild(wrapper);
-  });
-}
-
-function renderRawRow(row) {
-  rawRowTableBody.innerHTML = '';
-  Object.entries(row).forEach(([key, value]) => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${key}</td><td>${valueText(value)}</td>`;
-    rawRowTableBody.appendChild(tr);
-  });
 }
 
 function isPresent(value) {
@@ -281,36 +235,148 @@ function parseNumeric(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+function isTruthyFlag(value) {
+  if (value === true || value === 1) return true;
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return ['true', '1', 'yes', 'y'].includes(normalized);
+}
+
 function isCandidateRow(row) {
-  return String(row.intervention_candidate).toLowerCase() === 'true' || String(row.state || '').toLowerCase() === 'intervention_candidate';
+  return isTruthyFlag(row.intervention_candidate)
+    || isTruthyFlag(row.operator_intervention_candidate)
+    || isTruthyFlag(row.process_event_candidate)
+    || String(row.state || '').toLowerCase() === 'intervention_candidate';
 }
 
-function summarizeCurrentSample(row) {
-  const parts = [];
-  if (isPresent(row.machine_id)) parts.push(`Machine ${row.machine_id}`);
-  if (isPresent(row.state)) {
-    parts.push(`is ${String(row.state).toLowerCase()}`);
-  } else if (isPresent(row.execution)) {
-    parts.push(`execution ${row.execution}`);
-  }
-  if (isPresent(row.timestamp)) parts.push(`at ${row.timestamp}`);
-  if (row.is_synthetic_tick === true) {
-    parts.push('(filled synthetic tick)');
-  }
-
-  const extras = [];
-  if (isCandidateRow(row)) {
-    extras.push('Intervention candidate detected.');
-  } else if (isPresent(row.intervention_candidate)) {
-    extras.push('No intervention candidate.');
-  }
-  const eventScore = parseNumeric(row.event_score);
-  if (eventScore !== null) extras.push(`Event score ${eventScore.toFixed(3)}.`);
-  if (isPresent(row.fired_rules)) extras.push(`Fired rules: ${row.fired_rules}.`);
-
-  const sentence = parts.length ? `${parts.join(' ')}.` : 'Current sample loaded.';
-  return `${sentence} ${extras.join(' ')}`.trim();
+function candidateType(row) {
+  if (isPresent(row.candidate_type)) return valueText(row.candidate_type);
+  if (isTruthyFlag(row.operator_intervention_candidate)) return 'Operator intervention';
+  if (isTruthyFlag(row.process_event_candidate)) return 'Process event';
+  if (isTruthyFlag(row.intervention_candidate)) return 'Intervention candidate';
+  if (String(row.state || '').toLowerCase() === 'intervention_candidate') return 'Intervention candidate';
+  return '-';
 }
+
+function appendDefinition(container, label, value) {
+  if (!isPresent(value)) return;
+  const dt = document.createElement('dt');
+  dt.textContent = label;
+  const dd = document.createElement('dd');
+  dd.textContent = valueText(value);
+  container.append(dt, dd);
+}
+
+function renderTelemetrySnapshot(row) {
+  const snapshotFields = [
+    ['Timestamp', row.timestamp],
+    ['Machine state', row.state],
+    ['Active', row.active],
+    ['Dense idle', row.dense_idle],
+    ['Stopped', row.stopped],
+    ['Spindle RPM', row.Srpm],
+    ['Spindle load', row.Sload],
+    ['Spindle override', row.Sovr],
+    ['Feed override', row.Fovr],
+    ['Rapid override', row.Frapidovr],
+    ['Execution', row.execution],
+    ['Mode', row.mode],
+    ['Program', row.program],
+  ];
+  telemetrySnapshotGrid.innerHTML = '';
+  snapshotFields.forEach(([label, value]) => {
+    const article = document.createElement('article');
+    article.className = 'telemetry-value-card';
+    const heading = document.createElement('h4');
+    heading.textContent = label;
+    const body = document.createElement('p');
+    body.textContent = valueText(value);
+    article.append(heading, body);
+    telemetrySnapshotGrid.appendChild(article);
+  });
+}
+
+function renderDiagnostics(row) {
+  const diagnosticPriority = [
+    'intervention_candidate',
+    'operator_intervention_candidate',
+    'process_event_candidate',
+    'candidate_type',
+    'event_score',
+    'fired_rules',
+    'is_synthetic_tick',
+    'source_timestamp',
+    'source',
+  ];
+  const snapshotKeys = new Set(['timestamp', 'state', 'active', 'dense_idle', 'stopped', 'Srpm', 'Sload', 'Sovr', 'Fovr', 'Frapidovr', 'execution', 'mode', 'program']);
+  const orderedKeys = [...diagnosticPriority, ...Object.keys(row).filter((key) => !snapshotKeys.has(key) && !diagnosticPriority.includes(key))];
+  diagnosticFields.innerHTML = '';
+  orderedKeys.forEach((key) => {
+    if (!(key in row)) return;
+    const card = document.createElement('article');
+    card.className = 'diagnostic-field-card';
+    const heading = document.createElement('h4');
+    heading.textContent = key === 'is_synthetic_tick' ? 'tick type' : key;
+    const body = document.createElement('p');
+    body.textContent = key === 'is_synthetic_tick'
+      ? (row[key] === true ? 'Synthetic / filled tick' : 'Source-aligned tick')
+      : valueText(row[key]);
+    card.append(heading, body);
+    diagnosticFields.appendChild(card);
+  });
+}
+
+function renderRawRow(row) {
+  rawRowTableBody.innerHTML = '';
+  Object.entries(row).forEach(([key, value]) => {
+    const tr = document.createElement('tr');
+    const keyCell = document.createElement('td');
+    keyCell.textContent = key;
+    const valueCell = document.createElement('td');
+    valueCell.textContent = valueText(value);
+    tr.append(keyCell, valueCell);
+    rawRowTableBody.appendChild(tr);
+  });
+}
+
+function renderInterventionCard(row) {
+  const candidate = isCandidateRow(row);
+  const stateText = valueText(row.state);
+  interventionHeadline.textContent = candidate ? 'Possible intervention detected' : `Machine state: ${stateText}`;
+  interventionSummary.textContent = candidate ? 'Review candidate context, score, rules, and nearby waveform changes.' : 'No intervention candidate detected';
+  interventionBadge.textContent = candidate ? 'Intervention' : 'Normal';
+  interventionBadge.className = `status-badge ${candidate ? 'status-error' : stateBadgeClass(row.state)}`.trim();
+  interventionStatusCard.className = `section-block intervention-card ${candidate ? 'intervention-card--intervention' : 'intervention-card--normal'}`;
+  interventionDetails.innerHTML = '';
+  if (candidate) {
+    appendDefinition(interventionDetails, 'Candidate type', candidateType(row));
+    appendDefinition(interventionDetails, 'Event score', parseNumeric(row.event_score) !== null ? parseNumeric(row.event_score).toFixed(3) : row.event_score);
+    appendDefinition(interventionDetails, 'Fired rules', row.fired_rules);
+  }
+  appendDefinition(interventionDetails, 'Current state', stateText);
+  appendDefinition(interventionDetails, 'Timestamp', row.timestamp);
+}
+
+const fallbackPalette = ['#1d4ed8', '#15803d', '#a16207', '#7c3aed', '#be123c', '#0891b2', '#4338ca', '#0f766e'];
+const readableSignalLabels = {
+  Srpm: 'Spindle RPM',
+  Sload: 'Spindle load',
+  Sovr: 'Spindle override',
+  Fovr: 'Feed override',
+  Frapidovr: 'Rapid override',
+  Xabs: 'X absolute position',
+  Yabs: 'Y absolute position',
+  Zabs: 'Z absolute position',
+};
+const candidateRows = playbackRows.map((row, index) => ({ row, index })).filter((item) => isCandidateRow(item.row));
+const numericColumns = Object.keys(playbackRows[0] || {}).filter((column) => playbackRows.some((row) => parseNumeric(row[column]) !== null));
+numericFieldList.textContent = numericColumns.length ? numericColumns.join(', ') : 'None detected';
+const desiredSignals = ['Srpm', 'Sload', 'Sovr', 'Fovr', 'Frapidovr', 'Xabs', 'Yabs', 'Zabs'];
+const selectedSignalColumns = desiredSignals.filter((column) => playbackRows.some((row) => parseNumeric(row[column]) !== null));
+defaultSignalColumns.forEach((column) => {
+  if (!selectedSignalColumns.includes(column) && playbackRows.some((row) => parseNumeric(row[column]) !== null)) {
+    selectedSignalColumns.push(column);
+  }
+});
 
 const cursorPlugin = {
   id: 'cursorPlugin',
@@ -330,105 +396,148 @@ const cursorPlugin = {
   }
 };
 
-const fallbackPalette = ['#1d4ed8', '#15803d', '#a16207', '#7c3aed', '#be123c'];
-const numericColumns = Object.keys(playbackRows[0] || {}).filter((column) => {
-  return playbackRows.some((row) => parseNumeric(row[column]) !== null);
-});
-numericFieldList.textContent = numericColumns.length ? numericColumns.join(', ') : 'None detected';
+const signalChartsInstances = [];
+function createSignalCharts() {
+  signalCharts.innerHTML = '';
+  if (!window.Chart) {
+    chartUnavailable.hidden = false;
+    return;
+  }
+  if (!selectedSignalColumns.length) {
+    defaultSignalsEmpty.hidden = false;
+    return;
+  }
+  selectedSignalColumns.forEach((column, index) => {
+    const card = document.createElement('article');
+    card.className = 'signal-mini-chart';
+    const header = document.createElement('div');
+    header.className = 'signal-mini-chart__header';
+    const title = document.createElement('h4');
+    title.textContent = readableSignalLabels[column] || column;
+    const meta = document.createElement('p');
+    const values = playbackRows.map((row) => parseNumeric(row[column])).filter((value) => value !== null);
+    meta.textContent = values.length ? `${values.length.toLocaleString()} numeric samples` : 'No data';
+    header.append(title, meta);
+    const canvas = document.createElement('canvas');
+    card.append(header, canvas);
+    signalCharts.appendChild(card);
 
-const selectedDefaultSignalColumns = defaultSignalColumns;
-
-const timelineChart = new Chart(document.getElementById('timelineDensityChart'), {
-  type: 'line',
-  data: {
-    labels: playbackRows.map((row) => row.timestamp || '-'),
-    datasets: [{
-      label: 'Sample sequence',
-      data: playbackRows.map((_, idx) => idx + 1),
-      pointRadius: 1.5,
-      borderColor: '#1d4ed8',
-      borderWidth: 2,
-      tension: 0.1,
-      fill: false,
-    }]
-  },
-  options: {
-    responsive: true,
-    animation: false,
-    scales: {
-      y: { title: { display: true, text: 'Sample/row number' } }
-    },
-    plugins: {
-      legend: { display: false }
-    }
-  },
-  plugins: [cursorPlugin],
-});
-
-const defaultSignalsChart = new Chart(document.getElementById('defaultSignalsChart'), {
-  type: 'line',
-  data: {
-    labels: playbackRows.map((_, idx) => idx + 1),
-    datasets: selectedDefaultSignalColumns.map((column, index) => ({
-      label: column,
-      data: playbackRows.map((row) => parseNumeric(row[column])),
-      borderColor: fallbackPalette[index % fallbackPalette.length],
-      pointRadius: 0,
-      borderWidth: 1.6,
-      tension: 0.12,
-      fill: false,
-      spanGaps: true,
-    })),
-  },
-  options: {
-    responsive: true,
-    animation: false,
-    interaction: { mode: 'index', intersect: false },
-    scales: {
-      x: { title: { display: true, text: 'Sample/row number' } },
-    },
-    plugins: {
-      tooltip: {
-        callbacks: {
-          title(items) {
-            const idx = items?.[0]?.dataIndex ?? 0;
-            const row = playbackRows[idx] || {};
-            return `Row ${idx + 1}${row.timestamp ? ` • ${row.timestamp}` : ''}`;
+    signalChartsInstances.push(new Chart(canvas, {
+      type: 'line',
+      data: {
+        labels: playbackRows.map((_, rowIndex) => rowIndex + 1),
+        datasets: [
+          {
+            label: readableSignalLabels[column] || column,
+            data: playbackRows.map((row) => parseNumeric(row[column])),
+            borderColor: fallbackPalette[index % fallbackPalette.length],
+            pointRadius: 0,
+            borderWidth: 1.6,
+            tension: 0.12,
+            fill: false,
+            spanGaps: true,
+          },
+          {
+            label: 'Intervention candidates',
+            data: playbackRows.map((row) => isCandidateRow(row) ? parseNumeric(row[column]) : null),
+            pointBackgroundColor: '#dc2626',
+            pointBorderColor: '#991b1b',
+            pointRadius: 4,
+            showLine: false,
+            spanGaps: false,
+          },
+        ],
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        interaction: { mode: 'index', intersect: false },
+        scales: {
+          x: { display: false, title: { display: false, text: 'Row' } },
+          y: { ticks: { maxTicksLimit: 4 } },
+        },
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              title(items) {
+                const idx = items?.[0]?.dataIndex ?? 0;
+                const row = playbackRows[idx] || {};
+                return `Row ${idx + 1}${row.timestamp ? ` • ${row.timestamp}` : ''}`;
+              },
+            },
           },
         },
       },
-    },
-  },
-  plugins: [cursorPlugin],
-});
-if (!selectedDefaultSignalColumns.length) {
-  defaultSignalsEmpty.hidden = false;
-  document.getElementById('defaultSignalsChart').closest('.playback-chart-shell').hidden = true;
+      plugins: [cursorPlugin],
+    }));
+  });
+}
+
+function jumpToIndex(index) {
+  stopPlayback();
+  const numericIndex = Number(index);
+  if (!Number.isFinite(numericIndex)) return;
+  currentIndex = Math.min(playbackRows.length - 1, Math.max(0, numericIndex));
+  accumulatedSimulatedMs = 0;
+  renderCurrentRow();
+}
+
+function renderEventMarkers() {
+  eventMarkerStrip.innerHTML = '';
+  if (!candidateRows.length) {
+    eventSummaryText.textContent = 'No intervention candidates detected in this playback selection.';
+    previousEventBtn.disabled = true;
+    nextEventBtn.disabled = true;
+    return;
+  }
+  eventSummaryText.textContent = `${candidateRows.length.toLocaleString()} possible intervention candidate${candidateRows.length === 1 ? '' : 's'} detected. Use markers or buttons to jump.`;
+  previousEventBtn.disabled = false;
+  nextEventBtn.disabled = false;
+  candidateRows.forEach(({ row, index }) => {
+    const marker = document.createElement('button');
+    marker.type = 'button';
+    marker.className = 'event-marker';
+    marker.style.left = `${playbackRows.length > 1 ? (index / (playbackRows.length - 1)) * 100 : 0}%`;
+    marker.title = `Row ${index + 1}${row.timestamp ? ` • ${row.timestamp}` : ''}${candidateType(row) !== '-' ? ` • ${candidateType(row)}` : ''}`;
+    marker.setAttribute('aria-label', marker.title);
+    marker.addEventListener('click', () => jumpToIndex(index));
+    eventMarkerStrip.appendChild(marker);
+  });
+}
+
+function updateActiveEventMarkers() {
+  eventMarkerStrip.querySelectorAll('.event-marker').forEach((marker, markerIndex) => {
+    marker.classList.toggle('event-marker--active', candidateRows[markerIndex]?.index === currentIndex);
+  });
+}
+
+function jumpRelativeEvent(direction) {
+  if (!candidateRows.length) return;
+  const indexes = candidateRows.map((item) => item.index);
+  let target;
+  if (direction > 0) {
+    target = indexes.find((index) => index > currentIndex) ?? indexes[0];
+  } else {
+    target = [...indexes].reverse().find((index) => index < currentIndex) ?? indexes[indexes.length - 1];
+  }
+  jumpToIndex(target);
 }
 
 function renderCurrentRow() {
   const row = playbackRows[currentIndex];
   if (!row) return;
-  nowTimestamp.textContent = valueText(row.timestamp);
   timelineCurrentTs.textContent = valueText(row.timestamp);
-  stateBadge.textContent = valueText(row.state);
-  stateBadge.className = `status-badge ${stateBadgeClass(row.state)}`.trim();
-  nowMachine.textContent = valueText(row.machine_id || '{{ machine }}');
-  nowDay.textContent = '{{ day }}' || '-';
-  nowIndex.textContent = String(currentIndex + 1);
-  tickType.textContent = row.is_synthetic_tick === true ? 'Synthetic / filled tick' : 'Source-aligned tick';
-  const candidate = isCandidateRow(row);
-  candidateBadge.textContent = candidate ? 'Candidate event' : 'No';
-  candidateBadge.className = `status-badge playback-candidate-badge ${candidate ? 'status-error' : ''}`.trim();
-  sourceTimestamp.textContent = valueText(row.source_timestamp);
-  sampleSummary.textContent = summarizeCurrentSample(row);
   rowIndexText.textContent = String(currentIndex + 1);
   rowTotalText.textContent = String(playbackRows.length);
   rowSlider.value = String(currentIndex);
-  renderGroups(row);
+  renderInterventionCard(row);
+  renderTelemetrySnapshot(row);
+  renderDiagnostics(row);
   renderRawRow(row);
-  timelineChart.update('none');
-  defaultSignalsChart.update('none');
+  updateActiveEventMarkers();
+  signalChartsInstances.forEach((chart) => chart.update('none'));
 }
 
 function tickPlayback() {
@@ -493,27 +602,6 @@ function startPlaybackFromCurrentRow() {
   animationFrameId = requestAnimationFrame(tickPlayback);
 }
 
-function findIndexAtOrBefore(targetTimestampMs) {
-  let low = 0;
-  let high = timestampMs.length - 1;
-  let answer = -1;
-  while (low <= high) {
-    const mid = Math.floor((low + high) / 2);
-    const value = timestampMs[mid];
-    if (!Number.isFinite(value)) {
-      low = mid + 1;
-      continue;
-    }
-    if (value <= targetTimestampMs) {
-      answer = mid;
-      low = mid + 1;
-    } else {
-      high = mid - 1;
-    }
-  }
-  return answer;
-}
-
 document.getElementById('playBtn').addEventListener('click', () => {
   if (currentIndex >= playbackRows.length - 1) currentIndex = 0;
   startPlaybackFromCurrentRow();
@@ -524,31 +612,19 @@ document.getElementById('pauseBtn').addEventListener('click', () => {
 });
 
 document.getElementById('resetBtn').addEventListener('click', () => {
-  stopPlayback();
-  currentIndex = 0;
-  accumulatedSimulatedMs = 0;
-  renderCurrentRow();
+  jumpToIndex(0);
 });
 
 document.getElementById('stepBackBtn').addEventListener('click', () => {
-  stopPlayback();
-  currentIndex = Math.max(0, currentIndex - 1);
-  accumulatedSimulatedMs = 0;
-  renderCurrentRow();
+  jumpToIndex(currentIndex - 1);
 });
 
 document.getElementById('stepForwardBtn').addEventListener('click', () => {
-  stopPlayback();
-  currentIndex = Math.min(playbackRows.length - 1, currentIndex + 1);
-  accumulatedSimulatedMs = 0;
-  renderCurrentRow();
+  jumpToIndex(currentIndex + 1);
 });
 
 rowSlider.addEventListener('input', () => {
-  stopPlayback();
-  currentIndex = Number(rowSlider.value || 0);
-  accumulatedSimulatedMs = 0;
-  renderCurrentRow();
+  jumpToIndex(rowSlider.value || 0);
 });
 
 speedSelect.addEventListener('change', () => {
@@ -556,6 +632,11 @@ speedSelect.addEventListener('change', () => {
   if (isPlaying) lastFrameTime = performance.now();
 });
 
+previousEventBtn.addEventListener('click', () => jumpRelativeEvent(-1));
+nextEventBtn.addEventListener('click', () => jumpRelativeEvent(1));
+
+createSignalCharts();
+renderEventMarkers();
 renderCurrentRow();
 </script>
 {% elif rows is not none %}
