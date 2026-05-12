@@ -772,3 +772,111 @@ def test_clean_startup_can_load_explicit_non_workflow_playback_path(tmp_path: Pa
     assert "No playback-compatible exports" not in body
     assert "manual_non_workflow_state" in body
     assert "<strong>Machine:</strong> M1" in body
+
+
+def test_playback_template_renders_event_first_ui_without_candidates(tmp_path: Path, monkeypatch) -> None:
+    timeline_path = tmp_path / "timeline_rows.csv"
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z", "2026-03-01T10:00:01Z"],
+            "machine_id": ["M1", "M1"],
+            "state": ["dense_idle", "active"],
+            "intervention_candidate": [False, False],
+            "Srpm": [1000, 1200],
+            "Sload": [12.5, 14.0],
+            "Sovr": [100, 100],
+            "Fovr": [90, 95],
+            "Frapidovr": [50, 50],
+            "execution": ["READY", "ACTIVE"],
+            "mode": ["AUTO", "AUTO"],
+            "program": ["P100", "P100"],
+        }
+    ).to_csv(timeline_path, index=False)
+
+    artifacts, warnings = scan_artifacts([str(tmp_path)])
+    assert warnings == []
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime())
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "Current state" in body
+    assert "No intervention candidate detected" in body
+    assert "Telemetry signals" in body
+    assert "Intervention markers" in body
+    assert "Telemetry snapshot" in body
+    assert "Spindle RPM" in body
+    assert "Advanced diagnostics" in body
+    assert "Grouped row fields" not in body
+
+
+def test_playback_template_renders_prominent_intervention_ui(tmp_path: Path, monkeypatch) -> None:
+    timeline_path = tmp_path / "timeline_rows.csv"
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z", "2026-03-01T10:00:01Z"],
+            "machine_id": ["M1", "M1"],
+            "state": ["active", "dense_idle"],
+            "operator_intervention_candidate": [False, True],
+            "candidate_type": ["", "operator_override"],
+            "event_score": ["", 0.875],
+            "fired_rules": ["", "idle_after_override"],
+            "Srpm": [900, 0],
+            "Sload": [18, 2],
+        }
+    ).to_csv(timeline_path, index=False)
+
+    artifacts, warnings = scan_artifacts([str(tmp_path)])
+    assert warnings == []
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime())
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "renderInterventionCard" in body
+    assert "candidateType(row)" in body
+    assert "parseNumeric(row.event_score)" in body
+    assert "row.fired_rules" in body
+    assert "Previous event" in body
+    assert "Next event" in body
+    assert '"operator_intervention_candidate": true' in body
+    assert "operator_override" in body
+    assert "idle_after_override" in body
+
+
+def test_playback_template_tolerates_missing_signal_values(tmp_path: Path, monkeypatch) -> None:
+    timeline_path = tmp_path / "timeline_rows.csv"
+    pd.DataFrame(
+        {
+            "timestamp": ["2026-03-01T10:00:00Z", "2026-03-01T10:00:01Z"],
+            "machine_id": ["M1", "M1"],
+            "state": ["active", "dense_idle"],
+            "process_event_candidate": [False, True],
+            "Srpm": ["", ""],
+            "Sload": [None, ""],
+            "execution": ["ACTIVE", "READY"],
+        }
+    ).to_csv(timeline_path, index=False)
+
+    artifacts, warnings = scan_artifacts([str(tmp_path)])
+    assert warnings == []
+    monkeypatch.setattr("catalog.flask_app.routes.get_runtime_manager", lambda: _FakeRuntime())
+    monkeypatch.setattr("catalog.flask_app.routes.get_operator_scope_service", lambda: _FakeScopeService())
+    app = _app_with_catalog(_FakeCatalog(artifacts))
+
+    response = app.test_client().get("/playback")
+
+    assert response.status_code == 200
+    body = response.get_data(as_text=True)
+    assert "No usable signal data was available" in body
+    assert "Signal charts are unavailable because Chart.js did not load" in body
+    assert "if (!window.Chart)" in body
+    assert "createSignalCharts();" in body
+    assert "jumpRelativeEvent" in body
+    assert '"process_event_candidate": true' in body

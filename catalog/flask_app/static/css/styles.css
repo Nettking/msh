@@ -1065,3 +1065,229 @@ button.button-primary:hover {
   align-items: center;
   gap: 12px;
 }
+
+.intervention-card {
+  border-width: 1px;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.intervention-card--normal {
+  border-color: #cbd5e1;
+  background: #f8fafc;
+}
+
+.intervention-card--intervention {
+  border-color: #f87171;
+  background: #fff1f2;
+  box-shadow: 0 0 0 3px rgba(220, 38, 38, 0.08);
+}
+
+.intervention-card__body {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.intervention-card__eyebrow {
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.intervention-card h3 {
+  margin-bottom: 4px;
+  font-size: 1.25rem;
+}
+
+.intervention-details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+  margin: 14px 0 0;
+}
+
+.intervention-details dt {
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.intervention-details dd {
+  margin: 3px 0 0;
+  color: var(--text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.playback-events-panel .playback-timeline-header,
+.telemetry-snapshot .playback-timeline-header {
+  margin-bottom: 10px;
+}
+
+.event-nav-buttons {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.event-marker-strip {
+  position: relative;
+  min-height: 34px;
+  border: 1px solid #cbd5e1;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e2e8f0, #f8fafc);
+  overflow: hidden;
+}
+
+.event-marker-strip::before {
+  content: '';
+  position: absolute;
+  inset: 15px 10px auto;
+  border-top: 2px solid #cbd5e1;
+}
+
+.event-marker {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 22px;
+  padding: 0;
+  border: 2px solid #991b1b;
+  border-radius: 999px;
+  background: #dc2626;
+  transform: translate(-50%, -50%);
+  cursor: pointer;
+}
+
+.event-marker--active {
+  width: 18px;
+  height: 28px;
+  background: #facc15;
+  border-color: #92400e;
+  box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.25);
+}
+
+.signal-legend {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.84rem;
+  white-space: nowrap;
+}
+
+.signal-legend span {
+  width: 10px;
+  height: 10px;
+  border-radius: 999px;
+  background: #dc2626;
+  border: 1px solid #991b1b;
+}
+
+.signal-chart-stack {
+  display: grid;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.signal-mini-chart {
+  min-height: 146px;
+  border: 1px solid #dbeafe;
+  border-radius: 12px;
+  padding: 10px;
+  background: #fbfdff;
+}
+
+.signal-mini-chart__header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.signal-mini-chart__header h4 {
+  color: var(--text);
+}
+
+.signal-mini-chart__header p {
+  font-size: 0.84rem;
+}
+
+.signal-mini-chart canvas {
+  width: 100%;
+  height: 90px;
+}
+
+.telemetry-snapshot-grid,
+.diagnostic-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.telemetry-value-card,
+.diagnostic-field-card {
+  padding: 10px 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.telemetry-value-card h4,
+.diagnostic-field-card h4 {
+  margin-bottom: 4px;
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.telemetry-value-card p,
+.diagnostic-field-card p {
+  color: var(--text);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.diagnostics-panel > details > summary {
+  cursor: pointer;
+  color: var(--primary);
+  font-weight: 700;
+}
+
+.diagnostics-panel details[open] > summary {
+  margin-bottom: 10px;
+}
+
+.raw-row-details {
+  margin-top: 12px;
+}
+
+.raw-row-details summary {
+  cursor: pointer;
+  color: #334155;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .intervention-card__body,
+  .signal-mini-chart__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .event-nav-buttons {
+    width: 100%;
+  }
+
+  .event-nav-buttons button {
+    flex: 1 1 140px;
+  }
+}
