@@ -18,7 +18,12 @@ from typing import Any
 
 from catalog.orchestrator.pipeline import get_runtime_manager
 from catalog.runner.data_filtering import discover_available_dates, ensure_session_filtered_data
-from catalog.runner.playback import prepare_session_playback_exports
+from catalog.runner.playback import (
+    playback_exports_are_reusable,
+    playback_readiness,
+    prepare_session_playback_exports,
+    session_playback_export_dir,
+)
 from catalog.runner.script_catalog import ScriptOption, discover_runnable_scripts, repo_root
 from catalog.runner.script_exec import execute_script_for_session_with_logs
 from catalog.runner.session_store import (
@@ -90,15 +95,13 @@ class ControlPanelService:
         selected_session = _resolve_selected_session(
             sessions,
             selected_session_id,
-            strict=bool(selected_session_id),
+            strict=True,
         )
         selected_session_missing = bool(selected_session_id and selected_session is None)
-        if selected_session is None:
-            selected_session = latest_session
 
         session_rows: list[dict[str, Any]] = []
         for session in sessions:
-            session_rows.append(_session_row(session.session_id, session.metadata))
+            session_rows.append(_session_row(session.session_id, session.session_dir, session.metadata))
 
         selected_metadata = None
         workflow_rows: list[dict[str, str]] = []
@@ -155,6 +158,7 @@ class ControlPanelService:
             "selected_session": selected_session,
             "selected_session_missing": selected_session_missing,
             "selected_metadata": selected_metadata,
+            "selected_dataset": _selected_dataset_summary(selected_session, selected_metadata) if selected_session else None,
             "sessions": session_rows,
             "workflow_rows": workflow_rows,
             "script_rows": script_rows,
@@ -189,7 +193,7 @@ class ControlPanelService:
     ) -> tuple[bool, str, str]:
         """Validate a control action, reserve the single worker slot, and start it."""
         resolved_target: tuple[str, Any, str] | None = None
-        if action in {"startup_health", "run_selected_session_workflow", "run_script"}:
+        if action in {"startup_health", "run_selected_session_workflow", "run_script", "rebuild_playback_exports"}:
             try:
                 resolved_target = self._resolve_target_session(
                     selected_session_id=selected_session_id,
@@ -315,6 +319,16 @@ class ControlPanelService:
                 status, message, session_id, target_range, output_path, stdout_snippet, stderr_snippet = self._rerun_scripts(
                     target,
                     [script_key],
+                )
+            elif action == "rebuild_playback_exports":
+                target = resolved_target or self._resolve_target_session(
+                    selected_session_id=selected_session_id,
+                    scope_mode=scope_mode,
+                    start_date=start_date,
+                    end_date=end_date,
+                )
+                status, message, session_id, target_range, output_path, stdout_snippet, stderr_snippet = (
+                    self._rebuild_playback_exports(target)
                 )
             else:
                 status = "failed"
@@ -459,6 +473,31 @@ class ControlPanelService:
             return "failed", "; ".join(results), session_id, target_range, final_output_path, stdout_snippet, stderr_snippet
         return "ok", "; ".join(results), session_id, target_range, final_output_path, stdout_snippet, stderr_snippet
 
+    def _rebuild_playback_exports(
+        self,
+        target_session: tuple[str, Any, str],
+    ) -> tuple[str, str, str | None, str | None, str | None, str | None, str | None]:
+        session_id, session_dir, target_range = target_session
+        metadata = _load_normalized_session_metadata(session_dir, self._script_options)
+        if metadata is None:
+            return "failed", f"Missing session metadata for {session_id}", None, None, None, None, None
+
+        ensure_session_filtered_data(
+            source_data_dir=self.data_root,
+            session_dir=session_dir,
+            metadata=metadata,
+        )
+        export_path, export_status = prepare_session_playback_exports(session_dir, metadata)
+        return (
+            "ok",
+            f"Playback exports {export_status} for selected dataset {session_id}.",
+            session_id,
+            target_range,
+            str(export_path),
+            None,
+            None,
+        )
+
     def _finish_run(
         self,
         run_id: int,
@@ -591,15 +630,66 @@ def _range_label(metadata: dict[str, Any]) -> str:
     return f"{start}..{end}"
 
 
-def _session_row(session_id: str, metadata: dict[str, Any]) -> dict[str, Any]:
+def _session_row(session_id: str, session_dir: Any, metadata: dict[str, Any]) -> dict[str, Any]:
     status_parts: list[str] = []
     for step_name, step_scripts in WORKFLOW_STEPS:
         status_parts.append(f"{step_name}: {workflow_step_status(metadata, step_scripts)}")
+    outputs = _analysis_outputs(metadata)
     return {
         "session_id": session_id,
         "range": _range_label(metadata),
         "updated_at": metadata.get("updated_at") or metadata.get("created_at") or "n/a",
         "status_summary": "; ".join(status_parts) if status_parts else "n/a",
+        "outputs_summary": _outputs_summary(outputs),
+        "playback_summary": _playback_summary_from_metadata(session_dir, metadata),
+    }
+
+
+def _analysis_outputs(metadata: dict[str, Any]) -> list[str]:
+    outputs: list[str] = []
+    scripts = metadata.get("scripts", {}) if isinstance(metadata.get("scripts"), dict) else {}
+    for script_key, entry in sorted(scripts.items()):
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("output_path"):
+            outputs.append(str(script_key))
+    return outputs
+
+
+def _outputs_summary(outputs: list[str]) -> str:
+    if not outputs:
+        return "No analysis outputs recorded"
+    if len(outputs) <= 3:
+        return ", ".join(outputs)
+    return f"{', '.join(outputs[:3])} +{len(outputs) - 3} more"
+
+
+def _playback_summary_from_metadata(session_dir: Any, metadata: dict[str, Any]) -> str:
+    if playback_exports_are_reusable(session_dir, metadata):
+        return "Playback exports ready"
+    ready, missing = playback_readiness(session_dir, metadata)
+    if ready:
+        export_dir = session_playback_export_dir(session_dir, metadata)
+        if export_dir.exists():
+            return "Playback exports present; rebuild recommended"
+        return "Ready to build playback exports"
+    user_facing_missing = [item.replace("session filtered data", "dataset filtered data") for item in missing]
+    return "Playback not ready: " + "; ".join(user_facing_missing)
+
+
+def _selected_dataset_summary(session: Any, metadata: dict[str, Any] | None) -> dict[str, Any]:
+    metadata = metadata or dict(getattr(session, "metadata", {}) or {})
+    outputs = _analysis_outputs(metadata)
+    return {
+        "session_id": session.session_id,
+        "range": _range_label(metadata),
+        "updated_at": metadata.get("updated_at") or metadata.get("created_at") or "n/a",
+        "status_summary": "; ".join(
+            f"{step_name}: {workflow_step_status(metadata, step_scripts)}" for step_name, step_scripts in WORKFLOW_STEPS
+        ),
+        "outputs": outputs,
+        "outputs_summary": _outputs_summary(outputs),
+        "playback_summary": _playback_summary_from_metadata(session.session_dir, metadata),
     }
 
 
