@@ -37,6 +37,7 @@ Important fields include:
 - processed, pending, and total available day counts.
 - last successful refresh and last failure.
 - playback/catch-up readiness indicators.
+- telemetry analytics cache state, source file count, cached row count, and last rebuild time.
 
 A partial failure does not necessarily mean Flask is unusable. The runtime is best-effort and may hand off partial outputs so operators can inspect available artifacts.
 
@@ -51,6 +52,12 @@ Use `/control` for manual operation:
 - review recent action status and stdout/stderr snippets.
 
 Only one control action runs at a time in the current single-process threaded implementation. Recent action history is in memory and is not restart-persistent.
+
+### Telemetry analytics cache
+
+The telemetry analytics cache is a Parquet + DuckDB read cache for raw telemetry. When `/status` reports it as fresh, selected Flask paths can answer cache-covered queries from Parquet instead of scanning JSONL or session CSV exports, including live/latest views, machine/day summaries, playback machine/day loading, and exploration date-window filtering. The cache is intentionally conservative: JSONL/session files remain the fallback if the cache is missing, stale, or does not contain the fields needed for the request, and derived session-specific outputs still use session artifacts.
+
+Use the **Rebuild telemetry analytics cache** action in `/control` after loading new source files or when `/status` reports the cache as stale. Rebuilds currently perform a full JSONL-to-Parquet rebuild, so this improves repeated reads after the rebuild completes; it is not yet an incremental ingestion pipeline.
 
 ## `/playback`
 

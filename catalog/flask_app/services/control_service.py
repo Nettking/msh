@@ -16,6 +16,7 @@ from dataclasses import asdict, dataclass
 from datetime import date, datetime
 from typing import Any
 
+from catalog.common.telemetry_cache import rebuild_cache
 from catalog.orchestrator.pipeline import get_runtime_manager
 from catalog.runner.data_filtering import discover_available_dates, ensure_session_filtered_data
 from catalog.runner.playback import (
@@ -330,6 +331,10 @@ class ControlPanelService:
                 status, message, session_id, target_range, output_path, stdout_snippet, stderr_snippet = (
                     self._rebuild_playback_exports(target)
                 )
+            elif action == "rebuild_telemetry_cache":
+                status, message, session_id, target_range, output_path, stdout_snippet, stderr_snippet = (
+                    self._rebuild_telemetry_cache()
+                )
             else:
                 status = "failed"
                 message = f"Unsupported action: {action}"
@@ -495,6 +500,18 @@ class ControlPanelService:
             target_range,
             str(export_path),
             None,
+            None,
+        )
+
+    def _rebuild_telemetry_cache(self) -> tuple[str, str, str | None, str | None, str | None, str | None, str | None]:
+        result = rebuild_cache(self.data_root)
+        return (
+            "ok",
+            f"Rebuilt telemetry analytics cache with {result.row_count} rows from {result.source_file_count} source files.",
+            None,
+            None,
+            str(result.cache_path),
+            f"DuckDB/Parquet telemetry cache rebuilt at {result.cache_path}",
             None,
         )
 

@@ -69,7 +69,7 @@ See [catalog/README.md](catalog/README.md) for the script catalog and analysis w
 
 ## Telemetry analytics cache (Parquet + DuckDB)
 
-Raw JSONL telemetry files in `data/` remain the source of truth. The project also includes an optional analytical cache that converts those JSONL records into partitioned Parquet files and queries them with DuckDB. This is intended to improve repeated analytical queries over the same telemetry without changing the existing JSONL workflows.
+Raw JSONL telemetry files in `data/` remain the source of truth. The project also includes an analytical read cache that converts those JSONL records into partitioned Parquet files and queries them with DuckDB. Fresh caches are now used by selected production Flask paths, including live/latest telemetry, playback machine/day loading, exploration filtering, and machine/day summaries, while JSONL/session files remain the fallback when the cache is missing, stale, or lacks required fields.
 
 Cache layout:
 
@@ -77,17 +77,17 @@ Cache layout:
 data/cache/parquet/machine_id=<machine>/date=<YYYY-MM-DD>/part.parquet
 ```
 
-The cache is safe to delete and rebuild because it is derived entirely from raw JSONL. Existing scripts can continue reading JSONL directly; the cache is a modular helper for analytical reads. Rebuilds also write `data/cache/parquet/_manifest.json` with source JSONL paths, mtimes, sizes, and imported row count so freshness checks can detect changed, renamed, or deleted source files.
+The cache is safe to delete and rebuild because it is derived entirely from raw JSONL. Existing scripts can continue reading JSONL directly; cache-aware Flask routes check freshness first and fall back conservatively. Rebuilds also write `data/cache/parquet/_manifest.json` with source JSONL paths, mtimes, sizes, imported row count, and rebuild time so freshness/status checks can detect changed, renamed, or deleted source files.
 
 ### Rebuild the cache
 
-From the host or inside the Flask container, run:
+From `/control`, use **Rebuild telemetry analytics cache** to run a rebuild and show the result in recent control activity. From the host or inside the Flask container, you can also run:
 
 ```bash
 python -m catalog.cache.rebuild_telemetry_cache
 ```
 
-The command recursively scans `data/**/*.jsonl`, writes partitioned Parquet under `data/cache/parquet/`, prints the imported row count, and prints the output cache path. It rewrites the cache from source JSONL on each run, so it is safe to run multiple times without appending duplicate cache rows.
+The command recursively scans `data/**/*.jsonl`, loads the raw rows, writes partitioned Parquet under `data/cache/parquet/`, prints the imported row count, and prints the output cache path. It rewrites the cache from source JSONL on each run, so it is safe to run multiple times without appending duplicate cache rows. This is still a full rebuild, not incremental ingestion.
 
 Custom paths are available for development and tests:
 
@@ -105,23 +105,30 @@ docker compose up --build flask
 
 The Flask image installs the same Python dependencies as local development, including `duckdb` and `pyarrow`. The existing `docker-compose.yml` Flask service mounts `./data:/app/data`, so raw JSONL and the derived cache remain persistent on the host across container rebuilds.
 
-Cache rebuild is manual-only for now: `docker compose up --build flask` starts Flask and does not automatically refresh `data/cache/parquet/`. Run `python -m catalog.cache.rebuild_telemetry_cache` whenever new raw telemetry should be reflected in DuckDB/Parquet queries.
+Cache rebuild is manual-only for now: `docker compose up --build flask` starts Flask and does not automatically refresh `data/cache/parquet/`. Use `/control` or run `python -m catalog.cache.rebuild_telemetry_cache` whenever new raw telemetry should be reflected in DuckDB/Parquet queries. `/status` shows whether the cache is missing, fresh, or stale, plus source file and cached-row counts.
 
 ### Querying the cache
 
 Use `catalog.common.telemetry_cache.TelemetryCache` for DuckDB-backed helper queries:
 
 - latest sample per machine
+- recent samples per machine for live/latest UI state
+- playback timeline derivation for cache-covered machine/day slices
+- exploration samples filtered by date window
 - samples by machine and timestamp range
 - samples by date range
+- machine/day row counts
 - machine activity summary
 - optional pandas DataFrame output via `as_dataframe=True`
 
-If the Parquet cache is absent, helper queries return empty results rather than failing. Existing JSONL-based code paths remain available as the fallback behavior.
+If the Parquet cache is absent, helper queries return empty results rather than failing. Cache-aware Flask paths additionally require a fresh cached status check before using the cache and log when they use DuckDB/Parquet versus JSONL or session-export fallback paths. Cache-status scans are protected by a short TTL in request paths so frequently refreshed pages do not recursively inspect every JSONL/Parquet file on every request.
 
 ### Limitations and future path
 
 - The cache is rebuilt from JSONL and is not an operational write-ahead store.
-- Freshness is based on source JSONL and Parquet file modification times; rebuild after new raw telemetry arrives.
+- Rebuilds currently load JSONL into pandas before writing Parquet; streaming/incremental rebuilds are future work.
+- Queries currently open short-lived in-memory DuckDB connections; a persistent connection/cache manager is future work if UI refresh frequency requires it.
+- Live/latest telemetry currently uses a DuckDB window query over cache rows; a rolling latest-row cache or partition-pruned latest-query strategy is future work for multi-month datasets.
+- Freshness is based on source JSONL and manifest file identity; rebuild after new raw telemetry arrives. Request paths use a short cache-status TTL, so the UI can lag by a few seconds before reporting newly stale/fresh state.
 - Missing supported fields are stored as NULL, but analytics that require those values still need to handle NULLs.
 - This does not add TimescaleDB, PostgreSQL, Redis, or another live storage service. If future requirements need operational/live telemetry storage, retention policies, concurrent ingestion, or low-latency stateful queries, TimescaleDB/PostgreSQL can be evaluated as a separate architecture path while keeping JSONL export as the source-of-truth archive or interchange layer.

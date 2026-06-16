@@ -40,6 +40,8 @@ Scripts run in copied workspaces with session data linked or copied into `data/`
 
 `catalog/common/` contains reusable loading, timestamp/machine normalization, basic metrics, state inference, event grouping, and timeline export utilities. New scripts should prefer these helpers so data assumptions remain consistent.
 
+`catalog/common/telemetry_cache.py` builds a disposable Parquet cache over raw JSONL and exposes DuckDB query helpers for production read paths such as live/latest telemetry, playback machine/day loading, exploration filtering, and machine/day summaries. JSONL remains the source of truth: rebuilding the cache still scans and loads the raw JSONL corpus before writing Parquet, so the current cache primarily accelerates repeated reads after a fresh cache exists rather than making ingestion incremental.
+
 ### Script catalog
 
 Each `catalog/<script>/` directory contains a runnable analysis script and usually a script-specific README. The top-level [catalog/README.md](../catalog/README.md) is the canonical script catalog and workflow stage reference.
@@ -51,7 +53,7 @@ Each `catalog/<script>/` directory contains a runnable analysis script and usual
 - **Execution policy:** best effort; continue after individual script failures and surface failure state.
 - **Catch-up policy:** process historical days incrementally instead of forcing a full rebuild on startup.
 - **Playback coverage:** automatic scripts are bounded to health checks plus timeline/playback generation; manual and deep/exploratory scripts are excluded from bootstrap/catch-up.
-- **Cache policy:** reuse session data, script outputs, and playback exports when metadata signatures and expected files indicate they are still valid.
+- **Cache policy:** reuse session data, script outputs, playback exports, and the telemetry analytics cache when metadata signatures and expected files indicate they are still valid. The telemetry analytics cache is a cached read path for cache-covered fields; cache rebuilds are still full JSONL-to-Parquet rebuilds, and derived session-specific outputs continue using session artifacts.
 
 ## Startup mode decisions
 
@@ -66,5 +68,9 @@ The artifact catalog scans configured roots such as `results` and `data`. Artifa
 - The control panel is single-process and threaded; it is not a distributed job queue.
 - Recent control history is in memory and not durable across restarts.
 - Cache invalidation is intentionally lightweight and file/metadata based.
+- Telemetry analytics cache rebuilds are full rebuilds that load JSONL before writing Parquet; incremental updates are future work.
+- Telemetry cache status checks are cached briefly in request paths; forced status scans still recursively inspect source/cache files.
+- Telemetry cache queries currently open short-lived in-memory DuckDB connections; a persistent connection/cache manager is future work if refresh frequency requires it.
+- Live/latest telemetry cache reads currently use a window query over cached rows; a rolling latest-row cache or partition-pruned latest-query strategy is future work for multi-month datasets.
 - Manual and deep/exploratory analysis scripts may be slow and are excluded from bootstrap/catch-up.
 - Legacy and ingestion tools remain in the repository but are not runner-visible workflow steps.

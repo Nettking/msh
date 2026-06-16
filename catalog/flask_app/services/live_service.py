@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 import time
 from dataclasses import dataclass
@@ -11,6 +12,7 @@ from typing import Any
 import pandas as pd
 
 from catalog.common.state_inference import extract_intervention_candidates, infer_states_for_machine
+from catalog.common.telemetry_cache import CacheStatus, TelemetryCache, cached_cache_status
 
 from .catalog_service import ArtifactCatalog
 
@@ -32,6 +34,7 @@ LIVE_COLUMNS = (
     "Zabs",
 )
 NUMERIC_HINT_COLUMNS = ("Srpm", "Sload", "Sovr", "Fovr", "Frapidovr", "Xabs", "Yabs", "Zabs")
+LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -75,9 +78,15 @@ class LiveTelemetryService:
             and item.get("status") == "ready"
             and str(item.get("path", "")).lower().endswith(".jsonl")
         ]
+        data_dir = _data_dir_from_source_artifacts(source_artifacts)
+        status = cached_cache_status(data_dir)
         signature = (
             float(scan.scanned_at_epoch),
             tuple((item.get("path"), item.get("signature")) for item in source_artifacts),
+            status.exists,
+            status.fresh,
+            status.latest_cache_mtime,
+            status.manifest_row_count,
             self.stale_after_seconds,
             self.rows_per_machine,
             self.max_recent_artifacts,
@@ -88,18 +97,23 @@ class LiveTelemetryService:
             if cached and cached.signature == signature and (now_mono - cached.built_at_mono) <= self.refresh_ttl_seconds:
                 return cached.value
 
-        rebuilt = self._build_snapshot(source_artifacts)
+        rebuilt = self._build_snapshot(source_artifacts, data_dir=data_dir, status=status)
         with self._lock:
             self._cache = _CacheEntry(value=rebuilt, built_at_mono=time.monotonic(), signature=signature)
         return rebuilt
 
-    def _build_snapshot(self, source_artifacts: list[dict[str, Any]]) -> LiveSnapshot:
+    def _build_snapshot(self, source_artifacts: list[dict[str, Any]], *, data_dir: Path, status: CacheStatus) -> LiveSnapshot:
         now = datetime.now(timezone.utc)
-        recent_rows_by_machine = _recent_rows_by_machine(
-            source_artifacts,
-            rows_per_machine=self.rows_per_machine,
-            max_recent_artifacts=self.max_recent_artifacts,
-        )
+        recent_rows_by_machine = _recent_rows_by_machine_from_cache(data_dir, status=status, rows_per_machine=self.rows_per_machine)
+        if recent_rows_by_machine is None:
+            LOGGER.info("live telemetry using JSONL fallback source=jsonl_tail")
+            recent_rows_by_machine = _recent_rows_by_machine(
+                source_artifacts,
+                rows_per_machine=self.rows_per_machine,
+                max_recent_artifacts=self.max_recent_artifacts,
+            )
+        else:
+            LOGGER.info("live telemetry using DuckDB/Parquet cache source=telemetry_cache data_dir=%s", data_dir)
 
         known_machines = sorted(set(DEFAULT_MACHINES) | set(_path_machine_hints(source_artifacts)) | set(recent_rows_by_machine.keys()))
         machine_cards: list[dict[str, Any]] = []
@@ -232,6 +246,39 @@ def _path_machine_hints(source_artifacts: list[dict[str, Any]]) -> set[str]:
         if len(path.parts) >= 3 and path.parts[-3].lower() == "data":
             hints.add(path.parts[-2])
     return {item for item in hints if item}
+
+
+def _data_dir_from_source_artifacts(source_artifacts: list[dict[str, Any]]) -> Path:
+    for artifact in source_artifacts:
+        path = Path(str(artifact.get("path") or ""))
+        parts = path.parts
+        for idx in range(len(parts) - 1, -1, -1):
+            if parts[idx].lower() == "data":
+                return Path(*parts[: idx + 1])
+    return Path("data")
+
+
+def _recent_rows_by_machine_from_cache(data_dir: Path, *, status: CacheStatus, rows_per_machine: int) -> dict[str, list[dict[str, Any]]] | None:
+    if not status.exists or not status.fresh:
+        LOGGER.info(
+            "live telemetry cache unavailable; using JSONL fallback exists=%s fresh=%s data_dir=%s",
+            status.exists,
+            status.fresh,
+            data_dir,
+        )
+        return None
+    try:
+        rows = TelemetryCache(status.cache_path).recent_samples_per_machine(rows_per_machine=rows_per_machine)
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning("live telemetry cache query failed; using JSONL fallback data_dir=%s error=%s", data_dir, exc)
+        return None
+    by_machine: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        machine_name = str(row.get("machine_id") or row.get("machine") or "").strip()
+        if not machine_name:
+            continue
+        by_machine.setdefault(machine_name, []).append(row)
+    return by_machine
 
 
 def _recent_rows_by_machine(

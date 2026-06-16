@@ -188,6 +188,11 @@
     </div>
     <p><a href="{{ url_for('web.status') }}">Open /status</a> for full runtime/control details.</p>
     <p>Current global operator scope: <strong>{{ operator_scope.label }}</strong>{% if operator_scope.updated_at %} (updated {{ operator_scope.updated_at }}){% endif %}</p>
+
+    <dl class="kv-grid">
+      <div class="kv-row"><dt>Telemetry cache</dt><dd>{{ telemetry_cache_status.state|title }} · {{ telemetry_cache_status.cached_row_count if telemetry_cache_status.cached_row_count is not none else 'n/a' }} rows · {{ telemetry_cache_status.source_file_count }} source files</dd></div>
+      <div class="kv-row"><dt>Last cache rebuild</dt><dd>{{ telemetry_cache_status.last_rebuild_time or 'n/a' }}</dd></div>
+    </dl>
     <form method="post" action="{{ url_for('web.control_scope') }}" class="control-form control-card">
       <label for="scope_start">Scope start date:</label>
       <input id="scope_start" type="date" name="start_date" value="{{ operator_scope.start_date or '' }}">
@@ -206,6 +211,12 @@
     <form method="post" action="{{ url_for('web.control_action') }}">
       <input type="hidden" name="action" value="rerun_latest_session_workflow">
       <button type="submit">Run workflow on latest processed dataset (explicit latest action)</button>
+    </form>
+
+    <form method="post" action="{{ url_for('web.control_action') }}">
+      <input type="hidden" name="action" value="rebuild_telemetry_cache">
+      <button type="submit">Rebuild telemetry analytics cache</button>
+      <p class="form-help">Runs a full JSONL-to-Parquet rebuild for faster cached reads; JSONL remains the fallback/source of truth.</p>
     </form>
   </details>
 </section>

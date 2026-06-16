@@ -141,14 +141,14 @@ def line_or_scatter_data(
                     continue
                 points.append({"x": float(x), "y": float(y)})
             datasets.append({"label": col, "data": points})
-        return {"datasets": datasets, "x_is_time": ts is not None and ts.notna().any()}
+        return {"datasets": datasets, "x_is_time": bool(ts is not None and ts.notna().any())}
 
     labels = ts.dt.strftime("%Y-%m-%d %H:%M:%S").fillna("").tolist() if ts is not None and ts.notna().any() else [str(i) for i in range(len(rows))]
     datasets = []
     for col in y_cols:
         series = pd.to_numeric(rows[col], errors="coerce")
         datasets.append({"label": col, "data": [None if pd.isna(v) else float(v) for v in series.tolist()]})
-    return {"labels": labels, "datasets": datasets, "x_is_time": ts is not None and ts.notna().any()}
+    return {"labels": labels, "datasets": datasets, "x_is_time": bool(ts is not None and ts.notna().any())}
 
 
 def histogram_data(df: pd.DataFrame, col: str, bins: int = 20) -> dict:

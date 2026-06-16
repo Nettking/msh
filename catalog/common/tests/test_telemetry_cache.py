@@ -151,3 +151,30 @@ def test_cache_absent_queries_are_empty_and_status_reports_missing(tmp_path: Pat
     assert status.exists is False
     assert status.fresh is False
     assert latest == []
+
+
+def test_cached_cache_status_uses_ttl_and_can_be_invalidated(tmp_path: Path) -> None:
+    from catalog.common.telemetry_cache import cached_cache_status, invalidate_cache_status
+
+    _require_cache_dependencies()
+    data_dir = tmp_path / "data"
+    source = data_dir / "telemetry.jsonl"
+    _write_jsonl(source, [{"timestamp": "2026-03-23T08:00:00Z", "machine_id": "QuickTurn"}])
+    result = rebuild_cache(data_dir)
+
+    first = cached_cache_status(data_dir, result.cache_path, ttl_seconds=60, force=True)
+    source.write_text(
+        source.read_text(encoding="utf-8")
+        + json.dumps({"timestamp": "2026-03-23T08:01:00Z", "machine_id": "QuickTurn"})
+        + "\n",
+        encoding="utf-8",
+    )
+
+    within_ttl = cached_cache_status(data_dir, result.cache_path, ttl_seconds=60)
+    assert within_ttl is first
+    assert within_ttl.fresh is True
+
+    invalidate_cache_status(data_dir, result.cache_path)
+    after_invalidate = cached_cache_status(data_dir, result.cache_path, ttl_seconds=60)
+    assert after_invalidate is not first
+    assert after_invalidate.fresh is False
