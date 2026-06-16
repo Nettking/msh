@@ -10,6 +10,8 @@ from __future__ import annotations
 import json
 import shutil
 import tempfile
+import threading
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -57,6 +59,9 @@ DEFAULT_CACHE_RELATIVE_PATH = Path("cache") / "parquet"
 UNKNOWN_PARTITION = "__unknown__"
 MANIFEST_FILENAME = "_manifest.json"
 MANIFEST_VERSION = 1
+DEFAULT_CACHE_STATUS_TTL_SECONDS = 5.0
+_CACHE_STATUS_LOCK = threading.Lock()
+_CACHE_STATUS_CACHE: dict[tuple[str, str | None], tuple[float, CacheStatus]] = {}
 
 
 @dataclass(frozen=True)
@@ -82,6 +87,7 @@ class CacheStatus:
     manifest_exists: bool = False
     manifest_source_file_count: int | None = None
     manifest_row_count: int | None = None
+    manifest_generated_at: str | None = None
 
 
 def default_cache_dir(data_dir: Path | str = "data") -> Path:
@@ -163,6 +169,7 @@ def rebuild_cache(data_dir: Path | str = "data", cache_dir: Path | str | None = 
         shutil.rmtree(temp_dir, ignore_errors=True)
         raise
 
+    invalidate_cache_status(root, output)
     return CacheBuildResult(row_count=len(frame), source_file_count=len(files), cache_path=output)
 
 
@@ -176,6 +183,7 @@ def cache_status(data_dir: Path | str = "data", cache_dir: Path | str | None = N
     manifest_path = output / MANIFEST_FILENAME
     manifest = _read_manifest(manifest_path)
     manifest_row_count = None if manifest is None else _safe_int(manifest.get("row_count"))
+    manifest_generated_at = None if manifest is None else str(manifest.get("generated_at") or "") or None
     manifest_sources = None if manifest is None else manifest.get("sources")
     manifest_source_file_count = len(manifest_sources) if isinstance(manifest_sources, list) else None
     cache_files = [*parquet_files, manifest_path] if manifest_path.exists() else parquet_files
@@ -198,7 +206,52 @@ def cache_status(data_dir: Path | str = "data", cache_dir: Path | str | None = N
         manifest_exists=manifest_path.exists(),
         manifest_source_file_count=manifest_source_file_count,
         manifest_row_count=manifest_row_count,
+        manifest_generated_at=manifest_generated_at,
     )
+
+
+def cached_cache_status(
+    data_dir: Path | str = "data",
+    cache_dir: Path | str | None = None,
+    *,
+    ttl_seconds: float = DEFAULT_CACHE_STATUS_TTL_SECONDS,
+    force: bool = False,
+) -> CacheStatus:
+    """Return cache status with a short TTL to protect request hot paths.
+
+    ``cache_status`` recursively stats JSONL and Parquet files to prove freshness.
+    Flask pages can refresh frequently, so callers that do not need a forced
+    scan should use this helper and accept a small freshness delay.
+    """
+
+    key = _cache_status_key(data_dir, cache_dir)
+    now = time.monotonic()
+    ttl = max(float(ttl_seconds), 0.0)
+    with _CACHE_STATUS_LOCK:
+        cached = _CACHE_STATUS_CACHE.get(key)
+        if cached and not force and (now - cached[0]) <= ttl:
+            return cached[1]
+
+    status = cache_status(data_dir, cache_dir)
+    with _CACHE_STATUS_LOCK:
+        _CACHE_STATUS_CACHE[key] = (time.monotonic(), status)
+    return status
+
+
+def invalidate_cache_status(data_dir: Path | str | None = None, cache_dir: Path | str | None = None) -> None:
+    """Clear cached cache-status entries after rebuilds or explicit refreshes."""
+
+    with _CACHE_STATUS_LOCK:
+        if data_dir is None:
+            _CACHE_STATUS_CACHE.clear()
+            return
+        _CACHE_STATUS_CACHE.pop(_cache_status_key(data_dir, cache_dir), None)
+
+
+def _cache_status_key(data_dir: Path | str, cache_dir: Path | str | None) -> tuple[str, str | None]:
+    root = Path(data_dir).resolve()
+    output = Path(cache_dir).resolve() if cache_dir is not None else default_cache_dir(root).resolve()
+    return (str(root), str(output))
 
 
 class TelemetryCache:
@@ -266,6 +319,72 @@ class TelemetryCache:
             ORDER BY machine_id NULLS LAST
         """
         return self._query(sql, as_dataframe=as_dataframe)
+
+
+    def recent_samples_per_machine(
+        self,
+        *,
+        rows_per_machine: int = 300,
+        as_dataframe: bool = False,
+    ) -> list[dict[str, Any]] | pd.DataFrame:
+        """Return the most recent cached samples for each machine.
+
+        This is intended for live/latest-sample UI paths that previously tailed
+        raw JSONL files repeatedly. Rows are returned oldest-to-newest within
+        each machine bucket so downstream state inference sees chronological
+        input.
+        """
+
+        # Future optimization: maintain a rolling/latest-row cache or prune by
+        # recent partitions before ranking when deployments retain many months
+        # of telemetry.
+        sql = f"""
+            WITH ranked AS (
+                SELECT
+                    {', '.join(_quoted_columns())},
+                    row_number() OVER (
+                        PARTITION BY machine_id
+                        ORDER BY timestamp DESC NULLS LAST, source_file DESC NULLS LAST
+                    ) AS rn
+                FROM {_read_parquet_sql(self.cache_dir)}
+                WHERE machine_id IS NOT NULL
+            )
+            SELECT {', '.join(_quoted_columns())}
+            FROM ranked
+            WHERE rn <= ?
+            ORDER BY machine_id, timestamp
+        """
+        return self._query(sql, [int(rows_per_machine)], as_dataframe=as_dataframe)
+
+    def machine_day_row_counts(
+        self,
+        *,
+        start_date: str | None = None,
+        end_date: str | None = None,
+        as_dataframe: bool = False,
+    ) -> list[dict[str, Any]] | pd.DataFrame:
+        """Return cached row counts grouped by day and machine."""
+
+        predicates = ["timestamp IS NOT NULL"]
+        parameters: list[Any] = []
+        if start_date:
+            predicates.append("CAST(timestamp AS DATE) >= CAST(? AS DATE)")
+            parameters.append(start_date)
+        if end_date:
+            predicates.append("CAST(timestamp AS DATE) <= CAST(? AS DATE)")
+            parameters.append(end_date)
+        where_clause = " AND ".join(predicates)
+        sql = f"""
+            SELECT
+                CAST(timestamp AS DATE) AS date,
+                coalesce(machine_id, 'unknown') AS machine,
+                count(*) AS value
+            FROM {_read_parquet_sql(self.cache_dir)}
+            WHERE {where_clause}
+            GROUP BY 1, 2
+            ORDER BY 1, 2
+        """
+        return self._query(sql, parameters, as_dataframe=as_dataframe)
 
     def to_dataframe(self, sql: str, parameters: Sequence[Any] | None = None) -> pd.DataFrame:
         """Run a custom DuckDB query and return a pandas DataFrame."""

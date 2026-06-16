@@ -12,20 +12,22 @@ import json
 import re
 from dataclasses import dataclass
 from functools import lru_cache
-from typing import Any
 from pathlib import Path
+from typing import Any
 
 import pandas as pd
 
 from catalog.common.artifact_registry import read_raw_table
 from catalog.common.artifact_registry import read_table_columns
-from catalog.common.timeline_exports import build_state_interval_export
+from catalog.common.timeline_exports import build_state_interval_export, build_timeline_rows_export
+from catalog.common.telemetry_cache import TelemetryCache, cached_cache_status
 
 REQUIRED_PLAYBACK_COLUMNS = {"timestamp", "machine_id", "state"}
 DEFAULT_LIVE_SIGNAL_COLUMNS = ["Srpm", "Sload", "Sovr", "Fovr", "Frapidovr"]
 PLAYBACK_TICK_FREQUENCY = "200ms"
 DEFAULT_FALLBACK_PLAYBACK_DELAY_SECONDS = 0.2
 DEFAULT_MAX_PLAYBACK_DELAY_SECONDS = 5.0
+TELEMETRY_CACHE_PLAYBACK_PATH = "telemetry-cache://timeline"
 
 
 @dataclass
@@ -76,6 +78,26 @@ class PlaybackSelection:
     machine_day_counts: dict[str, dict[str, int]]
     selected_machine_days: list[str]
     selected_machine_day_counts: dict[str, int]
+
+
+def telemetry_cache_playback_artifact() -> dict[str, Any] | None:
+    """Return a virtual playback artifact for a fresh telemetry cache."""
+
+    status = cached_cache_status(Path("data"))
+    if not status.exists or not status.fresh:
+        return None
+    return {
+        "path": TELEMETRY_CACHE_PLAYBACK_PATH,
+        "file_name": "Telemetry analytics cache",
+        "category": "source_data",
+        "status": "ready",
+        "visibility": "default",
+        "playback_compatible": True,
+        "modified_at": status.manifest_generated_at or str(status.latest_cache_mtime or ""),
+        "signature": f"telemetry-cache:{status.latest_cache_mtime}:{status.manifest_row_count}",
+        "row_count": status.manifest_row_count or 0,
+        "is_virtual_cache": True,
+    }
 
 
 def _workflow_session_dir_for_artifact(path: str) -> Path | None:
@@ -364,6 +386,8 @@ def _playback_index_entry_for_path(
     scope_end: str,
     scope_active: bool,
 ) -> PlaybackArtifactIndexEntry | None:
+    if path == TELEMETRY_CACHE_PLAYBACK_PATH:
+        return _telemetry_cache_playback_index_entry(path, scope_start, scope_end, scope_active)
     try:
         frame = _read_playback_index_columns(path)
     except Exception:  # noqa: BLE001
@@ -401,6 +425,50 @@ def _playback_index_entry_for_path(
     )
     return PlaybackArtifactIndexEntry(path=path, machine_days=machine_days, machine_day_counts=machine_day_counts)
 
+
+def _telemetry_cache_playback_index_entry(
+    path: str,
+    scope_start: str,
+    scope_end: str,
+    scope_active: bool,
+) -> PlaybackArtifactIndexEntry | None:
+    status = cached_cache_status(Path("data"))
+    if not status.exists or not status.fresh:
+        return None
+    try:
+        frame = TelemetryCache(status.cache_path).machine_day_row_counts(
+            start_date=scope_start if scope_active else None,
+            end_date=scope_end if scope_active else None,
+            as_dataframe=True,
+        )
+    except Exception:  # noqa: BLE001
+        return None
+    if frame.empty or not {"date", "machine", "value"}.issubset(frame.columns):
+        return None
+    counts_by_machine: dict[str, dict[str, int]] = {}
+    for _, row in frame.iterrows():
+        machine_key = str(row.get("machine") or "").strip()
+        day_key = str(row.get("date") or "").strip()[:10]
+        if not machine_key or not day_key:
+            continue
+        try:
+            count = int(row.get("value") or 0)
+        except (TypeError, ValueError):
+            count = 0
+        if count <= 0:
+            continue
+        counts_by_machine.setdefault(machine_key, {})[day_key] = count
+    if not counts_by_machine:
+        return None
+    machine_days = tuple(
+        (machine_id, tuple(sorted(day_counts.keys())))
+        for machine_id, day_counts in sorted(counts_by_machine.items())
+    )
+    machine_day_counts = tuple(
+        (machine_id, tuple((day, day_counts[day]) for day in sorted(day_counts.keys())))
+        for machine_id, day_counts in sorted(counts_by_machine.items())
+    )
+    return PlaybackArtifactIndexEntry(path=path, machine_days=machine_days, machine_day_counts=machine_day_counts)
 
 @lru_cache(maxsize=32)
 def _cached_playback_selection_index(
@@ -583,6 +651,11 @@ def _has_non_empty_values(series: pd.Series) -> bool:
 
 def validate_playback_source(path: str) -> PlaybackValidation:
     """Validate a playback file by inspecting columns before loading all rows."""
+    if path == TELEMETRY_CACHE_PLAYBACK_PATH:
+        status = cached_cache_status(Path("data"))
+        if status.exists and status.fresh:
+            return PlaybackValidation(True, "")
+        return PlaybackValidation(False, "Telemetry analytics cache is missing or stale.")
     columns, load_error = read_table_columns(path)
     if load_error:
         return PlaybackValidation(False, f"Unable to inspect source columns: {load_error}")
@@ -593,6 +666,19 @@ def validate_playback_source(path: str) -> PlaybackValidation:
 
 
 def load_playback_frame(path: str) -> tuple[pd.DataFrame | None, str | None]:
+    if path == TELEMETRY_CACHE_PLAYBACK_PATH:
+        status = cached_cache_status(Path("data"))
+        if not status.exists or not status.fresh:
+            return None, "Telemetry analytics cache is missing or stale."
+        try:
+            samples = TelemetryCache(status.cache_path).samples_by_date_range(
+                "1900-01-01",
+                "2999-12-31",
+                as_dataframe=True,
+            )
+            return build_timeline_rows_export(samples), None
+        except Exception as exc:  # noqa: BLE001
+            return None, f"Could not load telemetry analytics cache: {exc}"
     try:
         frame = read_raw_table(path)
     except Exception as exc:  # noqa: BLE001
@@ -600,6 +686,22 @@ def load_playback_frame(path: str) -> tuple[pd.DataFrame | None, str | None]:
     if not isinstance(frame, pd.DataFrame):
         return None, f"Could not load '{path}': source did not produce a table."
     return frame, None
+
+
+def load_cached_playback_frame_for_machine_day(machine_id: str, day: str) -> tuple[pd.DataFrame | None, str | None]:
+    """Load a playback-ready timeline from the telemetry cache for one machine/day."""
+
+    status = cached_cache_status(Path("data"))
+    if not status.exists or not status.fresh:
+        return None, "Telemetry analytics cache is missing or stale."
+    try:
+        samples = TelemetryCache(status.cache_path).samples_by_date_range(day, day, as_dataframe=True)
+    except Exception as exc:  # noqa: BLE001
+        return None, f"Could not query telemetry analytics cache: {exc}"
+    if samples.empty:
+        return pd.DataFrame(columns=list(REQUIRED_PLAYBACK_COLUMNS)), None
+    samples = samples[samples["machine_id"].astype("string") == str(machine_id)]
+    return build_timeline_rows_export(samples), None
 
 
 def prepare_playback_frame(df: pd.DataFrame) -> pd.DataFrame:

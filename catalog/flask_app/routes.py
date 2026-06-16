@@ -5,6 +5,7 @@ from pathlib import Path
 import pandas as pd
 from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
 
+from catalog.common.telemetry_cache import TelemetryCache, cached_cache_status
 from catalog.orchestrator.pipeline import get_runtime_manager
 from catalog.runner.session_store import list_sessions
 
@@ -16,8 +17,10 @@ from .services.operator_page_cache import get_operator_page_cache
 from .services.operator_scope_service import get_operator_scope_service
 from .services.strategy_config_service import StrategyConfigService
 from .services.playback_service import (
+    TELEMETRY_CACHE_PLAYBACK_PATH,
     default_live_signal_columns,
     interval_rows,
+    load_cached_playback_frame_for_machine_day,
     load_playback_frame,
     playback_field_groups,
     prepare_playback_frame,
@@ -27,6 +30,7 @@ from .services.playback_service import (
     summarize_intervals,
     validate_playback_frame,
     validate_playback_source,
+    telemetry_cache_playback_artifact,
 )
 from .services.workflow_session_index import get_workflow_session_index
 
@@ -45,6 +49,49 @@ def startup_mode_gate():
         return redirect(url_for("web.startup", next=request.full_path if request.query_string else request.path))
     return None
 
+
+def _telemetry_cache_status_model() -> dict[str, object]:
+    status = cached_cache_status(Path("data"))
+    state = "fresh" if status.fresh else ("stale" if status.exists else "missing")
+    return {
+        "state": state,
+        "exists": status.exists,
+        "fresh": status.fresh,
+        "cache_path": str(status.cache_path),
+        "source_file_count": status.source_file_count,
+        "parquet_file_count": status.parquet_file_count,
+        "cached_row_count": status.manifest_row_count,
+        "manifest_source_file_count": status.manifest_source_file_count,
+        "last_rebuild_time": status.manifest_generated_at,
+    }
+
+
+def _machine_day_detail_from_cache(scope) -> dict | None:
+    status = cached_cache_status(Path("data"))
+    if not status.exists or not status.fresh:
+        current_app.logger.info(
+            "machine day summary using session export fallback cache_exists=%s cache_fresh=%s",
+            status.exists,
+            status.fresh,
+        )
+        return None
+    try:
+        frame = TelemetryCache(status.cache_path).machine_day_row_counts(
+            start_date=str(scope.start_date) if getattr(scope, "is_active", False) else None,
+            end_date=str(scope.end_date) if getattr(scope, "is_active", False) else None,
+            as_dataframe=True,
+        )
+    except Exception as exc:  # noqa: BLE001
+        current_app.logger.warning("machine day summary DuckDB cache failed; using session export fallback error=%s", exc)
+        return None
+    current_app.logger.info("machine day summary using DuckDB/Parquet cache rows=%s", len(frame))
+    return {
+        "session_id": "telemetry_cache",
+        "source_path": str(status.cache_path),
+        "status": "ready" if not frame.empty else "empty_rows",
+        "message": "No cached telemetry rows matched the selected scope." if frame.empty else "",
+        "frame": frame,
+    }
 
 def _strategy_config_service() -> StrategyConfigService:
     return StrategyConfigService(
@@ -145,6 +192,35 @@ def _machine_day_detail_for_session(session_id: str) -> dict:
     }
 
 
+def _telemetry_cache_exploration_artifact() -> dict[str, object] | None:
+    status = cached_cache_status(Path("data"))
+    if not status.exists or not status.fresh:
+        return None
+    return {
+        "path": "telemetry-cache://samples",
+        "file_name": "Telemetry analytics cache",
+        "visibility": "default",
+        "status": "ready",
+        "category": "source_data",
+        "row_count": status.manifest_row_count or 0,
+        "modified_at": status.manifest_generated_at or "",
+    }
+
+
+def _load_telemetry_cache_exploration_frame(window_start: str, window_end: str) -> tuple[pd.DataFrame | None, str | None]:
+    status = cached_cache_status(Path("data"))
+    if not status.exists or not status.fresh:
+        return None, "Telemetry analytics cache is missing or stale; choose an artifact or rebuild the cache."
+    start = (window_start or "1900-01-01")[:10]
+    end = (window_end or "2999-12-31")[:10]
+    try:
+        frame = TelemetryCache(status.cache_path).samples_by_date_range(start, end, as_dataframe=True)
+    except Exception as exc:  # noqa: BLE001
+        current_app.logger.warning("exploration DuckDB cache failed; use artifact fallback error=%s", exc)
+        return None, f"Could not query telemetry analytics cache: {exc}"
+    current_app.logger.info("exploration using DuckDB/Parquet cache rows=%s", len(frame))
+    return frame, None
+
 def _machine_day_chart_payload(frame: pd.DataFrame) -> tuple[dict, str]:
     required = {"date", "machine", "value"}
     if not required.issubset(frame.columns):
@@ -223,6 +299,7 @@ def status():
         internal_artifacts=internal_artifacts,
         phase_message=phase_messages.get(current_phase, "Runtime state is available below."),
         operator_scope=operator_scope,
+        telemetry_cache_status=_telemetry_cache_status_model(),
     )
 
 
@@ -288,7 +365,12 @@ def machine_view():
     trend = {"labels": [], "series": []}
     error = ""
     source_path = ""
-    if requested_session_id and requested_session_id not in readiness_by_session:
+    cache_detail = None if requested_session_id else _machine_day_detail_from_cache(scope)
+    if cache_detail is not None and cache_detail["status"] == "ready":
+        source_path = cache_detail["source_path"]
+        trend, payload_error = _machine_day_chart_payload(cache_detail["frame"])
+        error = payload_error
+    elif requested_session_id and requested_session_id not in readiness_by_session:
         error = f"Selected session was not found: {requested_session_id}"
     elif selected_session is None:
         runtime_phase = runtime_state.get("current_processing_phase")
@@ -324,6 +406,7 @@ def machine_view():
         y_axis_label="Row count",
         runtime_state=runtime_state,
         operator_scope=scope,
+        telemetry_cache_status=_telemetry_cache_status_model(),
     )
 
 
@@ -345,6 +428,9 @@ def playback():
         discovered = [
             a for a in scan_snapshot.artifacts if a.get("playback_compatible") and a.get("visibility") == "default"
         ]
+        cache_artifact = telemetry_cache_playback_artifact()
+        if cache_artifact is not None:
+            discovered.append(cache_artifact)
         return filter_playback_artifacts_for_runtime(
             discovered,
             runtime_state,
@@ -373,7 +459,11 @@ def playback():
     machine = selection.machine
     day = selection.day
 
-    selected = _catalog().artifact_by_path(selected_path) if selected_path else None
+    selected = (
+        telemetry_cache_playback_artifact()
+        if selected_path == TELEMETRY_CACHE_PLAYBACK_PATH
+        else (_catalog().artifact_by_path(selected_path) if selected_path else None)
+    )
     prepared_frame = None
     validation_reason = None
     rows = None
@@ -393,7 +483,12 @@ def playback():
             if not source_validation.is_valid:
                 validation_reason = source_validation.reason
             else:
-                frame, error = load_playback_frame(selected_path)
+                if selected_path == TELEMETRY_CACHE_PLAYBACK_PATH and machine and day:
+                    current_app.logger.info("playback using DuckDB/Parquet cache machine=%s day=%s", machine, day)
+                    frame, error = load_cached_playback_frame_for_machine_day(machine, day)
+                else:
+                    current_app.logger.info("playback using session export fallback path=%s", selected_path)
+                    frame, error = load_playback_frame(selected_path)
                 if frame is not None:
                     validation = validate_playback_frame(frame)
                     if validation.is_valid:
@@ -459,9 +554,16 @@ def playback():
 def exploration():
     snap = _catalog().cached_snapshot()
     visible_artifacts = [a for a in snap.artifacts if a.get("visibility") == "default"]
+    cache_exploration_artifact = _telemetry_cache_exploration_artifact()
+    if cache_exploration_artifact is not None:
+        visible_artifacts.insert(0, cache_exploration_artifact)
     selected_path = request.args.get("path", "")
     chart_type = request.args.get("chart", "line")
-    selected = _catalog().artifact_by_path(selected_path) if selected_path else None
+    selected = (
+        cache_exploration_artifact
+        if selected_path == "telemetry-cache://samples"
+        else (_catalog().artifact_by_path(selected_path) if selected_path else None)
+    )
     if selected and selected.get("visibility") != "default":
         selected = None
 
@@ -486,7 +588,11 @@ def exploration():
         window_end = f"{scope.end_date}T23:59"
 
     if selected:
-        frame, error = safe_load_artifact_frame(selected_path)
+        if selected_path == "telemetry-cache://samples":
+            frame, error = _load_telemetry_cache_exploration_frame(window_start, window_end)
+        else:
+            current_app.logger.info("exploration using artifact/session fallback path=%s", selected_path)
+            frame, error = safe_load_artifact_frame(selected_path)
         if frame is not None and not frame.empty:
             numeric = numeric_columns(frame)
             categorical = category_columns(frame)
@@ -586,7 +692,12 @@ def control():
         selected_session_id or "",
     )
     operator_scope = get_operator_scope_service().get()
-    return render_template("control.html", panel=panel, operator_scope=operator_scope)
+    return render_template(
+        "control.html",
+        panel=panel,
+        operator_scope=operator_scope,
+        telemetry_cache_status=_telemetry_cache_status_model(),
+    )
 
 
 @web.post("/control/scope")
