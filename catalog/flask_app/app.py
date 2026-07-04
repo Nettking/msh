@@ -9,6 +9,7 @@ from flask import Flask
 from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
+from .ai_routes import ai_web
 from .routes import web
 from .services.catalog_service import ArtifactCatalog
 
@@ -27,6 +28,7 @@ def create_app() -> Flask:
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
     app.register_blueprint(web)
+    app.register_blueprint(ai_web)
     return app
 
 
