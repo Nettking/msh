@@ -1,10 +1,10 @@
 # Data directory
 
-This directory is the expected local location for MTConnect JSONL inputs used by analysis scripts.
+This directory is the expected local location for MTConnect JSONL inputs used by the runtime, cache rebuilds, and analysis scripts.
 
-## Supported layouts currently used in this repository
+## Supported layouts
 
-1. **Flat files** (used by most analysis scripts):
+1. **Flat files**
 
 ```text
 data/
@@ -12,7 +12,7 @@ data/
   2026-01-11.jsonl
 ```
 
-2. **Per-machine subfolders** (written by `record data/standalone-recorder_v2.py`):
+2. **Per-machine subfolders**
 
 ```text
 data/
@@ -22,9 +22,11 @@ data/
     2026-01-10.jsonl
 ```
 
-## Important note
+## Current support level
 
-Many current analysis scripts only scan `data/*.jsonl` and do **not** recurse into machine subfolders. If your data was recorded with recorder v2, adjust scripts or pre-process layout before running those analyses.
+The current runtime, date discovery, workflow-session filtering, and telemetry analytics cache paths are intended to discover JSONL recursively under `data/**/*.jsonl`.
+
+Some older manual, exploratory, or legacy scripts may still assume a flat `data/*.jsonl` layout. When maintaining those scripts, prefer shared helpers from `catalog/common/` and `catalog/runner/` instead of implementing new ad hoc file discovery.
 
 ## Version-control policy
 
