@@ -38,3 +38,6 @@ Thumbs.db
 
 # Runner local cache
 /catalog/runner/.data_index.json
+
+# Local AI explainer cache
+/.cache/
