@@ -28,6 +28,24 @@ docker compose run --rm prep
 
 For detailed setup, environment variables, and expected first-run behavior, see [docs/quick_start.md](docs/quick_start.md).
 
+## AI explainer
+
+MSH includes a first read-only local AI explainer for asking system-understanding questions about the repository. It indexes selected documentation and code, retrieves relevant context, and sends that context to a local Ollama model.
+
+Preview retrieved context without calling Ollama:
+
+```bash
+python -m catalog.ai.ask --dry-run "How does data flow through MSH?"
+```
+
+Ask through Ollama:
+
+```bash
+python -m catalog.ai.ask "What does /control do?"
+```
+
+Use `MSH_AI_MODEL` or `--model` to select the Ollama model. See [docs/ai_explainer.md](docs/ai_explainer.md) for scope, exclusions, and safety boundaries.
+
 ## Main Flask URLs
 
 - `/` — operator overview and current runtime/workflow session summary.
@@ -36,6 +54,7 @@ For detailed setup, environment variables, and expected first-run behavior, see 
 - `/playback` — playback-compatible timeline exports and machine/day replay views.
 - `/analyses` — discovered analysis artifacts and basic chart previews.
 - `/live` — recent telemetry snapshot from scan-discovered JSONL sources.
+- `/ai` — read-only local AI explainer for system-understanding questions.
 - `/startup` — startup mode choice when an existing runtime namespace requires an operator decision.
 
 ## Repository map
@@ -44,6 +63,7 @@ For detailed setup, environment variables, and expected first-run behavior, see 
 - `catalog/orchestrator/` — non-interactive bootstrap/catch-up orchestration.
 - `catalog/runner/` — workflow session metadata, date filtering, script discovery/execution, and playback export helpers.
 - `catalog/common/` — shared telemetry loading, normalization, state inference, metrics, and timeline export utilities.
+- `catalog/ai/` — read-only repository explanation helpers backed by local Ollama.
 - `catalog/*/` — runner-visible automatic, manual, deep/exploratory, and legacy scripts plus script-specific README files.
 - `data/` — local raw JSONL telemetry input location; not intended for committed production data.
 - `results/` — generated analysis outputs, workflow sessions, runtime state, and discovered artifacts.
@@ -61,7 +81,12 @@ See [catalog/README.md](catalog/README.md) for the script catalog and analysis w
 - [Intervention strategies](docs/intervention_strategies.md) — config-driven candidate event labels, strategies, and review-ready output schema.
 - [Workflow sessions](docs/workflow_sessions.md) — session layout, cache reuse, script status, bootstrap, and catch-up behavior.
 - [Architecture](docs/architecture.md) — system components, dataflow diagram, policies, and design intent.
+- [AI explainer](docs/ai_explainer.md) — read-only Ollama/RAG explainer scope, indexed sources, exclusions, and usage.
 - [Troubleshooting](docs/troubleshooting.md) — common startup, data, playback, Docker, and script-run issues.
+
+## Data layout note
+
+Current runtime and cache paths generally support recursive `data/**/*.jsonl` discovery. Some older manual or legacy scripts may still assume a flat `data/*.jsonl` layout. Prefer the shared helpers in `catalog/common/` and `catalog/runner/` for new work so recursive discovery, timestamp parsing, and machine normalization stay consistent.
 
 ## Deprecated interactive menu
 
