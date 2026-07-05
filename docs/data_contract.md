@@ -1,6 +1,6 @@
 # Data contract
 
-This document describes the data shapes MSH expects and the artifacts it creates. It is descriptive, not a promise that every historical file is clean. For session lifecycle and cache behavior, see [Workflow sessions](workflow_sessions.md).
+This document describes the data shapes MSH expects and the artifacts it creates. It is descriptive, not a promise that every historical file is clean. For session lifecycle and cache behavior, see [Workflow sessions](workflow_sessions.md). For external source synchronization, see [Source synchronization](source_synchronization.md).
 
 ## Raw telemetry input
 
@@ -14,6 +14,30 @@ Common fields used by shared code and scripts include:
 - signal/context fields — examples include `Srpm`, `Sload`, `Sovr`, `Fovr`, `Frapidovr`, `execution`, `mode`, and `program`.
 
 If records in a file do not contain parseable timestamps, some date discovery and filtering paths can fall back to dates encoded in filenames. This is a compatibility behavior for historical data, not the preferred contract.
+
+## Multi-source telemetry input
+
+MSH can now receive telemetry from more than one source system. Source-specific connectors must normalize records before writing JSONL under `data/` so that recursive JSONL discovery does not ingest vendor metadata or non-telemetry API dumps.
+
+Recommended source landing layout:
+
+```text
+data/sources/<source-name>/jsonl/<YYYY-MM-DD>.jsonl
+data/source_state/<source-name>.json
+```
+
+The `.jsonl` files are part of the telemetry corpus. The source-state `.json` files are not telemetry and store watermarks, source run metadata, and synchronization status.
+
+For source connectors, the strongly recommended fields are:
+
+- `timestamp` — UTC measurement timestamp.
+- `machine_id` — stable machine identifier after source mapping.
+- `source` — source name, for example `observer_phoenix`.
+- `source_record_id` — stable source record key used for idempotent append/deduplication.
+- `measurement_type` — source measurement family, for example `trend`.
+- `value` and `unit` — scalar signal value and unit when the source record represents one scalar measurement.
+
+Connectors may add source-specific fields such as `point_id`, `point_name`, `channel`, `channel_name`, `source_machine_path`, and `alarm_info`. Consumers should tolerate extra columns.
 
 ## Normalized telemetry assumptions
 
@@ -72,3 +96,4 @@ Health scripts often validate raw telemetry availability and sequence behavior. 
 - Cache reuse is based on workflow session metadata signatures, timestamps, and output existence; it is not a full semantic validation of changed source data or changed script code.
 - JSONL records with inconsistent field names may require script-specific handling.
 - Filename-date fallback can include records without timestamps when the whole file has no parseable timestamp and the filename date is in scope.
+- Source connectors are responsible for producing MSH-compatible JSONL. Non-telemetry source metadata should not be written as `.jsonl` under `data/`.
