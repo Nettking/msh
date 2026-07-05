@@ -1,32 +1,45 @@
-# MSH CNC Telemetry Workbench
+# MSH CNC Telemetry Server
 
-MSH is a Flask-first workbench for orchestrating, replaying, and analyzing MTConnect-style CNC telemetry. It grew from standalone analysis scripts into a session-based runtime that can discover JSONL source data, prepare filtered workflow datasets, run bounded automatic scripts, export playback timelines, and expose operator/developer views through Flask.
+MSH is a server-oriented CNC telemetry workbench. A single checkout can run as an always-on Flask server, an MTConnect data recorder, a full recorder-plus-workbench server, or a one-shot preparation/synchronization job.
 
-The repository is intended for practical operation and as a research artifact: raw telemetry remains in `data/`, workflow session artifacts are written under `results/workflows/`, and reusable analysis scripts live in `catalog/`.
+The main deployment pattern is: keep raw telemetry under `data/`, keep generated workflow/session artifacts under `results/workflows/`, run selected services with Docker Compose profiles, and access the Flask workbench from another computer through a browser.
 
 ## Quick start
 
-Recommended Docker startup:
+Recommended server setup:
 
 ```bash
-docker compose up --build flask
+python setup_msh.py
+docker compose up -d --build
 ```
 
-Then open <http://localhost:5000>.
+Then open the web UI, if the selected mode includes it:
+
+```text
+http://localhost:5000
+```
+
+From another computer on the same network:
+
+```text
+http://<server-ip>:5000
+```
+
+The setup helper lets you choose what this checkout should activate:
+
+- full server: Flask workbench plus MTConnect recorder.
+- web workbench: Flask, orchestration, playback, source settings, and analysis UI.
+- web UI only: Flask without background orchestration.
+- recorder only: MTConnect data recorder without web UI.
+- one-shot prep or Observer Phoenix sync.
+
+For detailed setup, ports, profiles, and firewall notes, see [docs/server_setup.md](docs/server_setup.md) and [docs/quick_start.md](docs/quick_start.md).
 
 Local developer fallback:
 
 ```bash
 python -m catalog.flask_app.app
 ```
-
-Optional one-shot preparation container:
-
-```bash
-docker compose run --rm prep
-```
-
-For detailed setup, environment variables, and expected first-run behavior, see [docs/quick_start.md](docs/quick_start.md).
 
 ## AI explainer
 
@@ -54,21 +67,25 @@ Use `MSH_AI_MODEL` or `--model` to select the Ollama model. See [docs/ai_explain
 - `/playback` — playback-compatible timeline exports and machine/day replay views.
 - `/analyses` — discovered analysis artifacts and basic chart previews.
 - `/live` — recent telemetry snapshot from scan-discovered JSONL sources.
+- `/sources/observer-phoenix` — Observer Phoenix credential/status page.
 - `/ai` — read-only local AI explainer for system-understanding questions.
 - `/startup` — startup mode choice when an existing runtime namespace requires an operator decision.
 
 ## Repository map
 
+- `setup_msh.py` — interactive local deployment setup that writes ignored Docker Compose settings.
+- `docker-compose.yml` — profile-driven server components: web, recorder, full, prep, and observer-sync.
 - `catalog/flask_app/` — primary Flask application, routes, templates, and UI-facing services.
 - `catalog/orchestrator/` — non-interactive bootstrap/catch-up orchestration.
 - `catalog/runner/` — workflow session metadata, date filtering, script discovery/execution, and playback export helpers.
 - `catalog/common/` — shared telemetry loading, normalization, source synchronization state, state inference, metrics, and timeline export utilities.
 - `catalog/observer_phoenix/` — source connector that synchronizes SKF Observer Phoenix trend measurements into MSH-normalized JSONL.
+- `catalog/standalone-recorder_v2/` — configurable MTConnect recorder for recorder-only or full-server deployments.
 - `catalog/ai/` — read-only repository explanation helpers backed by local Ollama.
 - `catalog/*/` — runner-visible automatic, manual, deep/exploratory, and legacy scripts plus script-specific README files.
-- `data/` — local raw JSONL telemetry input location; not intended for committed production data.
-- `data/sources/` — source-specific normalized JSONL landing area for synchronized external sources.
-- `data/source_state/` — source synchronization watermarks and metadata; not telemetry input.
+- `data/` — local raw JSONL telemetry input and source-specific landing location; not intended for committed production data.
+- `data/sources/` — source-specific normalized JSONL landing area for synchronized/recorded external sources.
+- `data/source_state/` — source synchronization and recorder watermarks/state; not telemetry input.
 - `results/` — generated analysis outputs, workflow sessions, runtime state, and discovered artifacts.
 - `example-data/` — small sample JSONL input for development and documentation.
 - `ops/` — host-side operational helpers.
@@ -78,7 +95,8 @@ See [catalog/README.md](catalog/README.md) for the script catalog and analysis w
 
 ## Detailed documentation
 
-- [Quick start](docs/quick_start.md) — install/run commands and first-run expectations.
+- [Server setup](docs/server_setup.md) — deployment modes, LAN access, Docker Compose profiles, and recorder setup.
+- [Quick start](docs/quick_start.md) — setup commands and first-run expectations.
 - [Operator guide](docs/operator_guide.md) — daily UI workflow, sessions, playback, and controls.
 - [Data contract](docs/data_contract.md) — raw JSONL assumptions, normalized fields, derived artifacts, and playback-ready contract.
 - [Source synchronization](docs/source_synchronization.md) — multi-source landing layout, watermarks, and synchronization policy.
@@ -129,15 +147,16 @@ python -m catalog.cache.rebuild_telemetry_cache --data-dir data --cache-dir data
 
 ### Docker relationship
 
-The standard Flask startup remains:
+The standard server startup is:
 
 ```bash
-docker compose up --build flask
+python setup_msh.py
+docker compose up -d --build
 ```
 
-The Flask image installs the same Python dependencies as local development, including `duckdb` and `pyarrow`. The existing `docker-compose.yml` Flask service mounts `./data:/app/data`, so raw JSONL and the derived cache remain persistent on the host across container rebuilds.
+The Flask image installs the same Python dependencies as local development, including `duckdb` and `pyarrow`. The Docker services mount `./data:/app/data`, so raw JSONL, source configuration, recorder state, and the derived cache remain persistent on the host across container rebuilds.
 
-Cache rebuild is manual-only for now: `docker compose up --build flask` starts Flask and does not automatically refresh `data/cache/parquet/`. Use `/control` or run `python -m catalog.cache.rebuild_telemetry_cache` whenever new raw telemetry should be reflected in DuckDB/Parquet queries. `/status` shows whether the cache is missing, fresh, or stale, plus source file and cached-row counts.
+Cache rebuild is manual-only for now: starting the server does not automatically refresh `data/cache/parquet/`. Use `/control` or run `python -m catalog.cache.rebuild_telemetry_cache` whenever new raw telemetry should be reflected in DuckDB/Parquet queries. `/status` shows whether the cache is missing, fresh, or stale, plus source file and cached-row counts.
 
 ### Querying the cache
 
