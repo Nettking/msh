@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro">
+  <h2>Observer Phoenix source</h2>
+  <p>Configure the SKF Observer Phoenix source connector and check whether the Flask app can authenticate against the REST API.</p>
+</section>
+
+<section class="section-block section-block--primary">
+  <h3>Source status</h3>
+  <div class="metrics metrics-grid">
+    <article class="metric-card {% if status.configured %}metric-card--success{% else %}metric-card--warning{% endif %}">
+      <span class="metric-label">Credential state</span>
+      <span class="metric-value metric-value--long">
+        {% if status.configured %}Set{% else %}Default / unset{% endif %}
+      </span>
+    </article>
+    <article class="metric-card {% if status.last_test and status.last_test.connected %}metric-card--success{% elif status.last_test %}metric-card--danger{% else %}metric-card--warning{% endif %}">
+      <span class="metric-label">Connection</span>
+      <span class="metric-value metric-value--long">
+        {% if status.last_test and status.last_test.connected %}
+          Connected
+        {% elif status.last_test %}
+          Failed
+        {% else %}
+          Not tested
+        {% endif %}
+      </span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Active source</span>
+      <span class="metric-value metric-value--long">{{ status.active_label }}</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Config path</span>
+      <span class="metric-value metric-value--long">{{ status.config_path }}</span>
+    </article>
+  </div>
+
+  <p>{{ status.message }}</p>
+  {% if status.last_test %}
+  <p class="inline-note">
+    Last connection test: {{ status.last_test.tested_at or 'unknown time' }} ·
+    {{ status.last_test.message }}
+  </p>
+  {% endif %}
+</section>
+
+<section class="section-block">
+  <h3>Current effective settings</h3>
+  <dl class="kv-grid">
+    <div class="kv-row"><dt>Base URL</dt><dd>{{ status.base_url }}</dd></div>
+    <div class="kv-row"><dt>Username</dt><dd>{{ status.username or 'not set' }}</dd></div>
+    <div class="kv-row"><dt>Password</dt><dd>{{ 'set' if status.password_set else 'not set' }}</dd></div>
+    <div class="kv-row"><dt>TLS verification</dt><dd>{{ 'enabled' if status.verify_tls else 'disabled' }}</dd></div>
+    <div class="kv-row"><dt>Timeout</dt><dd>{{ status.timeout_seconds }} seconds</dd></div>
+    <div class="kv-row"><dt>Environment status</dt><dd>{{ status.env_status }}</dd></div>
+    <div class="kv-row"><dt>Local status</dt><dd>{{ status.local_status }}</dd></div>
+  </dl>
+</section>
+
+<section class="section-block section-block--actions">
+  <h3>Local runtime credentials</h3>
+  <p>These settings are written to the ignored local data directory. They are not committed to the repository. Complete environment variables override this local file.</p>
+
+  <form method="post" action="{{ url_for('source_web.save_observer_phoenix') }}" class="control-form control-card">
+    <label for="base_url">Base URL:</label>
+    <input id="base_url" type="url" name="base_url" value="{{ status.base_url }}" placeholder="https://localhost:14050" required>
+
+    <label for="username">Username:</label>
+    <input id="username" type="text" name="username" value="{{ status.username }}" autocomplete="username" required>
+
+    <label for="password">Password:</label>
+    <input id="password" type="password" name="password" value="" autocomplete="current-password" {% if not status.password_set %}required{% endif %}>
+    <p class="form-help">Leave blank to keep the existing local password.</p>
+
+    <label for="timeout_seconds">Timeout seconds:</label>
+    <input id="timeout_seconds" type="number" min="1" max="300" name="timeout_seconds" value="{{ status.timeout_seconds }}" required>
+
+    <label>
+      <input type="checkbox" name="verify_tls" {% if status.verify_tls %}checked{% endif %}>
+      Verify TLS certificate
+    </label>
+
+    <button class="button-primary" type="submit">Save local credentials</button>
+  </form>
+
+  <div class="control-action-grid control-action-grid--stacked">
+    <form method="post" action="{{ url_for('source_web.test_observer_phoenix') }}">
+      <button type="submit">Test connection</button>
+    </form>
+    <form method="post" action="{{ url_for('source_web.clear_observer_phoenix') }}">
+      <button type="submit">Clear local credentials</button>
+    </form>
+  </div>
+</section>
+{% endblock %}
