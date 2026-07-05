@@ -2,11 +2,21 @@
 {% block body %}
 <section class="page-intro">
   <h2>Assist</h2>
-  <p>Operator support cards: possible causes, suggested next steps, rationale, risk, alternatives, and confirmation.</p>
+  <p>Assist is for operator support during monitoring. It does not decide for the operator. It shows possible explanations, safe next steps, risks, and alternatives that the operator can accept, reject, or postpone.</p>
 </section>
 
 <section class="section-block section-block--primary">
-  <h3>Current support cards</h3>
+  <h3>How support cards work</h3>
+  <div class="info-grid">
+    <article class="info-card"><h4>1. Situation</h4><p>A card starts from a current issue, a common CNC template, or a reusable operator note.</p></article>
+    <article class="info-card"><h4>2. Suggestion</h4><p>The card explains possible causes, a suggested next step, the reason, the risk, and an alternative.</p></article>
+    <article class="info-card"><h4>3. Confirmation</h4><p>The operator records what they did. That response can later become evidence for a reusable strategy.</p></article>
+  </div>
+</section>
+
+<section class="section-block section-block--primary">
+  <h3>Support cards</h3>
+  <p>Cards marked as template-based are prompts for thinking. Cards based on reusable notes are stronger because they come from previous operator experience.</p>
   <div class="stack-list">
     {% for card in cards %}
     <article class="stack-row">
@@ -23,20 +33,8 @@
       </div>
       <form method="post" action="{{ url_for('operator_support_web.confirm_assist_action') }}" class="control-card">
         <input type="hidden" name="support_card_id" value="{{ card.id }}">
-        <label>
-          <span>Operator response</span>
-          <select name="confirmation_status" required>
-            <option value="accepted">Accept</option>
-            <option value="rejected">Reject</option>
-            <option value="do_later">Do later</option>
-            <option value="needs_supervisor">Needs supervisor</option>
-            <option value="already_done">Already done</option>
-          </select>
-        </label>
-        <label>
-          <span>Comment</span>
-          <textarea name="comment" rows="3" placeholder="Why did you accept/reject or what happened?"></textarea>
-        </label>
+        <label><span>Operator response</span><select name="confirmation_status" required><option value="accepted">Accept</option><option value="rejected">Reject</option><option value="do_later">Do later</option><option value="needs_supervisor">Needs supervisor</option><option value="already_done">Already done</option></select></label>
+        <label><span>Comment</span><textarea name="comment" rows="3" placeholder="Why did you accept/reject or what happened?"></textarea></label>
         <button class="button-primary" type="submit">Save confirmation</button>
       </form>
     </article>
@@ -47,16 +45,7 @@
 <section class="section-block">
   <h3>Recent confirmations</h3>
   {% if confirmations %}
-  <div class="table-scroll">
-    <table>
-      <tr><th>Time</th><th>Support card</th><th>Status</th><th>Comment</th></tr>
-      {% for item in confirmations %}
-      <tr><td>{{ item.confirmed_at }}</td><td><code>{{ item.support_card_id }}</code></td><td>{{ item.confirmation_status }}</td><td>{{ item.comment }}</td></tr>
-      {% endfor %}
-    </table>
-  </div>
-  {% else %}
-  <p>No confirmations saved yet.</p>
-  {% endif %}
+  <div class="table-scroll"><table><tr><th>Time</th><th>Support card</th><th>Status</th><th>Comment</th></tr>{% for item in confirmations %}<tr><td>{{ item.confirmed_at }}</td><td><code>{{ item.support_card_id }}</code></td><td>{{ item.confirmation_status }}</td><td>{{ item.comment }}</td></tr>{% endfor %}</table></div>
+  {% else %}<p>No confirmations saved yet.</p>{% endif %}
 </section>
 {% endblock %}
