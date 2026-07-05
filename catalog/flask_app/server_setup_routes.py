@@ -10,6 +10,7 @@ from .services.server_setup_service import (
     AI_MODEL_CHOICES,
     ServerSetupError,
     benchmark_ollama_response_time,
+    compare_ollama_setup_models,
     load_settings,
     pull_ollama_model,
     runtime_should_start,
@@ -25,6 +26,7 @@ _SETUP_PATHS = {
     "/server-setup/save",
     "/server-setup/pull-model",
     "/server-setup/test-ai-model",
+    "/server-setup/compare-ai-models",
     "/status",
     "/rescan",
 }
@@ -56,6 +58,8 @@ def browser_setup_gate():
         return _pull_from_request()
     if request.path == "/server-setup/test-ai-model" and request.method == "POST":
         return _test_ai_model_from_request()
+    if request.path == "/server-setup/compare-ai-models" and request.method == "POST":
+        return _compare_ai_models_from_request()
     if request.path in _SETUP_PATHS:
         return None
     try:
@@ -89,6 +93,14 @@ def _save_from_request():
     return redirect(_next_path())
 
 
+def _settings_for_ai_form():
+    settings = load_settings()
+    form_ai_enabled = request.form.get("ai_enabled") in {"on", "1", "true", "yes"}
+    if form_ai_enabled and not settings.ai_enabled:
+        settings = replace(settings, ai_enabled=True)
+    return settings
+
+
 def _selected_ai_model_from_request(settings) -> str:
     profile = str(request.form.get("ai_profile") or settings.ai_profile or "laptop-standard").strip()
     if profile in AI_MODEL_CHOICES:
@@ -98,22 +110,33 @@ def _selected_ai_model_from_request(settings) -> str:
 
 def _test_ai_model_from_request():
     try:
-        settings = load_settings()
+        settings = _settings_for_ai_form()
     except ServerSetupError as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
-
-    form_ai_enabled = request.form.get("ai_enabled") in {"on", "1", "true", "yes"}
-    if form_ai_enabled and not settings.ai_enabled:
-        settings = replace(settings, ai_enabled=True)
 
     model = _selected_ai_model_from_request(settings)
     result = benchmark_ollama_response_time(settings, model=model)
     return jsonify(result), 200 if result.get("ok") else 503
 
 
+def _compare_ai_models_from_request():
+    try:
+        settings = _settings_for_ai_form()
+    except ServerSetupError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+
+    result = compare_ollama_setup_models(settings)
+    return jsonify(result), 200 if result.get("ok") else 503
+
+
 @server_setup_web.post("/server-setup/test-ai-model")
 def test_ai_model():
     return _test_ai_model_from_request()
+
+
+@server_setup_web.post("/server-setup/compare-ai-models")
+def compare_ai_models():
+    return _compare_ai_models_from_request()
 
 
 def _pull_from_request():
