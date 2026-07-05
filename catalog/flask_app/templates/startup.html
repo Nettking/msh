@@ -1,7 +1,81 @@
 {% extends 'base.html' %}
 {% block body %}
 <section class="section-block section-block--primary">
-  <h2>Startup mode required</h2>
+  <h2>MSH startup setup</h2>
+  <p>Start the server with one command, then choose the role and model here in the browser.</p>
+  <pre>docker compose up -d --build</pre>
+  {% if server_setup_error %}
+  <p class="flash flash-error">{{ server_setup_error }}</p>
+  {% endif %}
+  <ul>
+    <li>Browser setup status: <strong>{{ 'configured' if server_setup_settings and server_setup_settings.configured else 'not configured' }}</strong></li>
+    {% if server_setup_settings %}
+    <li>Current role: <strong>{{ server_setup_settings.deployment_mode }}</strong></li>
+    <li>AI model: <strong>{{ server_setup_settings.ai_model if server_setup_settings.ai_enabled else 'disabled' }}</strong></li>
+    {% endif %}
+  </ul>
+</section>
+
+<section class="section-block section-block--actions">
+  <h3>Browser setup</h3>
+  <p>Use this for normal first-time setup and for later changes. Settings are stored in <code>data/server_setup/server_settings.json</code>, so they persist across container rebuilds.</p>
+  <form method="post" action="/server-setup/save" class="control-form control-card">
+    <input type="hidden" name="next" value="{{ next_path }}">
+
+    <label for="deployment_mode">Server role</label>
+    <select id="deployment_mode" name="deployment_mode">
+      {% for key, mode in server_setup_modes.items() %}
+      <option value="{{ key }}" {% if server_setup_settings and server_setup_settings.deployment_mode == key %}selected{% endif %}>{{ mode.label }} — {{ mode.description }}</option>
+      {% endfor %}
+    </select>
+
+    <label>
+      <input type="checkbox" name="ai_enabled" {% if not server_setup_settings or server_setup_settings.ai_enabled %}checked{% endif %}>
+      Enable local AI explainer
+    </label>
+
+    <label for="ai_profile">AI model for this device</label>
+    <select id="ai_profile" name="ai_profile">
+      {% for key, choice in server_setup_ai_choices.items() %}
+      <option value="{{ key }}" {% if server_setup_settings and server_setup_settings.ai_profile == key %}selected{% endif %}>{{ choice.label }} — {{ choice.model }} — {{ choice.device }}</option>
+      {% endfor %}
+    </select>
+
+    <label for="recorder_sources">Recorder sources</label>
+    <input id="recorder_sources" type="text" name="recorder_sources" value="{{ server_setup_settings.recorder_sources if server_setup_settings else '' }}" placeholder="IG500=http://192.168.200.251:5000/current;VTC=http://192.168.200.252:5000/current">
+    <p class="form-help">Use this when the server should record MTConnect data. Command-driven setup is still recommended for recorder-only machines.</p>
+
+    <label for="recorder_poll_interval">Recorder poll interval seconds</label>
+    <input id="recorder_poll_interval" type="number" step="0.1" min="0.1" name="recorder_poll_interval" value="{{ server_setup_settings.recorder_poll_interval if server_setup_settings else '0.2' }}">
+
+    <label>
+      <input type="checkbox" name="recorder_include_condition" {% if server_setup_settings and server_setup_settings.recorder_include_condition %}checked{% endif %}>
+      Include MTConnect condition values
+    </label>
+
+    <button class="button-primary" type="submit">Save startup setup</button>
+  </form>
+
+  <form method="post" action="/server-setup/pull-model" class="control-card">
+    <input type="hidden" name="next" value="{{ next_path }}">
+    <button type="submit">Install/update selected Ollama model</button>
+    <p>This calls the local Ollama service and pulls the selected model. It may take several minutes on first run.</p>
+  </form>
+</section>
+
+<section class="section-block">
+  <h3>Command-driven alternative</h3>
+  <p>Use this on servers where you want reproducible setup without browser prompts.</p>
+  <pre>python setup_msh.py --mode full-server --ai-profile laptop-standard --start</pre>
+  <p>Examples:</p>
+  <pre>python setup_msh.py --mode web-workbench --ai-profile edge-small --start
+python setup_msh.py --mode full-server --ai-profile workstation-strong --recorder-sources "IG500=http://192.168.200.251:5000/current" --start
+python setup_msh.py --mode web-ui-only --no-ai --start</pre>
+</section>
+
+{% if startup_state.requires_choice %}
+<section class="section-block section-block--primary">
+  <h2>Runtime startup mode required</h2>
   <p>Prior workflow state was detected. Choose how this boot should initialize runtime state before processing starts.</p>
   <ul>
     <li>Existing sessions: <strong>{{ startup_state.existing_sessions_count }}</strong></li>
@@ -26,4 +100,5 @@
     </form>
   </div>
 </section>
+{% endif %}
 {% endblock %}
