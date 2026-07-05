@@ -48,7 +48,21 @@ Recommended configuration:
 
 Use a dedicated Observer user with the minimum permissions needed to read machines, points, and measurements.
 
-Set credentials through environment variables rather than committing them:
+The Flask UI exposes a local source settings page:
+
+```text
+/sources/observer-phoenix
+```
+
+The page shows whether credentials are set from environment variables, set from a local runtime file, or still using the default/unset state. It also has a connection test that authenticates and calls the machine-list endpoint.
+
+Local credentials are written to the ignored runtime path:
+
+```text
+data/source_config/observer_phoenix.json
+```
+
+Complete environment variables take precedence over the local runtime file:
 
 ```bash
 export OBSERVER_PHOENIX_BASE_URL="https://localhost:14050"
@@ -85,6 +99,8 @@ python -m catalog.observer_phoenix.export_jsonl \
   --to-utc 2026-07-05T01:00:00Z \
   --machine-id 87
 ```
+
+If CLI credentials are omitted, the exporter uses the same precedence as the Flask page: complete environment variables first, then the local runtime settings file.
 
 After successful export, rebuild the analytics cache when cache-aware UI paths should see the new data:
 
