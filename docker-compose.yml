@@ -1,24 +1,67 @@
 services:
-  # Optional one-shot orchestration run (prep only).
-  prep:
-    build:
-      context: .
-      dockerfile: Dockerfile.cli
-    environment:
-      - MSH_SCAN_DIRS=results,data
-    volumes:
-      - ./data:/app/data
-      - ./results:/app/results
-
-  # Primary always-on digital twin workspace (auto-prepare + Flask).
+  # Primary server UI for operating, replaying, and analyzing telemetry.
+  # Enabled by setup profiles: web, full.
   flask:
+    profiles: ["web", "full"]
     build:
       context: .
       dockerfile: Dockerfile
     ports:
-      - "5000:5000"
+      - "${MSH_WEB_BIND:-0.0.0.0}:${MSH_WEB_PORT:-5000}:5000"
     environment:
-      - MSH_SCAN_DIRS=results,data
+      - MSH_SCAN_DIRS=${MSH_SCAN_DIRS:-results,data}
+      - MSH_SKIP_ORCHESTRATION=${MSH_SKIP_ORCHESTRATION:-0}
+      - MSH_FLASK_SECRET=${MSH_FLASK_SECRET:-msh-dev}
     volumes:
       - ./results:/app/results
+      - ./data:/app/data
+    restart: unless-stopped
+
+  # Optional always-on MTConnect recorder. Use this on a machine that should only
+  # collect source data, or together with flask for a full server deployment.
+  # Enabled by setup profiles: recorder, full.
+  recorder:
+    profiles: ["recorder", "full"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["python", "catalog/standalone-recorder_v2/standalone-recorder_v2.py"]
+    environment:
+      - MSH_RECORDER_SOURCES_JSON=${MSH_RECORDER_SOURCES_JSON:-}
+      - MSH_RECORDER_SOURCES=${MSH_RECORDER_SOURCES:-}
+      - MSH_RECORDER_DATA_DIR=${MSH_RECORDER_DATA_DIR:-data}
+      - MSH_RECORDER_STATE_FILE=${MSH_RECORDER_STATE_FILE:-data/source_state/mtconnect_recorder_state.json}
+      - MSH_RECORDER_POLL_INTERVAL=${MSH_RECORDER_POLL_INTERVAL:-0.2}
+      - MSH_RECORDER_FLUSH_INTERVAL=${MSH_RECORDER_FLUSH_INTERVAL:-1.0}
+      - MSH_RECORDER_REQUEST_TIMEOUT=${MSH_RECORDER_REQUEST_TIMEOUT:-1.0}
+      - MSH_RECORDER_INCLUDE_CONDITION=${MSH_RECORDER_INCLUDE_CONDITION:-false}
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  # Optional one-shot orchestration/preparation run.
+  # Enabled by setup profile: prep.
+  prep:
+    profiles: ["prep"]
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    environment:
+      - MSH_SCAN_DIRS=${MSH_SCAN_DIRS:-results,data}
+    volumes:
+      - ./data:/app/data
+      - ./results:/app/results
+
+  # Optional one-shot Observer Phoenix synchronization. This uses credentials
+  # from environment variables or data/source_config/observer_phoenix.json.
+  # Enabled by setup profile: observer-sync.
+  observer-sync:
+    profiles: ["observer-sync"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    entrypoint: ["python", "-m", "catalog.observer_phoenix.export_jsonl"]
+    environment:
+      - MSH_SCAN_DIRS=${MSH_SCAN_DIRS:-results,data}
+    volumes:
       - ./data:/app/data
