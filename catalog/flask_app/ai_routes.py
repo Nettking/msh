@@ -7,6 +7,7 @@ from catalog.ai.ollama_client import DEFAULT_MODEL, OllamaError, chat
 from catalog.ai.prompts import SYSTEM_PROMPT, build_extractive_prompt, build_prompt
 from catalog.ai.rag import format_context, retrieve
 from catalog.ai.repo_index import load_or_build_chunks, repo_root_from
+from catalog.ai.symbols import build_symbols
 
 ai_web = Blueprint("ai_web", __name__)
 
@@ -37,7 +38,8 @@ _PAGE = """
 def _answer_question(question: str, *, model: str, dry_run: bool, extractive: bool) -> dict[str, object]:
     root = repo_root_from()
     chunks = load_or_build_chunks(root)
-    selected = retrieve(question, chunks, limit=8)
+    symbols = build_symbols(root)
+    selected = retrieve(question, chunks, limit=8, symbols=symbols)
     sources = [chunk.source_label() for chunk in selected]
     context = format_context(selected)
     if not selected:
