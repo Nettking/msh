@@ -27,7 +27,7 @@ def _patch_setup(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "load_settings", lambda: default_settings(configured=True))
 
 
-def test_operator_strategy_capture_is_fast_quick_record(monkeypatch, tmp_path):
+def test_operator_strategy_capture_is_statement_first(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup(monkeypatch)
@@ -35,16 +35,33 @@ def test_operator_strategy_capture_is_fast_quick_record(monkeypatch, tmp_path):
     app = create_app()
     app.config.update(TESTING=True)
 
-    response = app.test_client().get("/operator-strategies")
+    response = app.test_client().get("/operator-strategies/capture")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "Quick record" in html
-    assert "Only the decision/action is required" in html
-    assert "autofocus" in html
-    assert "name=\"decision\" rows=\"5\" required" in html
-    assert "Situation / path" in html
-    assert "More detail / later analysis" in html
-    assert "Save fast record" in html
+    assert "Capture" in html
+    assert "Raw operator statement" in html
+    assert "Do not analyse it here" in html
+    assert "name=\"raw_statement\"" in html
+    assert "Save raw statement" in html
+    assert "Review Notes" in html
     assert "What did the operator decide?" not in html
-    assert "What should this become?" not in html
+
+
+def test_operator_strategy_review_explains_later_structuring(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    _patch_runtime(monkeypatch)
+    _patch_setup(monkeypatch)
+
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    response = app.test_client().get("/operator-strategies/review")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert "Review Notes" in html
+    assert "inbox for captured statements" in html
+    assert "Captured" in html
+    assert "Structured" in html
+    assert "Reusable" in html
