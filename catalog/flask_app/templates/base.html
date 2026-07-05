@@ -66,6 +66,8 @@
           <a class="{% if endpoint == 'web.control' %}is-active{% endif %}" href="{{ url_for('web.control') }}">Control</a>
           <a class="{% if endpoint == 'web.live' %}is-active{% endif %}" href="{{ url_for('web.live') }}">Live</a>
           <a class="{% if endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
+          <a class="{% if endpoint == 'operator_support_web.assist' %}is-active{% endif %}" href="{{ url_for('operator_support_web.assist') }}">Assist</a>
+          <a class="{% if endpoint == 'operator_support_web.first_part' %}is-active{% endif %}" href="{{ url_for('operator_support_web.first_part') }}">First Part</a>
           <a class="{% if endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
         {% endif %}
       </nav>
