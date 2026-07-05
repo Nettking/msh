@@ -12,6 +12,7 @@ from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_bac
 from .ai_routes import ai_web
 from .routes import web
 from .services.catalog_service import ArtifactCatalog
+from .source_routes import source_web
 
 
 def create_app() -> Flask:
@@ -28,6 +29,7 @@ def create_app() -> Flask:
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
     app.register_blueprint(web)
+    app.register_blueprint(source_web)
     app.register_blueprint(ai_web)
     return app
 
