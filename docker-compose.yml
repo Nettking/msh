@@ -1,8 +1,5 @@
 services:
-  # Primary server UI for operating, replaying, and analyzing telemetry.
-  # Enabled by setup profiles: web, full.
   flask:
-    profiles: ["web", "full"]
     build:
       context: .
       dockerfile: Dockerfile
@@ -19,42 +16,12 @@ services:
       - ./data:/app/data
     restart: unless-stopped
 
-  # Optional local Ollama model server for the MSH AI explainer.
-  # Enabled by setup profile: ai.
   ollama:
-    profiles: ["ai"]
     image: ollama/ollama:latest
     volumes:
       - ollama_models:/root/.ollama
     restart: unless-stopped
 
-  # One-shot model installer. It waits for the Ollama server and pulls the
-  # selected setup model into the shared ollama_models volume.
-  # Enabled by setup profile: ai.
-  ollama-pull:
-    profiles: ["ai"]
-    image: ollama/ollama:latest
-    depends_on:
-      - ollama
-    environment:
-      - OLLAMA_HOST=http://ollama:11434
-      - MSH_AI_MODEL=${MSH_AI_MODEL:-llama3.2:3b}
-    entrypoint:
-      - /bin/sh
-      - -lc
-      - |
-        for i in $$(seq 1 60); do
-          if ollama list >/dev/null 2>&1; then
-            break
-          fi
-          sleep 2
-        done
-        echo "Pulling Ollama model: $${MSH_AI_MODEL}"
-        ollama pull "$${MSH_AI_MODEL}"
-
-  # Optional always-on MTConnect recorder. Use this on a machine that should only
-  # collect source data, or together with flask for a full server deployment.
-  # Enabled by setup profiles: recorder, full.
   recorder:
     profiles: ["recorder", "full"]
     build:
@@ -74,8 +41,6 @@ services:
       - ./data:/app/data
     restart: unless-stopped
 
-  # Optional one-shot orchestration/preparation run.
-  # Enabled by setup profile: prep.
   prep:
     profiles: ["prep"]
     build:
@@ -87,9 +52,6 @@ services:
       - ./data:/app/data
       - ./results:/app/results
 
-  # Optional one-shot Observer Phoenix synchronization. This uses credentials
-  # from environment variables or data/source_config/observer_phoenix.json.
-  # Enabled by setup profile: observer-sync.
   observer-sync:
     profiles: ["observer-sync"]
     build:
