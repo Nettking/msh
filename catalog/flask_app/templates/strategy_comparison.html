@@ -1,0 +1,26 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro"><h2>Strategy comparison</h2><p>Compare operator strategies by situation, action, outcome, evidence, and trade-off.</p></section>
+<section class="section-block section-block--primary">
+  <h3>Compared situations</h3>
+  {% if comparisons %}
+  <div class="stack-list">
+    {% for group in comparisons %}
+    <article class="stack-row">
+      <div>
+        <h4>{{ group.situation }}</h4>
+        <p>{{ group.total_notes }} operator note(s)</p>
+        <div class="table-scroll">
+          <table><tr><th>Strategy</th><th>Evidence</th><th>Confidence</th><th>Reusable</th><th>Risk/trade-off</th></tr>
+          {% for strategy in group.strategies %}
+          <tr><td>{{ strategy.action }}</td><td>{{ strategy.evidence }}</td><td>{{ strategy.confidence }}</td><td>{{ strategy.reusable_count }}</td><td>{{ strategy.risk_or_tradeoff }}</td></tr>
+          {% endfor %}
+          </table>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}<p>No operator notes are available for comparison yet.</p>{% endif %}
+</section>
+{% endblock %}
