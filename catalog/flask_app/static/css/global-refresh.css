@@ -225,6 +225,39 @@ main {
   background: #f8fbff;
 }
 
+.source-inline-form {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 12px;
+  align-items: end;
+}
+
+.source-inline-form label {
+  display: grid;
+  gap: 6px;
+  color: #0f172a;
+  font-weight: 750;
+}
+
+.source-field-wide {
+  grid-column: 1 / -1;
+}
+
+.source-checkbox-label {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  min-height: 42px;
+}
+
+.source-checkbox-label input {
+  width: auto;
+}
+
+.source-inline-form button {
+  justify-self: start;
+}
+
 input,
 select,
 textarea {
@@ -311,7 +344,8 @@ pre,
 }
 
 @media (max-width: 920px) {
-  .site-header--grouped {
+  .site-header--grouped,
+  .source-inline-form {
     grid-template-columns: 1fr;
   }
 
