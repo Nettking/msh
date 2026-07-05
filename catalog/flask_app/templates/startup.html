@@ -1,28 +1,37 @@
 {% extends 'base.html' %}
 {% block body %}
+{% set setup_configured = server_setup_settings and server_setup_settings.configured %}
+{% set setup_editing = request.args.get('edit') == '1' or not setup_configured %}
+{% set recorder_role = server_setup_settings and server_setup_settings.deployment_mode in ['full-server', 'recorder-only'] %}
+{% set recorder_missing = recorder_role and not server_setup_settings.recorder_sources %}
 <section class="setup-hero">
   <div>
     <span class="setup-eyebrow">Browser setup</span>
+    {% if setup_configured and not setup_editing %}
+    <h2>MSH setup is complete</h2>
+    <p>This computer already has a saved setup. Choose how to start MSH now, or edit the setup if the role, AI model, or recorder settings are wrong.</p>
+    {% else %}
     <h2>Get MSH ready for this computer</h2>
-    <p>Move through one small step at a time. You can switch steps at any point, then save when the choices look right.</p>
+    <p>Move through one small step at a time. Save once when the choices look right.</p>
+    {% endif %}
   </div>
   <div class="setup-command-card setup-state-card">
     <span>Current state</span>
-    <strong>{{ 'Setup saved' if server_setup_settings and server_setup_settings.configured else 'Waiting for first setup' }}</strong>
-    <p>{{ 'Review or change the saved setup below.' if server_setup_settings and server_setup_settings.configured else 'Pick a role and save once before normal runtime starts.' }}</p>
+    <strong>{{ 'Setup saved' if setup_configured else 'Waiting for first setup' }}</strong>
+    <p>{{ 'Ready for runtime choice.' if setup_configured and not setup_editing else 'Review or change the setup below.' if setup_configured else 'Pick a role and save before normal runtime starts.' }}</p>
   </div>
 </section>
 
 <section class="section-block setup-summary-panel setup-summary-panel--compact">
-  <div class="setup-summary-card {{ 'setup-summary-card--ready' if server_setup_settings and server_setup_settings.configured else 'setup-summary-card--waiting' }}">
+  <div class="setup-summary-card {{ 'setup-summary-card--ready' if setup_configured else 'setup-summary-card--waiting' }}">
     <span>Setup</span>
-    <strong>{{ 'Configured' if server_setup_settings and server_setup_settings.configured else 'Needs setup' }}</strong>
-    <p>{{ 'Saved locally.' if server_setup_settings and server_setup_settings.configured else 'Not saved yet.' }}</p>
+    <strong>{{ 'Configured' if setup_configured else 'Needs setup' }}</strong>
+    <p>{{ 'Saved locally.' if setup_configured else 'Not saved yet.' }}</p>
   </div>
-  <div class="setup-summary-card">
+  <div class="setup-summary-card {% if recorder_missing %}setup-summary-card--waiting{% endif %}">
     <span>Role</span>
     <strong>{{ server_setup_modes[server_setup_settings.deployment_mode].label if server_setup_settings else 'Web workbench' }}</strong>
-    <p>{{ 'Saved role' if server_setup_settings and server_setup_settings.configured else 'Default role' }}</p>
+    <p>{% if recorder_missing %}Recorder source missing.{% elif setup_configured %}Saved role.{% else %}Default role.{% endif %}</p>
   </div>
   <div class="setup-summary-card {{ 'setup-summary-card--ready' if server_setup_ollama_status and server_setup_ollama_status.running else 'setup-summary-card--waiting' }}">
     <span>Ollama</span>
@@ -43,13 +52,100 @@
 </section>
 {% endif %}
 
+{% if setup_configured and not setup_editing %}
+<section class="section-block setup-panel setup-saved-panel">
+  <div class="setup-panel__header">
+    <div>
+      <h3>What do you want to do now?</h3>
+      <p>Setup is saved. The next decision is runtime startup, not setup editing.</p>
+    </div>
+    <span class="status-badge status-ready">ready</span>
+  </div>
+
+  {% if recorder_missing %}
+  <section class="section-block section-block--warning setup-inline-warning">
+    <h3>Recorder source is missing</h3>
+    <p>This computer is configured as {{ server_setup_modes[server_setup_settings.deployment_mode].label }}, but no MTConnect recorder source is configured. Add a recorder source before using this as a full data-capture station.</p>
+    <a class="button-link" href="{{ url_for('web.startup', next=next_path, edit='1', step='recorder') }}">Add recorder source</a>
+  </section>
+  {% endif %}
+
+  <div class="info-grid setup-saved-summary">
+    <article class="info-card">
+      <h4>Role</h4>
+      <p><strong>{{ server_setup_modes[server_setup_settings.deployment_mode].label }}</strong></p>
+      <p>{{ server_setup_modes[server_setup_settings.deployment_mode].description }}</p>
+    </article>
+    <article class="info-card">
+      <h4>Local AI</h4>
+      {% if server_setup_settings.ai_enabled %}
+      <p><strong>{{ server_setup_settings.ai_model }}</strong></p>
+      <p>{% if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed %}Model installed and ready.{% else %}Model is selected but not installed yet.{% endif %}</p>
+      {% else %}
+      <p><strong>Disabled</strong></p>
+      <p>MSH will not use the local AI explainer.</p>
+      {% endif %}
+    </article>
+    <article class="info-card">
+      <h4>Recorder</h4>
+      {% if recorder_role and server_setup_settings.recorder_sources %}
+      <p><strong>Configured</strong></p>
+      <p>{{ server_setup_settings.recorder_sources }}</p>
+      {% elif recorder_role %}
+      <p><strong>Needs source</strong></p>
+      <p>No recorder source is configured.</p>
+      {% else %}
+      <p><strong>Not used for this role</strong></p>
+      <p>No recorder source is required.</p>
+      {% endif %}
+    </article>
+  </div>
+
+  <div class="control-action-grid setup-saved-actions">
+    {% if server_setup_settings.ai_enabled and (not server_setup_ollama_status or not server_setup_ollama_status.selected_model_installed) %}
+    <form method="post" action="/server-setup/pull-model" class="control-card">
+      <input type="hidden" name="next" value="{{ next_path }}">
+      <button class="button-primary" type="submit">Install {{ server_setup_settings.ai_model }}</button>
+      <p>Pulls the saved model into local Ollama before you use AI features.</p>
+    </form>
+    {% endif %}
+
+    {% if startup_state.requires_choice %}
+    <form method="post" action="{{ url_for('web.choose_startup_mode') }}" class="control-card">
+      <input type="hidden" name="mode" value="continue_existing">
+      <input type="hidden" name="next" value="{{ next_path }}">
+      <button class="button-primary" type="submit">Continue from existing state</button>
+      <p>Reuse the existing runtime/session progress.</p>
+    </form>
+    <form method="post" action="{{ url_for('web.choose_startup_mode') }}" class="control-card">
+      <input type="hidden" name="mode" value="start_clean">
+      <input type="hidden" name="next" value="{{ next_path }}">
+      <button type="submit">Start clean</button>
+      <p>Start fresh. Existing files stay on disk.</p>
+    </form>
+    {% else %}
+    <div class="control-card">
+      <h4>Open MSH</h4>
+      <p>Runtime choice is not required right now. Continue to the main overview.</p>
+      <a class="button-link" href="{{ next_path or url_for('web.overview') }}">Open overview</a>
+    </div>
+    {% endif %}
+
+    <div class="control-card">
+      <h4>Change setup</h4>
+      <p>Only use this if the role, recorder, or AI model is wrong.</p>
+      <a class="button-link" href="{{ url_for('web.startup', next=next_path, edit='1', step='role') }}">Edit setup</a>
+    </div>
+  </div>
+</section>
+{% else %}
 <section class="section-block setup-panel setup-wizard" data-initial-step="{{ request.args.get('step', 'role') }}" id="setupWizard">
   <div class="setup-panel__header">
     <div>
-      <h3>Guided setup</h3>
-      <p>Each step has only the choices needed for that part. Use the step buttons to jump around.</p>
+      <h3>{{ 'Edit setup' if setup_configured else 'Guided setup' }}</h3>
+      <p>{{ 'Change only the settings that are wrong, then save again.' if setup_configured else 'Each step has only the choices needed for that part.' }}</p>
     </div>
-    <span class="status-badge {{ 'status-ready' if server_setup_settings and server_setup_settings.configured else 'status-waiting' }}">{{ 'saved' if server_setup_settings and server_setup_settings.configured else 'first run' }}</span>
+    <span class="status-badge {{ 'status-ready' if setup_configured else 'status-waiting' }}">{{ 'editing saved setup' if setup_configured else 'first run' }}</span>
   </div>
 
   <nav class="setup-wizard-nav" aria-label="Setup steps">
@@ -57,7 +153,7 @@
     <button type="button" data-step-target="ai"><strong>2</strong><span>AI</span></button>
     <button type="button" data-step-target="recorder"><strong>3</strong><span>Recorder</span></button>
     <button type="button" data-step-target="review"><strong>4</strong><span>Save</span></button>
-    {% if server_setup_settings and server_setup_settings.configured %}<button type="button" data-step-target="runtime"><strong>5</strong><span>Runtime</span></button>{% endif %}
+    {% if setup_configured %}<button type="button" data-step-target="runtime"><strong>5</strong><span>Runtime</span></button>{% endif %}
   </nav>
 
   <form method="post" action="/server-setup/save" class="setup-form" id="startupSetupForm">
@@ -206,7 +302,7 @@
     </section>
   </form>
 
-  {% if server_setup_settings and server_setup_settings.configured %}
+  {% if setup_configured %}
   <section class="setup-wizard-panel setup-runtime-panel" data-step="runtime" id="runtime">
     <div class="setup-step-card__title">
       <span class="setup-step-number">5</span>
@@ -247,6 +343,7 @@
   </section>
   {% endif %}
 </section>
+{% endif %}
 
 <details class="section-block setup-advanced">
   <summary>Advanced: command-driven setup</summary>
@@ -289,6 +386,7 @@
   }
 
   function showStep(step) {
+    if (!wizard) return;
     if (step === 'runtime' && !document.querySelector('[data-step="runtime"]')) step = 'review';
     if (!steps.includes(step)) step = 'role';
     document.querySelectorAll('[data-step]').forEach(function (panel) {
