@@ -67,6 +67,7 @@ Use `MSH_AI_MODEL` or `--model` to select the Ollama model. See [docs/ai_explain
 - `/playback` — playback-compatible timeline exports and machine/day replay views.
 - `/analyses` — discovered analysis artifacts and basic chart previews.
 - `/live` — recent telemetry snapshot from scan-discovered JSONL sources.
+- `/operator-strategies` — OSL-style operator strategy and decision/action capture for MSH field work.
 - `/sources/observer-phoenix` — Observer Phoenix credential/status page.
 - `/ai` — read-only local AI explainer for system-understanding questions.
 - `/startup` — startup mode choice when an existing runtime namespace requires an operator decision.
@@ -86,6 +87,7 @@ Use `MSH_AI_MODEL` or `--model` to select the Ollama model. See [docs/ai_explain
 - `data/` — local raw JSONL telemetry input and source-specific landing location; not intended for committed production data.
 - `data/sources/` — source-specific normalized JSONL landing area for synchronized/recorded external sources.
 - `data/source_state/` — source synchronization and recorder watermarks/state; not telemetry input.
+- `data/operator_strategy_records/` — local operator strategy capture notes; JSON, not telemetry JSONL.
 - `results/` — generated analysis outputs, workflow sessions, runtime state, and discovered artifacts.
 - `example-data/` — small sample JSONL input for development and documentation.
 - `ops/` — host-side operational helpers.
@@ -98,6 +100,7 @@ See [catalog/README.md](catalog/README.md) for the script catalog and analysis w
 - [Server setup](docs/server_setup.md) — deployment modes, LAN access, Docker Compose profiles, and recorder setup.
 - [Quick start](docs/quick_start.md) — setup commands and first-run expectations.
 - [Operator guide](docs/operator_guide.md) — daily UI workflow, sessions, playback, and controls.
+- [Operator strategy capture](docs/operator_strategy_capture.md) — OSL-style field-capture page for operator decisions and action timing.
 - [Data contract](docs/data_contract.md) — raw JSONL assumptions, normalized fields, derived artifacts, and playback-ready contract.
 - [Source synchronization](docs/source_synchronization.md) — multi-source landing layout, watermarks, and synchronization policy.
 - [SKF Observer Phoenix integration](docs/integrations/skf_observer_phoenix.md) — Observer Phoenix setup, export command, and mapping to MSH JSONL.
