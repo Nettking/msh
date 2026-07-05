@@ -17,7 +17,7 @@
     {% set active_group = 'monitor' %}
     {% if endpoint.startswith('operator_strategy_web.') or endpoint in ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export', 'web.strategies', 'web.save_strategies'] %}
       {% set active_group = 'workflow' %}
-    {% elif endpoint == 'web.startup' or endpoint.startswith('source_web.') or endpoint == 'web.status' or endpoint == 'operator_support_web.machine_notes' %}
+    {% elif endpoint == 'web.guide' or endpoint == 'web.startup' or endpoint.startswith('source_web.') or endpoint == 'web.status' or endpoint == 'operator_support_web.machine_notes' %}
       {% set active_group = 'system' %}
     {% endif %}
 
@@ -29,7 +29,7 @@
       <nav class="site-nav site-nav--primary" aria-label="Primary sections">
         <a class="{% if active_group == 'monitor' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Monitor</a>
         <a class="{% if active_group == 'workflow' %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.capture') }}">Workflow</a>
-        <a class="{% if active_group == 'system' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">System</a>
+        <a class="{% if active_group == 'system' %}is-active{% endif %}" href="{{ url_for('web.guide') }}">System</a>
       </nav>
       {% if artifact_catalog_freshness is defined %}
       <div class="catalog-freshness {% if artifact_catalog_freshness.stale %}catalog-freshness--stale{% endif %}">
@@ -46,6 +46,7 @@
           <a class="{% if endpoint in ['web.strategies', 'web.save_strategies'] %}is-active{% endif %}" href="{{ url_for('web.strategies') }}">Intervention Logic</a>
           <a class="{% if endpoint == 'operator_support_web.osl_export' %}is-active{% endif %}" href="{{ url_for('operator_support_web.osl_export') }}">SysML Export</a>
         {% elif active_group == 'system' %}
+          <a class="{% if endpoint == 'web.guide' %}is-active{% endif %}" href="{{ url_for('web.guide') }}">Guide</a>
           <a class="{% if endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">Setup</a>
           <a class="{% if endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ url_for('source_web.index') }}">Sources</a>
           <a class="{% if endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
