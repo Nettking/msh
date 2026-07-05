@@ -1,0 +1,62 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro">
+  <h2>Assist</h2>
+  <p>Operator support cards: possible causes, suggested next steps, rationale, risk, alternatives, and confirmation.</p>
+</section>
+
+<section class="section-block section-block--primary">
+  <h3>Current support cards</h3>
+  <div class="stack-list">
+    {% for card in cards %}
+    <article class="stack-row">
+      <div>
+        <h4>{{ card.issue }}</h4>
+        <p><strong>Observation:</strong> {{ card.observation }}</p>
+        <p><strong>Possible causes:</strong> {{ card.possible_causes|join(', ') }}</p>
+        <p><strong>Suggested next step:</strong> {{ card.suggested_action }}</p>
+        <p><strong>Reason:</strong> {{ card.rationale }}</p>
+        <p><strong>Risk:</strong> {{ card.risk }}</p>
+        <p><strong>Alternative:</strong> {{ card.alternative_action }}</p>
+        <p><strong>Evidence:</strong> {{ card.evidence|join('; ') }}</p>
+        {% if card.requires_confirmation %}<span class="status-badge status-waiting">requires operator confirmation</span>{% else %}<span class="status-badge status-ready">informational</span>{% endif %}
+      </div>
+      <form method="post" action="{{ url_for('operator_support_web.confirm_assist_action') }}" class="control-card">
+        <input type="hidden" name="support_card_id" value="{{ card.id }}">
+        <label>
+          <span>Operator response</span>
+          <select name="confirmation_status" required>
+            <option value="accepted">Accept</option>
+            <option value="rejected">Reject</option>
+            <option value="do_later">Do later</option>
+            <option value="needs_supervisor">Needs supervisor</option>
+            <option value="already_done">Already done</option>
+          </select>
+        </label>
+        <label>
+          <span>Comment</span>
+          <textarea name="comment" rows="3" placeholder="Why did you accept/reject or what happened?"></textarea>
+        </label>
+        <button class="button-primary" type="submit">Save confirmation</button>
+      </form>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section-block">
+  <h3>Recent confirmations</h3>
+  {% if confirmations %}
+  <div class="table-scroll">
+    <table>
+      <tr><th>Time</th><th>Support card</th><th>Status</th><th>Comment</th></tr>
+      {% for item in confirmations %}
+      <tr><td>{{ item.confirmed_at }}</td><td><code>{{ item.support_card_id }}</code></td><td>{{ item.confirmation_status }}</td><td>{{ item.comment }}</td></tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p>No confirmations saved yet.</p>
+  {% endif %}
+</section>
+{% endblock %}
