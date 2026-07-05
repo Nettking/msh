@@ -16,7 +16,7 @@
     {% set endpoint = request.endpoint or '' %}
     {% set active_group = 'monitor' %}
     {% if endpoint.startswith('operator_strategy_web.') or endpoint in ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export', 'web.strategies', 'web.save_strategies'] %}
-      {% set active_group = 'workflow' %}
+      {% set active_group = 'knowledge' %}
     {% elif endpoint == 'web.guide' or endpoint == 'web.startup' or endpoint.startswith('source_web.') or endpoint == 'web.status' or endpoint == 'operator_support_web.machine_notes' %}
       {% set active_group = 'system' %}
     {% endif %}
@@ -28,7 +28,7 @@
       </div>
       <nav class="site-nav site-nav--primary" aria-label="Primary sections">
         <a class="{% if active_group == 'monitor' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Monitor</a>
-        <a class="{% if active_group == 'workflow' %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.capture') }}">Workflow</a>
+        <a class="{% if active_group == 'knowledge' %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.capture') }}">Knowledge</a>
         <a class="{% if active_group == 'system' %}is-active{% endif %}" href="{{ url_for('web.guide') }}">System</a>
       </nav>
       {% if artifact_catalog_freshness is defined %}
@@ -39,7 +39,7 @@
       {% endif %}
       <form class="rescan-form" method="post" action="{{ url_for('web.rescan') }}"><input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}"><button type="submit">Rescan</button></form>
       <nav class="site-nav site-section-nav" aria-label="Section pages">
-        {% if active_group == 'workflow' %}
+        {% if active_group == 'knowledge' %}
           <a class="{% if endpoint == 'operator_strategy_web.capture' %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.capture') }}">Capture</a>
           <a class="{% if endpoint in ['operator_strategy_web.review', 'operator_strategy_web.structure'] %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.review') }}">Review Notes</a>
           <a class="{% if endpoint == 'operator_support_web.strategy_comparison' %}is-active{% endif %}" href="{{ url_for('operator_support_web.strategy_comparison') }}">Strategies</a>
