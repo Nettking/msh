@@ -1,7 +1,18 @@
 {% extends 'base.html' %}
 {% block body %}
-<section class="page-intro"><h2>Strategy comparison</h2><p>Compare operator strategies by situation, action, outcome, evidence, and trade-off.</p></section>
+<section class="page-intro">
+  <h2>Strategies</h2>
+  <p>This page is for the later analysis step. It compares structured notes by situation and shows which actions have evidence, outcomes, confidence, and trade-offs.</p>
+</section>
 <section class="section-block section-block--primary">
+  <h3>How to use this page</h3>
+  <div class="info-grid">
+    <article class="info-card"><h4>Before this page</h4><p>Capture raw statements first, then structure them in Review Notes.</p></article>
+    <article class="info-card"><h4>On this page</h4><p>Look for repeated situations and compare what operators tried.</p></article>
+    <article class="info-card"><h4>After this page</h4><p>Mark strong strategies as reusable and export them to SysML.</p></article>
+  </div>
+</section>
+<section class="section-block">
   <h3>Compared situations</h3>
   {% if comparisons %}
   <div class="stack-list">
@@ -11,16 +22,12 @@
         <h4>{{ group.situation }}</h4>
         <p>{{ group.total_notes }} operator note(s)</p>
         <div class="table-scroll">
-          <table><tr><th>Strategy</th><th>Evidence</th><th>Confidence</th><th>Reusable</th><th>Risk/trade-off</th></tr>
-          {% for strategy in group.strategies %}
-          <tr><td>{{ strategy.action }}</td><td>{{ strategy.evidence }}</td><td>{{ strategy.confidence }}</td><td>{{ strategy.reusable_count }}</td><td>{{ strategy.risk_or_tradeoff }}</td></tr>
-          {% endfor %}
-          </table>
+          <table><tr><th>Strategy</th><th>Evidence</th><th>Confidence</th><th>Reusable</th><th>Risk/trade-off</th></tr>{% for strategy in group.strategies %}<tr><td>{{ strategy.action }}</td><td>{{ strategy.evidence }}</td><td>{{ strategy.confidence }}</td><td>{{ strategy.reusable_count }}</td><td>{{ strategy.risk_or_tradeoff }}</td></tr>{% endfor %}</table>
         </div>
       </div>
     </article>
     {% endfor %}
   </div>
-  {% else %}<p>No operator notes are available for comparison yet.</p>{% endif %}
+  {% else %}<p>No structured operator notes are available for comparison yet. Go to Capture, record a statement, then Review Notes to structure it.</p>{% endif %}
 </section>
 {% endblock %}
