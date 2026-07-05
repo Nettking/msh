@@ -37,7 +37,7 @@ def _result_band(row: dict[str, Any]) -> str:
 
 def _result_elapsed(row: dict[str, Any]) -> int:
     value = row.get("result", {}).get("elapsed_ms")
-    return int(value) if isinstance(value, int | float) else 999_999
+    return int(value) if isinstance(value, (int, float)) else 999_999
 
 
 def _recommend(rows: list[dict[str, Any]]) -> dict[str, Any]:
