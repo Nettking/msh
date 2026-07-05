@@ -2,8 +2,8 @@
 {% block body %}
 <section class="page-intro operator-strategy-intro">
   <div>
-    <h2>Operator strategy capture</h2>
-    <p>Fast field-note capture for operator decisions. Save the action now; add extra detail only when it is useful.</p>
+    <h2>Operator notes</h2>
+    <p>Fast field-note capture for operator decisions. These notes document human reasoning; technical detection rules live under Intervention Rules.</p>
   </div>
 </section>
 
@@ -17,7 +17,7 @@
 <section class="section-block section-block--primary operator-capture-card">
   <div class="operator-section-heading">
     <div>
-      <h3>Quick record</h3>
+      <h3>Quick decision note</h3>
       <p>Only the decision/action is required. The rest is optional context for later analysis.</p>
     </div>
     <span class="status-badge status-ready">fast capture</span>
@@ -61,8 +61,8 @@
         <summary>More detail / later analysis</summary>
         <div class="operator-detail-grid">
           <label>
-            <span>Strategy name</span>
-            <input type="text" name="strategy_name" placeholder="Chatter response strategy">
+            <span>Note name</span>
+            <input type="text" name="strategy_name" placeholder="Chatter response note">
           </label>
           <label>
             <span>Process</span>
@@ -133,23 +133,23 @@
 
     <div class="operator-save-row operator-save-row--sticky">
       <div>
-        <strong>Save fast record</strong>
+        <strong>Save operator note</strong>
         <p>Stored locally at <code>{{ records_path }}</code>.</p>
       </div>
-      <button class="button-primary" type="submit">Save record</button>
+      <button class="button-primary" type="submit">Save note</button>
     </div>
   </form>
 </section>
 
 <section class="section-block">
-  <h3>Recent strategy records</h3>
+  <h3>Recent operator notes</h3>
   <p>Stored locally at <code>{{ records_path }}</code>. This file is JSON, not JSONL, so it is not scanned as telemetry.</p>
   {% if records %}
   <div class="table-scroll">
     <table>
       <tr>
         <th>Decision time</th>
-        <th>Strategy / path</th>
+        <th>Note / path</th>
         <th>Machine</th>
         <th>Goal</th>
         <th>Decision</th>
@@ -163,7 +163,7 @@
           <span class="text-muted">captured {{ record.captured_at }}</span>
         </td>
         <td>
-          {{ record.strategy_name or 'Quick record' }}<br>
+          {{ record.strategy_name or 'Quick note' }}<br>
           <span class="text-muted">{{ record.strategy_situation or 'No path name' }}</span>
         </td>
         <td>{{ record.machine or 'n/a' }}</td>
@@ -180,7 +180,7 @@
     </table>
   </div>
   {% else %}
-  <p>No operator strategy records have been saved yet.</p>
+  <p>No operator notes have been saved yet.</p>
   {% endif %}
 </section>
 
