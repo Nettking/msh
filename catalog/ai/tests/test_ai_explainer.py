@@ -4,6 +4,7 @@ from pathlib import Path
 
 from catalog.ai.rag import retrieve
 from catalog.ai.repo_index import build_chunks, iter_indexed_files, repo_root_from, should_index
+from catalog.ai.symbols import build_symbols
 
 
 def _write(path: Path, text: str) -> Path:
@@ -84,6 +85,23 @@ def test_retrieve_boosts_route_literals(tmp_path: Path) -> None:
 
     assert selected
     assert selected[0].path == "catalog/flask_app/routes.py"
+
+
+def test_symbol_aware_retrieval_prioritizes_matching_route_chunk(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    _write(root / "README.md", "Control documentation overview.\n")
+    _write(
+        root / "catalog" / "flask_app" / "routes.py",
+        "@web.route('/control')\ndef control():\n    return 'ok'\n\n@web.route('/status')\ndef status():\n    return 'status'\n",
+    )
+
+    chunks = build_chunks(root)
+    symbols = build_symbols(root)
+    selected = retrieve("explain /control", chunks, limit=1, symbols=symbols)
+
+    assert selected
+    assert selected[0].path == "catalog/flask_app/routes.py"
+    assert "def control" in selected[0].text
 
 
 def test_retrieve_returns_empty_when_no_context_matches(tmp_path: Path) -> None:
