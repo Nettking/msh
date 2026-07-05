@@ -58,6 +58,119 @@ main {
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
 }
 
+.overview-decision {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(260px, 1fr);
+  gap: 18px;
+  align-items: stretch;
+  border-color: #93c5fd;
+  background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
+}
+
+.overview-decision--ready {
+  border-color: #86efac;
+  background: linear-gradient(135deg, #ffffff 0%, #ecfdf3 100%);
+}
+
+.overview-decision--partial {
+  border-color: #fcd34d;
+  background: linear-gradient(135deg, #ffffff 0%, #fffbeb 100%);
+}
+
+.overview-decision--waiting {
+  border-color: #cbd5e1;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+}
+
+.overview-decision--error,
+.overview-decision--failed {
+  border-color: #fca5a5;
+  background: linear-gradient(135deg, #ffffff 0%, #fef2f2 100%);
+}
+
+.overview-decision h3 {
+  margin: 6px 0 8px;
+  font-size: clamp(1.45rem, 2vw, 2.2rem);
+  letter-spacing: -0.035em;
+}
+
+.overview-decision__summary {
+  max-width: 76ch;
+  color: #334155;
+  font-size: 1.02rem;
+}
+
+.overview-decision__next {
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.45);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.overview-decision__next strong {
+  display: block;
+  margin-bottom: 4px;
+  color: #0f172a;
+}
+
+.overview-decision__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.button-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid #b8c8e6;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #1e3a8a;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.button-link:hover {
+  background: #eff6ff;
+  border-color: #93b7ed;
+}
+
+.button-link--primary {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+
+.button-link--primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.overview-decision__facts {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid rgba(148, 163, 184, 0.35);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.68);
+}
+
+.overview-decision__facts ul {
+  margin: 0;
+  padding-left: 18px;
+  color: #334155;
+}
+
+.overview-decision__facts li + li {
+  margin-top: 6px;
+}
+
 .control-card,
 .info-card,
 .stack-row,
@@ -158,5 +271,9 @@ pre,
 @media (max-width: 920px) {
   .site-nav {
     border-radius: 18px;
+  }
+
+  .overview-decision {
+    grid-template-columns: 1fr;
   }
 }
