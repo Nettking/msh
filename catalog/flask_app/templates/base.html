@@ -21,7 +21,7 @@
       <nav class="site-nav" aria-label="Primary">
         <a class="{% if request.endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">Setup</a>
         <a class="{% if request.endpoint == 'web.overview' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Overview</a>
-        <a class="{% if request.endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Status</a>
+        <a class="{% if request.endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
         <a class="{% if request.endpoint == 'web.control' %}is-active{% endif %}" href="{{ url_for('web.control') }}">Control</a>
         <a class="{% if request.endpoint == 'web.live' %}is-active{% endif %}" href="{{ url_for('web.live') }}">Live</a>
         <a class="{% if request.endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
