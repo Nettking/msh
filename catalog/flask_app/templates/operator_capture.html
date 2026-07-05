@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro operator-strategy-intro">
+  <div>
+    <h2>Capture</h2>
+    <p>Use this on site. Write one raw statement quickly. Do not analyse it here. The goal is to avoid losing operator knowledge while the work is happening.</p>
+  </div>
+</section>
+
+<section class="section-block section-block--primary workflow-step-card">
+  <h3>Step 1: record the statement</h3>
+  <p>Good statements can be incomplete. Write what the operator said, what you observed, or what happened. You can structure it later in Review Notes.</p>
+  <form method="post" action="{{ url_for('operator_strategy_web.save') }}" class="operator-strategy-form operator-strategy-form--quick">
+    <input type="hidden" name="decision_time_mode" value="now">
+    <input type="hidden" name="decision_timezone" value="{{ default_timezone }}">
+    <input type="hidden" name="review_status" value="captured">
+
+    <label class="operator-main-decision">
+      <span>Raw operator statement <em class="required-marker">required</em></span>
+      <textarea name="raw_statement" rows="7" required autofocus placeholder="Example: When this machine is cold, the first part can drift. I usually wait before changing offsets unless the first part is clearly outside tolerance."></textarea>
+    </label>
+
+    <div class="operator-quick-grid">
+      <label>
+        <span>Machine, if known</span>
+        <select name="machine_id">
+          <option value="">Unknown / add later</option>
+          {% for machine in source_inventory.machines %}<option value="{{ machine.id }}">{{ machine.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>
+        <span>Quick tag / situation</span>
+        <input type="text" name="strategy_situation" placeholder="chatter / cold start / first part / tool wear">
+      </label>
+      <label>
+        <span>Confidence</span>
+        <select name="confidence"><option value="">Unknown</option><option>Low</option><option>Medium</option><option>High</option></select>
+      </label>
+    </div>
+
+    <button class="button-primary" type="submit">Save raw statement</button>
+  </form>
+</section>
+
+<section class="section-block">
+  <h3>What happens next?</h3>
+  <div class="info-grid">
+    <article class="info-card"><h4>1. Capture</h4><p>Save the raw statement quickly while you are with the machine or operator.</p></article>
+    <article class="info-card"><h4>2. Review later</h4><p>Open Review Notes and translate the statement into OSL fields such as observation, hypothesis, action, rationale, and trade-off.</p></article>
+    <article class="info-card"><h4>3. Reuse</h4><p>Mark good structured notes as reusable. They can then appear in strategy comparison and SysML export.</p></article>
+  </div>
+</section>
+
+<section class="section-block">
+  <h3>Recently captured</h3>
+  {% if records %}
+  <div class="stack-list">
+    {% for record in records %}
+    <article class="stack-row">
+      <div>
+        <h4>{{ record.strategy_situation or record.issue or 'Raw statement' }}</h4>
+        <p>{{ record.raw_statement or record.decision }}</p>
+        <p class="text-muted">{{ record.decision_time }} · status {{ record.review_status }}</p>
+      </div>
+      <a class="button-link" href="{{ url_for('operator_strategy_web.structure', record_id=record.id) }}">Structure later</a>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p>No statements captured yet.</p>
+  {% endif %}
+</section>
+{% endblock %}
