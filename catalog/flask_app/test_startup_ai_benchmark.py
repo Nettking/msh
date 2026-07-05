@@ -4,6 +4,7 @@ from catalog.flask_app import app as app_module
 from catalog.flask_app import routes as routes_module
 from catalog.flask_app import server_setup_routes
 from catalog.flask_app.app import create_app
+from catalog.flask_app.services.ai_model_benchmark_service import compare_ollama_setup_models
 from catalog.flask_app.services.server_setup_service import default_settings
 
 
@@ -70,31 +71,43 @@ def test_startup_ai_step_exposes_response_time_comparison(monkeypatch, tmp_path)
     assert "Too slow: choose a smaller model or stronger machine" in html
 
 
-def test_ai_model_benchmark_endpoint_uses_selected_profile(monkeypatch, tmp_path):
+def test_ai_model_benchmark_endpoint_returns_recommendation(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup_context(monkeypatch)
 
     settings = default_settings(configured=True)
-    captured: dict[str, str] = {}
     monkeypatch.setattr(server_setup_routes, "load_settings", lambda: settings)
 
-    def fake_benchmark(_settings, *, model):
-        captured["model"] = model
+    def fake_compare(_settings):
         return {
             "ok": True,
-            "model": model,
-            "elapsed_ms": 4200,
-            "assessment": {
-                "key": "fast",
-                "label": "Fast",
-                "description": "Comfortable for interactive setup and short repository questions.",
+            "rows": [
+                {
+                    "profile": "edge-small",
+                    "label": "Edge small",
+                    "model": "smollm2:360m",
+                    "installed": True,
+                    "tested": True,
+                    "result": {
+                        "ok": True,
+                        "elapsed_ms": 1200,
+                        "assessment": {"key": "fast", "label": "Fast", "description": "Comfortable."},
+                    },
+                }
+            ],
+            "recommendation": {
+                "verdict": "supported",
+                "hardware_supported": True,
+                "recommended_profile": "edge-small",
+                "recommended_model": "smollm2:360m",
+                "recommended_label": "Edge small",
+                "message": "Recommended model: Edge small (smollm2:360m).",
             },
-            "thresholds": [],
-            "message": f"{model} responded in 4200 ms. Assessment: Fast.",
+            "message": "Recommended model: Edge small (smollm2:360m).",
         }
 
-    monkeypatch.setattr(server_setup_routes, "benchmark_ollama_response_time", fake_benchmark)
+    monkeypatch.setattr(server_setup_routes, "compare_ollama_setup_models", fake_compare)
 
     app = create_app()
     app.config.update(TESTING=True)
@@ -105,7 +118,39 @@ def test_ai_model_benchmark_endpoint_uses_selected_profile(monkeypatch, tmp_path
 
     assert response.status_code == 200
     payload = response.get_json()
-    assert captured["model"] == "smollm2:360m"
-    assert payload["ok"] is True
-    assert payload["elapsed_ms"] == 4200
-    assert payload["assessment"]["label"] == "Fast"
+    assert payload["recommendation"]["recommended_profile"] == "edge-small"
+    assert payload["model"] == "smollm2:360m"
+    assert payload["assessment"]["label"] == "Edge small"
+    assert "Recommended model" in payload["message"]
+
+
+def test_ai_setup_comparison_marks_edge_small_too_slow_as_not_supported(monkeypatch):
+    settings = default_settings(configured=True)
+    monkeypatch.setattr(
+        "catalog.flask_app.services.ai_model_benchmark_service.ollama_status",
+        lambda _settings, timeout_seconds=2.0: {
+            "running": True,
+            "installed_by_profile": {
+                "edge-small": True,
+                "laptop-standard": False,
+                "workstation-strong": False,
+            },
+            "models": ["smollm2:360m"],
+        },
+    )
+    monkeypatch.setattr(
+        "catalog.flask_app.services.ai_model_benchmark_service.benchmark_ollama_response_time",
+        lambda _settings, *, model: {
+            "ok": True,
+            "model": model,
+            "elapsed_ms": 41000,
+            "assessment": {"key": "too_slow", "label": "Too slow", "description": "Too slow."},
+            "message": "too slow",
+        },
+    )
+
+    result = compare_ollama_setup_models(settings)
+
+    assert result["recommendation"]["verdict"] == "insufficient_hardware"
+    assert result["recommendation"]["hardware_supported"] is False
+    assert "Edge small" in result["recommendation"]["message"]
