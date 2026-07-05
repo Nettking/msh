@@ -12,10 +12,45 @@ services:
       - MSH_SCAN_DIRS=${MSH_SCAN_DIRS:-results,data}
       - MSH_SKIP_ORCHESTRATION=${MSH_SKIP_ORCHESTRATION:-0}
       - MSH_FLASK_SECRET=${MSH_FLASK_SECRET:-msh-dev}
+      - MSH_AI_MODEL=${MSH_AI_MODEL:-llama3.2:3b}
+      - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
     volumes:
       - ./results:/app/results
       - ./data:/app/data
     restart: unless-stopped
+
+  # Optional local Ollama model server for the MSH AI explainer.
+  # Enabled by setup profile: ai.
+  ollama:
+    profiles: ["ai"]
+    image: ollama/ollama:latest
+    volumes:
+      - ollama_models:/root/.ollama
+    restart: unless-stopped
+
+  # One-shot model installer. It waits for the Ollama server and pulls the
+  # selected setup model into the shared ollama_models volume.
+  # Enabled by setup profile: ai.
+  ollama-pull:
+    profiles: ["ai"]
+    image: ollama/ollama:latest
+    depends_on:
+      - ollama
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+      - MSH_AI_MODEL=${MSH_AI_MODEL:-llama3.2:3b}
+    entrypoint:
+      - /bin/sh
+      - -lc
+      - |
+        for i in $$(seq 1 60); do
+          if ollama list >/dev/null 2>&1; then
+            break
+          fi
+          sleep 2
+        done
+        echo "Pulling Ollama model: $${MSH_AI_MODEL}"
+        ollama pull "$${MSH_AI_MODEL}"
 
   # Optional always-on MTConnect recorder. Use this on a machine that should only
   # collect source data, or together with flask for a full server deployment.
@@ -65,3 +100,6 @@ services:
       - MSH_SCAN_DIRS=${MSH_SCAN_DIRS:-results,data}
     volumes:
       - ./data:/app/data
+
+volumes:
+  ollama_models:
