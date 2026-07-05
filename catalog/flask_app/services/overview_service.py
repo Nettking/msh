@@ -214,11 +214,13 @@ def _overview_decision(
     if not visible_count:
         return _decision(
             state="waiting",
-            title="No artifacts have been discovered yet",
-            summary="The overview has no source or derived artifacts to summarize.",
-            next_step="Use Control to start runtime processing, or rescan after placing data under the configured scan roots.",
-            primary_label="Open control",
-            primary_href="/control",
+            title="No playback-ready data is indexed yet",
+            summary=str(playback.get("message") or "The artifact scan has not indexed source, derived, or playback-ready data yet."),
+            next_step="Wait for the rescan to finish, then refresh Overview. If this stays empty, run the workflow from Control before opening Playback.",
+            primary_label="Open status",
+            primary_href="/status",
+            secondary_label="Open control",
+            secondary_href="/control",
         )
 
     if not runtime_started and playback.get("state") != "ready":
@@ -234,13 +236,13 @@ def _overview_decision(
     if playback.get("state") in {"waiting", "partial"}:
         return _decision(
             state="partial" if playback_count else "waiting",
-            title="Artifacts found, but playback is not ready",
+            title="Playback is not ready yet",
             summary=str(playback.get("message") or "Playback is still waiting for session output."),
-            next_step="Use Control or Status to finish the workflow session. Open Live if you only need recent recorded telemetry.",
-            primary_label="Open control",
-            primary_href="/control",
-            secondary_label="Open live",
-            secondary_href="/live",
+            next_step="Wait for rescan to finish, or use Control to generate playback output for the current session.",
+            primary_label="Open status",
+            primary_href="/status",
+            secondary_label="Open control",
+            secondary_href="/control",
         )
 
     if machine.get("state") == "ready" or analysis.get("state") == "ready":
@@ -319,6 +321,34 @@ def _session_scoped_artifacts(artifacts: list[dict[str, Any]], session_id: str) 
     return [item for item in artifacts if marker in str(item.get("path") or "").replace("\\", "/")]
 
 
+def _playback_state_for_overview(
+    session_playback_state: str,
+    session_playback_message: str,
+    *,
+    context_source: str,
+    session_id: str,
+    indexed_playback_count: int,
+) -> tuple[str, str]:
+    if session_playback_state == "ready" and indexed_playback_count > 0 and context_source == "runtime":
+        return "ready", session_playback_message
+    if session_playback_state == "ready" and indexed_playback_count > 0:
+        return (
+            "partial",
+            f"A playback export exists for fallback latest session {session_id or 'n/a'}, but the current runtime session is not confirmed. {_context_note(context_source, session_id)}",
+        )
+    if session_playback_state == "ready":
+        return (
+            "waiting",
+            "A session playback export exists, but the artifact scan has not indexed any playback-compatible exports yet. Wait for rescan to finish, then refresh Overview or Playback.",
+        )
+    if indexed_playback_count > 0:
+        return (
+            "partial",
+            f"Playback is not ready for {'runtime session' if context_source == 'runtime' else 'fallback latest session'} {session_id or 'n/a'}, but {indexed_playback_count} historical playback dataset(s) exist. {_context_note(context_source, session_id)}",
+        )
+    return "waiting", session_playback_message
+
+
 def _view_readiness(runtime_state: dict[str, Any], visible: list[dict[str, Any]], session_context: dict[str, Any]) -> list[dict[str, str]]:
     view_contracts = runtime_state.get("view_contracts") or {}
     machine_contract = view_contracts.get("machine", {})
@@ -332,9 +362,14 @@ def _view_readiness(runtime_state: dict[str, Any], visible: list[dict[str, Any]]
     current_derived_count = len([item for item in session_artifacts if item.get("category") == "derived_output" and item.get("status") == "ready"])
     historical_derived_ready = any(item.get("category") == "derived_output" and item.get("status") == "ready" for item in visible)
     any_artifacts = bool(visible)
-    playback_state, playback_message = _current_session_playback_status(session)
-    if context_source != "runtime" and playback_message:
-        playback_message = f"{playback_message} {_context_note(context_source, session_id)}".strip()
+    session_playback_state, session_playback_message = _current_session_playback_status(session)
+    playback_state, playback_message = _playback_state_for_overview(
+        session_playback_state,
+        session_playback_message,
+        context_source=context_source,
+        session_id=session_id,
+        indexed_playback_count=historical_playback_count,
+    )
 
     return [
         {
@@ -344,10 +379,8 @@ def _view_readiness(runtime_state: dict[str, Any], visible: list[dict[str, Any]]
         },
         {
             "view": "/playback",
-            "state": playback_state if playback_state != "waiting" else ("partial" if historical_playback_count > 0 else "waiting"),
-            "message": playback_message
-            if playback_state != "waiting" or historical_playback_count == 0
-            else f"Playback is not ready for {'runtime session' if context_source == 'runtime' else 'fallback latest session'} {session_id or 'n/a'}, but {historical_playback_count} historical playback dataset(s) exist. {context_note}",
+            "state": playback_state,
+            "message": playback_message,
         },
         {
             "view": "/analyses",
