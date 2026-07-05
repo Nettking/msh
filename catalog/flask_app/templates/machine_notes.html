@@ -1,0 +1,16 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro"><h2>Machine notes</h2><p>Capture machine-specific experience such as warm-up behavior, drift, and habits.</p></section>
+<section class="section-block section-block--primary">
+  <h3>Add machine note</h3>
+  <form method="post" action="{{ url_for('operator_support_web.save_machine_note') }}" class="control-form control-card source-inline-form">
+    <label><span>Machine</span><select name="machine_id"><option value="">Unassigned</option>{% for machine in source_inventory.machines %}<option value="{{ machine.id }}">{{ machine.name }}</option>{% endfor %}</select></label>
+    <label><span>Applies when</span><input type="text" name="applies_when" placeholder="cold start / long tool / aluminium"></label>
+    <label><span>Source</span><input type="text" name="source" placeholder="operator experience"></label>
+    <label class="source-field-wide"><span>Note</span><textarea name="note" rows="4" required></textarea></label>
+    <label class="source-field-wide"><span>Caution</span><textarea name="caution" rows="2"></textarea></label>
+    <button class="button-primary" type="submit">Save machine note</button>
+  </form>
+</section>
+<section class="section-block"><h3>Recent machine notes</h3><p>Stored at <code>{{ records_path }}</code>.</p>{% if notes %}<div class="stack-list">{% for item in notes %}<article class="stack-row"><div><h4>{{ item.applies_when or 'Machine note' }}</h4><p>{{ item.note }}</p><p class="text-muted">machine {{ item.machine_id or 'unassigned' }} · {{ item.source }}</p><p>{{ item.caution }}</p></div></article>{% endfor %}</div>{% else %}<p>No machine notes saved yet.</p>{% endif %}</section>
+{% endblock %}
