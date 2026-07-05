@@ -1,6 +1,6 @@
 # Source synchronization
 
-MSH originally treated `data/**/*.jsonl` as one local telemetry corpus. Observer Phoenix changes that assumption: telemetry can now arrive from several external systems, with their own identifiers, clock behavior, polling windows, and API limits.
+MSH originally treated `data/**/*.jsonl` as one local telemetry corpus. External sources such as MTConnect adapters and Observer Phoenix change that assumption: telemetry can arrive from several systems, with their own identifiers, clock behavior, polling windows, connection paths, and API limits.
 
 This document defines the source-synchronization layer that sits before workflow sessions and before the Parquet/DuckDB analytics cache.
 
@@ -11,12 +11,69 @@ This document defines the source-synchronization layer that sits before workflow
 - Track a separate synchronization watermark per source.
 - Keep vendor API metadata out of recursive JSONL telemetry scans.
 - Make repeated synchronization runs idempotent where possible.
+- Keep machine/source configuration visible from the Flask UI.
+- Provide simple connection tests for MTConnect and machine-network reachability.
+
+## Source configuration in the app
+
+System -> Sources is the user-facing source configuration page.
+
+It stores machine and sensor inventory under:
+
+```text
+data/source_config/machines_and_sensors.json
+```
+
+Machine entries can include:
+
+- machine name.
+- machine type.
+- controller/adapter.
+- MTConnect URL.
+- VPN/network test host.
+- VPN/network test port.
+- notes.
+
+Vibration sensor entries can include:
+
+- sensor name.
+- assigned machine.
+- source system.
+- signal/channel.
+- axis.
+- unit.
+- sampling rate.
+- enabled/disabled state.
+- notes.
+
+### MTConnect connection test
+
+The **Test MTConnect** button tests the configured machine MTConnect endpoint from the Flask server/container.
+
+If the stored URL is a base adapter URL, MSH tests `/current` automatically.
+
+Example:
+
+```text
+10.0.0.20:5000
+-> http://10.0.0.20:5000/current
+```
+
+A successful test means MSH reached the adapter endpoint and received an HTTP response. An HTTP error still means the host was reachable, but the adapter returned an error response.
+
+### VPN/network reachability test
+
+The **Test VPN/network** button opens a TCP connection from the Flask server/container to the configured host/port.
+
+This does not prove the VPN client is connected at the operating-system level. It proves the useful operational question for MSH: whether the app can reach the configured machine-network target from where MSH is running.
+
+If no VPN/network host is configured, the test falls back to the MTConnect host/port when possible.
 
 ## Dataflow
 
 ```mermaid
 flowchart LR
-    A[External source APIs] --> B[Source connector]
+    A[External source APIs and adapters] --> B[Source connector]
     B --> C[MSH-normalized JSONL]
     B --> D[Source sync state]
     C --> E[Telemetry analytics cache]
@@ -24,6 +81,7 @@ flowchart LR
     F --> G[Derived metrics and playback exports]
     E --> H[Cache-aware Flask views]
     G --> H
+    I[System -> Sources] --> B
 ```
 
 The key boundary is `MSH-normalized JSONL`. Anything under `data/` with a `.jsonl` suffix must be safe for the existing recursive telemetry scanner. Connector metadata, raw API pages, and watermarks should be JSON or another non-JSONL format.
@@ -38,6 +96,8 @@ data/
         <YYYY-MM-DD>.jsonl
   source_state/
     <source-name>.json
+  source_config/
+    machines_and_sensors.json
 ```
 
 For Observer Phoenix this becomes:
@@ -57,7 +117,7 @@ Required or strongly recommended fields:
 | --- | --- |
 | `timestamp` | UTC measurement timestamp, parseable as ISO 8601. |
 | `machine_id` | Stable machine identifier after source mapping. |
-| `source` | Source system name, for example `observer_phoenix`. |
+| `source` | Source system name, for example `observer_phoenix` or `mtconnect`. |
 | `source_record_id` | Stable record key used for idempotent append/deduplication. |
 | `measurement_type` | Source measurement family, for example `trend`. |
 | `value` | Scalar value when the record represents one scalar signal. |
@@ -70,7 +130,7 @@ Useful optional fields:
 | `machine` | Human-readable machine name. |
 | `source_machine_path` | Source hierarchy/path for traceability. |
 | `point_id` | Measurement point ID in the source system. |
-| `point_name` | Measurement point name in the source system. |
+| `point_name` | Measurement point name. |
 | `channel` | Source channel/direction. |
 | `channel_name` | Human-readable source channel name. |
 | `alarm_info` | Source alarm payload when explicitly requested. |
@@ -115,3 +175,4 @@ Later improvements can build on this without breaking the contract:
 - It does not make the Parquet cache the ingestion store.
 - It does not automatically reconcile clocks across systems beyond preserving UTC timestamps and source IDs.
 - It does not attempt to flatten large spectrum/TWF arrays into the normal scalar trend stream.
+- The VPN/network test does not prove OS-level VPN state; it only checks reachability from MSH to the configured machine-network target.
