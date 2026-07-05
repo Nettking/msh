@@ -4,6 +4,7 @@ Usage:
     python -m catalog.ai.ask "How does data flow through MSH?"
     python -m catalog.ai.ask --dry-run "What does /control do?"
     python -m catalog.ai.ask --show-sources "Where are workflow artifacts stored?"
+    python -m catalog.ai.ask --extractive "What does /control do?"
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from pathlib import Path
 
 from .grounding import append_grounding_warning
 from .ollama_client import DEFAULT_MODEL, OllamaError, chat
-from .prompts import SYSTEM_PROMPT, build_prompt
+from .prompts import SYSTEM_PROMPT, build_extractive_prompt, build_prompt
 from .rag import format_context, retrieve
 from .repo_index import load_or_build_chunks, repo_root_from
 
@@ -28,6 +29,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--no-cache", action="store_true", help="Do not read or write the local repository index cache.")
     parser.add_argument("--rebuild-index", action="store_true", help="Force rebuilding the local repository index cache.")
     parser.add_argument("--show-sources", action="store_true", help="Print retrieved source labels before the answer.")
+    parser.add_argument("--extractive", action="store_true", help="Use a stricter source-extractive answer prompt.")
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -63,7 +65,8 @@ def main() -> int:
         print(context)
         return 0
 
-    prompt = build_prompt(args.question, context, sources=source_labels)
+    prompt_builder = build_extractive_prompt if args.extractive else build_prompt
+    prompt = prompt_builder(args.question, context, sources=source_labels)
     try:
         answer = chat(prompt=prompt, system_prompt=SYSTEM_PROMPT, model=args.model)
     except OllamaError as exc:
