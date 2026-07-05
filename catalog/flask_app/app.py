@@ -10,6 +10,7 @@ from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
 from .ai_routes import ai_web
+from .operator_strategy_routes import operator_strategy_web
 from .routes import web
 from .services.catalog_service import ArtifactCatalog
 from .source_routes import source_web
@@ -30,6 +31,7 @@ def create_app() -> Flask:
     get_runtime_manager().mark_app_started()
     app.register_blueprint(web)
     app.register_blueprint(source_web)
+    app.register_blueprint(operator_strategy_web)
     app.register_blueprint(ai_web)
     return app
 
