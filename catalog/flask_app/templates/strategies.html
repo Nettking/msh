@@ -2,8 +2,8 @@
 {% block body %}
 <section class="page-intro strategies-intro">
   <div>
-    <h2>Intervention rules</h2>
-    <p>Technical YAML rules for detecting intervention candidates from telemetry signals. Operator notes are captured separately under Operator Notes.</p>
+    <h2>Intervention Logic</h2>
+    <p>This is the technical rule layer. Operator statements become structured strategies first; intervention logic decides how telemetry can detect candidate situations for those strategies.</p>
   </div>
   <div class="strategy-paths">
     <span><strong>Rules:</strong> {{ page.strategies_path }}</span>
@@ -11,34 +11,29 @@
   </div>
 </section>
 
+<section class="section-block section-block--primary">
+  <h3>Where this fits in the workflow</h3>
+  <div class="info-grid">
+    <article class="info-card"><h4>Before</h4><p>Capture raw statements, review them, and structure them into strategy knowledge.</p></article>
+    <article class="info-card"><h4>This page</h4><p>Define YAML rules that detect candidate situations from telemetry signals, such as load, vibration, or state changes.</p></article>
+    <article class="info-card"><h4>After</h4><p>Detected candidates can support Assist cards, validation cases, and later SysML/DT artefacts.</p></article>
+  </div>
+</section>
+
 <section class="section-block section-block--primary strategy-summary-compact">
   <h3>Rule summary</h3>
   <div class="metrics metrics-grid control-summary-strip">
-    <article class="metric-card metric-card--success">
-      <span class="metric-label">Enabled</span>
-      <span class="metric-value">{{ page.summary.enabled_count }}</span>
-    </article>
-    <article class="metric-card">
-      <span class="metric-label">Disabled</span>
-      <span class="metric-value">{{ page.summary.disabled_count }}</span>
-    </article>
-    <article class="metric-card metric-card--info">
-      <span class="metric-label">Labels in use</span>
-      <span class="metric-value metric-value--long">{{ page.summary.labels_in_use|join(', ') if page.summary.labels_in_use else 'None' }}</span>
-    </article>
-    <article class="metric-card">
-      <span class="metric-label">Active rule signature</span>
-      <span class="metric-value metric-value--long strategy-signature">{{ page.signature or 'Unavailable until config validates' }}</span>
-    </article>
+    <article class="metric-card metric-card--success"><span class="metric-label">Enabled</span><span class="metric-value">{{ page.summary.enabled_count }}</span></article>
+    <article class="metric-card"><span class="metric-label">Disabled</span><span class="metric-value">{{ page.summary.disabled_count }}</span></article>
+    <article class="metric-card metric-card--info"><span class="metric-label">Labels in use</span><span class="metric-value metric-value--long">{{ page.summary.labels_in_use|join(', ') if page.summary.labels_in_use else 'None' }}</span></article>
+    <article class="metric-card"><span class="metric-label">Active rule signature</span><span class="metric-value metric-value--long strategy-signature">{{ page.signature or 'Unavailable until config validates' }}</span></article>
   </div>
   <p class="muted">Saving writes back to <code>catalog/common/intervention_strategies.yaml</code>. Rule edits invalidate cached candidate outputs; candidate events regenerate the next time playback exports are prepared or rerun.</p>
 </section>
 
 <form method="post" action="{{ url_for('web.save_strategies') }}" class="strategy-editor-form">
   {% set indices = [] %}
-  {% for strategy in page.strategies %}
-    {% set _ = indices.append(loop.index0|string) %}
-  {% endfor %}
+  {% for strategy in page.strategies %}{% set _ = indices.append(loop.index0|string) %}{% endfor %}
   {% set _ = indices.append('new') %}
   <input type="hidden" name="strategy_indices" value="{{ indices|join(',') }}">
 
@@ -46,16 +41,7 @@
     <h3>Rule overview</h3>
     <div class="table-scroll">
       <table class="strategy-overview-table">
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Type</th>
-            <th>Signal</th>
-            <th>Label</th>
-            <th>Window</th>
-            <th>Status</th>
-          </tr>
-        </thead>
+        <thead><tr><th>ID</th><th>Type</th><th>Signal</th><th>Label</th><th>Window</th><th>Status</th></tr></thead>
         <tbody>
           {% for strategy in page.strategies %}
           <tr>
@@ -64,44 +50,31 @@
             <td>{{ strategy.signal or '—' }}</td>
             <td>{{ strategy.suggested_label or '—' }}</td>
             <td>{{ strategy.window_seconds if strategy.window_seconds is defined else '—' }}</td>
-            <td>
-              <span class="status-pill {% if strategy.enabled %}status-active{% else %}status-inactive{% endif %}">
-                {% if strategy.enabled %}Enabled{% else %}Disabled{% endif %}
-              </span>
-            </td>
+            <td><span class="status-pill {% if strategy.enabled %}status-active{% else %}status-inactive{% endif %}">{% if strategy.enabled %}Enabled{% else %}Disabled{% endif %}</span></td>
           </tr>
-          {% else %}
-          <tr>
-            <td colspan="6" class="muted">No intervention rules are configured yet.</td>
-          </tr>
-          {% endfor %}
+          {% else %}<tr><td colspan="6" class="muted">No intervention rules are configured yet.</td></tr>{% endfor %}
         </tbody>
       </table>
     </div>
   </section>
 
   <section class="section-block strategy-edit-section">
-    <h3>Edit rules</h3>
-    <p class="muted">Open a rule to edit its fields. Existing rules are collapsed by default.</p>
+    <h3>Edit intervention rules</h3>
+    <p class="muted">Open a rule to edit its fields. These rules are not operator notes; they are detection logic for finding candidate intervention situations in telemetry.</p>
     <div class="strategy-card-grid">
-      {% for strategy in page.strategies %}
-        {% set prefix = 'strategies-' ~ loop.index0 ~ '-' %}
-        {% include 'strategies_card.html' %}
-      {% endfor %}
+      {% for strategy in page.strategies %}{% set prefix = 'strategies-' ~ loop.index0 ~ '-' %}{% include 'strategies_card.html' %}{% endfor %}
     </div>
   </section>
 
   <details class="section-block strategy-add-details">
-    <summary>Add new rule</summary>
+    <summary>Add new intervention rule</summary>
     {% set strategy = {'id': '', 'enabled': false, 'type': 'delta_threshold', 'suggested_label': '', 'signal': '', 'description': '', 'window_seconds': 30} %}
     {% set prefix = 'strategies-new-' %}
-    <div class="strategy-card__body strategy-card__body--new">
-      {% include 'strategies_fields.html' %}
-    </div>
+    <div class="strategy-card__body strategy-card__body--new">{% include 'strategies_fields.html' %}</div>
   </details>
 
   <section class="section-block strategy-save-bar">
-    <button class="button-primary" type="submit">Save intervention rules</button>
+    <button class="button-primary" type="submit">Save intervention logic</button>
     <a href="{{ url_for('web.strategies') }}">Discard form changes</a>
   </section>
 </form>
@@ -111,31 +84,12 @@
   <div class="strategy-diagnostics-body">
     <section class="strategy-diagnostics-panel">
       <h3>Validation</h3>
-      {% if page.validation_errors %}
-      <ul class="validation-list validation-list--errors">
-        {% for error in page.validation_errors %}<li>{{ error }}</li>{% endfor %}
-      </ul>
-      {% else %}
-      <p class="status-ok">Current intervention rule config validates successfully.</p>
-      {% endif %}
-      {% if page.validation_warnings %}
-      <ul class="validation-list validation-list--warnings">
-        {% for warning in page.validation_warnings %}<li>{{ warning }}</li>{% endfor %}
-      </ul>
-      {% endif %}
+      {% if page.validation_errors %}<ul class="validation-list validation-list--errors">{% for error in page.validation_errors %}<li>{{ error }}</li>{% endfor %}</ul>{% else %}<p class="status-ok">Current intervention rule config validates successfully.</p>{% endif %}
+      {% if page.validation_warnings %}<ul class="validation-list validation-list--warnings">{% for warning in page.validation_warnings %}<li>{{ warning }}</li>{% endfor %}</ul>{% endif %}
     </section>
-
-    <section class="strategy-diagnostics-panel">
-      <h3>Label vocabulary</h3>
-      <div class="label-vocabulary">
-        {% for label_id, payload in page.labels.items() %}
-        <article class="label-pill">
-          <strong>{{ label_id }}</strong>
-          <span>{{ payload.description }}</span>
-        </article>
-        {% endfor %}
-      </div>
-    </section>
+    <section class="strategy-diagnostics-panel"><h3>Label vocabulary</h3><div class="label-vocabulary">
+      {% for label, meta in page.labels.items() %}<article class="label-card"><h4>{{ label }}</h4><p>{{ meta.description or 'No description' }}</p></article>{% else %}<p>No labels configured.</p>{% endfor %}
+    </div></section>
   </div>
 </details>
 {% endblock %}
