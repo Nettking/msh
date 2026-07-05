@@ -27,7 +27,7 @@ def _patch_setup(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "load_settings", lambda: default_settings(configured=True))
 
 
-def test_guide_page_explains_workflow(monkeypatch, tmp_path):
+def test_guide_page_explains_knowledge_flow(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup(monkeypatch)
@@ -40,7 +40,9 @@ def test_guide_page_explains_workflow(monkeypatch, tmp_path):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert "Guide" in html
-    assert "Recommended workflow" in html
+    assert "Monitor, Knowledge, and System" in html
+    assert "Recommended knowledge flow" in html
     assert "Capture a raw statement" in html
     assert "Intervention Logic" in html
     assert "SysML Export" in html
+    assert "Workflow" not in html
