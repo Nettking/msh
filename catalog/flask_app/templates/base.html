@@ -49,6 +49,7 @@
         {% elif active_group == 'system' %}
           <a class="{% if endpoint == 'web.guide' %}is-active{% endif %}" href="{{ url_for('web.guide') }}">Guide</a>
           <a class="{% if endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">Setup</a>
+          <a href="{{ url_for('web.guide') }}#setup-guide">Setup Guide</a>
           <a class="{% if endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ url_for('source_web.index') }}">Sources</a>
           <a class="{% if endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
         {% else %}
