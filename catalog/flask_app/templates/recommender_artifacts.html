@@ -1,0 +1,6 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro"><h2>Recommender artifacts</h2><p>Generate support-card artefacts from reusable operator notes.</p></section>
+<section class="section-block section-block--actions"><form method="post" action="{{ url_for('operator_support_web.generate_recommender_artifacts') }}"><button class="button-primary" type="submit">Generate recommender artifacts</button></form><p>Output path: <code>{{ output_path }}</code></p></section>
+<section class="section-block"><h3>Preview</h3>{% if artifacts %}<div class="stack-list">{% for item in artifacts %}<article class="stack-row"><div><h4>{{ item.recommendation }}</h4><p>{{ item.reason }}</p><p><strong>Risk:</strong> {{ item.risk }}</p><p><strong>Alternative:</strong> {{ item.alternative }}</p></div></article>{% endfor %}</div>{% else %}<p>No reusable notes available yet.</p>{% endif %}</section>
+{% endblock %}
