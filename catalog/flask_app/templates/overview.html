@@ -5,8 +5,32 @@
   <p>Control-room summary for current runtime state, machine activity, readiness, and operator entry points.</p>
 </section>
 
+<section class="section-block overview-decision overview-decision--{{ overview.decision.state }}">
+  <div class="overview-decision__main">
+    <span class="metric-label">Current system status</span>
+    <h3>{{ overview.decision.title }}</h3>
+    <p class="overview-decision__summary">{{ overview.decision.summary }}</p>
+    <div class="overview-decision__next">
+      <strong>Recommended next step</strong>
+      <p>{{ overview.decision.next_step }}</p>
+    </div>
+    <div class="overview-decision__actions">
+      <a class="button-link button-link--primary" href="{{ overview.decision.primary_action.href }}">{{ overview.decision.primary_action.label }}</a>
+      <a class="button-link" href="{{ overview.decision.secondary_action.href }}">{{ overview.decision.secondary_action.label }}</a>
+    </div>
+  </div>
+  <div class="overview-decision__facts">
+    <span class="status-badge status-{{ overview.decision.state|lower|replace(' ', '-') }}">{{ overview.decision.state }}</span>
+    <ul>
+      {% for fact in overview.decision.facts %}
+      <li>{{ fact }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+</section>
+
 <section class="section-block section-block--primary">
-  <h3>Headline summary</h3>
+  <h3>Technical summary</h3>
   <div class="metrics metrics-grid">
     <article class="metric-card metric-card--info">
       <span class="metric-label">Current phase</span>
