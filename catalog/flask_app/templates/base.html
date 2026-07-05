@@ -13,22 +13,26 @@
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   </head>
   <body>
-    <header class="site-header">
+    {% set endpoint = request.endpoint or '' %}
+    {% set active_group = 'operate' %}
+    {% if endpoint == 'web.startup' or endpoint.startswith('source_web.') %}
+      {% set active_group = 'configure' %}
+    {% elif endpoint.startswith('operator_strategy_web.') or endpoint in ['web.strategies', 'web.save_strategies'] %}
+      {% set active_group = 'knowledge' %}
+    {% endif %}
+
+    <header class="site-header site-header--grouped">
       <div class="site-header__identity">
         <h1>MSH Webapp</h1>
         <p>Flask control-room interface</p>
       </div>
-      <nav class="site-nav" aria-label="Primary">
-        <a class="{% if request.endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">Setup</a>
-        <a class="{% if request.endpoint == 'web.overview' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Overview</a>
-        <a class="{% if request.endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
-        <a class="{% if request.endpoint == 'web.control' %}is-active{% endif %}" href="{{ url_for('web.control') }}">Control</a>
-        <a class="{% if request.endpoint == 'web.live' %}is-active{% endif %}" href="{{ url_for('web.live') }}">Live</a>
-        <a class="{% if request.endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
-        <a class="{% if request.endpoint and request.endpoint.startswith('operator_strategy_web.') %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.index') }}">Operator Notes</a>
-        <a class="{% if request.endpoint and request.endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ url_for('source_web.observer_phoenix') }}">Sources</a>
-        <a class="{% if request.endpoint in ['web.strategies', 'web.save_strategies'] %}is-active{% endif %}" href="{{ url_for('web.strategies') }}">Intervention Rules</a>
+
+      <nav class="site-nav site-nav--primary" aria-label="Primary sections">
+        <a class="{% if active_group == 'operate' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Operate</a>
+        <a class="{% if active_group == 'configure' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">Configure</a>
+        <a class="{% if active_group == 'knowledge' %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.index') }}">Knowledge</a>
       </nav>
+
       {% if artifact_catalog_freshness is defined %}
       <div class="catalog-freshness {% if artifact_catalog_freshness.stale %}catalog-freshness--stale{% endif %}">
         <span>Artifact scan:</span>
@@ -44,11 +48,30 @@
         {% if artifact_catalog_freshness.scan_in_progress %}<span>Rescan running</span>{% elif artifact_catalog_freshness.stale %}<span>May be stale</span>{% endif %}
       </div>
       {% endif %}
+
       <form class="rescan-form" method="post" action="{{ url_for('web.rescan') }}">
         <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
         <button type="submit">Rescan</button>
       </form>
+
+      <nav class="site-nav site-section-nav" aria-label="Section pages">
+        {% if active_group == 'configure' %}
+          <a class="{% if endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">Setup</a>
+          <a class="{% if endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ url_for('source_web.observer_phoenix') }}">Sources</a>
+          <span class="site-section-nav__placeholder">Vibration sensors: planned</span>
+        {% elif active_group == 'knowledge' %}
+          <a class="{% if endpoint.startswith('operator_strategy_web.') %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.index') }}">Operator Notes</a>
+          <a class="{% if endpoint in ['web.strategies', 'web.save_strategies'] %}is-active{% endif %}" href="{{ url_for('web.strategies') }}">Intervention Rules</a>
+        {% else %}
+          <a class="{% if endpoint == 'web.overview' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Overview</a>
+          <a class="{% if endpoint == 'web.control' %}is-active{% endif %}" href="{{ url_for('web.control') }}">Control</a>
+          <a class="{% if endpoint == 'web.live' %}is-active{% endif %}" href="{{ url_for('web.live') }}">Live</a>
+          <a class="{% if endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
+          <a class="{% if endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
+        {% endif %}
+      </nav>
     </header>
+
     <main>
       {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
