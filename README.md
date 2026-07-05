@@ -33,7 +33,9 @@ The setup helper lets you choose what this checkout should activate:
 - recorder only: MTConnect data recorder without web UI.
 - one-shot prep or Observer Phoenix sync.
 
-For detailed setup, ports, profiles, and firewall notes, see [docs/server_setup.md](docs/server_setup.md) and [docs/quick_start.md](docs/quick_start.md).
+For web-capable modes, setup also asks whether to enable the local AI explainer and install a standard Ollama model. The three setup choices are `edge-small`, `laptop-standard`, and `workstation-strong`.
+
+For detailed setup, ports, profiles, model choices, and firewall notes, see [docs/server_setup.md](docs/server_setup.md) and [docs/quick_start.md](docs/quick_start.md).
 
 Local developer fallback:
 
@@ -44,6 +46,21 @@ python -m catalog.flask_app.app
 ## AI explainer
 
 MSH includes a first read-only local AI explainer for asking system-understanding questions about the repository. It indexes selected documentation and code, retrieves relevant context, and sends that context to a local Ollama model.
+
+`setup_msh.py` can install the model through Docker Compose. The standard choices are:
+
+| Setup choice | Model | Intended device |
+| --- | --- | --- |
+| `edge-small` | `smollm2:360m` | Small CPU, Raspberry Pi class, or very low memory testing. |
+| `laptop-standard` | `llama3.2:3b` | Normal laptop or small server. Default balance. |
+| `workstation-strong` | `qwen2.5:7b` | Gaming laptop, workstation, or GPU server. Stronger answers. |
+
+Retry model installation manually with:
+
+```bash
+docker compose up -d ollama
+docker compose run --rm ollama-pull
+```
 
 Preview retrieved context without calling Ollama:
 
@@ -75,7 +92,7 @@ Use `MSH_AI_MODEL` or `--model` to select the Ollama model. See [docs/ai_explain
 ## Repository map
 
 - `setup_msh.py` — interactive local deployment setup that writes ignored Docker Compose settings.
-- `docker-compose.yml` — profile-driven server components: web, recorder, full, prep, and observer-sync.
+- `docker-compose.yml` — profile-driven server components: web, recorder, full, prep, observer-sync, and ai.
 - `catalog/flask_app/` — primary Flask application, routes, templates, and UI-facing services.
 - `catalog/orchestrator/` — non-interactive bootstrap/catch-up orchestration.
 - `catalog/runner/` — workflow session metadata, date filtering, script discovery/execution, and playback export helpers.
@@ -97,7 +114,7 @@ See [catalog/README.md](catalog/README.md) for the script catalog and analysis w
 
 ## Detailed documentation
 
-- [Server setup](docs/server_setup.md) — deployment modes, LAN access, Docker Compose profiles, and recorder setup.
+- [Server setup](docs/server_setup.md) — deployment modes, LAN access, Docker Compose profiles, AI model setup, and recorder setup.
 - [Quick start](docs/quick_start.md) — setup commands and first-run expectations.
 - [Operator guide](docs/operator_guide.md) — daily UI workflow, sessions, playback, and controls.
 - [Operator strategy capture](docs/operator_strategy_capture.md) — OSL-style field-capture page for operator decisions and action timing.
