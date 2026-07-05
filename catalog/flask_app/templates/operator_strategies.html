@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro">
+  <h2>Operator strategy capture</h2>
+  <p>Record operator decisions and the reasoning around them while visiting MSH. These are OSL-style field notes, not telemetry samples.</p>
+</section>
+
+{% if load_error %}
+<section class="section-block section-block--warning">
+  <h3>Storage warning</h3>
+  <p>{{ load_error }}</p>
+</section>
+{% endif %}
+
+<section class="section-block section-block--primary">
+  <h3>Record a decision/action</h3>
+  <p>Capture both when this form is saved and when the operator decision actually happened. Use <strong>Now</strong> for live recording, or <strong>Custom time</strong> when entering a decision after the fact.</p>
+
+  <form method="post" action="{{ url_for('operator_strategy_web.save') }}" class="control-form control-card">
+    <div class="info-grid">
+      <label>
+        Strategy name
+        <input type="text" name="strategy_name" placeholder="Chatter response strategy">
+      </label>
+      <label>
+        Strategy situation / path
+        <input type="text" name="strategy_situation" placeholder="Quality-critical chatter path">
+      </label>
+      <label>
+        Machine
+        <input type="text" name="machine" placeholder="Mazak i500 / IG500 / VTC">
+      </label>
+      <label>
+        Process
+        <input type="text" name="process" placeholder="CNC machining">
+      </label>
+      <label>
+        Operation
+        <input type="text" name="operation" placeholder="Finishing pass">
+      </label>
+      <label>
+        Confidence
+        <select name="confidence">
+          <option value="">Unknown</option>
+          <option>Low</option>
+          <option>Medium</option>
+          <option>High</option>
+        </select>
+      </label>
+    </div>
+
+    <fieldset class="strategy-time-fieldset">
+      <legend>Decision/action time</legend>
+      <label><input type="radio" name="decision_time_mode" value="now" checked> Now</label>
+      <label><input type="radio" name="decision_time_mode" value="custom"> Custom time</label>
+      <div class="info-grid">
+        <label>
+          Custom decision/action time
+          <input type="datetime-local" name="decision_time_local">
+        </label>
+        <label>
+          Timezone
+          <input type="text" name="decision_timezone" value="{{ default_timezone }}" placeholder="Europe/Oslo">
+        </label>
+      </div>
+      <p class="form-help">Captured-at is always stored automatically when you save. Decision/action time can be different when you record something afterwards.</p>
+    </fieldset>
+
+    <label>
+      Observation
+      <textarea name="observation" rows="2" placeholder="What did the operator notice or receive as input?"></textarea>
+    </label>
+    <label>
+      Trigger
+      <textarea name="trigger" rows="2" placeholder="What made the operator decide that a response was needed?"></textarea>
+    </label>
+    <label>
+      Context
+      <textarea name="context" rows="2" placeholder="Material, tool, operation, quality requirement, production pressure, machine state..."></textarea>
+    </label>
+    <label>
+      Hypothesis
+      <textarea name="hypothesis" rows="2" placeholder="What did the operator think was happening?"></textarea>
+    </label>
+    <label>
+      Goal <span class="required-marker">required</span>
+      <textarea name="goal" rows="2" required placeholder="What was the operator trying to preserve, optimise, avoid, or achieve?"></textarea>
+    </label>
+    <label>
+      Decision/action <span class="required-marker">required</span>
+      <textarea name="decision" rows="2" required placeholder="What did the operator decide or do?"></textarea>
+    </label>
+    <label>
+      Rationale
+      <textarea name="rationale" rows="2" placeholder="Why was this decision selected?"></textarea>
+    </label>
+    <label>
+      Expected outcome
+      <textarea name="expected_outcome" rows="2" placeholder="What effect was expected?"></textarea>
+    </label>
+    <label>
+      Risk
+      <textarea name="risk" rows="2" placeholder="What could go wrong?"></textarea>
+    </label>
+    <label>
+      Trade-off
+      <textarea name="trade_off" rows="2" placeholder="What cost or consequence was accepted?"></textarea>
+    </label>
+    <label>
+      Evidence / source
+      <textarea name="evidence" rows="2" placeholder="Prior job, operator experience, manual, alarm, measurement, observation..."></textarea>
+    </label>
+    <label>
+      Trace target / possible DT artefact
+      <textarea name="trace_target" rows="2" placeholder="Monitoring rule, recommendation, dashboard, explanation, validation case..."></textarea>
+    </label>
+    <label>
+      Free notes
+      <textarea name="notes" rows="3" placeholder="Anything that does not fit the structured fields."></textarea>
+    </label>
+
+    <button class="button-primary" type="submit">Save operator strategy record</button>
+  </form>
+</section>
+
+<section class="section-block">
+  <h3>Recent strategy records</h3>
+  <p>Stored locally at <code>{{ records_path }}</code>. This file is JSON, not JSONL, so it is not scanned as telemetry.</p>
+  {% if records %}
+  <table>
+    <tr>
+      <th>Decision time</th>
+      <th>Strategy / path</th>
+      <th>Machine</th>
+      <th>Goal</th>
+      <th>Decision</th>
+      <th>Confidence</th>
+      <th></th>
+    </tr>
+    {% for record in records %}
+    <tr>
+      <td>
+        <strong>{{ record.decision_time }}</strong><br>
+        <span class="text-muted">captured {{ record.captured_at }}</span>
+      </td>
+      <td>
+        {{ record.strategy_name or 'Unnamed strategy' }}<br>
+        <span class="text-muted">{{ record.strategy_situation or 'No path name' }}</span>
+      </td>
+      <td>{{ record.machine or 'n/a' }}</td>
+      <td>{{ record.goal }}</td>
+      <td>{{ record.decision }}</td>
+      <td>{{ record.confidence or 'Unknown' }}</td>
+      <td>
+        <form method="post" action="{{ url_for('operator_strategy_web.delete', record_id=record.id) }}">
+          <button type="submit">Delete</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p>No operator strategy records have been saved yet.</p>
+  {% endif %}
+</section>
+{% endblock %}
