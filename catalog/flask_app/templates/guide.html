@@ -42,33 +42,17 @@
     <article class="guide-map__item">
       <h4>Monitor</h4>
       <p>Use this when you want to understand the current machine or data state.</p>
-      <ul>
-        <li>Overview</li>
-        <li>Live</li>
-        <li>Playback</li>
-        <li>Assist</li>
-      </ul>
+      <ul><li>Overview</li><li>Live</li><li>Playback</li><li>Assist</li></ul>
     </article>
     <article class="guide-map__item">
       <h4>Knowledge</h4>
       <p>Use this when you want to capture, interpret, compare, and export operator knowledge.</p>
-      <ul>
-        <li>Capture</li>
-        <li>Review Notes</li>
-        <li>Strategies</li>
-        <li>Intervention Logic</li>
-        <li>SysML Export</li>
-      </ul>
+      <ul><li>Capture</li><li>Review Notes</li><li>Strategies</li><li>Intervention Logic</li><li>SysML Export</li></ul>
     </article>
     <article class="guide-map__item">
       <h4>System</h4>
       <p>Use this when the app needs configuration, sources, connection tests, or troubleshooting.</p>
-      <ul>
-        <li>Guide</li>
-        <li>Setup</li>
-        <li>Sources</li>
-        <li>Diagnostics</li>
-      </ul>
+      <ul><li>Guide</li><li>Setup</li><li>Sources</li><li>Diagnostics</li></ul>
     </article>
   </div>
 </section>
@@ -80,38 +64,10 @@
     <p>Use this when the Setup page asks what this computer should do, whether to continue, or whether to start clean.</p>
   </div>
   <div class="guide-step-list">
-    <article class="guide-step">
-      <span class="guide-step__number">1</span>
-      <div>
-        <h4>Choose the computer role</h4>
-        <p>Use Web workbench for most analysis and field-review work. Use Full server only when this computer should both run the web app and record data. Use Recorder only for a dedicated data-capture machine.</p>
-        <a href="{{ url_for('web.startup') }}">Open Setup</a>
-      </div>
-    </article>
-    <article class="guide-step">
-      <span class="guide-step__number">2</span>
-      <div>
-        <h4>Choose AI only if it helps</h4>
-        <p>The local AI explainer is optional. Enable it when you want help understanding the repo, data flow, or app pages. It is not required for monitoring, capture, MTConnect tests, or SysML export.</p>
-        <a href="{{ url_for('web.startup', edit='1', step='ai') }}">Open AI setup</a>
-      </div>
-    </article>
-    <article class="guide-step">
-      <span class="guide-step__number">3</span>
-      <div>
-        <h4>Add recorder sources only for recorder roles</h4>
-        <p>If this computer records from MTConnect, add the recorder source in Setup. If you only want to configure machines and test MTConnect/VPN reachability, use System → Sources instead.</p>
-        <a href="{{ url_for('web.startup', edit='1', step='recorder') }}">Open recorder setup</a>
-      </div>
-    </article>
-    <article class="guide-step">
-      <span class="guide-step__number">4</span>
-      <div>
-        <h4>Continue vs Start clean</h4>
-        <p>Choose Continue when you want to reuse existing runtime/session progress. Choose Start clean when the runtime state looks wrong or you want MSH to rebuild its working state. Existing files stay on disk.</p>
-        <a href="{{ url_for('web.status') }}">Check Diagnostics</a>
-      </div>
-    </article>
+    <article class="guide-step"><span class="guide-step__number">1</span><div><h4>Choose the computer role</h4><p>Use Web workbench for most analysis and field-review work. Use Full server only when this computer should both run the web app and record data. Use Recorder only for a dedicated data-capture machine.</p><a href="{{ url_for('web.startup') }}">Open Setup</a></div></article>
+    <article class="guide-step"><span class="guide-step__number">2</span><div><h4>Choose AI only if it helps</h4><p>The local AI explainer is optional. Enable it when you want help understanding the repo, data flow, or app pages. It is not required for monitoring, capture, MTConnect tests, or SysML export.</p><a href="{{ url_for('web.startup', edit='1', step='ai') }}">Open AI setup</a></div></article>
+    <article class="guide-step"><span class="guide-step__number">3</span><div><h4>Add recorder sources only for recorder roles</h4><p>If this computer records from MTConnect, add the recorder source in Setup. If you only want to configure machines and test MTConnect/VPN reachability, use System → Sources instead.</p><a href="{{ url_for('web.startup', edit='1', step='recorder') }}">Open recorder setup</a></div></article>
+    <article class="guide-step"><span class="guide-step__number">4</span><div><h4>Continue vs Start clean</h4><p>Choose Continue when you want to reuse existing runtime/session progress. Choose Start clean when the runtime state looks wrong or you want MSH to rebuild its working state. Existing files stay on disk.</p><a href="{{ url_for('web.status') }}">Check Diagnostics</a></div></article>
   </div>
 </section>
 
@@ -121,102 +77,42 @@
     <h3>From field note to SysML</h3>
     <p>Do not try to model everything while standing at the machine. Capture first, structure later.</p>
   </div>
-
   <div class="guide-step-list">
-    <article class="guide-step">
-      <span class="guide-step__number">1</span>
-      <div>
-        <h4>Capture a raw statement</h4>
-        <p>Write what the operator said or what you observed. One useful sentence is enough.</p>
-        <a href="{{ url_for('operator_strategy_web.capture') }}">Open Capture</a>
-      </div>
-    </article>
-    <article class="guide-step">
-      <span class="guide-step__number">2</span>
-      <div>
-        <h4>Review notes later</h4>
-        <p>Go through the captured statements after the visit and decide which ones are useful.</p>
-        <a href="{{ url_for('operator_strategy_web.review') }}">Open Review Notes</a>
-      </div>
-    </article>
-    <article class="guide-step">
-      <span class="guide-step__number">3</span>
-      <div>
-        <h4>Structure the note</h4>
-        <p>Map the statement to context, observation, hypothesis, action, rationale, risk, evidence, and outcome.</p>
-        <a href="{{ url_for('operator_strategy_web.review') }}">Open the note inbox</a>
-      </div>
-    </article>
-    <article class="guide-step">
-      <span class="guide-step__number">4</span>
-      <div>
-        <h4>Compare strategies</h4>
-        <p>Look for repeated situations, useful actions, trade-offs, and strategies worth reusing.</p>
-        <a href="{{ url_for('operator_support_web.strategy_comparison') }}">Open Strategies</a>
-      </div>
-    </article>
-    <article class="guide-step">
-      <span class="guide-step__number">5</span>
-      <div>
-        <h4>Add intervention logic</h4>
-        <p>Add telemetry rules only when the situation can be detected from signals such as load, vibration, or state changes.</p>
-        <a href="{{ url_for('web.strategies') }}">Open Intervention Logic</a>
-      </div>
-    </article>
-    <article class="guide-step">
-      <span class="guide-step__number">6</span>
-      <div>
-        <h4>Export to SysML</h4>
-        <p>Export reusable strategies using the paper method: coded statement → OSL keywords → SysML artefact.</p>
-        <a href="{{ url_for('operator_support_web.osl_export') }}">Open SysML Export</a>
-      </div>
-    </article>
+    <article class="guide-step"><span class="guide-step__number">1</span><div><h4>Capture a raw statement</h4><p>Write what the operator said or what you observed. One useful sentence is enough.</p><a href="{{ url_for('operator_strategy_web.capture') }}">Open Capture</a></div></article>
+    <article class="guide-step"><span class="guide-step__number">2</span><div><h4>Review notes later</h4><p>Go through the captured statements after the visit and decide which ones are useful.</p><a href="{{ url_for('operator_strategy_web.review') }}">Open Review Notes</a></div></article>
+    <article class="guide-step"><span class="guide-step__number">3</span><div><h4>Structure the note</h4><p>Map the statement to context, observation, hypothesis, action, rationale, risk, evidence, and outcome.</p><a href="{{ url_for('operator_strategy_web.review') }}">Open the note inbox</a></div></article>
+    <article class="guide-step"><span class="guide-step__number">4</span><div><h4>Compare strategies</h4><p>Look for repeated situations, useful actions, trade-offs, and strategies worth reusing.</p><a href="{{ url_for('operator_support_web.strategy_comparison') }}">Open Strategies</a></div></article>
+    <article class="guide-step"><span class="guide-step__number">5</span><div><h4>Add intervention logic</h4><p>Add telemetry rules only when the situation can be detected from signals such as load, vibration, or state changes.</p><a href="{{ url_for('web.strategies') }}">Open Intervention Logic</a></div></article>
+    <article class="guide-step"><span class="guide-step__number">6</span><div><h4>Export to SysML</h4><p>Export reusable strategies using the paper method: coded statement → OSL keywords → SysML artefact.</p><a href="{{ url_for('operator_support_web.osl_export') }}">Open SysML Export</a></div></article>
   </div>
 </section>
 
 <section class="guide-definition-grid">
-  <article class="guide-definition guide-definition--strategy">
-    <span class="guide-kicker">Important distinction</span>
-    <h3>Strategy</h3>
-    <p>A strategy is interpreted operator knowledge. It explains a situation, what the operator did, why, what trade-off they accepted, and whether it worked.</p>
-  </article>
-  <article class="guide-definition guide-definition--logic">
-    <span class="guide-kicker">Important distinction</span>
-    <h3>Intervention Logic</h3>
-    <p>Intervention logic is technical detection logic. It uses telemetry to find candidate situations where a strategy might be relevant.</p>
-  </article>
+  <article class="guide-definition guide-definition--strategy"><span class="guide-kicker">Important distinction</span><h3>Strategy</h3><p>A strategy is interpreted operator knowledge. It explains a situation, what the operator did, why, what trade-off they accepted, and whether it worked.</p></article>
+  <article class="guide-definition guide-definition--logic"><span class="guide-kicker">Important distinction</span><h3>Intervention Logic</h3><p>Intervention logic is technical detection logic. It uses telemetry to find candidate situations where a strategy might be relevant.</p></article>
 </section>
 
 <section class="section-block guide-section">
-  <div class="guide-section__heading">
-    <span class="guide-kicker">Common questions</span>
-    <h3>Where should I go?</h3>
+  <div class="guide-section__heading"><span class="guide-kicker">Useful advanced pages</span><h3>Extra pages you may need later</h3><p>These are not in the main menu because they are supporting pages. Open them when you need the specific task.</p></div>
+  <div class="guide-map">
+    <article class="guide-map__item"><h4>First Part</h4><p>Record first-part verification before production continues.</p><a class="button-link" href="{{ url_for('operator_support_web.first_part') }}">Open First Part</a></article>
+    <article class="guide-map__item"><h4>Machine Notes</h4><p>Save machine-specific habits, warm-up behaviour, drift notes, and cautions.</p><a class="button-link" href="{{ url_for('operator_support_web.machine_notes') }}">Open Machine Notes</a></article>
+    <article class="guide-map__item"><h4>Learning</h4><p>See a compact summary of support cards, comparisons, and stored outcomes.</p><a class="button-link" href="{{ url_for('operator_support_web.learning') }}">Open Learning</a></article>
+    <article class="guide-map__item"><h4>Quality Outcomes</h4><p>Connect structured notes to later quality or inspection results.</p><a class="button-link" href="{{ url_for('operator_support_web.quality_outcomes') }}">Open Outcomes</a></article>
+    <article class="guide-map__item"><h4>Recommender Artifacts</h4><p>Generate support-card artefacts from reusable operator notes.</p><a class="button-link" href="{{ url_for('operator_support_web.recommender_artifacts') }}">Open Recommender Artifacts</a></article>
+    <article class="guide-map__item"><h4>Control</h4><p>Run processing actions and set shared operator scope when diagnostics says outputs are missing.</p><a class="button-link" href="{{ url_for('web.control') }}">Open Control</a></article>
   </div>
+</section>
+
+<section class="section-block guide-section">
+  <div class="guide-section__heading"><span class="guide-kicker">Common questions</span><h3>Where should I go?</h3></div>
   <div class="guide-faq">
-    <details open>
-      <summary>I am at the machine and heard something useful.</summary>
-      <p>Go to <a href="{{ url_for('operator_strategy_web.capture') }}">Knowledge → Capture</a> and write one raw statement. Do not structure it yet.</p>
-    </details>
-    <details>
-      <summary>I want help choosing setup options.</summary>
-      <p>Go to <a href="{{ url_for('web.guide') }}#setup-guide">System → Guide → Setup guide</a>. It explains computer role, AI, recorder sources, Continue, and Start clean.</p>
-    </details>
-    <details>
-      <summary>I want to turn notes into strategy fields.</summary>
-      <p>Go to <a href="{{ url_for('operator_strategy_web.review') }}">Knowledge → Review Notes</a>, open a note, and fill in the fields you can justify.</p>
-    </details>
-    <details>
-      <summary>I want to add machines, MTConnect URLs, or vibration sensors.</summary>
-      <p>Go to <a href="{{ url_for('source_web.index') }}">System → Sources</a>. Add the machine first, then add MTConnect URL, VPN/network test target, and any vibration sensors.</p>
-    </details>
-    <details>
-      <summary>I want to test MTConnect or VPN/network reachability.</summary>
-      <p>Go to <a href="{{ url_for('source_web.index') }}">System → Sources</a>. Use <strong>Test MTConnect</strong> to check the adapter endpoint and <strong>Test VPN/network</strong> to check whether MSH can reach the configured machine-network host from the server/container.</p>
-    </details>
-    <details>
-      <summary>I want to know if MSH is ready or why data is missing.</summary>
-      <p>Start with <a href="{{ url_for('web.overview') }}">Monitor → Overview</a>. If something looks wrong, use <a href="{{ url_for('web.status') }}">System → Diagnostics</a>.</p>
-    </details>
+    <details open><summary>I am at the machine and heard something useful.</summary><p>Go to <a href="{{ url_for('operator_strategy_web.capture') }}">Knowledge → Capture</a> and write one raw statement. Do not structure it yet.</p></details>
+    <details><summary>I want help choosing setup options.</summary><p>Go to <a href="{{ url_for('web.guide') }}#setup-guide">System → Guide → Setup guide</a>. It explains computer role, AI, recorder sources, Continue, and Start clean.</p></details>
+    <details><summary>I want to turn notes into strategy fields.</summary><p>Go to <a href="{{ url_for('operator_strategy_web.review') }}">Knowledge → Review Notes</a>, open a note, and fill in the fields you can justify.</p></details>
+    <details><summary>I want to add machines, MTConnect URLs, or vibration sensors.</summary><p>Go to <a href="{{ url_for('source_web.index') }}">System → Sources</a>. Add the machine first, then add MTConnect URL, VPN/network test target, and any vibration sensors.</p></details>
+    <details><summary>I want to test MTConnect or VPN/network reachability.</summary><p>Go to <a href="{{ url_for('source_web.index') }}">System → Sources</a>. Use <strong>Test MTConnect</strong> to check the adapter endpoint and <strong>Test VPN/network</strong> to check whether MSH can reach the configured machine-network host from the server/container.</p></details>
+    <details><summary>I want to know if MSH is ready or why data is missing.</summary><p>Start with <a href="{{ url_for('web.overview') }}">Monitor → Overview</a>. If something looks wrong, use <a href="{{ url_for('web.status') }}">System → Diagnostics</a>.</p></details>
   </div>
 </section>
 {% endblock %}
