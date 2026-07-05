@@ -1,94 +1,172 @@
 {% extends 'base.html' %}
 {% block body %}
-<section class="page-intro">
-  <h2>Guide</h2>
-  <p>Use this page when you are unsure where to go next. MSH is organised around three areas: Monitor, Knowledge, and System.</p>
+<section class="guide-hero">
+  <div class="guide-hero__copy">
+    <span class="guide-kicker">Start here</span>
+    <h2>How to use MSH</h2>
+    <p>MSH helps you monitor machine behaviour and turn operator experience into structured knowledge. Use the guide when you are unsure what to click next.</p>
+  </div>
+  <div class="guide-hero__actions">
+    <a class="button-link button-link--primary" href="{{ url_for('operator_strategy_web.capture') }}">Capture a statement</a>
+    <a class="button-link" href="{{ url_for('web.overview') }}">Open monitor</a>
+  </div>
 </section>
 
-<section class="section-block section-block--primary">
-  <h3>The short version</h3>
-  <div class="info-grid">
-    <article class="info-card">
+<section class="guide-quick-actions" aria-label="Common starting points">
+  <article class="guide-card guide-card--monitor">
+    <span class="guide-card__eyebrow">At the machine</span>
+    <h3>See what is happening now</h3>
+    <p>Use Monitor for overview, live data, playback, and assist cards.</p>
+    <a class="button-link" href="{{ url_for('web.overview') }}">Go to Monitor</a>
+  </article>
+  <article class="guide-card guide-card--knowledge">
+    <span class="guide-card__eyebrow">During a visit</span>
+    <h3>Capture operator knowledge</h3>
+    <p>Write one raw statement quickly. Structure it later when you have time.</p>
+    <a class="button-link" href="{{ url_for('operator_strategy_web.capture') }}">Start Capture</a>
+  </article>
+  <article class="guide-card guide-card--system">
+    <span class="guide-card__eyebrow">Setup or troubleshooting</span>
+    <h3>Configure the system</h3>
+    <p>Use System for setup, machines, sensors, sources, and diagnostics.</p>
+    <a class="button-link" href="{{ url_for('source_web.index') }}">Open Sources</a>
+  </article>
+</section>
+
+<section class="section-block guide-section">
+  <div class="guide-section__heading">
+    <span class="guide-kicker">Main structure</span>
+    <h3>Three areas, three purposes</h3>
+  </div>
+  <div class="guide-map">
+    <article class="guide-map__item">
       <h4>Monitor</h4>
-      <p>Use Monitor when you want to see what is happening now: overview, live data, playback, and support cards.</p>
-      <a class="button-link" href="{{ url_for('web.overview') }}">Open Monitor</a>
+      <p>Use this when you want to understand the current machine or data state.</p>
+      <ul>
+        <li>Overview</li>
+        <li>Live</li>
+        <li>Playback</li>
+        <li>Assist</li>
+      </ul>
     </article>
-    <article class="info-card">
+    <article class="guide-map__item">
       <h4>Knowledge</h4>
-      <p>Use Knowledge when you want to capture operator experience and turn it into structured strategies.</p>
-      <a class="button-link" href="{{ url_for('operator_strategy_web.capture') }}">Start Capture</a>
+      <p>Use this when you want to capture, interpret, compare, and export operator knowledge.</p>
+      <ul>
+        <li>Capture</li>
+        <li>Review Notes</li>
+        <li>Strategies</li>
+        <li>Intervention Logic</li>
+        <li>SysML Export</li>
+      </ul>
     </article>
-    <article class="info-card">
+    <article class="guide-map__item">
       <h4>System</h4>
-      <p>Use System when you need setup, sources, machines, sensors, or diagnostics.</p>
-      <a class="button-link" href="{{ url_for('source_web.index') }}">Open Sources</a>
+      <p>Use this when the app needs configuration, sources, or troubleshooting.</p>
+      <ul>
+        <li>Guide</li>
+        <li>Setup</li>
+        <li>Sources</li>
+        <li>Diagnostics</li>
+      </ul>
     </article>
   </div>
 </section>
 
-<section class="section-block">
-  <h3>Recommended knowledge flow</h3>
-  <div class="stack-list">
-    <article class="stack-row">
+<section class="section-block guide-section guide-section--flow">
+  <div class="guide-section__heading">
+    <span class="guide-kicker">Recommended knowledge flow</span>
+    <h3>From field note to SysML</h3>
+    <p>Do not try to model everything while standing at the machine. Capture first, structure later.</p>
+  </div>
+
+  <div class="guide-step-list">
+    <article class="guide-step">
+      <span class="guide-step__number">1</span>
       <div>
-        <h4>1. Capture a raw statement</h4>
-        <p>When you are at the machine or talking to an operator, write one statement in plain text. Do not analyse it yet.</p>
+        <h4>Capture a raw statement</h4>
+        <p>Write what the operator said or what you observed. One useful sentence is enough.</p>
+        <a href="{{ url_for('operator_strategy_web.capture') }}">Open Capture</a>
       </div>
-      <a class="button-link" href="{{ url_for('operator_strategy_web.capture') }}">Capture</a>
     </article>
-    <article class="stack-row">
+    <article class="guide-step">
+      <span class="guide-step__number">2</span>
       <div>
-        <h4>2. Review notes later</h4>
-        <p>After the visit, go through captured notes and decide what each note means.</p>
+        <h4>Review notes later</h4>
+        <p>Go through the captured statements after the visit and decide which ones are useful.</p>
+        <a href="{{ url_for('operator_strategy_web.review') }}">Open Review Notes</a>
       </div>
-      <a class="button-link" href="{{ url_for('operator_strategy_web.review') }}">Review Notes</a>
     </article>
-    <article class="stack-row">
+    <article class="guide-step">
+      <span class="guide-step__number">3</span>
       <div>
-        <h4>3. Structure the note</h4>
-        <p>Map the raw statement into OSL/paper fields such as context, observation, hypothesis, action, rationale, risk, evidence, and outcome.</p>
+        <h4>Structure the note</h4>
+        <p>Map the statement to context, observation, hypothesis, action, rationale, risk, evidence, and outcome.</p>
+        <a href="{{ url_for('operator_strategy_web.review') }}">Open the note inbox</a>
       </div>
-      <a class="button-link" href="{{ url_for('operator_strategy_web.review') }}">Open Inbox</a>
     </article>
-    <article class="stack-row">
+    <article class="guide-step">
+      <span class="guide-step__number">4</span>
       <div>
-        <h4>4. Compare strategies</h4>
-        <p>Compare structured notes by situation and action. Look for patterns, trade-offs, and reusable knowledge.</p>
+        <h4>Compare strategies</h4>
+        <p>Look for repeated situations, useful actions, trade-offs, and strategies worth reusing.</p>
+        <a href="{{ url_for('operator_support_web.strategy_comparison') }}">Open Strategies</a>
       </div>
-      <a class="button-link" href="{{ url_for('operator_support_web.strategy_comparison') }}">Strategies</a>
     </article>
-    <article class="stack-row">
+    <article class="guide-step">
+      <span class="guide-step__number">5</span>
       <div>
-        <h4>5. Add intervention logic when detection is possible</h4>
-        <p>Use Intervention Logic only for technical telemetry rules that detect candidate situations. It is not the same as an operator note.</p>
+        <h4>Add intervention logic</h4>
+        <p>Add telemetry rules only when the situation can be detected from signals such as load, vibration, or state changes.</p>
+        <a href="{{ url_for('web.strategies') }}">Open Intervention Logic</a>
       </div>
-      <a class="button-link" href="{{ url_for('web.strategies') }}">Intervention Logic</a>
     </article>
-    <article class="stack-row">
+    <article class="guide-step">
+      <span class="guide-step__number">6</span>
       <div>
-        <h4>6. Export reusable strategies to SysML</h4>
-        <p>Reusable structured notes can be exported using the paper method: coded CNC strategy statement → OSL keywords → SysML artefact.</p>
+        <h4>Export to SysML</h4>
+        <p>Export reusable strategies using the paper method: coded statement → OSL keywords → SysML artefact.</p>
+        <a href="{{ url_for('operator_support_web.osl_export') }}">Open SysML Export</a>
       </div>
-      <a class="button-link" href="{{ url_for('operator_support_web.osl_export') }}">SysML Export</a>
     </article>
   </div>
 </section>
 
-<section class="section-block section-block--primary">
-  <h3>Common questions</h3>
-  <div class="info-grid">
-    <article class="info-card">
-      <h4>Where do I add machines and sensors?</h4>
-      <p>Use System → Sources. This is where machines and vibration sensors are registered.</p>
-    </article>
-    <article class="info-card">
-      <h4>Where do I check if the app is ready?</h4>
-      <p>Use Monitor → Overview first. If something is wrong, use System → Diagnostics.</p>
-    </article>
-    <article class="info-card">
-      <h4>Where is the difference between strategy and intervention logic?</h4>
-      <p>A strategy is interpreted operator knowledge. Intervention logic is a technical rule that detects a candidate situation from telemetry.</p>
-    </article>
+<section class="guide-definition-grid">
+  <article class="guide-definition guide-definition--strategy">
+    <span class="guide-kicker">Important distinction</span>
+    <h3>Strategy</h3>
+    <p>A strategy is interpreted operator knowledge. It explains a situation, what the operator did, why, what trade-off they accepted, and whether it worked.</p>
+  </article>
+  <article class="guide-definition guide-definition--logic">
+    <span class="guide-kicker">Important distinction</span>
+    <h3>Intervention Logic</h3>
+    <p>Intervention logic is technical detection logic. It uses telemetry to find candidate situations where a strategy might be relevant.</p>
+  </article>
+</section>
+
+<section class="section-block guide-section">
+  <div class="guide-section__heading">
+    <span class="guide-kicker">Common questions</span>
+    <h3>Where should I go?</h3>
+  </div>
+  <div class="guide-faq">
+    <details open>
+      <summary>I am at the machine and heard something useful.</summary>
+      <p>Go to <a href="{{ url_for('operator_strategy_web.capture') }}">Knowledge → Capture</a> and write one raw statement. Do not structure it yet.</p>
+    </details>
+    <details>
+      <summary>I want to turn notes into strategy fields.</summary>
+      <p>Go to <a href="{{ url_for('operator_strategy_web.review') }}">Knowledge → Review Notes</a>, open a note, and fill in the fields you can justify.</p>
+    </details>
+    <details>
+      <summary>I want to add machines or vibration sensors.</summary>
+      <p>Go to <a href="{{ url_for('source_web.index') }}">System → Sources</a>.</p>
+    </details>
+    <details>
+      <summary>I want to know if MSH is ready or why data is missing.</summary>
+      <p>Start with <a href="{{ url_for('web.overview') }}">Monitor → Overview</a>. If something looks wrong, use <a href="{{ url_for('web.status') }}">System → Diagnostics</a>.</p>
+    </details>
   </div>
 </section>
 {% endblock %}
