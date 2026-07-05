@@ -1,6 +1,6 @@
-# MSH workflow-oriented navigation
+# MSH knowledge-oriented navigation
 
-The app should not expose every implementation page in the main menu. The menu should guide the operator through the real workflow.
+The app should not expose every implementation page in the main menu. The menu should guide the user through the real knowledge flow.
 
 ## Top-level areas
 
@@ -23,7 +23,7 @@ What can I inspect now?
 What support does the operator need now?
 ```
 
-### Workflow
+### Knowledge
 
 For turning field experience into structured operator strategies and technical intervention logic.
 
@@ -35,7 +35,7 @@ Primary pages:
 - Intervention Logic
 - SysML Export
 
-Workflow:
+Knowledge flow:
 
 ```text
 1. Capture a raw statement on site.
@@ -84,7 +84,7 @@ Every main page should answer three questions:
 
 1. What is this page for?
 2. What should I do here?
-3. Where does this step fit in the workflow?
+3. Where does this step fit in the knowledge flow?
 
 ## In-app documentation
 
@@ -93,4 +93,4 @@ MSH should include a user-facing guide page inside the app. This is different fr
 - Repo docs explain design decisions for developers/researchers.
 - The in-app guide explains what the operator or researcher should click next.
 
-The in-app guide should stay short, concrete, and workflow-based. It should avoid implementation details unless they help the user decide what to do next.
+The in-app guide should stay short, concrete, and knowledge-flow based. It should avoid implementation details unless they help the user decide what to do next.
