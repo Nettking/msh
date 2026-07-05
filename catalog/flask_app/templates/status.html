@@ -14,8 +14,8 @@
 {% set ready_for_views = indexed_count > 0 and cache_fresh and not has_failure %}
 
 <section class="page-intro">
-  <h2>System status</h2>
-  <p>Diagnosis for whether MSH has usable data, what is still building, and what to do next.</p>
+  <h2>Diagnostics</h2>
+  <p>Use this page when Overview says MSH is not ready, data is missing, or you need to understand what the runtime/cache is doing.</p>
 </section>
 
 <section class="section-block overview-decision {% if has_failure %}overview-decision--error{% elif ready_for_views %}overview-decision--ready{% elif update_running or scan_running %}overview-decision--waiting{% else %}overview-decision--partial{% endif %}">
@@ -30,10 +30,10 @@
       </div>
     {% elif no_data_ready and (update_running or scan_running) %}
       <h3>MSH is still preparing data</h3>
-      <p class="overview-decision__summary">Raw telemetry files exist, but Status has not indexed usable artifacts yet. A background update or rescan is currently running.</p>
+      <p class="overview-decision__summary">Raw telemetry files exist, but Diagnostics has not indexed usable artifacts yet. A background update or rescan is currently running.</p>
       <div class="overview-decision__next">
         <strong>Recommended next step</strong>
-        <p>Wait for the running job to finish, then refresh Status or Overview. Do not trust Playback/Machine until indexed artifacts appear.</p>
+        <p>Wait for the running job to finish, then refresh Diagnostics or Overview. Do not trust Playback/Machine until indexed artifacts appear.</p>
       </div>
     {% elif no_data_ready %}
       <h3>Raw data exists, but MSH has no usable index yet</h3>
@@ -202,40 +202,19 @@
 </section>
 {% endif %}
 
-<section class="section-block section-block--actions">
-  <h3>Actions</h3>
-  <div class="control-action-grid">
-    <form method="post" action="{{ url_for('web.refresh') }}" class="control-card">
-      <input type="hidden" name="next" value="{{ request.path }}">
-      <button type="submit">Run next processing step</button>
-      <p>Use this if the runtime is idle but expected workflow output has not appeared.</p>
-    </form>
-    <form method="post" action="{{ url_for('web.rescan') }}" class="control-card">
-      <input type="hidden" name="next" value="{{ request.path }}">
-      <button type="submit">Rescan artifacts</button>
-      <p>Use this after new output files are generated, or when indexed artifacts show as zero.</p>
-    </form>
-  </div>
-</section>
-
-<details class="section-block setup-advanced">
-  <summary>Advanced runtime/debug details</summary>
-  <dl class="kv-grid">
-    <div class="kv-row"><dt>Webapp started</dt><dd>{{ runtime_state.app_started_at or 'n/a' }}</dd></div>
-    <div class="kv-row"><dt>Runtime started</dt><dd>{{ runtime_state.runtime_started_at or 'n/a' }}</dd></div>
-    <div class="kv-row"><dt>Active runtime namespace</dt><dd>{{ runtime_state.active_runtime_namespace or 'default' }}</dd></div>
-    <div class="kv-row"><dt>Startup decision source</dt><dd>{{ runtime_state.startup_decision_source or 'n/a' }}</dd></div>
-    <div class="kv-row"><dt>Last successful refresh</dt><dd>{{ runtime_state.last_successful_refresh or 'n/a' }}</dd></div>
-    <div class="kv-row"><dt>Last update check</dt><dd>{{ runtime_state.last_update_check_at or 'n/a' }}</dd></div>
-    <div class="kv-row"><dt>Last successful catch-up step</dt><dd>{{ runtime_state.last_catchup_success_at or 'n/a' }}</dd></div>
-    <div class="kv-row"><dt>Remaining unprocessed days</dt><dd>{{ runtime_state.pending_dates_count or 0 }}</dd></div>
-    <div class="kv-row"><dt>Configured roots</dt><dd>{{ scan_dirs|join(', ') }}</dd></div>
-    <div class="kv-row"><dt>Indexed artifacts</dt><dd>{{ indexed_count }}</dd></div>
-    <div class="kv-row"><dt>Catalog warnings</dt><dd>{{ snapshot.warnings|length }}</dd></div>
-    <div class="kv-row"><dt>Internal metadata artifacts</dt><dd>{{ internal_artifacts|length }}</dd></div>
-    <div class="kv-row"><dt>Cache path</dt><dd>{{ telemetry_cache_status.cache_path }}</dd></div>
-    <div class="kv-row"><dt>Parquet files</dt><dd>{{ telemetry_cache_status.parquet_file_count }}</dd></div>
-    <div class="kv-row"><dt>Manifest source files</dt><dd>{{ telemetry_cache_status.manifest_source_file_count if telemetry_cache_status.manifest_source_file_count is not none else 'n/a' }}</dd></div>
-  </dl>
+<details class="section-block status-debug-details">
+  <summary>Advanced debug details</summary>
+  <section>
+    <h3>Raw runtime state</h3>
+    <pre>{{ runtime_state | tojson(indent=2) }}</pre>
+  </section>
+  <section>
+    <h3>Internal artifacts</h3>
+    {% if internal_artifacts %}
+    <ul>{% for artifact in internal_artifacts %}<li><code>{{ artifact.path }}</code> — {{ artifact.status }}</li>{% endfor %}</ul>
+    {% else %}
+    <p>No internal artifacts are indexed.</p>
+    {% endif %}
+  </section>
 </details>
 {% endblock %}
