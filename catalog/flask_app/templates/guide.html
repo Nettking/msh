@@ -1,0 +1,94 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro">
+  <h2>Guide</h2>
+  <p>Use this page when you are unsure where to go next. MSH is organised around three areas: Monitor, Workflow, and System.</p>
+</section>
+
+<section class="section-block section-block--primary">
+  <h3>The short version</h3>
+  <div class="info-grid">
+    <article class="info-card">
+      <h4>Monitor</h4>
+      <p>Use Monitor when you want to see what is happening now: overview, live data, playback, and support cards.</p>
+      <a class="button-link" href="{{ url_for('web.overview') }}">Open Monitor</a>
+    </article>
+    <article class="info-card">
+      <h4>Workflow</h4>
+      <p>Use Workflow when you want to capture operator knowledge and turn it into structured strategies.</p>
+      <a class="button-link" href="{{ url_for('operator_strategy_web.capture') }}">Start Capture</a>
+    </article>
+    <article class="info-card">
+      <h4>System</h4>
+      <p>Use System when you need setup, sources, machines, sensors, or diagnostics.</p>
+      <a class="button-link" href="{{ url_for('source_web.index') }}">Open Sources</a>
+    </article>
+  </div>
+</section>
+
+<section class="section-block">
+  <h3>Recommended workflow</h3>
+  <div class="stack-list">
+    <article class="stack-row">
+      <div>
+        <h4>1. Capture a raw statement</h4>
+        <p>When you are at the machine or talking to an operator, write one statement in plain text. Do not analyse it yet.</p>
+      </div>
+      <a class="button-link" href="{{ url_for('operator_strategy_web.capture') }}">Capture</a>
+    </article>
+    <article class="stack-row">
+      <div>
+        <h4>2. Review notes later</h4>
+        <p>After the visit, go through captured notes and decide what each note means.</p>
+      </div>
+      <a class="button-link" href="{{ url_for('operator_strategy_web.review') }}">Review Notes</a>
+    </article>
+    <article class="stack-row">
+      <div>
+        <h4>3. Structure the note</h4>
+        <p>Map the raw statement into OSL/paper fields such as context, observation, hypothesis, action, rationale, risk, evidence, and outcome.</p>
+      </div>
+      <a class="button-link" href="{{ url_for('operator_strategy_web.review') }}">Open Inbox</a>
+    </article>
+    <article class="stack-row">
+      <div>
+        <h4>4. Compare strategies</h4>
+        <p>Compare structured notes by situation and action. Look for patterns, trade-offs, and reusable knowledge.</p>
+      </div>
+      <a class="button-link" href="{{ url_for('operator_support_web.strategy_comparison') }}">Strategies</a>
+    </article>
+    <article class="stack-row">
+      <div>
+        <h4>5. Add intervention logic when detection is possible</h4>
+        <p>Use Intervention Logic only for technical telemetry rules that detect candidate situations. It is not the same as an operator note.</p>
+      </div>
+      <a class="button-link" href="{{ url_for('web.strategies') }}">Intervention Logic</a>
+    </article>
+    <article class="stack-row">
+      <div>
+        <h4>6. Export reusable strategies to SysML</h4>
+        <p>Reusable structured notes can be exported using the paper method: coded CNC strategy statement → OSL keywords → SysML artefact.</p>
+      </div>
+      <a class="button-link" href="{{ url_for('operator_support_web.osl_export') }}">SysML Export</a>
+    </article>
+  </div>
+</section>
+
+<section class="section-block section-block--primary">
+  <h3>Common questions</h3>
+  <div class="info-grid">
+    <article class="info-card">
+      <h4>Where do I add machines and sensors?</h4>
+      <p>Use System → Sources. This is where machines and vibration sensors are registered.</p>
+    </article>
+    <article class="info-card">
+      <h4>Where do I check if the app is ready?</h4>
+      <p>Use Monitor → Overview first. If something is wrong, use System → Diagnostics.</p>
+    </article>
+    <article class="info-card">
+      <h4>Where is the difference between strategy and intervention logic?</h4>
+      <p>A strategy is interpreted operator knowledge. Intervention logic is a technical rule that detects a candidate situation from telemetry.</p>
+    </article>
+  </div>
+</section>
+{% endblock %}
