@@ -70,7 +70,7 @@
     <input id="username" type="text" name="username" value="{{ status.username }}" autocomplete="username" required>
 
     <label for="password">Password:</label>
-    <input id="password" type="password" name="password" value="" autocomplete="current-password" {% if not status.password_set %}required{% endif %}>
+    <input id="password" type="password" name="password" value="" autocomplete="current-password" {% if status.local_status != 'complete' %}required{% endif %}>
     <p class="form-help">Leave blank to keep the existing local password.</p>
 
     <label for="timeout_seconds">Timeout seconds:</label>
