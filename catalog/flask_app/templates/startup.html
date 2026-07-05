@@ -30,7 +30,7 @@
     <p>{{ server_setup_ollama_status.message if server_setup_ollama_status else 'Checked on setup.' }}</p>
   </div>
   <div class="setup-summary-card {{ 'setup-summary-card--ready' if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed else 'setup-summary-card--waiting' }}">
-    <span>Model</span>
+    <span>Saved model</span>
     <strong>{{ server_setup_settings.ai_model if server_setup_settings and server_setup_settings.ai_enabled else 'Disabled' }}</strong>
     <p>{% if server_setup_settings and not server_setup_settings.ai_enabled %}AI disabled.{% elif server_setup_ollama_status and server_setup_ollama_status.selected_model_installed %}Installed.{% else %}Missing.{% endif %}</p>
   </div>
@@ -102,17 +102,21 @@
       </label>
       <div class="setup-choice-grid setup-model-grid" id="aiModelChoices">
         {% for key, choice in server_setup_ai_choices.items() %}
-        <label class="setup-choice-card setup-model-card {% if server_setup_settings and server_setup_settings.ai_profile == key %}is-selected{% endif %}" data-ai-card>
+        {% set model_installed = server_setup_ollama_status and server_setup_ollama_status.installed_by_profile and server_setup_ollama_status.installed_by_profile.get(key) %}
+        <label class="setup-choice-card setup-model-card {% if server_setup_settings and server_setup_settings.ai_profile == key %}is-selected{% endif %}" data-ai-card data-model-installed="{{ 'true' if model_installed else 'false' }}" data-model-name="{{ choice.model }}">
           <input type="radio" name="ai_profile" value="{{ key }}" {% if server_setup_settings and server_setup_settings.ai_profile == key %}checked{% endif %}>
           <span class="setup-choice-card__label">{{ choice.label }}</span>
           <span class="setup-model-name">{{ choice.model }}</span>
           <span class="setup-choice-card__description">{{ choice.device }}</span>
+          <span class="setup-choice-card__tag setup-model-install-tag {% if not model_installed %}setup-choice-card__tag--missing{% endif %}">{{ 'Installed' if model_installed else 'Not installed' }}</span>
         </label>
         {% endfor %}
       </div>
       <div class="setup-status-strip">
         <span class="status-badge {{ 'status-ready' if server_setup_ollama_status and server_setup_ollama_status.running else 'status-waiting' }}">Ollama {{ 'running' if server_setup_ollama_status and server_setup_ollama_status.running else 'waiting' }}</span>
-        <span class="status-badge {{ 'status-ready' if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed else 'status-waiting' }}">Model {{ 'installed' if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed else 'missing' }}</span>
+        {% set current_profile = server_setup_settings.ai_profile if server_setup_settings else 'laptop-standard' %}
+        {% set current_installed = server_setup_ollama_status and server_setup_ollama_status.installed_by_profile and server_setup_ollama_status.installed_by_profile.get(current_profile) %}
+        <span id="selectedModelStatus" class="status-badge {{ 'status-ready' if current_installed else 'status-waiting' }}">Selected model {{ 'installed' if current_installed else 'not installed' }}</span>
       </div>
       <div class="setup-wizard-actions">
         <button type="button" data-prev-step>Back</button>
@@ -179,7 +183,7 @@
       <span class="setup-step-number">5</span>
       <div>
         <h4>Next page</h4>
-        <p>Install the model if needed, then continue to MSH or choose runtime startup behavior.</p>
+        <p>Install the selected model if needed, then continue to MSH or choose runtime startup behavior.</p>
       </div>
     </div>
     <div class="control-action-grid">
@@ -187,7 +191,7 @@
       <form method="post" action="/server-setup/pull-model" class="control-card">
         <input type="hidden" name="next" value="{{ next_path }}">
         <button class="button-primary" type="submit">Install {{ server_setup_settings.ai_model }}</button>
-        <p>Pulls the selected model into local Ollama. First run may take several minutes.</p>
+        <p>Pulls the saved model into local Ollama. First run may take several minutes.</p>
       </form>
       {% endif %}
       {% if startup_state.requires_choice %}
@@ -278,6 +282,25 @@
     });
   }
 
+  function syncSelectedModelStatus() {
+    var status = document.getElementById('selectedModelStatus');
+    var selectedInput = document.querySelector('input[name="ai_profile"]:checked');
+    var aiEnabled = document.getElementById('aiEnabled');
+    if (!status || !selectedInput) return;
+    if (aiEnabled && !aiEnabled.checked) {
+      status.textContent = 'AI disabled';
+      status.classList.remove('status-ready');
+      status.classList.add('status-waiting');
+      return;
+    }
+    var card = selectedInput.closest('[data-ai-card]');
+    var installed = card && card.dataset.modelInstalled === 'true';
+    var modelName = card ? card.dataset.modelName : 'selected model';
+    status.textContent = modelName + (installed ? ' installed' : ' not installed');
+    status.classList.toggle('status-ready', installed);
+    status.classList.toggle('status-waiting', !installed);
+  }
+
   function syncRecorderVisibility() {
     var disabled = document.querySelector('.setup-recorder-disabled');
     var fields = document.querySelector('.setup-recorder-fields');
@@ -292,6 +315,7 @@
     var choices = document.getElementById('aiModelChoices');
     if (!enabled || !choices) return;
     choices.classList.toggle('is-muted', !enabled.checked);
+    syncSelectedModelStatus();
   }
 
   document.querySelectorAll('[data-step-target]').forEach(function (button) {
@@ -316,7 +340,10 @@
     });
   });
   document.querySelectorAll('[data-ai-card] input').forEach(function (input) {
-    input.addEventListener('change', function () { syncSelectedCards('[data-ai-card]'); });
+    input.addEventListener('change', function () {
+      syncSelectedCards('[data-ai-card]');
+      syncSelectedModelStatus();
+    });
   });
   var aiEnabled = document.getElementById('aiEnabled');
   if (aiEnabled) aiEnabled.addEventListener('change', syncAiVisibility);
@@ -324,6 +351,7 @@
   syncSelectedCards('[data-ai-card]');
   syncRecorderVisibility();
   syncAiVisibility();
+  syncSelectedModelStatus();
   showStep(initialStep);
 })();
 </script>
