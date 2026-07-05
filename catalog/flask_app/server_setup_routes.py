@@ -6,11 +6,11 @@ from flask import Blueprint, flash, jsonify, redirect, request, url_for
 
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
+from .services.ai_model_benchmark_service import compare_ollama_setup_models
 from .services.server_setup_service import (
     AI_MODEL_CHOICES,
     ServerSetupError,
     benchmark_ollama_response_time,
-    compare_ollama_setup_models,
     load_settings,
     pull_ollama_model,
     runtime_should_start,
