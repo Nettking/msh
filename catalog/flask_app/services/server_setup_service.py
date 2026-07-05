@@ -116,7 +116,7 @@ def load_settings(path: Path | str = SETTINGS_PATH) -> ServerSetupSettings:
     defaults = default_settings(configured=False).to_dict()
     values = {**defaults, **payload}
     if values.get("ai_profile") in AI_MODEL_CHOICES:
-        values["ai_model"] = AI_MODEL_CHOICES[str(values["ai_profile"])]["model"]
+        values["ai_model"] = AI_MODEL_CHOICES[str(values["ai_profile"])] ["model"]
     return ServerSetupSettings(
         configured=bool(values.get("configured")),
         deployment_mode=str(values.get("deployment_mode") or defaults["deployment_mode"]),
@@ -201,6 +201,11 @@ def env_lines_for(settings: ServerSetupSettings) -> list[str]:
     ]
 
 
+def _model_aliases(model_name: str) -> set[str]:
+    base = model_name.split(":", 1)[0]
+    return {model_name, base}
+
+
 def ollama_status(settings: ServerSetupSettings | None = None, timeout_seconds: float = 2.0) -> dict[str, Any]:
     settings = settings or load_settings()
     if not settings.ai_enabled:
@@ -209,6 +214,8 @@ def ollama_status(settings: ServerSetupSettings | None = None, timeout_seconds: 
             "selected_model": settings.ai_model,
             "selected_model_installed": False,
             "models": [],
+            "installed_by_profile": {key: False for key in AI_MODEL_CHOICES},
+            "installed_by_model": {choice["model"]: False for choice in AI_MODEL_CHOICES.values()},
             "message": "AI is disabled in setup.",
         }
     try:
@@ -221,16 +228,28 @@ def ollama_status(settings: ServerSetupSettings | None = None, timeout_seconds: 
             "selected_model": settings.ai_model,
             "selected_model_installed": False,
             "models": [],
+            "installed_by_profile": {key: False for key in AI_MODEL_CHOICES},
+            "installed_by_model": {choice["model"]: False for choice in AI_MODEL_CHOICES.values()},
             "message": f"Ollama is not reachable yet: {exc}",
         }
     models = sorted(str(item.get("name") or "") for item in payload.get("models", []) if item.get("name"))
+    installed_names = set(models)
+    installed_by_profile = {
+        key: bool(installed_names & _model_aliases(choice["model"])) for key, choice in AI_MODEL_CHOICES.items()
+    }
+    installed_by_model = {
+        choice["model"]: installed_by_profile[key] for key, choice in AI_MODEL_CHOICES.items()
+    }
     selected = settings.ai_model
+    selected_installed = bool(installed_names & _model_aliases(selected))
     return {
         "running": True,
         "selected_model": selected,
-        "selected_model_installed": selected in models,
+        "selected_model_installed": selected_installed,
         "models": models,
-        "message": "Ollama is running." if selected in models else f"Ollama is running, but {selected} is not installed yet.",
+        "installed_by_profile": installed_by_profile,
+        "installed_by_model": installed_by_model,
+        "message": "Ollama is running." if selected_installed else f"Ollama is running, but {selected} is not installed yet.",
     }
 
 
