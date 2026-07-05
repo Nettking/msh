@@ -58,7 +58,7 @@ SysML export         = formal model handoff for reusable strategies.
 
 ### System
 
-For configuration, documentation, and troubleshooting.
+For configuration, documentation, source setup, and troubleshooting.
 
 Primary pages:
 
@@ -72,9 +72,18 @@ Purpose:
 ```text
 Guide       = how to use the app.
 Setup       = how this MSH instance should run.
-Sources     = what machines and sensors exist.
+Sources     = machines, sensors, MTConnect endpoints, Observer Phoenix, and connection tests.
 Diagnostics = why the runtime/data pipeline is or is not ready.
 ```
+
+System -> Sources includes machine-level connection checks:
+
+```text
+Test MTConnect    = HTTP test from Flask server/container to the machine adapter endpoint.
+Test VPN/network  = TCP reachability test from Flask server/container to the machine network target.
+```
+
+The VPN/network test does not prove that the VPN client is connected at the OS level. It proves whether MSH can reach the configured machine-network host from where the app is running.
 
 Detailed/advanced pages should be reachable from cards on these pages, not dumped into the main menu.
 
