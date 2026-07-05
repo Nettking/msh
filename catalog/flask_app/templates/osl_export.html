@@ -1,6 +1,17 @@
 {% extends 'base.html' %}
 {% block body %}
-<section class="page-intro"><h2>OSL export</h2><p>Export reusable operator notes into an OSL-style YAML representation.</p></section>
-<section class="section-block section-block--actions"><form method="post" action="{{ url_for('operator_support_web.run_osl_export') }}"><button class="button-primary" type="submit">Export reusable notes to OSL</button></form><p>Output path: <code>{{ export_path }}</code></p></section>
-<section class="section-block"><h3>Preview</h3><pre>{{ preview }}</pre></section>
+<section class="page-intro">
+  <h2>OSL to SysML export</h2>
+  <p>Export reusable operator notes as a SysML text model. OSL is treated as the internal strategy structure; SysML is the formal modelling output.</p>
+</section>
+<section class="section-block section-block--actions">
+  <form method="post" action="{{ url_for('operator_support_web.run_osl_export') }}">
+    <button class="button-primary" type="submit">Export reusable notes to SysML</button>
+  </form>
+  <p>Output path: <code>{{ export_path }}</code></p>
+</section>
+<section class="section-block">
+  <h3>SysML preview</h3>
+  <pre>{{ preview }}</pre>
+</section>
 {% endblock %}
