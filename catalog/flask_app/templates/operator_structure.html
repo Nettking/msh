@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro operator-strategy-intro">
+  <div>
+    <h2>Structure Note</h2>
+    <p>Turn one raw statement into the paper/OSL structure. Keep the original statement unchanged and fill only the fields you can justify.</p>
+  </div>
+</section>
+
+<section class="section-block section-block--highlight">
+  <h3>Original statement</h3>
+  <p class="statement-quote">{{ record.raw_statement or record.decision }}</p>
+  <p class="text-muted">Captured {{ record.decision_time }} · current status {{ record.review_status }}</p>
+</section>
+
+<form method="post" action="{{ url_for('operator_strategy_web.update_structure', record_id=record.id) }}" class="operator-strategy-form">
+  <section class="section-block section-block--primary">
+    <h3>Step 3: map the statement to OSL keywords</h3>
+    <p>The goal is not to complete every field. The goal is to make the reasoning explicit enough that it can be reused or exported.</p>
+    <input type="hidden" name="raw_statement" value="{{ record.raw_statement or record.decision }}">
+
+    <div class="operator-detail-grid">
+      <label class="operator-field-wide"><span>Strategy name</span><input type="text" name="strategy_name" value="{{ record.strategy_name }}" placeholder="Cold start offset strategy"></label>
+      <label><span>Issue / situation</span><input type="text" name="issue" value="{{ record.issue }}" placeholder="chatter / cold start / tool wear"></label>
+      <label><span>Situation path</span><input type="text" name="strategy_situation" value="{{ record.strategy_situation }}" placeholder="early production after cold start"></label>
+      <label>
+        <span>Machine</span>
+        <select name="machine_id">
+          <option value="">Unassigned</option>
+          {% for machine in source_inventory.machines %}<option value="{{ machine.id }}" {% if record.machine_id == machine.id %}selected{% endif %}>{{ machine.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label><span>Machine text</span><input type="text" name="machine" value="{{ record.machine }}" placeholder="Mazak i500"></label>
+      <label><span>Process</span><input type="text" name="process" value="{{ record.process }}" placeholder="CNC machining"></label>
+      <label><span>Operation</span><input type="text" name="operation" value="{{ record.operation }}" placeholder="finishing pass"></label>
+      <label class="operator-field-wide"><span>Context</span><textarea name="context" rows="3" placeholder="When does this apply? Material, setup, machine state, production pressure...">{{ record.context }}</textarea></label>
+      <label><span>Trigger</span><textarea name="trigger" rows="3" placeholder="What made the operator react?">{{ record.trigger }}</textarea></label>
+      <label><span>Observation</span><textarea name="observation" rows="3" placeholder="What was noticed? Sound, vibration, load, surface finish...">{{ record.observation }}</textarea></label>
+      <label><span>Hypothesis / possible cause</span><textarea name="possible_cause" rows="3" placeholder="What did the operator think was causing it?">{{ record.possible_cause or record.hypothesis }}</textarea></label>
+      <label><span>Goal</span><textarea name="goal" rows="3" placeholder="What was the operator trying to preserve or avoid?">{{ record.goal }}</textarea></label>
+      <label class="operator-field-wide"><span>Decision / strategy action</span><textarea name="decision" rows="3" placeholder="What did the operator do or decide?">{{ record.decision }}</textarea></label>
+      <label><span>Action type</span><input type="text" name="action_type" value="{{ record.action_type }}" placeholder="reduce_feed / inspect_part / wait_for_warmup"></label>
+      <label><span>Rationale</span><textarea name="rationale" rows="3" placeholder="Why was this action selected?">{{ record.rationale }}</textarea></label>
+      <label><span>Expected outcome</span><textarea name="expected_outcome" rows="3" placeholder="What should improve?">{{ record.expected_outcome }}</textarea></label>
+      <label><span>Trade-off</span><textarea name="trade_off" rows="3" placeholder="What cost or compromise is accepted?">{{ record.trade_off }}</textarea></label>
+      <label><span>Risk</span><textarea name="risk" rows="3" placeholder="What could go wrong?">{{ record.risk }}</textarea></label>
+      <label class="operator-field-wide"><span>Alternative strategy</span><textarea name="alternative_strategy" rows="3" placeholder="What else could be tried?">{{ record.alternative_strategy }}</textarea></label>
+      <label><span>Evidence</span><textarea name="evidence" rows="3" placeholder="Experience, measurement, previous job, alarm, observation...">{{ record.evidence }}</textarea></label>
+      <label><span>Confidence</span><select name="confidence"><option value="">Unknown</option>{% for value in ['Low', 'Medium', 'High'] %}<option value="{{ value }}" {% if record.confidence == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+      <label><span>Outcome</span><textarea name="outcome" rows="3" placeholder="Did it work? What happened afterwards?">{{ record.outcome }}</textarea></label>
+      <label><span>Worked?</span><select name="worked"><option value="unknown" {% if record.worked == 'unknown' %}selected{% endif %}>Unknown</option><option value="yes" {% if record.worked == 'yes' %}selected{% endif %}>Yes</option><option value="partly" {% if record.worked == 'partly' %}selected{% endif %}>Partly</option><option value="no" {% if record.worked == 'no' %}selected{% endif %}>No</option></select></label>
+      <label class="operator-field-wide"><span>DT/SysML trace target</span><textarea name="trace_target" rows="2" placeholder="recommendation, monitoring rule, dashboard, validation case...">{{ record.trace_target }}</textarea></label>
+      <label class="source-checkbox-label"><input type="checkbox" name="operator_confirmation_required" {% if record.operator_confirmation_required %}checked{% endif %}><span>Requires operator confirmation</span></label>
+      <label class="source-checkbox-label"><input type="checkbox" name="reusable_strategy" {% if record.reusable_strategy %}checked{% endif %}><span>Reusable strategy</span></label>
+    </div>
+  </section>
+
+  <section class="section-block strategy-save-bar">
+    <button class="button-primary" type="submit">Save structured note</button>
+    <a href="{{ url_for('operator_strategy_web.review') }}">Back to Review Notes</a>
+  </section>
+</form>
+{% endblock %}
