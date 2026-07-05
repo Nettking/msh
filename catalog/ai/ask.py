@@ -17,6 +17,7 @@ from .ollama_client import DEFAULT_MODEL, OllamaError, chat
 from .prompts import SYSTEM_PROMPT, build_extractive_prompt, build_prompt
 from .rag import format_context, retrieve
 from .repo_index import load_or_build_chunks, repo_root_from
+from .symbols import build_symbols
 
 
 def parse_args() -> argparse.Namespace:
@@ -48,7 +49,8 @@ def main() -> int:
     args = parse_args()
     root = repo_root_from(args.root)
     chunks = load_or_build_chunks(root, use_cache=not args.no_cache, rebuild=args.rebuild_index)
-    selected = retrieve(args.question, chunks, limit=args.limit)
+    symbols = build_symbols(root)
+    selected = retrieve(args.question, chunks, limit=args.limit, symbols=symbols)
 
     if not selected:
         print("No relevant repository context found.")
