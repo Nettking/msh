@@ -14,22 +14,22 @@
   </head>
   <body>
     {% set endpoint = request.endpoint or '' %}
-    {% set active_group = 'operate' %}
-    {% if endpoint == 'web.startup' or endpoint.startswith('source_web.') or endpoint == 'operator_support_web.machine_notes' %}
-      {% set active_group = 'configure' %}
-    {% elif endpoint.startswith('operator_strategy_web.') or endpoint in ['web.strategies', 'web.save_strategies'] or endpoint in ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export', 'operator_support_web.recommender_artifacts'] %}
-      {% set active_group = 'knowledge' %}
+    {% set active_group = 'monitor' %}
+    {% if endpoint.startswith('operator_strategy_web.') or endpoint in ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export'] %}
+      {% set active_group = 'workflow' %}
+    {% elif endpoint == 'web.startup' or endpoint.startswith('source_web.') or endpoint == 'web.status' or endpoint == 'operator_support_web.machine_notes' %}
+      {% set active_group = 'system' %}
     {% endif %}
 
     <header class="site-header site-header--grouped">
       <div class="site-header__identity">
         <h1>MSH Webapp</h1>
-        <p>Flask control-room interface</p>
+        <p>Operator support and strategy capture</p>
       </div>
       <nav class="site-nav site-nav--primary" aria-label="Primary sections">
-        <a class="{% if active_group == 'operate' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Operate</a>
-        <a class="{% if active_group == 'configure' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">Configure</a>
-        <a class="{% if active_group == 'knowledge' %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.index') }}">Knowledge</a>
+        <a class="{% if active_group == 'monitor' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Monitor</a>
+        <a class="{% if active_group == 'workflow' %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.capture') }}">Workflow</a>
+        <a class="{% if active_group == 'system' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">System</a>
       </nav>
       {% if artifact_catalog_freshness is defined %}
       <div class="catalog-freshness {% if artifact_catalog_freshness.stale %}catalog-freshness--stale{% endif %}">
@@ -39,26 +39,20 @@
       {% endif %}
       <form class="rescan-form" method="post" action="{{ url_for('web.rescan') }}"><input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}"><button type="submit">Rescan</button></form>
       <nav class="site-nav site-section-nav" aria-label="Section pages">
-        {% if active_group == 'configure' %}
+        {% if active_group == 'workflow' %}
+          <a class="{% if endpoint == 'operator_strategy_web.capture' %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.capture') }}">Capture</a>
+          <a class="{% if endpoint in ['operator_strategy_web.review', 'operator_strategy_web.structure'] %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.review') }}">Review Notes</a>
+          <a class="{% if endpoint == 'operator_support_web.strategy_comparison' %}is-active{% endif %}" href="{{ url_for('operator_support_web.strategy_comparison') }}">Strategies</a>
+          <a class="{% if endpoint == 'operator_support_web.osl_export' %}is-active{% endif %}" href="{{ url_for('operator_support_web.osl_export') }}">SysML Export</a>
+        {% elif active_group == 'system' %}
           <a class="{% if endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">Setup</a>
           <a class="{% if endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ url_for('source_web.index') }}">Sources</a>
-          <a class="{% if endpoint == 'operator_support_web.machine_notes' %}is-active{% endif %}" href="{{ url_for('operator_support_web.machine_notes') }}">Machine Notes</a>
-        {% elif active_group == 'knowledge' %}
-          <a class="{% if endpoint.startswith('operator_strategy_web.') %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.index') }}">Operator Notes</a>
-          <a class="{% if endpoint == 'operator_support_web.strategy_comparison' %}is-active{% endif %}" href="{{ url_for('operator_support_web.strategy_comparison') }}">Strategy Comparison</a>
-          <a class="{% if endpoint in ['web.strategies', 'web.save_strategies'] %}is-active{% endif %}" href="{{ url_for('web.strategies') }}">Intervention Rules</a>
-          <a class="{% if endpoint == 'operator_support_web.osl_export' %}is-active{% endif %}" href="{{ url_for('operator_support_web.osl_export') }}">OSL Export</a>
-          <a class="{% if endpoint == 'operator_support_web.recommender_artifacts' %}is-active{% endif %}" href="{{ url_for('operator_support_web.recommender_artifacts') }}">Recommender Artifacts</a>
+          <a class="{% if endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
         {% else %}
           <a class="{% if endpoint == 'web.overview' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Overview</a>
-          <a class="{% if endpoint == 'web.control' %}is-active{% endif %}" href="{{ url_for('web.control') }}">Control</a>
           <a class="{% if endpoint == 'web.live' %}is-active{% endif %}" href="{{ url_for('web.live') }}">Live</a>
           <a class="{% if endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
           <a class="{% if endpoint == 'operator_support_web.assist' %}is-active{% endif %}" href="{{ url_for('operator_support_web.assist') }}">Assist</a>
-          <a class="{% if endpoint == 'operator_support_web.first_part' %}is-active{% endif %}" href="{{ url_for('operator_support_web.first_part') }}">First Part</a>
-          <a class="{% if endpoint == 'operator_support_web.quality_outcomes' %}is-active{% endif %}" href="{{ url_for('operator_support_web.quality_outcomes') }}">Outcomes</a>
-          <a class="{% if endpoint == 'operator_support_web.learning' %}is-active{% endif %}" href="{{ url_for('operator_support_web.learning') }}">Learning</a>
-          <a class="{% if endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
         {% endif %}
       </nav>
     </header>
