@@ -123,16 +123,16 @@
         <div class="setup-step-card__title">
           <span class="setup-step-number">2a</span>
           <div>
-            <h4>Response time check</h4>
-            <p>Run a tiny local prompt against the selected model, then compare the measured time with practical setup bands. First runs can be slower while the model loads.</p>
+            <h4>Benchmark and model suggestion</h4>
+            <p>Run the setup benchmark and let MSH suggest which installed AI profile to use.</p>
           </div>
         </div>
         <div class="setup-status-strip">
-          <button type="button" id="aiBenchmarkButton">Test selected model speed</button>
-          <span id="aiBenchmarkStatus" class="status-badge status-waiting">Not tested</span>
+          <button type="button" id="aiBenchmarkButton">Benchmark and suggest model</button>
+          <span id="aiBenchmarkStatus" class="status-badge status-waiting">Not benchmarked</span>
         </div>
         <div id="aiBenchmarkResult" class="setup-benchmark-result" role="status" aria-live="polite">
-          <p>Use this before saving if you are unsure whether the selected model is too slow for this computer.</p>
+          <p>Use this before saving if you are unsure which model this computer can run.</p>
         </div>
         <table class="artifact-table setup-benchmark-table">
           <thead>
@@ -386,12 +386,12 @@
     if (!button || !form) return;
     if (aiEnabled && !aiEnabled.checked) {
       setBenchmarkStatus('AI disabled', false);
-      renderBenchmarkResult({ ok: false, model: 'AI disabled', elapsed_ms: null, assessment: { label: 'Unavailable', description: 'Enable AI before testing model speed.' }, message: 'Enable AI before testing model speed.' });
+      renderBenchmarkResult({ ok: false, model: 'AI disabled', elapsed_ms: null, assessment: { label: 'Unavailable', description: 'Enable AI before benchmarking model choices.' }, message: 'Enable AI before benchmarking model choices.' });
       return;
     }
     var data = new FormData(form);
     button.disabled = true;
-    setBenchmarkStatus('Testing...', false);
+    setBenchmarkStatus('Benchmarking...', false);
     fetch('/server-setup/test-ai-model', {
       method: 'POST',
       body: data,
