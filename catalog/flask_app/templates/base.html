@@ -25,9 +25,9 @@
         <a class="{% if request.endpoint == 'web.control' %}is-active{% endif %}" href="{{ url_for('web.control') }}">Control</a>
         <a class="{% if request.endpoint == 'web.live' %}is-active{% endif %}" href="{{ url_for('web.live') }}">Live</a>
         <a class="{% if request.endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
-        <a class="{% if request.endpoint and request.endpoint.startswith('operator_strategy_web.') %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.index') }}">Operator Strategies</a>
+        <a class="{% if request.endpoint and request.endpoint.startswith('operator_strategy_web.') %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.index') }}">Operator Notes</a>
         <a class="{% if request.endpoint and request.endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ url_for('source_web.observer_phoenix') }}">Sources</a>
-        <a class="{% if request.endpoint in ['web.strategies', 'web.save_strategies'] %}is-active{% endif %}" href="{{ url_for('web.strategies') }}">Strategies</a>
+        <a class="{% if request.endpoint in ['web.strategies', 'web.save_strategies'] %}is-active{% endif %}" href="{{ url_for('web.strategies') }}">Intervention Rules</a>
       </nav>
       {% if artifact_catalog_freshness is defined %}
       <div class="catalog-freshness {% if artifact_catalog_freshness.stale %}catalog-freshness--stale{% endif %}">
@@ -61,13 +61,5 @@
       {% endwith %}
       {% block body %}{% endblock %}
     </main>
-    <script>
-      (function () {
-        var savedSetupText = document.querySelector('.setup-saved-panel > .setup-panel__header p');
-        if (savedSetupText) {
-          savedSetupText.textContent = 'Setup is saved. Choose whether to continue the previous session or start clean.';
-        }
-      })();
-    </script>
   </body>
 </html>
