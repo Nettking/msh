@@ -27,7 +27,7 @@ def _patch_setup(monkeypatch) -> None:
     monkeypatch.setattr(app_module, "load_settings", lambda: default_settings(configured=True))
 
 
-def test_operator_strategy_capture_uses_grouped_field_note_layout(monkeypatch, tmp_path):
+def test_operator_strategy_capture_is_fast_quick_record(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup(monkeypatch)
@@ -39,11 +39,12 @@ def test_operator_strategy_capture_uses_grouped_field_note_layout(monkeypatch, t
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "Record one operator decision" in html
-    assert "Identify the strategy" in html
-    assert "What was observed?" in html
-    assert "What did the operator decide?" in html
-    assert "What should this become?" in html
-    assert "class=\"operator-strategy-form\"" in html
-    assert "rows=\"6\" required" in html
-    assert "Save as local field note" in html
+    assert "Quick record" in html
+    assert "Only the decision/action is required" in html
+    assert "autofocus" in html
+    assert "name=\"decision\" rows=\"5\" required" in html
+    assert "Situation / path" in html
+    assert "More detail / later analysis" in html
+    assert "Save fast record" in html
+    assert "What did the operator decide?" not in html
+    assert "What should this become?" not in html
