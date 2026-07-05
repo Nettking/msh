@@ -24,22 +24,22 @@ DEFAULT_OLLAMA_BASE_URL = "http://ollama:11434"
 DEPLOYMENT_MODES: dict[str, dict[str, str]] = {
     "full-server": {
         "label": "Full server",
-        "description": "Flask workbench + recorder intent + AI-ready web UI.",
+        "description": "Web workbench plus MTConnect recorder settings for a complete MSH station.",
         "runtime": "enabled",
     },
     "web-workbench": {
         "label": "Web workbench",
-        "description": "Flask, orchestration, playback, source settings, strategy capture, analysis UI, and optional AI.",
+        "description": "Recommended. Analysis UI, playback, source settings, strategy capture, and AI.",
         "runtime": "enabled",
     },
     "web-ui-only": {
         "label": "Web UI only",
-        "description": "Flask UI without background orchestration. Useful for inspection/debugging.",
+        "description": "Inspect existing files without background orchestration. Useful for debugging.",
         "runtime": "disabled",
     },
     "recorder-only": {
         "label": "Recorder only",
-        "description": "Recorder role. Use command-driven setup when this machine should run without the web UI.",
+        "description": "Data capture role. Best used with command-driven setup when no web UI is needed.",
         "runtime": "disabled",
     },
 }
@@ -199,6 +199,39 @@ def env_lines_for(settings: ServerSetupSettings) -> list[str]:
         "MSH_RECORDER_REQUEST_TIMEOUT=1.0",
         f"MSH_RECORDER_INCLUDE_CONDITION={'true' if settings.recorder_include_condition else 'false'}",
     ]
+
+
+def ollama_status(settings: ServerSetupSettings | None = None, timeout_seconds: float = 2.0) -> dict[str, Any]:
+    settings = settings or load_settings()
+    if not settings.ai_enabled:
+        return {
+            "running": False,
+            "selected_model": settings.ai_model,
+            "selected_model_installed": False,
+            "models": [],
+            "message": "AI is disabled in setup.",
+        }
+    try:
+        req = request.Request(f"{settings.ollama_base_url.rstrip('/')}/api/tags", method="GET")
+        with request.urlopen(req, timeout=timeout_seconds) as response:
+            payload = json.loads(response.read().decode("utf-8"))
+    except Exception as exc:  # pragma: no cover - depends on local Docker/Ollama runtime
+        return {
+            "running": False,
+            "selected_model": settings.ai_model,
+            "selected_model_installed": False,
+            "models": [],
+            "message": f"Ollama is not reachable yet: {exc}",
+        }
+    models = sorted(str(item.get("name") or "") for item in payload.get("models", []) if item.get("name"))
+    selected = settings.ai_model
+    return {
+        "running": True,
+        "selected_model": selected,
+        "selected_model_installed": selected in models,
+        "models": models,
+        "message": "Ollama is running." if selected in models else f"Ollama is running, but {selected} is not installed yet.",
+    }
 
 
 def pull_ollama_model(settings: ServerSetupSettings, timeout_seconds: int = 900) -> tuple[bool, str]:
