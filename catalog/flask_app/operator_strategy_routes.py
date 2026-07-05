@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from .services.operator_strategy_service import DEFAULT_TIMEZONE, OperatorStrategyError, OperatorStrategyService
+from .services.source_inventory_service import SourceInventoryService
 
 
 operator_strategy_web = Blueprint("operator_strategy_web", __name__, url_prefix="/operator-strategies")
@@ -10,6 +11,13 @@ operator_strategy_web = Blueprint("operator_strategy_web", __name__, url_prefix=
 
 def _service() -> OperatorStrategyService:
     return OperatorStrategyService()
+
+
+def _source_inventory() -> dict[str, object]:
+    try:
+        return SourceInventoryService().status_model()
+    except Exception:
+        return {"machines": [], "vibration_sensors": []}
 
 
 @operator_strategy_web.get("")
@@ -27,6 +35,7 @@ def index():
         load_error=load_error,
         default_timezone=DEFAULT_TIMEZONE,
         records_path=service.records_path.as_posix(),
+        source_inventory=_source_inventory(),
     )
 
 
@@ -37,7 +46,30 @@ def save():
     except OperatorStrategyError as exc:
         flash(str(exc), "error")
     else:
-        flash(f"Recorded operator strategy decision at {record.decision_time}.", "success")
+        flash(f"Recorded operator note at {record.decision_time}.", "success")
+    return redirect(url_for("operator_strategy_web.index"))
+
+
+@operator_strategy_web.post("/<record_id>/outcome")
+def update_outcome(record_id: str):
+    try:
+        ok, message = _service().update_outcome(record_id, request.form)
+    except OperatorStrategyError as exc:
+        flash(str(exc), "error")
+    else:
+        flash(message, "success" if ok else "warning")
+    return redirect(url_for("operator_strategy_web.index"))
+
+
+@operator_strategy_web.post("/<record_id>/reusable")
+def mark_reusable(record_id: str):
+    reusable = str(request.form.get("reusable") or "1").lower() in {"1", "true", "yes", "on"}
+    try:
+        ok, message = _service().mark_reusable(record_id, reusable=reusable)
+    except OperatorStrategyError as exc:
+        flash(str(exc), "error")
+    else:
+        flash(message, "success" if ok else "warning")
     return redirect(url_for("operator_strategy_web.index"))
 
 
@@ -48,5 +80,5 @@ def delete(record_id: str):
     except OperatorStrategyError as exc:
         flash(str(exc), "error")
     else:
-        flash("Operator strategy record deleted." if deleted else "Operator strategy record was not found.", "success" if deleted else "warning")
+        flash("Operator note deleted." if deleted else "Operator note was not found.", "success" if deleted else "warning")
     return redirect(url_for("operator_strategy_web.index"))
