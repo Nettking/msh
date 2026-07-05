@@ -2,7 +2,11 @@
 {% block body %}
 <section class="page-intro">
   <h2>OSL to SysML export</h2>
-  <p>Export reusable operator notes as a SysML text model. OSL is treated as the internal strategy structure; SysML is the formal modelling output.</p>
+  <p>Export reusable operator notes as a SysML text model using the paper method: coded CNC strategy statement → OSL keywords → SysML artefact.</p>
+</section>
+<section class="section-block section-block--primary">
+  <h3>OSL method structure</h3>
+  <p>The export preserves the paper keywords as first-class SysML attributes: context, trigger, observation, hypothesis, strategy_action, rationale, tradeoff, alternative_strategy, evidence, confidence, outcome, and dt_artifact_link.</p>
 </section>
 <section class="section-block section-block--actions">
   <form method="post" action="{{ url_for('operator_support_web.run_osl_export') }}">
