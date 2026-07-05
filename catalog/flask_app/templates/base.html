@@ -39,7 +39,7 @@
       </div>
       {% endif %}
       <form class="rescan-form" method="post" action="{{ url_for('web.rescan') }}">
-        <input type="hidden" name="next" value="{{ request.path }}">
+        <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
         <button type="submit">Rescan</button>
       </form>
     </header>
