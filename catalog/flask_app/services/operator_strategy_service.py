@@ -147,6 +147,7 @@ class OperatorStrategyService:
         tmp = self.records_path.with_suffix(self.records_path.suffix + ".tmp")
         tmp.write_text(json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
         tmp.replace(self.records_path)
+        return None
 
 
 def _text(form: Any, name: str) -> str:
@@ -174,7 +175,3 @@ def _parse_local_datetime(value: str, timezone_name: str) -> datetime:
 def _validate_record(record: OperatorStrategyRecord) -> None:
     if not record.decision:
         raise OperatorStrategyError("Decision/action is required.")
-    if not record.goal:
-        raise OperatorStrategyError("Goal is required so the decision has a clear purpose.")
-    if not record.strategy_situation and not record.strategy_name:
-        raise OperatorStrategyError("Add either a strategy name or a strategy situation/path name.")
