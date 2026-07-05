@@ -62,6 +62,30 @@ def test_retrieve_prefers_matching_text_and_path(tmp_path: Path) -> None:
     assert selected[0].path == "docs/architecture.md"
 
 
+def test_retrieve_boosts_exact_repo_path(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    _write(root / "README.md", "Control documentation overview.\n")
+    _write(root / "catalog" / "flask_app" / "routes.py", "@web.route('/control')\ndef control():\n    return 'ok'\n")
+
+    chunks = build_chunks(root)
+    selected = retrieve("what does /control do in catalog/flask_app/routes.py", chunks, limit=1)
+
+    assert selected
+    assert selected[0].path == "catalog/flask_app/routes.py"
+
+
+def test_retrieve_boosts_route_literals(tmp_path: Path) -> None:
+    root = tmp_path / "repo"
+    _write(root / "README.md", "Control documentation overview.\n")
+    _write(root / "catalog" / "flask_app" / "routes.py", "@web.route('/control')\ndef control():\n    return 'ok'\n")
+
+    chunks = build_chunks(root)
+    selected = retrieve("what does the /control route do", chunks, limit=1)
+
+    assert selected
+    assert selected[0].path == "catalog/flask_app/routes.py"
+
+
 def test_retrieve_returns_empty_when_no_context_matches(tmp_path: Path) -> None:
     root = tmp_path / "repo"
     _write(root / "README.md", "Overview\n")
