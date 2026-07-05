@@ -1,104 +1,250 @@
 {% extends 'base.html' %}
 {% block body %}
-<section class="section-block section-block--primary">
-  <h2>MSH startup setup</h2>
-  <p>Start the server with one command, then choose the role and model here in the browser.</p>
-  <pre>docker compose up -d --build</pre>
-  {% if server_setup_error %}
-  <p class="flash flash-error">{{ server_setup_error }}</p>
-  {% endif %}
-  <ul>
-    <li>Browser setup status: <strong>{{ 'configured' if server_setup_settings and server_setup_settings.configured else 'not configured' }}</strong></li>
-    {% if server_setup_settings %}
-    <li>Current role: <strong>{{ server_setup_settings.deployment_mode }}</strong></li>
-    <li>AI model: <strong>{{ server_setup_settings.ai_model if server_setup_settings.ai_enabled else 'disabled' }}</strong></li>
-    {% endif %}
-  </ul>
+<section class="setup-hero">
+  <div>
+    <span class="setup-eyebrow">One-command setup</span>
+    <h2>Get MSH ready for this computer</h2>
+    <p>Start once, then choose the role, AI model, and recorder settings here. You can come back to this page later to change them.</p>
+  </div>
+  <div class="setup-command-card">
+    <span>Start command</span>
+    <code>docker compose up -d --build</code>
+  </div>
 </section>
 
-<section class="section-block section-block--actions">
-  <h3>Browser setup</h3>
-  <p>Use this for normal first-time setup and for later changes. Settings are stored in <code>data/server_setup/server_settings.json</code>, so they persist across container rebuilds.</p>
-  <form method="post" action="/server-setup/save" class="control-form control-card">
+<section class="setup-progress" aria-label="Setup progress">
+  <div class="setup-progress__step setup-progress__step--active"><strong>1</strong><span>Role</span></div>
+  <div class="setup-progress__step"><strong>2</strong><span>AI model</span></div>
+  <div class="setup-progress__step"><strong>3</strong><span>Recorder</span></div>
+  <div class="setup-progress__step"><strong>4</strong><span>Save</span></div>
+  <div class="setup-progress__step"><strong>5</strong><span>Start runtime</span></div>
+</section>
+
+<section class="section-block setup-summary-panel">
+  <div class="setup-summary-card {{ 'setup-summary-card--ready' if server_setup_settings and server_setup_settings.configured else 'setup-summary-card--waiting' }}">
+    <span>Setup</span>
+    <strong>{{ 'Configured' if server_setup_settings and server_setup_settings.configured else 'Needs setup' }}</strong>
+    <p>{{ 'Settings are saved locally.' if server_setup_settings and server_setup_settings.configured else 'Save the form below before normal runtime starts.' }}</p>
+  </div>
+  <div class="setup-summary-card">
+    <span>Role</span>
+    <strong>{{ server_setup_modes[server_setup_settings.deployment_mode].label if server_setup_settings else 'Web workbench' }}</strong>
+    <p>{{ 'Current saved role' if server_setup_settings and server_setup_settings.configured else 'Default before first save' }}</p>
+  </div>
+  <div class="setup-summary-card {{ 'setup-summary-card--ready' if server_setup_ollama_status and server_setup_ollama_status.running else 'setup-summary-card--waiting' }}">
+    <span>Ollama</span>
+    <strong>{{ 'Running' if server_setup_ollama_status and server_setup_ollama_status.running else 'Not ready' }}</strong>
+    <p>{{ server_setup_ollama_status.message if server_setup_ollama_status else 'Status is checked on this page.' }}</p>
+  </div>
+  <div class="setup-summary-card {{ 'setup-summary-card--ready' if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed else 'setup-summary-card--waiting' }}">
+    <span>Model</span>
+    <strong>{{ server_setup_settings.ai_model if server_setup_settings and server_setup_settings.ai_enabled else 'Disabled' }}</strong>
+    <p>{% if server_setup_settings and not server_setup_settings.ai_enabled %}AI is disabled.{% elif server_setup_ollama_status and server_setup_ollama_status.selected_model_installed %}Installed and ready.{% else %}Install after saving setup.{% endif %}</p>
+  </div>
+</section>
+
+{% if server_setup_error %}
+<section class="section-block section-block--warning">
+  <h3>Setup file problem</h3>
+  <p>{{ server_setup_error }}</p>
+</section>
+{% endif %}
+
+<section class="section-block setup-panel">
+  <div class="setup-panel__header">
+    <div>
+      <h3>Guided setup</h3>
+      <p>Choose the simplest role that matches this machine. The recommended role is selected by default.</p>
+    </div>
+    <span class="status-badge {{ 'status-ready' if server_setup_settings and server_setup_settings.configured else 'status-waiting' }}">{{ 'saved' if server_setup_settings and server_setup_settings.configured else 'first run' }}</span>
+  </div>
+
+  <form method="post" action="/server-setup/save" class="setup-form" id="startupSetupForm">
     <input type="hidden" name="next" value="{{ next_path }}">
 
-    <label for="deployment_mode">Server role</label>
-    <select id="deployment_mode" name="deployment_mode">
-      {% for key, mode in server_setup_modes.items() %}
-      <option value="{{ key }}" {% if server_setup_settings and server_setup_settings.deployment_mode == key %}selected{% endif %}>{{ mode.label }} — {{ mode.description }}</option>
-      {% endfor %}
-    </select>
+    <section class="setup-step-card">
+      <div class="setup-step-card__title">
+        <span class="setup-step-number">1</span>
+        <div>
+          <h4>What should this computer do?</h4>
+          <p>Use the web workbench for most visits. Choose full server only when this machine should also record MTConnect data.</p>
+        </div>
+      </div>
+      <div class="setup-choice-grid setup-role-grid">
+        {% for key, mode in server_setup_modes.items() %}
+        <label class="setup-choice-card {% if server_setup_settings and server_setup_settings.deployment_mode == key %}is-selected{% endif %}" data-role-card>
+          <input type="radio" name="deployment_mode" value="{{ key }}" {% if server_setup_settings and server_setup_settings.deployment_mode == key %}checked{% endif %}>
+          <span class="setup-choice-card__label">{{ mode.label }}</span>
+          <span class="setup-choice-card__description">{{ mode.description }}</span>
+          {% if key == 'web-workbench' %}<span class="setup-choice-card__tag">Recommended</span>{% endif %}
+          {% if key in ['full-server', 'recorder-only'] %}<span class="setup-choice-card__tag setup-choice-card__tag--recorder">Recorder settings</span>{% endif %}
+        </label>
+        {% endfor %}
+      </div>
+    </section>
 
-    <label>
-      <input type="checkbox" name="ai_enabled" {% if not server_setup_settings or server_setup_settings.ai_enabled %}checked{% endif %}>
-      Enable local AI explainer
-    </label>
+    <section class="setup-step-card">
+      <div class="setup-step-card__title">
+        <span class="setup-step-number">2</span>
+        <div>
+          <h4>Local AI explainer</h4>
+          <p>MSH uses its own Ollama service. Open WebUI does not need to be open.</p>
+        </div>
+      </div>
+      <label class="setup-toggle">
+        <input type="checkbox" name="ai_enabled" id="aiEnabled" {% if not server_setup_settings or server_setup_settings.ai_enabled %}checked{% endif %}>
+        <span>Enable local AI explainer</span>
+      </label>
+      <div class="setup-choice-grid setup-model-grid" id="aiModelChoices">
+        {% for key, choice in server_setup_ai_choices.items() %}
+        <label class="setup-choice-card setup-model-card {% if server_setup_settings and server_setup_settings.ai_profile == key %}is-selected{% endif %}" data-ai-card>
+          <input type="radio" name="ai_profile" value="{{ key }}" {% if server_setup_settings and server_setup_settings.ai_profile == key %}checked{% endif %}>
+          <span class="setup-choice-card__label">{{ choice.label }}</span>
+          <span class="setup-model-name">{{ choice.model }}</span>
+          <span class="setup-choice-card__description">{{ choice.device }}</span>
+        </label>
+        {% endfor %}
+      </div>
+      <div class="setup-status-strip">
+        <span class="status-badge {{ 'status-ready' if server_setup_ollama_status and server_setup_ollama_status.running else 'status-waiting' }}">Ollama {{ 'running' if server_setup_ollama_status and server_setup_ollama_status.running else 'waiting' }}</span>
+        <span class="status-badge {{ 'status-ready' if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed else 'status-waiting' }}">Model {{ 'installed' if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed else 'missing' }}</span>
+      </div>
+    </section>
 
-    <label for="ai_profile">AI model for this device</label>
-    <select id="ai_profile" name="ai_profile">
-      {% for key, choice in server_setup_ai_choices.items() %}
-      <option value="{{ key }}" {% if server_setup_settings and server_setup_settings.ai_profile == key %}selected{% endif %}>{{ choice.label }} — {{ choice.model }} — {{ choice.device }}</option>
-      {% endfor %}
-    </select>
+    <section class="setup-step-card" id="recorderSettings">
+      <div class="setup-step-card__title">
+        <span class="setup-step-number">3</span>
+        <div>
+          <h4>Recorder settings</h4>
+          <p>Only needed for full-server or recorder-only deployments. Leave empty until you know the machine endpoints.</p>
+        </div>
+      </div>
+      <div class="setup-field-grid">
+        <label>
+          <span>Recorder sources</span>
+          <input id="recorder_sources" type="text" name="recorder_sources" value="{{ server_setup_settings.recorder_sources if server_setup_settings else '' }}" placeholder="IG500=http://192.168.200.251:5000/current;VTC=http://192.168.200.252:5000/current">
+        </label>
+        <label>
+          <span>Poll interval seconds</span>
+          <input id="recorder_poll_interval" type="number" step="0.1" min="0.1" name="recorder_poll_interval" value="{{ server_setup_settings.recorder_poll_interval if server_setup_settings else '0.2' }}">
+        </label>
+      </div>
+      <label class="setup-toggle">
+        <input type="checkbox" name="recorder_include_condition" {% if server_setup_settings and server_setup_settings.recorder_include_condition %}checked{% endif %}>
+        <span>Include MTConnect condition values</span>
+      </label>
+    </section>
 
-    <label for="recorder_sources">Recorder sources</label>
-    <input id="recorder_sources" type="text" name="recorder_sources" value="{{ server_setup_settings.recorder_sources if server_setup_settings else '' }}" placeholder="IG500=http://192.168.200.251:5000/current;VTC=http://192.168.200.252:5000/current">
-    <p class="form-help">Use this when the server should record MTConnect data. Command-driven setup is still recommended for recorder-only machines.</p>
-
-    <label for="recorder_poll_interval">Recorder poll interval seconds</label>
-    <input id="recorder_poll_interval" type="number" step="0.1" min="0.1" name="recorder_poll_interval" value="{{ server_setup_settings.recorder_poll_interval if server_setup_settings else '0.2' }}">
-
-    <label>
-      <input type="checkbox" name="recorder_include_condition" {% if server_setup_settings and server_setup_settings.recorder_include_condition %}checked{% endif %}>
-      Include MTConnect condition values
-    </label>
-
-    <button class="button-primary" type="submit">Save startup setup</button>
-  </form>
-
-  <form method="post" action="/server-setup/pull-model" class="control-card">
-    <input type="hidden" name="next" value="{{ next_path }}">
-    <button type="submit">Install/update selected Ollama model</button>
-    <p>This calls the local Ollama service and pulls the selected model. It may take several minutes on first run.</p>
+    <section class="setup-step-card setup-save-card">
+      <div>
+        <h4>Save setup</h4>
+        <p>This writes local settings to <code>data/server_setup/server_settings.json</code>.</p>
+      </div>
+      <button class="button-primary setup-primary-button" type="submit">Save setup and continue</button>
+    </section>
   </form>
 </section>
 
-<section class="section-block">
-  <h3>Command-driven alternative</h3>
+{% if server_setup_settings and server_setup_settings.configured %}
+<section class="section-block setup-next-actions">
+  <div class="setup-panel__header">
+    <div>
+      <h3>Next actions</h3>
+      <p>Install the selected model, then start or continue runtime processing.</p>
+    </div>
+  </div>
+  <div class="control-action-grid">
+    <form method="post" action="/server-setup/pull-model" class="control-card">
+      <input type="hidden" name="next" value="{{ next_path }}">
+      <button class="button-primary" type="submit">Install {{ server_setup_settings.ai_model }}</button>
+      <p>Pulls the selected model into the local Ollama service. First run may take several minutes.</p>
+    </form>
+    <div class="control-card">
+      <h4>Open MSH</h4>
+      <p>After setup is saved and the runtime choice is resolved, continue to the overview.</p>
+      <a class="button-link" href="{{ next_path or url_for('web.overview') }}">Continue to MSH</a>
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<details class="section-block setup-advanced">
+  <summary>Advanced: command-driven setup</summary>
   <p>Use this on servers where you want reproducible setup without browser prompts.</p>
-  <pre>python setup_msh.py --mode full-server --ai-profile laptop-standard --start</pre>
-  <p>Examples:</p>
-  <pre>python setup_msh.py --mode web-workbench --ai-profile edge-small --start
-python setup_msh.py --mode full-server --ai-profile workstation-strong --recorder-sources "IG500=http://192.168.200.251:5000/current" --start
-python setup_msh.py --mode web-ui-only --no-ai --start</pre>
-</section>
+  <pre>python setup_msh.py --mode web-workbench --ai-profile laptop-standard --start</pre>
+  <pre>python setup_msh.py --mode full-server --ai-profile workstation-strong --recorder-sources "IG500=http://192.168.200.251:5000/current" --start</pre>
+  <pre>python setup_msh.py --mode web-ui-only --no-ai --start</pre>
+</details>
 
-{% if startup_state.requires_choice %}
-<section class="section-block section-block--primary">
-  <h2>Runtime startup mode required</h2>
-  <p>Prior workflow state was detected. Choose how this boot should initialize runtime state before processing starts.</p>
+{% if server_setup_settings and server_setup_settings.configured and startup_state.requires_choice %}
+<section class="section-block section-block--primary setup-runtime-choice">
+  <div class="setup-step-card__title">
+    <span class="setup-step-number">5</span>
+    <div>
+      <h3>Start runtime</h3>
+      <p>Prior runtime state was detected. Choose how this boot should initialize processing.</p>
+    </div>
+  </div>
   <ul>
     <li>Existing sessions: <strong>{{ startup_state.existing_sessions_count }}</strong></li>
     <li>Runtime state file present: <strong>{{ 'yes' if startup_state.has_runtime_state else 'no' }}</strong></li>
   </ul>
-</section>
-
-<section class="section-block section-block--actions">
-  <h3>Choose startup behavior</h3>
   <div class="control-action-grid">
-    <form method="post" action="{{ url_for('web.choose_startup_mode') }}">
+    <form method="post" action="{{ url_for('web.choose_startup_mode') }}" class="control-card">
       <input type="hidden" name="mode" value="continue_existing">
       <input type="hidden" name="next" value="{{ next_path }}">
       <button class="button-primary" type="submit">Continue from existing state</button>
       <p>Reuse existing runtime/session progress and continue normal catch-up behavior.</p>
     </form>
-    <form method="post" action="{{ url_for('web.choose_startup_mode') }}">
+    <form method="post" action="{{ url_for('web.choose_startup_mode') }}" class="control-card">
       <input type="hidden" name="mode" value="start_clean">
       <input type="hidden" name="next" value="{{ next_path }}">
-      <button type="submit">Start clean (new runtime namespace)</button>
-      <p>Start fresh without reusing prior runtime catch-up/session state as active state. Existing files stay on disk.</p>
+      <button type="submit">Start clean</button>
+      <p>Start fresh in a new runtime namespace. Existing files stay on disk.</p>
     </form>
   </div>
 </section>
 {% endif %}
+
+<script>
+(function () {
+  function syncSelectedCards(selector) {
+    document.querySelectorAll(selector).forEach(function (card) {
+      var input = card.querySelector('input[type="radio"]');
+      card.classList.toggle('is-selected', Boolean(input && input.checked));
+    });
+  }
+
+  function syncRecorderVisibility() {
+    var selected = document.querySelector('input[name="deployment_mode"]:checked');
+    var recorder = document.getElementById('recorderSettings');
+    if (!selected || !recorder) return;
+    var show = selected.value === 'full-server' || selected.value === 'recorder-only';
+    recorder.classList.toggle('is-hidden', !show);
+  }
+
+  function syncAiVisibility() {
+    var enabled = document.getElementById('aiEnabled');
+    var choices = document.getElementById('aiModelChoices');
+    if (!enabled || !choices) return;
+    choices.classList.toggle('is-muted', !enabled.checked);
+  }
+
+  document.querySelectorAll('[data-role-card] input').forEach(function (input) {
+    input.addEventListener('change', function () {
+      syncSelectedCards('[data-role-card]');
+      syncRecorderVisibility();
+    });
+  });
+  document.querySelectorAll('[data-ai-card] input').forEach(function (input) {
+    input.addEventListener('change', function () { syncSelectedCards('[data-ai-card]'); });
+  });
+  var aiEnabled = document.getElementById('aiEnabled');
+  if (aiEnabled) aiEnabled.addEventListener('change', syncAiVisibility);
+  syncSelectedCards('[data-role-card]');
+  syncSelectedCards('[data-ai-card]');
+  syncRecorderVisibility();
+  syncAiVisibility();
+})();
+</script>
 {% endblock %}
