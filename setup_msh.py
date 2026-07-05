@@ -3,12 +3,16 @@
 The helper writes a local `.env` file used by Docker Compose. The file is ignored
 by git and can be rerun whenever this checkout should behave as another server
 role: full server, web workbench, recorder-only, or one-shot preparation/sync.
+It can also select and optionally pull a local Ollama model for the AI explainer.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
+import os
 import secrets
+import shutil
+import subprocess
 
 
 ENV_PATH = Path(".env")
@@ -52,6 +56,27 @@ MODES = {
     },
 }
 
+AI_MODEL_CHOICES = {
+    "1": {
+        "name": "edge-small",
+        "device": "small CPU / Raspberry Pi class / low RAM",
+        "model": "smollm2:360m",
+        "notes": "very small and fast; weaker answers; good for testing the AI page",
+    },
+    "2": {
+        "name": "laptop-standard",
+        "device": "normal laptop or small server",
+        "model": "llama3.2:3b",
+        "notes": "default balance for the MSH explainer",
+    },
+    "3": {
+        "name": "workstation-strong",
+        "device": "gaming laptop, workstation, or GPU server",
+        "model": "qwen2.5:7b",
+        "notes": "stronger structured/code answers; needs more memory",
+    },
+}
+
 
 def _prompt(text: str, default: str | None = None) -> str:
     suffix = f" [{default}]" if default is not None else ""
@@ -83,6 +108,57 @@ def _render_env(values: dict[str, str]) -> str:
     return "\n".join(lines) + "\n"
 
 
+def _profile_set(profile_text: str) -> set[str]:
+    return {item.strip() for item in profile_text.split(",") if item.strip()}
+
+
+def _profile_text(profiles: set[str]) -> str:
+    preferred = ["full", "web", "recorder", "prep", "observer-sync", "ai"]
+    ordered = [profile for profile in preferred if profile in profiles]
+    ordered.extend(sorted(profiles - set(ordered)))
+    return ",".join(ordered)
+
+
+def _configure_ai(env: dict[str, str], profiles: set[str], *, default_enabled: bool) -> bool:
+    print("\nLocal AI explainer model")
+    enabled = _yes_no("Enable and install a local Ollama model for /ai", default_enabled)
+    if not enabled:
+        return False
+
+    print("\nChoose the standard model for this device:")
+    for key, choice in AI_MODEL_CHOICES.items():
+        print(f"{key}. {choice['name']}: {choice['device']} -> {choice['model']} ({choice['notes']})")
+    selected = _prompt("Choose AI model", "2")
+    if selected not in AI_MODEL_CHOICES:
+        print(f"Unknown AI model choice {selected}; using laptop-standard.")
+        selected = "2"
+    choice = AI_MODEL_CHOICES[selected]
+    profiles.add("ai")
+    env["MSH_AI_PROFILE"] = choice["name"]
+    env["MSH_AI_MODEL"] = choice["model"]
+    env["OLLAMA_BASE_URL"] = "http://ollama:11434"
+    return True
+
+
+def _run_model_pull(env: dict[str, str]) -> None:
+    if not shutil.which("docker"):
+        print("Docker was not found on PATH. Model will be pulled the next time Docker Compose starts the ai profile.")
+        return
+
+    compose_env = os.environ.copy()
+    compose_env.update(env)
+    print("\nStarting Ollama and pulling the selected model now...")
+    start = subprocess.run(["docker", "compose", "up", "-d", "ollama"], env=compose_env, check=False)
+    if start.returncode != 0:
+        print("Could not start the Ollama service now. Run this later: docker compose up -d --build")
+        return
+    pull = subprocess.run(["docker", "compose", "run", "--rm", "ollama-pull"], env=compose_env, check=False)
+    if pull.returncode == 0:
+        print("Selected Ollama model is installed.")
+    else:
+        print("Model pull failed. You can retry with: docker compose run --rm ollama-pull")
+
+
 def main() -> int:
     print("MSH server setup")
     print("Select which parts of this checkout should run with Docker Compose.\n")
@@ -94,16 +170,20 @@ def main() -> int:
         print(f"Unknown mode: {selected}")
         return 2
     mode = MODES[selected]
+    profiles = _profile_set(mode["profiles"])
 
     env: dict[str, str] = {
         "MSH_DEPLOYMENT_MODE": mode["name"],
-        "COMPOSE_PROFILES": mode["profiles"],
         "MSH_SKIP_ORCHESTRATION": mode["skip_orchestration"],
         "MSH_SCAN_DIRS": "results,data",
         "MSH_WEB_BIND": _prompt("Web bind address", "0.0.0.0"),
         "MSH_WEB_PORT": _prompt("Web port", "5000"),
         "MSH_FLASK_SECRET": secrets.token_urlsafe(32),
     }
+
+    ai_enabled = False
+    if profiles & {"full", "web"}:
+        ai_enabled = _configure_ai(env, profiles, default_enabled=True)
 
     if mode["profiles"] in {"full", "recorder"}:
         recorder_sources = _recorder_sources_prompt()
@@ -116,17 +196,23 @@ def main() -> int:
         env["MSH_RECORDER_REQUEST_TIMEOUT"] = _prompt("Recorder request timeout seconds", "1.0")
         env["MSH_RECORDER_INCLUDE_CONDITION"] = "true" if _yes_no("Record MTConnect condition values", False) else "false"
 
+    env["COMPOSE_PROFILES"] = _profile_text(profiles)
     ENV_PATH.write_text(_render_env(env), encoding="utf-8")
     Path("data").mkdir(exist_ok=True)
     Path("results").mkdir(exist_ok=True)
 
     print(f"\nWrote {ENV_PATH}")
-    print("Start the selected server components with:")
+    if ai_enabled and _yes_no("Pull the selected Ollama model now", True):
+        _run_model_pull(env)
+
+    print("\nStart the selected server components with:")
     print("  docker compose up -d --build")
     print("View logs with:")
     print("  docker compose logs -f")
-    if "web" in mode["profiles"] or mode["profiles"] == "full":
+    if "web" in profiles or "full" in profiles:
         print(f"Open: http://<server-ip>:{env['MSH_WEB_PORT']}")
+    if ai_enabled:
+        print(f"AI model: {env['MSH_AI_MODEL']} ({env['MSH_AI_PROFILE']})")
     return 0
 
 
