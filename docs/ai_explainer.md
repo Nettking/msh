@@ -1,6 +1,6 @@
 # AI Explainer
 
-This document defines the first, read-only AI integration for MSH. The goal is to let a local Ollama-backed assistant explain how the system works without changing code, running operational actions, or inspecting raw telemetry by default.
+This document defines the read-only AI integration for MSH. The goal is to let a local Ollama-backed assistant explain how the system works without changing code, running operational actions, or inspecting raw telemetry by default.
 
 ## Purpose
 
@@ -14,21 +14,46 @@ The AI explainer should answer system-understanding questions about the MSH code
 
 The explainer is not intended to be an autonomous developer agent in the first version. It should not modify files, create commits, run scripts, delete artifacts, rebuild caches, or make operational decisions.
 
+## Setup-managed Ollama model
+
+`setup_msh.py` can enable the local AI explainer and install an Ollama model through Docker Compose. When enabled, setup adds the `ai` profile, sets `MSH_AI_MODEL`, points Flask to the internal Ollama service with `OLLAMA_BASE_URL=http://ollama:11434`, and can pull the selected model immediately.
+
+The three standard setup choices are:
+
+| Setup choice | Model | Intended device |
+| --- | --- | --- |
+| `edge-small` | `smollm2:360m` | Small CPU, Raspberry Pi class, or very low memory testing. |
+| `laptop-standard` | `llama3.2:3b` | Normal laptop or small server. Default balance. |
+| `workstation-strong` | `qwen2.5:7b` | Gaming laptop, workstation, or GPU server. Stronger answers. |
+
+The Docker Compose services are:
+
+```text
+ollama       persistent local model server
+ollama-pull  one-shot installer that pulls MSH_AI_MODEL
+```
+
+Manual retry:
+
+```bash
+docker compose run --rm ollama-pull
+```
+
 ## Operating mode
 
-The first implementation should use retrieval-augmented generation:
+The implementation uses retrieval-augmented generation:
 
 1. Index selected repository files.
 2. Split indexed files into small chunks with file path and line metadata.
 3. Retrieve the most relevant chunks for a user question.
 4. Send only the question and retrieved context to the local Ollama model.
-5. Return an answer that cites the repository files used as context.
+5. Return an answer grounded in the repository files used as context.
 
 The model should be treated as an explanation layer over retrieved repository context, not as the source of truth.
 
 ## Default indexed sources
 
-The initial index should include:
+The initial index includes:
 
 ```text
 README.md
@@ -44,7 +69,7 @@ These files cover the documented architecture, setup instructions, Flask applica
 
 ## Default exclusions
 
-The initial index should exclude:
+The initial index excludes:
 
 ```text
 data/**
@@ -60,11 +85,11 @@ __pycache__/**
 
 `data/` and `results/` may contain large generated or local runtime artifacts. Raw telemetry should remain outside the default AI context unless a later, explicit analysis workflow is designed for it. `legacy/` should be excluded by default because it is not part of the current workflow path.
 
-Small committed sample data can be considered later, but it should not be indexed in the first version unless the explainer needs concrete examples to explain the data contract.
+Small committed sample data can be considered later, but it should not be indexed unless the explainer needs concrete examples to explain the data contract.
 
 ## Safety boundaries
 
-The first version must be read-only:
+The explainer is read-only:
 
 - no file writes
 - no commits or branch changes
@@ -76,9 +101,7 @@ The first version must be read-only:
 
 If a user asks for an operational action, the explainer should describe where that action is documented or implemented, but it should not perform the action.
 
-## Suggested package layout
-
-A minimal implementation can be placed under:
+## Package layout
 
 ```text
 catalog/ai/
@@ -91,17 +114,10 @@ catalog/ai/
 
 Responsibilities:
 
-- `repo_index.py`: discover allowed files, apply exclusions, read text, split chunks, and store a local index
-- `rag.py`: retrieve relevant chunks for a question
-- `ollama_client.py`: call the local Ollama API
-- `prompts.py`: keep the read-only system prompt and answer-format instructions
-
-A Flask route can be added later, for example:
-
-```text
-catalog/flask_app/routes/ai.py
-catalog/flask_app/templates/ai.html
-```
+- `repo_index.py`: discover allowed files, apply exclusions, read text, split chunks, and store a local index.
+- `rag.py`: retrieve relevant chunks for a question.
+- `ollama_client.py`: call the local Ollama API.
+- `prompts.py`: keep the read-only system prompt and answer-format instructions.
 
 ## Answer style
 
@@ -109,7 +125,7 @@ The explainer should give short, practical answers grounded in retrieved context
 
 ## Recommended first questions for testing
 
-Use these questions to validate the first implementation:
+Use these questions to validate the implementation:
 
 ```text
 How does data flow through MSH?
@@ -120,6 +136,6 @@ Which parts of the repository are legacy?
 What happens during startup?
 ```
 
-## Model choice
+## Model choice notes
 
-For code and system explanation, prefer a coder-oriented model when available, such as `qwen2.5-coder:7b`. Smaller models can be used for lightweight testing, but they may produce weaker explanations and should not be trusted without retrieved context.
+The setup defaults are deliberately practical rather than maximal. Small models are useful for checking that the AI page works, but they may ignore retrieved context or give weaker answers. The AI explainer should therefore keep retrieved context visible through dry-run/extractive modes and should never treat the model output as the source of truth.
