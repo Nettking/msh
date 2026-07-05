@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from flask import Flask
+from flask import Flask, request
 
 from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
@@ -14,7 +14,14 @@ from .operator_strategy_routes import operator_strategy_web
 from .routes import web
 from .server_setup_routes import server_setup_web
 from .services.catalog_service import ArtifactCatalog
-from .services.server_setup_service import AI_MODEL_CHOICES, DEPLOYMENT_MODES, ServerSetupError, load_settings, runtime_should_start
+from .services.server_setup_service import (
+    AI_MODEL_CHOICES,
+    DEPLOYMENT_MODES,
+    ServerSetupError,
+    load_settings,
+    ollama_status,
+    runtime_should_start,
+)
 from .source_routes import source_web
 
 
@@ -36,11 +43,15 @@ def create_app() -> Flask:
         except ServerSetupError as exc:
             settings = None
             setup_error = str(exc)
+        status = None
+        if settings is not None and request.path == "/startup":
+            status = ollama_status(settings)
         return {
             "server_setup_settings": settings,
             "server_setup_error": setup_error,
             "server_setup_modes": DEPLOYMENT_MODES,
             "server_setup_ai_choices": AI_MODEL_CHOICES,
+            "server_setup_ollama_status": status,
         }
 
     register_artifact_catalog_refresh(lambda reason: catalog.start_background_rescan_if_idle(reason=reason))
