@@ -2,13 +2,14 @@
 {% block body %}
 <section class="setup-hero">
   <div>
-    <span class="setup-eyebrow">One-command setup</span>
+    <span class="setup-eyebrow">Browser setup</span>
     <h2>Get MSH ready for this computer</h2>
-    <p>Start once, then choose the role, AI model, and recorder settings here. You can come back to this page later to change them.</p>
+    <p>Choose what this machine should do, select a local AI model, and save the settings. You can come back to this page later to change them.</p>
   </div>
-  <div class="setup-command-card">
-    <span>Start command</span>
-    <code>docker compose up -d --build</code>
+  <div class="setup-command-card setup-state-card">
+    <span>Current state</span>
+    <strong>{{ 'Setup saved' if server_setup_settings and server_setup_settings.configured else 'Waiting for first setup' }}</strong>
+    <p>{{ 'Review or change the saved setup below.' if server_setup_settings and server_setup_settings.configured else 'Pick a role and save once before normal runtime starts.' }}</p>
   </div>
 </section>
 
