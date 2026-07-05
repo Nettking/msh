@@ -11,12 +11,19 @@ def test_add_machine_and_vibration_sensor(tmp_path):
             "name": "Mazak i500",
             "machine_type": "CNC machining centre",
             "controller": "MTConnect",
+            "mtconnect_url": "http://10.0.0.20:5000",
+            "vpn_test_host": "10.0.0.20",
+            "vpn_test_port": "5000",
         }
     )
     assert ok, message
 
     status = service.status_model()
-    machine_id = status["machines"][0]["id"]
+    machine = status["machines"][0]
+    machine_id = machine["id"]
+    assert machine["mtconnect_url"] == "http://10.0.0.20:5000"
+    assert machine["vpn_test_host"] == "10.0.0.20"
+    assert machine["vpn_test_port"] == "5000"
 
     ok, message = service.add_vibration_sensor_from_form(
         {
@@ -53,3 +60,14 @@ def test_machine_with_sensor_must_not_be_deleted_first(tmp_path):
     assert service.delete_vibration_sensor(sensor_id)[0]
     assert service.delete_machine(machine_id)[0]
     assert service.status_model()["machine_count"] == 0
+
+
+def test_existing_machines_are_normalized_with_connection_fields(tmp_path):
+    path = tmp_path / "sources.json"
+    path.write_text('{"machines":[{"id":"m1","name":"Old machine"}],"vibration_sensors":[]}', encoding="utf-8")
+
+    machine = SourceInventoryService(path).status_model()["machines"][0]
+
+    assert machine["mtconnect_url"] == ""
+    assert machine["vpn_test_host"] == ""
+    assert machine["vpn_test_port"] == ""
