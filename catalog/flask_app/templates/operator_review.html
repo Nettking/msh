@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro operator-strategy-intro">
+  <div>
+    <h2>Review Notes</h2>
+    <p>This is the inbox for captured statements. Go through notes after the site visit and turn them into structured strategy knowledge.</p>
+  </div>
+</section>
+
+{% if load_error %}
+<section class="section-block section-block--warning"><h3>Storage warning</h3><p>{{ load_error }}</p></section>
+{% endif %}
+
+<section class="section-block section-block--primary">
+  <h3>Step 2: decide what each note means</h3>
+  <p>Open a note, preserve the original statement, and fill in the OSL/paper keywords only when you know them. Missing fields are allowed.</p>
+  <div class="info-grid">
+    <article class="info-card"><h4>Captured</h4><p>Raw statement exists, but it has not been interpreted yet.</p></article>
+    <article class="info-card"><h4>Structured</h4><p>The note has been translated into fields such as observation, hypothesis, action, rationale, and risk.</p></article>
+    <article class="info-card"><h4>Reusable</h4><p>The strategy is good enough to use in comparison, support cards, and SysML export.</p></article>
+  </div>
+</section>
+
+<section class="section-block">
+  <h3>Notes inbox</h3>
+  {% if records %}
+  <div class="stack-list">
+    {% for record in records %}
+    <article class="stack-row operator-note-row">
+      <div>
+        <h4>{{ record.strategy_name or record.strategy_situation or record.issue or 'Unstructured note' }}</h4>
+        <p>{{ record.raw_statement or record.decision }}</p>
+        <p class="text-muted">{{ record.decision_time }} · status {{ record.review_status }} · reusable {{ 'yes' if record.reusable_strategy else 'no' }}</p>
+        {% if record.issue or record.observation or record.possible_cause or record.rationale %}
+        <p><strong>Structured fields:</strong> issue={{ record.issue or 'n/a' }}, observation={{ record.observation or 'n/a' }}, hypothesis={{ record.possible_cause or record.hypothesis or 'n/a' }}</p>
+        {% endif %}
+      </div>
+      <div class="action-meta">
+        <a class="button-link button-link--primary" href="{{ url_for('operator_strategy_web.structure', record_id=record.id) }}">Structure note</a>
+        <form method="post" action="{{ url_for('operator_strategy_web.mark_reusable', record_id=record.id) }}">
+          <input type="hidden" name="reusable" value="{{ '0' if record.reusable_strategy else '1' }}">
+          <button type="submit">{{ 'Mark not reusable' if record.reusable_strategy else 'Mark reusable' }}</button>
+        </form>
+        <form method="post" action="{{ url_for('operator_strategy_web.delete', record_id=record.id) }}">
+          <button type="submit">Delete</button>
+        </form>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p>No notes have been captured yet. Start with Capture.</p>
+  {% endif %}
+</section>
+{% endblock %}
