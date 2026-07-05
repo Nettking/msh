@@ -2,7 +2,7 @@
 {% block body %}
 <section class="page-intro">
   <h2>Overview</h2>
-  <p>Operator landing page. It answers what is usable now and where to go next. Use Diagnostics for detailed runtime/cache/debug state.</p>
+  <p>Operator landing page. It separates Monitor, Assist, and Learning so alarms, recommendations, and reusable knowledge do not get mixed together.</p>
 </section>
 
 <section class="section-block overview-decision overview-decision--{{ overview.decision.state }}">
@@ -10,87 +10,48 @@
     <span class="metric-label">What can I do now?</span>
     <h3>{{ overview.decision.title }}</h3>
     <p class="overview-decision__summary">{{ overview.decision.summary }}</p>
-    <div class="overview-decision__next">
-      <strong>Recommended next step</strong>
-      <p>{{ overview.decision.next_step }}</p>
-    </div>
+    <div class="overview-decision__next"><strong>Recommended next step</strong><p>{{ overview.decision.next_step }}</p></div>
     <div class="overview-decision__actions">
-      <a class="button-link button-link--primary" href="{{ overview.decision.primary_action.href }}">
-        {% if overview.decision.primary_action.href == '/status' %}Open diagnostics{% else %}{{ overview.decision.primary_action.label }}{% endif %}
-      </a>
-      <a class="button-link" href="{{ overview.decision.secondary_action.href }}">
-        {% if overview.decision.secondary_action.href == '/status' %}Open diagnostics{% else %}{{ overview.decision.secondary_action.label }}{% endif %}
-      </a>
+      <a class="button-link button-link--primary" href="{{ overview.decision.primary_action.href }}">{% if overview.decision.primary_action.href == '/status' %}Open diagnostics{% else %}{{ overview.decision.primary_action.label }}{% endif %}</a>
+      <a class="button-link" href="{{ overview.decision.secondary_action.href }}">{% if overview.decision.secondary_action.href == '/status' %}Open diagnostics{% else %}{{ overview.decision.secondary_action.label }}{% endif %}</a>
     </div>
   </div>
-  <div class="overview-decision__facts">
-    <span class="status-badge status-{{ overview.decision.state|lower|replace(' ', '-') }}">{{ overview.decision.state }}</span>
-    <ul>
-      {% for fact in overview.decision.facts %}
-      <li>{{ fact }}</li>
-      {% endfor %}
-    </ul>
+  <div class="overview-decision__facts"><span class="status-badge status-{{ overview.decision.state|lower|replace(' ', '-') }}">{{ overview.decision.state }}</span><ul>{% for fact in overview.decision.facts %}<li>{{ fact }}</li>{% endfor %}</ul></div>
+</section>
+
+<section class="section-block section-block--primary">
+  <h3>Support modes</h3>
+  <div class="info-grid">
+    <article class="info-card">
+      <h4>Monitor</h4>
+      <p>What is happening now: current activity, readiness, data availability, and alarms.</p>
+      <a class="button-link" href="{{ url_for('web.live') }}">Open live</a>
+    </article>
+    <article class="info-card">
+      <h4>Assist</h4>
+      <p>Possible causes, suggested next steps, reasons, risks, alternatives, and operator confirmation.</p>
+      <a class="button-link" href="{{ url_for('operator_support_web.assist') }}">Open assist</a>
+    </article>
+    <article class="info-card">
+      <h4>Learning</h4>
+      <p>Previous operator notes, outcomes, reusable strategies, and strategy comparison.</p>
+      <a class="button-link" href="{{ url_for('operator_support_web.learning') }}">Open learning</a>
+    </article>
   </div>
 </section>
 
 <section class="section-block section-block--actions">
   <h3>Main views</h3>
   <div class="info-grid">
-    {% for item in overview.quick_links %}
-    {% if item.href != '/' %}
-    <article class="info-card">
-      <h4>
-        <a href="{{ item.href }}">
-          {% if item.href == '/status' %}Diagnostics{% else %}{{ item.label.replace('Open ', '')|title }}{% endif %}
-        </a>
-      </h4>
-      <p><span class="status-badge status-{{ item.state|lower|replace(' ', '-') }}">{{ item.state }}</span></p>
-      <p>{{ item.hint }}</p>
-    </article>
-    {% endif %}
-    {% endfor %}
+    {% for item in overview.quick_links %}{% if item.href != '/' %}
+    <article class="info-card"><h4><a href="{{ item.href }}">{% if item.href == '/status' %}Diagnostics{% else %}{{ item.label.replace('Open ', '')|title }}{% endif %}</a></h4><p><span class="status-badge status-{{ item.state|lower|replace(' ', '-') }}">{{ item.state }}</span></p><p>{{ item.hint }}</p></article>
+    {% endif %}{% endfor %}
   </div>
 </section>
 
-<section class="section-block now-block section-block--highlight">
-  <h3>Current activity</h3>
-  <div class="now-grid">
-    <p class="timestamp-highlight">Latest known timestamp: <strong>{{ overview.activity.latest_known_timestamp }}</strong></p>
-    <p class="signal-card"><span class="signal-card__label">Signal</span><strong>{{ overview.activity.summary }}</strong></p>
-  </div>
-</section>
+<section class="section-block now-block section-block--highlight"><h3>Current activity</h3><div class="now-grid"><p class="timestamp-highlight">Latest known timestamp: <strong>{{ overview.activity.latest_known_timestamp }}</strong></p><p class="signal-card"><span class="signal-card__label">Signal</span><strong>{{ overview.activity.summary }}</strong></p></div></section>
 
-<section class="section-block section-block--primary">
-  <h3>At a glance</h3>
-  <div class="metrics metrics-grid">
-    <article class="metric-card">
-      <span class="metric-label">Visible artifacts</span>
-      <strong class="metric-value">{{ overview.headline.visible_artifact_count }}</strong>
-    </article>
-    <article class="metric-card">
-      <span class="metric-label">Playback datasets</span>
-      <strong class="metric-value">{{ overview.headline.playback_compatible_count }}</strong>
-    </article>
-    <article class="metric-card {% if overview.headline.read_error_count %}metric-card--danger{% else %}metric-card--success{% endif %}">
-      <span class="metric-label">Read errors</span>
-      <strong class="metric-value">{{ overview.headline.read_error_count }}</strong>
-    </article>
-    <article class="metric-card {% if overview.headline.last_failure != 'none' %}metric-card--danger{% else %}metric-card--success{% endif %}">
-      <span class="metric-label">Runtime failure</span>
-      <strong class="metric-value metric-value--long">{{ overview.headline.last_failure }}</strong>
-    </article>
-  </div>
-  <p class="inline-note">Need cache state, runtime namespace, phase details, or scan/debug information? Open <a href="{{ url_for('web.status') }}">Diagnostics</a>.</p>
-</section>
+<section class="section-block section-block--primary"><h3>At a glance</h3><div class="metrics metrics-grid"><article class="metric-card"><span class="metric-label">Visible artifacts</span><strong class="metric-value">{{ overview.headline.visible_artifact_count }}</strong></article><article class="metric-card"><span class="metric-label">Playback datasets</span><strong class="metric-value">{{ overview.headline.playback_compatible_count }}</strong></article><article class="metric-card {% if overview.headline.read_error_count %}metric-card--danger{% else %}metric-card--success{% endif %}"><span class="metric-label">Read errors</span><strong class="metric-value">{{ overview.headline.read_error_count }}</strong></article><article class="metric-card {% if overview.headline.last_failure != 'none' %}metric-card--danger{% else %}metric-card--success{% endif %}"><span class="metric-label">Runtime failure</span><strong class="metric-value metric-value--long">{{ overview.headline.last_failure }}</strong></article></div><p class="inline-note">Need cache state, runtime namespace, phase details, or scan/debug information? Open <a href="{{ url_for('web.status') }}">Diagnostics</a>.</p></section>
 
-{% if overview.warnings %}
-<section class="section-block section-block--warning">
-  <h3>Scan warnings</h3>
-  <ul class="warning-list">
-    {% for warning in overview.warnings %}
-    <li>{{ warning }}</li>
-    {% endfor %}
-  </ul>
-</section>
-{% endif %}
+{% if overview.warnings %}<section class="section-block section-block--warning"><h3>Scan warnings</h3><ul class="warning-list">{% for warning in overview.warnings %}<li>{{ warning }}</li>{% endfor %}</ul></section>{% endif %}
 {% endblock %}
