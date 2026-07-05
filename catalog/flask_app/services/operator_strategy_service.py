@@ -260,10 +260,12 @@ _STRUCTURE_FIELDS = {
     "operator_confirmation_required", "reusable_strategy", "sensor_ids",
 }
 _CLEARABLE_FIELDS = _STRUCTURE_FIELDS - {"sensor_ids", "reusable_strategy", "operator_confirmation_required"}
+_STATUS_STRUCTURE_KEYS = {"issue", "observation", "trigger", "context", "hypothesis", "possible_cause", "goal", "rationale", "expected_outcome", "risk", "trade_off", "evidence", "trace_target"}
 
 
 def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(record)
+    inferred_status = _infer_review_status(record)
     defaults: dict[str, Any] = {
         "issue": "",
         "possible_cause": "",
@@ -278,7 +280,7 @@ def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
         "machine_id": "",
         "sensor_ids": [],
         "raw_statement": str(record.get("raw_statement") or record.get("decision") or record.get("notes") or ""),
-        "review_status": "reusable" if record.get("reusable_strategy") else "captured",
+        "review_status": inferred_status,
         "structured_at": "",
         "schema_version": SCHEMA_VERSION,
     }
@@ -288,6 +290,17 @@ def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
     normalized["reusable_strategy"] = bool(normalized.get("reusable_strategy"))
     normalized["operator_confirmation_required"] = bool(normalized.get("operator_confirmation_required"))
     return normalized
+
+
+def _infer_review_status(record: dict[str, Any]) -> str:
+    if record.get("reusable_strategy"):
+        return "reusable"
+    current = str(record.get("review_status") or "").strip()
+    if current:
+        return current
+    if any(str(record.get(key) or "").strip() for key in _STATUS_STRUCTURE_KEYS):
+        return "structured"
+    return "captured"
 
 
 def _split_ids(value: Any) -> list[str]:
