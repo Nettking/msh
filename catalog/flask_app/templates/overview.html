@@ -2,7 +2,7 @@
 {% block body %}
 <section class="page-intro">
   <h2>Overview</h2>
-  <p>Operator landing page. It separates Monitor, Assist, and Learning so alarms, recommendations, and reusable knowledge do not get mixed together.</p>
+  <p>Monitor landing page. Use this page to see whether MSH is usable right now. Use Workflow when you want to capture or structure operator knowledge.</p>
 </section>
 
 <section class="section-block overview-decision overview-decision--{{ overview.decision.state }}">
@@ -20,32 +20,11 @@
 </section>
 
 <section class="section-block section-block--primary">
-  <h3>Support modes</h3>
+  <h3>App workflow</h3>
   <div class="info-grid">
-    <article class="info-card">
-      <h4>Monitor</h4>
-      <p>What is happening now: current activity, readiness, data availability, and alarms.</p>
-      <a class="button-link" href="{{ url_for('web.live') }}">Open live</a>
-    </article>
-    <article class="info-card">
-      <h4>Assist</h4>
-      <p>Possible causes, suggested next steps, reasons, risks, alternatives, and operator confirmation.</p>
-      <a class="button-link" href="{{ url_for('operator_support_web.assist') }}">Open assist</a>
-    </article>
-    <article class="info-card">
-      <h4>Learning</h4>
-      <p>Previous operator notes, outcomes, reusable strategies, and strategy comparison.</p>
-      <a class="button-link" href="{{ url_for('operator_support_web.learning') }}">Open learning</a>
-    </article>
-  </div>
-</section>
-
-<section class="section-block section-block--actions">
-  <h3>Main views</h3>
-  <div class="info-grid">
-    {% for item in overview.quick_links %}{% if item.href != '/' %}
-    <article class="info-card"><h4><a href="{{ item.href }}">{% if item.href == '/status' %}Diagnostics{% else %}{{ item.label.replace('Open ', '')|title }}{% endif %}</a></h4><p><span class="status-badge status-{{ item.state|lower|replace(' ', '-') }}">{{ item.state }}</span></p><p>{{ item.hint }}</p></article>
-    {% endif %}{% endfor %}
+    <article class="info-card"><h4>Monitor</h4><p>Use Live, Playback, and Assist while looking at machine behaviour and support cards.</p><a class="button-link" href="{{ url_for('operator_support_web.assist') }}">Open assist</a></article>
+    <article class="info-card"><h4>Capture</h4><p>When you hear or observe useful operator knowledge, capture one raw statement first. Do not structure it on site.</p><a class="button-link" href="{{ url_for('operator_strategy_web.capture') }}">Capture statement</a></article>
+    <article class="info-card"><h4>Review later</h4><p>After the visit, turn raw notes into OSL keywords and reusable strategies, then export them to SysML.</p><a class="button-link" href="{{ url_for('operator_strategy_web.review') }}">Review notes</a></article>
   </div>
 </section>
 
