@@ -45,9 +45,10 @@ def test_operator_strategy_lifecycle(tmp_path):
     assert cards
     assert any("Reduced feed" in card["suggested_action"] for card in cards)
 
-    count, path = OslExportService(note_service=notes, export_path=tmp_path / "osl.yaml").export_reusable()
+    count, path = OslExportService(note_service=notes, export_path=tmp_path / "operator_strategies.sysml").export_reusable()
     assert count == 1
-    assert path.endswith("osl.yaml")
+    assert path.endswith("operator_strategies.sysml")
+    assert "package MSH_OperatorStrategies" in (tmp_path / "operator_strategies.sysml").read_text(encoding="utf-8")
 
     count, path = RecommenderArtifactService(note_service=notes, output_path=tmp_path / "rec.json").generate()
     assert count == 1
