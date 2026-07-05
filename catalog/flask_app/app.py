@@ -12,7 +12,9 @@ from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_bac
 from .ai_routes import ai_web
 from .operator_strategy_routes import operator_strategy_web
 from .routes import web
+from .server_setup_routes import server_setup_web
 from .services.catalog_service import ArtifactCatalog
+from .services.server_setup_service import AI_MODEL_CHOICES, DEPLOYMENT_MODES, ServerSetupError, load_settings, runtime_should_start
 from .source_routes import source_web
 
 
@@ -26,9 +28,25 @@ def create_app() -> Flask:
     def inject_catalog_freshness() -> dict[str, object]:
         return {"artifact_catalog_freshness": catalog.freshness()}
 
+    @app.context_processor
+    def inject_server_setup() -> dict[str, object]:
+        try:
+            settings = load_settings()
+            setup_error = ""
+        except ServerSetupError as exc:
+            settings = None
+            setup_error = str(exc)
+        return {
+            "server_setup_settings": settings,
+            "server_setup_error": setup_error,
+            "server_setup_modes": DEPLOYMENT_MODES,
+            "server_setup_ai_choices": AI_MODEL_CHOICES,
+        }
+
     register_artifact_catalog_refresh(lambda reason: catalog.start_background_rescan_if_idle(reason=reason))
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
+    app.register_blueprint(server_setup_web)
     app.register_blueprint(web)
     app.register_blueprint(source_web)
     app.register_blueprint(operator_strategy_web)
@@ -42,15 +60,23 @@ if __name__ == "__main__":
     port = int(os.getenv("FLASK_RUN_PORT", "5000"))
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
 
-    if os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1":
+    setup = None
+    try:
+        setup = load_settings()
+    except ServerSetupError as exc:
+        print(f"[orchestrator] browser setup needs attention before runtime starts: {exc}", flush=True)
+
+    if os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1" and setup is not None and runtime_should_start(setup):
         runtime_manager = get_runtime_manager()
         if runtime_manager.requires_startup_choice():
             print("[orchestrator] startup mode selection required at /startup before runtime processing begins", flush=True)
         else:
             print("[orchestrator] webapp-first startup: Flask available immediately, runtime starts in background", flush=True)
             start_runtime_background()
+    elif setup is None or not getattr(setup, "configured", False):
+        print("[orchestrator] first-time browser setup required at /startup; runtime will remain idle", flush=True)
     else:
-        print("[orchestrator] orchestration skipped; runtime manager will remain idle", flush=True)
+        print("[orchestrator] orchestration disabled by environment or browser setup; runtime manager will remain idle", flush=True)
 
     print(f"[orchestrator] starting Flask app on http://{host}:{port}", flush=True)
     app.run(host=host, port=port, debug=debug, threaded=True)
