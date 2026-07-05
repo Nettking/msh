@@ -15,10 +15,11 @@
   </head>
   <body>
     {% set endpoint = request.endpoint or '' %}
+    {% set knowledge_endpoints = ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export', 'operator_support_web.first_part', 'operator_support_web.quality_outcomes', 'operator_support_web.machine_notes', 'operator_support_web.learning', 'operator_support_web.recommender_artifacts', 'web.strategies', 'web.save_strategies'] %}
     {% set active_group = 'monitor' %}
-    {% if endpoint.startswith('operator_strategy_web.') or endpoint in ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export', 'web.strategies', 'web.save_strategies'] %}
+    {% if endpoint.startswith('operator_strategy_web.') or endpoint in knowledge_endpoints %}
       {% set active_group = 'knowledge' %}
-    {% elif endpoint == 'web.guide' or endpoint == 'web.startup' or endpoint.startswith('source_web.') or endpoint == 'web.status' or endpoint == 'operator_support_web.machine_notes' %}
+    {% elif endpoint == 'web.guide' or endpoint == 'web.startup' or endpoint.startswith('source_web.') or endpoint == 'web.status' %}
       {% set active_group = 'system' %}
     {% endif %}
 
