@@ -13,6 +13,7 @@ from .ai_routes import ai_web
 from .operator_strategy_routes import operator_strategy_web
 from .operator_support_routes import operator_support_web
 from .routes import web
+from . import routes_restored  # noqa: F401 - attaches additional handlers to the web blueprint
 from .server_setup_routes import server_setup_web
 from .services.catalog_service import ArtifactCatalog
 from .services.server_setup_service import (
