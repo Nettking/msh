@@ -28,7 +28,7 @@
   <article class="guide-card guide-card--system">
     <span class="guide-card__eyebrow">Setup or troubleshooting</span>
     <h3>Configure the system</h3>
-    <p>Use System for setup, machines, sensors, sources, and diagnostics.</p>
+    <p>Use System for setup, machines, sensors, MTConnect/VPN tests, sources, and diagnostics.</p>
     <a class="button-link" href="{{ url_for('source_web.index') }}">Open Sources</a>
   </article>
 </section>
@@ -62,7 +62,7 @@
     </article>
     <article class="guide-map__item">
       <h4>System</h4>
-      <p>Use this when the app needs configuration, sources, or troubleshooting.</p>
+      <p>Use this when the app needs configuration, sources, connection tests, or troubleshooting.</p>
       <ul>
         <li>Guide</li>
         <li>Setup</li>
@@ -160,8 +160,12 @@
       <p>Go to <a href="{{ url_for('operator_strategy_web.review') }}">Knowledge → Review Notes</a>, open a note, and fill in the fields you can justify.</p>
     </details>
     <details>
-      <summary>I want to add machines or vibration sensors.</summary>
-      <p>Go to <a href="{{ url_for('source_web.index') }}">System → Sources</a>.</p>
+      <summary>I want to add machines, MTConnect URLs, or vibration sensors.</summary>
+      <p>Go to <a href="{{ url_for('source_web.index') }}">System → Sources</a>. Add the machine first, then add MTConnect URL, VPN/network test target, and any vibration sensors.</p>
+    </details>
+    <details>
+      <summary>I want to test MTConnect or VPN/network reachability.</summary>
+      <p>Go to <a href="{{ url_for('source_web.index') }}">System → Sources</a>. Use <strong>Test MTConnect</strong> to check the adapter endpoint and <strong>Test VPN/network</strong> to check whether MSH can reach the configured machine-network host from the server/container.</p>
     </details>
     <details>
       <summary>I want to know if MSH is ready or why data is missing.</summary>
