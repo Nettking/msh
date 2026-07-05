@@ -31,8 +31,8 @@ def build_overview_snapshot(
     runtime_state: dict[str, Any] | None = None,
     sessions: list[Any] | None = None,
 ) -> OverviewSnapshot:
-    scan = scan or catalog.cached_snapshot()
-    runtime_state = runtime_state or get_runtime_manager().state_snapshot()
+    scan = scan if scan is not None else catalog.cached_snapshot()
+    runtime_state = runtime_state if runtime_state is not None else get_runtime_manager().state_snapshot()
     visible = [item for item in scan.artifacts if item.get("visibility") == "default"]
     sessions = sessions if sessions is not None else list_sessions(Path("results") / "workflows")
     session_context = _resolve_session_context(runtime_state, sessions)
