@@ -17,6 +17,11 @@
 !/results/README.md
 !/results/.gitkeep
 
+# Local deployment settings and secrets
+.env
+.env.*
+!.env.example
+
 # Python / environment
 __pycache__/
 *.py[cod]
