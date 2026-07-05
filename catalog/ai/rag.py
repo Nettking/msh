@@ -1,10 +1,11 @@
-"""Simple lexical retrieval for the read-only AI explainer."""
+"""Retrieval for the read-only AI explainer."""
 
 from __future__ import annotations
 
 import re
 
 from .repo_index import Chunk, tokenize
+from .symbols import Symbol, matching_symbols
 
 PATH_QUERY_RE = re.compile(r"\b[A-Za-z0-9_.-]+(?:/[A-Za-z0-9_.-]+)+(?:\.[A-Za-z0-9_]+)?\b")
 ROUTE_QUERY_RE = re.compile(r"(?<!\w)/[A-Za-z0-9_./<>-]+")
@@ -62,6 +63,26 @@ def _literal_bonus(question: str, chunk: Chunk) -> int:
     return bonus
 
 
+def _chunk_overlaps_symbol(chunk: Chunk, symbol: Symbol) -> bool:
+    if chunk.path != symbol.path:
+        return False
+    return chunk.start_line <= symbol.end_line and chunk.end_line >= symbol.start_line
+
+
+def _symbol_chunks(question: str, chunks: list[Chunk], symbols: list[Symbol] | None) -> list[Chunk]:
+    if not symbols:
+        return []
+    selected: list[Chunk] = []
+    seen: set[tuple[str, int, int]] = set()
+    for symbol in matching_symbols(question, symbols):
+        for chunk in chunks:
+            key = (chunk.path, chunk.start_line, chunk.end_line)
+            if key not in seen and _chunk_overlaps_symbol(chunk, symbol):
+                selected.append(chunk)
+                seen.add(key)
+    return selected
+
+
 def score_chunk(question: str, chunk: Chunk) -> int:
     """Score a chunk by token overlap plus exact path/route boosts."""
     question_tokens = tokenize(question)
@@ -71,12 +92,20 @@ def score_chunk(question: str, chunk: Chunk) -> int:
     return lexical_score + _literal_bonus(question, chunk)
 
 
-def retrieve(question: str, chunks: list[Chunk], limit: int = 8) -> list[Chunk]:
+def retrieve(question: str, chunks: list[Chunk], limit: int = 8, symbols: list[Symbol] | None = None) -> list[Chunk]:
     """Return the most relevant chunks for a question."""
+    prioritized = _symbol_chunks(question, chunks, symbols)
+    prioritized_keys = {(chunk.path, chunk.start_line, chunk.end_line) for chunk in prioritized}
+
     scored = [(score_chunk(question, chunk), chunk) for chunk in chunks]
-    scored = [(score, chunk) for score, chunk in scored if score > 0]
+    scored = [
+        (score, chunk)
+        for score, chunk in scored
+        if score > 0 and (chunk.path, chunk.start_line, chunk.end_line) not in prioritized_keys
+    ]
     scored.sort(key=lambda item: item[0], reverse=True)
-    return [chunk for _, chunk in scored[:limit]]
+    lexical = [chunk for _, chunk in scored]
+    return (prioritized + lexical)[:limit]
 
 
 def format_context(chunks: list[Chunk]) -> str:
