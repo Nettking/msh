@@ -39,10 +39,14 @@ def test_guide_page_explains_knowledge_flow(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "Guide" in html
+    assert "How to use MSH" in html
     assert "Monitor, Knowledge, and System" in html
+    assert "Start here" in html
+    assert "At the machine" in html
     assert "Recommended knowledge flow" in html
     assert "Capture a raw statement" in html
+    assert "Do not try to model everything while standing at the machine" in html
+    assert "Strategy" in html
     assert "Intervention Logic" in html
     assert "SysML Export" in html
     assert "Workflow" not in html
