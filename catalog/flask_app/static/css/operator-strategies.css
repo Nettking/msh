@@ -5,9 +5,41 @@
   align-items: flex-start;
 }
 
-.operator-capture-card {
+.operator-capture-card,
+.workflow-step-card {
   padding: 0;
   overflow: hidden;
+}
+
+.workflow-step-card > h3,
+.workflow-step-card > p {
+  margin-left: 20px;
+  margin-right: 20px;
+}
+
+.workflow-step-card > h3 {
+  margin-top: 20px;
+}
+
+.statement-quote {
+  margin: 0;
+  padding: 18px;
+  border-left: 5px solid #2563eb;
+  border-radius: 14px;
+  background: #eff6ff;
+  color: #0f172a;
+  font-size: 1.08rem;
+  line-height: 1.55;
+}
+
+.operator-note-row {
+  align-items: start;
+}
+
+.operator-note-row .action-meta {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
 }
 
 .operator-section-heading {
@@ -187,7 +219,8 @@
   }
 
   .operator-save-row,
-  .operator-section-heading {
+  .operator-section-heading,
+  .operator-strategy-intro {
     flex-direction: column;
     align-items: stretch;
   }
