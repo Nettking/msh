@@ -1,6 +1,6 @@
 # Script catalog and analysis workflow
 
-`catalog/` contains the analysis scripts and shared helpers used by the Flask-first MSH workflow. This page is intentionally focused on script discovery, script categories, and how analysis outputs fit into a workflow session. Runtime architecture and operator procedures live in the main `docs/` directory; use this page as the canonical script catalog.
+`catalog/` contains the analysis scripts, source connectors, and shared helpers used by the Flask-first MSH workflow. This page is intentionally focused on script discovery, script categories, and how analysis outputs fit into a workflow session. Runtime architecture and operator procedures live in the main `docs/` directory; use this page as the canonical script catalog.
 
 ## How scripts are discovered
 
@@ -47,6 +47,16 @@ The automatic runtime uses only stages 1 and 2 for the bounded playback-ready co
 
 See each script directory's README for script-specific inputs, outputs, and interpretation notes.
 
+## Source connector folders
+
+Source connectors prepare input data and should not be treated as one-shot analysis scripts.
+
+| Folder | Role |
+| --- | --- |
+| `observer_phoenix` | Synchronize SKF Observer Phoenix trend measurements into MSH-normalized JSONL. |
+
+Run source connectors directly from the command line, then rebuild the telemetry analytics cache when the synchronized data should be visible through cache-aware paths.
+
 ## Hidden or non-workflow folders
 
 The following folders are intentionally excluded from runner discovery:
@@ -55,6 +65,7 @@ The following folders are intentionally excluded from runner discovery:
 - `auto_connect` — desktop automation helper, not telemetry analysis.
 - `data_simulator` — Streamlit/simulation tool, not a one-shot session script.
 - `interventions` — environment-specific helper.
+- `observer_phoenix` — source synchronization connector, not an analysis script.
 - `standalone_recorder` — legacy ingestion tool.
 - `standalone-recorder_v2` — preferred ingestion tool, but still not an analysis script.
 
@@ -78,6 +89,7 @@ Prefer shared modules in `catalog/common/` when creating or maintaining scripts:
 
 - `data_loading.py` — JSONL/table loading helpers.
 - `telemetry_prep.py` — timestamp, machine, and signal normalization.
+- `source_sync.py` — source synchronization state and watermark helpers.
 - `basic_metrics.py` — compact timestamp/machine/sequence derived metrics.
 - `state_inference.py` and `state_events.py` — state and candidate-event inference.
 - `timeline_exports.py` — playback-compatible timeline exports.
@@ -88,5 +100,7 @@ This keeps script behavior aligned with the data contract and playback views.
 
 - Terminology and daily operation: [`docs/operator_guide.md`](../docs/operator_guide.md)
 - Runtime architecture: [`docs/architecture.md`](../docs/architecture.md)
+- Source synchronization: [`docs/source_synchronization.md`](../docs/source_synchronization.md)
+- Observer Phoenix integration: [`docs/integrations/skf_observer_phoenix.md`](../docs/integrations/skf_observer_phoenix.md)
 - Workflow sessions and cache behavior: [`docs/workflow_sessions.md`](../docs/workflow_sessions.md)
 - Data contracts and playback schema: [`docs/data_contract.md`](../docs/data_contract.md)
