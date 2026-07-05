@@ -1,0 +1,111 @@
+from __future__ import annotations
+
+from catalog.flask_app import app as app_module
+from catalog.flask_app import routes as routes_module
+from catalog.flask_app import server_setup_routes
+from catalog.flask_app.app import create_app
+from catalog.flask_app.services.server_setup_service import default_settings
+
+
+class FakeRuntimeManager:
+    def mark_app_started(self) -> None:
+        pass
+
+    def requires_startup_choice(self) -> bool:
+        return False
+
+    def startup_decision_snapshot(self) -> dict[str, bool]:
+        return {"requires_choice": False}
+
+
+def _patch_runtime(monkeypatch) -> None:
+    manager = FakeRuntimeManager()
+    monkeypatch.setattr(app_module, "get_runtime_manager", lambda: manager)
+    monkeypatch.setattr(routes_module, "get_runtime_manager", lambda: manager)
+
+
+def _patch_setup_context(monkeypatch) -> None:
+    settings = default_settings(configured=False)
+    monkeypatch.setattr(app_module, "load_settings", lambda: settings)
+    monkeypatch.setattr(
+        app_module,
+        "ollama_status",
+        lambda _settings: {
+            "running": True,
+            "selected_model": "llama3.2:3b",
+            "selected_model_installed": True,
+            "models": ["llama3.2:3b"],
+            "installed_by_profile": {
+                "edge-small": False,
+                "laptop-standard": True,
+                "workstation-strong": False,
+            },
+            "installed_by_model": {
+                "smollm2:360m": False,
+                "llama3.2:3b": True,
+                "qwen2.5:7b": False,
+            },
+            "message": "Ollama is running.",
+        },
+    )
+
+
+def test_startup_ai_step_exposes_response_time_comparison(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    _patch_runtime(monkeypatch)
+    _patch_setup_context(monkeypatch)
+
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    response = app.test_client().get("/startup?next=%2F&step=ai")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert 'data-initial-step="ai"' in html
+    assert "Response time check" in html
+    assert "Test selected model speed" in html
+    assert "/server-setup/test-ai-model" in html
+    assert "Fast: comfortable for interactive use" in html
+    assert "Too slow: choose a smaller model or stronger machine" in html
+
+
+def test_ai_model_benchmark_endpoint_uses_selected_profile(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    _patch_runtime(monkeypatch)
+    _patch_setup_context(monkeypatch)
+
+    settings = default_settings(configured=True)
+    captured: dict[str, str] = {}
+    monkeypatch.setattr(server_setup_routes, "load_settings", lambda: settings)
+
+    def fake_benchmark(_settings, *, model):
+        captured["model"] = model
+        return {
+            "ok": True,
+            "model": model,
+            "elapsed_ms": 4200,
+            "assessment": {
+                "key": "fast",
+                "label": "Fast",
+                "description": "Comfortable for interactive setup and short repository questions.",
+            },
+            "thresholds": [],
+            "message": f"{model} responded in 4200 ms. Assessment: Fast.",
+        }
+
+    monkeypatch.setattr(server_setup_routes, "benchmark_ollama_response_time", fake_benchmark)
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    response = app.test_client().post(
+        "/server-setup/test-ai-model",
+        data={"ai_enabled": "on", "ai_profile": "edge-small"},
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert captured["model"] == "smollm2:360m"
+    assert payload["ok"] is True
+    assert payload["elapsed_ms"] == 4200
+    assert payload["assessment"]["label"] == "Fast"
