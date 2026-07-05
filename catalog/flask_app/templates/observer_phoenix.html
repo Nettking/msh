@@ -1,12 +1,13 @@
 {% extends 'base.html' %}
 {% block body %}
 <section class="page-intro">
-  <h2>Observer Phoenix source</h2>
-  <p>Configure the SKF Observer Phoenix source connector and check whether the Flask app can authenticate against the REST API.</p>
+  <h2>Sources</h2>
+  <p>Configure external data sources. This is where machine and vibration data enter MSH before workflows turn them into playback, diagnostics, and operator views.</p>
 </section>
 
 <section class="section-block section-block--primary">
-  <h3>Source status</h3>
+  <h3>Observer Phoenix source</h3>
+  <p>Configure the SKF Observer Phoenix source connector and check whether the Flask app can authenticate against the REST API.</p>
   <div class="metrics metrics-grid">
     <article class="metric-card {% if status.configured %}metric-card--success{% else %}metric-card--warning{% endif %}">
       <span class="metric-label">Credential state</span>
@@ -43,6 +44,25 @@
     {{ status.last_test.message }}
   </p>
   {% endif %}
+</section>
+
+<section class="section-block section-block--highlight">
+  <h3>Where do I configure the vibration sensor?</h3>
+  <p>The vibration sensor should be configured as part of the data source, not on Overview or Diagnostics.</p>
+  <div class="info-grid">
+    <article class="info-card">
+      <h4>Today</h4>
+      <p>MSH can store Observer Phoenix connection settings here: base URL, username, password, TLS, and timeout.</p>
+    </article>
+    <article class="info-card">
+      <h4>Not implemented yet</h4>
+      <p>There is not yet a dedicated UI for mapping a specific vibration sensor/channel to a machine, axis, or measurement type.</p>
+    </article>
+    <article class="info-card">
+      <h4>Next sensible feature</h4>
+      <p>Add a source mapping section here for vibration channels, for example: machine, sensor name, signal/channel, unit, sampling rate, and enabled/disabled.</p>
+    </article>
+  </div>
 </section>
 
 <section class="section-block">
