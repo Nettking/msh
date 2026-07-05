@@ -61,5 +61,13 @@
       {% endwith %}
       {% block body %}{% endblock %}
     </main>
+    <script>
+      (function () {
+        var savedSetupText = document.querySelector('.setup-saved-panel > .setup-panel__header p');
+        if (savedSetupText) {
+          savedSetupText.textContent = 'Setup is saved. Choose whether to continue the previous session or start clean.';
+        }
+      })();
+    </script>
   </body>
 </html>
