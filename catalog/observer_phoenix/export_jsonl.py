@@ -17,6 +17,7 @@ from typing import Any, Iterable
 
 from catalog.common.source_sync import format_utc, load_state, parse_utc, save_state, subtract_overlap, utc_now
 from catalog.observer_phoenix.client import ObserverPhoenixClient, ObserverPhoenixConfig
+from catalog.observer_phoenix.settings import resolve_runtime_config
 
 
 SOURCE_NAME = "observer_phoenix"
@@ -25,9 +26,9 @@ WATERMARK_NAME = "trend_measurements"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Export Observer Phoenix trend measurements to MSH JSONL.")
-    parser.add_argument("--base-url", default=None, help="Observer Phoenix base URL. Defaults to OBSERVER_PHOENIX_BASE_URL.")
-    parser.add_argument("--username", default=None, help="Observer username. Defaults to OBSERVER_PHOENIX_USERNAME.")
-    parser.add_argument("--password", default=None, help="Observer password. Defaults to OBSERVER_PHOENIX_PASSWORD.")
+    parser.add_argument("--base-url", default=None, help="Observer Phoenix base URL. Defaults to runtime settings or OBSERVER_PHOENIX_BASE_URL.")
+    parser.add_argument("--username", default=None, help="Observer username. Defaults to runtime settings or OBSERVER_PHOENIX_USERNAME.")
+    parser.add_argument("--password", default=None, help="Observer password. Defaults to runtime settings or OBSERVER_PHOENIX_PASSWORD.")
     parser.add_argument("--data-dir", type=Path, default=Path("data"), help="MSH data directory.")
     parser.add_argument("--from-utc", default=None, help="Inclusive UTC start timestamp. Defaults to saved watermark or lookback window.")
     parser.add_argument("--to-utc", default=None, help="Inclusive UTC end timestamp. Defaults to current UTC time.")
@@ -45,7 +46,7 @@ def parse_args() -> argparse.Namespace:
 def build_client(args: argparse.Namespace) -> ObserverPhoenixClient:
     if args.base_url or args.username or args.password:
         if not args.base_url or not args.username or not args.password:
-            raise SystemExit("Provide --base-url, --username, and --password together, or use environment variables.")
+            raise SystemExit("Provide --base-url, --username, and --password together, or use environment/local runtime settings.")
         config = ObserverPhoenixConfig(
             base_url=args.base_url,
             username=args.username,
@@ -53,7 +54,7 @@ def build_client(args: argparse.Namespace) -> ObserverPhoenixClient:
             verify_tls=not args.no_verify_tls,
         )
     else:
-        config = ObserverPhoenixConfig.from_env()
+        config, _ = resolve_runtime_config(args.data_dir)
         if args.no_verify_tls:
             config.verify_tls = False
     return ObserverPhoenixClient(config)
