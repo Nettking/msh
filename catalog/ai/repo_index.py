@@ -10,7 +10,7 @@ from typing import Any
 
 INCLUDE_SUFFIXES = {".md", ".py", ".yml", ".yaml", ".txt"}
 INCLUDE_FILES = {"Dockerfile", "Dockerfile.cli", "requirements.txt"}
-EXCLUDED_DIRS = {".git", ".cache", "__pycache__", "data", "results", "legacy"}
+EXCLUDED_DIRS = {".git", ".cache", "__pycache__", "data", "results", "legacy", "tests"}
 EXCLUDED_SUFFIXES = {".pyc", ".parquet", ".duckdb", ".jsonl"}
 TOKEN_RE = re.compile(r"[A-Za-z0-9_./-]+")
 INDEX_VERSION = 1
