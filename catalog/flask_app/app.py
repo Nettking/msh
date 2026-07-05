@@ -11,6 +11,7 @@ from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_bac
 
 from .ai_routes import ai_web
 from .operator_strategy_routes import operator_strategy_web
+from .operator_support_routes import operator_support_web
 from .routes import web
 from .server_setup_routes import server_setup_web
 from .services.catalog_service import ArtifactCatalog
@@ -61,6 +62,7 @@ def create_app() -> Flask:
     app.register_blueprint(web)
     app.register_blueprint(source_web)
     app.register_blueprint(operator_strategy_web)
+    app.register_blueprint(operator_support_web)
     app.register_blueprint(ai_web)
     return app
 
