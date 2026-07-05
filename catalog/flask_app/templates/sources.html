@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro">
+  <h2>Sources</h2>
+  <p>Configure where data comes from: machines, vibration sensors, and external source connectors.</p>
+</section>
+
+<section class="section-block section-block--primary">
+  <h3>Source setup summary</h3>
+  <div class="metrics metrics-grid">
+    <article class="metric-card">
+      <span class="metric-label">Machines</span>
+      <span class="metric-value">{{ inventory.machine_count }}</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Vibration sensors</span>
+      <span class="metric-value">{{ inventory.sensor_count }}</span>
+    </article>
+    <article class="metric-card metric-card--success">
+      <span class="metric-label">Enabled sensors</span>
+      <span class="metric-value">{{ inventory.enabled_sensor_count }}</span>
+    </article>
+    <article class="metric-card {% if observer_status.configured %}metric-card--success{% else %}metric-card--warning{% endif %}">
+      <span class="metric-label">Observer Phoenix</span>
+      <span class="metric-value metric-value--long">{{ 'Configured' if observer_status.configured else 'Not configured' }}</span>
+    </article>
+  </div>
+  <p class="inline-note">Inventory file: <code>{{ inventory.inventory_path }}</code>. Connector credentials are configured separately under Observer Phoenix.</p>
+  <a class="button-link" href="{{ url_for('source_web.observer_phoenix') }}">Configure Observer Phoenix</a>
+</section>
+
+<section class="section-block section-block--actions">
+  <h3>Add machine</h3>
+  <form method="post" action="{{ url_for('source_web.add_machine') }}" class="control-form control-card source-inline-form">
+    <label>
+      <span>Machine name</span>
+      <input type="text" name="name" placeholder="Mazak i500" required>
+    </label>
+    <label>
+      <span>Machine type</span>
+      <input type="text" name="machine_type" placeholder="CNC machining centre">
+    </label>
+    <label>
+      <span>Controller / adapter</span>
+      <input type="text" name="controller" placeholder="MTConnect / Observer Phoenix / manual">
+    </label>
+    <label class="source-field-wide">
+      <span>Notes</span>
+      <textarea name="notes" rows="2" placeholder="Location, role, spindle/tooling notes, known sensor mounting..."></textarea>
+    </label>
+    <button class="button-primary" type="submit">Add machine</button>
+  </form>
+</section>
+
+<section class="section-block">
+  <h3>Configured machines</h3>
+  {% if inventory.machines %}
+  <div class="table-scroll">
+    <table>
+      <tr>
+        <th>Machine</th>
+        <th>Type</th>
+        <th>Controller / adapter</th>
+        <th>Notes</th>
+        <th></th>
+      </tr>
+      {% for machine in inventory.machines %}
+      <tr>
+        <td><strong>{{ machine.name }}</strong><br><span class="text-muted"><code>{{ machine.id }}</code></span></td>
+        <td>{{ machine.machine_type or 'n/a' }}</td>
+        <td>{{ machine.controller or 'n/a' }}</td>
+        <td>{{ machine.notes or '' }}</td>
+        <td>
+          <form method="post" action="{{ url_for('source_web.delete_machine', machine_id=machine.id) }}">
+            <button type="submit">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p>No machines are configured yet. Add the machine first, then assign vibration sensors to it.</p>
+  {% endif %}
+</section>
+
+<section class="section-block section-block--actions">
+  <h3>Add vibration sensor</h3>
+  <form method="post" action="{{ url_for('source_web.add_vibration_sensor') }}" class="control-form control-card source-inline-form">
+    <label>
+      <span>Sensor name</span>
+      <input type="text" name="name" placeholder="IG500 spindle vibration" required>
+    </label>
+    <label>
+      <span>Machine</span>
+      <select name="machine_id">
+        <option value="">Unassigned</option>
+        {% for machine in inventory.machines %}
+        <option value="{{ machine.id }}">{{ machine.name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>
+      <span>Source</span>
+      <input type="text" name="source" value="Observer Phoenix" placeholder="Observer Phoenix">
+    </label>
+    <label>
+      <span>Signal / channel</span>
+      <input type="text" name="channel" placeholder="VibrationVelocityRMS / channel id">
+    </label>
+    <label>
+      <span>Axis</span>
+      <input type="text" name="axis" placeholder="X / Y / Z / spindle">
+    </label>
+    <label>
+      <span>Unit</span>
+      <input type="text" name="unit" value="mm/s" placeholder="mm/s, g, m/s²">
+    </label>
+    <label>
+      <span>Sampling rate Hz</span>
+      <input type="text" name="sampling_rate_hz" placeholder="1000">
+    </label>
+    <label class="source-checkbox-label">
+      <input type="checkbox" name="enabled" checked>
+      <span>Enabled</span>
+    </label>
+    <label class="source-field-wide">
+      <span>Notes</span>
+      <textarea name="notes" rows="2" placeholder="Mounting position, bearing/spindle relation, threshold assumptions..."></textarea>
+    </label>
+    <button class="button-primary" type="submit">Add vibration sensor</button>
+  </form>
+</section>
+
+<section class="section-block">
+  <h3>Configured vibration sensors</h3>
+  {% if inventory.vibration_sensors %}
+  <div class="table-scroll">
+    <table>
+      <tr>
+        <th>Sensor</th>
+        <th>Machine</th>
+        <th>Source</th>
+        <th>Signal/channel</th>
+        <th>Axis</th>
+        <th>Unit</th>
+        <th>Status</th>
+        <th></th>
+      </tr>
+      {% for sensor in inventory.vibration_sensors %}
+      <tr>
+        <td><strong>{{ sensor.name }}</strong><br><span class="text-muted"><code>{{ sensor.id }}</code></span></td>
+        <td>{{ sensor.machine_name }}</td>
+        <td>{{ sensor.source or 'n/a' }}</td>
+        <td>{{ sensor.channel or 'n/a' }}</td>
+        <td>{{ sensor.axis or 'n/a' }}</td>
+        <td>{{ sensor.unit or 'n/a' }}</td>
+        <td><span class="status-badge {{ 'status-ready' if sensor.enabled else 'status-waiting' }}">{{ 'enabled' if sensor.enabled else 'disabled' }}</span></td>
+        <td>
+          <form method="post" action="{{ url_for('source_web.delete_vibration_sensor', sensor_id=sensor.id) }}">
+            <button type="submit">Remove</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p>No vibration sensors are configured yet.</p>
+  {% endif %}
+</section>
+{% endblock %}
