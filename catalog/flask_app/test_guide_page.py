@@ -49,4 +49,7 @@ def test_guide_page_explains_knowledge_flow(monkeypatch, tmp_path):
     assert "Strategy" in html
     assert "Intervention Logic" in html
     assert "SysML Export" in html
+    assert "MTConnect/VPN tests" in html
+    assert "Test MTConnect" in html
+    assert "Test VPN/network" in html
     assert "Workflow" not in html
