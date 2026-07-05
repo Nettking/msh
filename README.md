@@ -62,10 +62,13 @@ Use `MSH_AI_MODEL` or `--model` to select the Ollama model. See [docs/ai_explain
 - `catalog/flask_app/` — primary Flask application, routes, templates, and UI-facing services.
 - `catalog/orchestrator/` — non-interactive bootstrap/catch-up orchestration.
 - `catalog/runner/` — workflow session metadata, date filtering, script discovery/execution, and playback export helpers.
-- `catalog/common/` — shared telemetry loading, normalization, state inference, metrics, and timeline export utilities.
+- `catalog/common/` — shared telemetry loading, normalization, source synchronization state, state inference, metrics, and timeline export utilities.
+- `catalog/observer_phoenix/` — source connector that synchronizes SKF Observer Phoenix trend measurements into MSH-normalized JSONL.
 - `catalog/ai/` — read-only repository explanation helpers backed by local Ollama.
 - `catalog/*/` — runner-visible automatic, manual, deep/exploratory, and legacy scripts plus script-specific README files.
 - `data/` — local raw JSONL telemetry input location; not intended for committed production data.
+- `data/sources/` — source-specific normalized JSONL landing area for synchronized external sources.
+- `data/source_state/` — source synchronization watermarks and metadata; not telemetry input.
 - `results/` — generated analysis outputs, workflow sessions, runtime state, and discovered artifacts.
 - `example-data/` — small sample JSONL input for development and documentation.
 - `ops/` — host-side operational helpers.
@@ -78,6 +81,8 @@ See [catalog/README.md](catalog/README.md) for the script catalog and analysis w
 - [Quick start](docs/quick_start.md) — install/run commands and first-run expectations.
 - [Operator guide](docs/operator_guide.md) — daily UI workflow, sessions, playback, and controls.
 - [Data contract](docs/data_contract.md) — raw JSONL assumptions, normalized fields, derived artifacts, and playback-ready contract.
+- [Source synchronization](docs/source_synchronization.md) — multi-source landing layout, watermarks, and synchronization policy.
+- [SKF Observer Phoenix integration](docs/integrations/skf_observer_phoenix.md) — Observer Phoenix setup, export command, and mapping to MSH JSONL.
 - [Intervention strategies](docs/intervention_strategies.md) — config-driven candidate event labels, strategies, and review-ready output schema.
 - [Workflow sessions](docs/workflow_sessions.md) — session layout, cache reuse, script status, bootstrap, and catch-up behavior.
 - [Architecture](docs/architecture.md) — system components, dataflow diagram, policies, and design intent.
@@ -87,6 +92,8 @@ See [catalog/README.md](catalog/README.md) for the script catalog and analysis w
 ## Data layout note
 
 Current runtime and cache paths generally support recursive `data/**/*.jsonl` discovery. Some older manual or legacy scripts may still assume a flat `data/*.jsonl` layout. Prefer the shared helpers in `catalog/common/` and `catalog/runner/` for new work so recursive discovery, timestamp parsing, and machine normalization stay consistent.
+
+For synchronized external sources, write only MSH-normalized telemetry JSONL under `data/sources/<source>/jsonl/`. Keep connector state, API metadata, and raw non-telemetry payloads out of `.jsonl` files under `data/`.
 
 ## Deprecated interactive menu
 
