@@ -1,16 +1,40 @@
-# Operator strategy capture
+# Operator knowledge capture
 
-MSH includes a field-capture page for recording operator strategy decisions while visiting or working with MSH.
+MSH includes a knowledge-capture flow for recording operator statements during field work and structuring them later.
+
+The current pages are:
 
 ```text
-/operator-strategies
+/ operator-strategies/capture   -> capture one raw statement quickly
+/ operator-strategies/review    -> review captured notes later
+/ operator-strategies/structure/<id> -> map one note to OSL/paper fields
 ```
 
-The page is designed to support the Operator Strategy Language idea used in the Systems paper work: an operator decision should be captured together with the situation, observations, trigger, context, hypothesis, goal, rationale, expected outcome, risk, trade-off, confidence, evidence, and possible trace target.
+In the app menu these live under:
+
+```text
+Knowledge -> Capture
+Knowledge -> Review Notes
+Knowledge -> Strategies
+Knowledge -> Intervention Logic
+Knowledge -> SysML Export
+```
+
+## Why capture is now statement-first
+
+During a site visit, the user should not be forced to complete a formal model. The first step is only to preserve the statement while it is fresh.
+
+Example raw statement:
+
+```text
+When this machine is cold, the first part can drift. I usually wait before changing offsets unless the first part is clearly outside tolerance.
+```
+
+This creates a captured note. It is not yet a structured strategy.
 
 ## Why this is separate from telemetry
 
-Operator strategy records are research and field notes. They are not machine telemetry samples.
+Operator knowledge records are research and field notes. They are not machine telemetry samples.
 
 The records are stored as JSON under:
 
@@ -22,68 +46,106 @@ This is deliberately not JSONL. MSH recursively scans `data/**/*.jsonl` as telem
 
 ## Time model
 
-The page stores two different times:
+The service stores both capture time and decision/action time:
 
 | Field | Meaning |
 | --- | --- |
 | `captured_at` | When the form was saved. This is always set automatically by the server. |
-| `decision_time` | When the operator decision/action happened. This may be the same as capture time or a custom time entered afterwards. |
+| `decision_time` | When the statement, decision, or action is considered to have happened. |
 | `decision_time_mode` | `now` or `custom`. |
 | `decision_time_local` | Original local datetime entered for a custom decision/action time. |
 | `decision_timezone` | IANA timezone used to convert a custom local time to UTC, default `Europe/Oslo`. |
 
-This distinction matters when strategy records should later be compared with telemetry. A decision may be recorded at 14:42 even though the action happened at 13:15.
+The simple Capture page uses `now`. More detailed timing can still be stored when structuring or extending a note.
 
-## Required fields
+## Capture fields
 
-The form requires:
+The capture page intentionally stays small:
 
-- a strategy name or strategy situation/path name.
-- `goal`.
-- `decision`.
+- raw operator statement.
+- optional machine.
+- optional quick tag / situation.
+- optional confidence.
 
-The goal is required because an operator decision without a goal is difficult to compare or trace. The decision/action is required because the page is meant to record what was actually decided or done.
+Only a statement is required.
 
-## OSL-aligned fields
+## Review and structuring fields
 
-The capture form includes:
+Later, the user opens Review Notes and structures the note. The original statement should remain visible and unchanged. Missing fields are allowed.
 
-- strategy name.
-- strategy situation/path.
-- machine, process, and operation.
-- observation.
-- trigger.
+The structuring page supports OSL/paper fields such as:
+
 - context.
-- hypothesis.
+- trigger.
+- observation.
+- hypothesis / possible cause.
 - goal.
-- decision/action.
+- decision / strategy action.
 - rationale.
 - expected outcome.
-- risk.
 - trade-off.
+- risk.
+- alternative strategy.
+- evidence.
 - confidence.
-- evidence/source.
-- trace target or possible Digital Twin artefact.
-- free notes.
+- outcome.
+- DT/SysML trace target.
 
-These fields intentionally match the OSL concepts enough to support later modelling, comparison, and traceability work, while still being fast enough to use during a site visit.
+## Review status
 
-## Intended workflow at MSH
+A note can move through these states:
 
-1. Open `/operator-strategies` on the server.
-2. Select whether the decision happened **Now** or at a **Custom time**.
-3. Record the operator statement as close to the original wording as practical.
-4. Fill the structured fields where possible.
-5. Leave unknown fields empty rather than inventing information.
-6. Use the recent-record table to check what has been captured during the visit.
+```text
+captured   -> raw statement saved, not interpreted yet
+structured -> mapped to OSL/paper fields
+reusable   -> good enough for comparison, support cards, and SysML export
+```
+
+## Intervention logic is separate
+
+A structured strategy is interpreted operator knowledge. Intervention logic is a technical YAML rule used to detect candidate situations from telemetry.
+
+Example:
+
+```text
+Raw statement: The machine drifts while cold.
+Structured strategy: wait before changing offsets during cold-start drift.
+Intervention logic: detect early-run drift or related signal changes from telemetry.
+```
+
+Do not create intervention logic unless the situation can reasonably be detected from telemetry signals such as state, load, vibration, alarms, or measurement events.
+
+## SysML export
+
+Reusable structured strategies can be exported under Knowledge -> SysML Export.
+
+The export follows the paper method:
+
+```text
+coded CNC strategy statement
+  -> OSL keywords
+  -> SysML artefact
+```
+
+The exporter should stay aligned with `Nettking/systems-paper/sysml/osl-core.sysml` and the keyword-style SysML example. See `docs/agent_notes/osl_sysml_alignment.md` before changing the exporter.
+
+## Intended MSH field workflow
+
+1. Open Knowledge -> Capture during the site visit.
+2. Save one raw statement without analysing it.
+3. After the visit, open Knowledge -> Review Notes.
+4. Structure the note only where the interpretation is justified.
+5. Mark good structured notes as reusable.
+6. Compare reusable strategies under Knowledge -> Strategies.
+7. Add intervention logic only when telemetry can detect a candidate situation.
+8. Export reusable strategies to SysML.
 
 ## Later use
 
 The stored records can later support:
 
 - comparison of alternative operator strategies.
+- support cards in Assist.
 - traceability from operator reasoning to monitoring rules, recommendation services, dashboards, explanations, and validation cases.
 - alignment between decisions and telemetry windows using `decision_time`.
 - research coding for the Systems paper.
-
-The current page is a capture tool. It does not yet export LaTeX, SysML v2, or OSL keyword syntax automatically.
