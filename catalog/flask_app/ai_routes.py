@@ -9,6 +9,8 @@ from catalog.ai.rag import format_context, retrieve
 from catalog.ai.repo_index import load_or_build_chunks, repo_root_from
 from catalog.ai.symbols import build_symbols
 
+from .services.server_setup_service import load_settings
+
 ai_web = Blueprint("ai_web", __name__)
 
 _PAGE = """
@@ -16,6 +18,7 @@ _PAGE = """
 <title>MSH AI Explainer</title>
 <h1>MSH AI Explainer</h1>
 <p>Read-only local explainer for system-understanding questions. It retrieves repository context and sends only that context to Ollama.</p>
+<p>The default model comes from startup setup when available.</p>
 <form method="post" action="{{ url_for('ai_web.ai_ask') }}">
   <label for="question">Question</label><br>
   <textarea id="question" name="question" rows="4" cols="100">{{ question }}</textarea><br>
@@ -33,6 +36,16 @@ _PAGE = """
 {% endif %}
 {% if context %}<h2>Retrieved context</h2><pre style="white-space: pre-wrap">{{ context }}</pre>{% endif %}
 """
+
+
+def _default_model() -> str:
+    try:
+        settings = load_settings()
+    except Exception:
+        return DEFAULT_MODEL
+    if settings.configured and settings.ai_enabled and settings.ai_model:
+        return settings.ai_model
+    return DEFAULT_MODEL
 
 
 def _answer_question(question: str, *, model: str, dry_run: bool, extractive: bool) -> dict[str, object]:
@@ -60,7 +73,7 @@ def ai_page():
     return render_template_string(
         _PAGE,
         question="How does data flow through MSH?",
-        model=DEFAULT_MODEL,
+        model=_default_model(),
         dry_run=True,
         extractive=True,
         answer="",
@@ -73,7 +86,7 @@ def ai_page():
 @ai_web.post("/ai/ask")
 def ai_ask():
     question = (request.form.get("question") or "").strip()
-    model = (request.form.get("model") or DEFAULT_MODEL).strip()
+    model = (request.form.get("model") or _default_model()).strip()
     dry_run = request.form.get("dry_run") == "1"
     extractive = request.form.get("extractive") == "1"
     if not question:
