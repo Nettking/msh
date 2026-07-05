@@ -1,13 +1,13 @@
 {% extends 'base.html' %}
 {% block body %}
 <section class="page-intro">
-  <h2>System overview dashboard</h2>
-  <p>Control-room summary for current runtime state, machine activity, readiness, and operator entry points.</p>
+  <h2>Overview</h2>
+  <p>Operator landing page. It answers what is usable now and where to go next. Use Diagnostics for detailed runtime/cache/debug state.</p>
 </section>
 
 <section class="section-block overview-decision overview-decision--{{ overview.decision.state }}">
   <div class="overview-decision__main">
-    <span class="metric-label">Current system status</span>
+    <span class="metric-label">What can I do now?</span>
     <h3>{{ overview.decision.title }}</h3>
     <p class="overview-decision__summary">{{ overview.decision.summary }}</p>
     <div class="overview-decision__next">
@@ -15,8 +15,12 @@
       <p>{{ overview.decision.next_step }}</p>
     </div>
     <div class="overview-decision__actions">
-      <a class="button-link button-link--primary" href="{{ overview.decision.primary_action.href }}">{{ overview.decision.primary_action.label }}</a>
-      <a class="button-link" href="{{ overview.decision.secondary_action.href }}">{{ overview.decision.secondary_action.label }}</a>
+      <a class="button-link button-link--primary" href="{{ overview.decision.primary_action.href }}">
+        {% if overview.decision.primary_action.href == '/status' %}Open diagnostics{% else %}{{ overview.decision.primary_action.label }}{% endif %}
+      </a>
+      <a class="button-link" href="{{ overview.decision.secondary_action.href }}">
+        {% if overview.decision.secondary_action.href == '/status' %}Open diagnostics{% else %}{{ overview.decision.secondary_action.label }}{% endif %}
+      </a>
     </div>
   </div>
   <div class="overview-decision__facts">
@@ -29,101 +33,54 @@
   </div>
 </section>
 
-<section class="section-block section-block--primary">
-  <h3>Technical summary</h3>
-  <div class="metrics metrics-grid">
-    <article class="metric-card metric-card--info">
-      <span class="metric-label">Current phase</span>
-      <strong class="metric-value metric-value--long">{{ overview.headline.phase_label }}</strong>
-    </article>
-    <article class="metric-card">
-      <span class="metric-label">Processed days</span>
-      <strong class="metric-value">{{ overview.headline.processed_days }} / {{ overview.headline.total_days }}</strong>
-    </article>
-    <article class="metric-card metric-card--success">
-      <span class="metric-label">Catch-up complete</span>
-      <strong class="metric-value">{{ 'yes' if overview.headline.catch_up_complete else 'no' }}</strong>
-    </article>
-    <article class="metric-card metric-card--warning">
-      <span class="metric-label">Next queued day</span>
-      <strong class="metric-value">{{ overview.headline.next_queued_date }}</strong>
-    </article>
-    <article class="metric-card metric-card--danger">
-      <span class="metric-label">Last failure</span>
-      <strong class="metric-value metric-value--long">{{ overview.headline.last_failure }}</strong>
-    </article>
-  </div>
-
+<section class="section-block section-block--actions">
+  <h3>Main views</h3>
   <div class="info-grid">
+    {% for item in overview.quick_links %}
+    {% if item.href != '/' %}
     <article class="info-card">
-      <h4>Scan roots</h4>
-      <p>{{ scan_dirs|join(', ') }}</p>
+      <h4>
+        <a href="{{ item.href }}">
+          {% if item.href == '/status' %}Diagnostics{% else %}{{ item.label.replace('Open ', '')|title }}{% endif %}
+        </a>
+      </h4>
+      <p><span class="status-badge status-{{ item.state|lower|replace(' ', '-') }}">{{ item.state }}</span></p>
+      <p>{{ item.hint }}</p>
     </article>
-    <article class="info-card">
-      <h4>Artifact inventory snapshot</h4>
-      <p>{{ overview.headline.visible_artifact_count }} visible ({{ overview.headline.source_artifacts }} source, {{ overview.headline.derived_artifacts }} derived), {{ overview.headline.playback_compatible_count }} playback-compatible, {{ overview.headline.read_error_count }} read-error artifact(s).</p>
-    </article>
-    <article class="info-card">
-      <h4>Hidden by default</h4>
-      <p>{{ overview.headline.hidden_workflow_copy_count }} workflow copies, {{ overview.headline.hidden_internal_metadata_count }} internal metadata file(s).</p>
-    </article>
+    {% endif %}
+    {% endfor %}
   </div>
 </section>
 
 <section class="section-block now-block section-block--highlight">
-  <h3>What is happening now</h3>
+  <h3>Current activity</h3>
   <div class="now-grid">
     <p class="timestamp-highlight">Latest known timestamp: <strong>{{ overview.activity.latest_known_timestamp }}</strong></p>
-    <p class="signal-card"><span class="signal-card__label">Current signal</span><strong>{{ overview.activity.summary }}</strong></p>
+    <p class="signal-card"><span class="signal-card__label">Signal</span><strong>{{ overview.activity.summary }}</strong></p>
   </div>
-  <p class="inline-note">Per-machine last-seen rows are intentionally omitted here to keep <code>/</code> lightweight. Use Machine view for detailed machine timelines.</p>
 </section>
 
-<section class="section-block section-block--runtime">
-  <h3>Runtime progress</h3>
-  <dl class="kv-grid">
-    <div class="kv-row"><dt>Current processing phase</dt><dd>{{ overview.runtime.current_phase }}</dd></div>
-    <div class="kv-row"><dt>Currently processing date</dt><dd>{{ overview.runtime.currently_processing_date }}</dd></div>
-    <div class="kv-row"><dt>Processed days / total days</dt><dd>{{ overview.runtime.processed_days }} / {{ overview.runtime.total_days }}</dd></div>
-    <div class="kv-row"><dt>Next queued date</dt><dd>{{ overview.runtime.next_queued_date }}</dd></div>
-    <div class="kv-row"><dt>Last completed step</dt><dd>{{ overview.runtime.last_completed_step }}</dd></div>
-    <div class="kv-row"><dt>Last completed date</dt><dd>{{ overview.runtime.last_completed_date }}</dd></div>
-    <div class="kv-row"><dt>Catch-up complete</dt><dd>{{ overview.runtime.catch_up_complete }}</dd></div>
-    <div class="kv-row"><dt>Last failure</dt><dd>{{ overview.runtime.last_failure }}</dd></div>
-  </dl>
-</section>
-
-<section class="section-block section-block--readiness">
-  <h3>View readiness</h3>
-  <div class="stack-list">
-    {% for item in overview.readiness %}
-    <article class="stack-row">
-      <div>
-        <h4>{{ item.view }}</h4>
-        <p>{{ item.message }}</p>
-      </div>
-      <span class="status-badge status-{{ item.state|lower|replace(' ', '-') }}">{{ item.state }}</span>
+<section class="section-block section-block--primary">
+  <h3>At a glance</h3>
+  <div class="metrics metrics-grid">
+    <article class="metric-card">
+      <span class="metric-label">Visible artifacts</span>
+      <strong class="metric-value">{{ overview.headline.visible_artifact_count }}</strong>
     </article>
-    {% endfor %}
-  </div>
-</section>
-
-<section class="section-block section-block--actions">
-  <h3>Next actions / open views</h3>
-  <div class="stack-list action-list">
-    {% for item in overview.quick_links %}
-    <article class="stack-row action-row">
-      <div>
-        <h4><a href="{{ item.href }}">{{ item.label }}</a></h4>
-        <p>{{ item.hint }}</p>
-      </div>
-      <div class="action-meta">
-        <span class="status-badge status-{{ item.state|lower|replace(' ', '-') }}">{{ item.state }}</span>
-        <a class="subtle-link" href="{{ item.href }}">Open</a>
-      </div>
+    <article class="metric-card">
+      <span class="metric-label">Playback datasets</span>
+      <strong class="metric-value">{{ overview.headline.playback_compatible_count }}</strong>
     </article>
-    {% endfor %}
+    <article class="metric-card {% if overview.headline.read_error_count %}metric-card--danger{% else %}metric-card--success{% endif %}">
+      <span class="metric-label">Read errors</span>
+      <strong class="metric-value">{{ overview.headline.read_error_count }}</strong>
+    </article>
+    <article class="metric-card {% if overview.headline.last_failure != 'none' %}metric-card--danger{% else %}metric-card--success{% endif %}">
+      <span class="metric-label">Runtime failure</span>
+      <strong class="metric-value metric-value--long">{{ overview.headline.last_failure }}</strong>
+    </article>
   </div>
+  <p class="inline-note">Need cache state, runtime namespace, phase details, or scan/debug information? Open <a href="{{ url_for('web.status') }}">Diagnostics</a>.</p>
 </section>
 
 {% if overview.warnings %}
