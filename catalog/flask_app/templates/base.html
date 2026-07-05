@@ -20,6 +20,7 @@
         <a class="{% if request.endpoint == 'web.control' %}is-active{% endif %}" href="{{ url_for('web.control') }}">Control</a>
         <a class="{% if request.endpoint == 'web.live' %}is-active{% endif %}" href="{{ url_for('web.live') }}">Live</a>
         <a class="{% if request.endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
+        <a class="{% if request.endpoint and request.endpoint.startswith('operator_strategy_web.') %}is-active{% endif %}" href="{{ url_for('operator_strategy_web.index') }}">Operator Strategies</a>
         <a class="{% if request.endpoint and request.endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ url_for('source_web.observer_phoenix') }}">Sources</a>
         <a class="{% if request.endpoint in ['web.strategies', 'web.save_strategies'] %}is-active{% endif %}" href="{{ url_for('web.strategies') }}">Strategies</a>
       </nav>
