@@ -8,6 +8,8 @@ docker compose up -d --build
 
 Then open `/startup` in the browser.
 
+The default one-command startup launches the Flask web UI and the local Ollama service. It does not start the recorder profile automatically, because that could begin polling real machines before sources are checked. Use the command-driven alternative below when the recorder service should be started as part of the same command.
+
 The startup page is the normal place to choose or change local settings:
 
 - server role.
@@ -34,7 +36,7 @@ The file is local runtime configuration. It is under `data/`, so it persists acr
 
 ## Command-driven alternative
 
-Use command-driven setup when the settings should be reproducible without browser interaction:
+Use command-driven setup when the settings should be reproducible without browser interaction, or when recorder/full-server services should be activated from the command:
 
 ```bash
 python setup_msh.py --mode web-workbench --ai-profile laptop-standard --start
