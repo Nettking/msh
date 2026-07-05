@@ -46,6 +46,9 @@ def test_guide_page_explains_knowledge_flow(monkeypatch, tmp_path):
     assert "Recommended knowledge flow" in html
     assert "Capture a raw statement" in html
     assert "Do not try to model everything while standing at the machine" in html
+    assert "Setup guide" in html
+    assert "Choose the computer role" in html
+    assert "Continue vs Start clean" in html
     assert "Strategy" in html
     assert "Intervention Logic" in html
     assert "SysML Export" in html
