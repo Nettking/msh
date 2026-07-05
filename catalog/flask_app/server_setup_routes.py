@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from flask import Blueprint, flash, redirect, request, url_for
+from dataclasses import replace
+
+from flask import Blueprint, flash, jsonify, redirect, request, url_for
 
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
 from .services.server_setup_service import (
+    AI_MODEL_CHOICES,
     ServerSetupError,
+    benchmark_ollama_response_time,
     load_settings,
     pull_ollama_model,
     runtime_should_start,
@@ -16,7 +20,14 @@ from .services.server_setup_service import (
 
 server_setup_web = Blueprint("server_setup_web", __name__)
 
-_SETUP_PATHS = {"/startup", "/server-setup/save", "/server-setup/pull-model", "/status", "/rescan"}
+_SETUP_PATHS = {
+    "/startup",
+    "/server-setup/save",
+    "/server-setup/pull-model",
+    "/server-setup/test-ai-model",
+    "/status",
+    "/rescan",
+}
 
 
 def _next_path() -> str:
@@ -43,6 +54,8 @@ def browser_setup_gate():
         return _save_from_request()
     if request.path == "/server-setup/pull-model" and request.method == "POST":
         return _pull_from_request()
+    if request.path == "/server-setup/test-ai-model" and request.method == "POST":
+        return _test_ai_model_from_request()
     if request.path in _SETUP_PATHS:
         return None
     try:
@@ -74,6 +87,33 @@ def _save_from_request():
 
     flash("Background orchestration is disabled for this setup mode.", "info")
     return redirect(_next_path())
+
+
+def _selected_ai_model_from_request(settings) -> str:
+    profile = str(request.form.get("ai_profile") or settings.ai_profile or "laptop-standard").strip()
+    if profile in AI_MODEL_CHOICES:
+        return AI_MODEL_CHOICES[profile]["model"]
+    return str(request.form.get("model") or settings.ai_model or "").strip()
+
+
+def _test_ai_model_from_request():
+    try:
+        settings = load_settings()
+    except ServerSetupError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+
+    form_ai_enabled = request.form.get("ai_enabled") in {"on", "1", "true", "yes"}
+    if form_ai_enabled and not settings.ai_enabled:
+        settings = replace(settings, ai_enabled=True)
+
+    model = _selected_ai_model_from_request(settings)
+    result = benchmark_ollama_response_time(settings, model=model)
+    return jsonify(result), 200 if result.get("ok") else 503
+
+
+@server_setup_web.post("/server-setup/test-ai-model")
+def test_ai_model():
+    return _test_ai_model_from_request()
 
 
 def _pull_from_request():
