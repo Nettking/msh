@@ -23,6 +23,10 @@ def _next_path() -> str:
     return request.form.get("next") or request.args.get("next") or url_for("web.overview")
 
 
+def _startup_step_url(step: str) -> str:
+    return url_for("web.startup", next=_next_path(), step=step)
+
+
 @server_setup_web.before_app_request
 def browser_setup_gate():
     """Ensure one-command Docker startup lands in browser setup first.
@@ -57,22 +61,23 @@ def _save_from_request():
         save_settings(settings)
     except ServerSetupError as exc:
         flash(str(exc), "error")
-        return redirect(url_for("web.startup", next=_next_path()))
+        return redirect(_startup_step_url("review"))
 
-    flash("Server setup saved. These browser settings are stored under data/server_setup/.", "success")
+    flash("Server setup saved.", "success")
     if runtime_should_start(settings):
         if get_runtime_manager().requires_startup_choice():
-            flash("Runtime startup still needs a continue-vs-clean choice below before processing starts.", "info")
-        else:
-            start_runtime_background()
-            flash("Runtime background processing is enabled for this setup.", "success")
-    else:
-        flash("Background orchestration is disabled for this setup mode.", "info")
-    return redirect(url_for("web.startup", next=_next_path()))
+            flash("Choose how runtime should start next.", "info")
+            return redirect(_startup_step_url("runtime"))
+        start_runtime_background()
+        flash("Runtime background processing is enabled.", "success")
+        return redirect(_next_path())
+
+    flash("Background orchestration is disabled for this setup mode.", "info")
+    return redirect(_next_path())
 
 
 def _pull_from_request():
     settings = load_settings()
     ok, message = pull_ollama_model(settings)
     flash(message, "success" if ok else "error")
-    return redirect(url_for("web.startup", next=_next_path()))
+    return redirect(_startup_step_url("runtime"))
