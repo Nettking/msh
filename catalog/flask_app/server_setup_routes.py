@@ -10,7 +10,6 @@ from .services.ai_model_benchmark_service import compare_ollama_setup_models
 from .services.server_setup_service import (
     AI_MODEL_CHOICES,
     ServerSetupError,
-    benchmark_ollama_response_time,
     load_settings,
     pull_ollama_model,
     runtime_should_start,
@@ -108,14 +107,31 @@ def _selected_ai_model_from_request(settings) -> str:
     return str(request.form.get("model") or settings.ai_model or "").strip()
 
 
+def _legacy_shape_for_ai_page(result: dict) -> dict:
+    recommendation = result.get("recommendation") or {}
+    recommended_model = recommendation.get("recommended_model") or ""
+    rows = result.get("rows") or []
+    recommended_row = next((row for row in rows if row.get("model") == recommended_model), None)
+    recommended_result = (recommended_row or {}).get("result") or {}
+    result.setdefault("model", recommended_model or _selected_ai_model_from_request(load_settings()))
+    result.setdefault("elapsed_ms", recommended_result.get("elapsed_ms"))
+    result.setdefault(
+        "assessment",
+        {
+            "label": recommendation.get("recommended_label") or recommendation.get("verdict") or "No recommendation",
+            "description": recommendation.get("message") or result.get("message") or "No recommendation available.",
+        },
+    )
+    return result
+
+
 def _test_ai_model_from_request():
     try:
         settings = _settings_for_ai_form()
     except ServerSetupError as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
 
-    model = _selected_ai_model_from_request(settings)
-    result = benchmark_ollama_response_time(settings, model=model)
+    result = _legacy_shape_for_ai_page(compare_ollama_setup_models(settings))
     return jsonify(result), 200 if result.get("ok") else 503
 
 
