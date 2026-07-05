@@ -16,6 +16,7 @@ from .catalog_service import ArtifactCatalog, ScanSnapshot
 @dataclass
 class OverviewSnapshot:
     headline: dict[str, Any]
+    decision: dict[str, Any]
     activity: dict[str, Any]
     runtime: dict[str, Any]
     readiness: list[dict[str, str]]
@@ -36,13 +37,17 @@ def build_overview_snapshot(
     sessions = sessions if sessions is not None else list_sessions(Path("results") / "workflows")
     session_context = _resolve_session_context(runtime_state, sessions)
 
+    headline = _headline_summary(scan, runtime_state, visible)
+    runtime = _runtime_summary(runtime_state)
     machine_activity = _machine_activity(scan, session_context)
     readiness = _view_readiness(runtime_state, visible, session_context)
+    decision = _overview_decision(headline, runtime, readiness, machine_activity)
 
     return OverviewSnapshot(
-        headline=_headline_summary(scan, runtime_state, visible),
+        headline=headline,
+        decision=decision,
         activity=machine_activity,
-        runtime=_runtime_summary(runtime_state),
+        runtime=runtime,
         readiness=readiness,
         quick_links=_quick_links(readiness),
         warnings=list(scan.warnings),
@@ -131,6 +136,135 @@ def _runtime_summary(runtime_state: dict[str, Any]) -> dict[str, Any]:
         "discovery_complete": bool(runtime_state.get("discovery_complete")),
         "runtime_started": bool(runtime_state.get("runtime_started_at")),
     }
+
+
+def _overview_decision(
+    headline: dict[str, Any],
+    runtime: dict[str, Any],
+    readiness: list[dict[str, str]],
+    activity: dict[str, Any],
+) -> dict[str, Any]:
+    readiness_by_view = {item["view"]: item for item in readiness}
+    playback = readiness_by_view.get("/playback", {})
+    machine = readiness_by_view.get("/machine", {})
+    analysis = readiness_by_view.get("/analyses", {})
+    visible_count = int(headline.get("visible_artifact_count") or 0)
+    source_count = int(headline.get("source_artifacts") or 0)
+    derived_count = int(headline.get("derived_artifacts") or 0)
+    playback_count = int(headline.get("playback_compatible_count") or 0)
+    read_errors = int(headline.get("read_error_count") or 0)
+    runtime_started = bool(runtime.get("runtime_started"))
+    last_failure = str(runtime.get("last_failure") or headline.get("last_failure") or "none")
+
+    facts = [
+        f"{visible_count} visible artifact(s): {source_count} source, {derived_count} derived.",
+        f"Playback-compatible datasets: {playback_count}.",
+        f"Runtime phase: {headline.get('phase_label', 'unknown')}.",
+    ]
+    if read_errors:
+        facts.append(f"{read_errors} artifact(s) need attention during scan.")
+    if activity.get("latest_known_timestamp") and activity.get("latest_known_timestamp") != "n/a":
+        facts.append(f"Latest known timestamp: {activity['latest_known_timestamp']}.")
+
+    def _decision(
+        *,
+        state: str,
+        title: str,
+        summary: str,
+        next_step: str,
+        primary_label: str,
+        primary_href: str,
+        secondary_label: str = "Open status",
+        secondary_href: str = "/status",
+    ) -> dict[str, Any]:
+        return {
+            "state": state,
+            "title": title,
+            "summary": summary,
+            "next_step": next_step,
+            "primary_action": {"label": primary_label, "href": primary_href},
+            "secondary_action": {"label": secondary_label, "href": secondary_href},
+            "facts": facts,
+        }
+
+    if last_failure and last_failure != "none":
+        return _decision(
+            state="error",
+            title="Runtime needs attention",
+            summary=f"The latest runtime state reports a failure: {last_failure}",
+            next_step="Open Status to inspect the failure, then use Control when you are ready to restart or continue processing.",
+            primary_label="Open status",
+            primary_href="/status",
+            secondary_label="Open control",
+            secondary_href="/control",
+        )
+
+    if playback.get("state") == "ready":
+        return _decision(
+            state="ready",
+            title="Playback is ready",
+            summary=str(playback.get("message") or "A playback export is available for the selected session."),
+            next_step="Open Playback to inspect the current session. Use Live if you want the latest recorded telemetry instead.",
+            primary_label="Open playback",
+            primary_href="/playback",
+            secondary_label="Open live",
+            secondary_href="/live",
+        )
+
+    if not visible_count:
+        return _decision(
+            state="waiting",
+            title="No artifacts have been discovered yet",
+            summary="The overview has no source or derived artifacts to summarize.",
+            next_step="Use Control to start runtime processing, or rescan after placing data under the configured scan roots.",
+            primary_label="Open control",
+            primary_href="/control",
+        )
+
+    if not runtime_started and playback.get("state") != "ready":
+        return _decision(
+            state="waiting",
+            title="Artifacts exist, but runtime is not started",
+            summary="MSH can see files, but no active runtime session is driving machine or playback readiness yet.",
+            next_step="Open Control to start or continue a workflow session. Use Status if you want to inspect the startup state first.",
+            primary_label="Open control",
+            primary_href="/control",
+        )
+
+    if playback.get("state") in {"waiting", "partial"}:
+        return _decision(
+            state="partial" if playback_count else "waiting",
+            title="Artifacts found, but playback is not ready",
+            summary=str(playback.get("message") or "Playback is still waiting for session output."),
+            next_step="Use Control or Status to finish the workflow session. Open Live if you only need recent recorded telemetry.",
+            primary_label="Open control",
+            primary_href="/control",
+            secondary_label="Open live",
+            secondary_href="/live",
+        )
+
+    if machine.get("state") == "ready" or analysis.get("state") == "ready":
+        return _decision(
+            state="partial",
+            title="Analysis outputs are available",
+            summary="Some views are ready, but the overview did not find a playback-ready session yet.",
+            next_step="Open the ready analysis/live views, or use Control to generate playback output for the current session.",
+            primary_label="Open live",
+            primary_href="/live",
+            secondary_label="Open control",
+            secondary_href="/control",
+        )
+
+    return _decision(
+        state="partial",
+        title="System is partially ready",
+        summary="MSH has enough information to open some views, but not all runtime outputs are available yet.",
+        next_step="Use Status to inspect readiness, then continue from Control if workflow output is missing.",
+        primary_label="Open status",
+        primary_href="/status",
+        secondary_label="Open control",
+        secondary_href="/control",
+    )
 
 
 def _machine_activity(scan: ScanSnapshot, session_context: dict[str, Any]) -> dict[str, Any]:
