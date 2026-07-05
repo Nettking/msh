@@ -22,8 +22,17 @@ MSH can now receive telemetry from more than one source system. Source-specific 
 Recommended source landing layout:
 
 ```text
-data/sources/<source-name>/jsonl/<YYYY-MM-DD>.jsonl
+data/sources/<source-name>/jsonl/<optional-partitions>/<YYYY-MM-DD>.jsonl
 data/source_state/<source-name>.json
+```
+
+Examples:
+
+```text
+data/sources/observer_phoenix/jsonl/2026-07-05.jsonl
+data/sources/mtconnect_recorder/jsonl/IG500/2026-07-05.jsonl
+data/source_state/observer_phoenix.json
+data/source_state/mtconnect_recorder_state.json
 ```
 
 The `.jsonl` files are part of the telemetry corpus. The source-state `.json` files are not telemetry and store watermarks, source run metadata, and synchronization status.
@@ -32,12 +41,12 @@ For source connectors, the strongly recommended fields are:
 
 - `timestamp` — UTC measurement timestamp.
 - `machine_id` — stable machine identifier after source mapping.
-- `source` — source name, for example `observer_phoenix`.
-- `source_record_id` — stable source record key used for idempotent append/deduplication.
+- `source` — source name, for example `observer_phoenix` or `mtconnect_recorder`.
+- `source_record_id` — stable source record key used for idempotent append/deduplication when available.
 - `measurement_type` — source measurement family, for example `trend`.
 - `value` and `unit` — scalar signal value and unit when the source record represents one scalar measurement.
 
-Connectors may add source-specific fields such as `point_id`, `point_name`, `channel`, `channel_name`, `source_machine_path`, and `alarm_info`. Consumers should tolerate extra columns.
+Connectors may add source-specific fields such as `point_id`, `point_name`, `channel`, `channel_name`, `source_machine_path`, `alarm_info`, or MTConnect signal columns. Consumers should tolerate extra columns.
 
 ## Normalized telemetry assumptions
 
