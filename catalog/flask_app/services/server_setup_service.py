@@ -14,12 +14,40 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 import json
 from pathlib import Path
+import time
 from typing import Any
 from urllib import request
 
 
 SETTINGS_PATH = Path("data") / "server_setup" / "server_settings.json"
 DEFAULT_OLLAMA_BASE_URL = "http://ollama:11434"
+AI_BENCHMARK_PROMPT = "Reply with exactly: MSH_OK"
+AI_RESPONSE_TIME_BANDS: list[dict[str, object]] = [
+    {
+        "key": "fast",
+        "label": "Fast",
+        "upper_ms": 5_000,
+        "description": "Comfortable for interactive setup and short repository questions.",
+    },
+    {
+        "key": "usable",
+        "label": "Usable",
+        "upper_ms": 15_000,
+        "description": "Acceptable for occasional questions, but not instant.",
+    },
+    {
+        "key": "slow",
+        "label": "Slow",
+        "upper_ms": 30_000,
+        "description": "Works, but the user will notice the wait.",
+    },
+    {
+        "key": "too_slow",
+        "label": "Too slow",
+        "upper_ms": None,
+        "description": "Choose a smaller model or stronger machine for normal use.",
+    },
+]
 
 DEPLOYMENT_MODES: dict[str, dict[str, str]] = {
     "full-server": {
@@ -116,7 +144,7 @@ def load_settings(path: Path | str = SETTINGS_PATH) -> ServerSetupSettings:
     defaults = default_settings(configured=False).to_dict()
     values = {**defaults, **payload}
     if values.get("ai_profile") in AI_MODEL_CHOICES:
-        values["ai_model"] = AI_MODEL_CHOICES[str(values["ai_profile"])] ["model"]
+        values["ai_model"] = AI_MODEL_CHOICES[str(values["ai_profile"])]["model"]
     return ServerSetupSettings(
         configured=bool(values.get("configured")),
         deployment_mode=str(values.get("deployment_mode") or defaults["deployment_mode"]),
@@ -206,6 +234,31 @@ def _model_aliases(model_name: str) -> set[str]:
     return {model_name, base}
 
 
+def response_time_assessment(elapsed_ms: float | int | None) -> dict[str, object]:
+    """Classify an AI response-time measurement against setup-time guidance bands."""
+
+    if elapsed_ms is None:
+        return {
+            "key": "unavailable",
+            "label": "Unavailable",
+            "description": "No response-time measurement is available.",
+        }
+    for band in AI_RESPONSE_TIME_BANDS:
+        upper_ms = band["upper_ms"]
+        if upper_ms is None or float(elapsed_ms) <= float(upper_ms):
+            return {
+                "key": band["key"],
+                "label": band["label"],
+                "description": band["description"],
+            }
+    # The open-ended final band should always catch the value.
+    return {
+        "key": "too_slow",
+        "label": "Too slow",
+        "description": "Choose a smaller model or stronger machine for normal use.",
+    }
+
+
 def ollama_status(settings: ServerSetupSettings | None = None, timeout_seconds: float = 2.0) -> dict[str, Any]:
     settings = settings or load_settings()
     if not settings.ai_enabled:
@@ -250,6 +303,84 @@ def ollama_status(settings: ServerSetupSettings | None = None, timeout_seconds: 
         "installed_by_profile": installed_by_profile,
         "installed_by_model": installed_by_model,
         "message": "Ollama is running." if selected_installed else f"Ollama is running, but {selected} is not installed yet.",
+    }
+
+
+def benchmark_ollama_response_time(
+    settings: ServerSetupSettings,
+    *,
+    model: str | None = None,
+    timeout_seconds: int = 120,
+) -> dict[str, Any]:
+    """Measure a tiny local Ollama response and compare it to setup guidance bands."""
+
+    selected_model = (model or settings.ai_model).strip()
+    if not settings.ai_enabled:
+        return {
+            "ok": False,
+            "model": selected_model,
+            "elapsed_ms": None,
+            "assessment": response_time_assessment(None),
+            "thresholds": AI_RESPONSE_TIME_BANDS,
+            "message": "AI is disabled in setup. Enable AI before testing model speed.",
+        }
+    if not selected_model:
+        return {
+            "ok": False,
+            "model": "",
+            "elapsed_ms": None,
+            "assessment": response_time_assessment(None),
+            "thresholds": AI_RESPONSE_TIME_BANDS,
+            "message": "No Ollama model was selected.",
+        }
+
+    payload = json.dumps(
+        {
+            "model": selected_model,
+            "stream": False,
+            "messages": [
+                {
+                    "role": "system",
+                    "content": "You are a startup response-time check. Reply with exactly MSH_OK.",
+                },
+                {"role": "user", "content": AI_BENCHMARK_PROMPT},
+            ],
+            "options": {"num_predict": 8},
+        }
+    ).encode("utf-8")
+    req = request.Request(
+        f"{settings.ollama_base_url.rstrip('/')}/api/chat",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    started = time.perf_counter()
+    try:
+        with request.urlopen(req, timeout=timeout_seconds) as response:
+            body = response.read().decode("utf-8")
+        elapsed_ms = round((time.perf_counter() - started) * 1000.0)
+        response_payload = json.loads(body)
+    except Exception as exc:  # pragma: no cover - depends on local Docker/Ollama runtime
+        elapsed_ms = round((time.perf_counter() - started) * 1000.0)
+        return {
+            "ok": False,
+            "model": selected_model,
+            "elapsed_ms": elapsed_ms,
+            "assessment": response_time_assessment(None),
+            "thresholds": AI_RESPONSE_TIME_BANDS,
+            "message": f"Could not test {selected_model}: {exc}",
+        }
+
+    content = str(response_payload.get("message", {}).get("content") or "").strip()
+    assessment = response_time_assessment(elapsed_ms)
+    return {
+        "ok": True,
+        "model": selected_model,
+        "elapsed_ms": elapsed_ms,
+        "assessment": assessment,
+        "thresholds": AI_RESPONSE_TIME_BANDS,
+        "answer_preview": content[:80],
+        "message": f"{selected_model} responded in {elapsed_ms} ms. Assessment: {assessment['label']}.",
     }
 
 
