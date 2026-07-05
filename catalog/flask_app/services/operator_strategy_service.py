@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 DEFAULT_RECORDS_PATH = Path("data") / "operator_strategy_records" / "operator_strategies.json"
 DEFAULT_TIMEZONE = "Europe/Oslo"
-SCHEMA_VERSION = "msh.operator_strategy_records.v2"
+SCHEMA_VERSION = "msh.operator_strategy_records.v3"
 
 
 class OperatorStrategyError(RuntimeError):
@@ -64,6 +64,9 @@ class OperatorStrategyRecord:
     first_part_approval_id: str = ""
     machine_id: str = ""
     sensor_ids: list[str] | None = None
+    raw_statement: str = ""
+    review_status: str = "captured"
+    structured_at: str = ""
     schema_version: str = SCHEMA_VERSION
 
     def to_dict(self) -> dict[str, Any]:
@@ -96,10 +99,22 @@ class OperatorStrategyService:
         records.sort(key=lambda item: str(item.get("decision_time") or item.get("captured_at") or ""), reverse=True)
         return records[: max(1, limit)]
 
+    def review_records(self, limit: int = 100) -> list[dict[str, Any]]:
+        records = self.load_records()
+        order = {"captured": 0, "in_review": 1, "structured": 2, "reusable": 3}
+        records.sort(key=lambda item: (order.get(str(item.get("review_status") or "captured"), 9), str(item.get("decision_time") or "")), reverse=False)
+        return records[: max(1, limit)]
+
     def reusable_records(self, limit: int = 100) -> list[dict[str, Any]]:
         records = [record for record in self.load_records() if record.get("reusable_strategy")]
         records.sort(key=lambda item: str(item.get("decision_time") or item.get("captured_at") or ""), reverse=True)
         return records[: max(1, limit)]
+
+    def get_record(self, record_id: str) -> dict[str, Any] | None:
+        for record in self.load_records():
+            if str(record.get("id") or "") == str(record_id):
+                return record
+        return None
 
     def add_from_form(self, form: Any) -> OperatorStrategyRecord:
         captured_at_dt = datetime.now(timezone.utc).replace(microsecond=0)
@@ -118,6 +133,8 @@ class OperatorStrategyService:
                 raise OperatorStrategyError("Select a custom decision/action time, or use Now.")
             decision_time_dt = _parse_local_datetime(decision_time_local, timezone_name)
 
+        raw_statement = _text(form, "raw_statement") or _text(form, "decision")
+        decision = _text(form, "decision") or raw_statement
         record = OperatorStrategyRecord(
             id=uuid4().hex,
             captured_at=captured_at,
@@ -135,7 +152,7 @@ class OperatorStrategyService:
             context=_text(form, "context"),
             hypothesis=_text(form, "hypothesis"),
             goal=_text(form, "goal"),
-            decision=_text(form, "decision"),
+            decision=decision,
             rationale=_text(form, "rationale"),
             expected_outcome=_text(form, "expected_outcome"),
             risk=_text(form, "risk"),
@@ -146,7 +163,7 @@ class OperatorStrategyService:
             notes=_text(form, "notes"),
             issue=_text(form, "issue"),
             possible_cause=_text(form, "possible_cause"),
-            action_type=_text(form, "action_type") or _infer_action_type(_text(form, "decision")),
+            action_type=_text(form, "action_type") or _infer_action_type(decision),
             worked=_text(form, "worked") or "unknown",
             outcome=_text(form, "outcome"),
             reusable_strategy=bool(form.get("reusable_strategy")),
@@ -156,12 +173,37 @@ class OperatorStrategyService:
             first_part_approval_id=_text(form, "first_part_approval_id"),
             machine_id=_text(form, "machine_id"),
             sensor_ids=_split_ids(form.getlist("sensor_ids") if hasattr(form, "getlist") else form.get("sensor_ids")),
+            raw_statement=raw_statement,
+            review_status=_text(form, "review_status") or "captured",
         )
         _validate_record(record)
         records = self.load_records()
         records.append(record.to_dict())
         self._write_records(records)
         return record
+
+    def update_structure(self, record_id: str, form: Any) -> tuple[bool, str]:
+        records = self.load_records()
+        for record in records:
+            if str(record.get("id") or "") == str(record_id):
+                for field in _STRUCTURE_FIELDS:
+                    if field in {"reusable_strategy", "operator_confirmation_required"}:
+                        record[field] = _bool_from_form(form, field, bool(record.get(field)))
+                    elif field == "sensor_ids":
+                        record[field] = _split_ids(form.getlist("sensor_ids") if hasattr(form, "getlist") else form.get("sensor_ids"))
+                    else:
+                        value = _text(form, field)
+                        if value or field in _CLEARABLE_FIELDS:
+                            record[field] = value
+                if not record.get("decision"):
+                    record["decision"] = record.get("raw_statement") or record.get("notes") or "Structured operator note"
+                record["action_type"] = record.get("action_type") or _infer_action_type(str(record.get("decision") or ""))
+                record["review_status"] = "reusable" if record.get("reusable_strategy") else "structured"
+                record["structured_at"] = _format_utc(datetime.now(timezone.utc).replace(microsecond=0))
+                record["updated_at"] = record["structured_at"]
+                self._write_records(records)
+                return True, "Operator note structured."
+        return False, "Operator note was not found."
 
     def update_outcome(self, record_id: str, form: Any) -> tuple[bool, str]:
         records = self.load_records()
@@ -171,6 +213,7 @@ class OperatorStrategyService:
                 record["outcome"] = _text(form, "outcome") or record.get("outcome") or ""
                 record["quality_result_id"] = _text(form, "quality_result_id") or record.get("quality_result_id") or ""
                 record["reusable_strategy"] = _bool_from_form(form, "reusable_strategy", bool(record.get("reusable_strategy")))
+                record["review_status"] = "reusable" if record.get("reusable_strategy") else record.get("review_status") or "structured"
                 record["updated_at"] = _format_utc(datetime.now(timezone.utc).replace(microsecond=0))
                 self._write_records(records)
                 return True, "Operator note outcome updated."
@@ -181,6 +224,7 @@ class OperatorStrategyService:
         for record in records:
             if str(record.get("id") or "") == record_id:
                 record["reusable_strategy"] = reusable
+                record["review_status"] = "reusable" if reusable else "structured"
                 record["updated_at"] = _format_utc(datetime.now(timezone.utc).replace(microsecond=0))
                 self._write_records(records)
                 return True, "Operator note marked reusable." if reusable else "Operator note marked not reusable."
@@ -208,12 +252,22 @@ class OperatorStrategyService:
         return None
 
 
+_STRUCTURE_FIELDS = {
+    "raw_statement", "strategy_name", "strategy_situation", "machine", "machine_id", "process", "operation",
+    "issue", "observation", "trigger", "context", "hypothesis", "possible_cause", "goal", "decision",
+    "action_type", "rationale", "expected_outcome", "risk", "trade_off", "alternative_strategy", "confidence",
+    "evidence", "trace_target", "notes", "worked", "outcome", "quality_result_id", "first_part_approval_id",
+    "operator_confirmation_required", "reusable_strategy", "sensor_ids",
+}
+_CLEARABLE_FIELDS = _STRUCTURE_FIELDS - {"sensor_ids", "reusable_strategy", "operator_confirmation_required"}
+
+
 def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
     normalized = dict(record)
     defaults: dict[str, Any] = {
         "issue": "",
         "possible_cause": "",
-        "action_type": _infer_action_type(str(record.get("decision") or "")),
+        "action_type": _infer_action_type(str(record.get("decision") or record.get("raw_statement") or "")),
         "worked": "unknown",
         "outcome": "",
         "reusable_strategy": False,
@@ -223,6 +277,9 @@ def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
         "first_part_approval_id": "",
         "machine_id": "",
         "sensor_ids": [],
+        "raw_statement": str(record.get("raw_statement") or record.get("decision") or record.get("notes") or ""),
+        "review_status": "reusable" if record.get("reusable_strategy") else "captured",
+        "structured_at": "",
         "schema_version": SCHEMA_VERSION,
     }
     for key, value in defaults.items():
@@ -288,5 +345,5 @@ def _parse_local_datetime(value: str, timezone_name: str) -> datetime:
 
 
 def _validate_record(record: OperatorStrategyRecord) -> None:
-    if not record.decision:
-        raise OperatorStrategyError("Decision/action is required.")
+    if not record.decision and not record.raw_statement:
+        raise OperatorStrategyError("A statement or decision/action is required.")
