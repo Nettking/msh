@@ -23,6 +23,9 @@ class MachineConfig:
     controller: str
     notes: str
     created_at: str
+    mtconnect_url: str = ""
+    vpn_test_host: str = ""
+    vpn_test_port: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return self.__dict__.copy()
@@ -63,7 +66,7 @@ class SourceInventoryService:
         payload.setdefault("machines", [])
         payload.setdefault("vibration_sensors", [])
         payload.setdefault("updated_at", "")
-        payload["machines"] = [item for item in payload["machines"] if isinstance(item, dict)]
+        payload["machines"] = [_normalize_machine(item) for item in payload["machines"] if isinstance(item, dict)]
         payload["vibration_sensors"] = [item for item in payload["vibration_sensors"] if isinstance(item, dict)]
         return payload
 
@@ -99,6 +102,9 @@ class SourceInventoryService:
             controller=_text(form, "controller"),
             notes=_text(form, "notes"),
             created_at=_now_utc(),
+            mtconnect_url=_text(form, "mtconnect_url"),
+            vpn_test_host=_text(form, "vpn_test_host"),
+            vpn_test_port=_text(form, "vpn_test_port"),
         )
         inventory["machines"].append(machine.to_dict())
         self._write(inventory)
@@ -159,6 +165,7 @@ class SourceInventoryService:
         inventory["updated_at"] = _now_utc()
         inventory.setdefault("machines", [])
         inventory.setdefault("vibration_sensors", [])
+        inventory["machines"] = [_normalize_machine(item) for item in inventory["machines"] if isinstance(item, dict)]
         self.inventory_path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.inventory_path.with_suffix(self.inventory_path.suffix + ".tmp")
         tmp.write_text(json.dumps(inventory, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -172,6 +179,14 @@ def _empty_inventory() -> dict[str, Any]:
         "machines": [],
         "vibration_sensors": [],
     }
+
+
+def _normalize_machine(machine: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(machine)
+    normalized.setdefault("mtconnect_url", "")
+    normalized.setdefault("vpn_test_host", "")
+    normalized.setdefault("vpn_test_port", "")
+    return normalized
 
 
 def _text(form: Any, name: str) -> str:
