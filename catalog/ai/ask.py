@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from .grounding import append_grounding_warning
 from .ollama_client import DEFAULT_MODEL, OllamaError, chat
 from .prompts import SYSTEM_PROMPT, build_prompt
 from .rag import format_context, retrieve
@@ -52,23 +53,24 @@ def main() -> int:
         return 1
 
     context = _bounded_context(format_context(selected), args.max_context_chars)
+    source_labels = [chunk.source_label() for chunk in selected]
     if args.show_sources:
         print("Sources:")
-        for chunk in selected:
-            print(f"- {chunk.source_label()}")
+        for source in source_labels:
+            print(f"- {source}")
         print()
     if args.dry_run:
         print(context)
         return 0
 
-    prompt = build_prompt(args.question, context)
+    prompt = build_prompt(args.question, context, sources=source_labels)
     try:
         answer = chat(prompt=prompt, system_prompt=SYSTEM_PROMPT, model=args.model)
     except OllamaError as exc:
         print(exc)
         return 2
 
-    print(answer)
+    print(append_grounding_warning(answer, selected))
     return 0
 
 
