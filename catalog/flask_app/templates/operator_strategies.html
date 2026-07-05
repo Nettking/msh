@@ -3,7 +3,7 @@
 <section class="page-intro operator-strategy-intro">
   <div>
     <h2>Operator strategy capture</h2>
-    <p>Record what an operator decided, why it made sense in the situation, and what Digital Twin artefact it could later become.</p>
+    <p>Fast field-note capture for operator decisions. Save the action now; add extra detail only when it is useful.</p>
   </div>
 </section>
 
@@ -17,29 +17,27 @@
 <section class="section-block section-block--primary operator-capture-card">
   <div class="operator-section-heading">
     <div>
-      <h3>Record one operator decision</h3>
-      <p>Use this as a field-note form. The goal is not telemetry collection, but capturing the reasoning behind an operator action.</p>
+      <h3>Quick record</h3>
+      <p>Only the decision/action is required. The rest is optional context for later analysis.</p>
     </div>
-    <span class="status-badge status-partial">field note</span>
+    <span class="status-badge status-ready">fast capture</span>
   </div>
 
-  <form method="post" action="{{ url_for('operator_strategy_web.save') }}" class="operator-strategy-form">
-    <section class="operator-form-section">
-      <div class="operator-form-section__title">
-        <span class="setup-step-number">1</span>
-        <div>
-          <h4>Identify the strategy</h4>
-          <p>Name the decision pattern and where it applies.</p>
-        </div>
-      </div>
-      <div class="operator-identity-grid">
-        <label>
-          <span>Strategy name</span>
-          <input type="text" name="strategy_name" placeholder="Chatter response strategy">
-        </label>
+  <form method="post" action="{{ url_for('operator_strategy_web.save') }}" class="operator-strategy-form operator-strategy-form--quick">
+    <section class="operator-quick-section">
+      <label class="operator-main-decision">
+        <span>Decision/action <em class="required-marker">required</em></span>
+        <textarea name="decision" rows="5" required autofocus placeholder="Example: Reduced feed override when chatter appeared during finishing pass."></textarea>
+      </label>
+
+      <div class="operator-quick-grid">
         <label>
           <span>Situation / path</span>
-          <input type="text" name="strategy_situation" placeholder="Quality-critical chatter path">
+          <input type="text" name="strategy_situation" placeholder="Chatter during finishing">
+        </label>
+        <label>
+          <span>Machine</span>
+          <input type="text" name="machine" placeholder="Mazak i500">
         </label>
         <label>
           <span>Confidence</span>
@@ -51,140 +49,94 @@
           </select>
         </label>
       </div>
-      <div class="operator-context-grid">
-        <label>
-          <span>Machine</span>
-          <input type="text" name="machine" placeholder="Mazak i500 / IG500 / VTC">
-        </label>
-        <label>
-          <span>Process</span>
-          <input type="text" name="process" placeholder="CNC machining">
-        </label>
-        <label>
-          <span>Operation</span>
-          <input type="text" name="operation" placeholder="Finishing pass">
-        </label>
+
+      <div class="operator-fast-meta">
+        <input type="hidden" name="decision_time_mode" value="now">
+        <input type="hidden" name="decision_timezone" value="{{ default_timezone }}">
+        <span class="status-badge status-ready">time: now</span>
+        <span class="text-muted">Captured-at and decision time will be stored automatically.</span>
       </div>
+
+      <details class="operator-more-detail">
+        <summary>More detail / later analysis</summary>
+        <div class="operator-detail-grid">
+          <label>
+            <span>Strategy name</span>
+            <input type="text" name="strategy_name" placeholder="Chatter response strategy">
+          </label>
+          <label>
+            <span>Process</span>
+            <input type="text" name="process" placeholder="CNC machining">
+          </label>
+          <label>
+            <span>Operation</span>
+            <input type="text" name="operation" placeholder="Finishing pass">
+          </label>
+          <label>
+            <span>Custom decision/action time</span>
+            <input type="datetime-local" name="decision_time_local">
+          </label>
+          <label>
+            <span>Timezone</span>
+            <input type="text" name="decision_timezone_detail" value="{{ default_timezone }}" placeholder="Europe/Oslo">
+          </label>
+          <label class="operator-field-wide operator-custom-time-choice">
+            <span>Use custom time?</span>
+            <select name="decision_time_mode_detail">
+              <option value="now">No, use now</option>
+              <option value="custom">Yes, use custom time above</option>
+            </select>
+          </label>
+          <label class="operator-field-wide">
+            <span>Why / goal</span>
+            <textarea name="goal" rows="3" placeholder="What was the operator trying to preserve, avoid, or achieve?"></textarea>
+          </label>
+          <label>
+            <span>Observation</span>
+            <textarea name="observation" rows="3" placeholder="What did the operator notice?"></textarea>
+          </label>
+          <label>
+            <span>Trigger</span>
+            <textarea name="trigger" rows="3" placeholder="What made a response necessary?"></textarea>
+          </label>
+          <label class="operator-field-wide">
+            <span>Context</span>
+            <textarea name="context" rows="3" placeholder="Material, tool, quality requirement, pressure, machine state..."></textarea>
+          </label>
+          <label class="operator-field-wide">
+            <span>Rationale</span>
+            <textarea name="rationale" rows="3" placeholder="Why was this action selected?"></textarea>
+          </label>
+          <label>
+            <span>Expected outcome</span>
+            <textarea name="expected_outcome" rows="3" placeholder="What effect was expected?"></textarea>
+          </label>
+          <label>
+            <span>Risk / trade-off</span>
+            <textarea name="risk" rows="3" placeholder="What could go wrong or what cost was accepted?"></textarea>
+          </label>
+          <label class="operator-field-wide">
+            <span>Evidence / source</span>
+            <textarea name="evidence" rows="3" placeholder="Experience, alarm, measurement, prior job, observation..."></textarea>
+          </label>
+          <label class="operator-field-wide">
+            <span>Trace target / possible DT artefact</span>
+            <textarea name="trace_target" rows="3" placeholder="Monitoring rule, recommendation, dashboard, explanation, validation case..."></textarea>
+          </label>
+          <label class="operator-field-wide">
+            <span>Free notes</span>
+            <textarea name="notes" rows="3" placeholder="Anything else."></textarea>
+          </label>
+        </div>
+      </details>
     </section>
 
-    <section class="operator-form-section operator-time-section">
-      <div class="operator-form-section__title">
-        <span class="setup-step-number">2</span>
-        <div>
-          <h4>When did the decision happen?</h4>
-          <p>Captured-at is stored automatically when you save. Decision time can be different for notes entered afterwards.</p>
-        </div>
-      </div>
-      <div class="operator-time-grid">
-        <div class="operator-radio-card">
-          <label><input type="radio" name="decision_time_mode" value="now" checked> Use current time</label>
-          <label><input type="radio" name="decision_time_mode" value="custom"> Enter custom decision time</label>
-        </div>
-        <label>
-          <span>Custom decision/action time</span>
-          <input type="datetime-local" name="decision_time_local">
-        </label>
-        <label>
-          <span>Timezone</span>
-          <input type="text" name="decision_timezone" value="{{ default_timezone }}" placeholder="Europe/Oslo">
-        </label>
-      </div>
-    </section>
-
-    <section class="operator-form-section">
-      <div class="operator-form-section__title">
-        <span class="setup-step-number">3</span>
-        <div>
-          <h4>What was observed?</h4>
-          <p>Capture the situation before the action. These fields explain why a response was needed.</p>
-        </div>
-      </div>
-      <div class="operator-note-grid">
-        <label>
-          <span>Observation</span>
-          <textarea name="observation" rows="5" placeholder="What did the operator notice or receive as input?"></textarea>
-        </label>
-        <label>
-          <span>Trigger</span>
-          <textarea name="trigger" rows="5" placeholder="What made the operator decide that a response was needed?"></textarea>
-        </label>
-        <label class="operator-field-wide">
-          <span>Context</span>
-          <textarea name="context" rows="5" placeholder="Material, tool, operation, quality requirement, production pressure, machine state..."></textarea>
-        </label>
-        <label class="operator-field-wide">
-          <span>Hypothesis</span>
-          <textarea name="hypothesis" rows="5" placeholder="What did the operator think was happening?"></textarea>
-        </label>
-      </div>
-    </section>
-
-    <section class="operator-form-section operator-form-section--decision">
-      <div class="operator-form-section__title">
-        <span class="setup-step-number">4</span>
-        <div>
-          <h4>What did the operator decide?</h4>
-          <p>This is the core strategy: goal, action, and reasoning.</p>
-        </div>
-      </div>
-      <div class="operator-note-grid">
-        <label>
-          <span>Goal <em class="required-marker">required</em></span>
-          <textarea name="goal" rows="6" required placeholder="What was the operator trying to preserve, optimise, avoid, or achieve?"></textarea>
-        </label>
-        <label>
-          <span>Decision/action <em class="required-marker">required</em></span>
-          <textarea name="decision" rows="6" required placeholder="What did the operator decide or do?"></textarea>
-        </label>
-        <label class="operator-field-wide">
-          <span>Rationale</span>
-          <textarea name="rationale" rows="5" placeholder="Why was this decision selected?"></textarea>
-        </label>
-      </div>
-    </section>
-
-    <section class="operator-form-section">
-      <div class="operator-form-section__title">
-        <span class="setup-step-number">5</span>
-        <div>
-          <h4>What should this become?</h4>
-          <p>Capture expected outcome, risks, trade-offs, evidence, and possible DT trace target.</p>
-        </div>
-      </div>
-      <div class="operator-note-grid">
-        <label>
-          <span>Expected outcome</span>
-          <textarea name="expected_outcome" rows="4" placeholder="What effect was expected?"></textarea>
-        </label>
-        <label>
-          <span>Risk</span>
-          <textarea name="risk" rows="4" placeholder="What could go wrong?"></textarea>
-        </label>
-        <label>
-          <span>Trade-off</span>
-          <textarea name="trade_off" rows="4" placeholder="What cost or consequence was accepted?"></textarea>
-        </label>
-        <label>
-          <span>Evidence / source</span>
-          <textarea name="evidence" rows="4" placeholder="Prior job, operator experience, manual, alarm, measurement, observation..."></textarea>
-        </label>
-        <label class="operator-field-wide">
-          <span>Trace target / possible DT artefact</span>
-          <textarea name="trace_target" rows="4" placeholder="Monitoring rule, recommendation, dashboard, explanation, validation case..."></textarea>
-        </label>
-        <label class="operator-field-wide">
-          <span>Free notes</span>
-          <textarea name="notes" rows="5" placeholder="Anything that does not fit the structured fields."></textarea>
-        </label>
-      </div>
-    </section>
-
-    <div class="operator-save-row">
+    <div class="operator-save-row operator-save-row--sticky">
       <div>
-        <strong>Save as local field note</strong>
-        <p>Stored in <code>{{ records_path }}</code>. This is not scanned as telemetry.</p>
+        <strong>Save fast record</strong>
+        <p>Stored locally at <code>{{ records_path }}</code>.</p>
       </div>
-      <button class="button-primary" type="submit">Save operator strategy record</button>
+      <button class="button-primary" type="submit">Save record</button>
     </div>
   </form>
 </section>
@@ -211,11 +163,11 @@
           <span class="text-muted">captured {{ record.captured_at }}</span>
         </td>
         <td>
-          {{ record.strategy_name or 'Unnamed strategy' }}<br>
+          {{ record.strategy_name or 'Quick record' }}<br>
           <span class="text-muted">{{ record.strategy_situation or 'No path name' }}</span>
         </td>
         <td>{{ record.machine or 'n/a' }}</td>
-        <td>{{ record.goal }}</td>
+        <td>{{ record.goal or 'n/a' }}</td>
         <td>{{ record.decision }}</td>
         <td>{{ record.confidence or 'Unknown' }}</td>
         <td>
@@ -231,4 +183,20 @@
   <p>No operator strategy records have been saved yet.</p>
   {% endif %}
 </section>
+
+<script>
+(function () {
+  var detailMode = document.querySelector('select[name="decision_time_mode_detail"]');
+  var mainMode = document.querySelector('input[name="decision_time_mode"]');
+  var detailTimezone = document.querySelector('input[name="decision_timezone_detail"]');
+  var mainTimezone = document.querySelector('input[name="decision_timezone"]');
+  function syncTimeDetail() {
+    if (detailMode && mainMode) mainMode.value = detailMode.value || 'now';
+    if (detailTimezone && mainTimezone) mainTimezone.value = detailTimezone.value || mainTimezone.value;
+  }
+  if (detailMode) detailMode.addEventListener('change', syncTimeDetail);
+  if (detailTimezone) detailTimezone.addEventListener('input', syncTimeDetail);
+  syncTimeDetail();
+})();
+</script>
 {% endblock %}
