@@ -3,6 +3,7 @@ from __future__ import annotations
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
 from .services.observer_phoenix_config_service import ObserverPhoenixConfigService
+from .services.source_connection_test_service import SourceConnectionTestService
 from .services.source_inventory_service import SourceInventoryService
 
 
@@ -15,6 +16,10 @@ def _observer_phoenix_service() -> ObserverPhoenixConfigService:
 
 def _source_inventory_service() -> SourceInventoryService:
     return SourceInventoryService()
+
+
+def _connection_test_service() -> SourceConnectionTestService:
+    return SourceConnectionTestService(_source_inventory_service())
 
 
 @source_web.get("/")
@@ -35,6 +40,22 @@ def add_machine():
 def delete_machine(machine_id: str):
     ok, message = _source_inventory_service().delete_machine(machine_id)
     flash(message, "success" if ok else "error")
+    return redirect(url_for("source_web.index"))
+
+
+@source_web.post("/machines/<machine_id>/test-mtconnect")
+def test_machine_mtconnect(machine_id: str):
+    result = _connection_test_service().test_mtconnect(machine_id)
+    detail = f" {result.detail}" if result.detail else ""
+    flash(f"{result.title}: {result.message} Target: {result.target}.{detail}", "success" if result.ok else "error")
+    return redirect(url_for("source_web.index"))
+
+
+@source_web.post("/machines/<machine_id>/test-vpn")
+def test_machine_vpn(machine_id: str):
+    result = _connection_test_service().test_vpn_network(machine_id)
+    detail = f" {result.detail}" if result.detail else ""
+    flash(f"{result.title}: {result.message} Target: {result.target}.{detail}", "success" if result.ok else "error")
     return redirect(url_for("source_web.index"))
 
 
