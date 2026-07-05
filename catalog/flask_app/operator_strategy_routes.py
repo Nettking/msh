@@ -22,20 +22,57 @@ def _source_inventory() -> dict[str, object]:
 
 @operator_strategy_web.get("")
 def index():
+    return redirect(url_for("operator_strategy_web.capture"))
+
+
+@operator_strategy_web.get("/capture")
+def capture():
     service = _service()
     try:
-        records = service.recent_records(limit=30)
+        records = service.recent_records(limit=5)
         load_error = ""
     except OperatorStrategyError as exc:
         records = []
         load_error = str(exc)
     return render_template(
-        "operator_strategies.html",
+        "operator_capture.html",
         records=records,
         load_error=load_error,
         default_timezone=DEFAULT_TIMEZONE,
         records_path=service.records_path.as_posix(),
         source_inventory=_source_inventory(),
+    )
+
+
+@operator_strategy_web.get("/review")
+def review():
+    service = _service()
+    try:
+        records = service.review_records(limit=100)
+        load_error = ""
+    except OperatorStrategyError as exc:
+        records = []
+        load_error = str(exc)
+    return render_template(
+        "operator_review.html",
+        records=records,
+        load_error=load_error,
+        records_path=service.records_path.as_posix(),
+    )
+
+
+@operator_strategy_web.get("/structure/<record_id>")
+def structure(record_id: str):
+    service = _service()
+    record = service.get_record(record_id)
+    if record is None:
+        flash("Operator note was not found.", "warning")
+        return redirect(url_for("operator_strategy_web.review"))
+    return render_template(
+        "operator_structure.html",
+        record=record,
+        source_inventory=_source_inventory(),
+        default_timezone=DEFAULT_TIMEZONE,
     )
 
 
@@ -46,8 +83,19 @@ def save():
     except OperatorStrategyError as exc:
         flash(str(exc), "error")
     else:
-        flash(f"Recorded operator note at {record.decision_time}.", "success")
-    return redirect(url_for("operator_strategy_web.index"))
+        flash(f"Captured statement at {record.decision_time}.", "success")
+    return redirect(url_for("operator_strategy_web.capture"))
+
+
+@operator_strategy_web.post("/<record_id>/structure")
+def update_structure(record_id: str):
+    try:
+        ok, message = _service().update_structure(record_id, request.form)
+    except OperatorStrategyError as exc:
+        flash(str(exc), "error")
+    else:
+        flash(message, "success" if ok else "warning")
+    return redirect(url_for("operator_strategy_web.review"))
 
 
 @operator_strategy_web.post("/<record_id>/outcome")
@@ -58,7 +106,7 @@ def update_outcome(record_id: str):
         flash(str(exc), "error")
     else:
         flash(message, "success" if ok else "warning")
-    return redirect(url_for("operator_strategy_web.index"))
+    return redirect(url_for("operator_strategy_web.review"))
 
 
 @operator_strategy_web.post("/<record_id>/reusable")
@@ -70,7 +118,7 @@ def mark_reusable(record_id: str):
         flash(str(exc), "error")
     else:
         flash(message, "success" if ok else "warning")
-    return redirect(url_for("operator_strategy_web.index"))
+    return redirect(url_for("operator_strategy_web.review"))
 
 
 @operator_strategy_web.post("/delete/<record_id>")
@@ -81,4 +129,4 @@ def delete(record_id: str):
         flash(str(exc), "error")
     else:
         flash("Operator note deleted." if deleted else "Operator note was not found.", "success" if deleted else "warning")
-    return redirect(url_for("operator_strategy_web.index"))
+    return redirect(url_for("operator_strategy_web.review"))
