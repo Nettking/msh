@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro">
+  <h2>First Part</h2>
+  <p>Checklist for first-part verification before production continues.</p>
+</section>
+
+<section class="section-block section-block--primary">
+  <h3>Record first-part check</h3>
+  <form method="post" action="{{ url_for('operator_support_web.save_first_part') }}" class="control-form control-card source-inline-form">
+    <label>
+      <span>Machine</span>
+      <select name="machine_id">
+        <option value="">Unassigned</option>
+        {% for machine in source_inventory.machines %}<option value="{{ machine.id }}">{{ machine.name }}</option>{% endfor %}
+      </select>
+    </label>
+    <label><span>Part id</span><input type="text" name="part_id" placeholder="part / order / job"></label>
+    <label><span>Program id</span><input type="text" name="program_id" placeholder="NC program"></label>
+    <div class="source-field-wide info-grid">
+      {% for item in checklist_items %}
+      <label class="source-checkbox-label"><input type="checkbox" name="{{ item }}"><span>{{ item.replace('_', ' ')|title }}</span></label>
+      {% endfor %}
+    </div>
+    <label class="source-field-wide"><span>Measurement notes</span><textarea name="measurement_notes" rows="3" placeholder="Dimensions, surface finish, inspection result..."></textarea></label>
+    <label class="source-field-wide"><span>Quality deviation note</span><textarea name="quality_deviation_note" rows="3" placeholder="What is outside expectation, if anything?"></textarea></label>
+    <label><span>Signed by</span><input type="text" name="signed_by" placeholder="operator"></label>
+    <button class="button-primary" type="submit">Save first-part check</button>
+  </form>
+</section>
+
+<section class="section-block">
+  <h3>Recent first-part checks</h3>
+  <p>Stored locally at <code>{{ records_path }}</code>.</p>
+  {% if checks %}
+  <div class="table-scroll">
+    <table>
+      <tr><th>Time</th><th>Machine</th><th>Part</th><th>Program</th><th>Status</th><th>Notes</th></tr>
+      {% for item in checks %}
+      <tr>
+        <td>{{ item.created_at }}</td>
+        <td>{{ item.machine_id or 'n/a' }}</td>
+        <td>{{ item.part_id or 'n/a' }}</td>
+        <td>{{ item.program_id or 'n/a' }}</td>
+        <td><span class="status-badge {{ 'status-ready' if item.status == 'signed_off' else 'status-waiting' }}">{{ item.status }}</span></td>
+        <td>{{ item.measurement_notes or item.quality_deviation_note }}</td>
+      </tr>
+      {% endfor %}
+    </table>
+  </div>
+  {% else %}
+  <p>No first-part checks have been saved yet.</p>
+  {% endif %}
+</section>
+{% endblock %}
