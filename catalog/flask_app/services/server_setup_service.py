@@ -116,7 +116,7 @@ def load_settings(path: Path | str = SETTINGS_PATH) -> ServerSetupSettings:
     defaults = default_settings(configured=False).to_dict()
     values = {**defaults, **payload}
     if values.get("ai_profile") in AI_MODEL_CHOICES:
-        values["ai_model"] = AI_MODEL_CHOICES[str(values["ai_profile"])] ["model"]
+        values["ai_model"] = AI_MODEL_CHOICES[str(values["ai_profile"])]["model"]
     return ServerSetupSettings(
         configured=bool(values.get("configured")),
         deployment_mode=str(values.get("deployment_mode") or defaults["deployment_mode"]),
