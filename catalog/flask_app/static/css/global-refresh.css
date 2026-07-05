@@ -1,0 +1,150 @@
+body {
+  background: linear-gradient(180deg, #f7faff 0%, #edf3fb 100%);
+}
+
+.site-header {
+  background: rgba(247, 250, 255, 0.94);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.34);
+  box-shadow: 0 10px 32px rgba(15, 23, 42, 0.08);
+}
+
+.site-header__identity h1 {
+  color: #0f172a;
+  font-weight: 900;
+  letter-spacing: -0.03em;
+}
+
+.site-nav {
+  background: rgba(255, 255, 255, 0.74);
+  border: 1px solid rgba(203, 213, 225, 0.7);
+  border-radius: 999px;
+  padding: 4px;
+}
+
+.site-nav a {
+  color: #334155;
+  font-weight: 650;
+}
+
+.site-nav a:hover {
+  background: #ffffff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+
+.site-nav a.is-active {
+  background: #0f172a;
+  border-color: #0f172a;
+  color: #ffffff;
+}
+
+main {
+  max-width: 1320px;
+  padding-top: 28px;
+}
+
+.page-intro {
+  padding: 22px;
+  border: 1px solid #bfdbfe;
+  border-radius: 20px;
+  background: linear-gradient(135deg, #ffffff 0%, #f8fbff 100%);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
+}
+
+.section-block {
+  border-color: rgba(203, 213, 225, 0.85);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
+}
+
+.control-card,
+.info-card,
+.stack-row,
+.script-group,
+.field-group,
+.playback-current-inline,
+.session-compact-item {
+  border-color: rgba(203, 213, 225, 0.85);
+  border-radius: 14px;
+  background: #f8fbff;
+}
+
+input,
+select,
+textarea {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #0f172a;
+  padding: 8px 10px;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.16);
+  outline: none;
+}
+
+button,
+.rescan-form button,
+.section-block button {
+  border-radius: 999px;
+}
+
+.button-primary,
+button.button-primary {
+  background: #0f172a;
+  border-color: #0f172a;
+}
+
+.button-primary:hover,
+button.button-primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+table {
+  border-collapse: separate;
+  border-spacing: 0;
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+th {
+  background: #f1f5fb;
+  color: #334155;
+  font-size: 0.78rem;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
+}
+
+th,
+td {
+  border-left: 0;
+  border-right: 0;
+  border-color: #e2e8f0;
+}
+
+.flash {
+  border-radius: 12px;
+  padding: 10px 12px;
+}
+
+pre,
+.pre {
+  border: 1px solid #dbe4f0;
+  border-radius: 14px;
+  background: #0f172a;
+  color: #e2e8f0;
+  padding: 12px;
+}
+
+@media (max-width: 920px) {
+  .site-nav {
+    border-radius: 18px;
+  }
+}
