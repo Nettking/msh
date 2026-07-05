@@ -118,6 +118,35 @@
         {% set current_installed = server_setup_ollama_status and server_setup_ollama_status.installed_by_profile and server_setup_ollama_status.installed_by_profile.get(current_profile) %}
         <span id="selectedModelStatus" class="status-badge {{ 'status-ready' if current_installed else 'status-waiting' }}">Selected model {{ 'installed' if current_installed else 'not installed' }}</span>
       </div>
+
+      <div class="setup-response-benchmark" data-ai-benchmark-panel>
+        <div class="setup-step-card__title">
+          <span class="setup-step-number">2a</span>
+          <div>
+            <h4>Response time check</h4>
+            <p>Run a tiny local prompt against the selected model, then compare the measured time with practical setup bands. First runs can be slower while the model loads.</p>
+          </div>
+        </div>
+        <div class="setup-status-strip">
+          <button type="button" id="aiBenchmarkButton">Test selected model speed</button>
+          <span id="aiBenchmarkStatus" class="status-badge status-waiting">Not tested</span>
+        </div>
+        <div id="aiBenchmarkResult" class="setup-benchmark-result" role="status" aria-live="polite">
+          <p>Use this before saving if you are unsure whether the selected model is too slow for this computer.</p>
+        </div>
+        <table class="artifact-table setup-benchmark-table">
+          <thead>
+            <tr><th>Measured response</th><th>Interpretation</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>&le; 5 s</td><td>Fast: comfortable for interactive use.</td></tr>
+            <tr><td>5-15 s</td><td>Usable: acceptable for occasional questions.</td></tr>
+            <tr><td>15-30 s</td><td>Slow: works, but the user will notice the wait.</td></tr>
+            <tr><td>&gt; 30 s</td><td>Too slow: choose a smaller model or stronger machine.</td></tr>
+          </tbody>
+        </table>
+      </div>
+
       <div class="setup-wizard-actions">
         <button type="button" data-prev-step>Back</button>
         <button type="button" class="button-primary" data-next-step>Next</button>
@@ -318,6 +347,71 @@
     syncSelectedModelStatus();
   }
 
+  function escapeHtml(value) {
+    return String(value || '').replace(/[&<>"']/g, function (character) {
+      return {
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;'
+      }[character];
+    });
+  }
+
+  function setBenchmarkStatus(text, ready) {
+    var status = document.getElementById('aiBenchmarkStatus');
+    if (!status) return;
+    status.textContent = text;
+    status.classList.toggle('status-ready', Boolean(ready));
+    status.classList.toggle('status-waiting', !ready);
+  }
+
+  function renderBenchmarkResult(payload) {
+    var result = document.getElementById('aiBenchmarkResult');
+    if (!result) return;
+    var assessment = payload.assessment || {};
+    var elapsed = payload.elapsed_ms === null || payload.elapsed_ms === undefined ? 'not measured' : payload.elapsed_ms + ' ms';
+    result.innerHTML = [
+      '<p><strong>' + escapeHtml(payload.model || 'Selected model') + '</strong>: ' + escapeHtml(payload.message || 'No message returned.') + '</p>',
+      '<p>Measured response: <strong>' + escapeHtml(elapsed) + '</strong></p>',
+      '<p>Comparison: <strong>' + escapeHtml(assessment.label || 'Unavailable') + '</strong> — ' + escapeHtml(assessment.description || '') + '</p>'
+    ].join('');
+  }
+
+  function testSelectedAiModel() {
+    var button = document.getElementById('aiBenchmarkButton');
+    var form = document.getElementById('startupSetupForm');
+    var aiEnabled = document.getElementById('aiEnabled');
+    if (!button || !form) return;
+    if (aiEnabled && !aiEnabled.checked) {
+      setBenchmarkStatus('AI disabled', false);
+      renderBenchmarkResult({ ok: false, model: 'AI disabled', elapsed_ms: null, assessment: { label: 'Unavailable', description: 'Enable AI before testing model speed.' }, message: 'Enable AI before testing model speed.' });
+      return;
+    }
+    var data = new FormData(form);
+    button.disabled = true;
+    setBenchmarkStatus('Testing...', false);
+    fetch('/server-setup/test-ai-model', {
+      method: 'POST',
+      body: data,
+      headers: { 'Accept': 'application/json' }
+    }).then(function (response) {
+      return response.json().then(function (payload) {
+        payload.http_ok = response.ok;
+        return payload;
+      });
+    }).then(function (payload) {
+      renderBenchmarkResult(payload);
+      setBenchmarkStatus(payload.ok ? (payload.assessment && payload.assessment.label ? payload.assessment.label : 'Measured') : 'Failed', Boolean(payload.ok));
+      button.disabled = false;
+    }).catch(function (error) {
+      renderBenchmarkResult({ ok: false, model: 'Selected model', elapsed_ms: null, assessment: { label: 'Unavailable', description: 'The benchmark request failed.' }, message: error });
+      setBenchmarkStatus('Failed', false);
+      button.disabled = false;
+    });
+  }
+
   document.querySelectorAll('[data-step-target]').forEach(function (button) {
     button.addEventListener('click', function () { showStep(button.dataset.stepTarget); });
   });
@@ -347,6 +441,8 @@
   });
   var aiEnabled = document.getElementById('aiEnabled');
   if (aiEnabled) aiEnabled.addEventListener('change', syncAiVisibility);
+  var benchmarkButton = document.getElementById('aiBenchmarkButton');
+  if (benchmarkButton) benchmarkButton.addEventListener('click', testSelectedAiModel);
   syncSelectedCards('[data-role-card]');
   syncSelectedCards('[data-ai-card]');
   syncRecorderVisibility();
