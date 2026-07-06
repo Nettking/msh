@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro">
+  <h2>AI Explainer</h2>
+  <p>Ask read-only system-understanding questions about MSH. The explainer retrieves repository context first, then optionally sends that context to the configured local Ollama model.</p>
+</section>
+
+<section class="section-block section-block--primary ai-explainer-panel">
+  <div class="ai-explainer-panel__main">
+    <h3>Ask the repository explainer</h3>
+    <p class="ai-explainer-help">Use this for architecture, data flow, setup, routes, cache behaviour, and where implementation details live. It does not run scripts, rebuild caches, modify files, or inspect raw telemetry by default.</p>
+
+    <form class="ai-explainer-form" method="post" action="{{ url_for('ai_web.ai_ask') }}">
+      <label for="question">Question</label>
+      <textarea id="question" name="question" rows="5">{{ question }}</textarea>
+
+      <div class="ai-explainer-form__row">
+        <div>
+          <label for="model">Model</label>
+          <input id="model" name="model" value="{{ model }}">
+        </div>
+        <div class="ai-explainer-options" aria-label="Answer options">
+          <label><input type="checkbox" name="dry_run" value="1" {% if dry_run %}checked{% endif %}> Show retrieved context only</label>
+          <label><input type="checkbox" name="extractive" value="1" {% if extractive %}checked{% endif %}> Extractive answer mode</label>
+        </div>
+      </div>
+
+      <div class="ai-explainer-actions">
+        <button type="submit">Ask explainer</button>
+        <a class="button-link" href="{{ url_for('web.guide') }}#setup-guide">Open setup guide</a>
+      </div>
+    </form>
+  </div>
+
+  <aside class="ai-explainer-panel__aside">
+    <span class="metric-label">Safe operating mode</span>
+    <h4>Read-only repository context</h4>
+    <p>The answer is grounded in indexed documentation and code. Keep dry-run enabled when you want to inspect the exact context before asking the model.</p>
+  </aside>
+</section>
+
+{% if error %}
+<section class="section-block section-block--warning ai-explainer-result">
+  <h3>Error</h3>
+  <pre>{{ error }}</pre>
+</section>
+{% endif %}
+
+{% if answer %}
+<section class="section-block ai-explainer-result">
+  <h3>Answer</h3>
+  <pre>{{ answer }}</pre>
+</section>
+{% endif %}
+
+{% if sources %}
+<section class="section-block ai-explainer-sources">
+  <h3>Sources</h3>
+  <ul>
+    {% for source in sources %}
+      <li><code>{{ source }}</code></li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+
+{% if context %}
+<section class="section-block ai-explainer-result">
+  <h3>Retrieved context</h3>
+  <pre>{{ context }}</pre>
+</section>
+{% endif %}
+{% endblock %}
