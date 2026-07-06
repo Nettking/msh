@@ -42,7 +42,15 @@ def startup_mode_gate():
     endpoint = request.endpoint or ""
     if endpoint.startswith("static"):
         return None
-    allowed = {"web.startup", "web.choose_startup_mode", "web.status", "web.rescan", "web.guide"}
+    allowed = {
+        "web.startup",
+        "web.choose_startup_mode",
+        "web.status",
+        "web.rescan",
+        "web.guide",
+        "ai_web.ai_page",
+        "ai_web.ai_ask",
+    }
     if endpoint in allowed:
         return None
     if get_runtime_manager().requires_startup_choice():
@@ -92,6 +100,7 @@ def _machine_day_detail_from_cache(scope) -> dict | None:
         "message": "No cached telemetry rows matched the selected scope." if frame.empty else "",
         "frame": frame,
     }
+
 
 def _strategy_config_service() -> StrategyConfigService:
     return StrategyConfigService(
@@ -220,6 +229,7 @@ def _load_telemetry_cache_exploration_frame(window_start: str, window_end: str) 
         return None, f"Could not query telemetry analytics cache: {exc}"
     current_app.logger.info("exploration using DuckDB/Parquet cache rows=%s", len(frame))
     return frame, None
+
 
 def _machine_day_chart_payload(frame: pd.DataFrame) -> tuple[dict, str]:
     required = {"date", "machine", "value"}
