@@ -1,0 +1,121 @@
+.ai-explainer-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(220px, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+
+.ai-explainer-panel__main,
+.ai-explainer-panel__aside {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-explainer-panel__aside {
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+}
+
+.ai-explainer-help {
+  max-width: 78ch;
+}
+
+.ai-explainer-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.ai-explainer-form label {
+  font-weight: 600;
+}
+
+.ai-explainer-form textarea,
+.ai-explainer-form input[type="text"],
+.ai-explainer-form input:not([type]) {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  background: #fff;
+  color: var(--text);
+}
+
+.ai-explainer-form textarea {
+  resize: vertical;
+}
+
+.ai-explainer-form__row {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(220px, 1fr);
+  gap: 12px;
+  align-items: end;
+}
+
+.ai-explainer-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-muted);
+}
+
+.ai-explainer-options label {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.ai-explainer-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.ai-explainer-actions button {
+  padding: 10px 14px;
+  border-radius: 9px;
+  border: 1px solid var(--button-primary-border);
+  background: var(--button-primary-bg);
+  color: var(--button-primary-text);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.ai-explainer-actions button:hover {
+  background: var(--button-primary-bg-hover);
+  color: var(--button-primary-text);
+}
+
+.ai-explainer-result pre {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-x: auto;
+  background: var(--surface-muted);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  color: var(--text);
+}
+
+.ai-explainer-sources ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.ai-explainer-sources li + li {
+  margin-top: 6px;
+}
+
+@media (max-width: 760px) {
+  .ai-explainer-panel,
+  .ai-explainer-form__row {
+    grid-template-columns: 1fr;
+  }
+}
