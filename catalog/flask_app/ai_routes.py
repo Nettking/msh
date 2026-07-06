@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flask import Blueprint, render_template_string, request
+from flask import Blueprint, render_template, request
 
 from catalog.ai.grounding import append_grounding_warning
 from catalog.ai.ollama_client import DEFAULT_MODEL, OllamaError, chat
@@ -12,30 +12,6 @@ from catalog.ai.symbols import build_symbols
 from .services.server_setup_service import load_settings
 
 ai_web = Blueprint("ai_web", __name__)
-
-_PAGE = """
-<!doctype html>
-<title>MSH AI Explainer</title>
-<h1>MSH AI Explainer</h1>
-<p>Read-only local explainer for system-understanding questions. It retrieves repository context and sends only that context to Ollama.</p>
-<p>The default model comes from startup setup when available.</p>
-<form method="post" action="{{ url_for('ai_web.ai_ask') }}">
-  <label for="question">Question</label><br>
-  <textarea id="question" name="question" rows="4" cols="100">{{ question }}</textarea><br>
-  <label for="model">Model</label><br>
-  <input id="model" name="model" value="{{ model }}" size="40"><br>
-  <label><input type="checkbox" name="dry_run" value="1" {% if dry_run %}checked{% endif %}> Show retrieved context only</label><br>
-  <label><input type="checkbox" name="extractive" value="1" {% if extractive %}checked{% endif %}> Extractive answer mode</label><br><br>
-  <button type="submit">Ask</button>
-</form>
-{% if error %}<h2>Error</h2><pre>{{ error }}</pre>{% endif %}
-{% if answer %}<h2>Answer</h2><pre style="white-space: pre-wrap">{{ answer }}</pre>{% endif %}
-{% if sources %}
-<h2>Sources</h2>
-<ul>{% for source in sources %}<li><code>{{ source }}</code></li>{% endfor %}</ul>
-{% endif %}
-{% if context %}<h2>Retrieved context</h2><pre style="white-space: pre-wrap">{{ context }}</pre>{% endif %}
-"""
 
 
 def _default_model() -> str:
@@ -68,18 +44,37 @@ def _answer_question(question: str, *, model: str, dry_run: bool, extractive: bo
     return {"answer": append_grounding_warning(answer, selected), "context": "", "sources": sources, "error": ""}
 
 
+def _render_ai_page(
+    *,
+    question: str,
+    model: str,
+    dry_run: bool,
+    extractive: bool,
+    answer: str = "",
+    context: str = "",
+    sources: list[str] | None = None,
+    error: str = "",
+):
+    return render_template(
+        "ai_explainer.html",
+        question=question,
+        model=model,
+        dry_run=dry_run,
+        extractive=extractive,
+        answer=answer,
+        context=context,
+        sources=sources or [],
+        error=error,
+    )
+
+
 @ai_web.get("/ai")
 def ai_page():
-    return render_template_string(
-        _PAGE,
+    return _render_ai_page(
         question="How does data flow through MSH?",
         model=_default_model(),
         dry_run=True,
         extractive=True,
-        answer="",
-        context="",
-        sources=[],
-        error="",
     )
 
 
@@ -93,8 +88,7 @@ def ai_ask():
         result = {"answer": "", "context": "", "sources": [], "error": "Question is required."}
     else:
         result = _answer_question(question, model=model, dry_run=dry_run, extractive=extractive)
-    return render_template_string(
-        _PAGE,
+    return _render_ai_page(
         question=question,
         model=model,
         dry_run=dry_run,

@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/wizard.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/operator-strategies.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/source-tests.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/ai-explainer.css') }}">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   </head>
@@ -19,7 +20,7 @@
     {% set active_group = 'monitor' %}
     {% if endpoint.startswith('operator_strategy_web.') or endpoint in knowledge_endpoints %}
       {% set active_group = 'knowledge' %}
-    {% elif endpoint == 'web.guide' or endpoint == 'web.startup' or endpoint.startswith('source_web.') or endpoint == 'web.status' %}
+    {% elif endpoint == 'web.guide' or endpoint == 'web.startup' or endpoint.startswith('source_web.') or endpoint == 'web.status' or endpoint.startswith('ai_web.') %}
       {% set active_group = 'system' %}
     {% endif %}
 
@@ -53,6 +54,7 @@
           <a href="{{ url_for('web.guide') }}#setup-guide">Setup Guide</a>
           <a class="{% if endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ url_for('source_web.index') }}">Sources</a>
           <a class="{% if endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
+          <a class="{% if endpoint.startswith('ai_web.') %}is-active{% endif %}" href="{{ url_for('ai_web.ai_page') }}">AI Explainer</a>
         {% else %}
           <a class="{% if endpoint == 'web.overview' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Overview</a>
           <a class="{% if endpoint == 'web.live' %}is-active{% endif %}" href="{{ url_for('web.live') }}">Live</a>
