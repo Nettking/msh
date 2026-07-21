@@ -39,6 +39,10 @@ fi
 
 proot-distro build -t "$IMAGE" --install-as "$CONTAINER" "$ROOT"
 
+# data/ and results/ are excluded from the image build. Create the bind targets
+# inside the installed container before mounting the persistent Termux folders.
+proot-distro login --work-dir /app "$CONTAINER" -- mkdir -p /app/data /app/results
+
 printf '\n== Configuring MSH without Ollama ==\n'
 proot-distro login \
     --bind "$DATA_DIR:/app/data" \
