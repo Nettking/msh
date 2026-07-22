@@ -33,7 +33,9 @@ mkdir -p "$DATA_DIR" "$RESULTS_DIR"
 printf '\n== Building the MSH Linux image ==\n'
 if proot-distro list -q 2>/dev/null | grep -Fxq "$CONTAINER"; then
     echo "Replacing existing container: $CONTAINER"
-    proot-distro kill "$CONTAINER" >/dev/null 2>&1 || true
+    if ! MSH_PHONE_STOP_QUIET=1 bash "$ROOT/termux/msh-phone.sh" stop; then
+        fail "Could not stop the existing MSH container."
+    fi
     proot-distro remove "$CONTAINER"
 fi
 

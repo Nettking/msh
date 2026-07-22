@@ -7,8 +7,12 @@ STATE_DIR="${MSH_PHONE_STATE:-$HOME/msh-phone-state}"
 DATA_DIR="$STATE_DIR/data"
 RESULTS_DIR="$STATE_DIR/results"
 LOG_FILE="$RESULTS_DIR/termux-phone.log"
+PID_FILE="$RESULTS_DIR/termux-phone.pid"
 PORT="${MSH_PHONE_PORT:-5000}"
 URL="http://127.0.0.1:$PORT"
+STOP_WAIT_SECONDS="${MSH_PHONE_STOP_WAIT_SECONDS:-10}"
+KILL_WAIT_SECONDS="${MSH_PHONE_KILL_WAIT_SECONDS:-3}"
+PROC_ROOT="${MSH_PHONE_PROC_ROOT:-/proc}"
 
 usage() {
     cat <<'USAGE'
@@ -65,6 +69,145 @@ login_supports_detach() {
     proot-distro login --help 2>&1 | grep -q -- '--detach'
 }
 
+proot_distro_supports_command() {
+    proot-distro "$1" --help >/dev/null 2>&1
+}
+
+http_ready() {
+    curl -fsS "$URL/" >/dev/null 2>&1
+}
+
+process_start_time() {
+    local pid="$1"
+    local stat_line=""
+    local stat_fields=()
+
+    [[ -r "$PROC_ROOT/$pid/stat" ]] || return 1
+    IFS= read -r stat_line < "$PROC_ROOT/$pid/stat" || return 1
+    stat_line="${stat_line#*) }"
+    read -r -a stat_fields <<< "$stat_line"
+    [[ "${stat_fields[19]:-}" =~ ^[0-9]+$ ]] || return 1
+    printf '%s\n' "${stat_fields[19]}"
+}
+
+remember_server_pid() {
+    local pid="$1"
+    local start_time=""
+
+    start_time="$(process_start_time "$pid")" || return 1
+    printf '%s %s\n' "$pid" "$start_time" > "$PID_FILE"
+}
+
+tracked_server_pid() {
+    local pid=""
+    local expected_start=""
+    local current_start=""
+
+    [[ -f "$PID_FILE" ]] || return 1
+    read -r pid expected_start < "$PID_FILE" || return 1
+    [[ "$pid" =~ ^[0-9]+$ && "$expected_start" =~ ^[0-9]+$ ]] || return 1
+    current_start="$(process_start_time "$pid")" || return 1
+    [[ "$current_start" == "$expected_start" ]] || return 1
+    printf '%s\n' "$pid"
+}
+
+container_session_pids() {
+    local cmdline_file=""
+    local command_line=""
+    local pid=""
+    local current_rootfs="/containers/$CONTAINER/rootfs"
+    local legacy_rootfs="/installed-rootfs/$CONTAINER"
+
+    # PRoot-Distro 5.3 has no `ps` or `kill` command. Its proot process still
+    # exposes the container rootfs in /proc, which lets us find only sessions
+    # belonging to this MSH container (including sessions started before the
+    # PID file was introduced).
+    for cmdline_file in "$PROC_ROOT"/[0-9]*/cmdline; do
+        [[ -r "$cmdline_file" ]] || continue
+        command_line="$(tr '\0' ' ' < "$cmdline_file" 2>/dev/null || true)"
+        [[ "$command_line" == *proot* ]] || continue
+        if [[ "$command_line" != *"$current_rootfs"* && \
+              "$command_line" != *"$legacy_rootfs"* ]]; then
+            continue
+        fi
+        pid="${cmdline_file#"$PROC_ROOT"/}"
+        pid="${pid%/cmdline}"
+        [[ "$pid" =~ ^[0-9]+$ && "$pid" != "$$" ]] || continue
+        printf '%s\n' "$pid"
+    done
+}
+
+signal_process_tree() {
+    local root_pid="$1"
+    local signal_name="$2"
+    local child_pid=""
+    local children=""
+
+    [[ "$root_pid" =~ ^[0-9]+$ ]] || return 0
+    if [[ -r "$PROC_ROOT/$root_pid/task/$root_pid/children" ]]; then
+        IFS= read -r children < "$PROC_ROOT/$root_pid/task/$root_pid/children" || true
+        for child_pid in $children; do
+            signal_process_tree "$child_pid" "$signal_name"
+        done
+    fi
+    kill -s "$signal_name" "$root_pid" 2>/dev/null || true
+}
+
+signal_phone_sessions() {
+    local signal_name="$1"
+    local tracked_pid=""
+    local pid=""
+    local seen=" "
+
+    if [[ "$signal_name" == "TERM" ]] && proot_distro_supports_command kill; then
+        proot-distro kill "$CONTAINER" >/dev/null 2>&1 || true
+    fi
+
+    if tracked_pid="$(tracked_server_pid)"; then
+        signal_process_tree "$tracked_pid" "$signal_name"
+        seen+="$tracked_pid "
+    fi
+
+    while IFS= read -r pid; do
+        [[ "$seen" == *" $pid "* ]] && continue
+        signal_process_tree "$pid" "$signal_name"
+        seen+="$pid "
+    done < <(container_session_pids)
+}
+
+wait_for_http_stop() {
+    local wait_seconds="${1:-$STOP_WAIT_SECONDS}"
+    local attempt=0
+
+    [[ "$wait_seconds" =~ ^[0-9]+$ ]] || wait_seconds=10
+    for ((attempt = 0; attempt < wait_seconds; attempt++)); do
+        http_ready || return 0
+        sleep 1
+    done
+    ! http_ready
+}
+
+stop_server() {
+    local quiet="${1:-false}"
+
+    require_ready
+    signal_phone_sessions TERM
+    if ! wait_for_http_stop; then
+        signal_phone_sessions KILL
+        wait_for_http_stop "$KILL_WAIT_SECONDS" || true
+    fi
+
+    if http_ready; then
+        echo "MSH is still responding at $URL; stop was not confirmed." >&2
+        return 1
+    fi
+
+    rm -f "$PID_FILE"
+    if [[ "$quiet" != "true" && "${MSH_PHONE_STOP_QUIET:-0}" != "1" ]]; then
+        echo "MSH stopped."
+    fi
+}
+
 start_server_process() {
     local guest_command='exec python -m catalog.flask_app.app >> results/termux-phone.log 2>&1'
 
@@ -78,6 +221,11 @@ start_server_process() {
     nohup "${login_base[@]}" "$CONTAINER" -- bash -lc "$guest_command" \
         </dev/null >> "$LOG_FILE" 2>&1 &
     local server_pid=$!
+    if ! remember_server_pid "$server_pid"; then
+        echo "Could not record the MSH server process." >&2
+        kill "$server_pid" 2>/dev/null || true
+        return 1
+    fi
     disown "$server_pid" 2>/dev/null || true
 }
 
@@ -110,13 +258,14 @@ doctor() {
 
 start_server() {
     require_ready
-    proot-distro kill "$CONTAINER" >/dev/null 2>&1 || true
+    stop_server true
     : > "$LOG_FILE"
+    rm -f "$PID_FILE"
     start_server_process
 
     echo "Starting MSH at $URL ..."
     for _ in $(seq 1 30); do
-        if curl -fsS "$URL/" >/dev/null 2>&1; then
+        if http_ready; then
             echo "MSH is ready: $URL"
             return 0
         fi
@@ -124,6 +273,7 @@ start_server() {
     done
     echo "MSH did not become ready within 30 seconds." >&2
     tail -n 120 "$LOG_FILE" 2>/dev/null || true
+    stop_server true || true
     return 1
 }
 
@@ -132,8 +282,13 @@ run_guest() {
     "${login_base[@]}" "$CONTAINER" -- "$@"
 }
 
-command_name="${1:-start}"
-case "$command_name" in
+main() {
+    local command_name="${1:-start}"
+    local lines=""
+    local session_pids=""
+    local sources=""
+
+    case "$command_name" in
     doctor)
         doctor
         ;;
@@ -142,23 +297,29 @@ case "$command_name" in
         ;;
     foreground)
         require_ready
-        proot-distro kill "$CONTAINER" >/dev/null 2>&1 || true
+        stop_server true
         "${login_base[@]}" "$CONTAINER" -- python -m catalog.flask_app.app
         ;;
     stop)
-        require_ready
-        proot-distro kill "$CONTAINER" >/dev/null 2>&1 || true
-        echo "MSH stopped."
+        stop_server
         ;;
     restart)
-        require_ready
-        proot-distro kill "$CONTAINER" >/dev/null 2>&1 || true
         start_server
         ;;
     status)
         require_ready
-        proot-distro ps || true
-        if curl -fsS "$URL/" >/dev/null 2>&1; then
+        if proot_distro_supports_command ps; then
+            proot-distro ps || true
+        else
+            session_pids="$(container_session_pids)"
+            if [[ -n "$session_pids" ]]; then
+                session_pids="${session_pids//$'\n'/, }"
+                echo "PRoot: MSH session found (PID $session_pids)"
+            else
+                echo "PRoot: no MSH session found"
+            fi
+        fi
+        if http_ready; then
             echo "HTTP: ready at $URL"
         else
             echo "HTTP: not responding at $URL"
@@ -218,6 +379,11 @@ case "$command_name" in
         ;;
     *)
         usage >&2
-        exit 2
+        return 2
         ;;
-esac
+    esac
+}
+
+if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
+    main "$@"
+fi
