@@ -36,8 +36,8 @@ def _next_path() -> str:
     return request.form.get("next") or request.args.get("next") or url_for("web.overview")
 
 
-def _startup_step_url(step: str) -> str:
-    return url_for("web.startup", next=_next_path(), step=step)
+def _startup_step_url(step: str, *, next_path: str | None = None) -> str:
+    return url_for("web.startup", next=next_path or _next_path(), step=step)
 
 
 @server_setup_web.before_app_request
@@ -76,23 +76,34 @@ def browser_setup_gate():
 
 def _save_from_request():
     try:
+        previous_settings = load_settings()
+        first_user_setup = not (
+            previous_settings.configured and previous_settings.user_setup_complete
+        )
+    except ServerSetupError:
+        # A valid browser save is also the recovery path for an unreadable setup
+        # file, so treat it as a first setup instead of blocking the replacement.
+        first_user_setup = True
+
+    try:
         settings = settings_from_form(request.form)
         save_settings(settings)
     except ServerSetupError as exc:
         flash(str(exc), "error")
         return redirect(_startup_step_url("review"))
 
-    flash("Server setup saved.", "success")
+    next_path = url_for("web.get_started") if first_user_setup else _next_path()
+    flash("Device setup saved.", "success")
     if runtime_should_start(settings):
         if get_runtime_manager().requires_startup_choice():
             flash("Choose how runtime should start next.", "info")
-            return redirect(_startup_step_url("runtime"))
+            return redirect(_startup_step_url("runtime", next_path=next_path))
         start_runtime_background()
         flash("Runtime background processing is enabled.", "success")
-        return redirect(_next_path())
+        return redirect(next_path)
 
     flash("Background orchestration is disabled for this setup mode.", "info")
-    return redirect(_next_path())
+    return redirect(next_path)
 
 
 def _settings_for_ai_form():

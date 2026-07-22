@@ -271,6 +271,13 @@ def guide():
     return render_template("guide.html")
 
 
+@web.route("/get-started")
+def get_started():
+    """Offer a focused first task after the user completes device setup."""
+
+    return render_template("get_started.html")
+
+
 @web.route("/live")
 def live():
     snapshot = get_live_telemetry_service().snapshot(_catalog())

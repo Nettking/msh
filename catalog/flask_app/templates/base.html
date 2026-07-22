@@ -14,9 +14,9 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   </head>
-  <body class="{% if request.endpoint == 'web.startup' %}setup-focus{% endif %}">
-    {% set endpoint = request.endpoint or '' %}
-    {% set setup_focus = endpoint == 'web.startup' %}
+  {% set endpoint = request.endpoint or '' %}
+  {% set setup_focus = endpoint in ['web.startup', 'web.get_started'] %}
+  <body class="{% if setup_focus %}setup-focus{% endif %}">
     {% set setup_is_configured = server_setup_settings and server_setup_settings.configured and server_setup_settings.user_setup_complete %}
     {% set setup_runtime_pending = startup_state is defined and startup_state.requires_choice %}
     {% set knowledge_endpoints = ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export', 'operator_support_web.first_part', 'operator_support_web.quality_outcomes', 'operator_support_web.machine_notes', 'operator_support_web.learning', 'operator_support_web.recommender_artifacts', 'web.strategies', 'web.save_strategies'] %}
@@ -32,11 +32,13 @@
       <div class="setup-shell-header__identity">
         <span class="setup-shell-header__mark" aria-hidden="true">MSH</span>
         <div>
-          <strong>Device setup</strong>
-          <span>One step at a time</span>
+          <strong>{{ 'MSH ready' if endpoint == 'web.get_started' else 'Device setup' }}</strong>
+          <span>{{ 'Choose your first task' if endpoint == 'web.get_started' else 'One step at a time' }}</span>
         </div>
       </div>
-      {% if setup_is_configured and not setup_runtime_pending %}
+      {% if endpoint == 'web.get_started' %}
+      <a class="setup-shell-header__exit" href="{{ url_for('web.overview') }}">Full workbench</a>
+      {% elif setup_is_configured and not setup_runtime_pending %}
       <a class="setup-shell-header__exit" href="{{ next_path or url_for('web.overview') }}">Exit setup</a>
       {% else %}
       <span class="setup-shell-header__state">{{ 'Start MSH' if setup_is_configured else 'First-time setup' }}</span>

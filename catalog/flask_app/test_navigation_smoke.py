@@ -52,6 +52,7 @@ def test_main_navigation_pages_load(monkeypatch, tmp_path):
     pages = [
         ("/", "Overview"),
         ("/guide", "How to use MSH"),
+        ("/get-started", "What do you want to do first?"),
         ("/startup", "MSH is ready"),
         ("/startup?edit=1&step=ai", "Language-model capability"),
         ("/sources/", "Sources"),
@@ -68,3 +69,22 @@ def test_main_navigation_pages_load(monkeypatch, tmp_path):
         response = client.get(path)
         assert response.status_code == 200, path
         assert expected_text in response.get_data(as_text=True), path
+
+
+def test_get_started_is_a_focused_task_handoff(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    _patch_runtime(monkeypatch)
+    _patch_setup(monkeypatch)
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    html = app.test_client().get("/get-started").get_data(as_text=True)
+
+    assert '<body class="setup-focus">' in html
+    assert "site-nav--primary" not in html
+    assert "Artifact scan:" not in html
+    assert "Rescan" not in html
+    assert "Capture operator knowledge" in html
+    assert 'href="/operator-strategies/capture"' in html
+    assert 'href="/sources/"' in html
+    assert "Full workbench" in html

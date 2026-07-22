@@ -61,6 +61,7 @@ Main pages:
 - `/assist` — support cards with possible causes, next steps, risks, alternatives, and operator confirmation.
 - `/guide` — in-app user guide.
 - `/startup` — server role, connected language-model provider, model choice, and runtime startup decisions.
+- `/get-started` — focused first-task handoff shown once after initial setup and any required session-start choice.
 - `/sources/` — machine/source inventory, MTConnect URL setup, vibration sensors, Observer Phoenix link, and connection tests.
 - `/status` — diagnostics, runtime milestones, catch-up state, discovered artifacts, and readiness signals.
 - `/operator-strategies/capture` — capture one raw operator statement quickly during field work.

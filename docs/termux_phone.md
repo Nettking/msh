@@ -62,7 +62,7 @@ bash termux/msh-phone.sh start
 bash termux/msh-phone.sh open
 ```
 
-On a fresh phone installation, the browser opens the focused setup wizard. The technical defaults written by the Termux installer do not count as a completed user setup.
+On a fresh phone installation, the browser opens the focused setup wizard. The technical defaults written by the Termux installer do not count as a completed user setup. After setup and the session-start choice, a compact first-task screen lets the user capture an operator statement, connect machine data, or open the full workbench.
 
 Alternatively, open this manually in the Android browser:
 

@@ -527,6 +527,106 @@
   margin: 12px 0;
 }
 
+.get-started-hero,
+.get-started-panel {
+  border: 1px solid #bfdbfe;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
+}
+
+.get-started-hero {
+  margin-bottom: 12px;
+  padding: 20px;
+  background:
+    radial-gradient(circle at top left, #dbeafe 0, rgba(219, 234, 254, 0) 42%),
+    rgba(255, 255, 255, 0.96);
+}
+
+.get-started-hero h2 {
+  margin-top: 8px;
+  font-size: clamp(1.75rem, 5vw, 2.45rem);
+  line-height: 1.08;
+}
+
+.get-started-hero p {
+  margin-top: 8px;
+  max-width: 58ch;
+}
+
+.get-started-panel {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.get-started-panel__header p {
+  margin-top: 5px;
+  max-width: 64ch;
+}
+
+.get-started-action {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  background: #f8fafc;
+  color: #334155;
+  text-decoration: none;
+}
+
+.get-started-action:hover {
+  border-color: #60a5fa;
+  background: #ffffff;
+}
+
+.get-started-action strong {
+  color: #0f172a;
+  font-size: 1.08rem;
+}
+
+.get-started-action > span:not(.get-started-action__eyebrow):not(.get-started-action__button):not(.get-started-action__link) {
+  overflow-wrap: anywhere;
+}
+
+.get-started-action--primary {
+  border-width: 2px;
+  border-color: #60a5fa;
+  background: #eff6ff;
+}
+
+.get-started-action__eyebrow {
+  width: fit-content;
+  color: #1e3a8a;
+  font-size: 0.76rem;
+  font-weight: 900;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.get-started-action__button,
+.get-started-action__link {
+  width: fit-content;
+  margin-top: 3px;
+  color: #1d4ed8;
+  font-weight: 850;
+}
+
+.get-started-action__button {
+  border-radius: 999px;
+  padding: 8px 12px;
+  background: #2563eb;
+  color: #ffffff;
+}
+
+.get-started-alternatives {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
 .is-hidden {
   display: none !important;
 }
@@ -574,5 +674,14 @@
   .setup-choice-card {
     min-height: 0;
     padding: 14px;
+  }
+
+  .get-started-hero,
+  .get-started-panel {
+    padding: 15px;
+  }
+
+  .get-started-alternatives {
+    grid-template-columns: 1fr;
   }
 }

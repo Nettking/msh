@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="get-started-hero">
+  <span class="setup-eyebrow">Setup complete</span>
+  <h2>This device is ready</h2>
+  <p>Your choices are saved. You do not need to configure anything else before using MSH.</p>
+</section>
+
+<section class="get-started-panel" aria-labelledby="firstTaskHeading">
+  <div class="get-started-panel__header">
+    <h2 id="firstTaskHeading">What do you want to do first?</h2>
+    <p>If you are unsure, start by capturing one operator statement. It works before playback data is ready.</p>
+  </div>
+
+  <a class="get-started-action get-started-action--primary" href="{{ endpoint_url('operator_strategy_web.capture', '/operator-strategies/capture') }}">
+    <span class="get-started-action__eyebrow">Recommended first task</span>
+    <strong>Capture operator knowledge</strong>
+    <span>Write down one raw statement or observation now. You can review and structure it later.</span>
+    <span class="get-started-action__button">Capture a statement</span>
+  </a>
+
+  <div class="get-started-alternatives">
+    <a class="get-started-action" href="{{ endpoint_url('source_web.index', '/sources/') }}">
+      <strong>Connect machine data</strong>
+      <span>Add or inspect the machines and sensor sources available to this device.</span>
+      <span class="get-started-action__link">Open sources</span>
+    </a>
+    <a class="get-started-action" href="{{ url_for('web.overview') }}">
+      <strong>Explore the full workbench</strong>
+      <span>Open monitoring, playback, assistance, and system tools when you want the complete view.</span>
+      <span class="get-started-action__link">Open full MSH</span>
+    </a>
+  </div>
+</section>
+{% endblock %}
