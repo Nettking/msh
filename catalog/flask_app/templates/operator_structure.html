@@ -17,8 +17,6 @@
   <section class="section-block section-block--primary">
     <h3>Step 3: map the statement to OSL keywords</h3>
     <p>The goal is not to complete every field. The goal is to make the reasoning explicit enough that it can be reused or exported.</p>
-    <input type="hidden" name="raw_statement" value="{{ record.raw_statement or record.decision }}">
-
     <div class="operator-detail-grid">
       <label class="operator-field-wide"><span>Strategy name</span><input type="text" name="strategy_name" value="{{ record.strategy_name }}" placeholder="Cold start offset strategy"></label>
       <label><span>Issue / situation</span><input type="text" name="issue" value="{{ record.issue }}" placeholder="chatter / cold start / tool wear"></label>

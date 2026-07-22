@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import asdict, dataclass
+import hashlib
 import json
 from pathlib import Path
 import re
@@ -13,7 +14,7 @@ INCLUDE_FILES = {"Dockerfile", "Dockerfile.cli", "requirements.txt"}
 EXCLUDED_DIRS = {".git", ".cache", "__pycache__", "data", "results", "legacy", "tests"}
 EXCLUDED_SUFFIXES = {".pyc", ".parquet", ".duckdb", ".jsonl"}
 TOKEN_RE = re.compile(r"[A-Za-z0-9_./-]+")
-INDEX_VERSION = 1
+INDEX_VERSION = 2
 DEFAULT_INDEX_PATH = Path(".cache") / "msh_ai_index.json"
 
 
@@ -88,6 +89,7 @@ def _file_fingerprint(root: Path) -> list[dict[str, Any]]:
                 "path": path.relative_to(root).as_posix(),
                 "mtime_ns": stat.st_mtime_ns,
                 "size": stat.st_size,
+                "sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
             }
         )
     return fingerprint

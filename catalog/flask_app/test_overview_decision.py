@@ -43,9 +43,9 @@ def test_overview_decision_explains_empty_scan():
         sessions=[],
     )
 
-    assert overview.decision["title"] == "No artifacts have been discovered yet"
+    assert overview.decision["title"] == "No playback-ready data is indexed yet"
     assert "rescan" in overview.decision["next_step"].lower()
-    assert overview.decision["primary_action"]["href"] == "/control"
+    assert overview.decision["primary_action"]["href"] == "/status"
 
 
 def test_overview_decision_prioritizes_runtime_failure():

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import asdict
 from typing import Any
 
 from .operator_strategy_service import OperatorStrategyService
@@ -66,6 +65,7 @@ class OperatorSupportService:
         related = [note for note in notes if issue_key in _note_text(note)]
         evidence = [f"{len(related)} related operator note(s) found."] if related else ["No local operator notes yet; using seed rule template."]
         return SupportCard(
+            id=f"template-{issue_key.replace('_', '-')}",
             issue=issue_key.replace("_", " ").title(),
             observation=f"Potential {issue_key.replace('_', ' ')} situation.",
             possible_causes=CAUSE_LIBRARY[issue_key],
@@ -81,6 +81,7 @@ class OperatorSupportService:
     def _card_from_reusable_note(self, note: dict[str, Any]) -> SupportCard:
         action_type = str(note.get("action_type") or "manual_note")
         return SupportCard(
+            id=f"note-{note.get('id')}",
             issue=str(note.get("issue") or note.get("strategy_situation") or "Reusable operator strategy"),
             observation=str(note.get("observation") or note.get("context") or "Similar previous operator note exists."),
             possible_causes=[str(note.get("possible_cause") or note.get("hypothesis") or "operator experience")],

@@ -26,8 +26,9 @@ def test_overview_template_is_snapshot_driven() -> None:
         assert re.search(pattern, template) is None, f'overview.html should not contain legacy token pattern: {pattern}'
 
     assert 'overview.headline.' in template
+    assert 'overview.decision.' in template
     assert 'overview.activity.' in template
-    assert 'overview.runtime.' in template
-    assert 'overview.readiness' in template
-    assert 'overview.quick_links' in template
     assert 'overview.warnings' in template
+    assert 'overview.runtime.' not in template
+    assert 'overview.readiness' not in template
+    assert 'overview.quick_links' not in template

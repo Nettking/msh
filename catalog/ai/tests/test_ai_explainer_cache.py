@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from catalog.ai.repo_index import build_chunks, load_cached_chunks, load_or_build_chunks, save_cached_chunks
@@ -17,11 +18,13 @@ def test_cached_chunks_round_trip_and_invalidate_when_source_changes(tmp_path: P
     chunks = build_chunks(root)
 
     cache_path = save_cached_chunks(root, chunks)
+    original_stat = source.stat()
 
     assert cache_path.exists()
     assert load_cached_chunks(root) == chunks
 
     source.write_text("Changed overview\n", encoding="utf-8")
+    os.utime(source, ns=(original_stat.st_atime_ns, original_stat.st_mtime_ns))
 
     assert load_cached_chunks(root) is None
 

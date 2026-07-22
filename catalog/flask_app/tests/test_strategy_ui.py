@@ -126,10 +126,10 @@ def test_strategies_page_loads_successfully(tmp_path: Path, monkeypatch) -> None
 
     assert response.status_code == 200
     body = response.get_data(as_text=True)
-    assert "Intervention strategies" in body
+    assert "Intervention Logic" in body
     assert "override_drop" in body
     assert "operator_override_change" in body
-    assert "Active strategy signature" in body
+    assert "Active rule signature" in body
 
 
 def test_valid_strategy_edits_save_to_yaml(tmp_path: Path, monkeypatch) -> None:
@@ -226,7 +226,7 @@ def test_strategies_page_renders_single_form_and_collapsible_sections(
     body = response.get_data(as_text=True)
     assert body.count('<form method="post"') == 1
     assert "<details" in body
-    assert "Add new strategy" in body
+    assert "Add new intervention rule" in body
 
 
 def test_strategies_page_renders_each_strategy_zero_field_once(

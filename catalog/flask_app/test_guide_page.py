@@ -24,7 +24,11 @@ def _patch_runtime(monkeypatch) -> None:
 
 
 def _patch_setup(monkeypatch) -> None:
-    monkeypatch.setattr(app_module, "load_settings", lambda: default_settings(configured=True))
+    def load_configured_settings():
+        return default_settings(configured=True)
+
+    monkeypatch.setattr(app_module, "load_settings", load_configured_settings)
+    monkeypatch.setattr("catalog.flask_app.server_setup_routes.load_settings", load_configured_settings)
 
 
 def test_guide_page_explains_knowledge_flow(monkeypatch, tmp_path):
@@ -40,7 +44,7 @@ def test_guide_page_explains_knowledge_flow(monkeypatch, tmp_path):
     assert response.status_code == 200
     html = response.get_data(as_text=True)
     assert "How to use MSH" in html
-    assert "Monitor, Knowledge, and System" in html
+    assert "Three areas, three purposes" in html
     assert "Start here" in html
     assert "At the machine" in html
     assert "Recommended knowledge flow" in html

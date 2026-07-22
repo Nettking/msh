@@ -11,7 +11,11 @@ class StrategyComparisonService:
         self.note_service = note_service or OperatorStrategyService()
 
     def comparisons(self) -> list[dict[str, Any]]:
-        notes = self.note_service.recent_records(limit=500)
+        notes = [
+            note
+            for note in self.note_service.recent_records(limit=500)
+            if note.get("review_status") in {"structured", "reusable"}
+        ]
         grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
         for note in notes:
             key = _situation_key(note)

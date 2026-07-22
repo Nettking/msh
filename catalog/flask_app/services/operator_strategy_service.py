@@ -166,15 +166,15 @@ class OperatorStrategyService:
             action_type=_text(form, "action_type") or _infer_action_type(decision),
             worked=_text(form, "worked") or "unknown",
             outcome=_text(form, "outcome"),
-            reusable_strategy=bool(form.get("reusable_strategy")),
+            reusable_strategy=False,
             alternative_strategy=_text(form, "alternative_strategy"),
-            operator_confirmation_required=bool(form.get("operator_confirmation_required")),
+            operator_confirmation_required=_bool_from_form(form, "operator_confirmation_required"),
             quality_result_id=_text(form, "quality_result_id"),
             first_part_approval_id=_text(form, "first_part_approval_id"),
             machine_id=_text(form, "machine_id"),
             sensor_ids=_split_ids(form.getlist("sensor_ids") if hasattr(form, "getlist") else form.get("sensor_ids")),
             raw_statement=raw_statement,
-            review_status=_text(form, "review_status") or "captured",
+            review_status="captured",
         )
         _validate_record(record)
         records = self.load_records()
@@ -253,7 +253,7 @@ class OperatorStrategyService:
 
 
 _STRUCTURE_FIELDS = {
-    "raw_statement", "strategy_name", "strategy_situation", "machine", "machine_id", "process", "operation",
+    "strategy_name", "strategy_situation", "machine", "machine_id", "process", "operation",
     "issue", "observation", "trigger", "context", "hypothesis", "possible_cause", "goal", "decision",
     "action_type", "rationale", "expected_outcome", "risk", "trade_off", "alternative_strategy", "confidence",
     "evidence", "trace_target", "notes", "worked", "outcome", "quality_result_id", "first_part_approval_id",
@@ -287,8 +287,8 @@ def _normalize_record(record: dict[str, Any]) -> dict[str, Any]:
     for key, value in defaults.items():
         normalized.setdefault(key, value)
     normalized["sensor_ids"] = _split_ids(normalized.get("sensor_ids"))
-    normalized["reusable_strategy"] = bool(normalized.get("reusable_strategy"))
-    normalized["operator_confirmation_required"] = bool(normalized.get("operator_confirmation_required"))
+    normalized["reusable_strategy"] = _coerce_bool(normalized.get("reusable_strategy"))
+    normalized["operator_confirmation_required"] = _coerce_bool(normalized.get("operator_confirmation_required"))
     return normalized
 
 
@@ -317,7 +317,13 @@ def _bool_from_form(form: Any, name: str, default: bool = False) -> bool:
     if hasattr(form, "get") and form.get(name) is None:
         return default
     value = form.get(name) if hasattr(form, "get") else None
-    return str(value).lower() in {"1", "true", "yes", "on"}
+    return _coerce_bool(value)
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _infer_action_type(decision: str) -> str:

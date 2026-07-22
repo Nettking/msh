@@ -54,3 +54,39 @@ def test_operator_note_can_be_structured_later(tmp_path):
     assert structured["issue"] == "chatter"
     assert structured["review_status"] == "reusable"
     assert structured["reusable_strategy"] is True
+
+
+def test_capture_cannot_skip_review_or_treat_zero_as_true(tmp_path):
+    service = OperatorStrategyService(tmp_path / "records.json")
+
+    record = service.add_from_form(
+        {
+            "raw_statement": "The spindle sounds different after warm-up.",
+            "reusable_strategy": "on",
+            "review_status": "reusable",
+            "operator_confirmation_required": "0",
+        }
+    )
+
+    assert record.review_status == "captured"
+    assert record.reusable_strategy is False
+    assert record.operator_confirmation_required is False
+
+
+def test_structuring_preserves_the_original_statement(tmp_path):
+    service = OperatorStrategyService(tmp_path / "records.json")
+    record = service.add_from_form({"raw_statement": "Original operator wording."})
+
+    ok, message = service.update_structure(
+        record.id,
+        {
+            "raw_statement": "Replacement text that must be ignored.",
+            "decision": "Inspect the insert.",
+        },
+    )
+
+    assert ok, message
+    structured = service.get_record(record.id)
+    assert structured is not None
+    assert structured["raw_statement"] == "Original operator wording."
+    assert structured["decision"] == "Inspect the insert."

@@ -48,19 +48,20 @@
 
 <section class="section-block section-block--highlight">
   <h3>Where do I configure the vibration sensor?</h3>
-  <p>The vibration sensor should be configured as part of the data source, not on Overview or Diagnostics.</p>
+  <p>Configure vibration sensors in the source inventory, where each channel can be assigned to a machine.</p>
   <div class="info-grid">
     <article class="info-card">
-      <h4>Today</h4>
-      <p>MSH can store Observer Phoenix connection settings here: base URL, username, password, TLS, and timeout.</p>
+      <h4>Observer Phoenix connection</h4>
+      <p>This page stores the connection settings: base URL, username, password, TLS, and timeout.</p>
     </article>
     <article class="info-card">
-      <h4>Not implemented yet</h4>
-      <p>There is not yet a dedicated UI for mapping a specific vibration sensor/channel to a machine, axis, or measurement type.</p>
+      <h4>Machine and channel mapping</h4>
+      <p>The source inventory stores the machine, sensor name, signal/channel, axis, unit, sampling rate, and enabled state.</p>
+      <a class="button-link" href="{{ url_for('source_web.index') }}">Open source inventory</a>
     </article>
     <article class="info-card">
-      <h4>Next sensible feature</h4>
-      <p>Add a source mapping section here for vibration channels, for example: machine, sensor name, signal/channel, unit, sampling rate, and enabled/disabled.</p>
+      <h4>Separation of settings</h4>
+      <p>Keep credentials on this page and machine/sensor assignments in the source inventory.</p>
     </article>
   </div>
 </section>

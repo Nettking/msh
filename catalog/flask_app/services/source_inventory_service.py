@@ -67,7 +67,7 @@ class SourceInventoryService:
         payload.setdefault("vibration_sensors", [])
         payload.setdefault("updated_at", "")
         payload["machines"] = [_normalize_machine(item) for item in payload["machines"] if isinstance(item, dict)]
-        payload["vibration_sensors"] = [item for item in payload["vibration_sensors"] if isinstance(item, dict)]
+        payload["vibration_sensors"] = [_normalize_sensor(item) for item in payload["vibration_sensors"] if isinstance(item, dict)]
         return payload
 
     def status_model(self) -> dict[str, Any]:
@@ -141,7 +141,7 @@ class SourceInventoryService:
             axis=_text(form, "axis"),
             unit=_text(form, "unit") or "mm/s",
             sampling_rate_hz=_text(form, "sampling_rate_hz"),
-            enabled=bool(form.get("enabled")),
+            enabled=_coerce_bool(form.get("enabled")),
             notes=_text(form, "notes"),
             created_at=_now_utc(),
         )
@@ -166,6 +166,7 @@ class SourceInventoryService:
         inventory.setdefault("machines", [])
         inventory.setdefault("vibration_sensors", [])
         inventory["machines"] = [_normalize_machine(item) for item in inventory["machines"] if isinstance(item, dict)]
+        inventory["vibration_sensors"] = [_normalize_sensor(item) for item in inventory["vibration_sensors"] if isinstance(item, dict)]
         self.inventory_path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.inventory_path.with_suffix(self.inventory_path.suffix + ".tmp")
         tmp.write_text(json.dumps(inventory, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
@@ -189,6 +190,12 @@ def _normalize_machine(machine: dict[str, Any]) -> dict[str, Any]:
     return normalized
 
 
+def _normalize_sensor(sensor: dict[str, Any]) -> dict[str, Any]:
+    normalized = dict(sensor)
+    normalized["enabled"] = _coerce_bool(sensor.get("enabled"))
+    return normalized
+
+
 def _text(form: Any, name: str) -> str:
     return str(form.get(name) or "").strip()
 
@@ -196,6 +203,12 @@ def _text(form: Any, name: str) -> str:
 def _safe_id(value: Any) -> str:
     candidate = str(value or "").strip()
     return "".join(character for character in candidate if character.isalnum() or character in {"-", "_"})[:64]
+
+
+def _coerce_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value or "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _now_utc() -> str:

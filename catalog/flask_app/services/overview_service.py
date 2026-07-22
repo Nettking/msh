@@ -18,9 +18,6 @@ class OverviewSnapshot:
     headline: dict[str, Any]
     decision: dict[str, Any]
     activity: dict[str, Any]
-    runtime: dict[str, Any]
-    readiness: list[dict[str, str]]
-    quick_links: list[dict[str, str]]
     warnings: list[str]
 
 
@@ -47,9 +44,6 @@ def build_overview_snapshot(
         headline=headline,
         decision=decision,
         activity=machine_activity,
-        runtime=runtime,
-        readiness=readiness,
-        quick_links=_quick_links(readiness),
         warnings=list(scan.warnings),
     )
 
@@ -434,24 +428,3 @@ def _context_note(context_source: str, session_id: str) -> str:
     if context_source == "fallback_latest" and session_id:
         return "Runtime session id was unavailable/not found; using deterministic latest-session fallback."
     return "No runtime session context is available yet."
-
-
-def _quick_links(readiness: list[dict[str, str]]) -> list[dict[str, str]]:
-    readiness_map = {item["view"]: item for item in readiness}
-
-    def _entry(view: str, label: str) -> dict[str, str]:
-        item = readiness_map.get(view, {"state": "unknown", "message": "No readiness summary available."})
-        return {
-            "href": view,
-            "label": label,
-            "state": item["state"],
-            "hint": item["message"],
-        }
-
-    return [
-        _entry("/playback", "Open playback"),
-        _entry("/status", "Open status"),
-        _entry("/control", "Open control"),
-        _entry("/live", "Open live"),
-        _entry("/", "Refresh overview"),
-    ]

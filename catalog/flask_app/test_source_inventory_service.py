@@ -71,3 +71,13 @@ def test_existing_machines_are_normalized_with_connection_fields(tmp_path):
     assert machine["mtconnect_url"] == ""
     assert machine["vpn_test_host"] == ""
     assert machine["vpn_test_port"] == ""
+
+
+def test_sensor_boolean_values_are_parsed_explicitly(tmp_path):
+    service = SourceInventoryService(tmp_path / "sources.json")
+
+    assert service.add_vibration_sensor_from_form({"name": "Disabled sensor", "enabled": "0"})[0]
+
+    sensor = service.status_model()["vibration_sensors"][0]
+    assert sensor["enabled"] is False
+    assert service.status_model()["enabled_sensor_count"] == 0

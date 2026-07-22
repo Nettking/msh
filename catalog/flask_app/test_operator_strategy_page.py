@@ -24,7 +24,11 @@ def _patch_runtime(monkeypatch) -> None:
 
 
 def _patch_setup(monkeypatch) -> None:
-    monkeypatch.setattr(app_module, "load_settings", lambda: default_settings(configured=True))
+    def load_configured_settings():
+        return default_settings(configured=True)
+
+    monkeypatch.setattr(app_module, "load_settings", load_configured_settings)
+    monkeypatch.setattr("catalog.flask_app.server_setup_routes.load_settings", load_configured_settings)
 
 
 def test_operator_strategy_capture_is_statement_first(monkeypatch, tmp_path):
