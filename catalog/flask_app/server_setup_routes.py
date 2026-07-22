@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from dataclasses import replace
-
 from flask import Blueprint, flash, jsonify, redirect, request, url_for
 
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
@@ -10,7 +8,9 @@ from .services.ai_model_benchmark_service import compare_ollama_setup_models
 from .services.server_setup_service import (
     AI_MODEL_CHOICES,
     ServerSetupError,
+    ai_settings_from_form,
     load_settings,
+    ollama_status,
     pull_ollama_model,
     runtime_should_start,
     save_settings,
@@ -25,6 +25,7 @@ _SETUP_PATHS = {
     "/server-setup/save",
     "/server-setup/pull-model",
     "/server-setup/test-ai-model",
+    "/server-setup/test-ai-connection",
     "/server-setup/compare-ai-models",
     "/status",
     "/rescan",
@@ -57,6 +58,8 @@ def browser_setup_gate():
         return _pull_from_request()
     if request.path == "/server-setup/test-ai-model" and request.method == "POST":
         return _test_ai_model_from_request()
+    if request.path == "/server-setup/test-ai-connection" and request.method == "POST":
+        return _test_ai_connection_from_request()
     if request.path == "/server-setup/compare-ai-models" and request.method == "POST":
         return _compare_ai_models_from_request()
     if request.path in _SETUP_PATHS:
@@ -93,11 +96,7 @@ def _save_from_request():
 
 
 def _settings_for_ai_form():
-    settings = load_settings()
-    form_ai_enabled = request.form.get("ai_enabled") in {"on", "1", "true", "yes"}
-    if form_ai_enabled and not settings.ai_enabled:
-        settings = replace(settings, ai_enabled=True)
-    return settings
+    return ai_settings_from_form(request.form, load_settings())
 
 
 def _selected_ai_model_from_request(settings) -> str:
@@ -135,6 +134,17 @@ def _test_ai_model_from_request():
     return jsonify(result), 200 if result.get("ok") else 503
 
 
+def _test_ai_connection_from_request():
+    try:
+        settings = _settings_for_ai_form()
+    except ServerSetupError as exc:
+        return jsonify({"ok": False, "message": str(exc)}), 400
+
+    status = ollama_status(settings, timeout_seconds=3.0)
+    status["ok"] = bool(status.get("running"))
+    return jsonify(status), 200 if status["ok"] else 503
+
+
 def _compare_ai_models_from_request():
     try:
         settings = _settings_for_ai_form()
@@ -148,6 +158,11 @@ def _compare_ai_models_from_request():
 @server_setup_web.post("/server-setup/test-ai-model")
 def test_ai_model():
     return _test_ai_model_from_request()
+
+
+@server_setup_web.post("/server-setup/test-ai-connection")
+def test_ai_connection():
+    return _test_ai_connection_from_request()
 
 
 @server_setup_web.post("/server-setup/compare-ai-models")

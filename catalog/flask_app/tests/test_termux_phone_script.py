@@ -6,6 +6,7 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 PHONE_SCRIPT = REPO_ROOT / "termux" / "msh-phone.sh"
+SETUP_SCRIPT = REPO_ROOT / "termux" / "setup-phone.sh"
 
 
 def _write_executable(path: Path, body: str) -> None:
@@ -94,3 +95,10 @@ def test_stop_does_not_claim_success_while_http_responds(tmp_path: Path) -> None
     assert result.returncode == 1
     assert "MSH stopped." not in result.stdout
     assert "stop was not confirmed" in result.stderr
+
+
+def test_phone_rebuild_preserves_saved_connected_capabilities() -> None:
+    script = SETUP_SCRIPT.read_text(encoding="utf-8")
+
+    assert 'DATA_DIR/server_setup/server_settings.json' in script
+    assert "Preserving existing browser setup, including connected capabilities." in script

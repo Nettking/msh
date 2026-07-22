@@ -66,6 +66,10 @@ def test_startup_ai_step_exposes_model_suggestion_benchmark(monkeypatch, tmp_pat
     assert "Benchmark and model suggestion" in html
     assert "Benchmark and suggest model" in html
     assert "/server-setup/test-ai-model" in html
+    assert "Connected computer" in html
+    assert 'name="ai_provider_mode"' in html
+    assert 'name="ollama_base_url"' in html
+    assert "/server-setup/test-ai-connection" in html
 
 
 def test_ai_model_benchmark_endpoint_returns_recommendation(monkeypatch, tmp_path):

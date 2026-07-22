@@ -18,10 +18,15 @@ import subprocess
 
 from catalog.flask_app.services.server_setup_service import (
     AI_MODEL_CHOICES,
+    AI_PROVIDER_MODES,
+    DEFAULT_OLLAMA_BASE_URL,
     DEPLOYMENT_MODES,
+    ServerSetupError,
     ServerSetupSettings,
     compose_profiles_for,
     env_lines_for,
+    normalize_ollama_base_url,
+    pull_ollama_model,
     save_settings,
 )
 
@@ -74,13 +79,29 @@ def _settings_from_args(args: argparse.Namespace) -> ServerSetupSettings:
     if args.mode not in set(DEPLOYMENT_MODES) | set(ONE_SHOT_MODES):
         raise SystemExit(f"Unknown --mode: {args.mode}")
     ai_enabled = not args.no_ai and args.mode not in ONE_SHOT_MODES and args.mode != "recorder-only"
+    provider_mode = args.ai_provider or "local"
+    if provider_mode not in AI_PROVIDER_MODES:
+        raise SystemExit(f"Unknown --ai-provider: {provider_mode}")
+    if provider_mode == "connected":
+        if not args.ollama_url:
+            raise SystemExit("--ollama-url is required when --ai-provider=connected")
+        try:
+            ollama_base_url = normalize_ollama_base_url(args.ollama_url)
+        except ServerSetupError as exc:
+            raise SystemExit(str(exc)) from exc
+        provider_name = (args.ai_provider_name or "Connected computer").strip()
+    else:
+        ollama_base_url = DEFAULT_OLLAMA_BASE_URL
+        provider_name = "This computer"
     return ServerSetupSettings(
         configured=True,
         deployment_mode=args.mode,
         ai_enabled=ai_enabled,
+        ai_provider_mode=provider_mode,
+        ai_provider_name=provider_name,
         ai_profile=ai_profile,
         ai_model=AI_MODEL_CHOICES[ai_profile]["model"],
-        ollama_base_url="http://ollama:11434",
+        ollama_base_url=ollama_base_url,
         recorder_sources=args.recorder_sources or "",
         recorder_poll_interval=str(args.recorder_poll_interval),
         recorder_include_condition=bool(args.recorder_include_condition),
@@ -106,9 +127,16 @@ def _interactive_settings() -> tuple[ServerSetupSettings, str, str, bool, bool]:
     web_port = _prompt("Web port", "5000")
     no_ai = False
     ai_profile = "laptop-standard"
+    ai_provider = "local"
+    ai_provider_name = "This computer"
+    ollama_url = ""
     if mode not in ONE_SHOT_MODES and mode != "recorder-only":
-        no_ai = not _yes_no("Enable local AI explainer", True)
+        no_ai = not _yes_no("Enable AI explainer", True)
         if not no_ai:
+            ai_provider = _prompt("Language-model provider (local or connected)", "local")
+            if ai_provider == "connected":
+                ai_provider_name = _prompt("Connected computer name", "Laptop")
+                ollama_url = _prompt("Connected Ollama URL", "http://192.168.1.50:11434")
             print("\nAI model choices")
             for key, choice in AI_MODEL_CHOICES.items():
                 print(f"- {key}: {choice['model']} ({choice['device']})")
@@ -125,6 +153,9 @@ def _interactive_settings() -> tuple[ServerSetupSettings, str, str, bool, bool]:
         mode=mode,
         ai_profile=ai_profile,
         no_ai=no_ai,
+        ai_provider=ai_provider,
+        ai_provider_name=ai_provider_name,
+        ollama_url=ollama_url,
         recorder_sources=recorder_sources,
         recorder_poll_interval=poll_interval,
         recorder_include_condition=include_condition,
@@ -141,15 +172,24 @@ def _run_compose(settings: ServerSetupSettings, *, pull_model: bool, start: bool
     if start:
         subprocess.run(["docker", "compose", "up", "-d", "--build"], env=env, check=False)
     if pull_model and settings.ai_enabled:
-        subprocess.run(["docker", "compose", "up", "-d", "ollama"], env=env, check=False)
-        subprocess.run(["docker", "compose", "run", "--rm", "ollama-pull"], env=env, check=False)
+        if settings.ai_provider_mode == "connected":
+            ok, message = pull_ollama_model(settings)
+            print(message)
+            if not ok:
+                print("The connected model was not installed; setup can still be saved and retried in the browser.")
+        else:
+            subprocess.run(["docker", "compose", "up", "-d", "ollama"], env=env, check=False)
+            subprocess.run(["docker", "compose", "run", "--rm", "ollama-pull"], env=env, check=False)
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Configure MSH from the command line.")
     parser.add_argument("--mode", choices=sorted(set(DEPLOYMENT_MODES) | set(ONE_SHOT_MODES)), help="Deployment mode to write without prompts.")
-    parser.add_argument("--ai-profile", choices=sorted(AI_MODEL_CHOICES), default="laptop-standard", help="Standard local model choice.")
-    parser.add_argument("--no-ai", action="store_true", help="Disable local AI explainer in generated settings.")
+    parser.add_argument("--ai-profile", choices=sorted(AI_MODEL_CHOICES), default="laptop-standard", help="Standard Ollama model choice.")
+    parser.add_argument("--ai-provider", choices=sorted(AI_PROVIDER_MODES), default="local", help="Run Ollama locally or use a connected computer.")
+    parser.add_argument("--ai-provider-name", default="", help="Friendly name for a connected AI provider, such as Laptop.")
+    parser.add_argument("--ollama-url", default="", help="Ollama root URL when --ai-provider=connected.")
+    parser.add_argument("--no-ai", action="store_true", help="Disable the AI explainer in generated settings.")
     parser.add_argument("--recorder-sources", default="", help="MTConnect recorder sources, e.g. IG500=http://.../current;VTC=http://.../current")
     parser.add_argument("--recorder-poll-interval", default="0.2", help="Recorder poll interval in seconds.")
     parser.add_argument("--recorder-include-condition", action="store_true", help="Record MTConnect condition values.")

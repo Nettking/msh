@@ -1,6 +1,6 @@
 # AI Explainer
 
-This document defines the read-only AI integration for MSH. The goal is to let a local Ollama-backed assistant explain how the system works without changing code, running operational actions, or inspecting raw telemetry by default.
+This document defines the read-only AI integration for MSH. The goal is to let an Ollama-backed assistant explain how the system works without changing code, running operational actions, or inspecting raw telemetry by default. Ollama may run with MSH or be contributed by a connected computer.
 
 ## Purpose
 
@@ -14,9 +14,9 @@ The AI explainer should answer system-understanding questions about the MSH code
 
 The explainer is not intended to be an autonomous developer agent in the first version. It should not modify files, create commits, run scripts, delete artifacts, rebuild caches, or make operational decisions.
 
-## Setup-managed Ollama model
+## Setup-managed Ollama provider and model
 
-`setup_msh.py` can enable the local AI explainer and install an Ollama model through Docker Compose. When enabled, setup adds the `ai` profile, sets `MSH_AI_MODEL`, points Flask to the internal Ollama service with `OLLAMA_BASE_URL=http://ollama:11434`, and can pull the selected model immediately.
+Setup can use the internal Ollama service at `http://ollama:11434` or a connected computer at a trusted LAN/VPN URL such as `http://192.168.1.50:11434`. The saved provider is used by status checks, benchmarks, model installation, and AI Explainer requests without rebuilding MSH. See [Connected capabilities](connected_capabilities.md) for the phone-to-laptop flow.
 
 The three standard setup choices are:
 
@@ -46,7 +46,7 @@ The implementation uses retrieval-augmented generation:
 1. Index selected repository files.
 2. Split indexed files into small chunks with file path and line metadata.
 3. Retrieve the most relevant chunks for a user question.
-4. Send only the question and retrieved context to the local Ollama model.
+4. Send only the question and retrieved context to the configured Ollama provider.
 5. Return an answer grounded in the repository files used as context.
 
 The model should be treated as an explanation layer over retrieved repository context, not as the source of truth.
@@ -116,7 +116,7 @@ Responsibilities:
 
 - `repo_index.py`: discover allowed files, apply exclusions, read text, split chunks, and store a local index.
 - `rag.py`: retrieve relevant chunks for a question.
-- `ollama_client.py`: call the local Ollama API.
+- `ollama_client.py`: call the configured local or connected Ollama API.
 - `prompts.py`: keep the read-only system prompt and answer-format instructions.
 
 ## Answer style

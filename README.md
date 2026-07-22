@@ -33,7 +33,7 @@ The setup helper lets you choose what this checkout should activate:
 - recorder only: MTConnect data recorder without web UI.
 - one-shot prep or Observer Phoenix sync.
 
-For web-capable modes, setup also asks whether to enable the local AI explainer and install a standard Ollama model. The three setup choices are `edge-small`, `laptop-standard`, and `workstation-strong`.
+For web-capable modes, setup also asks whether to enable the AI explainer, whether Ollama runs on the MSH computer or a connected computer, and which standard model profile to use. The three model choices are `edge-small`, `laptop-standard`, and `workstation-strong`.
 
 For detailed setup, ports, profiles, model choices, and firewall notes, see [docs/server_setup.md](docs/server_setup.md) and [docs/quick_start.md](docs/quick_start.md).
 
@@ -50,7 +50,7 @@ The current UI is organised around three top-level areas:
 ```text
 Monitor   = current machine/data state and operator support
 Knowledge = capture, interpret, compare, and export operator knowledge
-System    = setup, sources, guide, and troubleshooting
+System    = setup, connected capabilities, sources, guide, and troubleshooting
 ```
 
 Main pages:
@@ -60,7 +60,7 @@ Main pages:
 - `/playback` — playback-compatible timeline exports and machine/day replay views.
 - `/assist` — support cards with possible causes, next steps, risks, alternatives, and operator confirmation.
 - `/guide` — in-app user guide.
-- `/startup` — startup mode choice when an existing runtime namespace requires an operator decision.
+- `/startup` — server role, connected language-model provider, model choice, and runtime startup decisions.
 - `/sources/` — machine/source inventory, MTConnect URL setup, vibration sensors, Observer Phoenix link, and connection tests.
 - `/status` — diagnostics, runtime milestones, catch-up state, discovered artifacts, and readiness signals.
 - `/operator-strategies/capture` — capture one raw operator statement quickly during field work.
@@ -69,7 +69,7 @@ Main pages:
 - `/strategy-comparison` — compare structured strategies by situation, action, evidence, confidence, outcome, and trade-off.
 - `/strategies` — intervention logic: YAML rules for detecting candidate situations from telemetry.
 - `/osl-export` — export reusable structured strategies to SysML using the paper method.
-- `/ai` — read-only local AI explainer for system-understanding questions.
+- `/ai` — read-only AI explainer backed by local Ollama or a connected model-providing computer.
 
 ## Machine source checks
 
@@ -99,7 +99,9 @@ Use Knowledge -> Capture during a site visit. Structure the note later under Kno
 
 ## AI explainer
 
-MSH includes a first read-only local AI explainer for asking system-understanding questions about the repository. It indexes selected documentation and code, retrieves relevant context, and sends that context to a local Ollama model.
+MSH includes a first read-only AI explainer for asking system-understanding questions about the repository. It indexes selected documentation and code, retrieves relevant context, and sends that context to either local Ollama or an Ollama provider contributed by a connected computer.
+
+For the phone-to-laptop flow, see [Connected capabilities](docs/connected_capabilities.md).
 
 `setup_msh.py` can install the model through Docker Compose. The standard choices are:
 
@@ -140,7 +142,7 @@ Use `MSH_AI_MODEL` or `--model` to select the Ollama model. See [docs/ai_explain
 - `catalog/common/` — shared telemetry loading, normalization, source synchronization state, state inference, metrics, and timeline export utilities.
 - `catalog/observer_phoenix/` — source connector that synchronizes SKF Observer Phoenix trend measurements into MSH-normalized JSONL.
 - `catalog/standalone-recorder_v2/` — configurable MTConnect recorder for recorder-only or full-server deployments.
-- `catalog/ai/` — read-only repository explanation helpers backed by local Ollama.
+- `catalog/ai/` — read-only repository explanation helpers backed by local or connected Ollama.
 - `catalog/*/` — runner-visible automatic, manual, deep/exploratory, and legacy scripts plus script-specific README files.
 - `data/` — local raw JSONL telemetry input and source-specific landing location; not intended for committed production data.
 - `data/sources/` — source-specific normalized JSONL landing area for synchronized/recorded external sources.

@@ -34,8 +34,8 @@
     <p>{% if recorder_missing %}Recorder source missing.{% elif setup_configured %}Saved role.{% else %}Default role.{% endif %}</p>
   </div>
   <div class="setup-summary-card {{ 'setup-summary-card--ready' if server_setup_ollama_status and server_setup_ollama_status.running else 'setup-summary-card--waiting' }}">
-    <span>Ollama</span>
-    <strong>{{ 'Running' if server_setup_ollama_status and server_setup_ollama_status.running else 'Not ready' }}</strong>
+    <span>AI provider</span>
+    <strong>{% if server_setup_settings and not server_setup_settings.ai_enabled %}Disabled{% elif server_setup_ollama_status and server_setup_ollama_status.provider %}{{ server_setup_ollama_status.provider.name }}{% else %}Not ready{% endif %}</strong>
     <p>{{ server_setup_ollama_status.message if server_setup_ollama_status else 'Checked on setup.' }}</p>
   </div>
   <div class="setup-summary-card {{ 'setup-summary-card--ready' if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed else 'setup-summary-card--waiting' }}">
@@ -77,13 +77,14 @@
       <p>{{ server_setup_modes[server_setup_settings.deployment_mode].description }}</p>
     </article>
     <article class="info-card">
-      <h4>Local AI</h4>
+      <h4>Language-model provider</h4>
       {% if server_setup_settings.ai_enabled %}
-      <p><strong>{{ server_setup_settings.ai_model }}</strong></p>
-      <p>{% if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed %}Model installed and ready.{% else %}Model is selected but not installed yet.{% endif %}</p>
+      <p><strong>{{ server_setup_settings.ai_provider_name }}</strong></p>
+      <p><code>{{ server_setup_settings.ollama_base_url }}</code></p>
+      <p>{% if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed %}{{ server_setup_settings.ai_model }} is ready.{% else %}{{ server_setup_settings.ai_model }} is selected but not ready yet.{% endif %}</p>
       {% else %}
       <p><strong>Disabled</strong></p>
-      <p>MSH will not use the local AI explainer.</p>
+      <p>MSH will not use a language-model provider.</p>
       {% endif %}
     </article>
     <article class="info-card">
@@ -106,7 +107,7 @@
     <form method="post" action="/server-setup/pull-model" class="control-card">
       <input type="hidden" name="next" value="{{ next_path }}">
       <button class="button-primary" type="submit">Install {{ server_setup_settings.ai_model }}</button>
-      <p>Pulls the saved model into local Ollama before you use AI features.</p>
+      <p>Installs the saved model on {{ server_setup_settings.ai_provider_name }} before you use AI features.</p>
     </form>
     {% endif %}
 
@@ -188,14 +189,44 @@
       <div class="setup-step-card__title">
         <span class="setup-step-number">2</span>
         <div>
-          <h4>Local AI explainer</h4>
-          <p>Open WebUI does not need to be open. MSH uses its own Ollama service.</p>
+          <h4>Language-model capability</h4>
+          <p>Use Ollama on this computer, or let a connected computer such as your laptop contribute the model.</p>
         </div>
       </div>
       <label class="setup-toggle">
         <input type="checkbox" name="ai_enabled" id="aiEnabled" {% if not server_setup_settings or server_setup_settings.ai_enabled %}checked{% endif %}>
-        <span>Enable local AI explainer</span>
+        <span>Enable AI explainer</span>
       </label>
+      <div class="setup-choice-grid setup-provider-grid" id="aiProviderChoices">
+        {% for key, provider in server_setup_ai_provider_modes.items() %}
+        <label class="setup-choice-card setup-provider-card {% if server_setup_settings and server_setup_settings.ai_provider_mode == key %}is-selected{% endif %}" data-ai-provider-card>
+          <input type="radio" name="ai_provider_mode" value="{{ key }}" {% if server_setup_settings and server_setup_settings.ai_provider_mode == key %}checked{% endif %}>
+          <span class="setup-choice-card__label">{{ provider.label }}</span>
+          <span class="setup-choice-card__description">{{ provider.description }}</span>
+          <span class="setup-choice-card__tag">{{ 'Local capability' if key == 'local' else 'Shared capability' }}</span>
+        </label>
+        {% endfor %}
+      </div>
+
+      <div class="setup-connected-provider {% if not server_setup_settings or server_setup_settings.ai_provider_mode != 'connected' %}is-hidden{% endif %}" id="connectedAiProviderFields">
+        <div class="setup-field-grid">
+          <label>
+            <span>Connected computer name</span>
+            <input type="text" name="ai_provider_name" maxlength="80" value="{{ server_setup_settings.ai_provider_name if server_setup_settings and server_setup_settings.ai_provider_mode == 'connected' else '' }}" placeholder="Laptop">
+          </label>
+          <label>
+            <span>Ollama URL</span>
+            <input type="url" name="ollama_base_url" maxlength="2048" value="{{ server_setup_settings.ollama_base_url if server_setup_settings and server_setup_settings.ai_provider_mode == 'connected' else '' }}" placeholder="http://192.168.1.50:11434">
+          </label>
+        </div>
+        <p>Use the laptop address visible from this device. Keep this on a trusted LAN or VPN; Ollama normally has no LAN authentication.</p>
+      </div>
+
+      <div class="setup-status-strip">
+        <button type="button" id="aiConnectionTestButton">Test provider connection</button>
+        <span id="aiConnectionStatus" class="status-badge {{ 'status-ready' if server_setup_ollama_status and server_setup_ollama_status.running else 'status-waiting' }}">{{ 'Connected' if server_setup_ollama_status and server_setup_ollama_status.running else 'Not tested' }}</span>
+      </div>
+      <p class="setup-connection-message" id="aiConnectionMessage">{{ server_setup_ollama_status.message if server_setup_ollama_status else 'Test the connection before benchmarking the model.' }}</p>
       <div class="setup-choice-grid setup-model-grid" id="aiModelChoices">
         {% for key, choice in server_setup_ai_choices.items() %}
         {% set model_installed = server_setup_ollama_status and server_setup_ollama_status.installed_by_profile and server_setup_ollama_status.installed_by_profile.get(key) %}
@@ -209,7 +240,7 @@
         {% endfor %}
       </div>
       <div class="setup-status-strip">
-        <span class="status-badge {{ 'status-ready' if server_setup_ollama_status and server_setup_ollama_status.running else 'status-waiting' }}">Ollama {{ 'running' if server_setup_ollama_status and server_setup_ollama_status.running else 'waiting' }}</span>
+        <span class="status-badge {{ 'status-ready' if server_setup_ollama_status and server_setup_ollama_status.running else 'status-waiting' }}">Provider {{ 'connected' if server_setup_ollama_status and server_setup_ollama_status.running else 'waiting' }}</span>
         {% set current_profile = server_setup_settings.ai_profile if server_setup_settings else 'laptop-standard' %}
         {% set current_installed = server_setup_ollama_status and server_setup_ollama_status.installed_by_profile and server_setup_ollama_status.installed_by_profile.get(current_profile) %}
         <span id="selectedModelStatus" class="status-badge {{ 'status-ready' if current_installed else 'status-waiting' }}">Selected model {{ 'installed' if current_installed else 'not installed' }}</span>
@@ -316,7 +347,7 @@
       <form method="post" action="/server-setup/pull-model" class="control-card">
         <input type="hidden" name="next" value="{{ next_path }}">
         <button class="button-primary" type="submit">Install {{ server_setup_settings.ai_model }}</button>
-        <p>Pulls the saved model into local Ollama. First run may take several minutes.</p>
+      <p>Installs the saved model on {{ server_setup_settings.ai_provider_name }}. First run may take several minutes.</p>
       </form>
       {% endif %}
       {% if startup_state.requires_choice %}
@@ -349,6 +380,7 @@
   <summary>Advanced: command-driven setup</summary>
   <p>Use this on servers where you want reproducible setup without browser prompts.</p>
   <pre>python setup_msh.py --mode web-workbench --ai-profile laptop-standard --start</pre>
+  <pre>python setup_msh.py --mode web-workbench --ai-provider connected --ai-provider-name Laptop --ollama-url http://192.168.1.50:11434 --ai-profile workstation-strong --start</pre>
   <pre>python setup_msh.py --mode full-server --ai-profile workstation-strong --recorder-sources "IG500=http://192.168.200.251:5000/current" --start</pre>
   <pre>python setup_msh.py --mode web-ui-only --no-ai --start</pre>
 </details>
@@ -437,11 +469,31 @@
     fields.classList.toggle('is-hidden', !show);
   }
 
+  function selectedAiProvider() {
+    var selected = document.querySelector('input[name="ai_provider_mode"]:checked');
+    return selected ? selected.value : 'local';
+  }
+
+  function syncAiProviderVisibility() {
+    var fields = document.getElementById('connectedAiProviderFields');
+    if (!fields) return;
+    var connected = selectedAiProvider() === 'connected';
+    fields.classList.toggle('is-hidden', !connected);
+    fields.querySelectorAll('input').forEach(function (input) {
+      input.required = connected;
+    });
+  }
+
   function syncAiVisibility() {
     var enabled = document.getElementById('aiEnabled');
     var choices = document.getElementById('aiModelChoices');
+    var providers = document.getElementById('aiProviderChoices');
+    var connectionButton = document.getElementById('aiConnectionTestButton');
     if (!enabled || !choices) return;
     choices.classList.toggle('is-muted', !enabled.checked);
+    if (providers) providers.classList.toggle('is-muted', !enabled.checked);
+    if (connectionButton) connectionButton.disabled = !enabled.checked;
+    syncAiProviderVisibility();
     syncSelectedModelStatus();
   }
 
@@ -463,6 +515,64 @@
     status.textContent = text;
     status.classList.toggle('status-ready', Boolean(ready));
     status.classList.toggle('status-waiting', !ready);
+  }
+
+  function setConnectionStatus(text, ready, message) {
+    var status = document.getElementById('aiConnectionStatus');
+    var detail = document.getElementById('aiConnectionMessage');
+    if (!status) return;
+    status.textContent = text;
+    status.classList.toggle('status-ready', Boolean(ready));
+    status.classList.toggle('status-waiting', !ready);
+    if (detail && message) detail.textContent = message;
+  }
+
+  function applyProviderModels(payload) {
+    var installed = payload.installed_by_model || {};
+    document.querySelectorAll('[data-ai-card]').forEach(function (card) {
+      var ready = Boolean(installed[card.dataset.modelName]);
+      card.dataset.modelInstalled = ready ? 'true' : 'false';
+      var tag = card.querySelector('.setup-model-install-tag');
+      if (tag) {
+        tag.textContent = ready ? 'Installed' : 'Not installed';
+        tag.classList.toggle('setup-choice-card__tag--missing', !ready);
+      }
+    });
+    syncSelectedModelStatus();
+  }
+
+  function testAiConnection() {
+    var button = document.getElementById('aiConnectionTestButton');
+    var form = document.getElementById('startupSetupForm');
+    var aiEnabled = document.getElementById('aiEnabled');
+    if (!button || !form) return;
+    if (aiEnabled && !aiEnabled.checked) {
+      setConnectionStatus('AI disabled', false, 'Enable AI before testing a provider.');
+      return;
+    }
+    if (selectedAiProvider() === 'connected' && !form.reportValidity()) {
+      setConnectionStatus('Address required', false, 'Enter a computer name and its Ollama LAN or VPN URL.');
+      return;
+    }
+    button.disabled = true;
+    setConnectionStatus('Testing...', false, 'Checking the Ollama API and available models.');
+    fetch('/server-setup/test-ai-connection', {
+      method: 'POST',
+      body: new FormData(form),
+      headers: { 'Accept': 'application/json' }
+    }).then(function (response) {
+      return response.json().then(function (payload) {
+        payload.http_ok = response.ok;
+        return payload;
+      });
+    }).then(function (payload) {
+      setConnectionStatus(payload.ok ? 'Connected' : 'Not reachable', Boolean(payload.ok), payload.message || 'No response returned.');
+      applyProviderModels(payload);
+      button.disabled = false;
+    }).catch(function () {
+      setConnectionStatus('Connection test failed', false, 'The browser request could not complete.');
+      button.disabled = false;
+    });
   }
 
   function renderBenchmarkResult(payload) {
@@ -537,12 +647,22 @@
       syncSelectedModelStatus();
     });
   });
+  document.querySelectorAll('[data-ai-provider-card] input').forEach(function (input) {
+    input.addEventListener('change', function () {
+      syncSelectedCards('[data-ai-provider-card]');
+      syncAiProviderVisibility();
+      setConnectionStatus('Not tested', false, 'Test this provider before benchmarking the model.');
+    });
+  });
   var aiEnabled = document.getElementById('aiEnabled');
   if (aiEnabled) aiEnabled.addEventListener('change', syncAiVisibility);
   var benchmarkButton = document.getElementById('aiBenchmarkButton');
   if (benchmarkButton) benchmarkButton.addEventListener('click', testSelectedAiModel);
+  var connectionButton = document.getElementById('aiConnectionTestButton');
+  if (connectionButton) connectionButton.addEventListener('click', testAiConnection);
   syncSelectedCards('[data-role-card]');
   syncSelectedCards('[data-ai-card]');
+  syncSelectedCards('[data-ai-provider-card]');
   syncRecorderVisibility();
   syncAiVisibility();
   syncSelectedModelStatus();

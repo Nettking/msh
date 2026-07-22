@@ -2,7 +2,7 @@
 {% block body %}
 <section class="page-intro">
   <h2>AI Explainer</h2>
-  <p>Ask read-only system-understanding questions about MSH. The explainer retrieves repository context first, then optionally sends that context to the configured local Ollama model.</p>
+  <p>Ask read-only system-understanding questions about MSH. The explainer retrieves repository context first, then sends that context to the configured Ollama provider when dry-run is disabled.</p>
 </section>
 
 <section class="section-block section-block--primary ai-explainer-panel">
@@ -33,9 +33,11 @@
   </div>
 
   <aside class="ai-explainer-panel__aside">
-    <span class="metric-label">Safe operating mode</span>
-    <h4>Read-only repository context</h4>
+    <span class="metric-label">Language-model provider</span>
+    <h4>{{ ai_provider_name }}</h4>
+    <p><code>{{ ollama_base_url }}</code></p>
     <p>The answer is grounded in indexed documentation and code. Keep dry-run enabled when you want to inspect the exact context before asking the model.</p>
+    <a class="button-link" href="{{ url_for('web.startup', edit='1', step='ai') }}">Change connection</a>
   </aside>
 </section>
 

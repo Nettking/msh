@@ -45,14 +45,24 @@ proot-distro build -t "$IMAGE" --install-as "$CONTAINER" "$ROOT"
 # inside the installed container before mounting the persistent Termux folders.
 proot-distro login --work-dir /app "$CONTAINER" -- mkdir -p /app/data /app/results
 
-printf '\n== Configuring MSH without Ollama ==\n'
+printf '\n== Configuring the MSH phone profile ==\n'
+if [[ -f "$DATA_DIR/server_setup/server_settings.json" ]]; then
+    echo "Preserving existing browser setup, including connected capabilities."
+else
+    proot-distro login \
+        --bind "$DATA_DIR:/app/data" \
+        --bind "$RESULTS_DIR:/app/results" \
+        --work-dir /app \
+        "$CONTAINER" -- python setup_msh.py \
+            --mode web-workbench --no-ai --web-bind 0.0.0.0 --web-port 5000
+fi
+
 proot-distro login \
     --bind "$DATA_DIR:/app/data" \
     --bind "$RESULTS_DIR:/app/results" \
     --work-dir /app \
     "$CONTAINER" -- bash -lc '
         set -e
-        python setup_msh.py --mode web-workbench --no-ai --web-bind 0.0.0.0 --web-port 5000
         if ! find data -type f -name "*.jsonl" -print -quit | grep -q .; then
             mkdir -p data/demo
             cp -a example-data/. data/demo/

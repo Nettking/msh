@@ -10,17 +10,19 @@ is still supported by setup_msh.py for scripted deployments.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 import json
 from pathlib import Path
 import time
 from typing import Any
 from urllib import request
+from urllib.parse import urlsplit, urlunsplit
 
 
 SETTINGS_PATH = Path("data") / "server_setup" / "server_settings.json"
 DEFAULT_OLLAMA_BASE_URL = "http://ollama:11434"
+DEFAULT_AI_PROVIDER_MODE = "local"
 AI_BENCHMARK_PROMPT = "Reply with exactly: MSH_OK"
 AI_RESPONSE_TIME_BANDS: list[dict[str, object]] = [
     {
@@ -90,12 +92,25 @@ AI_MODEL_CHOICES: dict[str, dict[str, str]] = {
     },
 }
 
+AI_PROVIDER_MODES: dict[str, dict[str, str]] = {
+    "local": {
+        "label": "This computer",
+        "description": "Use the Ollama service running alongside MSH.",
+    },
+    "connected": {
+        "label": "Connected computer",
+        "description": "Use an Ollama language model shared by another machine on a trusted network.",
+    },
+}
+
 
 @dataclass(frozen=True)
 class ServerSetupSettings:
     configured: bool
     deployment_mode: str
     ai_enabled: bool
+    ai_provider_mode: str
+    ai_provider_name: str
     ai_profile: str
     ai_model: str
     ollama_base_url: str
@@ -121,6 +136,8 @@ def default_settings(*, configured: bool = False) -> ServerSetupSettings:
         configured=configured,
         deployment_mode="web-workbench",
         ai_enabled=True,
+        ai_provider_mode=DEFAULT_AI_PROVIDER_MODE,
+        ai_provider_name="This computer",
         ai_profile="laptop-standard",
         ai_model=AI_MODEL_CHOICES["laptop-standard"]["model"],
         ollama_base_url=DEFAULT_OLLAMA_BASE_URL,
@@ -145,10 +162,15 @@ def load_settings(path: Path | str = SETTINGS_PATH) -> ServerSetupSettings:
     values = {**defaults, **payload}
     if values.get("ai_profile") in AI_MODEL_CHOICES:
         values["ai_model"] = AI_MODEL_CHOICES[str(values["ai_profile"])]["model"]
+    provider_mode = str(values.get("ai_provider_mode") or DEFAULT_AI_PROVIDER_MODE)
+    if provider_mode not in AI_PROVIDER_MODES:
+        provider_mode = DEFAULT_AI_PROVIDER_MODE
     return ServerSetupSettings(
         configured=bool(values.get("configured")),
         deployment_mode=str(values.get("deployment_mode") or defaults["deployment_mode"]),
         ai_enabled=bool(values.get("ai_enabled")),
+        ai_provider_mode=provider_mode,
+        ai_provider_name=str(values.get("ai_provider_name") or defaults["ai_provider_name"]),
         ai_profile=str(values.get("ai_profile") or defaults["ai_profile"]),
         ai_model=str(values.get("ai_model") or defaults["ai_model"]),
         ollama_base_url=str(values.get("ollama_base_url") or defaults["ollama_base_url"]),
@@ -159,21 +181,79 @@ def load_settings(path: Path | str = SETTINGS_PATH) -> ServerSetupSettings:
     )
 
 
+def normalize_ollama_base_url(value: str) -> str:
+    """Validate and normalize an Ollama HTTP endpoint used for server-side calls."""
+
+    raw = value.strip().rstrip("/")
+    try:
+        parsed = urlsplit(raw)
+        port = parsed.port
+    except ValueError as exc:
+        raise ServerSetupError("The connected Ollama URL has an invalid port.") from exc
+    if parsed.scheme not in {"http", "https"} or not parsed.hostname:
+        raise ServerSetupError("The connected Ollama URL must start with http:// or https:// and include a host.")
+    if parsed.username or parsed.password:
+        raise ServerSetupError("Credentials are not supported in the connected Ollama URL.")
+    if parsed.hostname.lower() in {"localhost", "127.0.0.1", "0.0.0.0", "::", "::1"}:
+        raise ServerSetupError("Use the connected computer's LAN or VPN address, not localhost or 0.0.0.0.")
+    if parsed.path not in {"", "/"} or parsed.query or parsed.fragment:
+        raise ServerSetupError("Use the Ollama server root only, for example http://192.168.1.50:11434.")
+    if port is not None and not 1 <= port <= 65535:
+        raise ServerSetupError("The connected Ollama URL has an invalid port.")
+    return urlunsplit((parsed.scheme, parsed.netloc, "", "", ""))
+
+
+def ai_settings_from_form(
+    form: Any,
+    settings: ServerSetupSettings | None = None,
+) -> ServerSetupSettings:
+    """Apply only AI/provider form values to settings for save and pre-save tests."""
+
+    settings = settings or default_settings(configured=False)
+    ai_enabled = form.get("ai_enabled") in {"on", "1", "true", "yes"}
+    ai_profile = str(form.get("ai_profile") or settings.ai_profile or "laptop-standard").strip()
+    if ai_profile not in AI_MODEL_CHOICES:
+        raise ServerSetupError("Unknown AI model profile.")
+
+    provider_mode = str(form.get("ai_provider_mode") or settings.ai_provider_mode or "local").strip()
+    if provider_mode not in AI_PROVIDER_MODES:
+        raise ServerSetupError("Unknown AI provider mode.")
+    if provider_mode == "connected":
+        provider_name = str(form.get("ai_provider_name") or "").strip()
+        if not provider_name and settings.ai_provider_mode == "connected":
+            provider_name = settings.ai_provider_name.strip()
+        if not provider_name:
+            raise ServerSetupError("Give the connected computer a name.")
+        if len(provider_name) > 80:
+            raise ServerSetupError("The connected computer name must be 80 characters or fewer.")
+        provider_url = str(form.get("ollama_base_url") or "").strip()
+        if not provider_url and settings.ai_provider_mode == "connected":
+            provider_url = settings.ollama_base_url
+        ollama_base_url = normalize_ollama_base_url(provider_url)
+    else:
+        provider_name = "This computer"
+        ollama_base_url = DEFAULT_OLLAMA_BASE_URL
+
+    return replace(
+        settings,
+        ai_enabled=ai_enabled,
+        ai_provider_mode=provider_mode,
+        ai_provider_name=provider_name,
+        ai_profile=ai_profile,
+        ai_model=AI_MODEL_CHOICES[ai_profile]["model"],
+        ollama_base_url=ollama_base_url,
+    )
+
+
 def settings_from_form(form: Any) -> ServerSetupSettings:
     deployment_mode = str(form.get("deployment_mode") or "web-workbench").strip()
     if deployment_mode not in DEPLOYMENT_MODES:
         raise ServerSetupError("Unknown deployment mode.")
-    ai_enabled = form.get("ai_enabled") == "on"
-    ai_profile = str(form.get("ai_profile") or "laptop-standard").strip()
-    if ai_profile not in AI_MODEL_CHOICES:
-        raise ServerSetupError("Unknown AI model profile.")
-    return ServerSetupSettings(
+    ai_settings = ai_settings_from_form(form)
+    return replace(
+        ai_settings,
         configured=True,
         deployment_mode=deployment_mode,
-        ai_enabled=ai_enabled,
-        ai_profile=ai_profile,
-        ai_model=AI_MODEL_CHOICES[ai_profile]["model"],
-        ollama_base_url=DEFAULT_OLLAMA_BASE_URL,
         recorder_sources=str(form.get("recorder_sources") or "").strip(),
         recorder_poll_interval=str(form.get("recorder_poll_interval") or "0.2").strip() or "0.2",
         recorder_include_condition=form.get("recorder_include_condition") == "on",
@@ -184,7 +264,7 @@ def settings_from_form(form: Any) -> ServerSetupSettings:
 def save_settings(settings: ServerSetupSettings, path: Path | str = SETTINGS_PATH) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"schema": "msh.server_setup.v1", **settings.to_dict()}
+    payload = {"schema": "msh.server_setup.v2", **settings.to_dict()}
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
@@ -204,7 +284,7 @@ def compose_profiles_for(settings: ServerSetupSettings) -> str:
         profiles.append("recorder")
     elif settings.deployment_mode in {"web-workbench", "web-ui-only"}:
         profiles.append("web")
-    if settings.ai_enabled:
+    if settings.ai_enabled and settings.ai_provider_mode == "local":
         profiles.append("ai")
     return ",".join(profiles)
 
@@ -234,6 +314,29 @@ def _model_aliases(model_name: str) -> set[str]:
     return {model_name, base}
 
 
+def ai_provider_label(settings: ServerSetupSettings) -> str:
+    if settings.ai_provider_mode == "connected":
+        return settings.ai_provider_name or "Connected computer"
+    return "This computer"
+
+
+def _ollama_status_base(settings: ServerSetupSettings) -> dict[str, Any]:
+    return {
+        "provider": {
+            "capability": "language-model",
+            "protocol": "ollama",
+            "mode": settings.ai_provider_mode,
+            "name": ai_provider_label(settings),
+            "base_url": settings.ollama_base_url,
+        },
+        "selected_model": settings.ai_model,
+        "selected_model_installed": False,
+        "models": [],
+        "installed_by_profile": {key: False for key in AI_MODEL_CHOICES},
+        "installed_by_model": {choice["model"]: False for choice in AI_MODEL_CHOICES.values()},
+    }
+
+
 def response_time_assessment(elapsed_ms: float | int | None) -> dict[str, object]:
     """Classify an AI response-time measurement against setup-time guidance bands."""
 
@@ -261,15 +364,13 @@ def response_time_assessment(elapsed_ms: float | int | None) -> dict[str, object
 
 def ollama_status(settings: ServerSetupSettings | None = None, timeout_seconds: float = 2.0) -> dict[str, Any]:
     settings = settings or load_settings()
+    base_status = _ollama_status_base(settings)
+    provider_name = ai_provider_label(settings)
     if not settings.ai_enabled:
         return {
+            **base_status,
             "running": False,
-            "selected_model": settings.ai_model,
-            "selected_model_installed": False,
-            "models": [],
-            "installed_by_profile": {key: False for key in AI_MODEL_CHOICES},
-            "installed_by_model": {choice["model"]: False for choice in AI_MODEL_CHOICES.values()},
-            "message": "AI is disabled in setup.",
+            "message": "The language-model capability is disabled in setup.",
         }
     try:
         req = request.Request(f"{settings.ollama_base_url.rstrip('/')}/api/tags", method="GET")
@@ -277,13 +378,9 @@ def ollama_status(settings: ServerSetupSettings | None = None, timeout_seconds: 
             payload = json.loads(response.read().decode("utf-8"))
     except Exception as exc:  # pragma: no cover - depends on local Docker/Ollama runtime
         return {
+            **base_status,
             "running": False,
-            "selected_model": settings.ai_model,
-            "selected_model_installed": False,
-            "models": [],
-            "installed_by_profile": {key: False for key in AI_MODEL_CHOICES},
-            "installed_by_model": {choice["model"]: False for choice in AI_MODEL_CHOICES.values()},
-            "message": f"Ollama is not reachable yet: {exc}",
+            "message": f"{provider_name} is not reachable at {settings.ollama_base_url}: {exc}",
         }
     models = sorted(str(item.get("name") or "") for item in payload.get("models", []) if item.get("name"))
     installed_names = set(models)
@@ -296,13 +393,17 @@ def ollama_status(settings: ServerSetupSettings | None = None, timeout_seconds: 
     selected = settings.ai_model
     selected_installed = bool(installed_names & _model_aliases(selected))
     return {
+        **base_status,
         "running": True,
-        "selected_model": selected,
         "selected_model_installed": selected_installed,
         "models": models,
         "installed_by_profile": installed_by_profile,
         "installed_by_model": installed_by_model,
-        "message": "Ollama is running." if selected_installed else f"Ollama is running, but {selected} is not installed yet.",
+        "message": (
+            f"{provider_name} is connected and {selected} is ready."
+            if selected_installed
+            else f"{provider_name} is connected, but {selected} is not installed yet."
+        ),
     }
 
 
@@ -399,4 +500,7 @@ def pull_ollama_model(settings: ServerSetupSettings, timeout_seconds: int = 900)
             body = response.read().decode("utf-8")
     except Exception as exc:  # pragma: no cover - depends on local Docker/Ollama runtime
         return False, f"Could not pull {settings.ai_model}: {exc}"
-    return True, f"Ollama model is installed or updated: {settings.ai_model}. Response: {body[:200]}"
+    return True, (
+        f"Ollama model is installed or updated on {ai_provider_label(settings)}: "
+        f"{settings.ai_model}. Response: {body[:200]}"
+    )

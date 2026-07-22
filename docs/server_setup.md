@@ -1,6 +1,6 @@
 # Server setup and deployment modes
 
-MSH is intended to run as an always-on telemetry server. A server machine can collect data, expose the Flask workbench on the local network, run the local AI explainer, or combine these roles.
+MSH is intended to run as an always-on telemetry server. A server machine can collect data, expose the Flask workbench on the local network, provide an AI capability, consume that capability from another connected machine, or combine these roles.
 
 The normal deployment shape is:
 
@@ -31,7 +31,9 @@ docker compose up -d --build
 
 The setup helper writes a local `.env` file. That file is ignored by git and controls which Docker Compose profiles are active.
 
-When a web-capable mode is selected, setup asks whether to enable the local AI explainer. The default is yes. Setup then offers three standard model choices and can pull the selected model immediately.
+When a web-capable mode is selected, setup asks whether to enable the AI explainer. The default is yes. Ollama can run beside MSH or on a connected computer on a trusted LAN/VPN. Setup then offers three standard model choices, tests the provider, and can pull the selected model immediately.
+
+See [Connected capabilities](connected_capabilities.md) for the phone-to-laptop setup.
 
 ## Deployment modes
 

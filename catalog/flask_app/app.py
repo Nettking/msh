@@ -17,6 +17,7 @@ from .server_setup_routes import server_setup_web
 from .services.catalog_service import ArtifactCatalog
 from .services.server_setup_service import (
     AI_MODEL_CHOICES,
+    AI_PROVIDER_MODES,
     DEPLOYMENT_MODES,
     ServerSetupError,
     load_settings,
@@ -52,6 +53,7 @@ def create_app() -> Flask:
             "server_setup_error": setup_error,
             "server_setup_modes": DEPLOYMENT_MODES,
             "server_setup_ai_choices": AI_MODEL_CHOICES,
+            "server_setup_ai_provider_modes": AI_PROVIDER_MODES,
             "server_setup_ollama_status": status,
         }
 

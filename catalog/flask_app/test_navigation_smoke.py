@@ -53,6 +53,7 @@ def test_main_navigation_pages_load(monkeypatch, tmp_path):
         ("/", "Overview"),
         ("/guide", "How to use MSH"),
         ("/startup", "MSH setup is complete"),
+        ("/startup?edit=1&step=ai", "Language-model capability"),
         ("/sources/", "Sources"),
         ("/status", "Diagnostics"),
         ("/operator-strategies/capture", "Capture"),

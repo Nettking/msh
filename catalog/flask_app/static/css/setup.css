@@ -218,6 +218,24 @@
   grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
 }
 
+.setup-provider-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.setup-connected-provider {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid #bfdbfe;
+  border-radius: 16px;
+  background: #eff6ff;
+}
+
+.setup-connected-provider p,
+.setup-connection-message {
+  overflow-wrap: anywhere;
+}
+
 .setup-choice-card {
   position: relative;
   display: grid;
@@ -465,6 +483,10 @@
   }
 
   .setup-field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .setup-provider-grid {
     grid-template-columns: 1fr;
   }
 }
