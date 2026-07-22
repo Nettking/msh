@@ -61,6 +61,26 @@ login_base=(
     --env "MPLBACKEND=Agg"
 )
 
+login_supports_detach() {
+    proot-distro login --help 2>&1 | grep -q -- '--detach'
+}
+
+start_server_process() {
+    local guest_command='exec python -m catalog.flask_app.app >> results/termux-phone.log 2>&1'
+
+    if login_supports_detach; then
+        "${login_base[@]}" --detach "$CONTAINER" -- bash -lc "$guest_command"
+        return
+    fi
+
+    # PRoot-Distro 5.3 and older do not provide login --detach. Keep the
+    # complete login process alive in the Termux background instead.
+    nohup "${login_base[@]}" "$CONTAINER" -- bash -lc "$guest_command" \
+        </dev/null >> "$LOG_FILE" 2>&1 &
+    local server_pid=$!
+    disown "$server_pid" 2>/dev/null || true
+}
+
 doctor() {
     local status=0
     echo "MSH phone doctor"
@@ -92,8 +112,7 @@ start_server() {
     require_ready
     proot-distro kill "$CONTAINER" >/dev/null 2>&1 || true
     : > "$LOG_FILE"
-    "${login_base[@]}" --detach "$CONTAINER" -- bash -lc \
-        'exec python -m catalog.flask_app.app >> results/termux-phone.log 2>&1'
+    start_server_process
 
     echo "Starting MSH at $URL ..."
     for _ in $(seq 1 30); do
