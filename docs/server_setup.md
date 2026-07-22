@@ -33,6 +33,8 @@ The setup helper writes a local `.env` file. That file is ignored by git and con
 
 When a web-capable mode is selected, setup asks whether to enable the AI explainer. The default is yes. Ollama can run beside MSH or on a connected computer on a trusted LAN/VPN. Setup then offers three standard model choices, tests the provider, and can pull the selected model immediately.
 
+The browser setup runs in a focused shell without the normal Monitor, Knowledge, and System menus. It shows one decision at a time: device role, AI connection, model, recorder when required, and finish. Normal navigation appears again after setup and any required runtime-start choice are complete.
+
 See [Connected capabilities](connected_capabilities.md) for the phone-to-laptop setup.
 
 ## Deployment modes

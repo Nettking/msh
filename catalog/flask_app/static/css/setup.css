@@ -25,6 +25,37 @@
   font-size: 1.03rem;
 }
 
+.setup-hero--focused {
+  display: block;
+  margin-bottom: 12px;
+  padding: 20px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+}
+
+.setup-hero--focused h2 {
+  font-size: clamp(1.75rem, 5vw, 2.5rem);
+}
+
+.setup-hero__meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 14px;
+}
+
+.setup-step-status {
+  color: #1e3a8a;
+  font-size: 0.86rem;
+  font-weight: 850;
+}
+
+.setup-help-link {
+  color: #1d4ed8;
+  font-size: 0.86rem;
+  font-weight: 750;
+}
+
 .setup-eyebrow {
   display: inline-flex;
   align-items: center;
@@ -222,6 +253,47 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.setup-more-choices {
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+.setup-more-choices summary,
+.setup-benchmark-scale summary,
+.setup-saved-details summary {
+  cursor: pointer;
+  color: #1e3a8a;
+  font-weight: 800;
+}
+
+.setup-more-choices .setup-choice-grid {
+  margin-top: 12px;
+}
+
+.setup-model-step {
+  display: grid;
+  gap: 14px;
+}
+
+.setup-ai-disabled-note {
+  padding: 16px;
+  border: 1px solid #cbd5e1;
+  border-radius: 16px;
+  background: #f8fafc;
+}
+
+.setup-ai-disabled-note p {
+  margin-top: 5px;
+}
+
+.setup-benchmark-scale {
+  margin-top: 10px;
+}
+
+.setup-benchmark-scale .setup-benchmark-table {
+  margin-top: 10px;
+}
+
 .setup-connected-provider {
   display: grid;
   gap: 10px;
@@ -417,6 +489,16 @@
   text-transform: uppercase;
 }
 
+.setup-saved-details {
+  margin: 16px 18px 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.setup-saved-details .setup-saved-summary {
+  margin-top: 12px;
+}
+
 .setup-saved-actions form.control-card button {
   font-size: 1rem;
   padding: 10px 14px;
@@ -468,6 +550,14 @@
     padding: 18px;
   }
 
+  .setup-hero--focused {
+    padding: 16px;
+  }
+
+  .setup-hero--focused p {
+    font-size: 0.96rem;
+  }
+
   .setup-progress {
     grid-template-columns: 1fr;
   }
@@ -488,5 +578,10 @@
 
   .setup-provider-grid {
     grid-template-columns: 1fr;
+  }
+
+  .setup-choice-card {
+    min-height: 0;
+    padding: 14px;
   }
 }

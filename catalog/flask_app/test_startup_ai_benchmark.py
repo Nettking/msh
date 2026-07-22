@@ -72,6 +72,31 @@ def test_startup_ai_step_exposes_model_suggestion_benchmark(monkeypatch, tmp_pat
     assert "/server-setup/test-ai-connection" in html
 
 
+def test_first_time_setup_uses_focused_guided_shell(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    _patch_runtime(monkeypatch)
+    _patch_setup_context(monkeypatch)
+
+    app = create_app()
+    app.config.update(TESTING=True)
+
+    response = app.test_client().get("/startup")
+
+    assert response.status_code == 200
+    html = response.get_data(as_text=True)
+    assert '<body class="setup-focus">' in html
+    assert 'class="setup-shell-header"' in html
+    assert "Set up this MSH device" in html
+    assert "Step 1 · Device role" in html
+    assert 'data-step-target="model"' in html
+    assert "Choose a specialized device role" in html
+    assert "site-nav--primary" not in html
+    assert "Artifact scan:" not in html
+    assert "rescan-form" not in html
+    assert "Not sure what to choose?" not in html
+    assert "Advanced: command-driven setup" not in html
+
+
 def test_ai_model_benchmark_endpoint_returns_recommendation(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)

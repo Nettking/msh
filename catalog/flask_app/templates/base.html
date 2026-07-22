@@ -14,8 +14,11 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
   </head>
-  <body>
+  <body class="{% if request.endpoint == 'web.startup' %}setup-focus{% endif %}">
     {% set endpoint = request.endpoint or '' %}
+    {% set setup_focus = endpoint == 'web.startup' %}
+    {% set setup_is_configured = server_setup_settings and server_setup_settings.configured %}
+    {% set setup_runtime_pending = startup_state is defined and startup_state.requires_choice %}
     {% set knowledge_endpoints = ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export', 'operator_support_web.first_part', 'operator_support_web.quality_outcomes', 'operator_support_web.machine_notes', 'operator_support_web.learning', 'operator_support_web.recommender_artifacts', 'web.strategies', 'web.save_strategies'] %}
     {% set active_group = 'monitor' %}
     {% if endpoint.startswith('operator_strategy_web.') or endpoint in knowledge_endpoints %}
@@ -24,6 +27,22 @@
       {% set active_group = 'system' %}
     {% endif %}
 
+    {% if setup_focus %}
+    <header class="setup-shell-header">
+      <div class="setup-shell-header__identity">
+        <span class="setup-shell-header__mark" aria-hidden="true">MSH</span>
+        <div>
+          <strong>Device setup</strong>
+          <span>One step at a time</span>
+        </div>
+      </div>
+      {% if setup_is_configured and not setup_runtime_pending %}
+      <a class="setup-shell-header__exit" href="{{ next_path or url_for('web.overview') }}">Exit setup</a>
+      {% else %}
+      <span class="setup-shell-header__state">{{ 'Start MSH' if setup_is_configured else 'First-time setup' }}</span>
+      {% endif %}
+    </header>
+    {% else %}
     <header class="site-header site-header--grouped">
       <div class="site-header__identity">
         <h1>MSH Webapp</h1>
@@ -63,14 +82,8 @@
         {% endif %}
       </nav>
     </header>
-    <main>
-      {% if endpoint == 'web.startup' %}
-      <section class="section-block setup-inline-guide">
-        <h3>Not sure what to choose?</h3>
-        <p>Open the Setup Guide before changing roles, AI, recorder sources, Continue, or Start clean.</p>
-        <a class="button-link button-link--primary" href="{{ url_for('web.guide') }}#setup-guide">Open Setup Guide</a>
-      </section>
-      {% endif %}
+    {% endif %}
+    <main class="{% if setup_focus %}setup-focus-main{% endif %}">
       {% with messages = get_flashed_messages(with_categories=true) %}{% if messages %}<ul class="flash-list">{% for category, message in messages %}<li class="flash flash-{{ category }}">{{ message }}</li>{% endfor %}</ul>{% endif %}{% endwith %}
       {% block body %}{% endblock %}
     </main>

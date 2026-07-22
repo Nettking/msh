@@ -4,44 +4,24 @@
 {% set setup_editing = request.args.get('edit') == '1' or not setup_configured %}
 {% set recorder_role = server_setup_settings and server_setup_settings.deployment_mode in ['full-server', 'recorder-only'] %}
 {% set recorder_missing = recorder_role and not server_setup_settings.recorder_sources %}
-<section class="setup-hero">
+<section class="setup-hero setup-hero--focused">
   <div>
-    <span class="setup-eyebrow">Browser setup</span>
+    <span class="setup-eyebrow">{{ 'Edit setup' if setup_configured and setup_editing else 'Device setup' if setup_configured else 'First-time setup' }}</span>
     {% if setup_configured and not setup_editing %}
     <h2>MSH setup is complete</h2>
-    <p>This computer already has a saved setup. Choose how to start MSH now, or edit the setup if the role, AI model, or recorder settings are wrong.</p>
+    <p>Choose how MSH should start. You can review the saved details after the startup choice.</p>
     {% else %}
-    <h2>Get MSH ready for this computer</h2>
-    <p>Move through one small step at a time. Save once when the choices look right.</p>
+    <h2>{{ 'Change this device setup' if setup_configured else 'Set up this MSH device' }}</h2>
+    <p>Answer one question at a time. Nothing is permanent; these choices can be changed later.</p>
     {% endif %}
-  </div>
-  <div class="setup-command-card setup-state-card">
-    <span>Current state</span>
-    <strong>{{ 'Setup saved' if setup_configured else 'Waiting for first setup' }}</strong>
-    <p>{{ 'Ready for runtime choice.' if setup_configured and not setup_editing else 'Review or change the setup below.' if setup_configured else 'Pick a role and save before normal runtime starts.' }}</p>
-  </div>
-</section>
-
-<section class="section-block setup-summary-panel setup-summary-panel--compact">
-  <div class="setup-summary-card {{ 'setup-summary-card--ready' if setup_configured else 'setup-summary-card--waiting' }}">
-    <span>Setup</span>
-    <strong>{{ 'Configured' if setup_configured else 'Needs setup' }}</strong>
-    <p>{{ 'Saved locally.' if setup_configured else 'Not saved yet.' }}</p>
-  </div>
-  <div class="setup-summary-card {% if recorder_missing %}setup-summary-card--waiting{% endif %}">
-    <span>Role</span>
-    <strong>{{ server_setup_modes[server_setup_settings.deployment_mode].label if server_setup_settings else 'Web workbench' }}</strong>
-    <p>{% if recorder_missing %}Recorder source missing.{% elif setup_configured %}Saved role.{% else %}Default role.{% endif %}</p>
-  </div>
-  <div class="setup-summary-card {{ 'setup-summary-card--ready' if server_setup_ollama_status and server_setup_ollama_status.running else 'setup-summary-card--waiting' }}">
-    <span>AI provider</span>
-    <strong>{% if server_setup_settings and not server_setup_settings.ai_enabled %}Disabled{% elif server_setup_ollama_status and server_setup_ollama_status.provider %}{{ server_setup_ollama_status.provider.name }}{% else %}Not ready{% endif %}</strong>
-    <p>{{ server_setup_ollama_status.message if server_setup_ollama_status else 'Checked on setup.' }}</p>
-  </div>
-  <div class="setup-summary-card {{ 'setup-summary-card--ready' if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed else 'setup-summary-card--waiting' }}">
-    <span>Saved model</span>
-    <strong>{{ server_setup_settings.ai_model if server_setup_settings and server_setup_settings.ai_enabled else 'Disabled' }}</strong>
-    <p>{% if server_setup_settings and not server_setup_settings.ai_enabled %}AI disabled.{% elif server_setup_ollama_status and server_setup_ollama_status.selected_model_installed %}Installed.{% else %}Missing.{% endif %}</p>
+    <div class="setup-hero__meta">
+      {% if setup_configured and not setup_editing %}
+      <span class="status-badge status-ready">Ready to start</span>
+      {% else %}
+      <span class="setup-step-status" id="setupStepStatus">Step 1 · Device role</span>
+      {% endif %}
+      <a class="setup-help-link" href="{{ url_for('web.guide') }}#setup-guide">Need help?</a>
+    </div>
   </div>
 </section>
 
@@ -69,38 +49,6 @@
     <a class="button-link" href="{{ url_for('web.startup', next=next_path, edit='1', step='recorder') }}">Add recorder source</a>
   </section>
   {% endif %}
-
-  <div class="info-grid setup-saved-summary">
-    <article class="info-card">
-      <h4>Role</h4>
-      <p><strong>{{ server_setup_modes[server_setup_settings.deployment_mode].label }}</strong></p>
-      <p>{{ server_setup_modes[server_setup_settings.deployment_mode].description }}</p>
-    </article>
-    <article class="info-card">
-      <h4>Language-model provider</h4>
-      {% if server_setup_settings.ai_enabled %}
-      <p><strong>{{ server_setup_settings.ai_provider_name }}</strong></p>
-      <p><code>{{ server_setup_settings.ollama_base_url }}</code></p>
-      <p>{% if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed %}{{ server_setup_settings.ai_model }} is ready.{% else %}{{ server_setup_settings.ai_model }} is selected but not ready yet.{% endif %}</p>
-      {% else %}
-      <p><strong>Disabled</strong></p>
-      <p>MSH will not use a language-model provider.</p>
-      {% endif %}
-    </article>
-    <article class="info-card">
-      <h4>Recorder</h4>
-      {% if recorder_role and server_setup_settings.recorder_sources %}
-      <p><strong>Configured</strong></p>
-      <p>{{ server_setup_settings.recorder_sources }}</p>
-      {% elif recorder_role %}
-      <p><strong>Needs source</strong></p>
-      <p>No recorder source is configured.</p>
-      {% else %}
-      <p><strong>Not used for this role</strong></p>
-      <p>No recorder source is required.</p>
-      {% endif %}
-    </article>
-  </div>
 
   <div class="control-action-grid setup-saved-actions">
     {% if server_setup_settings.ai_enabled and (not server_setup_ollama_status or not server_setup_ollama_status.selected_model_installed) %}
@@ -138,23 +86,50 @@
       <a class="button-link" href="{{ url_for('web.startup', next=next_path, edit='1', step='role') }}">Edit setup</a>
     </div>
   </div>
+
+  <details class="setup-saved-details">
+    <summary>Review saved setup</summary>
+    <div class="info-grid setup-saved-summary">
+      <article class="info-card">
+        <h4>Role</h4>
+        <p><strong>{{ server_setup_modes[server_setup_settings.deployment_mode].label }}</strong></p>
+        <p>{{ server_setup_modes[server_setup_settings.deployment_mode].description }}</p>
+      </article>
+      <article class="info-card">
+        <h4>Language-model provider</h4>
+        {% if server_setup_settings.ai_enabled %}
+        <p><strong>{{ server_setup_settings.ai_provider_name }}</strong></p>
+        <p><code>{{ server_setup_settings.ollama_base_url }}</code></p>
+        <p>{% if server_setup_ollama_status and server_setup_ollama_status.selected_model_installed %}{{ server_setup_settings.ai_model }} is ready.{% else %}{{ server_setup_settings.ai_model }} is selected but not ready yet.{% endif %}</p>
+        {% else %}
+        <p><strong>Disabled</strong></p>
+        <p>MSH will not use a language-model provider.</p>
+        {% endif %}
+      </article>
+      <article class="info-card">
+        <h4>Recorder</h4>
+        {% if recorder_role and server_setup_settings.recorder_sources %}
+        <p><strong>Configured</strong></p>
+        <p>{{ server_setup_settings.recorder_sources }}</p>
+        {% elif recorder_role %}
+        <p><strong>Needs source</strong></p>
+        <p>No recorder source is configured.</p>
+        {% else %}
+        <p><strong>Not used for this role</strong></p>
+        <p>No recorder source is required.</p>
+        {% endif %}
+      </article>
+    </div>
+  </details>
 </section>
 {% else %}
 <section class="section-block setup-panel setup-wizard" data-initial-step="{{ request.args.get('step', 'role') }}" id="setupWizard">
-  <div class="setup-panel__header">
-    <div>
-      <h3>{{ 'Edit setup' if setup_configured else 'Guided setup' }}</h3>
-      <p>{{ 'Change only the settings that are wrong, then save again.' if setup_configured else 'Each step has only the choices needed for that part.' }}</p>
-    </div>
-    <span class="status-badge {{ 'status-ready' if setup_configured else 'status-waiting' }}">{{ 'editing saved setup' if setup_configured else 'first run' }}</span>
-  </div>
-
   <nav class="setup-wizard-nav" aria-label="Setup steps">
     <button type="button" data-step-target="role"><strong>1</strong><span>Role</span></button>
-    <button type="button" data-step-target="ai"><strong>2</strong><span>AI</span></button>
-    <button type="button" data-step-target="recorder"><strong>3</strong><span>Recorder</span></button>
-    <button type="button" data-step-target="review"><strong>4</strong><span>Save</span></button>
-    {% if setup_configured %}<button type="button" data-step-target="runtime"><strong>5</strong><span>Runtime</span></button>{% endif %}
+    <button type="button" data-step-target="ai"><strong>2</strong><span>Connection</span></button>
+    <button type="button" data-step-target="model"><strong>3</strong><span>Model</span></button>
+    <button type="button" data-step-target="recorder"><strong>4</strong><span>Recorder</span></button>
+    <button type="button" data-step-target="review"><strong>5</strong><span>Finish</span></button>
   </nav>
 
   <form method="post" action="/server-setup/save" class="setup-form" id="startupSetupForm">
@@ -165,23 +140,37 @@
         <span class="setup-step-number">1</span>
         <div>
           <h4>What should this computer do?</h4>
-          <p>Pick one role. For most MSH visits, use Web workbench.</p>
+          <p>For most MSH visits, keep the recommended Web workbench role.</p>
         </div>
       </div>
       <div class="setup-choice-grid setup-role-grid">
-        {% for key, mode in server_setup_modes.items() %}
+        {% set mode = server_setup_modes['web-workbench'] %}
+        {% set key = 'web-workbench' %}
         <label class="setup-choice-card {% if server_setup_settings and server_setup_settings.deployment_mode == key %}is-selected{% endif %}" data-role-card>
           <input type="radio" name="deployment_mode" value="{{ key }}" {% if server_setup_settings and server_setup_settings.deployment_mode == key %}checked{% endif %}>
           <span class="setup-choice-card__label">{{ mode.label }}</span>
           <span class="setup-choice-card__description">{{ mode.description }}</span>
-          {% if key == 'web-workbench' %}<span class="setup-choice-card__tag">Recommended</span>{% endif %}
+          <span class="setup-choice-card__tag">Recommended</span>
+        </label>
+      </div>
+      <details class="setup-more-choices" {% if server_setup_settings and server_setup_settings.deployment_mode != 'web-workbench' %}open{% endif %}>
+        <summary>Choose a specialized device role</summary>
+        <div class="setup-choice-grid setup-role-grid">
+        {% for key, mode in server_setup_modes.items() %}
+        {% if key != 'web-workbench' %}
+        <label class="setup-choice-card {% if server_setup_settings and server_setup_settings.deployment_mode == key %}is-selected{% endif %}" data-role-card>
+          <input type="radio" name="deployment_mode" value="{{ key }}" {% if server_setup_settings and server_setup_settings.deployment_mode == key %}checked{% endif %}>
+          <span class="setup-choice-card__label">{{ mode.label }}</span>
+          <span class="setup-choice-card__description">{{ mode.description }}</span>
           {% if key in ['full-server', 'recorder-only'] %}<span class="setup-choice-card__tag setup-choice-card__tag--recorder">Recorder</span>{% endif %}
         </label>
+        {% endif %}
         {% endfor %}
-      </div>
+        </div>
+      </details>
       <div class="setup-wizard-actions">
         <span></span>
-        <button type="button" class="button-primary" data-next-step>Next: AI model</button>
+        <button type="button" class="button-primary" data-next-step>Next: connection</button>
       </div>
     </section>
 
@@ -227,6 +216,26 @@
         <span id="aiConnectionStatus" class="status-badge {{ 'status-ready' if server_setup_ollama_status and server_setup_ollama_status.running else 'status-waiting' }}">{{ 'Connected' if server_setup_ollama_status and server_setup_ollama_status.running else 'Not tested' }}</span>
       </div>
       <p class="setup-connection-message" id="aiConnectionMessage">{{ server_setup_ollama_status.message if server_setup_ollama_status else 'Test the connection before benchmarking the model.' }}</p>
+
+      <div class="setup-wizard-actions">
+        <button type="button" data-prev-step>Back</button>
+        <button type="button" class="button-primary" data-next-step>Next: model</button>
+      </div>
+    </section>
+
+    <section class="setup-wizard-panel" data-step="model">
+      <div class="setup-step-card__title">
+        <span class="setup-step-number">3</span>
+        <div>
+          <h4>Choose a language model</h4>
+          <p>Start with the recommended profile, or benchmark installed models before saving.</p>
+        </div>
+      </div>
+      <div class="setup-ai-disabled-note is-hidden" id="aiModelDisabledNote">
+        <h4>No model is needed</h4>
+        <p>The AI explainer is disabled. Continue to the next relevant step.</p>
+      </div>
+      <div class="setup-model-step" id="aiModelStepContent">
       <div class="setup-choice-grid setup-model-grid" id="aiModelChoices">
         {% for key, choice in server_setup_ai_choices.items() %}
         {% set model_installed = server_setup_ollama_status and server_setup_ollama_status.installed_by_profile and server_setup_ollama_status.installed_by_profile.get(key) %}
@@ -248,7 +257,6 @@
 
       <div class="setup-response-benchmark" data-ai-benchmark-panel>
         <div class="setup-step-card__title">
-          <span class="setup-step-number">2a</span>
           <div>
             <h4>Benchmark and model suggestion</h4>
             <p>Run the setup benchmark and let MSH suggest which installed AI profile to use.</p>
@@ -261,17 +269,21 @@
         <div id="aiBenchmarkResult" class="setup-benchmark-result" role="status" aria-live="polite">
           <p>Use this before saving if you are unsure which model this computer can run.</p>
         </div>
-        <table class="artifact-table setup-benchmark-table">
-          <thead>
-            <tr><th>Measured response</th><th>Interpretation</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>&le; 5 s</td><td>Fast: comfortable for interactive use.</td></tr>
-            <tr><td>5-15 s</td><td>Usable: acceptable for occasional questions.</td></tr>
-            <tr><td>15-30 s</td><td>Slow: works, but the user will notice the wait.</td></tr>
-            <tr><td>&gt; 30 s</td><td>Too slow: choose a smaller model or stronger machine.</td></tr>
-          </tbody>
-        </table>
+        <details class="setup-benchmark-scale">
+          <summary>How response time is judged</summary>
+          <table class="artifact-table setup-benchmark-table">
+            <thead>
+              <tr><th>Measured response</th><th>Interpretation</th></tr>
+            </thead>
+            <tbody>
+              <tr><td>&le; 5 s</td><td>Fast: comfortable for interactive use.</td></tr>
+              <tr><td>5-15 s</td><td>Usable: acceptable for occasional questions.</td></tr>
+              <tr><td>15-30 s</td><td>Slow: works, but the user will notice the wait.</td></tr>
+              <tr><td>&gt; 30 s</td><td>Too slow: choose a smaller model or stronger machine.</td></tr>
+            </tbody>
+          </table>
+        </details>
+      </div>
       </div>
 
       <div class="setup-wizard-actions">
@@ -282,7 +294,7 @@
 
     <section class="setup-wizard-panel" data-step="recorder" id="recorderSettings">
       <div class="setup-step-card__title">
-        <span class="setup-step-number">3</span>
+        <span class="setup-step-number">4</span>
         <div>
           <h4>Recorder settings</h4>
           <p>Only needed for Full server or Recorder only.</p>
@@ -316,7 +328,7 @@
 
     <section class="setup-wizard-panel" data-step="review">
       <div class="setup-step-card__title">
-        <span class="setup-step-number">4</span>
+        <span class="setup-step-number">5</span>
         <div>
           <h4>Save setup</h4>
           <p>Save local settings, then MSH will continue to the next required page automatically.</p>
@@ -332,50 +344,10 @@
       </div>
     </section>
   </form>
-
-  {% if setup_configured %}
-  <section class="setup-wizard-panel setup-runtime-panel" data-step="runtime" id="runtime">
-    <div class="setup-step-card__title">
-      <span class="setup-step-number">5</span>
-      <div>
-        <h4>Next page</h4>
-        <p>Install the selected model if needed, then continue to MSH or choose runtime startup behavior.</p>
-      </div>
-    </div>
-    <div class="control-action-grid">
-      {% if server_setup_settings.ai_enabled and (not server_setup_ollama_status or not server_setup_ollama_status.selected_model_installed) %}
-      <form method="post" action="/server-setup/pull-model" class="control-card">
-        <input type="hidden" name="next" value="{{ next_path }}">
-        <button class="button-primary" type="submit">Install {{ server_setup_settings.ai_model }}</button>
-      <p>Installs the saved model on {{ server_setup_settings.ai_provider_name }}. First run may take several minutes.</p>
-      </form>
-      {% endif %}
-      {% if startup_state.requires_choice %}
-      <form method="post" action="{{ url_for('web.choose_startup_mode') }}" class="control-card">
-        <input type="hidden" name="mode" value="continue_existing">
-        <input type="hidden" name="next" value="{{ next_path }}">
-        <button class="button-primary" type="submit">Continue from existing state</button>
-        <p>Reuse existing runtime/session progress.</p>
-      </form>
-      <form method="post" action="{{ url_for('web.choose_startup_mode') }}" class="control-card">
-        <input type="hidden" name="mode" value="start_clean">
-        <input type="hidden" name="next" value="{{ next_path }}">
-        <button type="submit">Start clean</button>
-        <p>Start fresh. Existing files stay on disk.</p>
-      </form>
-      {% else %}
-      <div class="control-card">
-        <h4>Open MSH</h4>
-        <p>Setup is saved and runtime can start normally.</p>
-        <a class="button-link" href="{{ next_path or url_for('web.overview') }}">Continue to MSH</a>
-      </div>
-      {% endif %}
-    </div>
-  </section>
-  {% endif %}
 </section>
 {% endif %}
 
+{% if setup_configured %}
 <details class="section-block setup-advanced">
   <summary>Advanced: command-driven setup</summary>
   <p>Use this on servers where you want reproducible setup without browser prompts.</p>
@@ -384,10 +356,18 @@
   <pre>python setup_msh.py --mode full-server --ai-profile workstation-strong --recorder-sources "IG500=http://192.168.200.251:5000/current" --start</pre>
   <pre>python setup_msh.py --mode web-ui-only --no-ai --start</pre>
 </details>
+{% endif %}
 
 <script>
 (function () {
-  var steps = ['role', 'ai', 'recorder', 'review', 'runtime'];
+  var steps = ['role', 'ai', 'model', 'recorder', 'review'];
+  var stepLabels = {
+    role: 'Device role',
+    ai: 'Connection',
+    model: 'Language model',
+    recorder: 'Recorder',
+    review: 'Finish'
+  };
   var wizard = document.getElementById('setupWizard');
   var initialStep = wizard ? wizard.dataset.initialStep : 'role';
 
@@ -401,36 +381,63 @@
     return role === 'full-server' || role === 'recorder-only';
   }
 
+  function aiIsEnabled() {
+    var enabled = document.getElementById('aiEnabled');
+    return Boolean(enabled && enabled.checked);
+  }
+
   function nextStep(current) {
     if (current === 'role') return 'ai';
-    if (current === 'ai') return roleHasRecorder() ? 'recorder' : 'review';
+    if (current === 'ai') return aiIsEnabled() ? 'model' : (roleHasRecorder() ? 'recorder' : 'review');
+    if (current === 'model') return roleHasRecorder() ? 'recorder' : 'review';
     if (current === 'recorder') return 'review';
-    if (current === 'review') return 'runtime';
-    return 'runtime';
+    return 'review';
   }
 
   function previousStep(current) {
-    if (current === 'runtime') return 'review';
-    if (current === 'review') return roleHasRecorder() ? 'recorder' : 'ai';
-    if (current === 'recorder') return 'ai';
+    if (current === 'review') return roleHasRecorder() ? 'recorder' : (aiIsEnabled() ? 'model' : 'ai');
+    if (current === 'recorder') return aiIsEnabled() ? 'model' : 'ai';
+    if (current === 'model') return 'ai';
     if (current === 'ai') return 'role';
     return 'role';
   }
 
-  function showStep(step) {
+  function updateStepStatus(step) {
+    var status = document.getElementById('setupStepStatus');
+    if (!status || !wizard) return;
+    var visibleButtons = Array.from(wizard.querySelectorAll('[data-step-target]')).filter(function (button) {
+      return !button.hidden;
+    });
+    var activeIndex = visibleButtons.findIndex(function (button) {
+      return button.dataset.stepTarget === step;
+    });
+    status.textContent = 'Step ' + (activeIndex + 1) + ' of ' + visibleButtons.length + ' · ' + (stepLabels[step] || 'Setup');
+  }
+
+  function showStep(step, shouldScroll) {
     if (!wizard) return;
-    if (step === 'runtime' && !document.querySelector('[data-step="runtime"]')) step = 'review';
     if (!steps.includes(step)) step = 'role';
-    document.querySelectorAll('[data-step]').forEach(function (panel) {
+    if (step === 'model' && !aiIsEnabled()) step = 'ai';
+    if (step === 'recorder' && !roleHasRecorder()) step = 'review';
+    wizard.querySelectorAll('[data-step]').forEach(function (panel) {
       panel.classList.toggle('is-active', panel.dataset.step === step);
     });
-    document.querySelectorAll('[data-step-target]').forEach(function (button) {
-      button.classList.toggle('is-active', button.dataset.stepTarget === step);
+    wizard.querySelectorAll('[data-step-target]').forEach(function (button) {
+      var active = button.dataset.stepTarget === step;
+      button.classList.toggle('is-active', active);
+      if (active) button.setAttribute('aria-current', 'step');
+      else button.removeAttribute('aria-current');
     });
+    updateStepStatus(step);
     if (history.replaceState) {
       var url = new URL(window.location.href);
       url.searchParams.set('step', step);
       history.replaceState(null, '', url.toString());
+    }
+    if (shouldScroll) {
+      window.requestAnimationFrame(function () {
+        wizard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     }
   }
 
@@ -463,10 +470,12 @@
   function syncRecorderVisibility() {
     var disabled = document.querySelector('.setup-recorder-disabled');
     var fields = document.querySelector('.setup-recorder-fields');
+    var stepButton = document.querySelector('[data-step-target="recorder"]');
     if (!disabled || !fields) return;
     var show = roleHasRecorder();
     disabled.classList.toggle('is-hidden', show);
     fields.classList.toggle('is-hidden', !show);
+    if (stepButton) stepButton.hidden = !show;
   }
 
   function selectedAiProvider() {
@@ -477,7 +486,7 @@
   function syncAiProviderVisibility() {
     var fields = document.getElementById('connectedAiProviderFields');
     if (!fields) return;
-    var connected = selectedAiProvider() === 'connected';
+    var connected = aiIsEnabled() && selectedAiProvider() === 'connected';
     fields.classList.toggle('is-hidden', !connected);
     fields.querySelectorAll('input').forEach(function (input) {
       input.required = connected;
@@ -486,15 +495,30 @@
 
   function syncAiVisibility() {
     var enabled = document.getElementById('aiEnabled');
-    var choices = document.getElementById('aiModelChoices');
     var providers = document.getElementById('aiProviderChoices');
     var connectionButton = document.getElementById('aiConnectionTestButton');
-    if (!enabled || !choices) return;
-    choices.classList.toggle('is-muted', !enabled.checked);
+    var modelStepButton = document.querySelector('[data-step-target="model"]');
+    var modelContent = document.getElementById('aiModelStepContent');
+    var modelDisabledNote = document.getElementById('aiModelDisabledNote');
+    if (!enabled) return;
     if (providers) providers.classList.toggle('is-muted', !enabled.checked);
     if (connectionButton) connectionButton.disabled = !enabled.checked;
+    if (modelStepButton) modelStepButton.hidden = !enabled.checked;
+    if (modelContent) modelContent.classList.toggle('is-hidden', !enabled.checked);
+    if (modelDisabledNote) modelDisabledNote.classList.toggle('is-hidden', enabled.checked);
     syncAiProviderVisibility();
     syncSelectedModelStatus();
+    var active = wizard && wizard.querySelector('[data-step].is-active');
+    if (active) updateStepStatus(active.dataset.step);
+  }
+
+  function currentStepIsValid(step) {
+    if (step !== 'ai' || !aiIsEnabled() || selectedAiProvider() !== 'connected') return true;
+    var fields = document.getElementById('connectedAiProviderFields');
+    if (!fields) return true;
+    return Array.from(fields.querySelectorAll('input')).every(function (input) {
+      return input.reportValidity();
+    });
   }
 
   function escapeHtml(value) {
@@ -621,24 +645,28 @@
   }
 
   document.querySelectorAll('[data-step-target]').forEach(function (button) {
-    button.addEventListener('click', function () { showStep(button.dataset.stepTarget); });
+    button.addEventListener('click', function () { showStep(button.dataset.stepTarget, true); });
   });
   document.querySelectorAll('[data-next-step]').forEach(function (button) {
     button.addEventListener('click', function () {
       var active = document.querySelector('[data-step].is-active');
-      showStep(nextStep(active ? active.dataset.step : 'role'));
+      var current = active ? active.dataset.step : 'role';
+      if (!currentStepIsValid(current)) return;
+      showStep(nextStep(current), true);
     });
   });
   document.querySelectorAll('[data-prev-step]').forEach(function (button) {
     button.addEventListener('click', function () {
       var active = document.querySelector('[data-step].is-active');
-      showStep(previousStep(active ? active.dataset.step : 'role'));
+      showStep(previousStep(active ? active.dataset.step : 'role'), true);
     });
   });
   document.querySelectorAll('[data-role-card] input').forEach(function (input) {
     input.addEventListener('change', function () {
       syncSelectedCards('[data-role-card]');
       syncRecorderVisibility();
+      var active = wizard && wizard.querySelector('[data-step].is-active');
+      if (active) updateStepStatus(active.dataset.step);
     });
   });
   document.querySelectorAll('[data-ai-card] input').forEach(function (input) {

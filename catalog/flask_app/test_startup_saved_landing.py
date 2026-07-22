@@ -80,6 +80,9 @@ def test_saved_startup_shows_runtime_landing_instead_of_wizard(monkeypatch, tmp_
     assert "Edit setup" in html
     assert "Recorder source is missing" in html
     assert "Guided setup" not in html
+    assert 'class="setup-shell-header"' in html
+    assert "site-nav--primary" not in html
+    assert html.index("Continue from existing state") < html.index("Review saved setup")
 
 
 def test_saved_startup_edit_mode_shows_wizard(monkeypatch, tmp_path):
