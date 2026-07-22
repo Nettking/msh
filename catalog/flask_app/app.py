@@ -88,7 +88,7 @@ if __name__ == "__main__":
         else:
             print("[orchestrator] webapp-first startup: Flask available immediately, runtime starts in background", flush=True)
             start_runtime_background()
-    elif setup is None or not getattr(setup, "configured", False):
+    elif setup is None or not getattr(setup, "configured", False) or not getattr(setup, "user_setup_complete", False):
         print("[orchestrator] first-time browser setup required at /startup; runtime will remain idle", flush=True)
     else:
         print("[orchestrator] orchestration disabled by environment or browser setup; runtime manager will remain idle", flush=True)

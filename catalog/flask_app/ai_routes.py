@@ -19,7 +19,7 @@ def _ai_defaults() -> tuple[str, str, str]:
         settings = load_settings()
     except Exception:
         return DEFAULT_MODEL, DEFAULT_BASE_URL, "Default Ollama"
-    if settings.configured and settings.ai_enabled and settings.ai_model:
+    if settings.configured and settings.user_setup_complete and settings.ai_enabled and settings.ai_model:
         return settings.ai_model, settings.ollama_base_url, ai_provider_label(settings)
     return DEFAULT_MODEL, DEFAULT_BASE_URL, "Default Ollama"
 

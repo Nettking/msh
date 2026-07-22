@@ -97,8 +97,9 @@ def test_stop_does_not_claim_success_while_http_responds(tmp_path: Path) -> None
     assert "stop was not confirmed" in result.stderr
 
 
-def test_phone_rebuild_preserves_saved_connected_capabilities() -> None:
+def test_phone_rebuild_preserves_custom_setup_and_defers_new_browser_setup() -> None:
     script = SETUP_SCRIPT.read_text(encoding="utf-8")
 
     assert 'DATA_DIR/server_setup/server_settings.json' in script
-    assert "Preserving existing browser setup, including connected capabilities." in script
+    assert "--migrate-legacy-phone-bootstrap" in script
+    assert "--browser-setup-pending" in script

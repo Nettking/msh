@@ -107,6 +107,7 @@ AI_PROVIDER_MODES: dict[str, dict[str, str]] = {
 @dataclass(frozen=True)
 class ServerSetupSettings:
     configured: bool
+    user_setup_complete: bool
     deployment_mode: str
     ai_enabled: bool
     ai_provider_mode: str
@@ -134,6 +135,7 @@ def utc_now() -> str:
 def default_settings(*, configured: bool = False) -> ServerSetupSettings:
     return ServerSetupSettings(
         configured=configured,
+        user_setup_complete=configured,
         deployment_mode="web-workbench",
         ai_enabled=True,
         ai_provider_mode=DEFAULT_AI_PROVIDER_MODE,
@@ -165,8 +167,12 @@ def load_settings(path: Path | str = SETTINGS_PATH) -> ServerSetupSettings:
     provider_mode = str(values.get("ai_provider_mode") or DEFAULT_AI_PROVIDER_MODE)
     if provider_mode not in AI_PROVIDER_MODES:
         provider_mode = DEFAULT_AI_PROVIDER_MODE
+    user_setup_complete = payload.get("user_setup_complete")
+    if user_setup_complete is None:
+        user_setup_complete = bool(values.get("configured"))
     return ServerSetupSettings(
         configured=bool(values.get("configured")),
+        user_setup_complete=bool(user_setup_complete),
         deployment_mode=str(values.get("deployment_mode") or defaults["deployment_mode"]),
         ai_enabled=bool(values.get("ai_enabled")),
         ai_provider_mode=provider_mode,
@@ -253,6 +259,7 @@ def settings_from_form(form: Any) -> ServerSetupSettings:
     return replace(
         ai_settings,
         configured=True,
+        user_setup_complete=True,
         deployment_mode=deployment_mode,
         recorder_sources=str(form.get("recorder_sources") or "").strip(),
         recorder_poll_interval=str(form.get("recorder_poll_interval") or "0.2").strip() or "0.2",
@@ -264,14 +271,61 @@ def settings_from_form(form: Any) -> ServerSetupSettings:
 def save_settings(settings: ServerSetupSettings, path: Path | str = SETTINGS_PATH) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"schema": "msh.server_setup.v2", **settings.to_dict()}
+    payload = {"schema": "msh.server_setup.v3", **settings.to_dict()}
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
 
+def migrate_legacy_phone_bootstrap(path: Path | str = SETTINGS_PATH) -> bool:
+    """Turn untouched legacy phone defaults back into a pending browser setup.
+
+    Older phone installs wrote a complete-looking setup before the user ever saw
+    the browser wizard. The migration is deliberately conservative and only
+    changes that exact automatic profile. Custom roles, AI providers, recorder
+    settings, and already-marked v3 settings are preserved.
+    """
+
+    path = Path(path)
+    if not path.exists():
+        return False
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise ServerSetupError(f"Could not read server setup settings: {path}") from exc
+    if not isinstance(payload, dict):
+        raise ServerSetupError(f"Server setup settings must be a JSON object: {path}")
+    if "user_setup_complete" in payload:
+        return False
+
+    untouched_phone_defaults = (
+        bool(payload.get("configured"))
+        and payload.get("deployment_mode") == "web-workbench"
+        and not bool(payload.get("ai_enabled"))
+        and str(payload.get("ai_provider_mode") or "local") == "local"
+        and str(payload.get("ollama_base_url") or DEFAULT_OLLAMA_BASE_URL) == DEFAULT_OLLAMA_BASE_URL
+        and not str(payload.get("recorder_sources") or "").strip()
+        and str(payload.get("recorder_poll_interval") or "0.2") == "0.2"
+        and not bool(payload.get("recorder_include_condition"))
+    )
+    if not untouched_phone_defaults:
+        return False
+
+    payload.update(
+        {
+            "schema": "msh.server_setup.v3",
+            "configured": False,
+            "user_setup_complete": False,
+            "updated_at": utc_now(),
+        }
+    )
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return True
+
+
 def runtime_should_start(settings: ServerSetupSettings | None = None) -> bool:
     settings = settings or load_settings()
-    if not settings.configured:
+    if not settings.configured or not settings.user_setup_complete:
         return False
     return settings.deployment_mode in {"full-server", "web-workbench"}
 

@@ -73,16 +73,20 @@ def test_saved_startup_shows_runtime_landing_instead_of_wizard(monkeypatch, tmp_
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "MSH setup is complete" in html
-    assert "What do you want to do now?" in html
-    assert "Continue from existing state" in html
-    assert "Start clean" in html
-    assert "Edit setup" in html
+    assert "Choose a starting point" in html
+    assert "MSH found saved session progress" in html
+    assert "Resume where MSH stopped" in html
+    assert "Resume session" in html
+    assert "Begin a new run" in html
+    assert "Start new session" in html
+    assert "Edit device setup" in html
     assert "Recorder source is missing" in html
     assert "Guided setup" not in html
+    assert "MSH setup is complete" not in html
+    assert "Advanced: command-driven setup" not in html
     assert 'class="setup-shell-header"' in html
     assert "site-nav--primary" not in html
-    assert html.index("Continue from existing state") < html.index("Review saved setup")
+    assert html.index("Resume session") < html.index("Device setup and changes")
 
 
 def test_saved_startup_edit_mode_shows_wizard(monkeypatch, tmp_path):

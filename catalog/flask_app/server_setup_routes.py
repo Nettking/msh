@@ -69,7 +69,7 @@ def browser_setup_gate():
     except ServerSetupError as exc:
         flash(str(exc), "error")
         return redirect(url_for("web.startup", next=request.full_path if request.query_string else request.path))
-    if not settings.configured:
+    if not settings.configured or not settings.user_setup_complete:
         return redirect(url_for("web.startup", next=request.full_path if request.query_string else request.path))
     return None
 

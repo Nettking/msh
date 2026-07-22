@@ -52,7 +52,7 @@ def test_main_navigation_pages_load(monkeypatch, tmp_path):
     pages = [
         ("/", "Overview"),
         ("/guide", "How to use MSH"),
-        ("/startup", "MSH setup is complete"),
+        ("/startup", "MSH is ready"),
         ("/startup?edit=1&step=ai", "Language-model capability"),
         ("/sources/", "Sources"),
         ("/status", "Diagnostics"),

@@ -50,7 +50,7 @@ The setup script:
 2. builds the root-level `Dockerfile` without a Docker daemon;
 3. installs the resulting container as `msh-phone`;
 4. creates persistent data and result directories under `~/msh-phone-state`;
-5. configures the web-workbench with AI disabled;
+5. writes safe web-workbench defaults with AI disabled, while leaving the browser setup pending;
 6. copies bundled example data into `data/demo` when no JSONL telemetry exists.
 
 The first build downloads an Ubuntu/Python container base and all Python dependencies. It can therefore take a while.
@@ -61,6 +61,8 @@ The first build downloads an Ubuntu/Python container base and all Python depende
 bash termux/msh-phone.sh start
 bash termux/msh-phone.sh open
 ```
+
+On a fresh phone installation, the browser opens the focused setup wizard. The technical defaults written by the Termux installer do not count as a completed user setup.
 
 Alternatively, open this manually in the Android browser:
 
@@ -162,7 +164,7 @@ cd ~/msh
 bash termux/msh-phone.sh update
 ```
 
-This pulls the latest `main`, rebuilds the Linux container, and preserves the external `data` and `results` directories. Existing browser setup is also preserved, including a connected laptop model provider. A fresh first installation still starts with AI disabled until a provider is configured.
+This pulls the latest `main`, rebuilds the Linux container, and preserves the external `data` and `results` directories. Custom browser setup is preserved, including a connected laptop model provider. Untouched defaults created by an older phone installer are migrated once to pending first-time setup; custom roles, AI providers, and recorder settings are not reset.
 
 ## Scope and limitations
 

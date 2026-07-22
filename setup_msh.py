@@ -25,6 +25,7 @@ from catalog.flask_app.services.server_setup_service import (
     ServerSetupSettings,
     compose_profiles_for,
     env_lines_for,
+    migrate_legacy_phone_bootstrap,
     normalize_ollama_base_url,
     pull_ollama_model,
     save_settings,
@@ -93,8 +94,10 @@ def _settings_from_args(args: argparse.Namespace) -> ServerSetupSettings:
     else:
         ollama_base_url = DEFAULT_OLLAMA_BASE_URL
         provider_name = "This computer"
+    browser_setup_pending = bool(getattr(args, "browser_setup_pending", False))
     return ServerSetupSettings(
-        configured=True,
+        configured=not browser_setup_pending,
+        user_setup_complete=not browser_setup_pending,
         deployment_mode=args.mode,
         ai_enabled=ai_enabled,
         ai_provider_mode=provider_mode,
@@ -197,11 +200,29 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--web-port", default="5000", help="Published web port.")
     parser.add_argument("--pull-model", action="store_true", help="Pull the selected Ollama model using Docker Compose.")
     parser.add_argument("--start", action="store_true", help="Start Docker Compose after writing settings.")
+    parser.add_argument(
+        "--browser-setup-pending",
+        action="store_true",
+        help="Write safe technical defaults but require the browser wizard before runtime starts.",
+    )
+    parser.add_argument(
+        "--migrate-legacy-phone-bootstrap",
+        action="store_true",
+        help="Mark untouched legacy phone defaults as pending browser setup without changing custom settings.",
+    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
+    if args.migrate_legacy_phone_bootstrap:
+        changed = migrate_legacy_phone_bootstrap()
+        print(
+            "Prepared legacy automatic phone defaults for first-time browser setup."
+            if changed
+            else "Existing browser setup was preserved."
+        )
+        return 0
     if args.mode:
         settings = _settings_from_args(args)
         web_bind = args.web_bind

@@ -17,7 +17,7 @@
   <body class="{% if request.endpoint == 'web.startup' %}setup-focus{% endif %}">
     {% set endpoint = request.endpoint or '' %}
     {% set setup_focus = endpoint == 'web.startup' %}
-    {% set setup_is_configured = server_setup_settings and server_setup_settings.configured %}
+    {% set setup_is_configured = server_setup_settings and server_setup_settings.configured and server_setup_settings.user_setup_complete %}
     {% set setup_runtime_pending = startup_state is defined and startup_state.requires_choice %}
     {% set knowledge_endpoints = ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export', 'operator_support_web.first_part', 'operator_support_web.quality_outcomes', 'operator_support_web.machine_notes', 'operator_support_web.learning', 'operator_support_web.recommender_artifacts', 'web.strategies', 'web.save_strategies'] %}
     {% set active_group = 'monitor' %}

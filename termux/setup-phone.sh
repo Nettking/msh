@@ -47,14 +47,19 @@ proot-distro login --work-dir /app "$CONTAINER" -- mkdir -p /app/data /app/resul
 
 printf '\n== Configuring the MSH phone profile ==\n'
 if [[ -f "$DATA_DIR/server_setup/server_settings.json" ]]; then
-    echo "Preserving existing browser setup, including connected capabilities."
+    proot-distro login \
+        --bind "$DATA_DIR:/app/data" \
+        --bind "$RESULTS_DIR:/app/results" \
+        --work-dir /app \
+        "$CONTAINER" -- python setup_msh.py --migrate-legacy-phone-bootstrap
 else
     proot-distro login \
         --bind "$DATA_DIR:/app/data" \
         --bind "$RESULTS_DIR:/app/results" \
         --work-dir /app \
         "$CONTAINER" -- python setup_msh.py \
-            --mode web-workbench --no-ai --web-bind 0.0.0.0 --web-port 5000
+            --mode web-workbench --no-ai --browser-setup-pending \
+            --web-bind 0.0.0.0 --web-port 5000
 fi
 
 proot-distro login \

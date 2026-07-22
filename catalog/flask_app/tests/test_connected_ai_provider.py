@@ -15,8 +15,10 @@ from catalog.flask_app.services.server_setup_service import (
     compose_profiles_for,
     default_settings,
     load_settings,
+    migrate_legacy_phone_bootstrap,
     normalize_ollama_base_url,
     ollama_status,
+    runtime_should_start,
     save_settings,
     settings_from_form,
 )
@@ -49,7 +51,8 @@ def test_connected_provider_round_trips_through_saved_setup(tmp_path) -> None:
     payload = json.loads(path.read_text(encoding="utf-8"))
     restored = load_settings(path)
 
-    assert payload["schema"] == "msh.server_setup.v2"
+    assert payload["schema"] == "msh.server_setup.v3"
+    assert payload["user_setup_complete"] is True
     assert restored == settings
 
 
@@ -74,6 +77,55 @@ def test_legacy_setup_defaults_to_local_provider(tmp_path) -> None:
 
     assert settings.ai_provider_mode == "local"
     assert settings.ai_provider_name == "This computer"
+    assert settings.user_setup_complete is True
+
+
+def test_legacy_phone_defaults_become_pending_browser_setup_once(tmp_path) -> None:
+    path = tmp_path / "server_settings.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "msh.server_setup.v2",
+                "configured": True,
+                "deployment_mode": "web-workbench",
+                "ai_enabled": False,
+                "ai_provider_mode": "local",
+                "ollama_base_url": "http://ollama:11434",
+                "recorder_sources": "",
+                "recorder_poll_interval": "0.2",
+                "recorder_include_condition": False,
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert migrate_legacy_phone_bootstrap(path) is True
+    migrated = load_settings(path)
+    assert migrated.configured is False
+    assert migrated.user_setup_complete is False
+    assert migrate_legacy_phone_bootstrap(path) is False
+
+
+def test_phone_bootstrap_migration_preserves_custom_provider(tmp_path) -> None:
+    path = tmp_path / "server_settings.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema": "msh.server_setup.v2",
+                "configured": True,
+                "deployment_mode": "web-workbench",
+                "ai_enabled": True,
+                "ai_provider_mode": "connected",
+                "ai_provider_name": "Laptop",
+                "ollama_base_url": "http://192.168.1.50:11434",
+                "recorder_sources": "",
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    assert migrate_legacy_phone_bootstrap(path) is False
+    assert load_settings(path).ai_provider_name == "Laptop"
 
 
 @pytest.mark.parametrize(
@@ -141,7 +193,29 @@ def test_command_setup_can_select_connected_provider() -> None:
     assert settings.ai_provider_mode == "connected"
     assert settings.ai_provider_name == "Laptop"
     assert settings.ollama_base_url == "http://192.168.1.50:11434"
+    assert settings.user_setup_complete is True
     assert "ai" not in compose_profiles_for(settings).split(",")
+
+
+def test_phone_bootstrap_can_leave_browser_setup_pending() -> None:
+    settings = _settings_from_args(
+        Namespace(
+            mode="web-workbench",
+            ai_profile="laptop-standard",
+            no_ai=True,
+            ai_provider="local",
+            ai_provider_name="",
+            ollama_url="",
+            recorder_sources="",
+            recorder_poll_interval="0.2",
+            recorder_include_condition=False,
+            browser_setup_pending=True,
+        )
+    )
+
+    assert settings.configured is False
+    assert settings.user_setup_complete is False
+    assert runtime_should_start(settings) is False
 
 
 def test_ollama_status_reports_connected_provider_and_models(monkeypatch) -> None:

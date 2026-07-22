@@ -1,22 +1,28 @@
 {% extends 'base.html' %}
 {% block body %}
-{% set setup_configured = server_setup_settings and server_setup_settings.configured %}
+{% set setup_configured = server_setup_settings and server_setup_settings.configured and server_setup_settings.user_setup_complete %}
 {% set setup_editing = request.args.get('edit') == '1' or not setup_configured %}
 {% set recorder_role = server_setup_settings and server_setup_settings.deployment_mode in ['full-server', 'recorder-only'] %}
 {% set recorder_missing = recorder_role and not server_setup_settings.recorder_sources %}
+{% set runtime_choice_pending = setup_configured and not setup_editing and startup_state.requires_choice %}
 <section class="setup-hero setup-hero--focused">
   <div>
-    <span class="setup-eyebrow">{{ 'Edit setup' if setup_configured and setup_editing else 'Device setup' if setup_configured else 'First-time setup' }}</span>
-    {% if setup_configured and not setup_editing %}
-    <h2>MSH setup is complete</h2>
-    <p>Choose how MSH should start. You can review the saved details after the startup choice.</p>
+    <span class="setup-eyebrow">{{ 'Session start' if runtime_choice_pending else 'Edit setup' if setup_configured and setup_editing else 'Device ready' if setup_configured else 'First-time setup' }}</span>
+    {% if runtime_choice_pending %}
+    <h2>Choose a starting point</h2>
+    <p>MSH found saved session progress. Resume it, or begin a new session. This choice does not delete your files or change the device setup.</p>
+    {% elif setup_configured and not setup_editing %}
+    <h2>MSH is ready</h2>
+    <p>No setup decision is required. Open the workbench, or review the device settings below.</p>
     {% else %}
     <h2>{{ 'Change this device setup' if setup_configured else 'Set up this MSH device' }}</h2>
     <p>Answer one question at a time. Nothing is permanent; these choices can be changed later.</p>
     {% endif %}
     <div class="setup-hero__meta">
-      {% if setup_configured and not setup_editing %}
-      <span class="status-badge status-ready">Ready to start</span>
+      {% if runtime_choice_pending %}
+      <span class="status-badge status-waiting">Choose one option</span>
+      {% elif setup_configured and not setup_editing %}
+      <span class="status-badge status-ready">Ready</span>
       {% else %}
       <span class="setup-step-status" id="setupStepStatus">Step 1 · Device role</span>
       {% endif %}
@@ -34,13 +40,15 @@
 
 {% if setup_configured and not setup_editing %}
 <section class="section-block setup-panel setup-saved-panel">
+  {% if not runtime_choice_pending %}
   <div class="setup-panel__header">
     <div>
-      <h3>What do you want to do now?</h3>
-      <p>Setup is saved. The next decision is runtime startup, not setup editing.</p>
+      <h3>Open MSH</h3>
+      <p>The device setup is saved and there is no session decision waiting.</p>
     </div>
     <span class="status-badge status-ready">ready</span>
   </div>
+  {% endif %}
 
   {% if recorder_missing %}
   <section class="section-block section-block--warning setup-inline-warning">
@@ -60,17 +68,21 @@
     {% endif %}
 
     {% if startup_state.requires_choice %}
-    <form method="post" action="{{ url_for('web.choose_startup_mode') }}" class="control-card">
+    <form method="post" action="{{ url_for('web.choose_startup_mode') }}" class="control-card setup-run-choice setup-run-choice--resume">
       <input type="hidden" name="mode" value="continue_existing">
       <input type="hidden" name="next" value="{{ next_path }}">
-      <button class="button-primary" type="submit">Continue from existing state</button>
-      <p>Reuse the existing runtime/session progress.</p>
+      <span class="setup-run-choice__eyebrow">Saved session</span>
+      <h4>Resume where MSH stopped</h4>
+      <p>Keep the current runtime and session progress.</p>
+      <button class="button-primary" type="submit">Resume session</button>
     </form>
-    <form method="post" action="{{ url_for('web.choose_startup_mode') }}" class="control-card">
+    <form method="post" action="{{ url_for('web.choose_startup_mode') }}" class="control-card setup-run-choice setup-run-choice--new">
       <input type="hidden" name="mode" value="start_clean">
       <input type="hidden" name="next" value="{{ next_path }}">
-      <button type="submit">Start clean</button>
-      <p>Start fresh. Existing files stay on disk.</p>
+      <span class="setup-run-choice__eyebrow">New session</span>
+      <h4>Begin a new run</h4>
+      <p>Reset runtime progress. Existing data files stay on disk.</p>
+      <button type="submit">Start new session</button>
     </form>
     {% else %}
     <div class="control-card">
@@ -80,15 +92,12 @@
     </div>
     {% endif %}
 
-    <div class="control-card">
-      <h4>Change setup</h4>
-      <p>Only use this if the role, recorder, or AI model is wrong.</p>
-      <a class="button-link" href="{{ url_for('web.startup', next=next_path, edit='1', step='role') }}">Edit setup</a>
-    </div>
   </div>
 
   <details class="setup-saved-details">
-    <summary>Review saved setup</summary>
+    <summary>Device setup and changes</summary>
+    <p>These settings are separate from the session choice above.</p>
+    <a class="button-link" href="{{ url_for('web.startup', next=next_path, edit='1', step='role') }}">Edit device setup</a>
     <div class="info-grid setup-saved-summary">
       <article class="info-card">
         <h4>Role</h4>
@@ -347,7 +356,7 @@
 </section>
 {% endif %}
 
-{% if setup_configured %}
+{% if setup_configured and setup_editing %}
 <details class="section-block setup-advanced">
   <summary>Advanced: command-driven setup</summary>
   <p>Use this on servers where you want reproducible setup without browser prompts.</p>

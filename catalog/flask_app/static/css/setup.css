@@ -437,56 +437,43 @@
   min-height: 150px;
 }
 
-.setup-saved-actions::before {
-  content: "Choose how to start this run: continue from the previous session, or start clean. You must choose one before MSH continues.";
-  grid-column: 1 / -1;
-  display: block;
-  padding: 14px 16px;
-  border: 1px solid #bfdbfe;
-  border-radius: 16px;
-  background: #eff6ff;
-  color: #1e3a8a;
-  font-weight: 800;
-  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.08);
+.setup-saved-actions {
+  margin-top: 0;
+  padding: 18px;
 }
 
 .setup-saved-actions .control-card {
-  min-height: 175px;
+  min-height: 160px;
 }
 
-.setup-saved-actions form.control-card {
+.setup-saved-actions .setup-run-choice {
   border-width: 2px;
 }
 
-.setup-saved-actions form.control-card:first-of-type {
+.setup-saved-actions .setup-run-choice--resume {
   border-color: #60a5fa;
   background: #eff6ff;
 }
 
-.setup-saved-actions form.control-card:first-of-type::before {
-  content: "Option 1";
+.setup-run-choice__eyebrow {
   display: inline-flex;
   width: fit-content;
   padding: 3px 8px;
   border-radius: 999px;
-  background: #dbeafe;
-  color: #1e3a8a;
+  background: #e2e8f0;
+  color: #334155;
   font-size: 0.78rem;
   font-weight: 900;
   text-transform: uppercase;
 }
 
-.setup-saved-actions form.control-card:nth-of-type(2)::before {
-  content: "Option 2";
-  display: inline-flex;
-  width: fit-content;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #f1f5f9;
-  color: #334155;
-  font-size: 0.78rem;
-  font-weight: 900;
-  text-transform: uppercase;
+.setup-run-choice--resume .setup-run-choice__eyebrow {
+  background: #dbeafe;
+  color: #1e3a8a;
+}
+
+.setup-run-choice h4 {
+  font-size: 1.12rem;
 }
 
 .setup-saved-details {
@@ -497,6 +484,10 @@
 
 .setup-saved-details .setup-saved-summary {
   margin-top: 12px;
+}
+
+.setup-saved-details > p {
+  margin-top: 8px;
 }
 
 .setup-saved-actions form.control-card button {

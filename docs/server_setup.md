@@ -35,6 +35,8 @@ When a web-capable mode is selected, setup asks whether to enable the AI explain
 
 The browser setup runs in a focused shell without the normal Monitor, Knowledge, and System menus. It shows one decision at a time: device role, AI connection, model, recorder when required, and finish. Normal navigation appears again after setup and any required runtime-start choice are complete.
 
+Technical bootstrap defaults are not treated as a user-completed setup. A session-resume choice is shown only after the browser wizard has been saved, and it is presented separately from device configuration.
+
 See [Connected capabilities](connected_capabilities.md) for the phone-to-laptop setup.
 
 ## Deployment modes
