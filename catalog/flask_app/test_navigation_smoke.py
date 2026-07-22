@@ -88,3 +88,21 @@ def test_get_started_is_a_focused_task_handoff(monkeypatch, tmp_path):
     assert 'href="/operator-strategies/capture"' in html
     assert 'href="/sources/"' in html
     assert "Full workbench" in html
+
+
+def test_main_pages_include_mobile_navigation_but_setup_does_not(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    _patch_runtime(monkeypatch)
+    _patch_setup(monkeypatch)
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    overview = client.get("/").get_data(as_text=True)
+    setup = client.get("/startup?edit=1").get_data(as_text=True)
+
+    assert 'data-mobile-navigation' in overview
+    assert 'aria-label="Mobile primary sections"' in overview
+    assert "Rescan now" in overview
+    assert 'data-mobile-navigation' not in setup
