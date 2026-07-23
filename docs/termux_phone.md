@@ -164,7 +164,15 @@ cd ~/msh
 bash termux/msh-phone.sh update
 ```
 
-This pulls the latest `main`, rebuilds the Linux container, and preserves the external `data` and `results` directories. Custom browser setup is preserved, including a connected laptop model provider. Untouched defaults created by an older phone installer are migrated once to pending first-time setup; custom roles, AI providers, and recorder settings are not reset.
+Normal updates pull the latest `main`, reuse the installed Linux/Python environment, and restart MSH automatically when it was already running. The application checkout is mounted into the container, so ordinary Python, template, CSS, JavaScript, and documentation changes do not reinstall dependencies.
+
+The updater fingerprints `Dockerfile` and `requirements.txt`. It performs the slower clean rebuild only when either file changes, the installed Python environment fails validation, or no container exists. Force that recovery path explicitly with:
+
+```bash
+bash termux/msh-phone.sh rebuild
+```
+
+External `data` and `results` directories remain preserved in both paths. Custom browser setup is also preserved, including a connected laptop model provider. Untouched defaults created by an older phone installer are migrated once to pending first-time setup; custom roles, AI providers, and recorder settings are not reset.
 
 ## Scope and limitations
 

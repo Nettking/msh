@@ -34,7 +34,8 @@ Commands:
   observer-sync          Run one Observer Phoenix synchronization.
   recorder SOURCES       Run the MTConnect recorder in the foreground.
                          Example: 'IG500=http://host:5000/current'
-  update                 Pull MSH main and rebuild while preserving data/results.
+  update                 Pull main; restart if running. Rebuild only if dependencies changed.
+  rebuild                Force a clean Linux environment rebuild.
 USAGE
 }
 
@@ -56,6 +57,7 @@ require_ready() {
 
 login_base=(
     proot-distro login
+    --bind "$ROOT:/app"
     --bind "$DATA_DIR:/app/data"
     --bind "$RESULTS_DIR:/app/results"
     --work-dir /app
@@ -63,6 +65,7 @@ login_base=(
     --env "FLASK_RUN_PORT=$PORT"
     --env "MSH_FLASK_SECRET=msh-phone-local"
     --env "MPLBACKEND=Agg"
+    --env "PYTHONDONTWRITEBYTECODE=1"
 )
 
 login_supports_detach() {
@@ -287,6 +290,7 @@ main() {
     local lines=""
     local session_pids=""
     local sources=""
+    local update_was_running=false
 
     case "$command_name" in
     doctor)
@@ -363,16 +367,28 @@ main() {
             exit 2
         }
         require_ready
-        proot-distro login \
-            --bind "$DATA_DIR:/app/data" \
-            --work-dir /app \
+        "${login_base[@]}" \
             --env "MSH_RECORDER_SOURCES=$sources" \
             "$CONTAINER" -- python catalog/standalone-recorder_v2/standalone-recorder_v2.py
         ;;
     update)
+        if container_exists && http_ready; then
+            update_was_running=true
+            stop_server true
+        fi
         cd "$ROOT"
-        git pull --ff-only
-        bash termux/setup-phone.sh
+        if ! git pull --ff-only; then
+            if [[ "$update_was_running" == "true" ]]; then
+                start_server
+            fi
+            return 1
+        fi
+        MSH_PHONE_RESTART_AFTER_SETUP="$update_was_running" \
+            bash termux/setup-phone.sh --update
+        ;;
+    rebuild)
+        cd "$ROOT"
+        bash termux/setup-phone.sh --rebuild
         ;;
     -h|--help|help)
         usage

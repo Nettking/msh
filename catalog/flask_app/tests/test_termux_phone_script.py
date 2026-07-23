@@ -49,6 +49,49 @@ exit 1
     }
 
 
+def _setup_environment(tmp_path: Path) -> tuple[dict[str, str], Path, Path]:
+    fake_bin = tmp_path / "setup-bin"
+    fake_bin.mkdir()
+    proot_log = tmp_path / "proot.log"
+    pkg_log = tmp_path / "pkg.log"
+    _write_executable(
+        fake_bin / "proot-distro",
+        """#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_PROOT_LOG"
+if [[ "${1:-}" == "list" ]]; then
+    printf '%s\n' 'msh-phone'
+fi
+exit 0
+""",
+    )
+    _write_executable(
+        fake_bin / "curl",
+        """#!/usr/bin/env bash
+exit 1
+""",
+    )
+    _write_executable(
+        fake_bin / "pkg",
+        """#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_PKG_LOG"
+exit 0
+""",
+    )
+
+    state_dir = tmp_path / "setup-state"
+    (state_dir / "data").mkdir(parents=True)
+    (state_dir / "results").mkdir()
+    environment = {
+        **os.environ,
+        "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
+        "PREFIX": "/data/data/com.termux/files/usr",
+        "FAKE_PROOT_LOG": str(proot_log),
+        "FAKE_PKG_LOG": str(pkg_log),
+        "MSH_PHONE_STATE": str(state_dir),
+    }
+    return environment, proot_log, pkg_log
+
+
 def test_stop_finds_a_session_started_before_pid_tracking(tmp_path: Path) -> None:
     marker = tmp_path / "http-ready"
     environment = _phone_environment(tmp_path, marker)
@@ -99,7 +142,86 @@ def test_stop_does_not_claim_success_while_http_responds(tmp_path: Path) -> None
 
 def test_phone_rebuild_preserves_custom_setup_and_defers_new_browser_setup() -> None:
     script = SETUP_SCRIPT.read_text(encoding="utf-8")
+    phone_script = PHONE_SCRIPT.read_text(encoding="utf-8")
 
     assert 'DATA_DIR/server_setup/server_settings.json' in script
     assert "--migrate-legacy-phone-bootstrap" in script
     assert "--browser-setup-pending" in script
+    assert 'BUILD_SIGNATURE_FILE="$STATE_DIR/runtime-build.signature"' in script
+    assert '"$(git -C "$ROOT" hash-object Dockerfile)"' in script
+    assert '"$(git -C "$ROOT" hash-object requirements.txt)"' in script
+    assert '--bind "$ROOT:/app"' in script
+    assert '--bind "$ROOT:/app"' in phone_script
+
+
+def test_existing_compatible_container_uses_fast_setup_without_pkg_or_build(tmp_path: Path) -> None:
+    environment, proot_log, pkg_log = _setup_environment(tmp_path)
+
+    result = subprocess.run(
+        ["bash", str(SETUP_SCRIPT), "--update"],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Runtime dependencies are unchanged" in result.stdout
+    assert "no dependency downloads were needed" in result.stdout
+    assert not pkg_log.exists()
+    commands = proot_log.read_text(encoding="utf-8")
+    assert "\nbuild " not in f"\n{commands}"
+    assert '--bind ' + str(REPO_ROOT) + ":/app" in commands
+    assert (Path(environment["MSH_PHONE_STATE"]) / "runtime-build.signature").is_file()
+
+
+def test_changed_runtime_signature_triggers_rebuild_without_pkg_refresh(tmp_path: Path) -> None:
+    environment, proot_log, pkg_log = _setup_environment(tmp_path)
+    signature_path = Path(environment["MSH_PHONE_STATE"]) / "runtime-build.signature"
+    signature_path.write_text("old-runtime\n", encoding="utf-8")
+
+    result = subprocess.run(
+        ["bash", str(SETUP_SCRIPT), "--update"],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "Dockerfile or requirements.txt changed" in result.stdout
+    commands = proot_log.read_text(encoding="utf-8")
+    assert "remove msh-phone" in commands
+    assert "build -t msh-phone:latest --install-as msh-phone" in commands
+    assert not pkg_log.exists()
+    assert signature_path.read_text(encoding="utf-8") != "old-runtime\n"
+
+
+def test_update_stops_before_pull_and_requests_automatic_restart(tmp_path: Path) -> None:
+    marker = tmp_path / "http-ready"
+    environment = _phone_environment(tmp_path, marker)
+    shell_program = f"""
+source {shlex.quote(str(PHONE_SCRIPT))}
+container_exists() {{ return 0; }}
+http_ready() {{ return 0; }}
+stop_server() {{ echo stop; }}
+start_server() {{ echo restart-after-failure; }}
+git() {{ echo "git $*"; return 0; }}
+bash() {{ echo "setup restart=${{MSH_PHONE_RESTART_AFTER_SETUP:-false}} $*"; }}
+main update
+"""
+
+    result = subprocess.run(
+        ["bash", "-c", shell_program],
+        env=environment,
+        capture_output=True,
+        text=True,
+        timeout=5,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert result.stdout.splitlines() == [
+        "stop",
+        "git pull --ff-only",
+        "setup restart=true termux/setup-phone.sh --update",
+    ]
