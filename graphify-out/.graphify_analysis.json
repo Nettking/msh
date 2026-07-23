@@ -805,12 +805,9 @@
       "catalog_flask_app_services_playback_service_best_artifact_for_machine_day",
       "catalog_flask_app_services_playback_service_cached_playback_selection_index",
       "catalog_flask_app_services_playback_service_entry_machine_days",
-      "catalog_flask_app_services_playback_service_entry_machines",
       "catalog_flask_app_services_playback_service_namespace_from_auto_session_id",
       "catalog_flask_app_services_playback_service_playback_artifact_runtime_preference",
-      "catalog_flask_app_services_playback_service_playback_index_entry_for_path",
       "catalog_flask_app_services_playback_service_playback_selection_index",
-      "catalog_flask_app_services_playback_service_playbackartifactindexentry",
       "catalog_flask_app_services_playback_service_playbackselection",
       "catalog_flask_app_services_playback_service_playbackselectionindex",
       "catalog_flask_app_services_playback_service_py_any",
@@ -821,7 +818,6 @@
       "catalog_flask_app_services_playback_service_rationale_313",
       "catalog_flask_app_services_playback_service_rationale_43",
       "catalog_flask_app_services_playback_service_rationale_516",
-      "catalog_flask_app_services_playback_service_rationale_52",
       "catalog_flask_app_services_playback_service_rationale_561",
       "catalog_flask_app_services_playback_service_rationale_61",
       "catalog_flask_app_services_playback_service_rationale_71",
@@ -1086,7 +1082,6 @@
     ],
     "20": [
       "catalog_common_telemetry_cache_cache_status",
-      "catalog_common_telemetry_cache_cache_status_key",
       "catalog_common_telemetry_cache_discover_jsonl_files",
       "catalog_common_telemetry_cache_invalidate_cache_status",
       "catalog_common_telemetry_cache_py_path",
@@ -1382,6 +1377,7 @@
       "catalog_flask_app_services_operator_strategy_service_operatorstrategyservice",
       "catalog_flask_app_services_operator_strategy_service_operatorstrategyservice_init",
       "catalog_flask_app_services_operator_strategy_service_py_path",
+      "catalog_flask_app_services_operator_support_service_operatorsupportservice_init",
       "catalog_flask_app_services_strategy_comparison_service",
       "catalog_flask_app_services_strategy_comparison_service_py_any",
       "catalog_flask_app_services_strategy_comparison_service_situation_key",
@@ -1601,6 +1597,7 @@
     ],
     "41": [
       "catalog_flask_app_services_operator_support_model",
+      "catalog_flask_app_services_operator_support_model_action_requires_confirmation",
       "catalog_flask_app_services_operator_support_model_actionrisk",
       "catalog_flask_app_services_operator_support_model_actionrisk_to_dict",
       "catalog_flask_app_services_operator_support_model_alternativeaction",
@@ -1618,7 +1615,17 @@
       "catalog_flask_app_services_operator_support_model_qualityoutcome",
       "catalog_flask_app_services_operator_support_model_qualityoutcome_to_dict",
       "catalog_flask_app_services_operator_support_model_recommendedaction",
-      "catalog_flask_app_services_operator_support_model_recommendedaction_to_dict"
+      "catalog_flask_app_services_operator_support_model_recommendedaction_to_dict",
+      "catalog_flask_app_services_operator_support_model_supportcard",
+      "catalog_flask_app_services_operator_support_model_supportcard_post_init",
+      "catalog_flask_app_services_operator_support_model_supportcard_to_dict",
+      "catalog_flask_app_services_operator_support_service",
+      "catalog_flask_app_services_operator_support_service_note_text",
+      "catalog_flask_app_services_operator_support_service_operatorsupportservice",
+      "catalog_flask_app_services_operator_support_service_operatorsupportservice_card_from_issue",
+      "catalog_flask_app_services_operator_support_service_operatorsupportservice_card_from_reusable_note",
+      "catalog_flask_app_services_operator_support_service_operatorsupportservice_support_cards",
+      "catalog_flask_app_services_operator_support_service_py_any"
     ],
     "42": [
       "catalog_standalone_recorder_v2_standalone_recorder_v2",
@@ -1663,6 +1670,7 @@
     ],
     "44": [
       "catalog_flask_app_operator_support_routes",
+      "catalog_flask_app_operator_support_routes_confirm_assist_action",
       "catalog_flask_app_operator_support_routes_first_part",
       "catalog_flask_app_operator_support_routes_learning",
       "catalog_flask_app_operator_support_routes_machine_notes",
@@ -1993,21 +2001,20 @@
     "62": [
       "catalog_common_telemetry_cache_cached_cache_status",
       "catalog_common_telemetry_cache_rationale_220",
+      "catalog_flask_app_services_playback_service_entry_machines",
       "catalog_flask_app_services_playback_service_load_cached_playback_frame_for_machine_day",
+      "catalog_flask_app_services_playback_service_playback_index_entry_for_path",
+      "catalog_flask_app_services_playback_service_playbackartifactindexentry",
       "catalog_flask_app_services_playback_service_py_path",
-      "catalog_flask_app_services_playback_service_rationale_117",
-      "catalog_flask_app_services_playback_service_rationale_155",
+      "catalog_flask_app_services_playback_service_rationale_52",
       "catalog_flask_app_services_playback_service_rationale_692",
       "catalog_flask_app_services_playback_service_rationale_84",
       "catalog_flask_app_services_playback_service_read_playback_index_columns",
-      "catalog_flask_app_services_playback_service_safe_runtime_namespace_for_session_id",
-      "catalog_flask_app_services_playback_service_session_is_linked_to_active_runtime",
       "catalog_flask_app_services_playback_service_telemetry_cache_playback_artifact",
       "catalog_flask_app_services_playback_service_telemetry_cache_playback_index_entry"
     ],
     "63": [
       "catalog_flask_app_operator_support_routes_assist",
-      "catalog_flask_app_operator_support_routes_confirm_assist_action",
       "catalog_flask_app_services_operator_confirmation_service",
       "catalog_flask_app_services_operator_confirmation_service_now_utc",
       "catalog_flask_app_services_operator_confirmation_service_operatorconfirmationservice",
@@ -2078,18 +2085,10 @@
       "catalog_flask_app_services_machine_notes_service_text"
     ],
     "68": [
-      "catalog_flask_app_services_operator_support_model_action_requires_confirmation",
-      "catalog_flask_app_services_operator_support_model_supportcard",
-      "catalog_flask_app_services_operator_support_model_supportcard_post_init",
-      "catalog_flask_app_services_operator_support_model_supportcard_to_dict",
-      "catalog_flask_app_services_operator_support_service",
-      "catalog_flask_app_services_operator_support_service_note_text",
-      "catalog_flask_app_services_operator_support_service_operatorsupportservice",
-      "catalog_flask_app_services_operator_support_service_operatorsupportservice_card_from_issue",
-      "catalog_flask_app_services_operator_support_service_operatorsupportservice_card_from_reusable_note",
-      "catalog_flask_app_services_operator_support_service_operatorsupportservice_init",
-      "catalog_flask_app_services_operator_support_service_operatorsupportservice_support_cards",
-      "catalog_flask_app_services_operator_support_service_py_any"
+      "catalog_flask_app_services_playback_service_rationale_117",
+      "catalog_flask_app_services_playback_service_rationale_155",
+      "catalog_flask_app_services_playback_service_safe_runtime_namespace_for_session_id",
+      "catalog_flask_app_services_playback_service_session_is_linked_to_active_runtime"
     ],
     "69": [
       "catalog_flask_app_services_workflow_session_index",
@@ -2268,6 +2267,7 @@
       "catalog_cache_rebuild_telemetry_cache_parse_args",
       "catalog_cache_rebuild_telemetry_cache_py_namespace",
       "catalog_cache_rebuild_telemetry_cache_rationale_1",
+      "catalog_common_telemetry_cache_cache_status_key",
       "catalog_common_telemetry_cache_default_cache_dir",
       "catalog_common_telemetry_cache_rationale_94"
     ],
@@ -2395,7 +2395,7 @@
     "8": 0.10256410256410256,
     "9": 0.11586452762923351,
     "10": 0.16532258064516128,
-    "11": 0.12043010752688173,
+    "11": 0.1339031339031339,
     "12": 0.11827956989247312,
     "13": 0.1103448275862069,
     "14": 0.14942528735632185,
@@ -2404,7 +2404,7 @@
     "17": 0.1354679802955665,
     "18": 0.11822660098522167,
     "19": 0.14814814814814814,
-    "20": 0.19576719576719576,
+    "20": 0.20512820512820512,
     "21": 0.14285714285714285,
     "22": 0.15608465608465608,
     "23": 0.14814814814814814,
@@ -2415,7 +2415,7 @@
     "28": 0.15151515151515152,
     "29": 0.1761904761904762,
     "30": 0.20952380952380953,
-    "31": 0.1761904761904762,
+    "31": 0.1645021645021645,
     "32": 0.22857142857142856,
     "33": 0.2,
     "34": 0.12857142857142856,
@@ -2425,10 +2425,10 @@
     "38": 0.2046783625730994,
     "39": 0.21052631578947367,
     "40": 0.13450292397660818,
-    "41": 0.15204678362573099,
+    "41": 0.11724137931034483,
     "42": 0.19298245614035087,
     "43": 0.30718954248366015,
-    "44": 0.2222222222222222,
+    "44": 0.2046783625730994,
     "45": 0.2679738562091503,
     "46": 0.24836601307189543,
     "47": 0.16993464052287582,
@@ -2446,13 +2446,13 @@
     "59": 0.2087912087912088,
     "60": 0.3076923076923077,
     "61": 0.4230769230769231,
-    "62": 0.1794871794871795,
-    "63": 0.28205128205128205,
+    "62": 0.20512820512820512,
+    "63": 0.3181818181818182,
     "64": 0.24358974358974358,
     "65": 0.3181818181818182,
     "66": 0.3181818181818182,
     "67": 0.3181818181818182,
-    "68": 0.3333333333333333,
+    "68": 0.5,
     "69": 0.21212121212121213,
     "70": 0.16666666666666666,
     "71": 0.19696969696969696,
@@ -2467,7 +2467,7 @@
     "80": 0.2777777777777778,
     "81": 0.35714285714285715,
     "82": 0.35714285714285715,
-    "83": 0.38095238095238093,
+    "83": 0.32142857142857145,
     "84": 0.47619047619047616,
     "85": 0.3333333333333333,
     "86": 0.8,
@@ -2600,8 +2600,41 @@
       "why": "connects across different repos/directories; bridges separate communities"
     }
   ],
-  "tokens": {
-    "input": 0,
-    "output": 0
-  }
+  "questions": [
+    {
+      "type": "bridge_node",
+      "question": "Why does `OperatorStrategyService` connect `OperatorStrategyService` to `SourceInventoryService`, `OperatorSupportService`, `operator_strategy_service.py`, `RecommenderArtifactService`, `OslExportService`?",
+      "why": "High betweenness centrality (0.040) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `TelemetryCache` connect `TelemetryCache` to `live_service.py`, `playback`, `playback_service.py`, `telemetry_cache.py`, `routes.py`, `LiveTelemetryService`, `cached_cache_status`?",
+      "why": "High betweenness centrality (0.036) - this node is a cross-community bridge."
+    },
+    {
+      "type": "bridge_node",
+      "question": "Why does `ArtifactCatalog` connect `scan_artifacts` to `pipeline.py`, `live_service.py`, `overview_service.py`, `get_workflow_session_index`, `operator_page_cache.py`, `routes.py`, `create_app`, `LiveTelemetryService`?",
+      "why": "High betweenness centrality (0.030) - this node is a cross-community bridge."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 15 inferred relationships involving `scan_artifacts()` (e.g. with `test_candidate_event_extract_is_not_classified_as_playback_when_timeline_exists()` and `test_overview_inventory_counts_workflow_timeline_export_as_playback()`) actually correct?",
+      "why": "`scan_artifacts()` has 15 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 18 inferred relationships involving `ScanSnapshot` (e.g. with `OverviewSnapshot` and `_FakeCatalog`) actually correct?",
+      "why": "`ScanSnapshot` has 18 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 7 inferred relationships involving `OperatorStrategyService` (e.g. with `OperatorSupportService` and `OslExportService`) actually correct?",
+      "why": "`OperatorStrategyService` has 7 INFERRED edges - model-reasoned connections that need verification."
+    },
+    {
+      "type": "verify_inferred",
+      "question": "Are the 15 inferred relationships involving `ArtifactCatalog` (e.g. with `_CacheEntry` and `LiveSnapshot`) actually correct?",
+      "why": "`ArtifactCatalog` has 15 INFERRED edges - model-reasoned connections that need verification."
+    }
+  ]
 }
