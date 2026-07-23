@@ -29,11 +29,12 @@
     {% endif %}
     {% macro primary_links(group) -%}
       <a class="{% if group == 'monitor' %}is-active{% endif %}" href="{{ url_for('web.overview') }}" {% if group == 'monitor' %}aria-current="page"{% endif %}>Monitor</a>
-      <a class="{% if group == 'knowledge' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.capture', '/operator-strategies/capture') }}" {% if group == 'knowledge' %}aria-current="page"{% endif %}>Knowledge</a>
+      <a class="{% if group == 'knowledge' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.index', '/operator-strategies') }}" {% if group == 'knowledge' %}aria-current="page"{% endif %}>Knowledge</a>
       <a class="{% if group == 'system' %}is-active{% endif %}" href="{{ url_for('web.guide') }}" {% if group == 'system' %}aria-current="page"{% endif %}>System</a>
     {%- endmacro %}
     {% macro section_links(group, current_endpoint) -%}
       {% if group == 'knowledge' %}
+        <a class="{% if current_endpoint == 'operator_strategy_web.index' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.index', '/operator-strategies') }}">Overview</a>
         <a class="{% if current_endpoint == 'operator_strategy_web.capture' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.capture', '/operator-strategies/capture') }}">Capture</a>
         <a class="{% if current_endpoint in ['operator_strategy_web.review', 'operator_strategy_web.structure'] %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.review', '/operator-strategies/review') }}">Review Notes</a>
         <a class="{% if current_endpoint == 'operator_support_web.strategy_comparison' %}is-active{% endif %}" href="{{ endpoint_url('operator_support_web.strategy_comparison', '/strategy-comparison') }}">Strategies</a>

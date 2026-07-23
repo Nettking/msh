@@ -22,7 +22,32 @@ def _source_inventory() -> dict[str, object]:
 
 @operator_strategy_web.get("")
 def index():
-    return redirect(url_for("operator_strategy_web.capture"))
+    service = _service()
+    try:
+        records = service.load_records()
+        load_error = ""
+    except OperatorStrategyError as exc:
+        records = []
+        load_error = str(exc)
+    status_counts = {
+        "captured": sum(
+            1
+            for record in records
+            if str(record.get("review_status") or "captured") in {"captured", "in_review"}
+        ),
+        "structured": sum(
+            1
+            for record in records
+            if str(record.get("review_status") or "") == "structured"
+        ),
+        "reusable": sum(1 for record in records if bool(record.get("reusable_strategy"))),
+    }
+    return render_template(
+        "knowledge.html",
+        status_counts=status_counts,
+        total_records=len(records),
+        load_error=load_error,
+    )
 
 
 @operator_strategy_web.get("/capture")

@@ -1,0 +1,75 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro">
+  <h2>Knowledge workspace</h2>
+  <p>Choose the task that matches where you are in the knowledge flow. Capture is for the moment something is said or observed; interpretation and modelling happen later.</p>
+</section>
+
+{% if load_error %}
+<section class="section-block section-block--warning">
+  <h3>Storage warning</h3>
+  <p>{{ load_error }}</p>
+</section>
+{% endif %}
+
+<section class="section-block section-block--primary">
+  <span class="metric-label">Choose what you need now</span>
+  <h3>Capture now or review later</h3>
+  <div class="info-grid">
+    <article class="info-card">
+      <h4>Capture a raw statement</h4>
+      <p>Use this at the machine. Save what the operator said or what you observed without trying to structure it yet.</p>
+      <a class="button-link button-link--primary" href="{{ url_for('operator_strategy_web.capture') }}">Open Capture</a>
+    </article>
+    <article class="info-card">
+      <h4>Review saved notes</h4>
+      <p>Use this after the visit. Interpret captured statements, add justified fields, and decide whether a strategy is reusable.</p>
+      <a class="button-link" href="{{ url_for('operator_strategy_web.review') }}">Open Review Notes</a>
+    </article>
+  </div>
+</section>
+
+<section class="section-block">
+  <h3>Current knowledge state</h3>
+  <div class="metrics metrics-grid">
+    <article class="metric-card">
+      <span class="metric-label">All notes</span>
+      <strong class="metric-value">{{ total_records }}</strong>
+    </article>
+    <article class="metric-card {% if status_counts.captured %}metric-card--warning{% endif %}">
+      <span class="metric-label">Waiting for review</span>
+      <strong class="metric-value">{{ status_counts.captured }}</strong>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Structured</span>
+      <strong class="metric-value">{{ status_counts.structured }}</strong>
+    </article>
+    <article class="metric-card {% if status_counts.reusable %}metric-card--success{% endif %}">
+      <span class="metric-label">Reusable</span>
+      <strong class="metric-value">{{ status_counts.reusable }}</strong>
+    </article>
+  </div>
+</section>
+
+<section class="section-block">
+  <span class="metric-label">Use when the notes are ready</span>
+  <h3>Compare, operationalise, and export</h3>
+  <div class="info-grid">
+    <article class="info-card">
+      <h4>Strategies</h4>
+      <p>Compare structured knowledge across situations, actions, outcomes, and trade-offs.</p>
+      <a class="button-link" href="{{ url_for('operator_support_web.strategy_comparison') }}">Open Strategies</a>
+    </article>
+    <article class="info-card">
+      <h4>Intervention Logic</h4>
+      <p>Define telemetry rules only when a relevant situation can be detected from machine signals.</p>
+      <a class="button-link" href="{{ url_for('web.strategies') }}">Open Intervention Logic</a>
+    </article>
+    <article class="info-card">
+      <h4>SysML Export</h4>
+      <p>Export reusable, structured strategies through the OSL-to-SysML workflow.</p>
+      <a class="button-link" href="{{ url_for('operator_support_web.osl_export') }}">Open SysML Export</a>
+    </article>
+  </div>
+</section>
+{% endblock %}

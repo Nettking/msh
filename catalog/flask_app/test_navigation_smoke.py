@@ -57,6 +57,7 @@ def test_main_navigation_pages_load(monkeypatch, tmp_path):
         ("/startup?edit=1&step=ai", "Language-model capability"),
         ("/sources/", "Sources"),
         ("/status", "Diagnostics"),
+        ("/operator-strategies", "Knowledge workspace"),
         ("/operator-strategies/capture", "Capture"),
         ("/operator-strategies/review", "Review Notes"),
         ("/strategy-comparison", "Strategies"),
@@ -106,3 +107,26 @@ def test_main_pages_include_mobile_navigation_but_setup_does_not(monkeypatch, tm
     assert 'aria-label="Mobile primary sections"' in overview
     assert "Rescan now" in overview
     assert 'data-mobile-navigation' not in setup
+
+
+def test_knowledge_navigation_opens_a_choice_page(monkeypatch, tmp_path):
+    monkeypatch.chdir(tmp_path)
+    _patch_runtime(monkeypatch)
+    _patch_setup(monkeypatch)
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    overview_html = client.get("/").get_data(as_text=True)
+    knowledge_response = client.get("/operator-strategies")
+    knowledge_html = knowledge_response.get_data(as_text=True)
+
+    assert knowledge_response.status_code == 200
+    assert 'href="/operator-strategies"' in overview_html
+    assert "Capture now or review later" in knowledge_html
+    assert 'href="/operator-strategies/capture"' in knowledge_html
+    assert 'href="/operator-strategies/review"' in knowledge_html
+    assert 'href="/strategy-comparison"' in knowledge_html
+    assert 'href="/strategies"' in knowledge_html
+    assert 'href="/osl-export"' in knowledge_html
