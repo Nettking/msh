@@ -10,6 +10,7 @@ import pytest
 from catalog.flask_app import ai_routes, server_setup_routes
 from catalog.flask_app.services import server_setup_service
 from catalog.flask_app.services.server_setup_service import (
+    COMMAND_ONLY_DEPLOYMENT_MODES,
     ServerSetupError,
     ai_settings_from_form,
     compose_profiles_for,
@@ -22,7 +23,8 @@ from catalog.flask_app.services.server_setup_service import (
     save_settings,
     settings_from_form,
 )
-from setup_msh import _settings_from_args
+import setup_msh
+from setup_msh import _run_compose, _settings_from_args
 
 
 def _connected_form(**overrides: str) -> dict[str, str]:
@@ -195,6 +197,79 @@ def test_command_setup_can_select_connected_provider() -> None:
     assert settings.ollama_base_url == "http://192.168.1.50:11434"
     assert settings.user_setup_complete is True
     assert "ai" not in compose_profiles_for(settings).split(",")
+
+
+def test_command_setup_can_create_edge_model_provider_node() -> None:
+    settings = _settings_from_args(
+        Namespace(
+            mode="language-model-provider",
+            ai_profile=None,
+            no_ai=False,
+            ai_provider="local",
+            ai_provider_name="",
+            ollama_url="",
+            recorder_sources="",
+            recorder_poll_interval="0.2",
+            recorder_include_condition=False,
+        )
+    )
+
+    assert "language-model-provider" in COMMAND_ONLY_DEPLOYMENT_MODES
+    assert settings.deployment_mode == "language-model-provider"
+    assert settings.ai_enabled is True
+    assert settings.ai_provider_mode == "local"
+    assert settings.ai_profile == "edge-small"
+    assert settings.ai_model == "smollm2:360m"
+    assert compose_profiles_for(settings) == "provider"
+    assert "MSH_PROVIDER_BIND=0.0.0.0" in server_setup_service.env_lines_for(settings)
+    assert "MSH_PROVIDER_MODEL=smollm2:360m" in server_setup_service.env_lines_for(settings)
+
+
+def test_provider_node_starts_only_provider_and_installs_model(monkeypatch) -> None:
+    settings = _settings_from_args(
+        Namespace(
+            mode="language-model-provider",
+            ai_profile="edge-small",
+            no_ai=False,
+            ai_provider="local",
+            ai_provider_name="",
+            ollama_url="",
+            recorder_sources="",
+            recorder_poll_interval="0.2",
+            recorder_include_condition=False,
+        )
+    )
+    calls: list[tuple[list[str], dict[str, str], bool]] = []
+
+    def fake_run(command, *, env, check):
+        calls.append((command, env, check))
+
+    monkeypatch.setattr(setup_msh.subprocess, "run", fake_run)
+
+    _run_compose(settings, pull_model=True, start=True)
+
+    assert [call[0] for call in calls] == [
+        ["docker", "compose", "--profile", "provider", "up", "-d", "model-provider"],
+        ["docker", "compose", "--profile", "provider", "run", "--rm", "model-provider-install"],
+    ]
+    assert all(call[2] is True for call in calls)
+    assert calls[0][1]["MSH_PROVIDER_MODEL"] == "smollm2:360m"
+
+
+def test_provider_node_cannot_disable_or_delegate_its_model() -> None:
+    base = dict(
+        mode="language-model-provider",
+        ai_profile="edge-small",
+        ai_provider_name="",
+        ollama_url="",
+        recorder_sources="",
+        recorder_poll_interval="0.2",
+        recorder_include_condition=False,
+    )
+    with pytest.raises(SystemExit, match="--no-ai"):
+        _settings_from_args(Namespace(**base, no_ai=True, ai_provider="local"))
+    with pytest.raises(SystemExit, match="own local model"):
+        _settings_from_args(Namespace(**base, no_ai=False, ai_provider="connected"))
 
 
 def test_phone_bootstrap_can_leave_browser_setup_pending() -> None:

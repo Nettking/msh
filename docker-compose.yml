@@ -21,6 +21,54 @@ services:
     volumes:
       - ollama_models:/root/.ollama
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  ollama-pull:
+    profiles: ["model-install"]
+    image: ollama/ollama:latest
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://ollama:11434
+    entrypoint: ["/bin/ollama"]
+    command: ["pull", "${MSH_AI_MODEL:-llama3.2:3b}"]
+
+  model-provider:
+    profiles: ["provider"]
+    image: ollama/ollama:latest
+    ports:
+      - "${MSH_PROVIDER_BIND:-0.0.0.0}:${MSH_PROVIDER_PORT:-11434}:11434"
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    volumes:
+      - model_provider_models:/root/.ollama
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+    labels:
+      - "no.msh.capability=language-model"
+      - "no.msh.protocol=ollama"
+
+  model-provider-install:
+    profiles: ["provider"]
+    image: ollama/ollama:latest
+    depends_on:
+      model-provider:
+        condition: service_healthy
+    environment:
+      - OLLAMA_HOST=http://model-provider:11434
+    entrypoint: ["/bin/ollama"]
+    command: ["pull", "${MSH_PROVIDER_MODEL:-smollm2:360m}"]
 
   recorder:
     profiles: ["recorder", "full"]
@@ -65,3 +113,4 @@ services:
 
 volumes:
   ollama_models:
+  model_provider_models:

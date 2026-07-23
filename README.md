@@ -1,6 +1,6 @@
 # MSH CNC Telemetry Server
 
-MSH is a server-oriented CNC telemetry workbench and operator-support prototype. A single checkout can run as an always-on Flask server, an MTConnect data recorder, a full recorder-plus-workbench server, or a one-shot preparation/synchronization job.
+MSH is a server-oriented CNC telemetry workbench and operator-support prototype. A single checkout can run as an always-on Flask server, an MTConnect data recorder, a full recorder-plus-workbench server, a language-model provider for another MSH device, or a one-shot preparation/synchronization job.
 
 The main deployment pattern is: keep raw telemetry under `data/`, keep generated workflow/session artifacts under `results/workflows/`, run selected services with Docker Compose profiles, and access the Flask workbench from another computer through a browser.
 
@@ -31,6 +31,7 @@ The setup helper lets you choose what this checkout should activate:
 - web workbench: Flask, orchestration, playback, source settings, and analysis UI.
 - web UI only: Flask without background orchestration.
 - recorder only: MTConnect data recorder without web UI.
+- language-model provider: headless Ollama capability contributed to another MSH device.
 - one-shot prep or Observer Phoenix sync.
 
 For web-capable modes, setup also asks whether to enable the AI explainer, whether Ollama runs on the MSH computer or a connected computer, and which standard model profile to use. The three model choices are `edge-small`, `laptop-standard`, and `workstation-strong`.
@@ -112,6 +113,20 @@ For the phone-to-laptop flow, see [Connected capabilities](docs/connected_capabi
 | `laptop-standard` | `llama3.2:3b` | Normal laptop or small server. Default balance. |
 | `workstation-strong` | `qwen2.5:7b` | Gaming laptop, workstation, or GPU server. Stronger answers. |
 
+To turn a Docker-capable laptop into a small MSH language-model provider directly from this repository:
+
+```bash
+git clone https://github.com/Nettking/msh.git
+cd msh
+docker compose --profile provider run --rm model-provider-install
+```
+
+That command starts the provider on port `11434`, installs `smollm2:360m`, and keeps the model in a persistent Docker volume. The equivalent command-driven setup is:
+
+```bash
+python setup_msh.py --mode language-model-provider --ai-profile edge-small --start --pull-model
+```
+
 Retry model installation manually with:
 
 ```bash
@@ -136,7 +151,7 @@ Use `MSH_AI_MODEL` or `--model` to select the Ollama model. See [docs/ai_explain
 ## Repository map
 
 - `setup_msh.py` — interactive local deployment setup that writes ignored Docker Compose settings.
-- `docker-compose.yml` — profile-driven server components: web, recorder, full, prep, observer-sync, and ai.
+- `docker-compose.yml` — profile-driven server components: web, recorder, full, prep, observer-sync, local AI, and connected model provider.
 - `catalog/flask_app/` — primary Flask application, routes, templates, and UI-facing services.
 - `catalog/orchestrator/` — non-interactive bootstrap/catch-up orchestration.
 - `catalog/runner/` — workflow session metadata, date filtering, script discovery/execution, and playback export helpers.

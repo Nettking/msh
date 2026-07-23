@@ -74,6 +74,14 @@ DEPLOYMENT_MODES: dict[str, dict[str, str]] = {
     },
 }
 
+COMMAND_ONLY_DEPLOYMENT_MODES: dict[str, dict[str, str]] = {
+    "language-model-provider": {
+        "label": "Language-model provider",
+        "description": "Headless MSH node that contributes an Ollama model to another MSH device.",
+        "runtime": "disabled",
+    },
+}
+
 AI_MODEL_CHOICES: dict[str, dict[str, str]] = {
     "edge-small": {
         "label": "Edge small",
@@ -331,6 +339,8 @@ def runtime_should_start(settings: ServerSetupSettings | None = None) -> bool:
 
 
 def compose_profiles_for(settings: ServerSetupSettings) -> str:
+    if settings.deployment_mode == "language-model-provider":
+        return "provider"
     profiles: list[str] = []
     if settings.deployment_mode == "full-server":
         profiles.append("full")
@@ -345,7 +355,7 @@ def compose_profiles_for(settings: ServerSetupSettings) -> str:
 
 def env_lines_for(settings: ServerSetupSettings) -> list[str]:
     skip = "0" if runtime_should_start(settings) else "1"
-    return [
+    lines = [
         f"MSH_DEPLOYMENT_MODE={settings.deployment_mode}",
         f"COMPOSE_PROFILES={compose_profiles_for(settings)}",
         f"MSH_SKIP_ORCHESTRATION={skip}",
@@ -361,6 +371,15 @@ def env_lines_for(settings: ServerSetupSettings) -> list[str]:
         "MSH_RECORDER_REQUEST_TIMEOUT=1.0",
         f"MSH_RECORDER_INCLUDE_CONDITION={'true' if settings.recorder_include_condition else 'false'}",
     ]
+    if settings.deployment_mode == "language-model-provider":
+        lines.extend(
+            [
+                "MSH_PROVIDER_BIND=0.0.0.0",
+                "MSH_PROVIDER_PORT=11434",
+                f"MSH_PROVIDER_MODEL={settings.ai_model}",
+            ]
+        )
+    return lines
 
 
 def _model_aliases(model_name: str) -> set[str]:

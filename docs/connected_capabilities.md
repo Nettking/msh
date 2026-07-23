@@ -12,29 +12,33 @@ http://127.0.0.1:5000                http://<laptop-ip>:11434
 
 The MSH device sends the repository question and retrieved repository context to the selected provider. Raw telemetry remains excluded from the AI context by default.
 
-## Prepare Ollama on the laptop
+## Install the MSH provider on the laptop
 
-Ollama binds to `127.0.0.1:11434` by default. To let another trusted device connect, set:
-
-```text
-OLLAMA_HOST=0.0.0.0:11434
-```
-
-On Windows:
-
-1. Quit Ollama from the taskbar.
-2. Open **Edit environment variables for your account**.
-3. Add or edit `OLLAMA_HOST` with the value `0.0.0.0:11434`.
-4. Start Ollama again from the Start menu.
-5. If Windows asks, allow Ollama on private networks. Otherwise add a private-network inbound firewall rule for TCP port `11434`.
-
-These environment-variable steps follow the [official Ollama FAQ](https://docs.ollama.com/faq). Keep the port limited to a trusted LAN or VPN; a normal local Ollama endpoint does not add LAN authentication.
-
-Install a model on the laptop, for example:
+The recommended provider is installed from the MSH repository. Only Docker and Git are required on the laptop:
 
 ```bash
-ollama pull qwen2.5:7b
+git clone https://github.com/Nettking/msh.git
+cd msh
+docker compose --profile provider run --rm model-provider-install
 ```
+
+The first run pulls the Ollama container and the default `edge-small` model (`smollm2:360m`). It starts a headless MSH provider on port `11434`; it does not start a second Flask workbench. The model remains in the persistent `model_provider_models` Docker volume, so ordinary restarts and repository updates do not download it again.
+
+An equivalent setup-helper command is:
+
+```bash
+python setup_msh.py --mode language-model-provider --ai-profile edge-small --start --pull-model
+```
+
+Verify or control the provider from the laptop:
+
+```bash
+docker compose --profile provider ps model-provider
+docker compose --profile provider up -d model-provider
+docker compose --profile provider down
+```
+
+Keep port `11434` limited to a trusted LAN or VPN. A normal local Ollama endpoint does not add LAN authentication.
 
 Find the laptop's LAN IPv4 address with `ipconfig` on Windows. Test from the phone's Termux shell, replacing the example address:
 
@@ -48,14 +52,13 @@ The response should be JSON containing a `models` list.
 
 In MSH:
 
-1. Open **System -> Setup**.
-2. Choose **Change setup**, then open the **AI** step.
-3. Enable the AI explainer.
-4. Select **Connected computer**.
-5. Name it, for example `Laptop`.
-6. Enter `http://<laptop-ip>:11434`.
-7. Select **Test provider connection**.
-8. Select a model that is installed on the laptop, then save.
+1. Open the mobile menu and select **System -> Connections**.
+2. Enable the AI explainer.
+3. Select **Connected computer**.
+4. Name it, for example `Laptop`.
+5. Enter `http://<laptop-ip>:11434`.
+6. Select **Test provider connection**.
+7. Continue to the model step, select **Edge small**, then save.
 
 The connection test reads `/api/tags` from the provider and updates the model readiness shown in setup. AI Explainer then uses the saved provider URL immediately; changing provider does not require rebuilding MSH.
 
@@ -79,6 +82,6 @@ If the MSH connection test fails:
 - confirm both devices are on the same trusted LAN or VPN;
 - confirm the URL uses the laptop's address, not `localhost` or `127.0.0.1`;
 - run `curl http://<laptop-ip>:11434/api/tags` from the MSH device;
-- restart Ollama after changing `OLLAMA_HOST`;
+- run `docker compose --profile provider ps model-provider` on the laptop;
 - check the laptop's private-network firewall rule for TCP `11434`;
 - avoid guest Wi-Fi/client-isolation networks, which prevent devices from reaching each other.

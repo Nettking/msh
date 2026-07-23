@@ -1,6 +1,6 @@
 # Quick start
 
-This guide gets MSH running as a server-oriented Docker deployment. The same checkout can run the full workbench, the web UI only, the MTConnect recorder only, or one-shot preparation/synchronization jobs.
+This guide gets MSH running as a server-oriented Docker deployment. The same checkout can run the full workbench, the web UI only, the MTConnect recorder only, a headless language-model provider, or one-shot preparation/synchronization jobs.
 
 ## Prerequisites
 
@@ -23,6 +23,7 @@ Choose one of the deployment modes:
 - **Web workbench** — Flask, orchestration, playback, source settings, and analysis UI.
 - **Web UI only** — Flask UI without background orchestration.
 - **Recorder only** — MTConnect recorder without the web UI.
+- **Language-model provider** — headless model capability for another connected MSH device.
 - **Prep only** — one-shot preparation/orchestration.
 - **Observer sync only** — one-shot Observer Phoenix synchronization.
 
@@ -37,6 +38,18 @@ When a web-capable mode is selected, setup can use Ollama on the MSH computer or
 The helper writes `.env`, which is ignored by git and read automatically by Docker Compose. If you choose to pull the model during setup, it starts the `ollama` service and runs the one-shot `ollama-pull` installer.
 
 For an Android/phone MSH instance using a laptop model, see [Connected capabilities](connected_capabilities.md).
+
+## Small laptop provider
+
+To make a Docker-capable laptop contribute the default small model without installing Ollama separately:
+
+```bash
+git clone https://github.com/Nettking/msh.git
+cd msh
+docker compose --profile provider run --rm model-provider-install
+```
+
+This starts the provider and downloads `smollm2:360m` once into a persistent Docker volume. Connect the other MSH device to `http://<laptop-ip>:11434`.
 
 ## Start with Docker
 

@@ -19,6 +19,7 @@ import subprocess
 from catalog.flask_app.services.server_setup_service import (
     AI_MODEL_CHOICES,
     AI_PROVIDER_MODES,
+    COMMAND_ONLY_DEPLOYMENT_MODES,
     DEFAULT_OLLAMA_BASE_URL,
     DEPLOYMENT_MODES,
     ServerSetupError,
@@ -74,13 +75,21 @@ def _write_env(settings: ServerSetupSettings, *, web_bind: str, web_port: str, o
 
 
 def _settings_from_args(args: argparse.Namespace) -> ServerSetupSettings:
-    ai_profile = args.ai_profile or "laptop-standard"
+    provider_node = args.mode == "language-model-provider"
+    ai_profile = args.ai_profile or ("edge-small" if provider_node else "laptop-standard")
     if ai_profile not in AI_MODEL_CHOICES:
         raise SystemExit(f"Unknown --ai-profile: {ai_profile}")
-    if args.mode not in set(DEPLOYMENT_MODES) | set(ONE_SHOT_MODES):
+    known_modes = set(DEPLOYMENT_MODES) | set(COMMAND_ONLY_DEPLOYMENT_MODES) | set(ONE_SHOT_MODES)
+    if args.mode not in known_modes:
         raise SystemExit(f"Unknown --mode: {args.mode}")
-    ai_enabled = not args.no_ai and args.mode not in ONE_SHOT_MODES and args.mode != "recorder-only"
-    provider_mode = args.ai_provider or "local"
+    if provider_node and args.no_ai:
+        raise SystemExit("--no-ai cannot be used with --mode=language-model-provider")
+    if provider_node and args.ai_provider == "connected":
+        raise SystemExit("A language-model-provider node must run its own local model.")
+    ai_enabled = provider_node or (
+        not args.no_ai and args.mode not in ONE_SHOT_MODES and args.mode != "recorder-only"
+    )
+    provider_mode = "local" if provider_node else (args.ai_provider or "local")
     if provider_mode not in AI_PROVIDER_MODES:
         raise SystemExit(f"Unknown --ai-provider: {provider_mode}")
     if provider_mode == "connected":
@@ -116,9 +125,13 @@ def _interactive_settings() -> tuple[ServerSetupSettings, str, str, bool, bool]:
     print("MSH setup")
     print("For browser setup, use only: docker compose up -d --build")
     print("For command-driven setup, answer the questions below.\n")
-    modes = list(DEPLOYMENT_MODES) + list(ONE_SHOT_MODES)
+    modes = list(DEPLOYMENT_MODES) + list(COMMAND_ONLY_DEPLOYMENT_MODES) + list(ONE_SHOT_MODES)
     for index, mode in enumerate(modes, start=1):
-        description = DEPLOYMENT_MODES.get(mode, {}).get("description") or f"Run {ONE_SHOT_MODES[mode]} one-shot service."
+        description = (
+            DEPLOYMENT_MODES.get(mode, {}).get("description")
+            or COMMAND_ONLY_DEPLOYMENT_MODES.get(mode, {}).get("description")
+            or f"Run {ONE_SHOT_MODES[mode]} one-shot service."
+        )
         print(f"{index}. {mode}: {description}")
     selected = _prompt("Choose mode", "1")
     try:
@@ -126,14 +139,22 @@ def _interactive_settings() -> tuple[ServerSetupSettings, str, str, bool, bool]:
     except (ValueError, IndexError):
         raise SystemExit(f"Unknown mode selection: {selected}")
 
-    web_bind = _prompt("Web bind address", "0.0.0.0")
-    web_port = _prompt("Web port", "5000")
+    web_bind = "0.0.0.0"
+    web_port = "5000"
+    if mode in {"full-server", "web-workbench", "web-ui-only"}:
+        web_bind = _prompt("Web bind address", web_bind)
+        web_port = _prompt("Web port", web_port)
     no_ai = False
     ai_profile = "laptop-standard"
     ai_provider = "local"
     ai_provider_name = "This computer"
     ollama_url = ""
-    if mode not in ONE_SHOT_MODES and mode != "recorder-only":
+    if mode == "language-model-provider":
+        print("\nAI model choices")
+        for key, choice in AI_MODEL_CHOICES.items():
+            print(f"- {key}: {choice['model']} ({choice['device']})")
+        ai_profile = _prompt("AI profile", "edge-small")
+    elif mode not in ONE_SHOT_MODES and mode != "recorder-only":
         no_ai = not _yes_no("Enable AI explainer", True)
         if not no_ai:
             ai_provider = _prompt("Language-model provider (local or connected)", "local")
@@ -172,6 +193,21 @@ def _interactive_settings() -> tuple[ServerSetupSettings, str, str, bool, bool]:
 def _run_compose(settings: ServerSetupSettings, *, pull_model: bool, start: bool, one_shot_profile: str | None = None) -> None:
     env = os.environ.copy()
     env["COMPOSE_PROFILES"] = one_shot_profile or compose_profiles_for(settings)
+    if settings.deployment_mode == "language-model-provider":
+        env["MSH_PROVIDER_MODEL"] = settings.ai_model
+        if start:
+            subprocess.run(
+                ["docker", "compose", "--profile", "provider", "up", "-d", "model-provider"],
+                env=env,
+                check=True,
+            )
+        if pull_model:
+            subprocess.run(
+                ["docker", "compose", "--profile", "provider", "run", "--rm", "model-provider-install"],
+                env=env,
+                check=True,
+            )
+        return
     if start:
         subprocess.run(["docker", "compose", "up", "-d", "--build"], env=env, check=False)
     if pull_model and settings.ai_enabled:
@@ -187,8 +223,17 @@ def _run_compose(settings: ServerSetupSettings, *, pull_model: bool, start: bool
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Configure MSH from the command line.")
-    parser.add_argument("--mode", choices=sorted(set(DEPLOYMENT_MODES) | set(ONE_SHOT_MODES)), help="Deployment mode to write without prompts.")
-    parser.add_argument("--ai-profile", choices=sorted(AI_MODEL_CHOICES), default="laptop-standard", help="Standard Ollama model choice.")
+    parser.add_argument(
+        "--mode",
+        choices=sorted(set(DEPLOYMENT_MODES) | set(COMMAND_ONLY_DEPLOYMENT_MODES) | set(ONE_SHOT_MODES)),
+        help="Deployment mode to write without prompts.",
+    )
+    parser.add_argument(
+        "--ai-profile",
+        choices=sorted(AI_MODEL_CHOICES),
+        default=None,
+        help="Standard Ollama model choice. Provider nodes default to edge-small.",
+    )
     parser.add_argument("--ai-provider", choices=sorted(AI_PROVIDER_MODES), default="local", help="Run Ollama locally or use a connected computer.")
     parser.add_argument("--ai-provider-name", default="", help="Friendly name for a connected AI provider, such as Laptop.")
     parser.add_argument("--ollama-url", default="", help="Ollama root URL when --ai-provider=connected.")
@@ -241,10 +286,15 @@ def main() -> int:
     print(f"Wrote {ENV_PATH}")
     if not one_shot_profile:
         print("Wrote data/server_setup/server_settings.json")
-    print("Browser-first startup command:")
-    print("  docker compose up -d --build")
-    print("Command-driven start command:")
-    print("  python setup_msh.py --mode web-workbench --ai-profile laptop-standard --start")
+    if settings.deployment_mode == "language-model-provider":
+        print("Language-model provider start/install command:")
+        print("  python setup_msh.py --mode language-model-provider --ai-profile edge-small --start --pull-model")
+        print("Connect another MSH device to http://<this-laptop-ip>:11434")
+    else:
+        print("Browser-first startup command:")
+        print("  docker compose up -d --build")
+        print("Command-driven start command:")
+        print("  python setup_msh.py --mode web-workbench --ai-profile laptop-standard --start")
     _run_compose(settings, pull_model=pull_model, start=start, one_shot_profile=one_shot_profile)
     return 0
 

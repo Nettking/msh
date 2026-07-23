@@ -47,6 +47,7 @@ See [Connected capabilities](connected_capabilities.md) for the phone-to-laptop 
 | Web workbench | `web` | Run the Flask workbench, orchestration, playback, sources page, strategy capture, analysis UI, and optional AI page. |
 | Web UI only | `web` with `MSH_SKIP_ORCHESTRATION=1` | Run the UI without background processing. Useful for inspection/debugging. |
 | Recorder only | `recorder` | Run only the MTConnect data recorder. No web UI. |
+| Language-model provider | `provider` | Run a headless MSH node that contributes an Ollama model to another MSH device. |
 | Prep only | `prep` | Run one-shot preparation/orchestration. |
 | Observer sync only | `observer-sync` | Run one-shot Observer Phoenix synchronization. |
 | AI model server | `ai` | Run Ollama and the one-shot model installer used by `/ai`. Usually combined with `web` or `full`. |
@@ -57,6 +58,41 @@ You can rerun setup at any time:
 python setup_msh.py
 docker compose up -d --build
 ```
+
+## Language-model provider node
+
+Use this mode when one MSH device, such as a phone, should use a model contributed by a Docker-capable laptop. The laptop is installed from the same MSH repository, but it runs only the provider services rather than a second web workbench.
+
+From a fresh checkout on the laptop, the Docker-only installation is:
+
+```bash
+git clone https://github.com/Nettking/msh.git
+cd msh
+docker compose --profile provider run --rm model-provider-install
+```
+
+This starts `model-provider`, waits for it to become healthy, and installs the default `edge-small` model (`smollm2:360m`). Port `11434` is published on the laptop so another MSH device on the trusted LAN/VPN can connect. The model is stored in the persistent `model_provider_models` volume and is not downloaded again during ordinary starts or repository updates.
+
+The setup-helper equivalent is:
+
+```bash
+python setup_msh.py --mode language-model-provider --ai-profile edge-small --start --pull-model
+```
+
+After the first install:
+
+```bash
+# Verify
+docker compose --profile provider ps model-provider
+
+# Start again without reinstalling the model
+docker compose --profile provider up -d model-provider
+
+# Stop
+docker compose --profile provider down
+```
+
+Do not expose port `11434` through the public internet. Restrict it to a trusted private network or VPN.
 
 ## AI model choices
 
@@ -83,11 +119,18 @@ For a full server the profile line is normally:
 COMPOSE_PROFILES=full,ai
 ```
 
-The `ai` profile adds two services:
+Local AI uses two services:
 
 ```text
 ollama       persistent local model server
 ollama-pull  one-shot installer that pulls MSH_AI_MODEL into the Docker volume
+```
+
+The provider profile uses separate services and storage:
+
+```text
+model-provider          persistent provider reachable on the trusted LAN/VPN
+model-provider-install  one-shot installer for MSH_PROVIDER_MODEL
 ```
 
 If setup cannot pull the model immediately, retry after Docker is running:
@@ -106,6 +149,7 @@ docker compose --profile web up -d --build
 docker compose --profile recorder up -d --build
 docker compose --profile full up -d --build
 docker compose --profile web --profile ai up -d --build
+docker compose --profile provider up -d model-provider
 ```
 
 The `.env` approach is preferred for a server because the selected role and AI model are remembered.
