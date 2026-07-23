@@ -1,75 +1,131 @@
 {% extends 'base.html' %}
+
+{% macro evidence_panel(sources, context) -%}
+  {% if sources or context %}
+  <details class="ai-chat-evidence">
+    <summary>
+      <span>Inspect sources</span>
+      {% if sources %}<span class="ai-chat-evidence__count">{{ sources|length }}</span>{% endif %}
+    </summary>
+    <div class="ai-chat-evidence__body">
+      {% if sources %}
+      <ul class="ai-chat-source-list">
+        {% for source in sources %}
+        <li><code>{{ source }}</code></li>
+        {% endfor %}
+      </ul>
+      {% endif %}
+      {% if context %}
+      <details class="ai-chat-context">
+        <summary>View retrieved excerpts</summary>
+        <pre>{{ context }}</pre>
+      </details>
+      {% endif %}
+    </div>
+  </details>
+  {% endif %}
+{%- endmacro %}
+
 {% block body %}
-<section class="page-intro">
-  <h2>AI Explainer</h2>
-  <p>Ask read-only system-understanding questions about MSH. The explainer retrieves repository context first, then sends that context to the configured Ollama provider when dry-run is disabled.</p>
-</section>
+<section
+  class="ai-chat"
+  data-ai-chat
+  data-provider="{{ ai_provider_name }}"
+>
+  <header class="ai-chat__header">
+    <div>
+      <span class="ai-chat__eyebrow">Read-only repository assistant</span>
+      <h2>AI Explainer</h2>
+      <p>Ask a question about how MSH works.</p>
+    </div>
+    <div class="ai-chat__connection" title="{{ ollama_base_url }}">
+      <span class="ai-chat__connection-dot" aria-hidden="true"></span>
+      <span>
+        <strong>{{ ai_provider_name }}</strong>
+        <small>{{ model }}</small>
+      </span>
+    </div>
+  </header>
 
-<section class="section-block section-block--primary ai-explainer-panel">
-  <div class="ai-explainer-panel__main">
-    <h3>Ask the repository explainer</h3>
-    <p class="ai-explainer-help">Use this for architecture, data flow, setup, routes, cache behaviour, and where implementation details live. It does not run scripts, rebuild caches, modify files, or inspect raw telemetry by default.</p>
-
-    <form class="ai-explainer-form" method="post" action="{{ url_for('ai_web.ai_ask') }}">
-      <label for="question">Question</label>
-      <textarea id="question" name="question" rows="5">{{ question }}</textarea>
-
-      <div class="ai-explainer-form__row">
-        <div>
-          <label for="model">Model</label>
-          <input id="model" name="model" value="{{ model }}">
+  <div class="ai-chat__transcript" data-ai-transcript aria-live="polite" aria-label="Conversation">
+    <article class="ai-message ai-message--assistant">
+      <div class="ai-message__role">MSH</div>
+      <div class="ai-message__bubble">
+        <div class="ai-answer">
+          <p>I can explain architecture, data flow, setup, routes, and implementation details from the MSH repository.</p>
         </div>
-        <div class="ai-explainer-options" aria-label="Answer options">
-          <label><input type="checkbox" name="dry_run" value="1" {% if dry_run %}checked{% endif %}> Show retrieved context only</label>
-          <label><input type="checkbox" name="extractive" value="1" {% if extractive %}checked{% endif %}> Extractive answer mode</label>
+        {% if not question and not answer and not context and not error %}
+        <div class="ai-chat-suggestions" aria-label="Suggested questions">
+          <button type="button" data-ai-suggestion="How does data flow through MSH?">How does data flow?</button>
+          <button type="button" data-ai-suggestion="How is the connected language model configured?">How is AI connected?</button>
+          <button type="button" data-ai-suggestion="What can this device do in MSH?">What can this device do?</button>
         </div>
+        {% endif %}
       </div>
+    </article>
 
-      <div class="ai-explainer-actions">
-        <button type="submit">Ask explainer</button>
-        <a class="button-link" href="{{ url_for('web.guide') }}#setup-guide">Open setup guide</a>
+    {% if question %}
+    <article class="ai-message ai-message--user">
+      <div class="ai-message__role">You</div>
+      <div class="ai-message__bubble"><p>{{ question }}</p></div>
+    </article>
+    {% endif %}
+
+    {% if answer or context or error %}
+    <article class="ai-message ai-message--assistant {% if error %}ai-message--error{% endif %}">
+      <div class="ai-message__role">MSH</div>
+      <div class="ai-message__bubble">
+        {% if error %}
+        <div class="ai-answer"><p>{{ error }}</p></div>
+        {% elif answer %}
+        <div class="ai-answer">{{ answer_html|safe }}</div>
+        {% else %}
+        <div class="ai-answer"><p>Retrieved context is ready. Open <strong>Inspect sources</strong> to review it.</p></div>
+        {% endif %}
+        {{ evidence_panel(sources, context) }}
       </div>
-    </form>
+    </article>
+    {% endif %}
   </div>
 
-  <aside class="ai-explainer-panel__aside">
-    <span class="metric-label">Language-model provider</span>
-    <h4>{{ ai_provider_name }}</h4>
-    <p><code>{{ ollama_base_url }}</code></p>
-    <p>The answer is grounded in indexed documentation and code. Keep dry-run enabled when you want to inspect the exact context before asking the model.</p>
-    <a class="button-link" href="{{ url_for('web.startup', edit='1', step='ai') }}">Change connection</a>
-  </aside>
+  <form class="ai-chat-composer" method="post" action="{{ url_for('ai_web.ai_ask') }}" data-ai-form>
+    <label class="ai-visually-hidden" for="question">Ask AI Explainer</label>
+    <div class="ai-chat-composer__row">
+      <textarea
+        id="question"
+        name="question"
+        rows="2"
+        required
+        placeholder="Ask how MSH works…"
+        data-ai-question
+      >{% if error and question %}{{ question }}{% endif %}</textarea>
+      <button class="button-primary ai-chat-composer__send" type="submit" data-ai-send>
+        <span>Send</span>
+        <span aria-hidden="true">↑</span>
+      </button>
+    </div>
+    <div class="ai-chat-composer__footer">
+      <span class="ai-chat-composer__hint">Enter to send · Shift+Enter for a new line</span>
+      <details class="ai-chat-options">
+        <summary>Answer options</summary>
+        <div class="ai-chat-options__panel">
+          <label for="model">Model</label>
+          <input id="model" name="model" value="{{ model }}">
+          <label>
+            <input type="checkbox" name="extractive" value="1" {% if extractive %}checked{% endif %}>
+            Strictly extractive answer
+          </label>
+          <label>
+            <input type="checkbox" name="dry_run" value="1" {% if dry_run %}checked{% endif %}>
+            Preview retrieved context without asking the model
+          </label>
+          <p>Provider: <strong>{{ ai_provider_name }}</strong><br><code>{{ ollama_base_url }}</code></p>
+          <a href="{{ url_for('web.startup', edit='1', step='ai') }}">Change connection</a>
+        </div>
+      </details>
+    </div>
+  </form>
 </section>
 
-{% if error %}
-<section class="section-block section-block--warning ai-explainer-result">
-  <h3>Error</h3>
-  <pre>{{ error }}</pre>
-</section>
-{% endif %}
-
-{% if answer %}
-<section class="section-block ai-explainer-result">
-  <h3>Answer</h3>
-  <pre>{{ answer }}</pre>
-</section>
-{% endif %}
-
-{% if sources %}
-<section class="section-block ai-explainer-sources">
-  <h3>Sources</h3>
-  <ul>
-    {% for source in sources %}
-      <li><code>{{ source }}</code></li>
-    {% endfor %}
-  </ul>
-</section>
-{% endif %}
-
-{% if context %}
-<section class="section-block ai-explainer-result">
-  <h3>Retrieved context</h3>
-  <pre>{{ context }}</pre>
-</section>
-{% endif %}
+<script src="{{ url_for('static', filename='js/ai-explainer.js') }}"></script>
 {% endblock %}

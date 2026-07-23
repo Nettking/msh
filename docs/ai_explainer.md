@@ -51,6 +51,12 @@ The implementation uses retrieval-augmented generation:
 
 The model should be treated as an explanation layer over retrieved repository context, not as the source of truth.
 
+## Browser interaction
+
+The web interface uses a message-style conversation. Sending a question keeps the current transcript visible, shows a working indicator while retrieval and the model request run, and renders the returned Markdown as readable headings, lists, paragraphs, and code.
+
+Repository provenance stays available without dominating the answer. Each assistant message has a collapsed **Inspect sources** section with the exact retrieved source labels. The retrieved excerpts are one additional disclosure level inside that section. Context-only preview and strictly extractive answers remain available under **Answer options**; normal questions call the configured model by default.
+
 ## Default indexed sources
 
 The initial index includes:

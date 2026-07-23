@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from flask import Blueprint, render_template, request
+from flask import Blueprint, jsonify, render_template, request
 
 from catalog.ai.grounding import append_grounding_warning
 from catalog.ai.ollama_client import DEFAULT_BASE_URL, DEFAULT_MODEL, OllamaError, chat
@@ -9,6 +9,7 @@ from catalog.ai.rag import format_context, retrieve
 from catalog.ai.repo_index import load_or_build_chunks, repo_root_from
 from catalog.ai.symbols import build_symbols
 
+from .services.ai_answer_formatting_service import render_safe_markdown
 from .services.server_setup_service import ai_provider_label, load_settings
 
 ai_web = Blueprint("ai_web", __name__)
@@ -48,7 +49,12 @@ def _answer_question(
         answer = chat(prompt=prompt, system_prompt=SYSTEM_PROMPT, model=model, base_url=base_url)
     except OllamaError as exc:
         return {"answer": "", "context": context, "sources": sources, "error": str(exc)}
-    return {"answer": append_grounding_warning(answer, selected), "context": "", "sources": sources, "error": ""}
+    return {
+        "answer": append_grounding_warning(answer, selected),
+        "context": context,
+        "sources": sources,
+        "error": "",
+    }
 
 
 def _render_ai_page(
@@ -73,6 +79,7 @@ def _render_ai_page(
         ai_provider_name=ai_provider_name,
         ollama_base_url=ollama_base_url,
         answer=answer,
+        answer_html=render_safe_markdown(answer),
         context=context,
         sources=sources or [],
         error=error,
@@ -83,10 +90,10 @@ def _render_ai_page(
 def ai_page():
     model, base_url, provider_name = _ai_defaults()
     return _render_ai_page(
-        question="How does data flow through MSH?",
+        question="",
         model=model,
-        dry_run=True,
-        extractive=True,
+        dry_run=False,
+        extractive=False,
         ai_provider_name=provider_name,
         ollama_base_url=base_url,
     )
@@ -109,6 +116,18 @@ def ai_ask():
             dry_run=dry_run,
             extractive=extractive,
         )
+    if request.accept_mimetypes.best == "application/json":
+        payload = {
+            **result,
+            "answer_html": render_safe_markdown(str(result["answer"])),
+            "question": question,
+            "model": model,
+            "provider_name": provider_name,
+            "dry_run": dry_run,
+            "extractive": extractive,
+        }
+        status = 400 if not question else (502 if result["error"] else 200)
+        return jsonify(payload), status
     return _render_ai_page(
         question=question,
         model=model,

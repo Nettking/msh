@@ -31,9 +31,12 @@ Question:
 {question}
 
 Answer format:
-- Start with the direct answer.
-- Include a short "Sources used" section.
-- In "Sources used", list only exact source labels from the allowed source list.
+- Write concise, readable Markdown.
+- Start with the direct answer and use short paragraphs.
+- Use headings, lists, and fenced code only when they improve clarity.
+- Do not repeat the retrieved context.
+- Do not add a sources section; the interface presents the allowed source list separately.
+- When a source label is useful in the answer, copy it exactly from the allowed source list.
 - Do not list guessed files, templates, modules, or related files.
 - If a file is not in the allowed source list, do not mention it.
 """
@@ -60,10 +63,12 @@ Rules:
 - If the retrieved context does not answer part of the question, say so.
 
 Answer format:
-Direct answer: <one or two sentences>
-Visible behavior:
+### Direct answer
+<one or two sentences>
+
+### Visible behavior
 - <fact from context>
 - <fact from context>
-Sources used:
-- <exact source label from allowed source list>
+
+Do not add a sources section; the interface presents the allowed source list separately.
 """
