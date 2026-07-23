@@ -10,7 +10,7 @@ import requests
 OLLAMA_URL = "http://192.168.10.172:11434/api/chat"
 
 # Endre denne dersom `ollama list` viser et annet modellnavn.
-MODEL = "qwen3-vl:4b"
+MODEL = "qwen3-vl:8b"
 
 SUPPORTED_EXTENSIONS = {
     ".jpg",
@@ -22,18 +22,41 @@ SUPPORTED_EXTENSIONS = {
 }
 
 PROMPT = """
-Analyser dette bildet nøye og skriv forklaringen på norsk.
+Analyze the image carefully and objectively.
 
-Beskriv:
-1. Hva bildet viser.
-2. Viktige objekter, personer eller grensesnittelementer.
-3. All lesbar tekst.
-4. Eventuelle feilmeldinger, advarsler eller problemer.
-5. Hva som ser ut til å skje i bildet.
+Provide the following sections:
 
-Ikke gjett dersom noe er uklart. Si tydelig hva du er usikker på.
+1. Image overview
+Describe what is directly visible in the image.
+
+2. Important objects
+List the important objects, people, buildings, or user-interface elements.
+
+3. Visible text
+Transcribe all readable text exactly.
+If no text is visible, state that briefly.
+
+4. Errors or problems
+Report any visible error messages, warnings, damaged elements, unusual states,
+or possible problems.
+Do not claim that no hidden or technical problems exist. Only describe what
+can be determined visually.
+
+5. What appears to be happening
+Describe the visible activity or state of the scene.
+
+6. Uncertainty
+List anything that is unclear, partially visible, or based on interpretation.
+
+Rules:
+- Write in clear and concise English.
+- Describe only what can reasonably be observed.
+- Separate observations from interpretations.
+- Do not infer emotions, intentions, ownership, location, building condition,
+  or technical condition without visible evidence.
+- Do not say that there is no uncertainty unless this is genuinely justified.
+- Do not invent details.
 """
-
 
 def encode_image(image_path: Path) -> str:
     """Les bildet og returner det Base64-kodet."""

@@ -46,3 +46,5 @@ Thumbs.db
 
 # Local AI explainer cache
 /.cache/
+/new-stuff/desktop_agent_output
+new-stuff/bildebeskrivelser.md
