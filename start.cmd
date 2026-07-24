@@ -1,5 +1,5 @@
 @echo off
-title MSH Flask
+title MSH Flask and Recorder
 
 cd /d "%~dp0"
 
@@ -11,6 +11,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-docker compose up --build flask
+docker compose up --build flask recorder
 
 pause
