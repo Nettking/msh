@@ -15,6 +15,7 @@ from .operator_support_routes import operator_support_web
 from .routes import web
 from .server_setup_routes import server_setup_web
 from .services.catalog_service import ArtifactCatalog
+from .services.recorder_control_service import get_recorder_control_service
 from .services.server_setup_service import (
     AI_MODEL_CHOICES,
     AI_PROVIDER_MODES,
@@ -45,19 +46,25 @@ def create_app() -> Flask:
         except ServerSetupError as exc:
             settings = None
             setup_error = str(exc)
-        status = None
+
+        ai_status = None
         if settings is not None and request.path == "/startup":
-            status = ollama_status(settings)
+            ai_status = ollama_status(settings)
+
+        recorder_status = get_recorder_control_service().status(settings)
         return {
             "server_setup_settings": settings,
             "server_setup_error": setup_error,
             "server_setup_modes": DEPLOYMENT_MODES,
             "server_setup_ai_choices": AI_MODEL_CHOICES,
             "server_setup_ai_provider_modes": AI_PROVIDER_MODES,
-            "server_setup_ollama_status": status,
+            "server_setup_ollama_status": ai_status,
+            "server_setup_recorder_status": recorder_status,
         }
 
-    register_artifact_catalog_refresh(lambda reason: catalog.start_background_rescan_if_idle(reason=reason))
+    register_artifact_catalog_refresh(
+        lambda reason: catalog.start_background_rescan_if_idle(reason=reason)
+    )
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
     app.register_blueprint(server_setup_web)
@@ -79,19 +86,46 @@ if __name__ == "__main__":
     try:
         setup = load_settings()
     except ServerSetupError as exc:
-        print(f"[orchestrator] browser setup needs attention before runtime starts: {exc}", flush=True)
+        print(
+            f"[orchestrator] browser setup needs attention before runtime starts: {exc}",
+            flush=True,
+        )
 
-    if os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1" and setup is not None and runtime_should_start(setup):
+    if (
+        os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1"
+        and setup is not None
+        and runtime_should_start(setup)
+    ):
         runtime_manager = get_runtime_manager()
         if runtime_manager.requires_startup_choice():
-            print("[orchestrator] startup mode selection required at /startup before runtime processing begins", flush=True)
+            print(
+                "[orchestrator] startup mode selection required at /startup "
+                "before runtime processing begins",
+                flush=True,
+            )
         else:
-            print("[orchestrator] webapp-first startup: Flask available immediately, runtime starts in background", flush=True)
+            print(
+                "[orchestrator] webapp-first startup: Flask available immediately, "
+                "runtime starts in background",
+                flush=True,
+            )
             start_runtime_background()
-    elif setup is None or not getattr(setup, "configured", False) or not getattr(setup, "user_setup_complete", False):
-        print("[orchestrator] first-time browser setup required at /startup; runtime will remain idle", flush=True)
+    elif (
+        setup is None
+        or not getattr(setup, "configured", False)
+        or not getattr(setup, "user_setup_complete", False)
+    ):
+        print(
+            "[orchestrator] first-time browser setup required at /startup; "
+            "runtime will remain idle",
+            flush=True,
+        )
     else:
-        print("[orchestrator] orchestration disabled by environment or browser setup; runtime manager will remain idle", flush=True)
+        print(
+            "[orchestrator] orchestration disabled by environment or browser setup; "
+            "runtime manager will remain idle",
+            flush=True,
+        )
 
     print(f"[orchestrator] starting Flask app on http://{host}:{port}", flush=True)
     app.run(host=host, port=port, debug=debug, threaded=True)
