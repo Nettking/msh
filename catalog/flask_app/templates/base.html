@@ -58,7 +58,7 @@
     {%- endmacro %}
 
     {% if setup_focus %}
-    <header class="setup-shell-header">
+    <header class="setup-shell-header" style="flex-wrap: wrap;">
       <div class="setup-shell-header__identity">
         <span class="setup-shell-header__mark" aria-hidden="true">MSH</span>
         <div>
@@ -67,15 +67,19 @@
         </div>
       </div>
       {% if recorder_role %}
-      <form method="post" action="{{ '/server-setup/recording/stop' if server_setup_recorder_status.requested_enabled else '/server-setup/recording/start' }}" class="setup-shell-header__recording">
-        <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
-        <span class="status-badge {{ 'status-ready' if server_setup_recorder_status.running else 'status-waiting' }}">
-          {{ 'Recording' if server_setup_recorder_status.running else 'Starting' if server_setup_recorder_status.requested_enabled else 'Recording off' }}
-        </span>
-        <button class="{% if not server_setup_recorder_status.requested_enabled %}button-primary{% endif %}" type="submit">
-          {{ 'Stop recording' if server_setup_recorder_status.requested_enabled else 'Start recording' }}
-        </button>
-      </form>
+        {% if server_setup_recorder_status.ready %}
+        <form method="post" action="{{ '/server-setup/recording/stop' if server_setup_recorder_status.requested_enabled else '/server-setup/recording/start' }}" style="display:flex;align-items:center;gap:8px;" title="{{ server_setup_recorder_status.message }}">
+          <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+          <span class="status-badge {{ 'status-ready' if server_setup_recorder_status.running else 'status-waiting' }}">
+            {% if server_setup_recorder_status.running %}Recording{% elif server_setup_recorder_status.state == 'error' %}Recorder error{% elif server_setup_recorder_status.state == 'offline' %}Recorder offline{% elif server_setup_recorder_status.requested_enabled %}Starting{% else %}Recording off{% endif %}
+          </span>
+          <button class="{% if not server_setup_recorder_status.requested_enabled %}button-primary{% endif %}" type="submit">
+            {{ 'Stop recording' if server_setup_recorder_status.requested_enabled else 'Start recording' }}
+          </button>
+        </form>
+        {% else %}
+        <a class="setup-shell-header__exit" href="{{ url_for('web.startup', edit='1', step='recorder') }}">Configure recording</a>
+        {% endif %}
       {% endif %}
       {% if endpoint == 'web.get_started' %}
       <a class="setup-shell-header__exit" href="{{ url_for('web.overview') }}">Full workbench</a>
