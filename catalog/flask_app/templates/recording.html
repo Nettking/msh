@@ -1,0 +1,71 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="setup-hero setup-hero--focused">
+  <div>
+    <span class="setup-eyebrow">MTConnect recorder</span>
+    <h2>{{ 'Recording is on' if recorder_status.running else 'Recording is off' }}</h2>
+    <p>Start or stop collection from the MTConnect sources saved in this device setup. Recording is independent from the analysis-session choice.</p>
+    <div class="setup-hero__meta">
+      <span class="status-badge {{ 'status-ready' if recorder_status.running else 'status-waiting' }}">
+        {{ 'Recording' if recorder_status.running else 'Stopped' }}
+      </span>
+      <a class="setup-help-link" href="{{ url_for('web.startup') }}">Back to startup</a>
+    </div>
+  </div>
+</section>
+
+<section class="section-block setup-panel">
+  <div class="setup-panel__header">
+    <div>
+      <h3>Recording control</h3>
+      <p>{{ recorder_status.last_message }}</p>
+    </div>
+    {% if recorder_status.running %}
+    <form method="post" action="{{ url_for('server_setup_web.stop_recording') }}">
+      <button type="submit">Stop recording</button>
+    </form>
+    {% else %}
+    <form method="post" action="{{ url_for('server_setup_web.start_recording') }}">
+      <button class="button-primary" type="submit" {% if not recorder_ready %}disabled{% endif %}>Start recording</button>
+    </form>
+    {% endif %}
+  </div>
+
+  {% if not recorder_ready %}
+  <section class="section-block section-block--warning setup-inline-warning">
+    <h3>Recorder setup is incomplete</h3>
+    <p>Choose the Full server or Recorder only role and configure at least one MTConnect source.</p>
+    <a class="button-link" href="{{ url_for('web.startup', edit='1', step='recorder') }}">Edit recorder setup</a>
+  </section>
+  {% endif %}
+
+  <div class="info-grid">
+    <article class="info-card">
+      <h4>Role</h4>
+      <p><strong>{{ server_setup_modes[server_setup_settings.deployment_mode].label if server_setup_settings else 'Not configured' }}</strong></p>
+    </article>
+    <article class="info-card">
+      <h4>Sources</h4>
+      <p><code>{{ server_setup_settings.recorder_sources if server_setup_settings and server_setup_settings.recorder_sources else 'No sources configured' }}</code></p>
+    </article>
+    <article class="info-card">
+      <h4>Process</h4>
+      <p><strong>{{ 'Running' if recorder_status.running else 'Stopped' }}</strong></p>
+      {% if recorder_status.pid %}<p>PID {{ recorder_status.pid }}</p>{% endif %}
+      {% if recorder_status.started_at %}<p>Started {{ recorder_status.started_at }}</p>{% endif %}
+    </article>
+  </div>
+</section>
+
+<section class="section-block">
+  <h3>Where data is written</h3>
+  <p><code>data/sources/mtconnect_recorder/jsonl/&lt;machine&gt;/&lt;date&gt;.jsonl</code></p>
+  <p>Recorder log: <code>{{ recorder_status.log_path }}</code></p>
+  {% if recorder_status.log_tail %}
+  <details>
+    <summary>Show recent recorder log</summary>
+    <pre>{{ recorder_status.log_tail }}</pre>
+  </details>
+  {% endif %}
+</section>
+{% endblock %}
