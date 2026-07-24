@@ -5,6 +5,10 @@ from flask import Blueprint, flash, jsonify, redirect, request, url_for
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
 from .services.ai_model_benchmark_service import compare_ollama_setup_models
+from .services.recorder_control_service import (
+    RecorderControlError,
+    get_recorder_control_service,
+)
 from .services.server_setup_service import (
     AI_MODEL_CHOICES,
     ServerSetupError,
@@ -27,13 +31,18 @@ _SETUP_PATHS = {
     "/server-setup/test-ai-model",
     "/server-setup/test-ai-connection",
     "/server-setup/compare-ai-models",
+    "/server-setup/recording/start",
+    "/server-setup/recording/stop",
     "/status",
     "/rescan",
 }
 
 
 def _next_path() -> str:
-    return request.form.get("next") or request.args.get("next") or url_for("web.overview")
+    value = request.form.get("next") or request.args.get("next") or ""
+    if value.startswith("/") and not value.startswith("//"):
+        return value
+    return url_for("web.overview")
 
 
 def _startup_step_url(step: str, *, next_path: str | None = None) -> str:
@@ -44,10 +53,9 @@ def _startup_step_url(step: str, *, next_path: str | None = None) -> str:
 def browser_setup_gate():
     """Ensure one-command Docker startup lands in browser setup first.
 
-    This runs before the normal web startup gate because the blueprint is
-    registered before `web`. It also handles setup POSTs directly so they are not
-    blocked by the older continue-vs-clean startup gate when prior runtime state
-    exists.
+    Setup and recorder-control POSTs are handled here before the older runtime
+    choice gate. Recording is intentionally independent from the analysis-session
+    continue-vs-clean decision.
     """
 
     if request.endpoint and request.endpoint.startswith("static"):
@@ -62,16 +70,47 @@ def browser_setup_gate():
         return _test_ai_connection_from_request()
     if request.path == "/server-setup/compare-ai-models" and request.method == "POST":
         return _compare_ai_models_from_request()
+    if request.path == "/server-setup/recording/start" and request.method == "POST":
+        return _set_recording_from_request(True)
+    if request.path == "/server-setup/recording/stop" and request.method == "POST":
+        return _set_recording_from_request(False)
     if request.path in _SETUP_PATHS:
         return None
+
     try:
         settings = load_settings()
     except ServerSetupError as exc:
         flash(str(exc), "error")
-        return redirect(url_for("web.startup", next=request.full_path if request.query_string else request.path))
+        return redirect(
+            url_for(
+                "web.startup",
+                next=request.full_path if request.query_string else request.path,
+            )
+        )
     if not settings.configured or not settings.user_setup_complete:
-        return redirect(url_for("web.startup", next=request.full_path if request.query_string else request.path))
+        return redirect(
+            url_for(
+                "web.startup",
+                next=request.full_path if request.query_string else request.path,
+            )
+        )
     return None
+
+
+def _set_recording_from_request(enabled: bool):
+    destination = request.form.get("next") or url_for("web.startup")
+    if not destination.startswith("/") or destination.startswith("//"):
+        destination = url_for("web.startup")
+
+    try:
+        settings = load_settings()
+        ok, message = get_recorder_control_service().set_enabled(enabled, settings)
+    except (ServerSetupError, RecorderControlError) as exc:
+        flash(str(exc), "error")
+        return redirect(destination)
+
+    flash(message, "success" if ok else "error")
+    return redirect(destination)
 
 
 def _save_from_request():
@@ -81,14 +120,17 @@ def _save_from_request():
             previous_settings.configured and previous_settings.user_setup_complete
         )
     except ServerSetupError:
-        # A valid browser save is also the recovery path for an unreadable setup
-        # file, so treat it as a first setup instead of blocking the replacement.
         first_user_setup = True
 
     try:
         settings = settings_from_form(request.form)
         save_settings(settings)
-    except ServerSetupError as exc:
+        if (
+            settings.deployment_mode not in {"full-server", "recorder-only"}
+            or not settings.recorder_sources.strip()
+        ):
+            get_recorder_control_service().set_enabled(False, settings)
+    except (ServerSetupError, RecorderControlError) as exc:
         flash(str(exc), "error")
         return redirect(_startup_step_url("review"))
 
@@ -111,7 +153,11 @@ def _settings_for_ai_form():
 
 
 def _selected_ai_model_from_request(settings) -> str:
-    profile = str(request.form.get("ai_profile") or settings.ai_profile or "laptop-standard").strip()
+    profile = str(
+        request.form.get("ai_profile")
+        or settings.ai_profile
+        or "laptop-standard"
+    ).strip()
     if profile in AI_MODEL_CHOICES:
         return AI_MODEL_CHOICES[profile]["model"]
     return str(request.form.get("model") or settings.ai_model or "").strip()
@@ -121,15 +167,29 @@ def _legacy_shape_for_ai_page(result: dict) -> dict:
     recommendation = result.get("recommendation") or {}
     recommended_model = recommendation.get("recommended_model") or ""
     rows = result.get("rows") or []
-    recommended_row = next((row for row in rows if row.get("model") == recommended_model), None)
+    recommended_row = next(
+        (row for row in rows if row.get("model") == recommended_model),
+        None,
+    )
     recommended_result = (recommended_row or {}).get("result") or {}
-    result.setdefault("model", recommended_model or _selected_ai_model_from_request(load_settings()))
+    result.setdefault(
+        "model",
+        recommended_model or _selected_ai_model_from_request(load_settings()),
+    )
     result.setdefault("elapsed_ms", recommended_result.get("elapsed_ms"))
     result.setdefault(
         "assessment",
         {
-            "label": recommendation.get("recommended_label") or recommendation.get("verdict") or "No recommendation",
-            "description": recommendation.get("message") or result.get("message") or "No recommendation available.",
+            "label": (
+                recommendation.get("recommended_label")
+                or recommendation.get("verdict")
+                or "No recommendation"
+            ),
+            "description": (
+                recommendation.get("message")
+                or result.get("message")
+                or "No recommendation available."
+            ),
         },
     )
     return result
