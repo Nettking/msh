@@ -71,20 +71,22 @@ services:
     command: ["pull", "${MSH_PROVIDER_MODEL:-smollm2:360m}"]
 
   recorder:
-    profiles: ["recorder", "full"]
     build:
       context: .
       dockerfile: Dockerfile
     entrypoint: ["python", "catalog/standalone-recorder_v2/standalone-recorder_v2.py"]
     environment:
-      - MSH_RECORDER_SOURCES_JSON=${MSH_RECORDER_SOURCES_JSON:-}
-      - MSH_RECORDER_SOURCES=${MSH_RECORDER_SOURCES:-}
-      - MSH_RECORDER_DATA_DIR=${MSH_RECORDER_DATA_DIR:-data}
-      - MSH_RECORDER_STATE_FILE=${MSH_RECORDER_STATE_FILE:-data/source_state/mtconnect_recorder_state.json}
-      - MSH_RECORDER_POLL_INTERVAL=${MSH_RECORDER_POLL_INTERVAL:-0.2}
+      - MSH_RECORDER_MANAGED=true
+      - MSH_RECORDER_DATA_DIR=data
+      - MSH_RECORDER_STATE_FILE=data/source_state/mtconnect_recorder_state.json
+      - MSH_RECORDER_CONTROL_FILE=data/source_state/mtconnect_recorder_control.json
+      - MSH_RECORDER_SETTINGS_FILE=data/server_setup/server_settings.json
+      - MSH_RECORDER_STATUS_FILE=data/source_state/mtconnect_recorder_status.json
+      - MSH_RECORDER_LOG_FILE=data/source_state/mtconnect_recorder.log
       - MSH_RECORDER_FLUSH_INTERVAL=${MSH_RECORDER_FLUSH_INTERVAL:-1.0}
       - MSH_RECORDER_REQUEST_TIMEOUT=${MSH_RECORDER_REQUEST_TIMEOUT:-1.0}
-      - MSH_RECORDER_INCLUDE_CONDITION=${MSH_RECORDER_INCLUDE_CONDITION:-false}
+      - MSH_RECORDER_CONFIG_REFRESH_INTERVAL=${MSH_RECORDER_CONFIG_REFRESH_INTERVAL:-1.0}
+      - MSH_RECORDER_STATUS_INTERVAL=${MSH_RECORDER_STATUS_INTERVAL:-1.0}
     volumes:
       - ./data:/app/data
     restart: unless-stopped
