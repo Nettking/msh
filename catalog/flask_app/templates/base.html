@@ -20,6 +20,7 @@
   <body class="{% if setup_focus %}setup-focus{% endif %}">
     {% set setup_is_configured = server_setup_settings and server_setup_settings.configured and server_setup_settings.user_setup_complete %}
     {% set setup_runtime_pending = startup_state is defined and startup_state.requires_choice %}
+    {% set recorder_role = setup_is_configured and server_setup_settings.deployment_mode in ['full-server', 'recorder-only'] %}
     {% set knowledge_endpoints = ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export', 'operator_support_web.first_part', 'operator_support_web.quality_outcomes', 'operator_support_web.machine_notes', 'operator_support_web.learning', 'operator_support_web.recommender_artifacts', 'web.strategies', 'web.save_strategies'] %}
     {% set active_group = 'monitor' %}
     {% if endpoint.startswith('operator_strategy_web.') or endpoint in knowledge_endpoints %}
@@ -44,6 +45,7 @@
         <a class="{% if current_endpoint == 'web.guide' %}is-active{% endif %}" href="{{ url_for('web.guide') }}">Guide</a>
         <a class="{% if current_endpoint == 'web.startup' and request.args.get('step') != 'ai' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">Setup</a>
         <a class="{% if current_endpoint == 'web.startup' and request.args.get('step') == 'ai' %}is-active{% endif %}" href="{{ url_for('web.startup', edit='1', step='ai') }}">Connections</a>
+        <a href="{{ url_for('web.startup') }}">Recording</a>
         <a class="{% if current_endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ endpoint_url('source_web.index', '/sources/') }}">Sources</a>
         <a class="{% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
         <a class="{% if current_endpoint.startswith('ai_web.') %}is-active{% endif %}" href="{{ endpoint_url('ai_web.ai_page', '/ai') }}">AI Explainer</a>
@@ -64,6 +66,17 @@
           <span>{{ 'Choose your first task' if endpoint == 'web.get_started' else 'One step at a time' }}</span>
         </div>
       </div>
+      {% if recorder_role %}
+      <form method="post" action="{{ '/server-setup/recording/stop' if server_setup_recorder_status.requested_enabled else '/server-setup/recording/start' }}" class="setup-shell-header__recording">
+        <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
+        <span class="status-badge {{ 'status-ready' if server_setup_recorder_status.running else 'status-waiting' }}">
+          {{ 'Recording' if server_setup_recorder_status.running else 'Starting' if server_setup_recorder_status.requested_enabled else 'Recording off' }}
+        </span>
+        <button class="{% if not server_setup_recorder_status.requested_enabled %}button-primary{% endif %}" type="submit">
+          {{ 'Stop recording' if server_setup_recorder_status.requested_enabled else 'Start recording' }}
+        </button>
+      </form>
+      {% endif %}
       {% if endpoint == 'web.get_started' %}
       <a class="setup-shell-header__exit" href="{{ url_for('web.overview') }}">Full workbench</a>
       {% elif setup_is_configured and not setup_runtime_pending %}
