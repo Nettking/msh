@@ -1,4 +1,4 @@
-"""Replayable D3 storage-provider registration and assignment state."""
+"""Replayable storage-provider registration, assignment, and grant state."""
 
 from __future__ import annotations
 
@@ -6,13 +6,13 @@ import json
 import sqlite3
 import uuid
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
 from .errors import FederationValidationError, RevisionGapError
 from .models import SessionEvent
-from .storage_protocol import STORAGE_PROTOCOL, STORAGE_PROTOCOL_MAJOR
+from .storage_protocol import STORAGE_PROTOCOL, STORAGE_PROTOCOL_MAJOR, StorageOperation
 
 STORAGE_GROUP_CREATED = "storage.group.created"
 STORAGE_PROVIDER_REGISTERED = "storage.provider.registered"
@@ -28,10 +28,29 @@ def _required(value: str, field_name: str) -> str:
     return value
 
 
-def _utc(value: datetime) -> datetime:
+def _uint(value: Any, field_name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise FederationValidationError(
+            "invalid-non-negative-integer", field_name, "must be a non-negative integer"
+        )
+    return value
+
+
+def _utc(value: datetime, field_name: str = "occurred_at") -> datetime:
     if value.tzinfo is None or value.utcoffset() is None:
-        raise FederationValidationError("invalid-timestamp", "occurred_at", "must be timezone-aware")
+        raise FederationValidationError("invalid-timestamp", field_name, "must be timezone-aware")
     return value.astimezone(timezone.utc)
+
+
+def _parse_utc(value: Any, field_name: str) -> datetime:
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise FederationValidationError("invalid-timestamp", field_name, "must be RFC 3339") from exc
+    if not isinstance(value, datetime):
+        raise FederationValidationError("invalid-timestamp", field_name, "must be RFC 3339")
+    return _utc(value, field_name)
 
 
 @dataclass(frozen=True)
@@ -119,17 +138,57 @@ class StorageControlPlaneSnapshot:
                 if provider is None:
                     raise FederationValidationError("unknown-provider", "provider_id", "provider is not registered")
                 if not provider.assignable:
-                    raise FederationValidationError("provider-not-assignable", "provider_id", "provider is not ready, authorized, and protocol-compatible")
+                    raise FederationValidationError(
+                        "provider-not-assignable",
+                        "provider_id",
+                        "provider is not ready, authorized, and protocol-compatible",
+                    )
             self.groups[group_id] = StorageGroupAssignment(group_id, primary, replicas)
+            active = self.leader_grants.get(group_id)
+            if active is not None and active.get("provider_id") != primary:
+                self.leader_grants.pop(group_id, None)
         elif event.event_type == STORAGE_LEADER_GRANTED:
             group_id = _required(payload.get("group_id"), "group_id")
             provider_id = _required(payload.get("provider_id"), "provider_id")
             assignment = self.groups.get(group_id)
             if assignment is None or assignment.primary_provider_id != provider_id:
                 raise FederationValidationError("not-assigned-primary", "provider_id", "leader must be the assigned primary")
-            self.leader_grants[group_id] = dict(payload)
+            provider = self.providers.get(provider_id)
+            if provider is None or not provider.assignable:
+                raise FederationValidationError("provider-not-assignable", "provider_id", "leader provider is not assignable")
+            grant_id = _required(payload.get("grant_id"), "grant_id")
+            term = _uint(payload.get("term"), "term")
+            fencing_token = _uint(payload.get("fencing_token"), "fencing_token")
+            lease_expires_at = _parse_utc(payload.get("lease_expires_at"), "lease_expires_at")
+            if lease_expires_at <= event.occurred_at:
+                raise FederationValidationError("invalid-lease", "lease_expires_at", "must be later than issuance")
+            scopes = tuple(payload.get("scopes", ()))
+            if not scopes or any(not isinstance(scope, str) or not scope for scope in scopes):
+                raise FederationValidationError("invalid-scope", "scopes", "must contain at least one operation")
+            active = self.leader_grants.get(group_id)
+            if active is not None:
+                if term <= int(active["term"]):
+                    raise FederationValidationError("stale-term", "term", "must increase for a replacement grant")
+                if fencing_token <= int(active["fencing_token"]):
+                    raise FederationValidationError(
+                        "stale-fencing-token", "fencing_token", "must increase for a replacement grant"
+                    )
+            self.leader_grants[group_id] = {
+                "group_id": group_id,
+                "provider_id": provider_id,
+                "node_id": provider.node_id,
+                "grant_id": grant_id,
+                "term": term,
+                "fencing_token": fencing_token,
+                "lease_expires_at": lease_expires_at.isoformat(),
+                "scopes": list(scopes),
+            }
         elif event.event_type == STORAGE_LEADER_REVOKED:
             group_id = _required(payload.get("group_id"), "group_id")
+            grant_id = _required(payload.get("grant_id"), "grant_id")
+            active = self.leader_grants.get(group_id)
+            if active is not None and active.get("grant_id") != grant_id:
+                raise FederationValidationError("unknown-grant", "grant_id", "cannot revoke a different active grant")
             self.leader_grants.pop(group_id, None)
         else:
             raise FederationValidationError("unsupported-event", "event_type", "unknown storage control-plane event")
@@ -190,7 +249,15 @@ class StorageControlPlaneStore:
             for row in rows
         )
 
-    def append(self, *, session_id: str, actor_node_id: str, event_type: str, payload: dict[str, Any], occurred_at: datetime | None = None) -> SessionEvent:
+    def append(
+        self,
+        *,
+        session_id: str,
+        actor_node_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+        occurred_at: datetime | None = None,
+    ) -> SessionEvent:
         session_id = _required(session_id, "session_id")
         actor_node_id = _required(actor_node_id, "actor_node_id")
         occurred_at = _utc(occurred_at or datetime.now(timezone.utc))
@@ -229,9 +296,19 @@ class StorageControlPlaneStore:
         return event
 
     def create_group(self, session_id: str, actor_node_id: str, group_id: str) -> SessionEvent:
-        return self.append(session_id=session_id, actor_node_id=actor_node_id, event_type=STORAGE_GROUP_CREATED, payload={"group_id": group_id})
+        return self.append(
+            session_id=session_id,
+            actor_node_id=actor_node_id,
+            event_type=STORAGE_GROUP_CREATED,
+            payload={"group_id": group_id},
+        )
 
-    def register_provider(self, session_id: str, actor_node_id: str, provider: StorageProviderRegistration) -> SessionEvent:
+    def register_provider(
+        self,
+        session_id: str,
+        actor_node_id: str,
+        provider: StorageProviderRegistration,
+    ) -> SessionEvent:
         if provider.session_id != session_id:
             raise FederationValidationError("session-mismatch", "session_id", "provider belongs to another session")
         return self.append(
@@ -249,23 +326,74 @@ class StorageControlPlaneStore:
         )
 
     def remove_provider(self, session_id: str, actor_node_id: str, provider_id: str) -> SessionEvent:
-        return self.append(session_id=session_id, actor_node_id=actor_node_id, event_type=STORAGE_PROVIDER_REMOVED, payload={"provider_id": provider_id})
+        return self.append(
+            session_id=session_id,
+            actor_node_id=actor_node_id,
+            event_type=STORAGE_PROVIDER_REMOVED,
+            payload={"provider_id": provider_id},
+        )
 
-    def change_assignment(self, session_id: str, actor_node_id: str, group_id: str, primary_provider_id: str | None, replica_provider_ids: tuple[str, ...] = ()) -> SessionEvent:
+    def change_assignment(
+        self,
+        session_id: str,
+        actor_node_id: str,
+        group_id: str,
+        primary_provider_id: str | None,
+        replica_provider_ids: tuple[str, ...] = (),
+    ) -> SessionEvent:
         return self.append(
             session_id=session_id,
             actor_node_id=actor_node_id,
             event_type=STORAGE_ASSIGNMENT_CHANGED,
-            payload={"group_id": group_id, "primary_provider_id": primary_provider_id, "replica_provider_ids": list(replica_provider_ids)},
+            payload={
+                "group_id": group_id,
+                "primary_provider_id": primary_provider_id,
+                "replica_provider_ids": list(replica_provider_ids),
+            },
         )
 
-    def grant_leader(self, session_id: str, actor_node_id: str, group_id: str, provider_id: str, grant_id: str, term: int, fencing_token: int) -> SessionEvent:
+    def grant_leader(
+        self,
+        session_id: str,
+        actor_node_id: str,
+        group_id: str,
+        provider_id: str,
+        grant_id: str,
+        term: int,
+        fencing_token: int,
+        *,
+        lease_expires_at: datetime | None = None,
+        scopes: tuple[str, ...] = (StorageOperation.BATCH_INGEST.value,),
+        occurred_at: datetime | None = None,
+    ) -> SessionEvent:
+        issued_at = _utc(occurred_at or datetime.now(timezone.utc))
+        expiry = _utc(lease_expires_at or issued_at + timedelta(minutes=5), "lease_expires_at")
         return self.append(
             session_id=session_id,
             actor_node_id=actor_node_id,
             event_type=STORAGE_LEADER_GRANTED,
-            payload={"group_id": group_id, "provider_id": provider_id, "grant_id": grant_id, "term": term, "fencing_token": fencing_token},
+            occurred_at=issued_at,
+            payload={
+                "group_id": group_id,
+                "provider_id": provider_id,
+                "grant_id": grant_id,
+                "term": term,
+                "fencing_token": fencing_token,
+                "lease_expires_at": expiry.isoformat(),
+                "scopes": list(scopes),
+            },
         )
 
-    def revoke_leader(self, session_id: str, actor_node_id: str, group_id: str, grant_id: str) -> SessionEvent:
-        return self.append(session_id=session_id, actor_node_id=actor_node_id, event_type=STORAGE_LEADER_REVOKED, payload={"group_id": group_id, "grant_id": grant_id})
+    def revoke_leader(
+        self,
+        session_id: str,
+        actor_node_id: str,
+        group_id: str,
+        grant_id: str,
+    ) -> SessionEvent:
+        return self.append(
+            session_id=session_id,
+            actor_node_id=actor_node_id,
+            event_type=STORAGE_LEADER_REVOKED,
+            payload={"group_id": group_id, "grant_id": grant_id},
+        )
