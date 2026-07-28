@@ -1,0 +1,151 @@
+from __future__ import annotations
+
+import os
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from uuid import uuid4
+
+import pytest
+
+from catalog.federation.errors import FederationValidationError
+from catalog.federation.local_storage import FilesystemBatchStorageProvider
+from catalog.federation.postgres_storage import PostgreSQLBatchStorageProvider
+from catalog.federation.storage_protocol import (
+    BatchIngestRequest,
+    BatchIngestState,
+    StorageErrorCode,
+    WriteAuthority,
+)
+
+POSTGRES_DSN = os.environ.get(
+    "MSH_TEST_POSTGRES_DSN",
+    "postgresql://msh:msh@127.0.0.1:5432/msh_test",
+)
+
+
+def _request(
+    content: object,
+    *,
+    session_id: str,
+    batch_id: str = "batch-1",
+    key: str = "idem-1",
+) -> BatchIngestRequest:
+    now = datetime(2026, 7, 29, tzinfo=timezone.utc)
+    return BatchIngestRequest(
+        authority=WriteAuthority(
+            session_id=session_id,
+            group_id="storage-main",
+            actor_node_id="node-a",
+            grant_id="grant-1",
+            term=1,
+            fencing_token=10,
+            lease_expires_at=now + timedelta(minutes=5),
+        ),
+        dataset_id="telemetry",
+        batch_id=batch_id,
+        idempotency_key=key,
+        content_hash=BatchIngestRequest.calculate_content_hash(content),
+        content=content,
+        created_at=now,
+    )
+
+
+def _postgres() -> PostgreSQLBatchStorageProvider:
+    try:
+        return PostgreSQLBatchStorageProvider(POSTGRES_DSN)
+    except Exception as exc:  # pragma: no cover - local developers may not run PostgreSQL
+        pytest.skip(f"PostgreSQL integration service unavailable: {exc}")
+
+
+@pytest.fixture(params=["filesystem", "postgresql"])
+def provider(request, tmp_path: Path):
+    if request.param == "filesystem":
+        return FilesystemBatchStorageProvider(tmp_path / "storage")
+    return _postgres()
+
+
+def test_shared_provider_conformance(provider) -> None:
+    session_id = f"session-{uuid4()}"
+    content = {"observations": [{"sequence": 1, "value": 12.5}]}
+    request = _request(content, session_id=session_id)
+
+    first = provider.ingest(request)
+    assert first.state is BatchIngestState.STORED
+    assert provider.exists(
+        session_id=session_id,
+        group_id="storage-main",
+        batch_id="batch-1",
+    )
+    assert provider.read(
+        session_id=session_id,
+        group_id="storage-main",
+        batch_id="batch-1",
+    ) == content
+
+    retry = provider.ingest(request)
+    assert retry.state is BatchIngestState.ALREADY_STORED
+
+    description = provider.describe()
+    assert description["protocol"] == "msh-storage-v1"
+    assert description["backend"] in {"filesystem", "postgresql"}
+    assert provider.health()["status"] == "ready"
+
+
+def test_shared_provider_rejects_idempotency_conflict(provider) -> None:
+    session_id = f"session-{uuid4()}"
+    provider.ingest(_request({"value": 1}, session_id=session_id))
+
+    with pytest.raises(FederationValidationError) as error:
+        provider.ingest(
+            _request(
+                {"value": 2},
+                session_id=session_id,
+                batch_id="batch-2",
+                key="idem-1",
+            )
+        )
+
+    assert error.value.code == StorageErrorCode.IDEMPOTENCY_CONFLICT.value
+    assert not provider.exists(
+        session_id=session_id,
+        group_id="storage-main",
+        batch_id="batch-2",
+    )
+
+
+def test_postgresql_provider_survives_reconstruction() -> None:
+    session_id = f"session-{uuid4()}"
+    first = _postgres()
+    first.ingest(_request({"value": "durable"}, session_id=session_id))
+
+    reconstructed = _postgres()
+    assert reconstructed.read(
+        session_id=session_id,
+        group_id="storage-main",
+        batch_id="batch-1",
+    ) == {"value": "durable"}
+
+
+def test_postgresql_invalid_hash_is_not_committed() -> None:
+    session_id = f"session-{uuid4()}"
+    provider = _postgres()
+    request = _request({"value": 1}, session_id=session_id)
+    invalid = BatchIngestRequest(
+        authority=request.authority,
+        dataset_id=request.dataset_id,
+        batch_id=request.batch_id,
+        idempotency_key=request.idempotency_key,
+        content_hash="sha256:" + "0" * 64,
+        content=request.content,
+        created_at=request.created_at,
+    )
+
+    with pytest.raises(FederationValidationError) as error:
+        provider.ingest(invalid)
+
+    assert error.value.code == StorageErrorCode.CONTENT_HASH_MISMATCH.value
+    assert not provider.exists(
+        session_id=session_id,
+        group_id="storage-main",
+        batch_id="batch-1",
+    )
