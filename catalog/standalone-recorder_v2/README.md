@@ -70,9 +70,9 @@ For every configured source, the recorder:
 3. requests `/sample?from=<checkpoint>&count=<batch-size>`;
 4. validates sequence continuity;
 5. atomically stores the original XML and its manifest;
-6. atomically stores one normalized JSONL batch;
-7. fsyncs both artifacts;
-8. advances the checkpoint only after the durable writes succeed.
+6. atomically stores the complete observation NDJSON batch;
+7. atomically stores the MSH-compatible wide JSONL batch;
+8. advances the checkpoint only after all durable writes succeed.
 
 If the process stops after raw XML is stored but before the checkpoint is
 advanced, the next run recovers the archived batch before requesting newer
@@ -81,16 +81,35 @@ duplicate records.
 
 ## Output
 
-### Normalized telemetry
+### MSH-compatible telemetry JSONL
 
-One observation per line:
+The regular MSH scan path receives one wide state snapshot for every MTConnect
+sequence:
 
 ```text
 data/sources/mtconnect_recorder/jsonl/
   <source>/<agent-instance>/<date>/seq-<first>-<last>-next-<next>.jsonl
 ```
 
-Each record retains, when supplied by the Agent or `/probe` model:
+Each observation updates its named signal and carries forward the latest known
+values for that machine. Existing MSH consumers therefore continue to see
+columns such as `Srpm`, `execution`, and `Xabs`, while every source sequence is
+still represented. The carried state is persisted in the durable checkpoint so
+it survives normal restarts. It is reset after an Agent restart or an
+unrecoverable sequence gap rather than carrying stale values across missing
+data.
+
+### Complete normalized observations
+
+Every Sample, Event, and Condition is also stored as a detailed record outside
+the automatic wide-telemetry scan:
+
+```text
+data/sources/mtconnect_recorder/observations/
+  <source>/<agent-instance>/<date>/seq-<first>-<last>-next-<next>.ndjson
+```
+
+Each detailed record retains, when supplied by the Agent or `/probe` model:
 
 - `agent_instance_id` and observation `sequence`;
 - original observation timestamp and recorder receipt time;
