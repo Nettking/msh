@@ -152,7 +152,7 @@ class ReplicationWorker:
                 await self._deliver(entry)
                 self.outbox.acknowledge(entry.outbox_id, now=self.clock())
                 completed += 1
-            except Exception as error:
+            except (FederationValidationError, OSError, TimeoutError, TypeError, ValueError) as error:
                 self.outbox.record_failure(
                     entry.outbox_id,
                     error=str(error),
