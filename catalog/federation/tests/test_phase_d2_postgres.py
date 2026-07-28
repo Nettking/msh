@@ -5,6 +5,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from uuid import uuid4
 
+import psycopg
 import pytest
 
 from catalog.federation.errors import FederationValidationError
@@ -53,7 +54,7 @@ def _request(
 def _postgres() -> PostgreSQLBatchStorageProvider:
     try:
         return PostgreSQLBatchStorageProvider(POSTGRES_DSN)
-    except Exception as exc:  # pragma: no cover - local developers may not run PostgreSQL
+    except psycopg.Error as exc:  # pragma: no cover - local developers may not run PostgreSQL
         pytest.skip(f"PostgreSQL integration service unavailable: {exc}")
 
 
