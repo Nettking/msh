@@ -4,6 +4,7 @@ from .errors import FederationValidationError
 from .filesystem_storage import FilesystemRecorderStorageProvider
 from .local_storage import BatchStorageProvider, FilesystemBatchStorageProvider, LocalStorageService
 from .outbox import OutboxEntry, OutboxState, SQLiteOutbox
+from .postgres_storage import PostgreSQLBatchStorageProvider
 from .providers import (
     CapabilityProvider,
     ProviderError,
@@ -57,6 +58,7 @@ __all__ = [
     "FederationValidationError",
     "FilesystemRecorderStorageProvider",
     "FilesystemBatchStorageProvider",
+    "PostgreSQLBatchStorageProvider",
     "BatchStorageProvider",
     "LocalStorageService",
     "SQLiteOutbox",
