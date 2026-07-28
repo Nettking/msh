@@ -48,7 +48,13 @@ def create_app() -> Flask:
             setup_error = str(exc)
 
         ai_status = None
-        if settings is not None and request.path == "/startup":
+        if (
+            settings is not None
+            and settings.configured
+            and settings.user_setup_complete
+            and settings.deployment_mode != "recorder-only"
+            and request.path == "/startup"
+        ):
             ai_status = ollama_status(settings)
 
         recorder_status = get_recorder_control_service().status(settings)

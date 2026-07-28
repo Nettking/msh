@@ -2,9 +2,13 @@
 {% block body %}
 {% set setup_configured = server_setup_settings and server_setup_settings.configured and server_setup_settings.user_setup_complete %}
 {% set setup_editing = request.args.get('edit') == '1' or not setup_configured %}
-{% set recorder_role = server_setup_settings and server_setup_settings.deployment_mode in ['full-server', 'recorder-only'] %}
+{% set selected_role = server_setup_settings.deployment_mode if server_setup_settings else 'web-workbench' %}
+{% set recorder_role = selected_role in ['full-server', 'recorder-only'] %}
+{% set recorder_only = selected_role == 'recorder-only' %}
+{% set ai_role = selected_role != 'recorder-only' %}
+{% set runtime_role = selected_role in ['full-server', 'web-workbench'] %}
 {% set recorder_missing = recorder_role and not server_setup_settings.recorder_sources %}
-{% set runtime_choice_pending = setup_configured and not setup_editing and startup_state.requires_choice %}
+{% set runtime_choice_pending = setup_configured and not setup_editing and runtime_role and startup_state.requires_choice %}
 <section class="setup-hero setup-hero--focused">
   <div>
     <span class="setup-eyebrow">{{ 'Session start' if runtime_choice_pending else 'Edit setup' if setup_configured and setup_editing else 'Device ready' if setup_configured else 'First-time setup' }}</span>
@@ -13,7 +17,7 @@
     <p>MSH found saved session progress. Resume it, or begin a new session. This choice does not delete your files or change the device setup.</p>
     {% elif setup_configured and not setup_editing %}
     <h2>MSH is ready</h2>
-    <p>No setup decision is required. Open the workbench, or review the device settings below.</p>
+    <p>{% if recorder_only %}Recorder station setup is saved. Open recorder status to start capture or check the machines.{% else %}No setup decision is required. Open the workbench, or review the device settings below.{% endif %}</p>
     {% else %}
     <h2>{{ 'Change this device setup' if setup_configured else 'Set up this MSH device' }}</h2>
     <p>Answer one question at a time. Nothing is permanent; these choices can be changed later.</p>
@@ -59,15 +63,22 @@
   {% endif %}
 
   <div class="control-action-grid setup-saved-actions">
-    {% if server_setup_settings.ai_enabled and (not server_setup_ollama_status or not server_setup_ollama_status.selected_model_installed) %}
+    {% if ai_role and server_setup_settings.ai_enabled and (not server_setup_ollama_status or not server_setup_ollama_status.selected_model_installed) %}
     <form method="post" action="/server-setup/pull-model" class="control-card">
       <input type="hidden" name="next" value="{{ next_path }}">
+      <input type="hidden" name="_csrf_token" value="{{ mtconnect_discovery_csrf_token }}">
       <button class="button-primary" type="submit">Install {{ server_setup_settings.ai_model }}</button>
       <p>Installs the saved model on {{ server_setup_settings.ai_provider_name }} before you use AI features.</p>
     </form>
     {% endif %}
 
-    {% if startup_state.requires_choice %}
+    {% if recorder_only %}
+    <div class="control-card">
+      <h4>Recorder status</h4>
+      <p>Start or stop recording, review each machine, and run another network scan.</p>
+      <a class="button-link button-link--primary" href="{{ url_for('web.status') }}#recorder-status">Open recorder status</a>
+    </div>
+    {% elif runtime_choice_pending %}
     <form method="post" action="{{ url_for('web.choose_startup_mode') }}" class="control-card setup-run-choice setup-run-choice--resume">
       <input type="hidden" name="mode" value="continue_existing">
       <input type="hidden" name="next" value="{{ next_path }}">
@@ -92,6 +103,14 @@
     </div>
     {% endif %}
 
+    {% if recorder_role and not recorder_only %}
+    <div class="control-card">
+      <h4>Recorder status</h4>
+      <p>Review configured MTConnect machines and data capture.</p>
+      <a class="button-link" href="{{ url_for('web.status') }}#recorder-status">Open recorder status</a>
+    </div>
+    {% endif %}
+
   </div>
 
   <details class="setup-saved-details">
@@ -104,6 +123,7 @@
         <p><strong>{{ server_setup_modes[server_setup_settings.deployment_mode].label }}</strong></p>
         <p>{{ server_setup_modes[server_setup_settings.deployment_mode].description }}</p>
       </article>
+      {% if ai_role %}
       <article class="info-card">
         <h4>Language-model provider</h4>
         {% if server_setup_settings.ai_enabled %}
@@ -115,38 +135,39 @@
         <p>MSH will not use a language-model provider.</p>
         {% endif %}
       </article>
+      {% endif %}
+      {% if recorder_role %}
       <article class="info-card">
         <h4>Recorder</h4>
-        {% if recorder_role and server_setup_settings.recorder_sources %}
+        {% if server_setup_settings.recorder_sources %}
         <p><strong>Configured</strong></p>
         <p>{{ server_setup_settings.recorder_sources }}</p>
-        {% elif recorder_role %}
+        {% else %}
         <p><strong>Needs source</strong></p>
         <p>No recorder source is configured.</p>
-        {% else %}
-        <p><strong>Not used for this role</strong></p>
-        <p>No recorder source is required.</p>
         {% endif %}
       </article>
+      {% endif %}
     </div>
   </details>
 </section>
 {% else %}
-<section class="section-block setup-panel setup-wizard" data-initial-step="{{ request.args.get('step', 'role') }}" id="setupWizard">
+<section class="section-block setup-panel setup-wizard" data-initial-step="{{ request.args.get('step', 'role') }}" data-runtime-choice="{{ 'true' if startup_state.requires_choice else 'false' }}" id="setupWizard">
   <nav class="setup-wizard-nav" aria-label="Setup steps">
-    <button type="button" data-step-target="role"><strong>1</strong><span>Role</span></button>
-    <button type="button" data-step-target="ai"><strong>2</strong><span>Connection</span></button>
-    <button type="button" data-step-target="model"><strong>3</strong><span>Model</span></button>
-    <button type="button" data-step-target="recorder"><strong>4</strong><span>Recorder</span></button>
-    <button type="button" data-step-target="review"><strong>5</strong><span>Finish</span></button>
+    <button type="button" data-step-target="role"><strong data-step-number>1</strong><span>Role</span></button>
+    <button type="button" data-step-target="ai"><strong data-step-number>2</strong><span>Connection</span></button>
+    <button type="button" data-step-target="model"><strong data-step-number>3</strong><span>Model</span></button>
+    <button type="button" data-step-target="recorder"><strong data-step-number>4</strong><span>Recorder</span></button>
+    <button type="button" data-step-target="review"><strong data-step-number>5</strong><span>Finish</span></button>
   </nav>
 
   <form method="post" action="/server-setup/save" class="setup-form" id="startupSetupForm">
     <input type="hidden" name="next" value="{{ next_path }}">
+    <input type="hidden" name="_csrf_token" value="{{ mtconnect_discovery_csrf_token }}">
 
     <section class="setup-wizard-panel" data-step="role">
       <div class="setup-step-card__title">
-        <span class="setup-step-number">1</span>
+        <span class="setup-step-number" data-step-number>1</span>
         <div>
           <h4>What should this computer do?</h4>
           <p>For most MSH visits, keep the recommended Web workbench role.</p>
@@ -180,13 +201,13 @@
       </details>
       <div class="setup-wizard-actions">
         <span></span>
-        <button type="button" class="button-primary" data-next-step>Next: connection</button>
+        <button type="button" class="button-primary" id="roleNextButton" data-next-step>Next: connection</button>
       </div>
     </section>
 
     <section class="setup-wizard-panel" data-step="ai">
       <div class="setup-step-card__title">
-        <span class="setup-step-number">2</span>
+        <span class="setup-step-number" data-step-number>2</span>
         <div>
           <h4>Language-model capability</h4>
           <p>Use Ollama on this computer, or let a connected computer such as your laptop contribute the model.</p>
@@ -235,7 +256,7 @@
 
     <section class="setup-wizard-panel" data-step="model">
       <div class="setup-step-card__title">
-        <span class="setup-step-number">3</span>
+        <span class="setup-step-number" data-step-number>3</span>
         <div>
           <h4>Choose a language model</h4>
           <p>Start with the recommended profile, or benchmark installed models before saving.</p>
@@ -304,22 +325,64 @@
 
     <section class="setup-wizard-panel" data-step="recorder" id="recorderSettings">
       <div class="setup-step-card__title">
-        <span class="setup-step-number">4</span>
+        <span class="setup-step-number" data-step-number>4</span>
         <div>
-          <h4>Recorder settings</h4>
-          <p>Used by Full server and Recorder station. These settings are kept in the persistent data folder.</p>
+          <h4>Find and record the machines</h4>
+          <p>Scan the machine network here. MSH reads stable identity from each Agent's MTConnect data instead of relying on a repeated name such as Mazak.</p>
         </div>
       </div>
-      <div class="setup-recorder-disabled">
-        <h4>Recorder is disabled for this role</h4>
-        <p>No recorder sources are needed. Continue to Save.</p>
-      </div>
       <div class="setup-recorder-fields">
-        <div class="setup-field-grid">
+        <div class="setup-discovery-controls">
           <label>
-            <span>Recorder sources</span>
-            <input id="recorder_sources" type="text" name="recorder_sources" value="{{ server_setup_settings.recorder_sources if server_setup_settings else '' }}" placeholder="MAZAK-M7ZDA13010Z=http://192.168.200.249:5000">
+            <span>Private machine subnet</span>
+            <input id="setupDiscoveryCidr" type="text" value="{{ mtconnect_discovery.recommended_cidr }}" placeholder="192.168.200.0/24">
           </label>
+          <label class="setup-discovery-port">
+            <span>MTConnect port</span>
+            <input id="setupDiscoveryPort" type="number" min="1" max="65535" value="{{ mtconnect_discovery.default_port }}">
+          </label>
+          <button class="button-primary" id="setupDiscoveryButton" type="button">Scan network</button>
+        </div>
+        <p class="inline-note">The scan is limited to a private IPv4 <code>/24</code> or smaller and must be started from the browser on this MSH machine.</p>
+        <p id="setupDiscoveryStatus" class="setup-connection-message" role="status" aria-live="polite">
+          {% if mtconnect_discovery.scan.state == 'complete' %}
+          Last scan found {{ mtconnect_discovery.scan.machines_found }} machine(s) from {{ mtconnect_discovery.scan.agents_found }} MTConnect Agent(s).
+          {% else %}
+          Enter the machine subnet, then scan. Your other setup choices stay on this page.
+          {% endif %}
+        </p>
+
+        <div id="setupDiscoveryResults" class="setup-discovery-results" aria-live="polite">
+          {% if mtconnect_discovery.scan.state == 'complete' and mtconnect_discovery.scan.results %}
+          <div class="table-scroll">
+            <table>
+              <thead><tr><th>Use</th><th>Machine name from data</th><th>Stable identity</th><th>MTConnect Agent</th><th>Setup status</th></tr></thead>
+              <tbody>
+              {% for result in mtconnect_discovery.scan.results %}
+                {% for machine in result.machines %}
+                <tr>
+                  {% if loop.first %}
+                  <td rowspan="{{ result.machines|length }}"><input type="checkbox" name="source_id" value="{{ result.source_id }}" checked aria-label="Use {{ result.display_name }}"></td>
+                  {% endif %}
+                  <td><strong>{{ machine.display_name }}</strong>{% if machine.reported_name %}<br><span class="text-muted">Device name: {{ machine.reported_name }}</span>{% endif %}</td>
+                  <td><code>{{ machine.machine_id }}</code><br><span class="text-muted">{{ machine.identity_kind.replace('_', ' ') }}</span></td>
+                  {% if loop.first %}
+                  <td rowspan="{{ result.machines|length }}"><code>{{ result.base_url }}</code><br><span class="text-muted">Recorder key: {{ result.source_name }}</span></td>
+                  <td rowspan="{{ result.machines|length }}">{% if result.configured_as %}<span class="status-badge status-ready">Configured as {{ result.configured_as }}</span>{% else %}<span class="status-badge status-waiting">Ready to add</span>{% endif %}</td>
+                  {% endif %}
+                </tr>
+                {% endfor %}
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+          <p class="setup-discovery-save-note">Checked MTConnect Agents will be added when you save this setup.</p>
+          {% elif mtconnect_discovery.scan.state == 'complete' %}
+          <p>No MTConnect Agent answered on that subnet and port. Check the subnet, VPN route, Docker networking, machine address, and port.</p>
+          {% endif %}
+        </div>
+
+        <div class="setup-field-grid">
           <label>
             <span>Poll interval seconds</span>
             <input id="recorder_poll_interval" type="number" step="0.1" min="0.1" name="recorder_poll_interval" value="{{ server_setup_settings.recorder_poll_interval if server_setup_settings else '0.2' }}">
@@ -329,25 +392,31 @@
           <input type="checkbox" name="recorder_include_condition" {% if server_setup_settings and server_setup_settings.recorder_include_condition %}checked{% endif %}>
           <span>Include MTConnect condition values</span>
         </label>
-        <p class="inline-note">Do not use a generic label such as <code>Mazak</code> for several machines. Diagnostics can scan a private subnet and read each machine's UUID, serial number, and name directly from MTConnect data.</p>
-        <a class="button-link" href="{{ url_for('web.status') }}">Scan for MTConnect machines</a>
+        <details class="setup-more-choices setup-manual-source">
+          <summary>Advanced: add or edit a recorder source manually</summary>
+          <label>
+            <span>Recorder sources (<code>Name=URL;Name=URL</code>)</span>
+            <input id="recorder_sources" type="text" name="recorder_sources" value="{{ server_setup_settings.recorder_sources if server_setup_settings else '' }}" placeholder="MAZAK-M7ZDA13010Z=http://192.168.200.249:5000">
+          </label>
+          <p class="inline-note">Use a unique UUID, serial number, or Device id as the name. Checked scan results are merged with these manual sources when you save.</p>
+        </details>
       </div>
       <div class="setup-wizard-actions">
         <button type="button" data-prev-step>Back</button>
-        <button type="button" class="button-primary" data-next-step>Next: save</button>
+        <button type="button" class="button-primary" data-next-step>Use selected machines and continue</button>
       </div>
     </section>
 
     <section class="setup-wizard-panel" data-step="review">
       <div class="setup-step-card__title">
-        <span class="setup-step-number">5</span>
+        <span class="setup-step-number" data-step-number>5</span>
         <div>
           <h4>Save setup</h4>
           <p>Save local settings, then MSH will continue to the next required page automatically.</p>
         </div>
       </div>
       <div class="setup-review-grid">
-        <div class="setup-review-card"><span>After save</span><strong>{% if startup_state.requires_choice %}Runtime choice{% else %}MSH overview{% endif %}</strong><p>{% if startup_state.requires_choice %}You will be sent to the runtime start step.{% else %}You will be sent to the overview page.{% endif %}</p></div>
+        <div class="setup-review-card"><span>After save</span><strong id="setupReviewDestination">MSH overview</strong><p id="setupReviewDestinationMessage">You will be sent to the overview page.</p></div>
         <div class="setup-review-card"><span>Settings file</span><strong>Local</strong><p><code>data/server_setup/server_settings.json</code></p></div>
       </div>
       <div class="setup-wizard-actions">
@@ -382,6 +451,7 @@
   };
   var wizard = document.getElementById('setupWizard');
   var initialStep = wizard ? wizard.dataset.initialStep : 'role';
+  var runtimeChoiceRequired = Boolean(wizard && wizard.dataset.runtimeChoice === 'true');
 
   function selectedRole() {
     var selected = document.querySelector('input[name="deployment_mode"]:checked');
@@ -400,6 +470,68 @@
   function aiIsEnabled() {
     var enabled = document.getElementById('aiEnabled');
     return roleUsesAi() && Boolean(enabled && enabled.checked);
+  }
+
+  function stepIsVisible(step) {
+    if (step === 'ai') return roleUsesAi();
+    if (step === 'model') return aiIsEnabled();
+    if (step === 'recorder') return roleHasRecorder();
+    return true;
+  }
+
+  function syncStepNavigation() {
+    if (!wizard) return;
+    var visibleNumber = 0;
+    steps.forEach(function (step) {
+      var visible = stepIsVisible(step);
+      var button = wizard.querySelector('[data-step-target="' + step + '"]');
+      if (button) button.hidden = !visible;
+      if (!visible) return;
+      visibleNumber += 1;
+      if (button) {
+        var buttonNumber = button.querySelector('[data-step-number]');
+        if (buttonNumber) buttonNumber.textContent = String(visibleNumber);
+      }
+      var panelNumber = wizard.querySelector('[data-step="' + step + '"] [data-step-number]');
+      if (panelNumber) panelNumber.textContent = String(visibleNumber);
+    });
+
+    var roleNext = document.getElementById('roleNextButton');
+    if (roleNext) roleNext.textContent = roleUsesAi() ? 'Next: connection' : 'Next: recorder';
+
+    var destination = document.getElementById('setupReviewDestination');
+    var destinationMessage = document.getElementById('setupReviewDestinationMessage');
+    if (destination && destinationMessage) {
+      if (selectedRole() === 'recorder-only') {
+        destination.textContent = 'Recorder status';
+        destinationMessage.textContent = 'You will be sent to the recorder status page, ready to start capture.';
+      } else if (
+        runtimeChoiceRequired
+        && (selectedRole() === 'full-server' || selectedRole() === 'web-workbench')
+      ) {
+        destination.textContent = 'Runtime choice';
+        destinationMessage.textContent = 'You will choose whether to resume the saved session or start a new one.';
+      } else {
+        destination.textContent = 'MSH overview';
+        destinationMessage.textContent = 'You will be sent to the overview page.';
+      }
+    }
+
+    var active = wizard.querySelector('[data-step].is-active');
+    if (active) updateStepStatus(active.dataset.step);
+  }
+
+  function syncRoleInputs() {
+    var aiDisabledForRole = !roleUsesAi();
+    document.querySelectorAll('[data-step="ai"] input, [data-step="model"] input').forEach(function (input) {
+      input.disabled = aiDisabledForRole;
+    });
+    var recorderDisabledForRole = !roleHasRecorder();
+    document.querySelectorAll('.setup-recorder-fields input').forEach(function (input) {
+      input.disabled = recorderDisabledForRole;
+    });
+    var scanButton = document.getElementById('setupDiscoveryButton');
+    if (scanButton) scanButton.disabled = recorderDisabledForRole;
   }
 
   function nextStep(current) {
@@ -485,14 +617,11 @@
   }
 
   function syncRecorderVisibility() {
-    var disabled = document.querySelector('.setup-recorder-disabled');
     var fields = document.querySelector('.setup-recorder-fields');
-    var stepButton = document.querySelector('[data-step-target="recorder"]');
-    if (!disabled || !fields) return;
-    var show = roleHasRecorder();
-    disabled.classList.toggle('is-hidden', show);
-    fields.classList.toggle('is-hidden', !show);
-    if (stepButton) stepButton.hidden = !show;
+    if (!fields) return;
+    fields.classList.toggle('is-hidden', !roleHasRecorder());
+    syncRoleInputs();
+    syncStepNavigation();
   }
 
   function selectedAiProvider() {
@@ -528,8 +657,8 @@
     if (modelDisabledNote) modelDisabledNote.classList.toggle('is-hidden', available && enabled.checked);
     syncAiProviderVisibility();
     syncSelectedModelStatus();
-    var active = wizard && wizard.querySelector('[data-step].is-active');
-    if (active) updateStepStatus(active.dataset.step);
+    syncRoleInputs();
+    syncStepNavigation();
   }
 
   function currentStepIsValid(step) {
@@ -664,6 +793,148 @@
     });
   }
 
+  function textNodeElement(tagName, value, className) {
+    var element = document.createElement(tagName);
+    element.textContent = String(value || '');
+    if (className) element.className = className;
+    return element;
+  }
+
+  function appendPrimaryAndDetail(cell, primary, detail, primaryTag) {
+    cell.appendChild(textNodeElement(primaryTag || 'strong', primary || 'Unknown'));
+    if (detail) {
+      cell.appendChild(document.createElement('br'));
+      cell.appendChild(textNodeElement('span', detail, 'text-muted'));
+    }
+  }
+
+  function renderDiscoveryResults(scan) {
+    var container = document.getElementById('setupDiscoveryResults');
+    if (!container) return;
+    container.replaceChildren();
+    var results = Array.isArray(scan && scan.results) ? scan.results : [];
+    if (!results.length) {
+      container.appendChild(textNodeElement(
+        'p',
+        'No MTConnect Agent answered on that subnet and port. Check the subnet, VPN route, Docker networking, machine address, and port.'
+      ));
+      return;
+    }
+
+    var scroll = document.createElement('div');
+    scroll.className = 'table-scroll';
+    var table = document.createElement('table');
+    var head = document.createElement('thead');
+    var headRow = document.createElement('tr');
+    ['Use', 'Machine name from data', 'Stable identity', 'MTConnect Agent', 'Setup status'].forEach(function (label) {
+      headRow.appendChild(textNodeElement('th', label));
+    });
+    head.appendChild(headRow);
+    table.appendChild(head);
+    var body = document.createElement('tbody');
+
+    results.forEach(function (result) {
+      var machines = Array.isArray(result.machines) && result.machines.length
+        ? result.machines
+        : [{ display_name: result.display_name || 'Unknown machine', machine_id: '', identity_kind: '' }];
+      machines.forEach(function (machine, machineIndex) {
+        var row = document.createElement('tr');
+        if (machineIndex === 0) {
+          var useCell = document.createElement('td');
+          useCell.rowSpan = machines.length;
+          var checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.name = 'source_id';
+          checkbox.value = String(result.source_id || '');
+          checkbox.checked = true;
+          checkbox.setAttribute('aria-label', 'Use ' + String(result.display_name || 'MTConnect Agent'));
+          useCell.appendChild(checkbox);
+          row.appendChild(useCell);
+        }
+
+        var machineCell = document.createElement('td');
+        appendPrimaryAndDetail(
+          machineCell,
+          machine.display_name || result.display_name || 'Unknown machine',
+          machine.reported_name ? 'Device name: ' + machine.reported_name : ''
+        );
+        row.appendChild(machineCell);
+
+        var identityCell = document.createElement('td');
+        appendPrimaryAndDetail(
+          identityCell,
+          machine.machine_id || machine.identity_value || 'not reported',
+          String(machine.identity_kind || 'identity').replace(/_/g, ' '),
+          'code'
+        );
+        row.appendChild(identityCell);
+
+        if (machineIndex === 0) {
+          var agentCell = document.createElement('td');
+          agentCell.rowSpan = machines.length;
+          appendPrimaryAndDetail(
+            agentCell,
+            result.base_url || '',
+            result.source_name ? 'Recorder key: ' + result.source_name : '',
+            'code'
+          );
+          row.appendChild(agentCell);
+
+          var stateCell = document.createElement('td');
+          stateCell.rowSpan = machines.length;
+          stateCell.appendChild(textNodeElement('span', 'Ready to add', 'status-badge status-waiting'));
+          row.appendChild(stateCell);
+        }
+        body.appendChild(row);
+      });
+    });
+    table.appendChild(body);
+    scroll.appendChild(table);
+    container.appendChild(scroll);
+    container.appendChild(textNodeElement(
+      'p',
+      'Checked MTConnect Agents will be added when you save this setup.',
+      'setup-discovery-save-note'
+    ));
+    syncRoleInputs();
+  }
+
+  function scanMtconnectNetwork() {
+    var button = document.getElementById('setupDiscoveryButton');
+    var cidr = document.getElementById('setupDiscoveryCidr');
+    var port = document.getElementById('setupDiscoveryPort');
+    var status = document.getElementById('setupDiscoveryStatus');
+    var csrf = document.querySelector('#startupSetupForm input[name="_csrf_token"]');
+    if (!button || !cidr || !port || !status || !csrf) return;
+    cidr.setCustomValidity(cidr.value.trim() ? '' : 'Enter the private machine subnet, for example 192.168.200.0/24.');
+    port.setCustomValidity(port.value ? '' : 'Enter the MTConnect port, normally 5000.');
+    if (!cidr.reportValidity() || !port.reportValidity()) return;
+
+    var data = new FormData();
+    data.append('_csrf_token', csrf.value);
+    data.append('cidr', cidr.value);
+    data.append('port', port.value);
+    button.disabled = true;
+    status.textContent = 'Scanning the machine network. A full /24 can take a little while...';
+    fetch('/status/mtconnect-scan', {
+      method: 'POST',
+      body: data,
+      headers: { 'Accept': 'application/json' }
+    }).then(function (response) {
+      return response.json().then(function (payload) {
+        if (!response.ok || !payload.ok) throw new Error(payload.message || 'The scan failed.');
+        return payload;
+      });
+    }).then(function (payload) {
+      renderDiscoveryResults(payload.scan || {});
+      status.textContent = payload.message || 'Network scan complete.';
+      button.disabled = false;
+    }).catch(function (error) {
+      status.textContent = error.message || 'The network scan could not complete.';
+      button.disabled = false;
+    });
+  }
+
   document.querySelectorAll('[data-step-target]').forEach(function (button) {
     button.addEventListener('click', function () { showStep(button.dataset.stepTarget, true); });
   });
@@ -686,8 +957,8 @@
       syncSelectedCards('[data-role-card]');
       syncRecorderVisibility();
       syncAiVisibility();
-      var active = wizard && wizard.querySelector('[data-step].is-active');
-      if (active) updateStepStatus(active.dataset.step);
+      syncRoleInputs();
+      syncStepNavigation();
     });
   });
   document.querySelectorAll('[data-ai-card] input').forEach(function (input) {
@@ -709,11 +980,23 @@
   if (benchmarkButton) benchmarkButton.addEventListener('click', testSelectedAiModel);
   var connectionButton = document.getElementById('aiConnectionTestButton');
   if (connectionButton) connectionButton.addEventListener('click', testAiConnection);
+  var discoveryButton = document.getElementById('setupDiscoveryButton');
+  if (discoveryButton) discoveryButton.addEventListener('click', scanMtconnectNetwork);
+  var discoveryCidr = document.getElementById('setupDiscoveryCidr');
+  if (discoveryCidr) discoveryCidr.addEventListener('input', function () {
+    discoveryCidr.setCustomValidity('');
+  });
+  var discoveryPort = document.getElementById('setupDiscoveryPort');
+  if (discoveryPort) discoveryPort.addEventListener('input', function () {
+    discoveryPort.setCustomValidity('');
+  });
   syncSelectedCards('[data-role-card]');
   syncSelectedCards('[data-ai-card]');
   syncSelectedCards('[data-ai-provider-card]');
   syncRecorderVisibility();
   syncAiVisibility();
+  syncRoleInputs();
+  syncStepNavigation();
   syncSelectedModelStatus();
   showStep(initialStep);
 })();

@@ -78,6 +78,37 @@ DEPLOYMENT_MODES: dict[str, dict[str, str]] = {
     },
 }
 
+ROLE_CAPABILITY_AI = "ai"
+ROLE_CAPABILITY_RECORDER = "recorder"
+ROLE_CAPABILITY_RUNTIME = "runtime"
+ROLE_CAPABILITIES: dict[str, frozenset[str]] = {
+    "full-server": frozenset(
+        {
+            ROLE_CAPABILITY_AI,
+            ROLE_CAPABILITY_RECORDER,
+            ROLE_CAPABILITY_RUNTIME,
+        }
+    ),
+    "web-workbench": frozenset(
+        {
+            ROLE_CAPABILITY_AI,
+            ROLE_CAPABILITY_RUNTIME,
+        }
+    ),
+    "web-ui-only": frozenset({ROLE_CAPABILITY_AI}),
+    "recorder-only": frozenset({ROLE_CAPABILITY_RECORDER}),
+}
+AI_DEPLOYMENT_MODES = frozenset(
+    mode
+    for mode, capabilities in ROLE_CAPABILITIES.items()
+    if ROLE_CAPABILITY_AI in capabilities
+)
+RECORDER_DEPLOYMENT_MODES = frozenset(
+    mode
+    for mode, capabilities in ROLE_CAPABILITIES.items()
+    if ROLE_CAPABILITY_RECORDER in capabilities
+)
+
 COMMAND_ONLY_DEPLOYMENT_MODES: dict[str, dict[str, str]] = {
     "language-model-provider": {
         "label": "Language-model provider",
@@ -138,6 +169,18 @@ class ServerSetupSettings:
 
 class ServerSetupError(RuntimeError):
     pass
+
+
+def role_has_capability(deployment_mode: str, capability: str) -> bool:
+    return capability in ROLE_CAPABILITIES.get(str(deployment_mode or ""), frozenset())
+
+
+def role_uses_ai(deployment_mode: str) -> bool:
+    return role_has_capability(deployment_mode, ROLE_CAPABILITY_AI)
+
+
+def role_has_recorder(deployment_mode: str) -> bool:
+    return role_has_capability(deployment_mode, ROLE_CAPABILITY_RECORDER)
 
 
 def utc_now() -> str:
@@ -263,24 +306,48 @@ def ai_settings_from_form(
     )
 
 
-def settings_from_form(form: Any) -> ServerSetupSettings:
-    deployment_mode = str(form.get("deployment_mode") or "web-workbench").strip()
+def settings_from_form(
+    form: Any,
+    previous_settings: ServerSetupSettings | None = None,
+) -> ServerSetupSettings:
+    previous_settings = previous_settings or default_settings(configured=False)
+    deployment_mode = str(
+        form.get("deployment_mode")
+        or previous_settings.deployment_mode
+        or "web-workbench"
+    ).strip()
     if deployment_mode not in DEPLOYMENT_MODES:
         raise ServerSetupError("Unknown deployment mode.")
-    ai_settings = ai_settings_from_form(form)
-    recorder_sources = normalize_recorder_sources(
-        str(form.get("recorder_sources") or "").strip()
-    )
+
+    settings = previous_settings
+    if role_uses_ai(deployment_mode):
+        if form.get("ai_enabled") in {"on", "1", "true", "yes"}:
+            settings = ai_settings_from_form(form, settings)
+        else:
+            settings = replace(settings, ai_enabled=False)
+
+    recorder_values: dict[str, Any] = {}
+    if role_has_recorder(deployment_mode):
+        recorder_values = {
+            "recorder_sources": normalize_recorder_sources(
+                str(form.get("recorder_sources") or "").strip()
+            ),
+            "recorder_poll_interval": (
+                str(form.get("recorder_poll_interval") or "0.2").strip()
+                or "0.2"
+            ),
+            "recorder_include_condition": (
+                form.get("recorder_include_condition") == "on"
+            ),
+        }
+
     return replace(
-        ai_settings,
+        settings,
         configured=True,
         user_setup_complete=True,
         deployment_mode=deployment_mode,
-        ai_enabled=False if deployment_mode == "recorder-only" else ai_settings.ai_enabled,
-        recorder_sources=recorder_sources,
-        recorder_poll_interval=str(form.get("recorder_poll_interval") or "0.2").strip() or "0.2",
-        recorder_include_condition=form.get("recorder_include_condition") == "on",
         updated_at=utc_now(),
+        **recorder_values,
     )
 
 
@@ -369,7 +436,10 @@ def runtime_should_start(settings: ServerSetupSettings | None = None) -> bool:
     settings = settings or load_settings()
     if not settings.configured or not settings.user_setup_complete:
         return False
-    return settings.deployment_mode in {"full-server", "web-workbench"}
+    return role_has_capability(
+        settings.deployment_mode,
+        ROLE_CAPABILITY_RUNTIME,
+    )
 
 
 def compose_profiles_for(settings: ServerSetupSettings) -> str:
@@ -382,7 +452,11 @@ def compose_profiles_for(settings: ServerSetupSettings) -> str:
         profiles.append("recorder")
     elif settings.deployment_mode in {"web-workbench", "web-ui-only"}:
         profiles.append("web")
-    if settings.ai_enabled and settings.ai_provider_mode == "local":
+    if (
+        role_uses_ai(settings.deployment_mode)
+        and settings.ai_enabled
+        and settings.ai_provider_mode == "local"
+    ):
         profiles.append("ai")
     return ",".join(profiles)
 

@@ -54,6 +54,7 @@ from .services.server_setup_service import (
     ServerSetupError,
     load_settings,
     parse_recorder_sources,
+    runtime_should_start,
 )
 from .services.strategy_config_service import StrategyConfigService
 from .services.workflow_session_index import get_workflow_session_index
@@ -76,6 +77,34 @@ def startup_mode_gate():
     endpoint = request.endpoint or ""
     if endpoint.startswith("static"):
         return None
+    try:
+        setup_settings = load_settings()
+    except ServerSetupError:
+        setup_settings = None
+    if (
+        setup_settings is not None
+        and setup_settings.configured
+        and setup_settings.user_setup_complete
+        and setup_settings.deployment_mode == "recorder-only"
+    ):
+        recorder_endpoints = {
+            "web.startup",
+            "web.status",
+            "web.guide",
+            "server_setup_web.scan_mtconnect_network",
+            "server_setup_web.save_discovered_mtconnect_sources",
+        }
+        if endpoint in recorder_endpoints:
+            return None
+        return redirect(url_for("web.status"))
+    if (
+        setup_settings is not None
+        and setup_settings.configured
+        and setup_settings.user_setup_complete
+        and not runtime_should_start(setup_settings)
+    ):
+        return None
+
     allowed = {
         "web.startup",
         "web.choose_startup_mode",
@@ -107,6 +136,61 @@ def _telemetry_cache_status_model() -> dict[str, object]:
         "cached_row_count": status.manifest_row_count,
         "manifest_source_file_count": status.manifest_source_file_count,
         "last_rebuild_time": status.manifest_generated_at,
+    }
+
+
+def _mtconnect_discovery_model() -> dict[str, object]:
+    """Build the shared MTConnect setup/status discovery view model."""
+
+    try:
+        setup_settings = load_settings()
+        configured_sources = parse_recorder_sources(
+            setup_settings.recorder_sources
+        )
+    except ServerSetupError:
+        setup_settings = None
+        configured_sources = {}
+
+    discovery_service = get_mtconnect_discovery_service()
+    saved_scan = discovery_service.last_scan()
+    mtconnect_scan = dict(saved_scan) if isinstance(saved_scan, dict) else {}
+    scan_results = mtconnect_scan.get("results", [])
+    if not isinstance(scan_results, list):
+        scan_results = []
+    configured_urls = {
+        url.casefold(): name for name, url in configured_sources.items()
+    }
+    normalized_results = []
+    for result in scan_results:
+        if not isinstance(result, dict):
+            continue
+        machines = result.get("machines", [])
+        if not isinstance(machines, list):
+            machines = []
+        normalized_results.append(
+            {
+                **result,
+                "machines": [
+                    machine
+                    for machine in machines
+                    if isinstance(machine, dict)
+                ],
+                "configured_as": configured_urls.get(
+                    str(result.get("base_url") or "").casefold(),
+                    "",
+                ),
+            }
+        )
+    mtconnect_scan["results"] = normalized_results
+
+    return {
+        "scan": mtconnect_scan,
+        "recommended_cidr": discovery_service.recommended_cidr(
+            setup_settings
+        ),
+        "default_port": mtconnect_scan.get("port") or 5000,
+        "setup_settings": setup_settings,
+        "configured_sources": configured_sources,
     }
 
 
@@ -325,26 +409,8 @@ def status():
         "failed": "Background runtime encountered a failure. Check last failure details below.",
     }
     current_phase = runtime_state.get("current_processing_phase", "runtime_not_started")
-    try:
-        setup_settings = load_settings()
-        configured_sources = parse_recorder_sources(
-            setup_settings.recorder_sources
-        )
-    except ServerSetupError:
-        setup_settings = None
-        configured_sources = {}
-    discovery_service = get_mtconnect_discovery_service()
-    mtconnect_scan = discovery_service.last_scan()
-    configured_urls = {
-        url.casefold(): name for name, url in configured_sources.items()
-    }
-    for result in mtconnect_scan.get("results", []):
-        if not isinstance(result, dict):
-            continue
-        result["configured_as"] = configured_urls.get(
-            str(result.get("base_url") or "").casefold(),
-            "",
-        )
+    mtconnect_discovery = _mtconnect_discovery_model()
+    setup_settings = mtconnect_discovery["setup_settings"]
     return render_template(
         "status.html",
         snapshot=snap,
@@ -355,15 +421,7 @@ def status():
         operator_scope=operator_scope,
         telemetry_cache_status=_telemetry_cache_status_model(),
         recorder_status=get_recorder_control_service().status(setup_settings),
-        mtconnect_discovery={
-            "scan": mtconnect_scan,
-            "recommended_cidr": discovery_service.recommended_cidr(
-                setup_settings
-            ),
-            "default_port": mtconnect_scan.get("port") or 5000,
-            "setup_settings": setup_settings,
-            "configured_sources": configured_sources,
-        },
+        mtconnect_discovery=mtconnect_discovery,
     )
 
 
@@ -371,7 +429,12 @@ def status():
 def startup():
     next_path = request.args.get("next", "/")
     startup_state = get_runtime_manager().startup_decision_snapshot()
-    return render_template("startup.html", startup_state=startup_state, next_path=next_path)
+    return render_template(
+        "startup.html",
+        startup_state=startup_state,
+        next_path=next_path,
+        mtconnect_discovery=_mtconnect_discovery_model(),
+    )
 
 
 @web.post("/startup/choose")

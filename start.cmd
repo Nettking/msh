@@ -36,7 +36,7 @@ docker compose ps flask recorder
 echo.
 
 echo Waiting for the MSH web page...
-powershell -NoProfile -Command "$deadline = (Get-Date).AddSeconds(90); do { try { $response = Invoke-WebRequest -UseBasicParsing -Uri 'http://localhost:5000/status' -TimeoutSec 2; if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) { exit 0 } } catch {}; Start-Sleep -Seconds 1 } while ((Get-Date) -lt $deadline); exit 1"
+powershell -NoProfile -Command "$deadline = (Get-Date).AddSeconds(90); do { try { $response = Invoke-WebRequest -UseBasicParsing -Uri 'http://localhost:5000/startup' -TimeoutSec 2; if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) { exit 0 } } catch {}; Start-Sleep -Seconds 1 } while ((Get-Date) -lt $deadline); exit 1"
 if errorlevel 1 (
     echo.
     echo The containers started, but the MSH web page did not become ready.
@@ -47,11 +47,12 @@ if errorlevel 1 (
 )
 
 echo MSH is running:        http://localhost:5000
+echo Setup:                 http://localhost:5000/startup
 echo Recorder diagnostics: http://localhost:5000/status
 echo Web access is limited to this MSH machine by default.
 echo.
 echo Setup, recording state, checkpoints, and recorded data remain under data\
 echo and will be reused the next time start.cmd is run.
 
-start "" "http://localhost:5000/status"
+start "" "http://localhost:5000/startup"
 exit /b 0

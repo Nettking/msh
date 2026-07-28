@@ -20,9 +20,12 @@ from .services.server_setup_service import (
     AI_MODEL_CHOICES,
     ServerSetupError,
     ai_settings_from_form,
+    default_settings,
     load_settings,
     ollama_status,
     pull_ollama_model,
+    role_has_recorder,
+    role_uses_ai,
     runtime_should_start,
     save_settings,
     settings_from_form,
@@ -43,7 +46,6 @@ _SETUP_PATHS = {
     "/server-setup/recording/stop",
     "/status/mtconnect-scan",
     "/status/mtconnect-sources",
-    "/status",
     "/rescan",
 }
 
@@ -63,29 +65,35 @@ def inject_mtconnect_csrf_token():
     return {"mtconnect_discovery_csrf_token": _mtconnect_csrf_token()}
 
 
-def _require_mtconnect_csrf() -> None:
-    """Reject cross-site or tokenless requests before touching scan/settings files."""
+def _require_setup_csrf(*, local_only: bool = False) -> None:
+    """Reject cross-site or tokenless requests before changing local setup."""
 
-    request_host = request.host.casefold()
-    local_host = request_host in {"localhost", "127.0.0.1", "[::1]"} or (
-        request_host.startswith(("localhost:", "127.0.0.1:", "[::1]:"))
-    )
-    if not local_host:
-        raise MtconnectDiscoveryError(
-            "MTConnect network discovery can only be changed from the browser "
-            "on the MSH machine."
+    if local_only:
+        request_host = request.host.casefold()
+        local_host = request_host in {"localhost", "127.0.0.1", "[::1]"} or (
+            request_host.startswith(("localhost:", "127.0.0.1:", "[::1]:"))
         )
+        if not local_host:
+            raise MtconnectDiscoveryError(
+                "MTConnect network discovery can only be changed from the "
+                "browser on the MSH machine."
+            )
     if request.headers.get("Sec-Fetch-Site", "").casefold() == "cross-site":
         raise MtconnectDiscoveryError(
-            "The network discovery request was blocked because it came from "
-            "another site. Reload Diagnostics and try again."
+            "The setup request was blocked because it came from "
+            "another site. Reload the MSH Setup page and try again."
         )
     expected = str(session.get(_MTCONNECT_CSRF_SESSION_KEY) or "")
     supplied = str(request.form.get("_csrf_token") or "")
     if not expected or not supplied or not hmac.compare_digest(expected, supplied):
         raise MtconnectDiscoveryError(
-            "The network discovery form expired. Reload Diagnostics and try again."
+            "The setup form expired. Reload the MSH Setup page "
+            "and try again."
         )
+
+
+def _require_mtconnect_csrf() -> None:
+    _require_setup_csrf(local_only=True)
 
 
 def _next_path() -> str:
@@ -153,9 +161,14 @@ def _set_recording_from_request(enabled: bool):
         destination = url_for("web.startup")
 
     try:
+        _require_setup_csrf()
         settings = load_settings()
         ok, message = get_recorder_control_service().set_enabled(enabled, settings)
-    except (ServerSetupError, RecorderControlError) as exc:
+    except (
+        MtconnectDiscoveryError,
+        ServerSetupError,
+        RecorderControlError,
+    ) as exc:
         flash(str(exc), "error")
         return redirect(destination)
 
@@ -165,6 +178,10 @@ def _set_recording_from_request(enabled: bool):
 
 @server_setup_web.post("/status/mtconnect-scan")
 def scan_mtconnect_network():
+    wants_json = (
+        request.accept_mimetypes["application/json"]
+        > request.accept_mimetypes["text/html"]
+    )
     try:
         _require_mtconnect_csrf()
         result = get_mtconnect_discovery_service().scan(
@@ -172,14 +189,23 @@ def scan_mtconnect_network():
             port=str(request.form.get("port") or "5000"),
         )
     except MtconnectDiscoveryError as exc:
-        flash(str(exc), "error")
-    else:
-        flash(
-            "Network scan complete: "
-            f"{result.get('machines_found', 0)} machine(s) from "
-            f"{result.get('agents_found', 0)} MTConnect Agent(s).",
-            "success",
-        )
+        message = str(exc)
+        if wants_json:
+            return jsonify({"ok": False, "message": message}), 400
+        flash(message, "error")
+        return redirect(url_for("web.status") + "#mtconnect-discovery")
+
+    message = (
+        "Network scan complete: "
+        f"{result.get('machines_found', 0)} machine(s) from "
+        f"{result.get('agents_found', 0)} MTConnect Agent(s)."
+    )
+    if wants_json:
+        return jsonify({"ok": True, "scan": result, "message": message})
+    flash(
+        message,
+        "success",
+    )
     return redirect(url_for("web.status") + "#mtconnect-discovery")
 
 
@@ -206,26 +232,51 @@ def save_discovered_mtconnect_sources():
 
 def _save_from_request():
     try:
+        _require_setup_csrf()
+    except MtconnectDiscoveryError as exc:
+        flash(str(exc), "error")
+        return redirect(_startup_step_url("review"))
+
+    try:
         previous_settings = load_settings()
         first_user_setup = not (
             previous_settings.configured and previous_settings.user_setup_complete
         )
     except ServerSetupError:
+        previous_settings = default_settings(configured=False)
         first_user_setup = True
 
     try:
-        settings = settings_from_form(request.form)
+        settings = settings_from_form(request.form, previous_settings)
+        selected_source_ids = request.form.getlist("source_id")
+        if selected_source_ids:
+            _require_mtconnect_csrf()
+            settings = (
+                get_mtconnect_discovery_service().merge_selected_results(
+                    settings,
+                    selected_source_ids,
+                )
+            )
         save_settings(settings)
         if (
-            settings.deployment_mode not in {"full-server", "recorder-only"}
+            not role_has_recorder(settings.deployment_mode)
             or not settings.recorder_sources.strip()
         ):
             get_recorder_control_service().set_enabled(False, settings)
-    except (ServerSetupError, RecorderControlError) as exc:
+    except (
+        MtconnectDiscoveryError,
+        ServerSetupError,
+        RecorderControlError,
+    ) as exc:
         flash(str(exc), "error")
         return redirect(_startup_step_url("review"))
 
-    next_path = url_for("web.get_started") if first_user_setup else _next_path()
+    if first_user_setup and settings.deployment_mode == "recorder-only":
+        next_path = url_for("web.status") + "#recorder-status"
+    elif first_user_setup:
+        next_path = url_for("web.get_started")
+    else:
+        next_path = _next_path()
     flash("Device setup saved.", "success")
     if runtime_should_start(settings):
         if get_runtime_manager().requires_startup_choice():
@@ -240,7 +291,17 @@ def _save_from_request():
 
 
 def _settings_for_ai_form():
-    return ai_settings_from_form(request.form, load_settings())
+    settings = load_settings()
+    deployment_mode = str(
+        request.form.get("deployment_mode")
+        or settings.deployment_mode
+        or ""
+    ).strip()
+    if not role_uses_ai(deployment_mode):
+        raise ServerSetupError(
+            "Language-model actions are not available for the selected role."
+        )
+    return ai_settings_from_form(request.form, settings)
 
 
 def _selected_ai_model_from_request(settings) -> str:
@@ -288,8 +349,9 @@ def _legacy_shape_for_ai_page(result: dict) -> dict:
 
 def _test_ai_model_from_request():
     try:
+        _require_setup_csrf()
         settings = _settings_for_ai_form()
-    except ServerSetupError as exc:
+    except (MtconnectDiscoveryError, ServerSetupError) as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
 
     result = _legacy_shape_for_ai_page(compare_ollama_setup_models(settings))
@@ -298,8 +360,9 @@ def _test_ai_model_from_request():
 
 def _test_ai_connection_from_request():
     try:
+        _require_setup_csrf()
         settings = _settings_for_ai_form()
-    except ServerSetupError as exc:
+    except (MtconnectDiscoveryError, ServerSetupError) as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
 
     status = ollama_status(settings, timeout_seconds=3.0)
@@ -309,8 +372,9 @@ def _test_ai_connection_from_request():
 
 def _compare_ai_models_from_request():
     try:
+        _require_setup_csrf()
         settings = _settings_for_ai_form()
-    except ServerSetupError as exc:
+    except (MtconnectDiscoveryError, ServerSetupError) as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
 
     result = compare_ollama_setup_models(settings)
@@ -333,7 +397,15 @@ def compare_ai_models():
 
 
 def _pull_from_request():
-    settings = load_settings()
-    ok, message = pull_ollama_model(settings)
+    try:
+        _require_setup_csrf()
+        settings = load_settings()
+        if not role_uses_ai(settings.deployment_mode):
+            raise ServerSetupError(
+                "Language-model actions are not available for the selected role."
+            )
+        ok, message = pull_ollama_model(settings)
+    except (MtconnectDiscoveryError, ServerSetupError) as exc:
+        ok, message = False, str(exc)
     flash(message, "success" if ok else "error")
     return redirect(_startup_step_url("runtime"))

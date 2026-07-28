@@ -359,7 +359,13 @@ def test_connection_endpoint_uses_unsaved_connected_provider(monkeypatch) -> Non
     app.config["SECRET_KEY"] = "test"
     app.register_blueprint(server_setup_routes.server_setup_web)
 
-    response = app.test_client().post("/server-setup/test-ai-connection", data=_connected_form())
+    client = app.test_client()
+    with client.session_transaction() as browser_session:
+        browser_session["mtconnect_discovery_csrf_token"] = "test-csrf-token"
+    response = client.post(
+        "/server-setup/test-ai-connection",
+        data={"_csrf_token": "test-csrf-token", **_connected_form()},
+    )
 
     assert response.status_code == 200
     assert response.get_json()["ok"] is True
