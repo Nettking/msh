@@ -138,11 +138,19 @@ def test_batch_files_are_raw_first_and_normalized_idempotently(tmp_path, monkeyp
     )
 
     assert first.normalized_path == second.normalized_path
+    assert first.observation_path == second.observation_path
     assert first.raw_path == second.raw_path
     assert gzip.decompress(first.raw_path.read_bytes()).decode("utf-8") == SAMPLE_XML
-    rows = [json.loads(line) for line in first.normalized_path.read_text().splitlines()]
-    assert len(rows) == 3
-    assert [row["sequence"] for row in rows] == [10, 11, 12]
+
+    observations = [json.loads(line) for line in first.observation_path.read_text().splitlines()]
+    assert len(observations) == 3
+    assert [row["sequence"] for row in observations] == [10, 11, 12]
+
+    snapshots = [json.loads(line) for line in first.normalized_path.read_text().splitlines()]
+    assert len(snapshots) == 3
+    assert [row["sequence"] for row in snapshots] == [10, 11, 12]
+    assert snapshots[-1]["Xabs"] == 2.5
+    assert snapshots[-1]["Xtravel"] == "Fault"
 
 
 def test_sequence_plan_records_agent_buffer_overflow(tmp_path, monkeypatch):
@@ -181,7 +189,9 @@ def test_checkpoint_only_contains_committed_next_sequence(tmp_path, monkeypatch)
         next_sequence=13,
         probe_sha256="abc",
         last_raw_file="raw.xml.gz",
+        last_observation_file="observations.ndjson",
         last_normalized_file="batch.jsonl",
+        latest_values={"MAZAK-001": {"Xabs": 2.5}},
     )
     runtime.save_state()
     runtime.executor.shutdown(wait=True, cancel_futures=True)
@@ -190,6 +200,7 @@ def test_checkpoint_only_contains_committed_next_sequence(tmp_path, monkeypatch)
     assert payload["schema"] == "msh.mtconnect_recorder.checkpoints.v3"
     assert payload["sources"]["Mazak"]["next_sequence"] == 13
     assert payload["sources"]["Mazak"]["last_raw_file"] == "raw.xml.gz"
+    assert payload["sources"]["Mazak"]["latest_values"]["MAZAK-001"]["Xabs"] == 2.5
 
 
 def test_orphaned_raw_batch_is_recovered_before_checkpoint_advances(tmp_path, monkeypatch):
@@ -217,6 +228,9 @@ def test_orphaned_raw_batch_is_recovered_before_checkpoint_advances(tmp_path, mo
     assert expected == 13
     assert runtime.checkpoints["Mazak"].next_sequence == 13
     assert raw.raw_path.exists()
+    observation_path = Path(runtime.checkpoints["Mazak"].last_observation_file)
     normalized = Path(runtime.checkpoints["Mazak"].last_normalized_file)
+    assert observation_path.exists()
     assert normalized.exists()
+    assert len(observation_path.read_text().splitlines()) == 3
     assert len(normalized.read_text().splitlines()) == 3
