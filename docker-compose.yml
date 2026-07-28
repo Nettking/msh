@@ -92,6 +92,30 @@ services:
       - ./data:/app/data
     restart: unless-stopped
 
+  relay:
+    profiles: ["relay"]
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    entrypoint: []
+    command:
+      - python
+      - -m
+      - catalog.relay.service
+      - serve
+      - --database
+      - /var/lib/msh-relay/control.sqlite3
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8765"
+      - --unsafe-development-plaintext
+    ports:
+      - "127.0.0.1:${MSH_RELAY_PORT:-8765}:8765"
+    volumes:
+      - relay_state:/var/lib/msh-relay
+    restart: unless-stopped
+
   prep:
     profiles: ["prep"]
     build:
@@ -117,3 +141,4 @@ services:
 volumes:
   ollama_models:
   model_provider_models:
+  relay_state:

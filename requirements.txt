@@ -5,5 +5,7 @@ numpy
 scikit-learn
 joblib
 requests
+cryptography>=43
+websockets>=14,<16
 duckdb
 pyarrow

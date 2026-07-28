@@ -18,3 +18,31 @@ class FederationValidationError(ValueError):
 
 class ProtocolCompatibilityError(FederationValidationError):
     """An object uses an unsupported protocol schema."""
+
+
+class FederationOperationError(RuntimeError):
+    """A rejected federation operation with a stable machine-readable reason."""
+
+    def __init__(self, code: str, message: str, field: str | None = None) -> None:
+        self.code = code
+        self.field = field
+        self.message = message
+        super().__init__(f"{field + ': ' if field else ''}{message} ({code})")
+
+    def to_dict(self) -> dict[str, str]:
+        value = {"code": self.code, "message": self.message}
+        if self.field is not None:
+            value["field"] = self.field
+        return value
+
+
+class AuthenticationError(FederationOperationError):
+    """The remote node did not prove an enrolled, active identity."""
+
+
+class AuthorizationError(FederationOperationError):
+    """An authenticated actor is not authorized for the requested scope."""
+
+
+class RevisionGapError(FederationOperationError):
+    """An ordered session event cannot be applied because a revision is missing."""

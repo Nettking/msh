@@ -178,6 +178,9 @@ Use `MSH_AI_MODEL` or `--model` to select the Ollama model. See [docs/ai_explain
 - `catalog/observer_phoenix/` — source connector that synchronizes SKF Observer Phoenix trend measurements into MSH-normalized JSONL.
 - `catalog/standalone-recorder_v2/` — configurable MTConnect recorder for recorder-only or full-server deployments.
 - `catalog/ai/` — read-only repository explanation helpers backed by local or connected Ollama.
+- `catalog/federation/` — federation contracts plus the opt-in transactional Phase 2 coordinator and authoritative event log.
+- `catalog/node/` — outbound-only relay client, persistent Ed25519 identity, and durable replay state.
+- `catalog/relay/` — independently runnable authenticated WebSocket relay service.
 - `catalog/*/` — runner-visible automatic, manual, deep/exploratory, and legacy scripts plus script-specific README files.
 - `data/` — local raw JSONL telemetry input and source-specific landing location; not intended for committed production data.
 - `data/sources/` — source-specific normalized JSONL landing area for synchronized/recorded external sources.
@@ -203,6 +206,7 @@ See [catalog/README.md](catalog/README.md) for the script catalog and analysis w
 - [Workflow sessions](docs/workflow_sessions.md) — session layout, cache reuse, script status, bootstrap, and catch-up behavior.
 - [Data contract](docs/data_contract.md) — raw JSONL assumptions, normalized fields, derived artifacts, and playback-ready contract.
 - [Architecture](docs/architecture.md) — system components, dataflow diagram, policies, and design intent.
+- [Phase 2 relay-first runbook](docs/implementation/federated_session_phase2_runbook.md) — start, enroll, join, route, replay, inspect, and revoke two independent nodes.
 - [AI explainer](docs/ai_explainer.md) — read-only Ollama/RAG explainer scope, indexed sources, exclusions, and usage.
 - [Troubleshooting](docs/troubleshooting.md) — common startup, data, playback, Docker, and script-run issues.
 
