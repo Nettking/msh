@@ -17,11 +17,6 @@
 !/results/README.md
 !/results/.gitkeep
 
-# Local deployment settings and secrets
-.env
-.env.*
-!.env.example
-
 # Python / environment
 __pycache__/
 *.py[cod]
@@ -43,9 +38,7 @@ Thumbs.db
 
 # Runner local cache
 /catalog/runner/.data_index.json
-
-# Local AI explainer cache
-/.cache/
-/new-stuff/desktop_agent_output
-new-stuff/bildebeskrivelser.md
-new-stuff/bildebeskrivelser.md
+/.tmp.driveupload
+*.ini
+/catalog/standalone_recorder/data
+/record data/data
