@@ -93,7 +93,9 @@ services:
     restart: unless-stopped
 
   relay:
-    profiles: ["relay"]
+    # Development-only plaintext relay. The host publication remains loopback-only.
+    # Use a direct TLS deployment or a maintained TLS reverse proxy outside local development.
+    profiles: ["relay-dev"]
     build:
       context: .
       dockerfile: Dockerfile.cli
