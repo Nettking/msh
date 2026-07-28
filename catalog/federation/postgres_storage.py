@@ -1,7 +1,7 @@
 """Transactional PostgreSQL provider for the D1 batch-storage contract.
 
 The provider stores immutable JSON batches and their idempotency identity in one
-PostgreSQL transaction.  It is intentionally local-only in D2: connection details
+PostgreSQL transaction. It is intentionally local-only in D2: connection details
 are supplied by the process and are never advertised through the storage protocol.
 """
 
@@ -28,7 +28,7 @@ from .storage_protocol import (
 class PostgreSQLBatchStorageProvider:
     """PostgreSQL implementation of ``BatchStorageProvider``.
 
-    A caller supplies a DSN or keyword connection string.  The value remains local
+    A caller supplies a DSN or keyword connection string. The value remains local
     process configuration and is never returned from ``describe`` or ``health``.
     """
 
@@ -42,103 +42,100 @@ class PostgreSQLBatchStorageProvider:
         return psycopg.connect(self._dsn, row_factory=dict_row)
 
     def _initialize(self) -> None:
-        with self._connect() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    CREATE TABLE IF NOT EXISTS msh_storage_batches (
-                        session_id TEXT NOT NULL,
-                        group_id TEXT NOT NULL,
-                        dataset_id TEXT NOT NULL,
-                        batch_id TEXT NOT NULL,
-                        idempotency_key TEXT NOT NULL,
-                        content_hash TEXT NOT NULL,
-                        content JSONB NOT NULL,
-                        created_at TIMESTAMPTZ NOT NULL,
-                        PRIMARY KEY (session_id, group_id, batch_id),
-                        UNIQUE (session_id, group_id, idempotency_key)
-                    )
-                    """
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS msh_storage_batches (
+                    session_id TEXT NOT NULL,
+                    group_id TEXT NOT NULL,
+                    dataset_id TEXT NOT NULL,
+                    batch_id TEXT NOT NULL,
+                    idempotency_key TEXT NOT NULL,
+                    content_hash TEXT NOT NULL,
+                    content JSONB NOT NULL,
+                    created_at TIMESTAMPTZ NOT NULL,
+                    PRIMARY KEY (session_id, group_id, batch_id),
+                    UNIQUE (session_id, group_id, idempotency_key)
                 )
+                """
+            )
 
     def ingest(self, request: BatchIngestRequest) -> BatchIngestResult:
         request.validate_content_hash()
         authority = request.authority
 
-        with self._connect() as connection:
-            with connection.cursor() as cursor:
-                # Serialize competing retries for the same logical storage group.
-                cursor.execute(
-                    "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
-                    (f"{authority.session_id}:{authority.group_id}",),
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT pg_advisory_xact_lock(hashtextextended(%s, 0))",
+                (f"{authority.session_id}:{authority.group_id}",),
+            )
+            cursor.execute(
+                """
+                SELECT batch_id, content_hash
+                FROM msh_storage_batches
+                WHERE session_id = %s AND group_id = %s AND idempotency_key = %s
+                """,
+                (
+                    authority.session_id,
+                    authority.group_id,
+                    request.idempotency_key,
+                ),
+            )
+            existing = cursor.fetchone()
+            if existing is not None:
+                state = classify_idempotent_ingest(
+                    existing_batch_id=existing["batch_id"],
+                    existing_content_hash=existing["content_hash"],
+                    requested_batch_id=request.batch_id,
+                    requested_content_hash=request.content_hash,
                 )
-                cursor.execute(
-                    """
-                    SELECT batch_id, content_hash
-                    FROM msh_storage_batches
-                    WHERE session_id = %s AND group_id = %s AND idempotency_key = %s
-                    """,
-                    (
-                        authority.session_id,
-                        authority.group_id,
-                        request.idempotency_key,
-                    ),
+                return BatchIngestResult(
+                    request.batch_id,
+                    request.idempotency_key,
+                    request.content_hash,
+                    state,
                 )
-                existing = cursor.fetchone()
-                if existing is not None:
-                    state = classify_idempotent_ingest(
-                        existing_batch_id=existing["batch_id"],
-                        existing_content_hash=existing["content_hash"],
-                        requested_batch_id=request.batch_id,
-                        requested_content_hash=request.content_hash,
-                    )
-                    return BatchIngestResult(
-                        request.batch_id,
-                        request.idempotency_key,
-                        request.content_hash,
-                        state,
-                    )
 
-                cursor.execute(
-                    """
-                    SELECT idempotency_key, content_hash
-                    FROM msh_storage_batches
-                    WHERE session_id = %s AND group_id = %s AND batch_id = %s
-                    """,
-                    (authority.session_id, authority.group_id, request.batch_id),
+            cursor.execute(
+                """
+                SELECT idempotency_key, content_hash
+                FROM msh_storage_batches
+                WHERE session_id = %s AND group_id = %s AND batch_id = %s
+                """,
+                (authority.session_id, authority.group_id, request.batch_id),
+            )
+            by_batch = cursor.fetchone()
+            if by_batch is not None:
+                raise FederationValidationError(
+                    StorageErrorCode.IDEMPOTENCY_CONFLICT.value,
+                    "batch_id",
+                    "was previously committed with another idempotency key or content hash",
                 )
-                by_batch = cursor.fetchone()
-                if by_batch is not None:
-                    raise FederationValidationError(
-                        StorageErrorCode.IDEMPOTENCY_CONFLICT.value,
-                        "batch_id",
-                        "was previously committed with another idempotency key or content hash",
-                    )
 
-                cursor.execute(
-                    """
-                    INSERT INTO msh_storage_batches (
-                        session_id, group_id, dataset_id, batch_id,
-                        idempotency_key, content_hash, content, created_at
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s)
-                    """,
-                    (
-                        authority.session_id,
-                        authority.group_id,
-                        request.dataset_id,
-                        request.batch_id,
-                        request.idempotency_key,
-                        request.content_hash,
-                        json.dumps(
-                            request.content,
-                            sort_keys=True,
-                            separators=(",", ":"),
-                            ensure_ascii=False,
-                            allow_nan=False,
-                        ),
-                        request.created_at,
+            cursor.execute(
+                """
+                INSERT INTO msh_storage_batches (
+                    session_id, group_id, dataset_id, batch_id,
+                    idempotency_key, content_hash, content, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+                """,
+                (
+                    authority.session_id,
+                    authority.group_id,
+                    request.dataset_id,
+                    request.batch_id,
+                    request.idempotency_key,
+                    request.content_hash,
+                    json.dumps(
+                        request.content,
+                        sort_keys=True,
+                        separators=(",", ":"),
+                        ensure_ascii=False,
+                        allow_nan=False,
                     ),
-                )
+                    request.created_at,
+                ),
+            )
 
         return BatchIngestResult(
             request.batch_id,
@@ -148,29 +145,27 @@ class PostgreSQLBatchStorageProvider:
         )
 
     def exists(self, *, session_id: str, group_id: str, batch_id: str) -> bool:
-        with self._connect() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT 1 FROM msh_storage_batches
-                    WHERE session_id = %s AND group_id = %s AND batch_id = %s
-                    """,
-                    (session_id, group_id, batch_id),
-                )
-                return cursor.fetchone() is not None
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT 1 FROM msh_storage_batches
+                WHERE session_id = %s AND group_id = %s AND batch_id = %s
+                """,
+                (session_id, group_id, batch_id),
+            )
+            return cursor.fetchone() is not None
 
     def read(self, *, session_id: str, group_id: str, batch_id: str) -> object | None:
-        with self._connect() as connection:
-            with connection.cursor() as cursor:
-                cursor.execute(
-                    """
-                    SELECT content FROM msh_storage_batches
-                    WHERE session_id = %s AND group_id = %s AND batch_id = %s
-                    """,
-                    (session_id, group_id, batch_id),
-                )
-                row = cursor.fetchone()
-                return None if row is None else row["content"]
+        with self._connect() as connection, connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT content FROM msh_storage_batches
+                WHERE session_id = %s AND group_id = %s AND batch_id = %s
+                """,
+                (session_id, group_id, batch_id),
+            )
+            row = cursor.fetchone()
+            return None if row is None else row["content"]
 
     def describe(self) -> dict[str, object]:
         return {
@@ -181,10 +176,9 @@ class PostgreSQLBatchStorageProvider:
 
     def health(self) -> dict[str, object]:
         try:
-            with self._connect() as connection:
-                with connection.cursor() as cursor:
-                    cursor.execute("SELECT 1")
-                    cursor.fetchone()
+            with self._connect() as connection, connection.cursor() as cursor:
+                cursor.execute("SELECT 1")
+                cursor.fetchone()
             return {"status": "ready", "durable": True}
         except psycopg.Error as exc:
             return {
