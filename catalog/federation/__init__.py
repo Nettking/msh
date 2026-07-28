@@ -65,6 +65,7 @@ from .storage_protocol import (
     classify_idempotent_ingest,
     validate_protocol_version,
 )
+from .write_authority import AuthorizedStorageService, StorageWriteAuthorityValidator
 
 __all__ = [
     "FederationValidationError",
@@ -73,6 +74,8 @@ __all__ = [
     "PostgreSQLBatchStorageProvider",
     "BatchStorageProvider",
     "LocalStorageService",
+    "AuthorizedStorageService",
+    "StorageWriteAuthorityValidator",
     "SQLiteOutbox",
     "OutboxEntry",
     "OutboxState",
