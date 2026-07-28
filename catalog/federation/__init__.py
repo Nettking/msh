@@ -22,6 +22,16 @@ from .providers import (
     StorageWriteOutcome,
 )
 from .registry import LocalCapabilityRegistry
+from .replication import (
+    REPLICATION_SCHEMA,
+    CallableReplicationTransport,
+    DurableReplicationOutbox,
+    ReplicationPlanner,
+    ReplicationRunResult,
+    ReplicationTarget,
+    ReplicationTransport,
+    ReplicationWorker,
+)
 from .leader_selection import (
     LeaderSelectionResult,
     StorageGroupPolicy,
@@ -90,6 +100,14 @@ __all__ = [
     "StorageRequestTransport",
     "CallableStorageTransport",
     "RelayNodeStorageTransport",
+    "REPLICATION_SCHEMA",
+    "ReplicationTarget",
+    "ReplicationTransport",
+    "CallableReplicationTransport",
+    "ReplicationPlanner",
+    "DurableReplicationOutbox",
+    "ReplicationRunResult",
+    "ReplicationWorker",
     "SQLiteOutbox",
     "OutboxEntry",
     "OutboxState",
