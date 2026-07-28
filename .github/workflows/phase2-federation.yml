@@ -1,0 +1,82 @@
+name: Phase 2 federation
+
+on:
+  pull_request:
+    paths:
+      - "catalog/federation/**"
+      - "catalog/node/**"
+      - "catalog/relay/**"
+      - "docker-compose.yml"
+      - "requirements.txt"
+      - "constraints-phase2.txt"
+      - ".github/workflows/phase2-federation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/federation/**"
+      - "catalog/node/**"
+      - "catalog/relay/**"
+      - "docker-compose.yml"
+      - "requirements.txt"
+      - "constraints-phase2.txt"
+      - ".github/workflows/phase2-federation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: phase2-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  linux:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile
+        run: python -m compileall catalog setup_msh.py
+      - name: Phase 0 and 1 regressions
+        run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py
+      - name: Phase 2 unit and integration tests
+        run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase2_unit.py catalog/node/tests catalog/relay/tests
+      - name: Ruff federation code
+        run: python -m ruff check catalog/federation catalog/node catalog/relay
+      - name: Compose validation
+        run: |
+          docker compose config --quiet
+          docker compose --profile relay-dev config --quiet
+      - name: Diff hygiene
+        run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
+
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest
+      - name: Identity, state, protocol, and relay tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/node/tests/test_identity.py
+          catalog/node/tests/test_state.py
+          catalog/node/tests/test_client.py
+          catalog/relay/tests/test_service.py
+          catalog/federation/tests/test_phase2_unit.py

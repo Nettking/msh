@@ -1,4 +1,4 @@
-"""Shared defense-in-depth redaction for federation status and audit data."""
+"""Defense-in-depth classification and redaction for federation data."""
 
 from __future__ import annotations
 
@@ -115,8 +115,63 @@ def is_nonpublic_location_text(value: object) -> bool:
     )
 
 
-def redact_secrets(value: Any) -> Any:
-    """Recursively redact secret-named fields and credential-shaped strings."""
+def contains_secret_material(value: Any) -> bool:
+    """Return whether a value contains credential-shaped data."""
+
+    if is_secret_text(value):
+        return True
+    if isinstance(value, dict):
+        return any(
+            is_sensitive_field_name(str(key)) or contains_secret_material(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, (list, tuple)):
+        return any(contains_secret_material(item) for item in value)
+    return False
+
+
+def contains_nonpublic_location(value: Any) -> bool:
+    """Return whether a value exposes backend or physical location details."""
+
+    if is_nonpublic_location_text(value):
+        return True
+    if isinstance(value, dict):
+        return any(
+            is_nonpublic_location_key(str(key)) or contains_nonpublic_location(item)
+            for key, item in value.items()
+        )
+    if isinstance(value, (list, tuple)):
+        return any(contains_nonpublic_location(item) for item in value)
+    return False
+
+
+def contains_nonpublic_transport_data(value: Any) -> bool:
+    """Validate the combined relay policy without conflating its two reasons."""
+
+    return contains_secret_material(value) or contains_nonpublic_location(value)
+
+
+def redact_secret_material(value: Any) -> Any:
+    """Recursively redact credentials while preserving ordinary location text."""
+
+    if is_secret_text(value):
+        return REDACTED
+    if isinstance(value, dict):
+        return {
+            key: (
+                REDACTED
+                if is_sensitive_field_name(str(key))
+                else redact_secret_material(item)
+            )
+            for key, item in value.items()
+        }
+    if isinstance(value, (list, tuple)):
+        return [redact_secret_material(item) for item in value]
+    return value
+
+
+def redact_nonpublic_data(value: Any) -> Any:
+    """Recursively redact both credentials and backend location details."""
 
     if is_secret_text(value) or is_nonpublic_location_text(value):
         return REDACTED
@@ -126,10 +181,16 @@ def redact_secrets(value: Any) -> Any:
                 REDACTED
                 if is_sensitive_field_name(str(key))
                 or is_nonpublic_location_key(str(key))
-                else redact_secrets(item)
+                else redact_nonpublic_data(item)
             )
             for key, item in value.items()
         }
     if isinstance(value, (list, tuple)):
-        return [redact_secrets(item) for item in value]
+        return [redact_nonpublic_data(item) for item in value]
     return value
+
+
+def redact_secrets(value: Any) -> Any:
+    """Backward-compatible strict redaction used by existing Phase 2 callers."""
+
+    return redact_nonpublic_data(value)
