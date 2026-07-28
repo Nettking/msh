@@ -3,6 +3,14 @@
 from .errors import FederationValidationError
 from .filesystem_storage import FilesystemRecorderStorageProvider
 from .local_storage import BatchStorageProvider, FilesystemBatchStorageProvider, LocalStorageService
+from .logical_storage import (
+    CallableStorageTransport,
+    LogicalStorageClient,
+    RelayNodeStorageTransport,
+    StorageRequestTransport,
+    StorageRoute,
+    StorageRouteResolver,
+)
 from .outbox import OutboxEntry, OutboxState, SQLiteOutbox
 from .postgres_storage import PostgreSQLBatchStorageProvider
 from .providers import (
@@ -76,6 +84,12 @@ __all__ = [
     "LocalStorageService",
     "AuthorizedStorageService",
     "StorageWriteAuthorityValidator",
+    "LogicalStorageClient",
+    "StorageRoute",
+    "StorageRouteResolver",
+    "StorageRequestTransport",
+    "CallableStorageTransport",
+    "RelayNodeStorageTransport",
     "SQLiteOutbox",
     "OutboxEntry",
     "OutboxState",
