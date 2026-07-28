@@ -1,6 +1,17 @@
 """Pure domain contracts for federated MSH sessions."""
 
 from .errors import FederationValidationError
+from .filesystem_storage import FilesystemRecorderStorageProvider
+from .outbox import OutboxEntry, OutboxState, SQLiteOutbox
+from .providers import (
+    CapabilityProvider,
+    ProviderError,
+    ProviderErrorCode,
+    StorageProvider,
+    StorageReadOutcome,
+    StorageWriteOutcome,
+)
+from .registry import LocalCapabilityRegistry
 from .leader_selection import (
     LeaderSelectionResult,
     StorageGroupPolicy,
@@ -27,6 +38,17 @@ from .models import (
 
 __all__ = [
     "FederationValidationError",
+    "FilesystemRecorderStorageProvider",
+    "SQLiteOutbox",
+    "OutboxEntry",
+    "OutboxState",
+    "StorageProvider",
+    "CapabilityProvider",
+    "ProviderError",
+    "ProviderErrorCode",
+    "StorageReadOutcome",
+    "StorageWriteOutcome",
+    "LocalCapabilityRegistry",
     "CapabilityAnnouncement",
     "CapabilityStatus",
     "CommitState",

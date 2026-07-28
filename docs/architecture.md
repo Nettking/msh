@@ -2,6 +2,26 @@
 
 MSH is a Flask-first orchestration and analysis system for CNC telemetry. It keeps the web UI responsive while background runtime work prepares data, runs scripts, and exposes artifacts for inspection.
 
+## Phase 1 local federation boundary
+
+Federation's first implementation is local-only. Backend-neutral synchronous
+storage and capability-provider contracts sit in `catalog/federation`, with a
+process-local, thread-safe capability registry and a durable SQLite outbox. The
+registry is explicitly not durable and the outbox does not claim or deliver
+network work.
+
+Recorder storage remains owned by `DurableRecorderStore`. Its adapter delegates
+the existing raw, detailed-observation, compatibility JSONL write sequence
+without changing paths or checkpoint behavior. Filesystem files and SQLite do
+**not** share an ACID transaction. A transactional SQLite prepared record first
+persists the immutable session, destination, schema, idempotency identity, and
+content hash. The recorder then writes its existing raw manifest and derived
+files before that prepared record becomes pending. After interruption, recorder
+recovery completes derived files and reconciliation activates only matching
+prepared records using their original persisted routing. Incomplete prepares
+are never advertised. Completed rows are retained rather than deleted,
+preserving acknowledgement and idempotency history.
+
 ## Dataflow
 
 ```mermaid
