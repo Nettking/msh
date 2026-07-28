@@ -3,3 +3,5 @@
 # security-sensitive deployments use these reviewed versions.
 cryptography==43.0.3
 websockets==15.0.1
+psycopg==3.2.9
+psycopg-binary==3.2.9
