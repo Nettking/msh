@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import replace
+from pathlib import Path
 
 from catalog.flask_app import app as app_module
 from catalog.flask_app import routes as routes_module
@@ -210,6 +211,17 @@ def test_recorder_setup_contains_inline_discovery_and_role_scoped_saved_view(
 
     monkeypatch.setattr(app_module, "ollama_status", fail_if_ollama_is_contacted)
 
+    def fail_if_workbench_catalog_is_loaded():
+        raise AssertionError(
+            "Recorder-only status must not build workbench diagnostics."
+        )
+
+    monkeypatch.setattr(
+        routes_module,
+        "_catalog",
+        fail_if_workbench_catalog_is_loaded,
+    )
+
     app = create_app()
     app.config.update(TESTING=True)
     client = app.test_client()
@@ -217,7 +229,7 @@ def test_recorder_setup_contains_inline_discovery_and_role_scoped_saved_view(
     edit_html = client.get("/startup?edit=1&step=recorder").get_data(
         as_text=True
     )
-    saved_html = client.get("/startup").get_data(as_text=True)
+    saved_response = client.get("/startup")
     status_html = client.get("/status").get_data(as_text=True)
     workbench_response = client.get("/")
     guide_response = client.get("/guide")
@@ -230,15 +242,22 @@ def test_recorder_setup_contains_inline_discovery_and_role_scoped_saved_view(
     assert "MAZAK-M7ZDA13010Z" in edit_html
     assert "Checked MTConnect Agents will be added" in edit_html
     assert "Scan for MTConnect machines" not in edit_html
-    assert "Open recorder status" in saved_html
-    assert "<h4>Recorder</h4>" in saved_html
-    assert "<h4>Language-model provider</h4>" not in saved_html
-    assert "AI Explainer" not in saved_html
-    assert ">Monitor</a>" not in saved_html
-    assert "Recorder status" in status_html
-    assert "MTConnect network discovery" in status_html
+    assert saved_response.status_code == 302
+    assert saved_response.location == "/status"
+    assert "AI Explainer" not in status_html
+    assert ">Monitor</a>" not in status_html
+    assert 'data-recorder-dashboard' in status_html
+    assert "Records this run" in status_html
+    assert "Add or rescan machines" in status_html
+    assert "MTConnect network discovery" not in status_html
+    assert "data-source-state" in status_html
+    assert "data-next-sequence" in status_html
+    assert 'aria-label="Section pages"' not in status_html
+    assert 'aria-label="Mobile section pages"' not in status_html
+    assert "chart.js" not in status_html
     assert "Open source inventory" not in status_html
     assert "Open control" not in status_html
+    assert "Stop recording" not in edit_html
     assert workbench_response.status_code == 302
     assert workbench_response.location == "/status"
     assert guide_response.status_code == 200
@@ -336,4 +355,143 @@ def test_full_server_can_open_recorder_status_before_runtime_choice(
     response = app.test_client().get("/status")
 
     assert response.status_code == 200
-    assert "Recorder station" in response.get_data(as_text=True)
+    assert "data-recorder-dashboard" in response.get_data(as_text=True)
+
+
+def test_recorder_live_status_endpoint_is_small_fresh_and_role_scoped(
+    monkeypatch,
+    tmp_path,
+):
+    monkeypatch.chdir(tmp_path)
+    _patch_runtime(monkeypatch, requires_choice=True)
+    settings = replace(
+        default_settings(configured=True),
+        deployment_mode="recorder-only",
+        ai_enabled=False,
+        recorder_sources="M8015RW221N=http://192.168.200.101:5000",
+    )
+    _patch_setup(monkeypatch, settings)
+
+    class FakeRecorder:
+        calls = 0
+
+        def web_status(self, _settings):
+            self.calls += 1
+            return {
+                "schema": "msh.recorder.web_status.v1",
+                "generated_at": "2026-07-28T12:45:10Z",
+                "poll_after_ms": 2000,
+                "ready": True,
+                "requested_enabled": True,
+                "running": True,
+                "worker_alive": True,
+                "state": "recording",
+                "message": "Recording one MTConnect source.",
+                "heartbeat_at": "2026-07-28T12:45:10Z",
+                "records_written": 15021 + self.calls,
+                "records_buffered": 0,
+                "last_flush_at": "2026-07-28T12:45:10Z",
+                "sources": [
+                    {
+                        "source_name": "M8015RW221N",
+                        "machine_id": "M8015RW221N",
+                        "base_url": "http://192.168.200.101:5000",
+                        "last_success_at": "2026-07-28T12:45:10Z",
+                        "next_sequence": 10932 + self.calls,
+                        "agent_last_sequence": 10931 + self.calls,
+                        "caught_up": True,
+                        "last_error": "",
+                        "state": "caught_up",
+                    }
+                ],
+            }
+
+    fake_recorder = FakeRecorder()
+    monkeypatch.setattr(
+        routes_module,
+        "get_recorder_control_service",
+        lambda: fake_recorder,
+    )
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    client = app.test_client()
+
+    first = client.get(
+        "/status/recorder.json",
+        headers={"Accept": "application/json"},
+    )
+    second = client.get(
+        "/status/recorder.json",
+        headers={"Accept": "application/json"},
+    )
+
+    assert first.status_code == 200
+    assert second.status_code == 200
+    assert first.is_json
+    assert first.headers["Cache-Control"] == "no-store, max-age=0"
+    assert first.headers["X-Content-Type-Options"] == "nosniff"
+    assert first.get_json()["records_written"] == 15022
+    assert second.get_json()["records_written"] == 15023
+    assert second.get_json()["sources"][0]["next_sequence"] == 10934
+    assert "log_tail" not in second.get_json()
+    assert "status_path" not in second.get_json()
+
+
+def test_recorder_live_script_polls_without_unsafe_html() -> None:
+    script = (
+        Path(__file__).parent
+        / "static"
+        / "js"
+        / "recorder-status.js"
+    ).read_text(encoding="utf-8")
+
+    assert 'cache: "no-store"' in script
+    assert "AbortController" in script
+    assert "document.hidden" in script
+    assert "pageshow" in script
+    assert "requestTimeoutMs" in script
+    assert "setTimeout" in script
+    assert "textContent" in script
+    assert "innerHTML" not in script
+
+
+def test_recorder_live_status_endpoint_rejects_non_recorder_role(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _patch_runtime(monkeypatch)
+    _patch_setup(monkeypatch, default_settings(configured=True))
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    response = app.test_client().get(
+        "/status/recorder.json",
+        headers={"Accept": "application/json"},
+    )
+
+    assert response.status_code == 409
+    assert response.is_json
+    assert response.get_json()["error"] == "recorder_not_enabled"
+
+
+def test_recorder_live_status_endpoint_returns_json_when_setup_is_incomplete(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    _patch_runtime(monkeypatch)
+    _patch_setup(monkeypatch, default_settings(configured=False))
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    response = app.test_client().get(
+        "/status/recorder.json",
+        headers={"Accept": "application/json"},
+    )
+
+    assert response.status_code == 409
+    assert response.is_json
+    assert response.headers["Cache-Control"] == "no-store, max-age=0"
+    assert response.get_json()["error"] == "setup_required"
