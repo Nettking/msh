@@ -153,20 +153,21 @@
         </div>
       </div>
       <div class="setup-choice-grid setup-role-grid">
-        {% set mode = server_setup_modes['web-workbench'] %}
-        {% set key = 'web-workbench' %}
+        {% for key in ['web-workbench', 'recorder-only'] %}
+        {% set mode = server_setup_modes[key] %}
         <label class="setup-choice-card {% if server_setup_settings and server_setup_settings.deployment_mode == key %}is-selected{% endif %}" data-role-card>
           <input type="radio" name="deployment_mode" value="{{ key }}" {% if server_setup_settings and server_setup_settings.deployment_mode == key %}checked{% endif %}>
           <span class="setup-choice-card__label">{{ mode.label }}</span>
           <span class="setup-choice-card__description">{{ mode.description }}</span>
-          <span class="setup-choice-card__tag">Recommended</span>
+          <span class="setup-choice-card__tag{% if key == 'recorder-only' %} setup-choice-card__tag--recorder{% endif %}">{{ 'Recommended' if key == 'web-workbench' else 'Recorder' }}</span>
         </label>
+        {% endfor %}
       </div>
-      <details class="setup-more-choices" {% if server_setup_settings and server_setup_settings.deployment_mode != 'web-workbench' %}open{% endif %}>
+      <details class="setup-more-choices" {% if server_setup_settings and server_setup_settings.deployment_mode not in ['web-workbench', 'recorder-only'] %}open{% endif %}>
         <summary>Choose a specialized device role</summary>
         <div class="setup-choice-grid setup-role-grid">
         {% for key, mode in server_setup_modes.items() %}
-        {% if key != 'web-workbench' %}
+        {% if key not in ['web-workbench', 'recorder-only'] %}
         <label class="setup-choice-card {% if server_setup_settings and server_setup_settings.deployment_mode == key %}is-selected{% endif %}" data-role-card>
           <input type="radio" name="deployment_mode" value="{{ key }}" {% if server_setup_settings and server_setup_settings.deployment_mode == key %}checked{% endif %}>
           <span class="setup-choice-card__label">{{ mode.label }}</span>
@@ -306,7 +307,7 @@
         <span class="setup-step-number">4</span>
         <div>
           <h4>Recorder settings</h4>
-          <p>Only needed for Full server or Recorder only.</p>
+          <p>Used by Full server and Recorder station. These settings are kept in the persistent data folder.</p>
         </div>
       </div>
       <div class="setup-recorder-disabled">
@@ -317,7 +318,7 @@
         <div class="setup-field-grid">
           <label>
             <span>Recorder sources</span>
-            <input id="recorder_sources" type="text" name="recorder_sources" value="{{ server_setup_settings.recorder_sources if server_setup_settings else '' }}" placeholder="IG500=http://192.168.200.251:5000/current">
+            <input id="recorder_sources" type="text" name="recorder_sources" value="{{ server_setup_settings.recorder_sources if server_setup_settings else '' }}" placeholder="MAZAK-M7ZDA13010Z=http://192.168.200.249:5000">
           </label>
           <label>
             <span>Poll interval seconds</span>
@@ -328,6 +329,8 @@
           <input type="checkbox" name="recorder_include_condition" {% if server_setup_settings and server_setup_settings.recorder_include_condition %}checked{% endif %}>
           <span>Include MTConnect condition values</span>
         </label>
+        <p class="inline-note">Do not use a generic label such as <code>Mazak</code> for several machines. Diagnostics can scan a private subnet and read each machine's UUID, serial number, and name directly from MTConnect data.</p>
+        <a class="button-link" href="{{ url_for('web.status') }}">Scan for MTConnect machines</a>
       </div>
       <div class="setup-wizard-actions">
         <button type="button" data-prev-step>Back</button>
@@ -390,13 +393,17 @@
     return role === 'full-server' || role === 'recorder-only';
   }
 
+  function roleUsesAi() {
+    return selectedRole() !== 'recorder-only';
+  }
+
   function aiIsEnabled() {
     var enabled = document.getElementById('aiEnabled');
-    return Boolean(enabled && enabled.checked);
+    return roleUsesAi() && Boolean(enabled && enabled.checked);
   }
 
   function nextStep(current) {
-    if (current === 'role') return 'ai';
+    if (current === 'role') return roleUsesAi() ? 'ai' : 'recorder';
     if (current === 'ai') return aiIsEnabled() ? 'model' : (roleHasRecorder() ? 'recorder' : 'review');
     if (current === 'model') return roleHasRecorder() ? 'recorder' : 'review';
     if (current === 'recorder') return 'review';
@@ -405,7 +412,7 @@
 
   function previousStep(current) {
     if (current === 'review') return roleHasRecorder() ? 'recorder' : (aiIsEnabled() ? 'model' : 'ai');
-    if (current === 'recorder') return aiIsEnabled() ? 'model' : 'ai';
+    if (current === 'recorder') return roleUsesAi() ? (aiIsEnabled() ? 'model' : 'ai') : 'role';
     if (current === 'model') return 'ai';
     if (current === 'ai') return 'role';
     return 'role';
@@ -426,6 +433,7 @@
   function showStep(step, shouldScroll) {
     if (!wizard) return;
     if (!steps.includes(step)) step = 'role';
+    if ((step === 'ai' || step === 'model') && !roleUsesAi()) step = 'recorder';
     if (step === 'model' && !aiIsEnabled()) step = 'ai';
     if (step === 'recorder' && !roleHasRecorder()) step = 'review';
     wizard.querySelectorAll('[data-step]').forEach(function (panel) {
@@ -510,11 +518,14 @@
     var modelContent = document.getElementById('aiModelStepContent');
     var modelDisabledNote = document.getElementById('aiModelDisabledNote');
     if (!enabled) return;
-    if (providers) providers.classList.toggle('is-muted', !enabled.checked);
-    if (connectionButton) connectionButton.disabled = !enabled.checked;
-    if (modelStepButton) modelStepButton.hidden = !enabled.checked;
-    if (modelContent) modelContent.classList.toggle('is-hidden', !enabled.checked);
-    if (modelDisabledNote) modelDisabledNote.classList.toggle('is-hidden', enabled.checked);
+    var available = roleUsesAi();
+    if (providers) providers.classList.toggle('is-muted', !available || !enabled.checked);
+    if (connectionButton) connectionButton.disabled = !available || !enabled.checked;
+    var aiStepButton = document.querySelector('[data-step-target="ai"]');
+    if (aiStepButton) aiStepButton.hidden = !available;
+    if (modelStepButton) modelStepButton.hidden = !available || !enabled.checked;
+    if (modelContent) modelContent.classList.toggle('is-hidden', !available || !enabled.checked);
+    if (modelDisabledNote) modelDisabledNote.classList.toggle('is-hidden', available && enabled.checked);
     syncAiProviderVisibility();
     syncSelectedModelStatus();
     var active = wizard && wizard.querySelector('[data-step].is-active');
@@ -674,6 +685,7 @@
     input.addEventListener('change', function () {
       syncSelectedCards('[data-role-card]');
       syncRecorderVisibility();
+      syncAiVisibility();
       var active = wizard && wizard.querySelector('[data-step].is-active');
       if (active) updateStepStatus(active.dataset.step);
     });

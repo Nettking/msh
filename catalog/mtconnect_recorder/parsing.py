@@ -1,14 +1,50 @@
 """MTConnect /probe and /sample parsing."""
 from __future__ import annotations
 
+from collections.abc import Iterable
 from hashlib import sha256
-from typing import Any, Iterable
+from typing import Any
 from xml.etree import ElementTree as ET
 
 from .model import (
-    MtconnectProtocolError, ParsedBatch, ProbeModel, SequencePlan,
-    SourceCheckpoint, StreamHeader, _find_first, _local_name, _try_number, _utc_now,
+    MtconnectProtocolError,
+    ParsedBatch,
+    ProbeModel,
+    SequencePlan,
+    SourceCheckpoint,
+    StreamHeader,
+    _find_first,
+    _local_name,
+    _try_number,
+    _utc_now,
 )
+
+
+def machine_display_name(
+    *,
+    device_name: str | None,
+    serial_number: str | None,
+    machine_id: str | None,
+    fallback: str,
+) -> str:
+    """Return a readable name that cannot collapse same-brand machines.
+
+    MTConnect adapters often expose a generic Device name such as ``Mazak``.
+    The serial number or UUID from the same MTConnect document is therefore
+    included whenever it is available.
+    """
+
+    name = str(device_name or "").strip()
+    serial = str(serial_number or "").strip()
+    identity = str(machine_id or "").strip()
+    if serial:
+        if name and serial.casefold() not in name.casefold():
+            return f"{name} {serial}"
+        return name or serial
+    if name and identity and name.casefold() != identity.casefold():
+        return f"{name} [{identity}]"
+    return name or identity or fallback
+
 
 def parse_stream_header(xml_text: str) -> StreamHeader:
     root = ET.fromstring(xml_text)
@@ -69,7 +105,11 @@ def parse_probe(xml_text: str) -> ProbeModel:
                 device_info["serial_number"] = description.attrib["serialNumber"]
         devices[str(device_id)] = device_info
 
-        def walk(element: ET.Element, component_path: list[dict[str, Any]]) -> None:
+        def walk(
+            element: ET.Element,
+            component_path: list[dict[str, Any]],
+            device_metadata: dict[str, Any],
+        ) -> None:
             local = _local_name(element.tag)
             current_path = component_path
             if local not in {
@@ -110,10 +150,10 @@ def parse_probe(xml_text: str) -> ProbeModel:
                     "coordinate_system": element.attrib.get("coordinateSystem"),
                     "representation": element.attrib.get("representation"),
                     "sample_rate": element.attrib.get("sampleRate"),
-                    "device_id": device_info.get("id"),
-                    "device_name": device_info.get("name"),
-                    "device_uuid": device_info.get("uuid"),
-                    "serial_number": device_info.get("serial_number"),
+                    "device_id": device_metadata.get("id"),
+                    "device_name": device_metadata.get("name"),
+                    "device_uuid": device_metadata.get("uuid"),
+                    "serial_number": device_metadata.get("serial_number"),
                     "component_path": current_path,
                     "constraints": constraints,
                     "attributes": dict(element.attrib),
@@ -121,9 +161,9 @@ def parse_probe(xml_text: str) -> ProbeModel:
                 return
 
             for child in element:
-                walk(child, current_path)
+                walk(child, current_path, device_metadata)
 
-        walk(device, [])
+        walk(device, [], device_info)
 
     return ProbeModel(sha256=digest, devices=devices, data_items=data_items)
 
@@ -191,9 +231,24 @@ def parse_streams(
         device_uuid = (
             stream_context.get("stream_device_uuid")
             or metadata.get("device_uuid")
+        )
+        machine_id = str(
+            device_uuid
+            or metadata.get("serial_number")
+            or metadata.get("device_id")
             or source_name
         )
-        machine_id = str(device_uuid)
+        device_name = (
+            stream_context.get("stream_device_name")
+            or metadata.get("device_name")
+        )
+        serial_number = metadata.get("serial_number")
+        machine_name = machine_display_name(
+            device_name=device_name,
+            serial_number=serial_number,
+            machine_id=machine_id,
+            fallback=source_name,
+        )
         observation_type = _local_name(element.tag)
         source_record_id = (
             f"{header.instance_id}:{sequence}:{data_item_id or observation_type}:{ordinal}"
@@ -204,7 +259,8 @@ def parse_streams(
             "source": "mtconnect_recorder",
             "source_name": source_name,
             "source_record_id": source_record_id,
-            "machine": source_name,
+            "machine": machine_name,
+            "machine_name": machine_name,
             "machine_id": machine_id,
             "agent_instance_id": header.instance_id,
             "sequence": sequence,
@@ -228,8 +284,8 @@ def parse_streams(
             "stream_component_id": stream_context.get("stream_component_id"),
             "stream_component_name": stream_context.get("stream_component_name"),
             "device_uuid": stream_context.get("stream_device_uuid") or metadata.get("device_uuid"),
-            "device_name": stream_context.get("stream_device_name") or metadata.get("device_name"),
-            "serial_number": metadata.get("serial_number"),
+            "device_name": device_name,
+            "serial_number": serial_number,
             "condition_level": observation_type if category == "CONDITION" else None,
             "attributes": attributes,
             "data_item_attributes": metadata.get("attributes", {}),

@@ -1,31 +1,47 @@
 """HTTP client and runtime loop for the sequence-based MTConnect recorder."""
 from __future__ import annotations
 
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from logging.handlers import RotatingFileHandler
-from pathlib import Path
-from typing import Any, Mapping
-from xml.etree import ElementTree as ET
 import json
 import logging
 import os
 import signal
 import threading
 import time
+from collections.abc import Mapping
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import replace
+from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from typing import Any
+from xml.etree import ElementTree as ET
 
 import requests
 
 from .model import (
-    SourceCheckpoint, StoredBatch, _bool_from_env, _float_from_env, _int_from_env,
-    _local_name, _parse_sources_text, _read_json, _sources_from_environment,
-    _utc_now, _write_json_atomic, normalize_agent_base_url, MtconnectProtocolError,
+    MtconnectProtocolError,
     ProbeModel,
+    SourceCheckpoint,
+    StoredBatch,
+    _bool_from_env,
+    _float_from_env,
+    _int_from_env,
+    _local_name,
+    _parse_sources_text,
+    _read_json,
+    _sources_from_environment,
+    _utc_now,
+    _write_json_atomic,
+    normalize_agent_base_url,
 )
 from .parsing import (
-    parse_probe, parse_stream_header, parse_streams, plan_sequence,
+    parse_probe,
+    parse_stream_header,
+    parse_streams,
+    plan_sequence,
     validate_batch_continuity,
 )
 from .storage import DurableRecorderStore
+
 
 class MtconnectClient:
     def __init__(self, base_url: str, *, timeout: float) -> None:
@@ -183,6 +199,53 @@ class RecorderRuntime:
             }
             _write_json_atomic(STATE_FILE, payload)
 
+    def reconcile_checkpoint_aliases(self, sources: Mapping[str, str]) -> bool:
+        """Keep sequence continuity when a source adopts its MTConnect UUID.
+
+        Older manual setup commonly used a generic alias such as ``Mazak``.
+        Network discovery replaces that alias with a stable identity from
+        ``/probe``. A checkpoint is safe to move when exactly one inactive
+        checkpoint has the same normalized Agent URL.
+        """
+
+        changed = False
+        active_names = set(sources)
+        with self.lock:
+            for source_name, base_url in sources.items():
+                if source_name in self.checkpoints:
+                    continue
+                candidates: list[tuple[str, SourceCheckpoint]] = []
+                for old_name, checkpoint in self.checkpoints.items():
+                    if old_name in active_names:
+                        continue
+                    try:
+                        checkpoint_url = normalize_agent_base_url(checkpoint.base_url)
+                    except ValueError:
+                        checkpoint_url = checkpoint.base_url.strip().rstrip("/")
+                    if checkpoint_url == normalize_agent_base_url(base_url):
+                        candidates.append((old_name, checkpoint))
+                if len(candidates) != 1:
+                    continue
+                old_name, checkpoint = candidates[0]
+                storage_aliases = list(
+                    dict.fromkeys([*checkpoint.storage_aliases, old_name])
+                )
+                self.checkpoints[source_name] = replace(
+                    checkpoint,
+                    source_name=source_name,
+                    base_url=normalize_agent_base_url(base_url),
+                    storage_aliases=storage_aliases,
+                )
+                del self.checkpoints[old_name]
+                changed = True
+                log.info(
+                    "Moved recorder checkpoint alias %s -> %s for %s",
+                    old_name,
+                    source_name,
+                    base_url,
+                )
+        return changed
+
     def refresh_configuration(self, *, force: bool = False) -> None:
         now = time.monotonic()
         if not force and now - self.last_config_refresh < CONFIG_REFRESH_INTERVAL:
@@ -215,6 +278,7 @@ class RecorderRuntime:
             return
 
         poll_interval = max(0.05, min(float(poll_interval), 60.0))
+        checkpoint_aliases_changed = self.reconcile_checkpoint_aliases(sources)
         with self.lock:
             previous_enabled = self.enabled
             previous_sources = dict(self.sources)
@@ -258,6 +322,8 @@ class RecorderRuntime:
             else:
                 self.state = "recording"
                 self.message = f"Recording {len(self.sources)} MTConnect source(s) by sequence."
+        if checkpoint_aliases_changed:
+            self.save_state()
 
     def _load_probe(
         self,
@@ -305,6 +371,7 @@ class RecorderRuntime:
         count_raw_batch: bool = True,
     ) -> None:
         with self.lock:
+            previous_checkpoint = self.checkpoints.get(source_name)
             checkpoint = SourceCheckpoint(
                 source_name=source_name,
                 base_url=base_url,
@@ -312,6 +379,11 @@ class RecorderRuntime:
                 agent_instance_id=instance_id,
                 next_sequence=next_sequence,
                 probe_sha256=probe_sha256,
+                storage_aliases=(
+                    list(previous_checkpoint.storage_aliases)
+                    if previous_checkpoint is not None
+                    else []
+                ),
                 last_raw_file=str(stored.raw_path),
                 last_observation_file=str(stored.observation_path),
                 last_normalized_file=str(stored.normalized_path),
@@ -333,6 +405,7 @@ class RecorderRuntime:
         instance_id: int,
         expected: int,
         probe: ProbeModel,
+        archive_source_names: tuple[str, ...] | None = None,
     ) -> int:
         """Finish raw batches that were archived before a crash.
 
@@ -341,10 +414,18 @@ class RecorderRuntime:
         recovery deterministic and prevents skipping an unresolved range.
         """
 
-        refs = self.store.iter_raw_batches(
-            source_name=source_name,
-            instance_id=instance_id,
-        )
+        lookup_names = archive_source_names or (source_name,)
+        refs = []
+        seen_manifests: set[Path] = set()
+        for archive_source_name in lookup_names:
+            for ref in self.store.iter_raw_batches(
+                source_name=archive_source_name,
+                instance_id=instance_id,
+            ):
+                if ref.manifest_path in seen_manifests:
+                    continue
+                seen_manifests.add(ref.manifest_path)
+                refs.append(ref)
         while True:
             candidates = [ref for ref in refs if ref.first_sequence == expected]
             if not candidates:
@@ -414,11 +495,18 @@ class RecorderRuntime:
 
             # Recover any raw batch that reached disk before a previous crash.
             if checkpoint is not None:
-                archived_probe = self.store.load_archived_probe(
-                    source_name=source_name,
-                    instance_id=checkpoint.agent_instance_id,
-                    probe_sha256=checkpoint.probe_sha256 or None,
+                archive_source_names = tuple(
+                    dict.fromkeys([source_name, *checkpoint.storage_aliases])
                 )
+                archived_probe = None
+                for archive_source_name in archive_source_names:
+                    archived_probe = self.store.load_archived_probe(
+                        source_name=archive_source_name,
+                        instance_id=checkpoint.agent_instance_id,
+                        probe_sha256=checkpoint.probe_sha256 or None,
+                    )
+                    if archived_probe is not None:
+                        break
                 if archived_probe is not None:
                     self._recover_archived_batches(
                         source_name=source_name,
@@ -426,6 +514,7 @@ class RecorderRuntime:
                         instance_id=checkpoint.agent_instance_id,
                         expected=checkpoint.next_sequence,
                         probe=archived_probe,
+                        archive_source_names=archive_source_names,
                     )
                     checkpoint = self.checkpoints.get(source_name)
                     if checkpoint and checkpoint.agent_instance_id == current_header.instance_id:

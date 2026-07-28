@@ -22,7 +22,7 @@ Choose one of the deployment modes:
 - **Full server** — Flask workbench plus MTConnect recorder.
 - **Web workbench** — Flask, orchestration, playback, source settings, and analysis UI.
 - **Web UI only** — Flask UI without background orchestration.
-- **Recorder only** — MTConnect recorder without the web UI.
+- **Recorder station** — MTConnect recorder with setup, controls, and diagnostics UI.
 - **Language-model provider** — headless model capability for another connected MSH device.
 - **Prep only** — one-shot preparation/orchestration.
 - **Observer sync only** — one-shot Observer Phoenix synchronization.

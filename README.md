@@ -6,6 +6,18 @@ The main deployment pattern is: keep raw telemetry under `data/`, keep generated
 
 ## Quick start
 
+Windows recorder station:
+
+```cmd
+start.cmd
+```
+
+This starts the MSH web app and managed recorder service in the background,
+opens Diagnostics, and reuses the setup, recording switch, checkpoints, and
+data already stored under `data\`. The launcher binds the web page to
+`127.0.0.1` by default, so setup and network-scan controls are available only
+from the MSH machine unless `MSH_WEB_BIND` is explicitly changed.
+
 Recommended server setup:
 
 ```bash
@@ -30,7 +42,7 @@ The setup helper lets you choose what this checkout should activate:
 - full server: Flask workbench plus MTConnect recorder.
 - web workbench: Flask, orchestration, playback, source settings, and analysis UI.
 - web UI only: Flask without background orchestration.
-- recorder only: MTConnect data recorder without web UI.
+- recorder station: MTConnect data recorder with setup, controls, and diagnostics UI.
 - language-model provider: headless Ollama capability contributed to another MSH device.
 - one-shot prep or Observer Phoenix sync.
 
@@ -64,7 +76,7 @@ Main pages:
 - `/startup` — server role, connected language-model provider, model choice, and runtime startup decisions.
 - `/get-started` — focused first-task handoff shown once after initial setup and any required session-start choice.
 - `/sources/` — machine/source inventory, MTConnect URL setup, vibration sensors, Observer Phoenix link, and connection tests.
-- `/status` — diagnostics, runtime milestones, catch-up state, discovered artifacts, and readiness signals.
+- `/status` — recorder health, private-network MTConnect discovery, runtime milestones, cache state, and readiness signals.
 - `/operator-strategies/capture` — capture one raw operator statement quickly during field work.
 - `/operator-strategies/review` — review captured statements and open notes for structuring.
 - `/operator-strategies/structure/<id>` — map one note into OSL/paper fields.
@@ -83,6 +95,11 @@ Test VPN/network  = TCP reachability test from Flask server/container to the con
 ```
 
 The VPN/network test does not prove that the VPN client is connected at the operating-system level. It proves whether MSH can reach the configured machine-network host from where the app is running.
+
+Diagnostics can also scan an explicitly entered private IPv4 subnet (at most a
+`/24`) for MTConnect Agents on port `5000`. Discovery reads `/probe` and uses
+the MTConnect UUID, serial number, and Device name. A generic vendor name such
+as `Mazak` is never used as the only machine identity.
 
 ## Knowledge capture flow
 

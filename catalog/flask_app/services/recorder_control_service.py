@@ -104,7 +104,7 @@ class RecorderControlService:
         if enabled and not self.ready(settings):
             if settings.deployment_mode not in {"full-server", "recorder-only"}:
                 raise RecorderControlError(
-                    "Choose the Full server or Recorder only role before starting recording."
+                    "Choose the Full server or Recorder station role before starting recording."
                 )
             raise RecorderControlError(
                 "Add at least one MTConnect source in device setup before starting recording."

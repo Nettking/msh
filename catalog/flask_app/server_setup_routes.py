@@ -1,10 +1,17 @@
 from __future__ import annotations
 
-from flask import Blueprint, flash, jsonify, redirect, request, url_for
+import hmac
+import secrets
+
+from flask import Blueprint, flash, jsonify, redirect, request, session, url_for
 
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
 from .services.ai_model_benchmark_service import compare_ollama_setup_models
+from .services.mtconnect_discovery_service import (
+    MtconnectDiscoveryError,
+    get_mtconnect_discovery_service,
+)
 from .services.recorder_control_service import (
     RecorderControlError,
     get_recorder_control_service,
@@ -21,8 +28,9 @@ from .services.server_setup_service import (
     settings_from_form,
 )
 
-
 server_setup_web = Blueprint("server_setup_web", __name__)
+
+_MTCONNECT_CSRF_SESSION_KEY = "mtconnect_discovery_csrf_token"
 
 _SETUP_PATHS = {
     "/startup",
@@ -33,9 +41,51 @@ _SETUP_PATHS = {
     "/server-setup/compare-ai-models",
     "/server-setup/recording/start",
     "/server-setup/recording/stop",
+    "/status/mtconnect-scan",
+    "/status/mtconnect-sources",
     "/status",
     "/rescan",
 }
+
+
+def _mtconnect_csrf_token() -> str:
+    token = str(session.get(_MTCONNECT_CSRF_SESSION_KEY) or "")
+    if not token:
+        token = secrets.token_urlsafe(32)
+        session[_MTCONNECT_CSRF_SESSION_KEY] = token
+    return token
+
+
+@server_setup_web.app_context_processor
+def inject_mtconnect_csrf_token():
+    """Expose a per-browser token only to forms rendered by this app."""
+
+    return {"mtconnect_discovery_csrf_token": _mtconnect_csrf_token()}
+
+
+def _require_mtconnect_csrf() -> None:
+    """Reject cross-site or tokenless requests before touching scan/settings files."""
+
+    request_host = request.host.casefold()
+    local_host = request_host in {"localhost", "127.0.0.1", "[::1]"} or (
+        request_host.startswith(("localhost:", "127.0.0.1:", "[::1]:"))
+    )
+    if not local_host:
+        raise MtconnectDiscoveryError(
+            "MTConnect network discovery can only be changed from the browser "
+            "on the MSH machine."
+        )
+    if request.headers.get("Sec-Fetch-Site", "").casefold() == "cross-site":
+        raise MtconnectDiscoveryError(
+            "The network discovery request was blocked because it came from "
+            "another site. Reload Diagnostics and try again."
+        )
+    expected = str(session.get(_MTCONNECT_CSRF_SESSION_KEY) or "")
+    supplied = str(request.form.get("_csrf_token") or "")
+    if not expected or not supplied or not hmac.compare_digest(expected, supplied):
+        raise MtconnectDiscoveryError(
+            "The network discovery form expired. Reload Diagnostics and try again."
+        )
 
 
 def _next_path() -> str:
@@ -111,6 +161,47 @@ def _set_recording_from_request(enabled: bool):
 
     flash(message, "success" if ok else "error")
     return redirect(destination)
+
+
+@server_setup_web.post("/status/mtconnect-scan")
+def scan_mtconnect_network():
+    try:
+        _require_mtconnect_csrf()
+        result = get_mtconnect_discovery_service().scan(
+            str(request.form.get("cidr") or ""),
+            port=str(request.form.get("port") or "5000"),
+        )
+    except MtconnectDiscoveryError as exc:
+        flash(str(exc), "error")
+    else:
+        flash(
+            "Network scan complete: "
+            f"{result.get('machines_found', 0)} machine(s) from "
+            f"{result.get('agents_found', 0)} MTConnect Agent(s).",
+            "success",
+        )
+    return redirect(url_for("web.status") + "#mtconnect-discovery")
+
+
+@server_setup_web.post("/status/mtconnect-sources")
+def save_discovered_mtconnect_sources():
+    try:
+        _require_mtconnect_csrf()
+        settings = load_settings()
+        settings = get_mtconnect_discovery_service().merge_selected_results(
+            settings,
+            request.form.getlist("source_id"),
+        )
+        save_settings(settings)
+    except (MtconnectDiscoveryError, ServerSetupError) as exc:
+        flash(str(exc), "error")
+    else:
+        flash(
+            "Selected MTConnect machines were saved as recorder sources. "
+            "Use Start recording when you are ready to collect data.",
+            "success",
+        )
+    return redirect(url_for("web.status") + "#mtconnect-discovery")
 
 
 def _save_from_request():

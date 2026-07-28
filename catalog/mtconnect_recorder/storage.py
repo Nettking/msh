@@ -1,11 +1,12 @@
 """Durable raw, detailed observation, compatibility snapshot, probe, gap, and event storage."""
 from __future__ import annotations
 
-from hashlib import sha256
-from pathlib import Path
-from typing import Any, Mapping
 import gzip
 import json
+from collections.abc import Mapping
+from hashlib import sha256
+from pathlib import Path
+from typing import Any
 
 from .model import (
     MtconnectProtocolError,
@@ -207,6 +208,11 @@ class DurableRecorderStore:
                     "source_name": source_name,
                     "source_record_id": f"snapshot:{record.get('source_record_id')}",
                     "machine": record.get("machine") or source_name,
+                    "machine_name": (
+                        record.get("machine_name")
+                        or record.get("machine")
+                        or source_name
+                    ),
                     "machine_id": machine_id,
                     "agent_instance_id": batch.header.instance_id,
                     "sequence": record.get("sequence"),

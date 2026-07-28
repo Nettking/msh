@@ -3,11 +3,10 @@ from __future__ import annotations
 import gzip
 import importlib.util
 import json
-from pathlib import Path
 import sys
+from pathlib import Path
 
 import pytest
-
 
 RECORDER_PATH = Path(__file__).resolve().parents[1] / "standalone-recorder_v2.py"
 
@@ -107,6 +106,8 @@ def test_sample_parsing_preserves_every_observation_and_condition_attributes(tmp
     assert [row["sequence"] for row in batch.observations] == [10, 11, 12]
     assert batch.observations[0]["value"] == 1.25
     assert batch.observations[0]["machine_id"] == "MAZAK-001"
+    assert batch.observations[0]["machine"] == "Mazak SERIAL-1"
+    assert batch.observations[0]["machine_name"] == "Mazak SERIAL-1"
     assert batch.observations[0]["data_item_id"] == "xp"
     assert batch.observations[0]["unit"] == "MILLIMETER"
 
@@ -116,6 +117,58 @@ def test_sample_parsing_preserves_every_observation_and_condition_attributes(tmp
     assert condition["native_value"] == "Travel exceeded"
     assert condition["attributes"]["nativeCode"] == "X42"
     assert condition["attributes"]["qualifier"] == "HIGH"
+
+
+def test_machine_id_falls_back_to_probe_serial_then_device_id(tmp_path, monkeypatch):
+    recorder = load_recorder(tmp_path, monkeypatch)
+    probe_without_uuid = PROBE_XML.replace(' uuid="MAZAK-001"', "")
+    stream_without_uuid = SAMPLE_XML.replace(' uuid="MAZAK-001"', "")
+
+    serial_probe = recorder.parse_probe(probe_without_uuid)
+    serial_batch = recorder.parse_streams(
+        stream_without_uuid,
+        source_name="generic-mazak-alias",
+        probe=serial_probe,
+    )
+    assert serial_batch.observations[0]["machine_id"] == "SERIAL-1"
+    assert serial_batch.observations[0]["machine"] == "Mazak SERIAL-1"
+
+    device_id_probe = recorder.parse_probe(
+        probe_without_uuid.replace(' serialNumber="SERIAL-1"', "")
+    )
+    device_id_batch = recorder.parse_streams(
+        stream_without_uuid,
+        source_name="generic-mazak-alias",
+        probe=device_id_probe,
+    )
+    assert device_id_batch.observations[0]["machine_id"] == "d1"
+    assert device_id_batch.observations[0]["machine"] == "Mazak [d1]"
+
+
+def test_source_names_cannot_share_a_storage_directory(tmp_path, monkeypatch):
+    recorder = load_recorder(tmp_path, monkeypatch)
+
+    with pytest.raises(ValueError, match="same storage directory"):
+        recorder.runtime._parse_sources_text(
+            "Mazak One=http://10.0.0.1:5000;"
+            "MAZAK-ONE=http://10.0.0.2:5000"
+        )
+
+
+def test_json_source_names_cannot_share_a_storage_directory(tmp_path, monkeypatch):
+    recorder = load_recorder(tmp_path, monkeypatch)
+    monkeypatch.setenv(
+        "MSH_RECORDER_SOURCES_JSON",
+        json.dumps(
+            {
+                "Mazak One": "http://10.0.0.1:5000",
+                "mazak-one": "http://10.0.0.2:5000",
+            }
+        ),
+    )
+
+    with pytest.raises(ValueError, match="same storage directory"):
+        recorder.runtime._sources_from_environment()
 
 
 def test_batch_files_are_raw_first_and_normalized_idempotently(tmp_path, monkeypatch):
@@ -201,6 +254,99 @@ def test_checkpoint_only_contains_committed_next_sequence(tmp_path, monkeypatch)
     assert payload["sources"]["Mazak"]["next_sequence"] == 13
     assert payload["sources"]["Mazak"]["last_raw_file"] == "raw.xml.gz"
     assert payload["sources"]["Mazak"]["latest_values"]["MAZAK-001"]["Xabs"] == 2.5
+
+
+def test_checkpoint_alias_moves_to_discovered_machine_identity(tmp_path, monkeypatch):
+    recorder = load_recorder(tmp_path, monkeypatch)
+    runtime = recorder.RecorderRuntime()
+    runtime.checkpoints["Mazak"] = recorder.SourceCheckpoint(
+        source_name="Mazak",
+        base_url="http://192.168.200.249:5000/current",
+        machine_id="MAZAK-001",
+        agent_instance_id=77,
+        next_sequence=13,
+        probe_sha256="abc",
+    )
+
+    changed = runtime.reconcile_checkpoint_aliases(
+        {"MAZAK-001": "http://192.168.200.249:5000"}
+    )
+    runtime.executor.shutdown(wait=True, cancel_futures=True)
+
+    assert changed is True
+    assert "Mazak" not in runtime.checkpoints
+    assert runtime.checkpoints["MAZAK-001"].next_sequence == 13
+    assert runtime.checkpoints["MAZAK-001"].source_name == "MAZAK-001"
+    assert runtime.checkpoints["MAZAK-001"].storage_aliases == ["Mazak"]
+
+
+def test_alias_migration_recovers_old_namespace_raw_batch_after_restart(
+    tmp_path,
+    monkeypatch,
+):
+    recorder = load_recorder(tmp_path, monkeypatch)
+    state_file = tmp_path / "state.json"
+    monkeypatch.setattr(recorder.runtime, "STATE_FILE", state_file)
+    probe = recorder.parse_probe(PROBE_XML)
+    batch = recorder.parse_streams(SAMPLE_XML, source_name="Mazak", probe=probe)
+
+    first_runtime = recorder.RecorderRuntime()
+    first_runtime.store.store_probe(
+        source_name="Mazak",
+        instance_id=77,
+        xml_text=PROBE_XML,
+        probe=probe,
+    )
+    old_raw = first_runtime.store.store_raw_batch(
+        source_name="Mazak",
+        requested_from=10,
+        xml_text=SAMPLE_XML,
+        batch=batch,
+    )
+    first_runtime.checkpoints["Mazak"] = recorder.SourceCheckpoint(
+        source_name="Mazak",
+        base_url="http://192.168.200.249:5000",
+        machine_id="MAZAK-001",
+        agent_instance_id=77,
+        next_sequence=10,
+        probe_sha256=probe.sha256,
+    )
+    assert first_runtime.reconcile_checkpoint_aliases(
+        {"MAZAK-001": "http://192.168.200.249:5000"}
+    )
+    first_runtime.save_state()
+    first_runtime.executor.shutdown(wait=True, cancel_futures=True)
+
+    class CurrentOnlyClient:
+        def __init__(self, base_url, *, timeout):
+            self.base_url = base_url
+            self.timeout = timeout
+
+        def fetch_current(self):
+            return SAMPLE_XML
+
+        def fetch_probe(self):
+            pytest.fail("The archived probe under the old alias should be reused.")
+
+        def fetch_sample(self, *, from_sequence, count):
+            pytest.fail("The archived raw batch should satisfy recovery.")
+
+    monkeypatch.setattr(recorder.runtime, "MtconnectClient", CurrentOnlyClient)
+    restarted_runtime = recorder.RecorderRuntime()
+    restarted_runtime.load_state()
+
+    _, success, error = restarted_runtime.capture_source(
+        "MAZAK-001",
+        "http://192.168.200.249:5000",
+    )
+    restarted_runtime.executor.shutdown(wait=True, cancel_futures=True)
+
+    assert success is True, error
+    checkpoint = restarted_runtime.checkpoints["MAZAK-001"]
+    assert checkpoint.next_sequence == 13
+    assert checkpoint.storage_aliases == ["Mazak"]
+    assert Path(checkpoint.last_raw_file) == old_raw.raw_path
+    assert "MAZAK-001" in Path(checkpoint.last_observation_file).parts
 
 
 def test_orphaned_raw_batch_is_recovered_before_checkpoint_advances(tmp_path, monkeypatch):
