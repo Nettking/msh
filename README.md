@@ -13,8 +13,9 @@ start.cmd
 ```
 
 This starts the MSH web app and managed recorder service in the background,
-opens Setup, and reuses the selected role, recording switch, checkpoints, and
-data already stored under `data\`. The launcher binds the web page to
+opens Setup on first use and the live Recorder status page after setup, and
+reuses the selected role, recording switch, checkpoints, and data already
+stored under `data\`. The launcher binds the web page to
 `127.0.0.1` by default, so setup and network-scan controls are available only
 from the MSH machine unless `MSH_WEB_BIND` is explicitly changed.
 
@@ -76,7 +77,7 @@ Main pages:
 - `/startup` — server role, connected language-model provider, model choice, and runtime startup decisions.
 - `/get-started` — focused first-task handoff shown once after initial setup and any required session-start choice.
 - `/sources/` — machine/source inventory, MTConnect URL setup, vibration sensors, Observer Phoenix link, and connection tests.
-- `/status` — recorder health, private-network MTConnect discovery, runtime milestones, cache state, and readiness signals.
+- `/status` — live recorder health and sequence progress for recorder roles, plus runtime/cache diagnostics for workbench roles.
 - `/operator-strategies/capture` — capture one raw operator statement quickly during field work.
 - `/operator-strategies/review` — review captured statements and open notes for structuring.
 - `/operator-strategies/structure/<id>` — map one note into OSL/paper fields.
