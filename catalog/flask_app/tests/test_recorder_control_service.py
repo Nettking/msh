@@ -104,3 +104,80 @@ def test_status_distinguishes_requested_recording_from_offline_worker(tmp_path) 
     assert status["worker_alive"] is False
     assert status["running"] is False
     assert status["state"] == "offline"
+
+
+def test_status_keeps_configured_sources_visible_while_offline(tmp_path) -> None:
+    service = _service(tmp_path)
+    service.status_path.write_text(
+        json.dumps(
+            {
+                "source_status": {
+                    "REMOVED-MACHINE": {
+                        "base_url": "http://192.168.200.250:5000",
+                    }
+                }
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status = service.status(
+        _settings(
+            sources=(
+                "M8015RW221N=http://192.168.200.101:5000;"
+                "MAZAK-M7ZDA13010Z=http://192.168.200.249:5000"
+            )
+        )
+    )
+
+    assert list(status["source_status"]) == [
+        "M8015RW221N",
+        "MAZAK-M7ZDA13010Z",
+    ]
+    assert status["source_status"]["M8015RW221N"]["state"] == "offline"
+    assert status["source_status"]["M8015RW221N"]["base_url"] == (
+        "http://192.168.200.101:5000"
+    )
+
+
+def test_status_normalizes_malformed_runtime_values(tmp_path) -> None:
+    service = _service(tmp_path)
+    service.status_path.write_text(
+        json.dumps(
+            {
+                "records_written": "unknown",
+                "records_buffered": {"bad": "value"},
+                "source_status": {
+                    "IG500": {
+                        "next_sequence": "not-a-number",
+                        "agent_last_sequence": [],
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    status = service.status(_settings())
+
+    assert status["records_written"] == 0
+    assert status["records_buffered"] == 0
+    assert status["source_status"]["IG500"]["next_sequence"] is None
+    assert (
+        status["source_status"]["IG500"]["agent_last_sequence"] is None
+    )
+
+
+def test_web_status_excludes_debug_paths_and_log_tail(tmp_path) -> None:
+    service = _service(tmp_path)
+    service.log_path.write_text("secret diagnostic text", encoding="utf-8")
+
+    payload = service.web_status(_settings())
+
+    assert payload["schema"] == "msh.recorder.web_status.v1"
+    assert payload["poll_after_ms"] == 2000
+    assert payload["sources"][0]["source_name"] == "IG500"
+    assert "control_path" not in payload
+    assert "status_path" not in payload
+    assert "log_path" not in payload
+    assert "log_tail" not in payload
