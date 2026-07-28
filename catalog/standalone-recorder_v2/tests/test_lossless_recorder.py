@@ -171,7 +171,7 @@ def test_sequence_plan_records_agent_buffer_overflow(tmp_path, monkeypatch):
 def test_checkpoint_only_contains_committed_next_sequence(tmp_path, monkeypatch):
     recorder = load_recorder(tmp_path, monkeypatch)
     state_file = tmp_path / "state.json"
-    monkeypatch.setattr(recorder, "STATE_FILE", state_file)
+    monkeypatch.setattr(recorder.runtime, "STATE_FILE", state_file)
     runtime = recorder.RecorderRuntime()
     runtime.checkpoints["Mazak"] = recorder.SourceCheckpoint(
         source_name="Mazak",
@@ -194,7 +194,7 @@ def test_checkpoint_only_contains_committed_next_sequence(tmp_path, monkeypatch)
 
 def test_orphaned_raw_batch_is_recovered_before_checkpoint_advances(tmp_path, monkeypatch):
     recorder = load_recorder(tmp_path, monkeypatch)
-    monkeypatch.setattr(recorder, "STATE_FILE", tmp_path / "state.json")
+    monkeypatch.setattr(recorder.runtime, "STATE_FILE", tmp_path / "state.json")
     probe = recorder.parse_probe(PROBE_XML)
     batch = recorder.parse_streams(SAMPLE_XML, source_name="Mazak", probe=probe)
     runtime = recorder.RecorderRuntime()
