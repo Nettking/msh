@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Protocol
 
 from .errors import FederationValidationError
-from .storage_control_plane import StorageControlPlaneStore, StorageProviderRegistration
+from .storage_control_plane import StorageControlPlaneStore
 from .storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
