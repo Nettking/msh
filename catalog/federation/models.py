@@ -189,8 +189,23 @@ class CapabilityAnnouncement(DomainModel):
             raise FederationValidationError("invalid-enum", "status", "unknown capability status") from exc
         if not isinstance(self.properties, dict):
             raise FederationValidationError("invalid-object", "properties", "must be an object")
-        secret_names = {"password", "private_key", "secret", "token", "credential"}
-        if any(str(key).lower() in secret_names for key in self.properties):
+        try:
+            json.dumps(self.properties, allow_nan=False)
+        except (TypeError, ValueError) as exc:
+            raise FederationValidationError(
+                "invalid-json", "properties", "must contain only JSON-compatible values"
+            ) from exc
+        secret_names = {"password", "private_key", "secret", "token", "credential",
+                        "api_key", "authorization", "access_token", "refresh_token",
+                        "client_secret"}
+        def contains_secret(value: Any) -> bool:
+            if isinstance(value, dict):
+                return any(str(key).lower() in secret_names or contains_secret(item)
+                           for key, item in value.items())
+            if isinstance(value, (list, tuple)):
+                return any(contains_secret(item) for item in value)
+            return False
+        if contains_secret(self.properties):
             raise FederationValidationError(
                 "secret-property", "properties", "must not contain credentials or secrets"
             )
