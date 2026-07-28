@@ -7,6 +7,7 @@ from flask import (
     Blueprint,
     current_app,
     flash,
+    jsonify,
     redirect,
     render_template,
     request,
@@ -90,6 +91,7 @@ def startup_mode_gate():
         recorder_endpoints = {
             "web.startup",
             "web.status",
+            "web.recorder_status_snapshot",
             "web.guide",
             "server_setup_web.scan_mtconnect_network",
             "server_setup_web.save_discovered_mtconnect_sources",
@@ -109,6 +111,7 @@ def startup_mode_gate():
         "web.startup",
         "web.choose_startup_mode",
         "web.status",
+        "web.recorder_status_snapshot",
         "web.rescan",
         "web.guide",
         "server_setup_web.scan_mtconnect_network",
@@ -396,6 +399,25 @@ def live():
 
 @web.route("/status")
 def status():
+    try:
+        setup_settings = load_settings()
+    except ServerSetupError:
+        setup_settings = None
+    recorder_status = get_recorder_control_service().status(
+        setup_settings
+    )
+    if (
+        setup_settings is not None
+        and setup_settings.configured
+        and setup_settings.user_setup_complete
+        and setup_settings.deployment_mode == "recorder-only"
+    ):
+        return render_template(
+            "status.html",
+            recorder_status=recorder_status,
+            setup_settings=setup_settings,
+        )
+
     snap = _catalog().cached_snapshot()
     runtime_state = get_runtime_manager().state_snapshot()
     operator_scope = get_operator_scope_service().get()
@@ -409,8 +431,6 @@ def status():
         "failed": "Background runtime encountered a failure. Check last failure details below.",
     }
     current_phase = runtime_state.get("current_processing_phase", "runtime_not_started")
-    mtconnect_discovery = _mtconnect_discovery_model()
-    setup_settings = mtconnect_discovery["setup_settings"]
     return render_template(
         "status.html",
         snapshot=snap,
@@ -420,13 +440,68 @@ def status():
         phase_message=phase_messages.get(current_phase, "Runtime state is available below."),
         operator_scope=operator_scope,
         telemetry_cache_status=_telemetry_cache_status_model(),
-        recorder_status=get_recorder_control_service().status(setup_settings),
-        mtconnect_discovery=mtconnect_discovery,
+        recorder_status=recorder_status,
+        setup_settings=setup_settings,
     )
+
+
+@web.get("/status/recorder.json")
+def recorder_status_snapshot():
+    try:
+        setup_settings = load_settings()
+    except ServerSetupError:
+        setup_settings = None
+    if (
+        setup_settings is None
+        or not setup_settings.configured
+        or not setup_settings.user_setup_complete
+    ):
+        response = jsonify(
+            {
+                "schema": "msh.recorder.web_status.v1",
+                "error": "setup_required",
+                "message": "Complete device setup before reading recorder status.",
+            }
+        )
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response, 409
+    if setup_settings.deployment_mode not in {
+        "full-server",
+        "recorder-only",
+    }:
+        response = jsonify(
+            {
+                "schema": "msh.recorder.web_status.v1",
+                "error": "recorder_not_enabled",
+                "message": "This device role does not include the recorder.",
+            }
+        )
+        response.headers["Cache-Control"] = "no-store, max-age=0"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        return response, 409
+    payload = get_recorder_control_service().web_status(setup_settings)
+    response = jsonify(payload)
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @web.route("/startup")
 def startup():
+    try:
+        setup_settings = load_settings()
+    except ServerSetupError:
+        setup_settings = None
+    if (
+        setup_settings is not None
+        and setup_settings.configured
+        and setup_settings.user_setup_complete
+        and setup_settings.deployment_mode == "recorder-only"
+        and request.args.get("edit") != "1"
+    ):
+        return redirect(url_for("web.status"))
+
     next_path = request.args.get("next", "/")
     startup_state = get_runtime_manager().startup_decision_snapshot()
     return render_template(
