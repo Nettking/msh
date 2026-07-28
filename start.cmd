@@ -48,7 +48,7 @@ if errorlevel 1 (
 
 echo MSH is running:        http://localhost:5000
 echo Setup:                 http://localhost:5000/startup
-echo Recorder diagnostics: http://localhost:5000/status
+echo Recorder status:      http://localhost:5000/status
 echo Web access is limited to this MSH machine by default.
 echo.
 echo Setup, recording state, checkpoints, and recorded data remain under data\
