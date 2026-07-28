@@ -40,7 +40,7 @@ class ControlledHandover:
         target_term: int,
         target_fencing_token: int,
         pending_outbox_ids: set[int] | None = None,
-    ) -> "ControlledHandover":
+    ) -> ControlledHandover:
         assignment = snapshot.groups.get(group_id)
         if assignment is None or assignment.primary_provider_id is None:
             raise FederationValidationError(
