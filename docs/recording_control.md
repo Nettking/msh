@@ -21,7 +21,7 @@ start.cmd
 `start.cmd` starts both containers in the background and opens:
 
 ```text
-http://localhost:5000/status
+http://localhost:5000/startup
 ```
 
 The launcher waits until the page answers before opening it and binds the web
@@ -46,13 +46,14 @@ inspect those changes. Do not use a hard reset on a recorder machine.
 
 ## Discover machines from MTConnect data
 
-1. During first-time setup choose **Recorder station** (or **Full server**) and
-   save. The recorder source may be left blank initially.
-2. Open **System -> Diagnostics**.
-3. Under **MTConnect network discovery**, enter the private machine subnet,
+1. During first-time setup choose **Recorder station** (or **Full server**).
+2. In the Recorder step, enter the private machine subnet,
    such as `192.168.200.0/24`, and port `5000`.
-4. Click **Scan network**.
-5. Select the returned machines and save them as recorder sources.
+3. Click **Scan network**.
+4. Keep the required MTConnect Agents checked, continue, and save setup.
+
+The selected role and checked Agents are saved together. Diagnostics remains
+available after setup for status checks and later rescans.
 
 Discovery reads each Agent's `/probe` document. The stable recorder key comes
 from the MTConnect Device UUID, with serial number, Device id, and address used

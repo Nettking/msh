@@ -14,12 +14,16 @@
 {% set ready_for_views = indexed_count > 0 and cache_fresh and not has_failure %}
 {% set recorder = recorder_status %}
 {% set network_scan = mtconnect_discovery.scan %}
+{% set setup_mode = mtconnect_discovery.setup_settings.deployment_mode if mtconnect_discovery.setup_settings else '' %}
+{% set recorder_role = setup_mode in ['full-server', 'recorder-only'] %}
+{% set recorder_only = setup_mode == 'recorder-only' %}
 
 <section class="page-intro">
-  <h2>Diagnostics</h2>
-  <p>Check the recorder, discover MTConnect machines, and understand what the runtime or cache is doing.</p>
+  <h2>{{ 'Recorder status' if recorder_only else 'Diagnostics' }}</h2>
+  <p>{% if recorder_only %}Check recording, review each MTConnect machine, or scan the network again.{% elif recorder_role %}Check the recorder, discover MTConnect machines, and understand what the runtime or cache is doing.{% else %}Understand what the runtime or cache is doing.{% endif %}</p>
 </section>
 
+{% if recorder_role %}
 <section class="section-block section-block--primary" id="recorder-status">
   <div class="setup-panel__header">
     <div>
@@ -52,12 +56,13 @@
     {% if recorder.ready %}
     <form method="post" action="{{ '/server-setup/recording/stop' if recorder.requested_enabled else '/server-setup/recording/start' }}">
       <input type="hidden" name="next" value="{{ url_for('web.status') }}#recorder-status">
+      <input type="hidden" name="_csrf_token" value="{{ mtconnect_discovery_csrf_token }}">
       <button class="button-primary" type="submit">{{ 'Stop recording' if recorder.requested_enabled else 'Start recording' }}</button>
     </form>
     {% else %}
     <a class="button-link button-link--primary" href="{{ url_for('web.startup', edit='1', step='recorder', next=url_for('web.status')) }}">Configure recorder station</a>
     {% endif %}
-    <a class="button-link" href="{{ endpoint_url('source_web.index', '/sources/') }}">Open source inventory</a>
+    {% if not recorder_only %}<a class="button-link" href="{{ endpoint_url('source_web.index', '/sources/') }}">Open source inventory</a>{% endif %}
   </div>
   {% if recorder.source_status %}
   <div class="table-scroll">
@@ -143,7 +148,9 @@
   {% endif %}
   {% endif %}
 </section>
+{% endif %}
 
+{% if not recorder_only %}
 <section class="section-block overview-decision {% if has_failure %}overview-decision--error{% elif ready_for_views %}overview-decision--ready{% elif update_running or scan_running %}overview-decision--waiting{% else %}overview-decision--partial{% endif %}">
   <div class="overview-decision__main">
     <span class="metric-label">Current diagnosis</span>
@@ -343,4 +350,5 @@
     {% endif %}
   </section>
 </details>
+{% endif %}
 {% endblock %}

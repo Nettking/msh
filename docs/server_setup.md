@@ -195,12 +195,13 @@ During setup, recorder sources can be entered as:
 IG500=http://192.168.200.251:5000/current;VTC=http://192.168.200.252:5000/current
 ```
 
-For a recorder station, prefer **System -> Diagnostics -> Scan for MTConnect
-machines**. Enter the private machine subnet, for example
-`192.168.200.0/24`, and keep the MTConnect port at `5000`. MSH requests
+For a recorder station, choose **Recorder station** in main Setup and use the
+network scan in its Recorder step. Enter the private machine subnet, for
+example `192.168.200.0/24`, and keep the MTConnect port at `5000`. MSH requests
 `/probe` only from that bounded private range and proposes source keys from the
 MTConnect UUID. The visible label includes Device name plus serial number or
-UUID, so two Mazak machines remain distinct.
+UUID, so two Mazak machines remain distinct. Checked Agents and the role are
+saved together.
 
 The same value can be placed in `.env` manually:
 

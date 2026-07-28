@@ -137,9 +137,16 @@ def test_ai_model_benchmark_endpoint_returns_recommendation(monkeypatch, tmp_pat
 
     app = create_app()
     app.config.update(TESTING=True)
-    response = app.test_client().post(
+    client = app.test_client()
+    with client.session_transaction() as browser_session:
+        browser_session["mtconnect_discovery_csrf_token"] = "test-csrf-token"
+    response = client.post(
         "/server-setup/test-ai-model",
-        data={"ai_enabled": "on", "ai_profile": "edge-small"},
+        data={
+            "_csrf_token": "test-csrf-token",
+            "ai_enabled": "on",
+            "ai_profile": "edge-small",
+        },
     )
 
     assert response.status_code == 200

@@ -13,7 +13,7 @@ start.cmd
 ```
 
 This starts the MSH web app and managed recorder service in the background,
-opens Diagnostics, and reuses the setup, recording switch, checkpoints, and
+opens Setup, and reuses the selected role, recording switch, checkpoints, and
 data already stored under `data\`. The launcher binds the web page to
 `127.0.0.1` by default, so setup and network-scan controls are available only
 from the MSH machine unless `MSH_WEB_BIND` is explicitly changed.
@@ -96,10 +96,11 @@ Test VPN/network  = TCP reachability test from Flask server/container to the con
 
 The VPN/network test does not prove that the VPN client is connected at the operating-system level. It proves whether MSH can reach the configured machine-network host from where the app is running.
 
-Diagnostics can also scan an explicitly entered private IPv4 subnet (at most a
-`/24`) for MTConnect Agents on port `5000`. Discovery reads `/probe` and uses
-the MTConnect UUID, serial number, and Device name. A generic vendor name such
-as `Mazak` is never used as the only machine identity.
+The Recorder step in main Setup can scan an explicitly entered private IPv4
+subnet (at most a `/24`) for MTConnect Agents on port `5000`. Discovery reads
+`/probe` and uses the MTConnect UUID, serial number, and Device name. A generic
+vendor name such as `Mazak` is never used as the only machine identity. Checked
+Agents and the selected role are saved together.
 
 ## Knowledge capture flow
 
