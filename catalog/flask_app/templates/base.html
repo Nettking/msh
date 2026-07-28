@@ -3,7 +3,8 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>MSH Flask Webapp</title>
+    {% set document_recorder_only = server_setup_settings and server_setup_settings.configured and server_setup_settings.user_setup_complete and server_setup_settings.deployment_mode == 'recorder-only' %}
+    <title>{{ 'MSH Recorder' if document_recorder_only else 'MSH Webapp' }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/global-refresh.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/setup.css') }}">
@@ -12,8 +13,10 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/source-tests.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ai-explainer.css') }}">
     <script defer src="{{ url_for('static', filename='js/mobile-navigation.js') }}"></script>
+    {% if not document_recorder_only %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    {% endif %}
   </head>
   {% set endpoint = request.endpoint or '' %}
   {% set setup_focus = endpoint in ['web.startup', 'web.get_started'] %}
@@ -33,8 +36,8 @@
     {% endif %}
     {% macro primary_links(group) -%}
       {% if recorder_only %}
-      <a class="{% if endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}" {% if endpoint == 'web.status' %}aria-current="page"{% endif %}>Recorder</a>
-      <a class="{% if endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup') }}" {% if endpoint == 'web.startup' %}aria-current="page"{% endif %}>Setup</a>
+      <a class="{% if endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}" {% if endpoint == 'web.status' %}aria-current="page"{% endif %}>Status</a>
+      <a class="{% if endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup', edit='1') }}" {% if endpoint == 'web.startup' %}aria-current="page"{% endif %}>Setup</a>
       {% else %}
       <a class="{% if group == 'monitor' %}is-active{% endif %}" href="{{ url_for('web.overview') }}" {% if group == 'monitor' %}aria-current="page"{% endif %}>Monitor</a>
       <a class="{% if group == 'knowledge' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.index', '/operator-strategies') }}" {% if group == 'knowledge' %}aria-current="page"{% endif %}>Knowledge</a>
@@ -44,7 +47,7 @@
     {% macro section_links(group, current_endpoint) -%}
       {% if recorder_only %}
         <a class="{% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Recorder status</a>
-        <a class="{% if current_endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">Setup</a>
+        <a class="{% if current_endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup', edit='1') }}">Setup</a>
       {% elif group == 'knowledge' %}
         <a class="{% if current_endpoint == 'operator_strategy_web.index' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.index', '/operator-strategies') }}">Overview</a>
         <a class="{% if current_endpoint == 'operator_strategy_web.capture' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.capture', '/operator-strategies/capture') }}">Capture</a>
@@ -85,7 +88,7 @@
           <span>{{ 'Choose your first task' if endpoint == 'web.get_started' else 'One step at a time' }}</span>
         </div>
       </div>
-      {% if recorder_role %}
+      {% if recorder_role and not recorder_only %}
         {% if server_setup_recorder_status.ready %}
         <form method="post" action="{{ '/server-setup/recording/stop' if server_setup_recorder_status.requested_enabled else '/server-setup/recording/start' }}" style="display:flex;align-items:center;gap:8px;" title="{{ server_setup_recorder_status.message }}">
           <input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}">
@@ -110,7 +113,7 @@
       {% endif %}
     </header>
     {% else %}
-    <header class="site-header site-header--grouped">
+    <header class="site-header site-header--grouped {% if recorder_only %}site-header--recorder{% endif %}">
       <div class="site-header__identity">
         <h1>{{ 'MSH Recorder station' if recorder_only else 'MSH Webapp' }}</h1>
         <p>{{ 'MTConnect data capture' if recorder_only else 'Operator support and strategy capture' }}</p>
@@ -127,12 +130,14 @@
       {% if not recorder_only %}
       <form class="rescan-form" method="post" action="{{ url_for('web.rescan') }}"><input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}"><button type="submit">Rescan</button></form>
       {% endif %}
+      {% if not recorder_only %}
       <nav class="site-nav site-section-nav" aria-label="Section pages">
         {{ section_links(active_group, endpoint) }}
       </nav>
+      {% endif %}
       <details class="mobile-navigation" data-mobile-navigation>
-        <summary aria-label="Navigation menu: {{ active_group|capitalize }}">
-          <span>{{ active_group|capitalize }}</span>
+        <summary aria-label="{{ 'Recorder navigation menu' if recorder_only else 'Navigation menu: ' ~ active_group|capitalize }}">
+          <span>{{ 'Menu' if recorder_only else active_group|capitalize }}</span>
           <span class="mobile-navigation__icon" aria-hidden="true"><i></i><i></i><i></i></span>
         </summary>
         <div class="mobile-navigation__panel">
@@ -142,12 +147,14 @@
               {{ primary_links(active_group) }}
             </nav>
           </section>
+          {% if not recorder_only %}
           <section class="mobile-navigation__section">
             <span class="mobile-navigation__label">{{ active_group|capitalize }} pages</span>
             <nav class="mobile-navigation__links" aria-label="Mobile section pages">
               {{ section_links(active_group, endpoint) }}
             </nav>
           </section>
+          {% endif %}
           <footer class="mobile-navigation__footer">
             {% if artifact_catalog_freshness is defined and not recorder_only %}
             <p class="mobile-navigation__freshness {% if artifact_catalog_freshness.stale %}is-stale{% endif %}">
