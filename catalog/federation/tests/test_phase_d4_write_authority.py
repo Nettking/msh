@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from catalog.federation.errors import FederationValidationError
 from catalog.federation.local_storage import FilesystemBatchStorageProvider
 from catalog.federation.storage_control_plane import (
     StorageControlPlaneStore,
@@ -28,35 +29,23 @@ NOW = datetime(2026, 7, 29, 12, 0, tzinfo=timezone.utc)
 EXPIRY = NOW + timedelta(minutes=5)
 
 
+def _registration(provider_id: str, node_id: str) -> StorageProviderRegistration:
+    return StorageProviderRegistration(
+        session_id="session-1",
+        provider_id=provider_id,
+        node_id=node_id,
+        protocol=STORAGE_PROTOCOL,
+        protocol_version=STORAGE_PROTOCOL_VERSION,
+        authorized=True,
+        status="ready",
+    )
+
+
 def _control_plane(path: Path) -> StorageControlPlaneStore:
     store = StorageControlPlaneStore(path)
-    store.create_group("session-1", "coordinator", "storage-main",)
-    store.register_provider(
-        "session-1",
-        "coordinator",
-        StorageProviderRegistration(
-            session_id="session-1",
-            provider_id="provider-a",
-            node_id="node-a",
-            protocol=STORAGE_PROTOCOL,
-            protocol_version=STORAGE_PROTOCOL_VERSION,
-            authorized=True,
-            status="ready",
-        ),
-    )
-    store.register_provider(
-        "session-1",
-        "coordinator",
-        StorageProviderRegistration(
-            session_id="session-1",
-            provider_id="provider-b",
-            node_id="node-b",
-            protocol=STORAGE_PROTOCOL,
-            protocol_version=STORAGE_PROTOCOL_VERSION,
-            authorized=True,
-            status="ready",
-        ),
-    )
+    store.create_group("session-1", "coordinator", "storage-main")
+    store.register_provider("session-1", "coordinator", _registration("provider-a", "node-a"))
+    store.register_provider("session-1", "coordinator", _registration("provider-b", "node-b"))
     store.change_assignment(
         "session-1", "coordinator", "storage-main", "provider-a", ("provider-b",)
     )
@@ -110,7 +99,7 @@ def _envelope(request: BatchIngestRequest) -> StorageRequestEnvelope:
     )
 
 
-def _service(tmp_path: Path, store: StorageControlPlaneStore, *, now=NOW):
+def _service(tmp_path: Path, store: StorageControlPlaneStore, *, now: datetime = NOW):
     validator = StorageWriteAuthorityValidator(store, now=lambda: now)
     provider = FilesystemBatchStorageProvider(tmp_path / "storage")
     return AuthorizedStorageService(provider, validator), provider
@@ -200,19 +189,7 @@ def test_old_primary_is_fenced_after_new_grant(tmp_path: Path) -> None:
 def test_grant_scope_is_enforced(tmp_path: Path) -> None:
     store = StorageControlPlaneStore(tmp_path / "control.sqlite3")
     store.create_group("session-1", "coordinator", "storage-main")
-    store.register_provider(
-        "session-1",
-        "coordinator",
-        StorageProviderRegistration(
-            session_id="session-1",
-            provider_id="provider-a",
-            node_id="node-a",
-            protocol=STORAGE_PROTOCOL,
-            protocol_version=STORAGE_PROTOCOL_VERSION,
-            authorized=True,
-            status="ready",
-        ),
-    )
+    store.register_provider("session-1", "coordinator", _registration("provider-a", "node-a"))
     store.change_assignment("session-1", "coordinator", "storage-main", "provider-a")
     store.grant_leader(
         "session-1",
@@ -237,7 +214,7 @@ def test_grant_scope_is_enforced(tmp_path: Path) -> None:
 def test_replacement_grants_must_advance_term_and_fencing_token(tmp_path: Path) -> None:
     store = _control_plane(tmp_path / "control.sqlite3")
 
-    with pytest.raises(Exception) as stale_term:
+    with pytest.raises(FederationValidationError) as stale_term:
         store.grant_leader(
             "session-1",
             "coordinator",
@@ -249,9 +226,9 @@ def test_replacement_grants_must_advance_term_and_fencing_token(tmp_path: Path) 
             lease_expires_at=EXPIRY + timedelta(minutes=5),
             occurred_at=NOW + timedelta(minutes=1),
         )
-    assert getattr(stale_term.value, "code", None) == StorageErrorCode.STALE_TERM.value
+    assert stale_term.value.code == StorageErrorCode.STALE_TERM.value
 
-    with pytest.raises(Exception) as stale_token:
+    with pytest.raises(FederationValidationError) as stale_token:
         store.grant_leader(
             "session-1",
             "coordinator",
@@ -263,4 +240,4 @@ def test_replacement_grants_must_advance_term_and_fencing_token(tmp_path: Path) 
             lease_expires_at=EXPIRY + timedelta(minutes=5),
             occurred_at=NOW + timedelta(minutes=1),
         )
-    assert getattr(stale_token.value, "code", None) == StorageErrorCode.STALE_FENCING_TOKEN.value
+    assert stale_token.value.code == StorageErrorCode.STALE_FENCING_TOKEN.value
