@@ -1,16 +1,17 @@
 """Shared models and durable helper functions for the MTConnect recorder."""
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from pathlib import Path
-from typing import Any, Mapping, Optional
-from urllib.parse import urlsplit, urlunsplit
-from xml.etree import ElementTree as ET
 import json
 import os
 import re
 import threading
+from collections.abc import Mapping
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any
+from urllib.parse import urlsplit, urlunsplit
+from xml.etree import ElementTree as ET
 
 DEFAULT_SOURCES = {
     "QuickTurn": "http://192.168.200.249:5000",
@@ -57,6 +58,7 @@ class SourceCheckpoint:
     agent_instance_id: int
     next_sequence: int
     probe_sha256: str
+    storage_aliases: list[str] = field(default_factory=list)
     last_raw_file: str | None = None
     last_observation_file: str | None = None
     last_normalized_file: str | None = None
@@ -64,7 +66,19 @@ class SourceCheckpoint:
     updated_at: str = field(default_factory=lambda: _utc_now())
 
     @classmethod
-    def from_dict(cls, source_name: str, payload: Mapping[str, Any]) -> "SourceCheckpoint":
+    def from_dict(cls, source_name: str, payload: Mapping[str, Any]) -> SourceCheckpoint:
+        aliases = payload.get("storage_aliases")
+        storage_aliases = (
+            [
+                alias.strip()
+                for alias in aliases
+                if isinstance(alias, str)
+                and alias.strip()
+                and alias.strip() != source_name
+            ]
+            if isinstance(aliases, list)
+            else []
+        )
         return cls(
             source_name=source_name,
             base_url=str(payload.get("base_url") or ""),
@@ -72,6 +86,7 @@ class SourceCheckpoint:
             agent_instance_id=int(payload["agent_instance_id"]),
             next_sequence=int(payload["next_sequence"]),
             probe_sha256=str(payload.get("probe_sha256") or ""),
+            storage_aliases=list(dict.fromkeys(storage_aliases)),
             last_raw_file=(str(payload["last_raw_file"]) if payload.get("last_raw_file") else None),
             last_observation_file=(
                 str(payload["last_observation_file"])
@@ -98,6 +113,7 @@ class SourceCheckpoint:
             "agent_instance_id": self.agent_instance_id,
             "next_sequence": self.next_sequence,
             "probe_sha256": self.probe_sha256,
+            "storage_aliases": self.storage_aliases,
             "last_raw_file": self.last_raw_file,
             "last_observation_file": self.last_observation_file,
             "last_normalized_file": self.last_normalized_file,
@@ -228,6 +244,22 @@ def _slug(value: str) -> str:
     return cleaned or "unknown"
 
 
+def _validate_source_storage_names(sources: Mapping[str, str]) -> None:
+    """Reject source names that would share a recorder directory on Windows."""
+
+    names_by_directory: dict[str, str] = {}
+    for source_name in sources:
+        directory_key = _slug(source_name).casefold()
+        existing_name = names_by_directory.get(directory_key)
+        if existing_name is not None and existing_name != source_name:
+            raise ValueError(
+                "Recorder source names map to the same storage directory: "
+                f"{existing_name!r} and {source_name!r}. "
+                "Use distinct MTConnect UUIDs or serial numbers."
+            )
+        names_by_directory[directory_key] = source_name
+
+
 def _local_name(tag: str) -> str:
     return tag.rsplit("}", 1)[-1]
 
@@ -236,7 +268,7 @@ def _find_first(root: ET.Element, local_name: str) -> ET.Element | None:
     return next((element for element in root.iter() if _local_name(element.tag) == local_name), None)
 
 
-def _try_number(value: Optional[str]) -> Any:
+def _try_number(value: str | None) -> Any:
     if value is None:
         return None
     stripped = value.strip()
@@ -281,7 +313,13 @@ def _parse_sources_text(value: str) -> dict[str, str]:
         name = name.strip()
         url = normalize_agent_base_url(url)
         if name:
+            if name in sources:
+                raise ValueError(
+                    f"Recorder source name is duplicated: {name}. "
+                    "Use the MTConnect machine UUID or another unique identity."
+                )
             sources[name] = url
+    _validate_source_storage_names(sources)
     return sources
 
 
@@ -298,6 +336,7 @@ def _sources_from_environment() -> dict[str, str]:
         }
         if not sources:
             raise ValueError("MSH_RECORDER_SOURCES_JSON contains no valid sources.")
+        _validate_source_storage_names(sources)
         return sources
 
     list_text = os.getenv("MSH_RECORDER_SOURCES", "").strip()

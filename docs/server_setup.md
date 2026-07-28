@@ -46,7 +46,7 @@ See [Connected capabilities](connected_capabilities.md) for the phone-to-laptop 
 | Full server | `full` | Run the Flask workbench and the MTConnect recorder together. |
 | Web workbench | `web` | Run the Flask workbench, orchestration, playback, sources page, strategy capture, analysis UI, and optional AI page. |
 | Web UI only | `web` with `MSH_SKIP_ORCHESTRATION=1` | Run the UI without background processing. Useful for inspection/debugging. |
-| Recorder only | `recorder` | Run only the MTConnect data recorder. No web UI. |
+| Recorder station | `recorder` | Run MTConnect capture with the setup, recorder controls, and diagnostics UI. |
 | Language-model provider | `provider` | Run a headless MSH node that contributes an Ollama model to another MSH device. |
 | Prep only | `prep` | Run one-shot preparation/orchestration. |
 | Observer sync only | `observer-sync` | Run one-shot Observer Phoenix synchronization. |
@@ -194,6 +194,13 @@ During setup, recorder sources can be entered as:
 ```text
 IG500=http://192.168.200.251:5000/current;VTC=http://192.168.200.252:5000/current
 ```
+
+For a recorder station, prefer **System -> Diagnostics -> Scan for MTConnect
+machines**. Enter the private machine subnet, for example
+`192.168.200.0/24`, and keep the MTConnect port at `5000`. MSH requests
+`/probe` only from that bounded private range and proposes source keys from the
+MTConnect UUID. The visible label includes Device name plus serial number or
+UUID, so two Mazak machines remain distinct.
 
 The same value can be placed in `.env` manually:
 

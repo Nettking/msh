@@ -10,15 +10,19 @@ is still supported by setup_msh.py for scripted deployments.
 
 from __future__ import annotations
 
+import json
+import time
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-import json
 from pathlib import Path
-import time
 from typing import Any
 from urllib import request
 from urllib.parse import urlsplit, urlunsplit
 
+from catalog.mtconnect_recorder.model import (
+    _parse_sources_text,
+    _validate_source_storage_names,
+)
 
 SETTINGS_PATH = Path("data") / "server_setup" / "server_settings.json"
 DEFAULT_OLLAMA_BASE_URL = "http://ollama:11434"
@@ -68,8 +72,8 @@ DEPLOYMENT_MODES: dict[str, dict[str, str]] = {
         "runtime": "disabled",
     },
     "recorder-only": {
-        "label": "Recorder only",
-        "description": "Data capture role. Best used with command-driven setup when no web UI is needed.",
+        "label": "Recorder station",
+        "description": "MTConnect data capture with setup, recorder controls, and a live status page.",
         "runtime": "disabled",
     },
 }
@@ -264,16 +268,46 @@ def settings_from_form(form: Any) -> ServerSetupSettings:
     if deployment_mode not in DEPLOYMENT_MODES:
         raise ServerSetupError("Unknown deployment mode.")
     ai_settings = ai_settings_from_form(form)
+    recorder_sources = normalize_recorder_sources(
+        str(form.get("recorder_sources") or "").strip()
+    )
     return replace(
         ai_settings,
         configured=True,
         user_setup_complete=True,
         deployment_mode=deployment_mode,
-        recorder_sources=str(form.get("recorder_sources") or "").strip(),
+        ai_enabled=False if deployment_mode == "recorder-only" else ai_settings.ai_enabled,
+        recorder_sources=recorder_sources,
         recorder_poll_interval=str(form.get("recorder_poll_interval") or "0.2").strip() or "0.2",
         recorder_include_condition=form.get("recorder_include_condition") == "on",
         updated_at=utc_now(),
     )
+
+
+def parse_recorder_sources(value: str) -> dict[str, str]:
+    """Parse and validate the persisted ``Name=URL;...`` source format."""
+
+    try:
+        return _parse_sources_text(str(value or "").strip())
+    except (TypeError, ValueError) as exc:
+        raise ServerSetupError(str(exc)) from exc
+
+
+def format_recorder_sources(sources: dict[str, str]) -> str:
+    """Serialize recorder sources deterministically for durable settings."""
+
+    try:
+        _validate_source_storage_names(sources)
+    except ValueError as exc:
+        raise ServerSetupError(str(exc)) from exc
+    return ";".join(
+        f"{name}={url}"
+        for name, url in sorted(sources.items(), key=lambda item: item[0].casefold())
+    )
+
+
+def normalize_recorder_sources(value: str) -> str:
+    return format_recorder_sources(parse_recorder_sources(value))
 
 
 def save_settings(settings: ServerSetupSettings, path: Path | str = SETTINGS_PATH) -> Path:

@@ -10,36 +10,70 @@ This is separate from the runtime session choice:
 
 ## Start MSH
 
-From the repository root:
+On the Windows MSH machine, update and start from Command Prompt:
 
-```powershell
-git pull origin main
-docker compose up -d --build flask recorder
+```cmd
+cd /d C:\path\to\msh
+git pull --ff-only origin main
+start.cmd
 ```
 
-Or use:
+`start.cmd` starts both containers in the background and opens:
 
-```powershell
-.\start.cmd
+```text
+http://localhost:5000/status
 ```
 
-The recorder container starts in standby mode. It does not contact machine
-sources until recording is enabled.
+The launcher waits until the page answers before opening it and binds the web
+port to `127.0.0.1` by default. This keeps recorder setup and private-network
+scan controls on the MSH machine.
+
+Do not run `setup_msh.py` for an ordinary restart. Browser-managed settings are
+already stored under `data\` and rerunning command setup could replace them.
+The recorder container starts in standby mode until recording is enabled.
+
+For a fresh checkout:
+
+```cmd
+cd /d "%USERPROFILE%\Documents"
+git clone https://github.com/Nettking/msh.git
+cd msh
+start.cmd
+```
+
+If `git pull --ff-only` reports local changes or a branch conflict, stop and
+inspect those changes. Do not use a hard reset on a recorder machine.
+
+## Discover machines from MTConnect data
+
+1. During first-time setup choose **Recorder station** (or **Full server**) and
+   save. The recorder source may be left blank initially.
+2. Open **System -> Diagnostics**.
+3. Under **MTConnect network discovery**, enter the private machine subnet,
+   such as `192.168.200.0/24`, and port `5000`.
+4. Click **Scan network**.
+5. Select the returned machines and save them as recorder sources.
+
+Discovery reads each Agent's `/probe` document. The stable recorder key comes
+from the MTConnect Device UUID, with serial number, Device id, and address used
+as fallbacks. The displayed machine name also comes from `/probe` and includes
+the serial number or UUID. This avoids merging several machines under the
+generic name `Mazak`.
 
 ## Turn recording on
 
 1. Open `http://localhost:5000/startup`.
-2. Confirm the device role is **Full server** or **Recorder only**.
+2. Confirm the device role is **Full server** or **Recorder station**.
 3. Confirm at least one recorder source is configured, for example:
 
    ```text
-   IG500=http://192.168.200.251:5000/current
+   MAZAK-M7ZDA13010Z=http://192.168.200.249:5000
    ```
 
    Multiple sources use semicolons:
 
    ```text
-   QuickTurn=http://192.168.200.249:5000/current;IG500=http://192.168.200.251:5000/current;VTC=http://192.168.200.252:5000/current
+   MAZAK-M7ZDA13010Z=http://192.168.200.249:5000;IG500-UUID=http://192.168.200.251:5000
    ```
 
 4. Click **Start recording** in the startup header.
@@ -70,6 +104,20 @@ Sequence state survives restarts in:
 ```text
 data/source_state/mtconnect_recorder_state.json
 ```
+
+The following host-mounted paths also survive `git pull`, image rebuilds, and
+future `start.cmd` runs:
+
+```text
+data/server_setup/server_settings.json
+data/source_state/mtconnect_recorder_control.json
+data/source_state/mtconnect_network_scan.json
+data/sources/mtconnect_recorder/
+```
+
+If discovery replaces an old generic alias with the UUID for the same Agent
+URL, the recorder moves that source's checkpoint to the new alias before
+continuing. It does not intentionally restart at sequence zero.
 
 The rotating recorder log is:
 

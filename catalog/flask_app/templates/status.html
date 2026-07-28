@@ -12,10 +12,136 @@
 {% set scan_running = artifact_catalog_freshness is defined and artifact_catalog_freshness.scan_in_progress %}
 {% set no_data_ready = indexed_count == 0 and (raw_file_count > 0 or cache_missing) %}
 {% set ready_for_views = indexed_count > 0 and cache_fresh and not has_failure %}
+{% set recorder = recorder_status %}
+{% set network_scan = mtconnect_discovery.scan %}
 
 <section class="page-intro">
   <h2>Diagnostics</h2>
-  <p>Use this page when Overview says MSH is not ready, data is missing, or you need to understand what the runtime/cache is doing.</p>
+  <p>Check the recorder, discover MTConnect machines, and understand what the runtime or cache is doing.</p>
+</section>
+
+<section class="section-block section-block--primary" id="recorder-status">
+  <div class="setup-panel__header">
+    <div>
+      <h3>Recorder station</h3>
+      <p>{{ recorder.message }}</p>
+    </div>
+    <span class="status-badge {% if recorder.running %}status-ready{% elif recorder.state in ['error', 'offline'] %}status-error{% else %}status-waiting{% endif %}">
+      {{ recorder.state.replace('_', ' ')|title }}
+    </span>
+  </div>
+  <div class="metrics metrics-grid">
+    <article class="metric-card {% if recorder.worker_alive %}metric-card--success{% else %}metric-card--danger{% endif %}">
+      <span class="metric-label">Recorder service</span>
+      <span class="metric-value">{{ 'Online' if recorder.worker_alive else 'Offline' }}</span>
+    </article>
+    <article class="metric-card {% if recorder.running %}metric-card--success{% else %}metric-card--warning{% endif %}">
+      <span class="metric-label">Recording</span>
+      <span class="metric-value">{{ 'Active' if recorder.running else 'Off' if not recorder.requested_enabled else 'Starting' }}</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Records written</span>
+      <span class="metric-value">{{ recorder.records_written }}</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Last commit</span>
+      <span class="metric-value metric-value--long">{{ recorder.last_flush_at or 'None yet' }}</span>
+    </article>
+  </div>
+  <div class="overview-decision__actions">
+    {% if recorder.ready %}
+    <form method="post" action="{{ '/server-setup/recording/stop' if recorder.requested_enabled else '/server-setup/recording/start' }}">
+      <input type="hidden" name="next" value="{{ url_for('web.status') }}#recorder-status">
+      <button class="button-primary" type="submit">{{ 'Stop recording' if recorder.requested_enabled else 'Start recording' }}</button>
+    </form>
+    {% else %}
+    <a class="button-link button-link--primary" href="{{ url_for('web.startup', edit='1', step='recorder', next=url_for('web.status')) }}">Configure recorder station</a>
+    {% endif %}
+    <a class="button-link" href="{{ endpoint_url('source_web.index', '/sources/') }}">Open source inventory</a>
+  </div>
+  {% if recorder.source_status %}
+  <div class="table-scroll">
+    <table>
+      <thead><tr><th>Source identity</th><th>Machine ID</th><th>Agent</th><th>Last success</th><th>Next sequence</th><th>Status</th></tr></thead>
+      <tbody>
+      {% for source_name, source in recorder.source_status.items() %}
+      <tr>
+        <td><strong>{{ source_name }}</strong></td>
+        <td><code>{{ source.machine_id or 'not read yet' }}</code></td>
+        <td><code>{{ source.base_url or 'n/a' }}</code></td>
+        <td>{{ source.last_success_at or 'waiting' }}</td>
+        <td>{{ source.next_sequence if source.next_sequence is not none else 'n/a' }}</td>
+        <td>{% if source.last_error %}<span class="status-badge status-error">{{ source.last_error }}</span>{% else %}<span class="status-badge status-ready">{{ 'Caught up' if source.caught_up else 'Polling' }}</span>{% endif %}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% endif %}
+</section>
+
+<section class="section-block section-block--actions" id="mtconnect-discovery">
+  <h3>MTConnect network discovery</h3>
+  <p>Scan an explicit private IPv4 subnet for MTConnect Agents. MSH reads each Agent's <code>/probe</code> data and identifies machines by UUID, with serial number, Device id, and address as fallbacks. A generic name such as <code>Mazak</code> is never the only identity.</p>
+  <form method="post" action="/status/mtconnect-scan" class="control-form control-card source-inline-form">
+    <input type="hidden" name="_csrf_token" value="{{ mtconnect_discovery_csrf_token }}">
+    <label class="source-field-wide">
+      <span>Private machine subnet</span>
+      <input type="text" name="cidr" value="{{ mtconnect_discovery.recommended_cidr }}" placeholder="192.168.200.0/24" required>
+    </label>
+    <label>
+      <span>MTConnect port</span>
+      <input type="number" name="port" min="1" max="65535" value="{{ mtconnect_discovery.default_port }}" required>
+    </label>
+    <button class="button-primary" type="submit">Scan network</button>
+  </form>
+  <p class="inline-note">For safety and predictable scan time, only RFC1918 IPv4 ranges of <code>/24</code> or smaller are accepted. Scan and source changes must be made from <code>localhost</code> on the MSH machine. The scan runs from the MSH Docker network, which is also where the recorder connects.</p>
+
+  {% if network_scan.state == 'running' %}
+  <p><span class="status-badge status-waiting">Scan interrupted or still running</span> Started {{ network_scan.started_at or 'recently' }}.</p>
+  {% elif network_scan.state == 'complete' %}
+  <div class="metrics metrics-grid">
+    <article class="metric-card"><span class="metric-label">Subnet</span><span class="metric-value metric-value--long">{{ network_scan.cidr }}</span></article>
+    <article class="metric-card"><span class="metric-label">Addresses checked</span><span class="metric-value">{{ network_scan.addresses_scanned }}</span></article>
+    <article class="metric-card {% if network_scan.agents_found %}metric-card--success{% else %}metric-card--warning{% endif %}"><span class="metric-label">MTConnect Agents</span><span class="metric-value">{{ network_scan.agents_found }}</span></article>
+    <article class="metric-card {% if network_scan.machines_found %}metric-card--success{% else %}metric-card--warning{% endif %}"><span class="metric-label">Machines found</span><span class="metric-value">{{ network_scan.machines_found }}</span></article>
+  </div>
+  {% if network_scan.results %}
+  <form method="post" action="/status/mtconnect-sources">
+    <input type="hidden" name="_csrf_token" value="{{ mtconnect_discovery_csrf_token }}">
+    <div class="table-scroll">
+      <table>
+        <thead><tr><th>Use</th><th>Machine name from data</th><th>Stable identity</th><th>MTConnect Agent</th><th>Setup status</th></tr></thead>
+        <tbody>
+        {% for result in network_scan.results %}
+          {% for machine in result.machines %}
+          <tr>
+            {% if loop.first %}
+            <td rowspan="{{ result.machines|length }}"><input type="checkbox" name="source_id" value="{{ result.source_id }}" checked aria-label="Use {{ result.display_name }}"></td>
+            {% endif %}
+            <td><strong>{{ machine.display_name }}</strong>{% if machine.reported_name %}<br><span class="text-muted">Device name: {{ machine.reported_name }}</span>{% endif %}</td>
+            <td><code>{{ machine.machine_id }}</code><br><span class="text-muted">{{ machine.identity_kind.replace('_', ' ') }}</span></td>
+            {% if loop.first %}
+            <td rowspan="{{ result.machines|length }}"><code>{{ result.base_url }}</code><br><span class="text-muted">Recorder key: {{ result.source_name }}</span></td>
+            <td rowspan="{{ result.machines|length }}">{% if result.configured_as %}<span class="status-badge status-ready">Configured as {{ result.configured_as }}</span>{% else %}<span class="status-badge status-waiting">Not configured</span>{% endif %}</td>
+            {% endif %}
+          </tr>
+          {% endfor %}
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% if mtconnect_discovery.setup_settings and mtconnect_discovery.setup_settings.deployment_mode in ['full-server', 'recorder-only'] %}
+    <button class="button-primary" type="submit">Use selected machines for recording</button>
+    {% else %}
+    <p class="inline-note">Choose Full server or Recorder station in Setup before saving these results.</p>
+    <a class="button-link button-link--primary" href="{{ url_for('web.startup', edit='1', step='role', next=url_for('web.status')) }}">Choose recorder role</a>
+    {% endif %}
+  </form>
+  {% else %}
+  <p>No MTConnect Agent answered on this subnet and port. Check the subnet, VPN route, Docker networking, machine address, and MTConnect port.</p>
+  {% endif %}
+  {% endif %}
 </section>
 
 <section class="section-block overview-decision {% if has_failure %}overview-decision--error{% elif ready_for_views %}overview-decision--ready{% elif update_running or scan_running %}overview-decision--waiting{% else %}overview-decision--partial{% endif %}">

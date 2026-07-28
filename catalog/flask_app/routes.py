@@ -3,16 +3,34 @@ from __future__ import annotations
 from pathlib import Path
 
 import pandas as pd
-from flask import Blueprint, current_app, flash, redirect, render_template, request, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    redirect,
+    render_template,
+    request,
+    url_for,
+)
 
 from catalog.common.telemetry_cache import TelemetryCache, cached_cache_status
 from catalog.orchestrator.pipeline import get_runtime_manager
 from catalog.runner.session_store import list_sessions
 
 from .services.catalog_service import ArtifactCatalog, safe_load_artifact_frame
-from .services.chart_service import category_columns, category_counts, histogram_data, line_or_scatter_data, machine_day_trend, numeric_columns
+from .services.chart_service import (
+    category_columns,
+    category_counts,
+    histogram_data,
+    line_or_scatter_data,
+    machine_day_trend,
+    numeric_columns,
+)
 from .services.control_service import get_control_panel_service
 from .services.live_service import get_live_telemetry_service
+from .services.mtconnect_discovery_service import (
+    get_mtconnect_discovery_service,
+)
 from .services.operator_page_cache import get_operator_page_cache
 from .services.operator_scope_service import get_operator_scope_service
 from .services.playback_service import (
@@ -30,6 +48,12 @@ from .services.playback_service import (
     telemetry_cache_playback_artifact,
     validate_playback_frame,
     validate_playback_source,
+)
+from .services.recorder_control_service import get_recorder_control_service
+from .services.server_setup_service import (
+    ServerSetupError,
+    load_settings,
+    parse_recorder_sources,
 )
 from .services.strategy_config_service import StrategyConfigService
 from .services.workflow_session_index import get_workflow_session_index
@@ -58,6 +82,8 @@ def startup_mode_gate():
         "web.status",
         "web.rescan",
         "web.guide",
+        "server_setup_web.scan_mtconnect_network",
+        "server_setup_web.save_discovered_mtconnect_sources",
         "ai_web.ai_page",
         "ai_web.ai_ask",
     }
@@ -299,6 +325,26 @@ def status():
         "failed": "Background runtime encountered a failure. Check last failure details below.",
     }
     current_phase = runtime_state.get("current_processing_phase", "runtime_not_started")
+    try:
+        setup_settings = load_settings()
+        configured_sources = parse_recorder_sources(
+            setup_settings.recorder_sources
+        )
+    except ServerSetupError:
+        setup_settings = None
+        configured_sources = {}
+    discovery_service = get_mtconnect_discovery_service()
+    mtconnect_scan = discovery_service.last_scan()
+    configured_urls = {
+        url.casefold(): name for name, url in configured_sources.items()
+    }
+    for result in mtconnect_scan.get("results", []):
+        if not isinstance(result, dict):
+            continue
+        result["configured_as"] = configured_urls.get(
+            str(result.get("base_url") or "").casefold(),
+            "",
+        )
     return render_template(
         "status.html",
         snapshot=snap,
@@ -308,6 +354,16 @@ def status():
         phase_message=phase_messages.get(current_phase, "Runtime state is available below."),
         operator_scope=operator_scope,
         telemetry_cache_status=_telemetry_cache_status_model(),
+        recorder_status=get_recorder_control_service().status(setup_settings),
+        mtconnect_discovery={
+            "scan": mtconnect_scan,
+            "recommended_cidr": discovery_service.recommended_cidr(
+                setup_settings
+            ),
+            "default_port": mtconnect_scan.get("port") or 5000,
+            "setup_settings": setup_settings,
+            "configured_sources": configured_sources,
+        },
     )
 
 
