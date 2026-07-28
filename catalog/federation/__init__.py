@@ -1,7 +1,9 @@
 """Pure domain contracts for federated MSH sessions."""
 
+from .acknowledgement import AcknowledgementMode, AcknowledgementPolicy, AcknowledgementProgress
 from .errors import FederationValidationError
 from .filesystem_storage import FilesystemRecorderStorageProvider
+from .handover import ControlledHandover, HandoverState
 from .local_storage import BatchStorageProvider, FilesystemBatchStorageProvider, LocalStorageService
 from .logical_storage import (
     CallableStorageTransport,
@@ -86,6 +88,11 @@ from .storage_protocol import (
 from .write_authority import AuthorizedStorageService, StorageWriteAuthorityValidator
 
 __all__ = [
+    "AcknowledgementMode",
+    "AcknowledgementPolicy",
+    "AcknowledgementProgress",
+    "ControlledHandover",
+    "HandoverState",
     "FederationValidationError",
     "FilesystemRecorderStorageProvider",
     "FilesystemBatchStorageProvider",
