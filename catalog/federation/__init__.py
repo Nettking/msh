@@ -35,6 +35,22 @@ from .models import (
     StorageRole,
     StorageWriteRequest,
 )
+from .storage_protocol import (
+    STORAGE_PROTOCOL,
+    STORAGE_PROTOCOL_MAJOR,
+    STORAGE_PROTOCOL_VERSION,
+    BatchIngestRequest,
+    BatchIngestResult,
+    BatchIngestState,
+    StorageError,
+    StorageErrorCode,
+    StorageOperation,
+    StorageRequestEnvelope,
+    StorageResponseEnvelope,
+    WriteAuthority,
+    classify_idempotent_ingest,
+    validate_protocol_version,
+)
 
 __all__ = [
     "FederationValidationError",
@@ -68,4 +84,18 @@ __all__ = [
     "StorageWriteRequest",
     "select_storage_leader",
     "validate_primary_write",
+    "STORAGE_PROTOCOL",
+    "STORAGE_PROTOCOL_MAJOR",
+    "STORAGE_PROTOCOL_VERSION",
+    "BatchIngestRequest",
+    "BatchIngestResult",
+    "BatchIngestState",
+    "StorageError",
+    "StorageErrorCode",
+    "StorageOperation",
+    "StorageRequestEnvelope",
+    "StorageResponseEnvelope",
+    "WriteAuthority",
+    "classify_idempotent_ingest",
+    "validate_protocol_version",
 ]
