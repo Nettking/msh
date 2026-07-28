@@ -316,7 +316,7 @@ def test_status_network_scan_route_is_available_before_runtime_choice(
     )
 
     assert response.status_code == 302
-    assert response.location == "/status#mtconnect-discovery"
+    assert response.location == "/startup?edit=1&step=recorder"
     assert discovery.scan_calls == [("192.168.200.0/24", "5000")]
 
 
@@ -404,7 +404,7 @@ def test_discovered_sources_are_saved_to_persistent_setup(
     )
 
     assert response.status_code == 302
-    assert response.location == "/status#mtconnect-discovery"
+    assert response.location == "/status#recorder-status"
     assert discovery.selected == ["source-a", "source-b"]
     assert saved[-1].recorder_sources == (
         "MAZAK-001=http://192.168.200.249:5000"
@@ -477,7 +477,10 @@ def test_inline_setup_selection_requires_local_csrf_before_saving(
     )
 
     assert response.status_code == 302
-    assert urlsplit(response.location).path == "/startup"
+    location = urlsplit(response.location)
+    assert location.path == "/startup"
+    assert parse_qs(location.query)["edit"] == ["1"]
+    assert parse_qs(location.query)["step"] == ["review"]
     assert saved == []
     assert discovery.selected == []
 
@@ -499,7 +502,10 @@ def test_setup_save_requires_csrf_without_discovery_selection(
     )
 
     assert response.status_code == 302
-    assert urlsplit(response.location).path == "/startup"
+    location = urlsplit(response.location)
+    assert location.path == "/startup"
+    assert parse_qs(location.query)["edit"] == ["1"]
+    assert parse_qs(location.query)["step"] == ["review"]
     assert saved == []
     assert runtime_starts == []
 
