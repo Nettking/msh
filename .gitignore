@@ -38,3 +38,7 @@ Thumbs.db
 
 # Runner local cache
 /catalog/runner/.data_index.json
+/.tmp.driveupload
+*.ini
+/catalog/standalone_recorder/data
+/record data/data
