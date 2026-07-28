@@ -74,6 +74,7 @@ jobs:
           catalog/federation/tests/test_phase_d3_control_plane.py
           catalog/federation/tests/test_phase_d4_write_authority.py
           catalog/federation/tests/test_phase_d5_logical_storage.py
+          catalog/federation/tests/test_phase_d6_replication.py
       - name: Phase 2 unit and integration tests
         run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase2_unit.py catalog/node/tests catalog/relay/tests
       - name: Ruff federation code
@@ -114,3 +115,4 @@ jobs:
           catalog/federation/tests/test_phase_d3_control_plane.py
           catalog/federation/tests/test_phase_d4_write_authority.py
           catalog/federation/tests/test_phase_d5_logical_storage.py
+          catalog/federation/tests/test_phase_d6_replication.py
