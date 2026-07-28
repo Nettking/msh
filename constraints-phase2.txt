@@ -1,0 +1,5 @@
+# Reproducibility constraints for the Phase 2 federation subsystem.
+# Keep requirements.txt broad enough for normal development while CI and
+# security-sensitive deployments use these reviewed versions.
+cryptography==43.0.3
+websockets==14.2
