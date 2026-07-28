@@ -346,7 +346,14 @@ select-candidate
 no-qualified-candidate
 synchronization-required
 storage-degraded
+authoritative-state-required
 ```
+
+`authoritative-state-required` means selection found a qualified candidate but
+cannot safely propose a new grant because neither a persisted authoritative
+fencing counter nor a correctly scoped previous coordinator grant was supplied.
+It returns no selected node, term, fencing token, or lease. Candidate-reported
+terms and fencing tokens never substitute for this coordinator-owned state.
 
 ## Pure leader-selection algorithm
 
@@ -374,6 +381,12 @@ Policy:
 8. If required committed data cannot be located, return storage-degraded.
 9. Selection itself does not create authority; the coordinator must issue a new
    term, lease, and fencing token in a leadership grant.
+10. Required-dataset committed revisions and contiguous watermarks must match
+    the authoritative manifest exactly. Candidate-local data beyond those
+    values is provisional reconciliation state and never increases authority.
+11. If a new grant is required but authoritative fencing state is unavailable,
+    return `authoritative-state-required` rather than restarting a fencing
+    counter or deriving one from candidate reports.
 ```
 
 The pure function must not perform I/O, mutate candidates, generate random IDs, or read global time.

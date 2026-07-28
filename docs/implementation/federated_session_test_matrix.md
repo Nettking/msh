@@ -139,6 +139,22 @@ An unsupported major version is rejected with a structured compatibility error.
 
 Wall-clock timestamp alone never outranks authoritative revision, term, fencing token, or committed watermarks.
 
+### F0-021 Candidate-local coverage does not increase authority
+
+Given node A exactly matches the authoritative required-dataset revision,
+watermark, and hash, while node B reports the same authoritative node revision
+and hash but a higher dataset revision or watermark, node B is rejected as
+`required-dataset-authoritatively-ahead`. Local or provisional coverage does not
+improve leadership rank.
+
+### F0-022 New grant requires authoritative fencing state
+
+Given a qualified candidate but no active/last scoped coordinator grant and no
+persisted authoritative fencing counter, selection returns
+`authoritative-state-required`. It does not select a node or propose a term,
+fencing token, or lease. Supplying the persisted counter allows the next token
+to increment monotonically.
+
 ## Phase 1: local interface and outbox tests
 
 ### F1-001 Existing recorder output compatibility
