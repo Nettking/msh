@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -94,8 +95,7 @@ def _request() -> BatchIngestRequest:
     )
 
 
-@pytest.mark.asyncio
-async def test_logical_client_routes_ingest_to_assigned_primary(tmp_path: Path) -> None:
+def test_logical_client_routes_ingest_to_assigned_primary(tmp_path: Path) -> None:
     transport = FakeTransport()
     client = LogicalStorageClient(
         session_id="session-1",
@@ -104,7 +104,7 @@ async def test_logical_client_routes_ingest_to_assigned_primary(tmp_path: Path) 
         transport=transport,
     )
 
-    result = await client.ingest(_request())
+    result = asyncio.run(client.ingest(_request()))
 
     assert result.state is BatchIngestState.STORED
     assert transport.calls[0][0] == "node-a"
@@ -113,8 +113,7 @@ async def test_logical_client_routes_ingest_to_assigned_primary(tmp_path: Path) 
     assert envelope.authorization_context["group_id"] == "storage-main"
 
 
-@pytest.mark.asyncio
-async def test_logical_client_exposes_provider_agnostic_reads(tmp_path: Path) -> None:
+def test_logical_client_exposes_provider_agnostic_reads(tmp_path: Path) -> None:
     transport = FakeTransport()
     client = LogicalStorageClient(
         session_id="session-1",
@@ -123,13 +122,18 @@ async def test_logical_client_exposes_provider_agnostic_reads(tmp_path: Path) ->
         transport=transport,
     )
 
-    assert await client.exists(group_id="storage-main", batch_id="batch-1")
-    assert await client.read(group_id="storage-main", batch_id="batch-1") == {"value": 42}
+    async def exercise() -> tuple[bool, object]:
+        exists = await client.exists(group_id="storage-main", batch_id="batch-1")
+        content = await client.read(group_id="storage-main", batch_id="batch-1")
+        return exists, content
+
+    exists, content = asyncio.run(exercise())
+    assert exists
+    assert content == {"value": 42}
     assert [call[0] for call in transport.calls] == ["node-a", "node-a"]
 
 
-@pytest.mark.asyncio
-async def test_no_primary_fails_without_transport_access(tmp_path: Path) -> None:
+def test_no_primary_fails_without_transport_access(tmp_path: Path) -> None:
     store = StorageControlPlaneStore(tmp_path / "control.sqlite3")
     store.create_group("session-1", "coordinator", "storage-main")
     transport = FakeTransport()
@@ -141,14 +145,13 @@ async def test_no_primary_fails_without_transport_access(tmp_path: Path) -> None
     )
 
     with pytest.raises(FederationValidationError) as error:
-        await client.exists(group_id="storage-main", batch_id="batch-1")
+        asyncio.run(client.exists(group_id="storage-main", batch_id="batch-1"))
 
     assert error.value.code == "not-primary"
     assert transport.calls == []
 
 
-@pytest.mark.asyncio
-async def test_client_does_not_fail_over_to_replica(tmp_path: Path) -> None:
+def test_client_does_not_fail_over_to_replica(tmp_path: Path) -> None:
     store = _store(tmp_path / "control.sqlite3")
     store.register_provider(
         "session-1",
@@ -175,7 +178,7 @@ async def test_client_does_not_fail_over_to_replica(tmp_path: Path) -> None:
     )
 
     with pytest.raises(FederationValidationError) as error:
-        await client.read(group_id="storage-main", batch_id="batch-1")
+        asyncio.run(client.read(group_id="storage-main", batch_id="batch-1"))
 
     assert error.value.code == "not-primary"
     assert transport.calls == []
