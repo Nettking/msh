@@ -52,8 +52,8 @@ inspect those changes. Do not use a hard reset on a recorder machine.
 3. Click **Scan network**.
 4. Keep the required MTConnect Agents checked, continue, and save setup.
 
-The selected role and checked Agents are saved together. Diagnostics remains
-available after setup for status checks and later rescans.
+The selected role and checked Agents are saved together. On the Recorder status
+page, **Add or rescan machines** opens this same Recorder setup step again.
 
 Discovery reads each Agent's `/probe` document. The stable recorder key comes
 from the MTConnect Device UUID, with serial number, Device id, and address used
@@ -63,9 +63,9 @@ generic name `Mazak`.
 
 ## Turn recording on
 
-1. Open `http://localhost:5000/startup`.
-2. Confirm the device role is **Full server** or **Recorder station**.
-3. Confirm at least one recorder source is configured, for example:
+1. Open `http://localhost:5000/status`. A configured Recorder station is sent
+   here automatically when `start.cmd` opens MSH.
+2. Confirm at least one recorder source is configured, for example:
 
    ```text
    MAZAK-M7ZDA13010Z=http://192.168.200.249:5000
@@ -77,7 +77,11 @@ generic name `Mazak`.
    MAZAK-M7ZDA13010Z=http://192.168.200.249:5000;IG500-UUID=http://192.168.200.251:5000
    ```
 
-4. Click **Start recording** in the startup header.
+3. Click **Start recording** on Recorder status.
+
+Recorder totals, last-save time, machine health, and sequence numbers refresh
+about every two seconds while the page is visible. Live refresh pauses in a
+hidden tab and resumes when you return.
 
 The web app writes the desired state to:
 

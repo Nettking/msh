@@ -80,6 +80,14 @@ body {
   color: #ffffff;
 }
 
+.site-header--recorder {
+  grid-template-columns: minmax(240px, 1fr) auto;
+}
+
+.site-header--recorder .site-nav--primary {
+  justify-self: end;
+}
+
 .mobile-navigation {
   display: none;
 }
@@ -178,6 +186,255 @@ main.setup-focus-main {
   border-radius: 18px;
   background: rgba(255, 255, 255, 0.94);
   box-shadow: 0 12px 32px rgba(15, 23, 42, 0.07);
+}
+
+.recorder-dashboard {
+  overflow: hidden;
+  border: 1px solid rgba(203, 213, 225, 0.92);
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 14px 38px rgba(15, 23, 42, 0.08);
+}
+
+.recorder-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 20px 22px 16px;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.recorder-toolbar__title,
+.recorder-toolbar__actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.recorder-toolbar h2 {
+  margin: 0;
+  color: #0f172a;
+  font-size: clamp(1.45rem, 2vw, 1.9rem);
+  letter-spacing: -0.035em;
+}
+
+.recorder-toolbar p {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.recorder-toolbar__actions form {
+  margin: 0;
+}
+
+.recorder-control-button {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid var(--button-primary-border);
+  border-radius: 999px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.recorder-live-state {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: #166534;
+  font-size: 0.84rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.recorder-live-state::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #22c55e;
+  box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.13);
+  content: "";
+}
+
+.recorder-live-state.is-delayed {
+  color: #92400e;
+}
+
+.recorder-live-state.is-delayed::before {
+  background: #f59e0b;
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, 0.13);
+}
+
+.recorder-stat-strip {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+
+.recorder-stat-strip article {
+  min-width: 0;
+  padding: 15px 22px;
+}
+
+.recorder-stat-strip article + article {
+  border-left: 1px solid #e2e8f0;
+}
+
+.recorder-stat-strip span,
+.recorder-machine__facts dt,
+.recorder-machine details dt {
+  color: #64748b;
+  font-size: 0.74rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.recorder-stat-strip strong {
+  display: block;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+  color: #0f172a;
+  font-size: clamp(1.15rem, 2vw, 1.55rem);
+  line-height: 1.2;
+}
+
+.recorder-machines {
+  padding: 18px 22px 22px;
+}
+
+.recorder-machines > header {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.recorder-machines h3,
+.recorder-machines p {
+  margin: 0;
+}
+
+.recorder-machines h3 {
+  color: #0f172a;
+  font-size: 1.1rem;
+}
+
+.recorder-machines p {
+  margin-top: 3px;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.recorder-machine-list {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.recorder-machine {
+  min-width: 0;
+  padding: 15px;
+  border: 1px solid #dbe3ef;
+  border-radius: 15px;
+  background: #ffffff;
+}
+
+.recorder-machine > header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.recorder-machine h4 {
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: #0f172a;
+  font-size: 1rem;
+}
+
+.recorder-machine > header div > span {
+  display: block;
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+  color: #64748b;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.78rem;
+}
+
+.recorder-machine__facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 14px 0 0;
+}
+
+.recorder-machine__facts div {
+  min-width: 0;
+  padding: 10px;
+  border-radius: 11px;
+  background: #f8fafc;
+}
+
+.recorder-machine__facts dt,
+.recorder-machine__facts dd,
+.recorder-machine details dl,
+.recorder-machine details dd {
+  margin: 0;
+}
+
+.recorder-machine__facts dd {
+  margin-top: 3px;
+  overflow-wrap: anywhere;
+  color: #0f172a;
+  font-size: 1rem;
+  font-weight: 800;
+}
+
+.recorder-machine details {
+  margin-top: 11px;
+  border-top: 1px solid #e2e8f0;
+  color: #475569;
+}
+
+.recorder-machine details summary {
+  padding-top: 10px;
+  cursor: pointer;
+  color: #475569;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.recorder-machine details dl {
+  display: grid;
+  gap: 8px;
+  padding-top: 10px;
+}
+
+.recorder-machine details dl div {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 10px;
+}
+
+.recorder-machine details dd,
+.recorder-machine details code {
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+.recorder-machine-list__empty {
+  grid-column: 1 / -1;
+  padding: 18px;
+  border: 1px dashed #cbd5e1;
+  border-radius: 14px;
+  background: #f8fafc;
+  color: #64748b;
+  text-align: center;
 }
 
 .overview-decision {
@@ -613,6 +870,10 @@ main.setup-focus-main {
     flex-wrap: nowrap;
   }
 
+  .site-header--recorder {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
   .site-header--grouped > * {
     min-width: 0;
   }
@@ -783,6 +1044,29 @@ main.setup-focus-main {
   .overview-decision {
     grid-template-columns: minmax(0, 1fr);
     gap: 14px;
+  }
+
+  .recorder-toolbar,
+  .recorder-machines > header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .recorder-toolbar__actions {
+    width: 100%;
+  }
+
+  .recorder-stat-strip {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .recorder-stat-strip article + article {
+    border-top: 1px solid #e2e8f0;
+    border-left: 0;
+  }
+
+  .recorder-machine-list {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .overview-decision__main,
