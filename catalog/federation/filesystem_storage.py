@@ -7,14 +7,26 @@ with the raw manifest to finish activation without runtime routing guesses.
 
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Mapping
 from datetime import datetime
 from hashlib import sha256
 from pathlib import Path
-import sqlite3
-from typing import Any, Mapping
+from typing import Any
 
-from mtconnect_recorder.model import ParsedBatch, StoredBatch
-from mtconnect_recorder.storage import DurableRecorderStore
+from catalog.mtconnect_recorder.model import ParsedBatch, StoredBatch
+from catalog.mtconnect_recorder.storage import DurableRecorderStore
+
+try:
+    # Phase 0/1 applications place ``catalog`` directly on sys.path and import
+    # recorder models through this established package name.  Supporting both
+    # names avoids rejecting the same dataclass solely because Python loaded it
+    # through two compatible module paths.
+    from mtconnect_recorder.model import ParsedBatch as LegacyParsedBatch
+except ModuleNotFoundError:  # pragma: no cover - only one import layout is active
+    LegacyParsedBatch = ParsedBatch
+
+_PARSED_BATCH_TYPES = (ParsedBatch, LegacyParsedBatch)
 
 from .errors import FederationValidationError
 from .models import StorageBatch
@@ -101,7 +113,9 @@ class FilesystemRecorderStorageProvider:
 
     def write(self, batch: StorageBatch, payload: Any) -> StorageWriteOutcome:
         """StorageProvider entry point for a parsed local recorder payload."""
-        if not isinstance(payload, dict) or not isinstance(payload.get("batch"), ParsedBatch):
+        if not isinstance(payload, dict) or not isinstance(
+            payload.get("batch"), _PARSED_BATCH_TYPES
+        ):
             return StorageWriteOutcome(batch, False, False, ProviderError(
                 ProviderErrorCode.INVALID, "recorder payload requires a parsed batch", "payload"))
         try:

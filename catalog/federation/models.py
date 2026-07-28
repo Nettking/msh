@@ -2,17 +2,23 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 from dataclasses import MISSING, asdict, dataclass, fields
 from datetime import datetime, timezone
 from enum import Enum
-import hashlib
-import json
-from typing import Any, ClassVar, TypeVar
+from typing import Any, ClassVar, Self
 
 from .errors import FederationValidationError, ProtocolCompatibilityError
+from .redaction import (
+    is_nonpublic_location_key,
+    is_nonpublic_location_text,
+    is_secret_text,
+    is_sensitive_field_name,
+)
 
 JSON = dict[str, Any]
-T = TypeVar("T", bound="DomainModel")
+MAX_PUBLIC_METADATA_TEXT_BYTES = 512
 
 
 class SessionState(str, Enum):
@@ -66,6 +72,29 @@ def _required_text(value: Any, field: str) -> str:
     return value
 
 
+def _public_metadata_text(value: Any, field: str) -> str:
+    value = _required_text(value, field)
+    if len(value.encode("utf-8")) > MAX_PUBLIC_METADATA_TEXT_BYTES:
+        raise FederationValidationError(
+            "metadata-too-large",
+            field,
+            f"must not exceed {MAX_PUBLIC_METADATA_TEXT_BYTES} UTF-8 bytes",
+        )
+    if is_secret_text(value):
+        raise FederationValidationError(
+            "secret-metadata",
+            field,
+            "must not contain credentials or secrets",
+        )
+    if is_nonpublic_location_text(value):
+        raise FederationValidationError(
+            "nonpublic-metadata",
+            field,
+            "must not expose backend paths or physical storage addresses",
+        )
+    return value
+
+
 def _uint(value: Any, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise FederationValidationError("invalid-non-negative-integer", field, "must be a non-negative integer")
@@ -104,7 +133,7 @@ class DomainModel:
     SCHEMA: ClassVar[str]
 
     @classmethod
-    def from_dict(cls: type[T], value: JSON) -> T:
+    def from_dict(cls, value: JSON) -> Self:
         if not isinstance(value, dict):
             raise FederationValidationError("invalid-object", cls.__name__, "must be an object")
         schema = value.get("schema")
@@ -139,8 +168,13 @@ class NodeIdentity(DomainModel):
     identity_version: int
 
     def __post_init__(self) -> None:
-        for name in ("node_id", "display_name", "public_key"):
+        for name in ("node_id", "public_key"):
             object.__setattr__(self, name, _required_text(getattr(self, name), name))
+        object.__setattr__(
+            self,
+            "display_name",
+            _public_metadata_text(self.display_name, "display_name"),
+        )
         object.__setattr__(self, "created_at", _utc(self.created_at, "created_at"))
         object.__setattr__(self, "identity_version", _uint(self.identity_version, "identity_version"))
 
@@ -157,8 +191,18 @@ class Session(DomainModel):
     coordinator_id: str
 
     def __post_init__(self) -> None:
-        for name in ("session_id", "display_name", "created_by_node_id", "coordinator_id"):
+        for name in ("created_by_node_id", "coordinator_id"):
             object.__setattr__(self, name, _required_text(getattr(self, name), name))
+        object.__setattr__(
+            self,
+            "session_id",
+            _public_metadata_text(self.session_id, "session_id"),
+        )
+        object.__setattr__(
+            self,
+            "display_name",
+            _public_metadata_text(self.display_name, "display_name"),
+        )
         try:
             object.__setattr__(self, "state", SessionState(self.state))
         except ValueError as exc:
@@ -181,8 +225,14 @@ class CapabilityAnnouncement(DomainModel):
     announced_at: datetime
 
     def __post_init__(self) -> None:
-        for name in ("capability_id", "node_id", "session_id", "type", "protocol", "protocol_version"):
+        for name in ("node_id", "session_id"):
             object.__setattr__(self, name, _required_text(getattr(self, name), name))
+        for name in ("capability_id", "type", "protocol", "protocol_version"):
+            object.__setattr__(
+                self,
+                name,
+                _public_metadata_text(getattr(self, name), name),
+            )
         try:
             object.__setattr__(self, "status", CapabilityStatus(self.status))
         except ValueError as exc:
@@ -195,19 +245,32 @@ class CapabilityAnnouncement(DomainModel):
             raise FederationValidationError(
                 "invalid-json", "properties", "must contain only JSON-compatible values"
             ) from exc
-        secret_names = {"password", "private_key", "secret", "token", "credential",
-                        "api_key", "authorization", "access_token", "refresh_token",
-                        "client_secret"}
         def contains_secret(value: Any) -> bool:
             if isinstance(value, dict):
-                return any(str(key).lower() in secret_names or contains_secret(item)
+                return any(is_sensitive_field_name(str(key)) or contains_secret(item)
                            for key, item in value.items())
             if isinstance(value, (list, tuple)):
                 return any(contains_secret(item) for item in value)
-            return False
+            return is_secret_text(value)
         if contains_secret(self.properties):
             raise FederationValidationError(
                 "secret-property", "properties", "must not contain credentials or secrets"
+            )
+        def contains_location(value: Any) -> bool:
+            if isinstance(value, dict):
+                return any(
+                    is_nonpublic_location_key(str(key))
+                    or contains_location(item)
+                    for key, item in value.items()
+                )
+            if isinstance(value, (list, tuple)):
+                return any(contains_location(item) for item in value)
+            return is_nonpublic_location_text(value)
+        if contains_location(self.properties):
+            raise FederationValidationError(
+                "nonpublic-property",
+                "properties",
+                "must not expose backend paths or physical storage addresses",
             )
         object.__setattr__(self, "announced_at", _utc(self.announced_at, "announced_at"))
 
@@ -264,7 +327,7 @@ class DatasetCoverage:
         object.__setattr__(self, "missing_ranges", normalized)
 
     @classmethod
-    def from_dict(cls, value: JSON) -> "DatasetCoverage":
+    def from_dict(cls, value: JSON) -> DatasetCoverage:
         known = {field.name for field in fields(cls)}
         missing = [name for name in known if name not in value]
         if missing:
