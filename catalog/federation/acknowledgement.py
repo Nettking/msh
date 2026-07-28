@@ -56,7 +56,7 @@ class AcknowledgementProgress:
     replica_count: int
     acknowledged_provider_ids: frozenset[str] = frozenset()
 
-    def acknowledge(self, provider_id: str) -> "AcknowledgementProgress":
+    def acknowledge(self, provider_id: str) -> AcknowledgementProgress:
         if not isinstance(provider_id, str) or not provider_id:
             raise FederationValidationError("invalid-id", "provider_id", "must be non-empty text")
         if len(self.acknowledged_provider_ids) >= self.replica_count and provider_id not in self.acknowledged_provider_ids:
