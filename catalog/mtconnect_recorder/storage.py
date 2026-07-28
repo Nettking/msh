@@ -1,4 +1,4 @@
-"""Durable raw, normalized, probe, gap, and event storage."""
+"""Durable raw, detailed observation, compatibility snapshot, probe, gap, and event storage."""
 from __future__ import annotations
 
 from hashlib import sha256
@@ -8,11 +8,20 @@ import gzip
 import json
 
 from .model import (
-    MtconnectProtocolError, ParsedBatch, ProbeModel, RawBatchRef, StoredBatch,
-    _read_json, _slug, _utc_now, _write_bytes_atomic, _write_json_atomic,
+    MtconnectProtocolError,
+    ParsedBatch,
+    ProbeModel,
+    RawBatchRef,
+    StoredBatch,
+    _read_json,
+    _slug,
+    _utc_now,
+    _write_bytes_atomic,
+    _write_json_atomic,
     _write_text_atomic,
 )
 from .parsing import parse_probe
+
 
 class DurableRecorderStore:
     def __init__(self, data_dir: Path) -> None:
@@ -20,6 +29,7 @@ class DurableRecorderStore:
         self.root = data_dir / "sources" / "mtconnect_recorder"
         self.raw_root = self.root / "raw"
         self.probe_root = self.root / "probe"
+        self.observation_root = self.root / "observations"
         self.normalized_root = self.root / "jsonl"
         self.gap_root = self.root / "gaps"
         self.event_root = self.root / "events"
@@ -110,20 +120,70 @@ class DurableRecorderStore:
             observation_count=len(batch.observations),
         )
 
-    def store_normalized_batch(
-        self,
-        *,
-        source_name: str,
-        batch: ParsedBatch,
-    ) -> Path:
+    def _batch_location(self, *, source_name: str, batch: ParsedBatch) -> tuple[str, str]:
         if not batch.observations:
-            raise ValueError("Cannot normalize an empty MTConnect observation batch.")
+            raise ValueError("Cannot store an empty MTConnect observation batch.")
         first = batch.first_observation_sequence
         last = batch.last_observation_sequence
         if first is None or last is None:
             raise ValueError("Observation batch does not contain sequence numbers.")
         day = str(batch.observations[0].get("timestamp") or _utc_now())[:10]
-        base_name = f"seq-{first}-{last}-next-{batch.header.next_sequence}"
+        return day, f"seq-{first}-{last}-next-{batch.header.next_sequence}"
+
+    def store_observation_batch(
+        self,
+        *,
+        source_name: str,
+        batch: ParsedBatch,
+    ) -> Path:
+        """Store complete normalized observations outside MSH's wide JSONL scan."""
+
+        day, base_name = self._batch_location(source_name=source_name, batch=batch)
+        path = (
+            self.observation_root
+            / _slug(source_name)
+            / str(batch.header.instance_id)
+            / day
+            / f"{base_name}.ndjson"
+        )
+        text = "".join(
+            json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
+            for record in batch.observations
+        )
+        _write_text_atomic(path, text)
+        return path
+
+    @staticmethod
+    def _signal_key(record: Mapping[str, Any]) -> str:
+        return str(
+            record.get("name")
+            or record.get("data_item_id")
+            or record.get("observation_type")
+            or "unknown"
+        )
+
+    @staticmethod
+    def _signal_value(record: Mapping[str, Any]) -> Any:
+        if record.get("category") == "CONDITION":
+            return record.get("condition_level") or record.get("native_value")
+        return record.get("value")
+
+    def store_normalized_batch(
+        self,
+        *,
+        source_name: str,
+        batch: ParsedBatch,
+        initial_values: Mapping[str, Mapping[str, Any]] | None = None,
+    ) -> tuple[Path, dict[str, dict[str, Any]]]:
+        """Write MSH-compatible wide snapshots while retaining every sequence.
+
+        The detailed observation representation is stored separately as NDJSON.
+        This JSONL view carries forward each machine's latest known signal values,
+        so existing MSH live, playback, cache, and analysis paths continue to see
+        columns such as ``Srpm``, ``execution``, and ``Xabs``.
+        """
+
+        day, base_name = self._batch_location(source_name=source_name, batch=batch)
         normalized_path = (
             self.normalized_root
             / _slug(source_name)
@@ -131,12 +191,39 @@ class DurableRecorderStore:
             / day
             / f"{base_name}.jsonl"
         )
+        states: dict[str, dict[str, Any]] = {
+            str(machine): dict(values)
+            for machine, values in (initial_values or {}).items()
+        }
+        snapshots: list[dict[str, Any]] = []
+        for record in batch.observations:
+            machine_id = str(record.get("machine_id") or source_name)
+            state = states.setdefault(machine_id, {})
+            state[self._signal_key(record)] = self._signal_value(record)
+            snapshots.append(
+                {
+                    "schema": "msh.mtconnect.snapshot.v2",
+                    "source": "mtconnect_recorder",
+                    "source_name": source_name,
+                    "source_record_id": f"snapshot:{record.get('source_record_id')}",
+                    "machine": record.get("machine") or source_name,
+                    "machine_id": machine_id,
+                    "agent_instance_id": batch.header.instance_id,
+                    "sequence": record.get("sequence"),
+                    "timestamp": record.get("timestamp"),
+                    "received_at": record.get("received_at"),
+                    "changed_data_item_id": record.get("data_item_id"),
+                    "changed_name": record.get("name"),
+                    "changed_category": record.get("category"),
+                    **state,
+                }
+            )
         normalized_text = "".join(
             json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
-            for record in batch.observations
+            for record in snapshots
         )
         _write_text_atomic(normalized_path, normalized_text)
-        return normalized_path
+        return normalized_path, states
 
     def store_batch(
         self,
@@ -145,22 +232,32 @@ class DurableRecorderStore:
         requested_from: int,
         xml_text: str,
         batch: ParsedBatch,
+        initial_values: Mapping[str, Mapping[str, Any]] | None = None,
     ) -> StoredBatch:
+        # The write order is intentional: immutable raw -> detailed normalized
+        # observations -> MSH-compatible snapshots -> caller commits checkpoint.
         raw = self.store_raw_batch(
             source_name=source_name,
             requested_from=requested_from,
             xml_text=xml_text,
             batch=batch,
         )
-        normalized_path = self.store_normalized_batch(
+        observation_path = self.store_observation_batch(
             source_name=source_name,
             batch=batch,
         )
+        normalized_path, latest_values = self.store_normalized_batch(
+            source_name=source_name,
+            batch=batch,
+            initial_values=initial_values,
+        )
         return StoredBatch(
             raw_path=raw.raw_path,
+            observation_path=observation_path,
             normalized_path=normalized_path,
             raw_sha256=raw.raw_sha256,
             observation_count=raw.observation_count,
+            latest_values=latest_values,
         )
 
     def iter_raw_batches(
@@ -180,7 +277,6 @@ class DurableRecorderStore:
             try:
                 raw_path = Path(str(payload["raw_file"]))
                 if not raw_path.exists():
-                    # Support moving the data directory after capture.
                     candidate_name = manifest_path.name.removesuffix(".manifest.json")
                     raw_path = manifest_path.with_name(candidate_name)
                 refs.append(
