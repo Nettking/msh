@@ -22,7 +22,7 @@ MSH can now receive telemetry from more than one source system. Source-specific 
 Recommended source landing layout:
 
 ```text
-data/sources/<source-name>/jsonl/<optional-partitions>/<YYYY-MM-DD>.jsonl
+data/sources/<source-name>/jsonl/<optional-partitions>/<batch>.jsonl
 data/source_state/<source-name>.json
 ```
 
@@ -30,7 +30,7 @@ Examples:
 
 ```text
 data/sources/observer_phoenix/jsonl/2026-07-05.jsonl
-data/sources/mtconnect_recorder/jsonl/IG500/2026-07-05.jsonl
+data/sources/mtconnect_recorder/jsonl/IG500/<instance>/2026-07-05/seq-100-999-next-1000.jsonl
 data/source_state/observer_phoenix.json
 data/source_state/mtconnect_recorder_state.json
 ```
@@ -47,6 +47,32 @@ For source connectors, the strongly recommended fields are:
 - `value` and `unit` — scalar signal value and unit when the source record represents one scalar measurement.
 
 Connectors may add source-specific fields such as `point_id`, `point_name`, `channel`, `channel_name`, `source_machine_path`, `alarm_info`, or MTConnect signal columns. Consumers should tolerate extra columns.
+
+## MTConnect recorder contract
+
+The active MTConnect recorder writes one JSONL line per observation rather than one flattened `/current` snapshot. The durable identity is based on Agent instance and observation sequence, and each row should retain at least:
+
+- `agent_instance_id` and `sequence`;
+- the original observation `timestamp` and local `received_at` time;
+- `data_item_id`, category, type, subtype, and complete observation attributes;
+- original text value plus typed `value`;
+- device UUID, component context, units, and the `/probe` SHA-256 used for enrichment.
+
+The normalized telemetry batch is stored under:
+
+```text
+data/sources/mtconnect_recorder/jsonl/<source>/<instance>/<date>/seq-<first>-<last>-next-<next>.jsonl
+```
+
+The exact MTConnect `/sample` XML is stored separately and is not scanned as telemetry:
+
+```text
+data/sources/mtconnect_recorder/raw/<source>/<instance>/<date>/*.xml.gz
+data/sources/mtconnect_recorder/probe/<source>/<instance>/*.xml.gz
+data/sources/mtconnect_recorder/gaps/<source>/<instance>/*.json
+```
+
+The raw response is written before the normalized batch and before the durable checkpoint advances. On restart, archived-but-uncommitted raw batches are replayed into their deterministic JSONL batch path. If the Agent ring buffer has already overwritten a required range, the recorder writes an explicit gap record instead of silently advancing.
 
 ## Normalized telemetry assumptions
 
@@ -106,3 +132,4 @@ Health scripts often validate raw telemetry availability and sequence behavior. 
 - JSONL records with inconsistent field names may require script-specific handling.
 - Filename-date fallback can include records without timestamps when the whole file has no parseable timestamp and the filename date is in scope.
 - Source connectors are responsible for producing MSH-compatible JSONL. Non-telemetry source metadata should not be written as `.jsonl` under `data/`.
+- MTConnect capture can only be complete while required observations remain in the Agent buffer. Any overwritten interval must be treated as an explicit gap.
