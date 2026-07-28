@@ -19,10 +19,11 @@ from .model import (
     SourceCheckpoint, StoredBatch, _bool_from_env, _float_from_env, _int_from_env,
     _local_name, _parse_sources_text, _read_json, _sources_from_environment,
     _utc_now, _write_json_atomic, normalize_agent_base_url, MtconnectProtocolError,
+    ProbeModel,
 )
 from .parsing import (
     parse_probe, parse_stream_header, parse_streams, plan_sequence,
-    validate_batch_continuity, ProbeModel,
+    validate_batch_continuity,
 )
 from .storage import DurableRecorderStore
 
@@ -154,7 +155,7 @@ class RecorderRuntime:
         if payload.get("schema") != "msh.mtconnect_recorder.checkpoints.v3":
             if payload:
                 log.warning(
-                    "Ignoring legacy recorder state; the lossless recorder will start from "
+                    "Ignoring legacy recorder state; the loss-aware recorder will start from "
                     "the earliest sequence still retained by each Agent."
                 )
             return
@@ -312,7 +313,9 @@ class RecorderRuntime:
                 next_sequence=next_sequence,
                 probe_sha256=probe_sha256,
                 last_raw_file=str(stored.raw_path),
+                last_observation_file=str(stored.observation_path),
                 last_normalized_file=str(stored.normalized_path),
+                latest_values=stored.latest_values,
                 updated_at=_utc_now(),
             )
             self.checkpoints[source_name] = checkpoint
@@ -358,16 +361,31 @@ class RecorderRuntime:
                     f"Archived batch instance mismatch in {ref.raw_path}."
                 )
             validate_batch_continuity(batch, expected)
-            normalized_path = self.store.store_normalized_batch(
+            active_checkpoint = self.checkpoints.get(source_name)
+            initial_values = (
+                active_checkpoint.latest_values
+                if active_checkpoint
+                and active_checkpoint.agent_instance_id == instance_id
+                and active_checkpoint.next_sequence == expected
+                else {}
+            )
+            observation_path = self.store.store_observation_batch(
                 source_name=source_name,
                 batch=batch,
+            )
+            normalized_path, latest_values = self.store.store_normalized_batch(
+                source_name=source_name,
+                batch=batch,
+                initial_values=initial_values,
             )
             machine_id = str(batch.observations[0].get("machine_id") or source_name)
             stored = StoredBatch(
                 raw_path=ref.raw_path,
+                observation_path=observation_path,
                 normalized_path=normalized_path,
                 raw_sha256=ref.raw_sha256,
                 observation_count=ref.observation_count,
+                latest_values=latest_values,
             )
             self._commit_checkpoint(
                 source_name=source_name,
@@ -490,6 +508,13 @@ class RecorderRuntime:
             expected = plan.requested_from
             batches = 0
             last_machine_id = source_name
+            compatibility_values = (
+                checkpoint.latest_values
+                if checkpoint is not None
+                and checkpoint.agent_instance_id == current_header.instance_id
+                and plan.gap_from is None
+                else {}
+            )
 
             while batches < MAX_BATCHES_PER_CYCLE and not self.stop_event.is_set():
                 if expected > current_header.last_sequence:
@@ -531,6 +556,7 @@ class RecorderRuntime:
                     with self.lock:
                         self.gaps_detected += 1
                     expected = batch.header.first_sequence
+                    compatibility_values = {}
                     continue
 
                 if not batch.observations:
@@ -542,6 +568,7 @@ class RecorderRuntime:
                     requested_from=expected,
                     xml_text=sample_xml,
                     batch=batch,
+                    initial_values=compatibility_values,
                 )
                 first_record = batch.observations[0]
                 last_machine_id = str(first_record.get("machine_id") or source_name)
@@ -555,6 +582,7 @@ class RecorderRuntime:
                     stored=stored,
                 )
                 expected = batch.header.next_sequence
+                compatibility_values = stored.latest_values
                 batches += 1
                 log.info(
                     "[%s] committed sequences %s-%s (%s observations)",
@@ -680,6 +708,8 @@ class RecorderRuntime:
                 "max_batches_per_cycle": MAX_BATCHES_PER_CYCLE,
                 "conditions_included": True,
                 "raw_archive_enabled": True,
+                "detailed_observation_archive_enabled": True,
+                "wide_compatibility_jsonl_enabled": True,
             }
         _write_json_atomic(STATUS_FILE, payload)
 
@@ -690,7 +720,7 @@ class RecorderRuntime:
         self.refresh_configuration(force=True)
         self.publish_status(force=True)
 
-        log.info("Lossless MTConnect recorder started; managed=%s", MANAGED_MODE)
+        log.info("Loss-aware MTConnect recorder started; managed=%s", MANAGED_MODE)
         log.info("Data directory: %s", DATA_DIR)
         log.info("Batch size: %s", BATCH_SIZE)
         if MANAGED_MODE:
@@ -718,7 +748,7 @@ class RecorderRuntime:
                 self.message = "Recorder service is shutting down."
             self.publish_status(force=True)
             self.executor.shutdown(wait=True, cancel_futures=True)
-            log.info("Lossless MTConnect recorder stopped")
+            log.info("Loss-aware MTConnect recorder stopped")
 
     def request_stop(self, signum: int | None = None, frame: Any = None) -> None:
         del frame
