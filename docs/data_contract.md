@@ -50,7 +50,30 @@ Connectors may add source-specific fields such as `point_id`, `point_name`, `cha
 
 ## MTConnect recorder contract
 
-The active MTConnect recorder writes one JSONL line per observation rather than one flattened `/current` snapshot. The durable identity is based on Agent instance and observation sequence, and each row should retain at least:
+The active MTConnect recorder maintains two normalized representations in
+addition to the immutable raw XML archive.
+
+The MSH-compatible scan path contains one wide state snapshot per MTConnect
+observation sequence:
+
+```text
+data/sources/mtconnect_recorder/jsonl/<source>/<instance>/<date>/seq-<first>-<last>-next-<next>.jsonl
+```
+
+Each observation updates its named signal and carries forward the latest known
+values for the same machine. This preserves the wide columns expected by live,
+playback, cache, and existing analysis code, such as `Srpm`, `execution`, and
+`Xabs`. The latest-value map is part of the durable checkpoint and is reset after
+an Agent instance change or a known sequence gap.
+
+The complete normalized observation stream is stored separately as NDJSON so it
+is not accidentally interpreted as wide telemetry:
+
+```text
+data/sources/mtconnect_recorder/observations/<source>/<instance>/<date>/seq-<first>-<last>-next-<next>.ndjson
+```
+
+Each detailed observation retains at least:
 
 - `agent_instance_id` and `sequence`;
 - the original observation `timestamp` and local `received_at` time;
@@ -58,13 +81,8 @@ The active MTConnect recorder writes one JSONL line per observation rather than 
 - original text value plus typed `value`;
 - device UUID, component context, units, and the `/probe` SHA-256 used for enrichment.
 
-The normalized telemetry batch is stored under:
-
-```text
-data/sources/mtconnect_recorder/jsonl/<source>/<instance>/<date>/seq-<first>-<last>-next-<next>.jsonl
-```
-
-The exact MTConnect `/sample` XML is stored separately and is not scanned as telemetry:
+The exact MTConnect `/sample` XML and model metadata are stored separately and
+are not scanned as telemetry:
 
 ```text
 data/sources/mtconnect_recorder/raw/<source>/<instance>/<date>/*.xml.gz
@@ -72,7 +90,11 @@ data/sources/mtconnect_recorder/probe/<source>/<instance>/*.xml.gz
 data/sources/mtconnect_recorder/gaps/<source>/<instance>/*.json
 ```
 
-The raw response is written before the normalized batch and before the durable checkpoint advances. On restart, archived-but-uncommitted raw batches are replayed into their deterministic JSONL batch path. If the Agent ring buffer has already overwritten a required range, the recorder writes an explicit gap record instead of silently advancing.
+The write order is raw XML, detailed observations, compatible wide snapshots,
+and finally the durable checkpoint. On restart, archived-but-uncommitted raw
+batches are replayed into deterministic output paths. If the Agent ring buffer
+has already overwritten a required range, the recorder writes an explicit gap
+record instead of silently advancing.
 
 ## Normalized telemetry assumptions
 
