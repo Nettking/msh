@@ -73,12 +73,10 @@ jobs:
           catalog/federation/tests/test_phase_d2_postgres.py
           catalog/federation/tests/test_phase_d3_control_plane.py
           catalog/federation/tests/test_phase_d4_write_authority.py
+          catalog/federation/tests/test_phase_d5_logical_storage.py
       - name: Phase 2 unit and integration tests
         run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase2_unit.py catalog/node/tests catalog/relay/tests
       - name: Ruff federation code
-        # The initial CI baseline contains pre-existing style-only findings.
-        # Keep substantive lint coverage active while those are cleaned up in
-        # a dedicated formatting-only change.
         run: >-
           python -m ruff check catalog/federation catalog/node catalog/relay
           --ignore I001,RUF022,B008,C408,PLC0206
@@ -115,3 +113,4 @@ jobs:
           catalog/federation/tests/test_phase2_unit.py
           catalog/federation/tests/test_phase_d3_control_plane.py
           catalog/federation/tests/test_phase_d4_write_authority.py
+          catalog/federation/tests/test_phase_d5_logical_storage.py
