@@ -44,6 +44,7 @@ _SETUP_PATHS = {
     "/server-setup/compare-ai-models",
     "/server-setup/recording/start",
     "/server-setup/recording/stop",
+    "/status/recorder.json",
     "/status/mtconnect-scan",
     "/status/mtconnect-sources",
     "/rescan",
@@ -103,7 +104,19 @@ def _next_path() -> str:
     return url_for("web.overview")
 
 
-def _startup_step_url(step: str, *, next_path: str | None = None) -> str:
+def _startup_step_url(
+    step: str,
+    *,
+    next_path: str | None = None,
+    edit: bool = False,
+) -> str:
+    if edit:
+        return url_for(
+            "web.startup",
+            edit="1",
+            next=next_path or _next_path(),
+            step=step,
+        )
     return url_for("web.startup", next=next_path or _next_path(), step=step)
 
 
@@ -193,7 +206,9 @@ def scan_mtconnect_network():
         if wants_json:
             return jsonify({"ok": False, "message": message}), 400
         flash(message, "error")
-        return redirect(url_for("web.status") + "#mtconnect-discovery")
+        return redirect(
+            url_for("web.startup", edit="1", step="recorder")
+        )
 
     message = (
         "Network scan complete: "
@@ -206,7 +221,7 @@ def scan_mtconnect_network():
         message,
         "success",
     )
-    return redirect(url_for("web.status") + "#mtconnect-discovery")
+    return redirect(url_for("web.startup", edit="1", step="recorder"))
 
 
 @server_setup_web.post("/status/mtconnect-sources")
@@ -227,7 +242,7 @@ def save_discovered_mtconnect_sources():
             "Use Start recording when you are ready to collect data.",
             "success",
         )
-    return redirect(url_for("web.status") + "#mtconnect-discovery")
+    return redirect(url_for("web.status") + "#recorder-status")
 
 
 def _save_from_request():
@@ -235,7 +250,7 @@ def _save_from_request():
         _require_setup_csrf()
     except MtconnectDiscoveryError as exc:
         flash(str(exc), "error")
-        return redirect(_startup_step_url("review"))
+        return redirect(_startup_step_url("review", edit=True))
 
     try:
         previous_settings = load_settings()
@@ -269,7 +284,7 @@ def _save_from_request():
         RecorderControlError,
     ) as exc:
         flash(str(exc), "error")
-        return redirect(_startup_step_url("review"))
+        return redirect(_startup_step_url("review", edit=True))
 
     if first_user_setup and settings.deployment_mode == "recorder-only":
         next_path = url_for("web.status") + "#recorder-status"
