@@ -58,7 +58,9 @@ class SourceCheckpoint:
     next_sequence: int
     probe_sha256: str
     last_raw_file: str | None = None
+    last_observation_file: str | None = None
     last_normalized_file: str | None = None
+    latest_values: dict[str, dict[str, Any]] = field(default_factory=dict)
     updated_at: str = field(default_factory=lambda: _utc_now())
 
     @classmethod
@@ -71,11 +73,21 @@ class SourceCheckpoint:
             next_sequence=int(payload["next_sequence"]),
             probe_sha256=str(payload.get("probe_sha256") or ""),
             last_raw_file=(str(payload["last_raw_file"]) if payload.get("last_raw_file") else None),
+            last_observation_file=(
+                str(payload["last_observation_file"])
+                if payload.get("last_observation_file")
+                else None
+            ),
             last_normalized_file=(
                 str(payload["last_normalized_file"])
                 if payload.get("last_normalized_file")
                 else None
             ),
+            latest_values={
+                str(machine): dict(values)
+                for machine, values in (payload.get("latest_values") or {}).items()
+                if isinstance(values, Mapping)
+            },
             updated_at=str(payload.get("updated_at") or _utc_now()),
         )
 
@@ -87,7 +99,9 @@ class SourceCheckpoint:
             "next_sequence": self.next_sequence,
             "probe_sha256": self.probe_sha256,
             "last_raw_file": self.last_raw_file,
+            "last_observation_file": self.last_observation_file,
             "last_normalized_file": self.last_normalized_file,
+            "latest_values": self.latest_values,
             "updated_at": self.updated_at,
         }
 
@@ -107,9 +121,11 @@ class RawBatchRef:
 @dataclass(frozen=True)
 class StoredBatch:
     raw_path: Path
+    observation_path: Path
     normalized_path: Path
     raw_sha256: str
     observation_count: int
+    latest_values: dict[str, dict[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -118,6 +134,11 @@ class SequencePlan:
     gap_from: int | None = None
     gap_to: int | None = None
     reason: str | None = None
+
+
+# ---------------------------------------------------------------------------
+# Environment and filesystem helpers
+# ---------------------------------------------------------------------------
 
 
 def _bool_from_env(name: str, default: bool = False) -> bool:
