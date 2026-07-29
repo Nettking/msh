@@ -587,3 +587,33 @@ checkpoints.
     and idempotent command creation.
 - Safe to resume from current branch head:
   - yes, after the E6.1 commit is created and pushed.
+
+## E6.2 checkpoint record
+
+- Exact base commit: `d30367e` for the E6.2 worktree state before this
+  checkpoint is committed.
+- Current branch: `agent/phase-e-completeness-aware-failover`
+- Draft PR: #122, `Implement Phase E completeness-aware failover`
+- Completed checkpoint: E6.2
+- Current checkpoint: E6.2 validation and idempotent command creation are
+  complete and validated locally.
+- Files changed:
+  - `catalog/federation/phase_d_control.py`
+  - `catalog/federation/tests/test_phase_e6_promotion_transaction.py`
+  - `docs/implementation/phase_e_progress.md`
+- Tests run and exact results:
+  - `python -m compileall -q catalog setup_msh.py` via `.venv\Scripts\python.exe` — passed
+  - `pytest -q catalog/federation/tests/test_phase_e6_promotion_transaction.py` — passed
+  - `pytest -q catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/tests/test_phase_e5_degraded_state.py catalog/federation/tests/test_phase_e6_promotion_transaction.py` — passed
+  - `pytest -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py` — passed
+  - `pytest -q catalog/federation/tests/test_phase2_unit.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_local_storage.py` — passed
+  - `ruff check catalog/federation/phase_d_control.py catalog/federation/promotion_transaction.py catalog/federation/tests/test_phase_e6_promotion_transaction.py` — passed
+- Known failures / limitations:
+  - None for the E6.2 slice after the final validation pass.
+  - This checkpoint does not yet fence or grant authority; that belongs to E6.3+.
+- Remote push status:
+  - Pending for the E6.2 checkpoint.
+- Exact next recommended action:
+  - Commit `Add coordinator controlled storage promotion` for the E6.2 validation checkpoint, push it, and then proceed to E6.3 old-authority fencing.
+- Safe to resume from current branch head:
+  - yes, after the E6.2 commit is created and pushed.

@@ -738,6 +738,18 @@ class PhaseDControlPlane:
             updated_at=row["updated_at"],
         )
 
+    def create_promotion_transaction(self, record: PromotionTransactionRecord) -> PromotionTransactionRecord:
+        existing = self.promotion_transaction(record.session_id, record.group_id, record.promotion_id)
+        if existing is not None:
+            if existing == record:
+                return existing
+            raise FederationValidationError(
+                "conflicting-promotion-command",
+                "promotion_id",
+                "promotion id already exists with different immutable inputs",
+            )
+        return self.upsert_promotion_transaction(record)
+
     def upsert_promotion_transaction(self, record: PromotionTransactionRecord) -> PromotionTransactionRecord:
         with self._connect() as connection:
             connection.execute(
@@ -797,6 +809,63 @@ class PhaseDControlPlane:
             )
             connection.commit()
         return record
+
+    def validate_promotion_transaction_inputs(
+        self,
+        session_id: str,
+        group_id: str,
+        selection: Any,
+        *,
+        promotion_id: str,
+        reported_at: datetime | None = None,
+    ) -> PromotionTransactionRecord:
+        manifest = self.manifest(session_id, group_id)
+        if selection.selected_provider_id is None:
+            raise FederationValidationError("no-qualified-candidate", "selection", selection.reason)
+        assessment = self.latest_storage_replica_assessment(session_id, group_id, selection.selected_provider_id)
+        if assessment is None or assessment.report is None:
+            raise FederationValidationError("missing-assessment", "selection", "selected candidate report is unavailable")
+        if not assessment.accepted or not assessment.eligibility:
+            raise FederationValidationError("candidate-not-eligible", "selection", assessment.eligibility_reason)
+        report = assessment.report
+        if report.manifest_revision != manifest.revision or report.manifest_hash != manifest.manifest_hash:
+            raise FederationValidationError("stale-candidate-report", "report", "selected candidate no longer matches the authoritative manifest")
+        if report.session_id != session_id or report.group_id != group_id:
+            raise FederationValidationError("candidate-mismatch", "report", "selected candidate report does not match the target scope")
+        if report.provider_id != selection.selected_provider_id:
+            raise FederationValidationError("candidate-mismatch", "provider_id", "selected candidate changed")
+        if selection.decision == "storage-degraded":
+            raise FederationValidationError("storage-degraded", "selection", selection.reason)
+        if selection.selected_provider_id not in selection.candidate_provider_ids:
+            raise FederationValidationError("candidate-mismatch", "selection", "selected candidate is not in the candidate set")
+        current = self.snapshot(session_id).leader_grants.get(group_id)
+        previous_provider_id = None if current is None else str(current["provider_id"])
+        previous_term = None if current is None else int(current["term"])
+        return PromotionTransactionRecord(
+            schema="msh.storage_promotion_transaction.v1",
+            promotion_id=promotion_id,
+            session_id=session_id,
+            group_id=group_id,
+            selected_provider_id=report.provider_id,
+            selected_report_hash=report.report_hash(),
+            selected_report_revision=report.report_revision,
+            selected_manifest_revision=manifest.revision,
+            selected_manifest_hash=manifest.manifest_hash,
+            previous_provider_id=previous_provider_id,
+            previous_term=previous_term,
+            reserved_term=None,
+            fencing_status="not-started",
+            fencing_acknowledged=False,
+            fencing_ack_identity=None,
+            grant_id=None,
+            grant_status="not-started",
+            grant_acknowledged=False,
+            grant_ack_identity=None,
+            state="validated",
+            failure_code=None,
+            failure_reason=None,
+            updated_at=reported_at or datetime.now(timezone.utc),
+        )
 
     def submit_storage_replica_report(
         self,
