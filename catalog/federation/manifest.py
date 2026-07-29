@@ -108,6 +108,14 @@ def _schema(value: Any) -> str:
     return MANIFEST_SCHEMA
 
 
+def _sequence_range(value: SequenceRange | dict[str, int] | tuple[int, int]) -> SequenceRange:
+    if isinstance(value, SequenceRange):
+        return value
+    if isinstance(value, tuple) and len(value) == 2:
+        return SequenceRange(start=value[0], end=value[1])
+    return SequenceRange.from_dict(value)
+
+
 @dataclass(frozen=True, order=True)
 class SequenceRange:
     """An inclusive source-sequence interval."""
@@ -143,6 +151,64 @@ class SequenceRange:
 
     def to_dict(self) -> dict[str, int]:
         return {"start": self.start, "end": self.end}
+
+
+def normalize_sequence_ranges(
+    ranges: tuple[SequenceRange | dict[str, int], ...],
+) -> tuple[SequenceRange, ...]:
+    """Return sorted, merged, non-overlapping inclusive ranges."""
+
+    normalized = sorted(
+        _sequence_range(value)
+        for value in ranges
+    )
+    if not normalized:
+        return ()
+    merged: list[SequenceRange] = [normalized[0]]
+    for current in normalized[1:]:
+        previous = merged[-1]
+        if current.start <= previous.end + 1:
+            merged[-1] = SequenceRange(previous.start, max(previous.end, current.end))
+        else:
+            merged.append(current)
+    return tuple(merged)
+
+
+def subtract_sequence_ranges(
+    source: tuple[SequenceRange, ...],
+    removed: tuple[SequenceRange | dict[str, int] | tuple[int, int], ...],
+) -> tuple[SequenceRange, ...]:
+    """Subtract inclusive ranges deterministically from an ordered coverage set."""
+
+    remaining = list(normalize_sequence_ranges(source))
+    for gap in normalize_sequence_ranges(removed):
+        next_remaining: list[SequenceRange] = []
+        for current in remaining:
+            if gap.end < current.start or gap.start > current.end:
+                next_remaining.append(current)
+                continue
+            if gap.start > current.start:
+                next_remaining.append(SequenceRange(current.start, gap.start - 1))
+            if gap.end < current.end:
+                next_remaining.append(SequenceRange(gap.end + 1, current.end))
+        remaining = next_remaining
+    return tuple(normalize_sequence_ranges(tuple(remaining)))
+
+
+def _coverage_from_sequences(
+    committed: tuple[SequenceRange | dict[str, int], ...],
+) -> tuple[int | None, tuple[SequenceRange, ...]]:
+    normalized = normalize_sequence_ranges(committed)
+    if not normalized:
+        return None, ()
+    watermark = normalized[0].end
+    missing: list[SequenceRange] = []
+    previous_end = normalized[0].end
+    for current in normalized[1:]:
+        if current.start > previous_end + 1:
+            missing.append(SequenceRange(previous_end + 1, current.start - 1))
+        previous_end = current.end
+    return watermark, tuple(missing)
 
 
 class ManifestItemKind(str, Enum):
@@ -464,6 +530,50 @@ class DatasetManifest:
             "last_contiguous_sequence": self.last_contiguous_sequence,
             "missing_ranges": [value.to_dict() for value in self.missing_ranges],
         }
+
+    def with_committed_sequences(
+        self,
+        committed_ranges: tuple[
+            SequenceRange | dict[str, int] | tuple[int, int], ...
+        ],
+    ) -> Self:
+        """Return a new dataset manifest with deterministic coverage evidence."""
+
+        last_contiguous_sequence, missing_ranges = _coverage_from_sequences(
+            committed_ranges,
+        )
+        return DatasetManifest(
+            dataset_id=self.dataset_id,
+            schema_name=self.schema_name,
+            schema_version=self.schema_version,
+            required=self.required,
+            source_id=self.source_id,
+            last_contiguous_sequence=last_contiguous_sequence,
+            missing_ranges=missing_ranges,
+        )
+
+    def fill_missing_ranges(
+        self,
+        filled_ranges: tuple[
+            SequenceRange | dict[str, int] | tuple[int, int], ...
+        ],
+    ) -> Self:
+        """Return a new dataset manifest after deterministically filling gaps."""
+
+        if self.last_contiguous_sequence is None:
+            return self.with_committed_sequences(filled_ranges)
+        normalized = subtract_sequence_ranges(self.missing_ranges, filled_ranges)
+        if normalized == self.missing_ranges:
+            return self
+        return DatasetManifest(
+            dataset_id=self.dataset_id,
+            schema_name=self.schema_name,
+            schema_version=self.schema_version,
+            required=self.required,
+            source_id=self.source_id,
+            last_contiguous_sequence=self.last_contiguous_sequence,
+            missing_ranges=normalized,
+        )
 
 
 @dataclass(frozen=True)

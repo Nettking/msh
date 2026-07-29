@@ -41,7 +41,7 @@ has been verified. Do not build from the older Phase D branches.
 | --- | --- | --- |
 | E0 | Completed | Contract and acceptance mapping; pure completeness contracts |
 | E1 | Completed | Authoritative manifest persistence and storage-commit integration |
-| E2 | Remaining | Watermarks, missing ranges, conflicts, restart persistence |
+| E2 | In progress | Watermarks, missing ranges, conflicts, restart persistence |
 | E3 | Remaining | Authenticated replica integrity and eligibility reporting |
 | E4 | Remaining | Deterministic complete-candidate selection |
 | E5 | Remaining | Durable safe `storage-degraded` state |
@@ -51,8 +51,8 @@ has been verified. Do not build from the older Phase D branches.
 
 Completed checkpoints: E0, E1.
 
-Current checkpoint: none. E1 is complete and validated; E2 is the next
-checkpoint and has not been started.
+Current checkpoint: E2. E1 is complete and validated; E2 work is scoped to
+authoritative watermarks, missing ranges, and restart-safe persistence.
 
 ## Acceptance mapping
 
@@ -368,3 +368,40 @@ only as one integrated authoritative-manifest unit. If interruption occurs
 before that push, the last remote-safe head remains green E0 commit
 `dd923bc30dc5f60b0133bfd90cba312bd596a2b5`. The exact base and stacked-PR
 dependency are recorded above.
+
+## E2 checkpoint update
+
+The current task is implementing E2 only. The working tree now contains a
+coherent E2 coverage layer built on top of the frozen E1 manifest chain:
+
+- `catalog/federation/manifest.py` adds inclusive range normalization,
+  subtraction, and dataset coverage helpers.
+- `catalog/federation/manifest_store.py` adds restart-safe dataset coverage
+  updates persisted as new authoritative manifest revisions.
+- `catalog/federation/tests/test_phase_e2_watermarks.py` covers empty datasets,
+  first committed range, contiguous append, gaps, gap filling, adjacent merge,
+  overlapping evidence, restart reconstruction, multi-dataset isolation, and
+  malformed input.
+
+Exact validation for the E2 checkpoint so far:
+
+- `42 passed in 10.14s` for the focused E0/E1/E2 suite.
+- `64 passed in 7.17s` for `catalog/federation/tests/test_phase0.py` and
+  `catalog/federation/tests/test_phase1.py`.
+- `28 passed in 8.71s` for `catalog/federation/tests/test_phase2_unit.py`.
+- `5 passed in 3.85s` for `catalog/federation/tests/test_phase_d6_replication.py`.
+- `10 passed in 3.50s` for `catalog/federation/tests/test_local_storage.py`.
+- `All checks passed!` for Ruff on the changed Python files.
+- `python -m compileall -q catalog setup_msh.py` passed.
+
+Known limitation:
+
+- `catalog/federation/tests/test_phase_d2_postgres.py` started locally but did
+  not complete in this environment before the checkpoint was paused, so
+  PostgreSQL-backed validation remains unresolved here.
+
+Exact next recommended action:
+
+Commit the E2 checkpoint, push it on `agent/phase-e-completeness-aware-failover`,
+and update draft PR #122 with the E2 summary and the PostgreSQL environment
+limitation.

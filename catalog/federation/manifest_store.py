@@ -191,6 +191,20 @@ class ManifestCommitResult:
 
 
 @dataclass(frozen=True)
+class DatasetCoverageUpdate:
+    session_id: str
+    group_id: str
+    dataset_id: str
+    schema_name: str
+    schema_version: int
+    required: bool
+    source_id: str | None
+    committed_ranges: tuple[tuple[int, int], ...]
+    expected_control_revision: int
+    updated_at: datetime
+
+
+@dataclass(frozen=True)
 class ManifestCommitIntent:
     """Coordinator-retained immutable metadata prepared before provider write."""
 
@@ -1058,6 +1072,141 @@ class AuthoritativeManifestStore:
             for intent in intents
             if intent.primary_provider_id == provider_id
         )
+
+    def update_dataset_coverage(
+        self,
+        update: DatasetCoverageUpdate,
+    ) -> ManifestCommitResult:
+        """Persist a deterministic coverage revision for one dataset."""
+
+        if not isinstance(update, DatasetCoverageUpdate):
+            raise FederationValidationError(
+                "invalid-object",
+                "update",
+                "must be DatasetCoverageUpdate",
+            )
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._check_control_revision(
+                    connection,
+                    update.session_id,
+                    update.expected_control_revision,
+                )
+                self._require_group(connection, update.session_id, update.group_id)
+                head = self._head(connection, update.session_id, update.group_id)
+                existing_dataset = next(
+                    (
+                        dataset
+                        for dataset in head.datasets
+                        if dataset.dataset_id == update.dataset_id
+                    ),
+                    None,
+                )
+                if existing_dataset is None:
+                    dataset = DatasetManifest(
+                        dataset_id=update.dataset_id,
+                        schema_name=update.schema_name,
+                        schema_version=update.schema_version,
+                        required=update.required,
+                        source_id=update.source_id,
+                        last_contiguous_sequence=None,
+                        missing_ranges=(),
+                    ).with_committed_sequences(update.committed_ranges)
+                else:
+                    if (
+                        existing_dataset.schema_name != update.schema_name
+                        or existing_dataset.schema_version
+                        != update.schema_version
+                        or existing_dataset.required != update.required
+                        or existing_dataset.source_id != update.source_id
+                    ):
+                        raise FederationValidationError(
+                            "manifest-dataset-conflict",
+                            "dataset_id",
+                            "coverage update conflicts with the authoritative dataset contract",
+                        )
+                    dataset = existing_dataset.with_committed_sequences(
+                        update.committed_ranges
+                    )
+                if dataset == existing_dataset:
+                    return ManifestCommitResult(head, head.revision, False)
+                datasets = tuple(
+                    dataset if value.dataset_id == dataset.dataset_id else value
+                    for value in head.datasets
+                )
+                if existing_dataset is None:
+                    datasets = (*datasets, dataset)
+                manifest = AuthoritativeStorageManifest.build(
+                    session_id=update.session_id,
+                    group_id=update.group_id,
+                    revision=head.revision + 1,
+                    term=head.term,
+                    previous_manifest_hash=head.manifest_hash,
+                    datasets=datasets,
+                    items=head.items,
+                    updated_at=update.updated_at,
+                )
+                connection.execute(
+                    """INSERT INTO storage_manifest_revisions
+                       (session_id, group_id, revision, term,
+                        previous_manifest_hash, manifest_hash, commit_state,
+                        manifest_json, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        update.session_id,
+                        update.group_id,
+                        manifest.revision,
+                        manifest.term,
+                        manifest.previous_manifest_hash,
+                        manifest.manifest_hash,
+                        manifest.commit_state.value,
+                        _json(manifest.to_dict()),
+                        _timestamp(manifest.updated_at),
+                    ),
+                )
+                connection.execute(
+                    """INSERT INTO storage_manifest_datasets
+                       (session_id, group_id, dataset_id, dataset_json,
+                        introduced_revision)
+                       VALUES (?, ?, ?, ?, ?)
+                       ON CONFLICT(session_id, group_id, dataset_id)
+                       DO UPDATE SET
+                         dataset_json=excluded.dataset_json,
+                         introduced_revision=excluded.introduced_revision""",
+                    (
+                        update.session_id,
+                        update.group_id,
+                        dataset.dataset_id,
+                        _json(dataset.to_dict()),
+                        manifest.revision,
+                    ),
+                )
+                updated = connection.execute(
+                    """UPDATE storage_manifest_heads
+                       SET revision=?, manifest_hash=?
+                       WHERE session_id=? AND group_id=? AND revision=?
+                         AND manifest_hash=?""",
+                    (
+                        manifest.revision,
+                        manifest.manifest_hash,
+                        update.session_id,
+                        update.group_id,
+                        head.revision,
+                        head.manifest_hash,
+                    ),
+                )
+                if updated.rowcount != 1:
+                    raise FederationValidationError(
+                        "concurrent-manifest-change",
+                        "revision",
+                        "manifest head changed while coverage was being updated",
+                    )
+                connection.commit()
+                return ManifestCommitResult(manifest, manifest.revision, True)
+            except Exception:
+                connection.rollback()
+                raise
 
     def finalize_intent(
         self,
