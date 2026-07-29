@@ -538,6 +538,9 @@ branch is ready for remote verification and CI follow-up.
 - Known failures / limitations:
   - None for the E5 slice after the final validation pass.
   - PR and CI verification still require GitHub access from a machine with GitHub CLI or browser access.
+- Remote push status:
+  - E5 commit `231d39f` is pushed to `origin/agent/phase-e-completeness-aware-failover`.
+  - GitHub Actions / PR status were not directly inspectable from this environment.
 - Exact next recommended action:
   - Commit `Add safe storage degraded state`, push it, and then verify PR #122 and CI from GitHub.
 - Safe to resume from current branch head:
