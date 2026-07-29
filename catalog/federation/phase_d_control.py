@@ -31,6 +31,7 @@ from .promotion_finalization import (
     PROMOTION_FINALIZATION_SCHEMA,
     PromotionFinalizationRecord,
 )
+from .promotion_recovery import PromotionRecoveryResult, recover_storage_promotion
 from .promotion_transaction import PromotionTransactionRecord
 from .provider_fencing import (
     ProviderFenceStore,
@@ -900,6 +901,29 @@ class PhaseDControlPlane:
             updated_at=reported_at or datetime.now(timezone.utc),
         )
 
+    def revalidate_promotion_bindings(self, record: PromotionTransactionRecord) -> None:
+        manifest = self.manifest(record.session_id, record.group_id)
+        assessment = self.latest_storage_replica_assessment(
+            record.session_id,
+            record.group_id,
+            record.selected_provider_id,
+        )
+        if (
+            manifest.revision != record.selected_manifest_revision
+            or manifest.manifest_hash != record.selected_manifest_hash
+            or assessment is None
+            or assessment.report is None
+            or assessment.report_revision != record.selected_report_revision
+            or assessment.report_hash != record.selected_report_hash
+            or not assessment.accepted
+            or not assessment.eligibility
+        ):
+            raise FederationValidationError(
+                "stale-promotion-binding",
+                "promotion_id",
+                "durable manifest or selected report no longer matches the promotion",
+            )
+
     @staticmethod
     def _promotion_fence_idempotency_key(record: PromotionTransactionRecord) -> str:
         payload = (
@@ -1694,6 +1718,65 @@ class PhaseDControlPlane:
             "missing_ranges": list(finalization.missing_ranges),
             "obligations": finalization.recovery_obligations,
         }
+
+    def fail_promotion_transaction(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+        *,
+        failure_code: str,
+        failure_reason: str,
+        now: datetime | None = None,
+    ) -> PromotionTransactionRecord:
+        record = self.promotion_transaction(session_id, group_id, promotion_id)
+        if record is None:
+            raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction does not exist")
+        if record.state == "finalized":
+            raise FederationValidationError("promotion-finalized", "state", "completed promotion cannot be failed")
+        if record.state == "failed":
+            if record.failure_code == failure_code and record.failure_reason == failure_reason:
+                return record
+            raise FederationValidationError(
+                "conflicting-promotion-failure",
+                "failure_code",
+                "failed transaction already has different durable diagnostics",
+            )
+        return self.upsert_promotion_transaction(
+            PromotionTransactionRecord(
+                **{
+                    **record.to_dict(),
+                    "state": "failed",
+                    "failure_code": failure_code,
+                    "failure_reason": failure_reason,
+                    "updated_at": _utc(now),
+                }
+            )
+        )
+
+    def recover_promotion(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+        *,
+        provider_fence_store: ProviderFenceStore,
+        selected_provider_store: ProviderFenceStore,
+        fencing_delivery_available: bool = True,
+        grant_delivery_available: bool = True,
+        now: datetime | None = None,
+    ) -> PromotionRecoveryResult:
+        return recover_storage_promotion(
+            self,
+            session_id,
+            group_id,
+            promotion_id,
+            provider_fence_store=provider_fence_store,
+            selected_provider_store=selected_provider_store,
+            fencing_delivery_available=fencing_delivery_available,
+            grant_delivery_available=grant_delivery_available,
+            now=now,
+        )
 
     def submit_storage_replica_report(
         self,

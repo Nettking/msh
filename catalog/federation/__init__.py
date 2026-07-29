@@ -70,6 +70,10 @@ from .promotion_finalization import (
     PROMOTION_FINALIZATION_SCHEMA,
     PromotionFinalizationRecord,
 )
+from .promotion_recovery import (
+    PromotionRecoveryResult,
+    recover_storage_promotion,
+)
 from .provider_fencing import (
     PROVIDER_FENCE_SCHEMA,
     PROVIDER_GRANT_SCHEMA,
@@ -220,6 +224,7 @@ __all__ = [
     "PhaseDStorageService",
     "PostgreSQLBatchStorageProvider",
     "PromotionFinalizationRecord",
+    "PromotionRecoveryResult",
     "ProviderError",
     "ProviderErrorCode",
     "ProviderFenceStore",
@@ -272,6 +277,7 @@ __all__ = [
     "assess_storage_replica_report",
     "classify_idempotent_ingest",
     "evaluate_storage_promotion_candidate",
+    "recover_storage_promotion",
     "select_storage_leader",
     "select_storage_promotion_candidate",
     "validate_primary_write",

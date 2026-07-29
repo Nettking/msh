@@ -888,3 +888,114 @@ checkpoints.
     then explicitly approve E6.6.
 - Safe to resume from current branch head:
   - yes; E6.5 is pushed and no E6.6 or E7 runtime work is present.
+
+## E6.6 checkpoint record
+
+- Phase E objective:
+  - Recover coordinator-controlled storage promotion deterministically from
+    durable coordinator and provider evidence without repeating completed
+    side effects or weakening completeness and fencing guarantees.
+- Exact base commit: `3cd9c0fdb19e3f777d85c0264b5bfdff25ead2a0`.
+- Current branch: `agent/phase-e-completeness-aware-failover`.
+- Draft PR: #122, `Implement Phase E completeness-aware failover`.
+- Completed checkpoints: E0, E1, E2, E3, E4, E5, E6 design, E6.1, E6.2,
+  E6.3, E6.4, E6.5, and E6.6.
+- Current checkpoint:
+  - E6.6 full restart recovery and duplicate reconciliation are complete and
+    validated locally. Commit and push remain for publication.
+- Remaining checkpoints:
+  - E7 returning former-primary recovery and relay-first catch-up.
+  - E8 diagnostics and end-to-end acceptance.
+- Architectural decisions:
+  - `PhaseDControlPlane.recover_promotion()` is the single recovery entry
+    point. It repeatedly re-reads durable transaction state and advances only
+    through already approved E6 boundaries.
+  - Recovery calls for one database/session/group/promotion serialize through
+    a process-wide keyed lock. Each durable operation is also idempotent, so
+    duplicate and restarted control-plane instances converge on the same
+    provider evidence, reserved term, grant, and finalization.
+  - Provider evidence is reconciled before delivery. Existing fence or grant
+    records are treated as lost-response evidence and acknowledged without
+    sending a second logical command.
+  - Temporary provider unavailability persists retryable diagnostics while
+    leaving the transaction at `validated` or `allocated-term`; it never marks
+    the promotion failed.
+  - Explicit durable failure uses `fail_promotion_transaction()` and preserves
+    all accumulated fencing evidence, reserved term, degraded state, and
+    operator-readable failure diagnostics.
+  - Corrupt, impossible, contradictory, stale, or coordinator-ahead state
+    returns `operator-attention` and performs no authority-producing action.
+  - Recovery does not mutate the manifest, remove E7 obligations, implement
+    former-primary catch-up, or begin E7.
+- Files changed:
+  - `catalog/federation/promotion_recovery.py`
+  - `catalog/federation/phase_d_control.py`
+  - `catalog/federation/__init__.py`
+  - `catalog/federation/tests/test_phase_e66_recovery.py`
+  - `docs/implementation/phase_e_progress.md`
+- Recovery entry point and stage mapping:
+  - `validated` / fencing delivery pending:
+    - reconcile provider fence; otherwise deliver the stable fence command;
+      persist its exact acknowledgement.
+  - provider fence durable but coordinator behind:
+    - record the existing provider acknowledgement without redelivery.
+  - `fenced-old-authority`:
+    - revalidate fence evidence and reserve the one durable increasing term.
+  - `allocated-term` / grant delivery pending:
+    - reconcile the provider grant; otherwise deliver the stable logical grant;
+      persist its exact acknowledgement.
+  - provider grant durable but coordinator behind:
+    - record the existing provider acknowledgement without redelivery.
+  - `granted-new-authority`:
+    - revalidate the complete chain and persist finalization.
+  - `finalized` with degraded state pending:
+    - clear only the matching captured degraded record.
+  - completed `finalized`:
+    - return the existing finalization unchanged.
+  - `failed`:
+    - return the durable failure code and reason without retry.
+- Retryable versus failed-state rules:
+  - missing evidence before delivery with an unavailable provider is
+    `retryable`;
+  - provider evidence expected by an advanced coordinator stage but missing or
+    mismatched is `operator-attention`;
+  - only an explicit unrecoverable failure transition creates durable
+    `failed`, with stable code and reason.
+- Corruption handling:
+  - stage/evidence shape is validated before every action;
+  - corrupt transaction hashes, fence records, reservations, grants,
+    finalizations, impossible ordering, and coordinator-ahead combinations
+    fail closed as `operator-attention`;
+  - degraded state remains intact on every corrupt or failed path.
+- Duplicate and concurrent behavior:
+  - repeated completed recovery returns the same durable result;
+  - lost fence and grant responses reconcile existing provider evidence;
+  - concurrent attempts serialize and create one finalization row, one
+    reserved term, and one provider grant;
+  - no duplicate logical fence, term, grant, or unrelated degraded clear is
+    produced.
+- Tests run and exact results:
+  - `.venv\Scripts\python.exe -m compileall -q catalog setup_msh.py` — passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py catalog/federation/tests/test_phase_e65_finalization.py catalog/federation/tests/test_phase_e66_recovery.py`
+    — 93 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/tests/test_phase_e5_degraded_state.py catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py catalog/federation/tests/test_phase_e65_finalization.py catalog/federation/tests/test_phase_e66_recovery.py`
+    — 148 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py`
+    — 64 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase2_unit.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_local_storage.py`
+    — 43 passed.
+  - `.venv\Scripts\python.exe -m ruff check catalog/federation/__init__.py catalog/federation/phase_d_control.py catalog/federation/promotion_recovery.py catalog/federation/promotion_finalization.py catalog/federation/provider_fencing.py catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py catalog/federation/tests/test_phase_e65_finalization.py catalog/federation/tests/test_phase_e66_recovery.py`
+    — passed.
+  - `git diff --check` — passed; only expected LF-to-CRLF working-copy
+    notices were emitted.
+- Known failures:
+  - None in the required local E6.6 validation.
+- Unresolved questions:
+  - E6 must be independently reviewed and explicitly declared complete before
+    E7 begins.
+- Exact next recommended action:
+  - Commit as `Add restart safe storage promotion recovery`, push immediately,
+    update PR #122, verify GitHub Actions, and wait for explicit E6 completion
+    review. Do not begin E7.
+- Safe to resume from current branch head:
+  - yes after the E6.6 commit is pushed; no E7 runtime work is present.
