@@ -68,7 +68,10 @@ from .phase_d_service import PhaseDStorageService
 from .postgres_storage import PostgreSQLBatchStorageProvider
 from .provider_fencing import (
     PROVIDER_FENCE_SCHEMA,
+    PROVIDER_GRANT_SCHEMA,
     ProviderFenceStore,
+    StorageAuthorityGrantAcknowledgement,
+    StorageAuthorityGrantCommand,
     StorageFenceAcknowledgement,
     StorageFenceCommand,
 )
@@ -149,6 +152,7 @@ __all__ = [
     "MANIFEST_SCHEMA",
     "PHASE_D_SERVICE_REPLICATION_OWNER",
     "PROVIDER_FENCE_SCHEMA",
+    "PROVIDER_GRANT_SCHEMA",
     "RECORDER_STORAGE_SCHEMA",
     "RELAY_STORAGE_KIND",
     "REPLICATION_SCHEMA",
@@ -226,6 +230,8 @@ __all__ = [
     "Session",
     "SessionEvent",
     "SessionState",
+    "StorageAuthorityGrantAcknowledgement",
+    "StorageAuthorityGrantCommand",
     "StorageBatch",
     "StorageCommitStatus",
     "StorageControlPlaneSnapshot",

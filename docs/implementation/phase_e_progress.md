@@ -697,3 +697,102 @@ checkpoints.
     and only then explicitly approve E6.4.
 - Safe to resume from current branch head:
   - yes; E6.3 is pushed and no E6.4 runtime work is present.
+
+## E6.4 checkpoint record
+
+- Phase E objective:
+  - Promote storage authority only from complete, authenticated evidence while
+    durably fencing obsolete writers, allocating monotonic terms, and
+    preserving manifest and recovery state.
+- Exact base commit: `c9bf9708c94ccfca1aa0c5cbbbdd5c0a30f55337`.
+- Current branch: `agent/phase-e-completeness-aware-failover`.
+- Draft PR: #122, `Implement Phase E completeness-aware failover`.
+- Completed checkpoints: E0, E1, E2, E3, E4, E5, E6 design, E6.1, E6.2,
+  E6.3, and E6.4.
+- Current checkpoint:
+  - E6.4 strictly increasing term reservation and idempotent provider-local
+    new-authority grant are complete and validated locally. Commit and push
+    remain for publication.
+- Remaining checkpoints:
+  - E6.5 finalization and degraded-state exit.
+  - E6.6 full recovery and failure reconciliation.
+  - E7 and E8 remain unstarted.
+- Architectural decisions:
+  - Term reservation is a coordinator SQLite `BEGIN IMMEDIATE` transaction
+    that updates the promotion record and the group term counter together.
+  - The reserved term is one greater than the maximum previous authority term,
+    provider fencing high-water term, durable counter, all promotion
+    reservations, and all observed control-plane grant events for the group.
+  - Duplicate or restarted reservation reuses the immutable reserved term and
+    stable grant ID; a promotion never allocates a second term.
+  - Grant identity and idempotency identity bind promotion, session, group,
+    selected provider, reserved term, manifest revision/hash, and selected
+    report revision/hash.
+  - The provider stores one logical grant durably with `synchronous=FULL`
+    before acknowledging. Retry and lost-response recovery return the original
+    persisted acknowledgement.
+  - Provider-local fence and grant ledgers reject fenced, stale, duplicate, and
+    conflicting authority. The coordinator advances only after authenticated,
+    exact, provider-local durable grant evidence.
+  - E6.4 does not modify assignment or coordinator leader-grant events, does
+    not clear `storage-degraded`, and does not finalize the promotion.
+- Files changed:
+  - `catalog/federation/provider_fencing.py`
+  - `catalog/federation/phase_d_control.py`
+  - `catalog/federation/__init__.py`
+  - `catalog/federation/tests/test_phase_e64_authority_grant.py`
+  - `docs/implementation/phase_e_progress.md`
+- Term-reservation persistence rules:
+  - reservation is allowed only from `fenced-old-authority`;
+  - the exact provider-local fence record and acknowledgement identity are
+    revalidated before allocation and before grant delivery;
+  - `reserved_term`, stable `grant_id`, `grant_status=reserved`, and
+    `state=allocated-term` commit before any provider grant attempt;
+  - corrupt or non-increasing reservations fail closed;
+  - all later attempts reuse the original reservation.
+- Provider-side durable grant state:
+  - session, group, provider, promotion, term, manifest revision/hash, report
+    revision/hash, stable grant ID, idempotency key, acknowledgement identity,
+    and persistence timestamp.
+- Grant acknowledgement validation:
+  - the authenticated node must own the selected provider;
+  - every immutable command field and acknowledgement identity must match the
+    persisted E6 transaction;
+  - current authoritative manifest and selected report must still match the
+    transaction;
+  - provider-local durable evidence must exactly equal the received
+    acknowledgement;
+  - missing, stale, corrupt, mismatched, conflicting, or unauthenticated
+    evidence fails closed.
+- Duplicate and restart behavior:
+  - reservation survives restart and never allocates a replacement term;
+  - duplicate grant delivery returns the same acknowledgement;
+  - a lost acknowledgement is recovered from provider-local durable state;
+  - restart before delivery, after provider persistence, and after coordinator
+    acknowledgement all resume deterministically;
+  - retryable delivery failure preserves the reservation, degraded state, and
+    recovery obligations.
+- Tests run and exact results:
+  - `.venv\Scripts\python.exe -m compileall -q catalog setup_msh.py` — passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py`
+    — 47 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/tests/test_phase_e5_degraded_state.py catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py`
+    — 102 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py`
+    — 64 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase2_unit.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_local_storage.py`
+    — 43 passed.
+  - `.venv\Scripts\python.exe -m ruff check catalog/federation/__init__.py catalog/federation/phase_d_control.py catalog/federation/provider_fencing.py catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py`
+    — passed.
+  - `git diff --check` — passed; only expected LF-to-CRLF working-copy
+    notices were emitted.
+- Known failures:
+  - None in the required local E6.4 validation.
+- Unresolved questions:
+  - None for E6.4. E6.5 must finalize the already acknowledged logical grant
+    without issuing a second grant or changing its reserved term.
+- Exact next recommended action:
+  - Commit as `Add idempotent storage authority grant`, push immediately,
+    update PR #122, verify GitHub Actions, and wait for explicit E6.5 approval.
+- Safe to resume from current branch head:
+  - yes after the E6.4 commit is pushed; no E6.5 runtime behavior is present.

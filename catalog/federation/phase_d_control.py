@@ -30,6 +30,8 @@ from .models import SessionEvent
 from .promotion_transaction import PromotionTransactionRecord
 from .provider_fencing import (
     ProviderFenceStore,
+    StorageAuthorityGrantAcknowledgement,
+    StorageAuthorityGrantCommand,
     StorageFenceAcknowledgement,
     StorageFenceCommand,
 )
@@ -890,7 +892,12 @@ class PhaseDControlPlane:
         record = self.promotion_transaction(session_id, group_id, promotion_id)
         if record is None:
             raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction does not exist")
-        if record.state not in ("validated", "fenced-old-authority"):
+        if record.state not in (
+            "validated",
+            "fenced-old-authority",
+            "allocated-term",
+            "granted-new-authority",
+        ):
             raise FederationValidationError("invalid-promotion-stage", "state", "transaction is not ready for fencing")
         if record.previous_provider_id is None or record.previous_term is None:
             raise FederationValidationError(
@@ -907,6 +914,45 @@ class PhaseDControlPlane:
             fencing_high_water_term=record.previous_term,
             idempotency_key=self._promotion_fence_idempotency_key(record),
         )
+
+    def _verify_persisted_promotion_fence(
+        self,
+        record: PromotionTransactionRecord,
+        provider_fence_store: ProviderFenceStore,
+    ) -> StorageFenceAcknowledgement:
+        if (
+            record.state not in ("fenced-old-authority", "allocated-term", "granted-new-authority")
+            or not record.fencing_acknowledged
+            or record.fencing_ack_identity is None
+        ):
+            raise FederationValidationError(
+                "promotion-not-fenced",
+                "state",
+                "provider-enforced fencing is not durably confirmed",
+            )
+        command = self.promotion_fencing_command(record.session_id, record.group_id, record.promotion_id)
+        evidence = provider_fence_store.acknowledgement(record.group_id)
+        if (
+            evidence is None
+            or evidence.acknowledgement_id != record.fencing_ack_identity
+            or evidence.acknowledgement_id != ProviderFenceStore.acknowledgement_identity(command)
+            or {
+                "promotion_id": evidence.promotion_id,
+                "session_id": evidence.session_id,
+                "group_id": evidence.group_id,
+                "provider_id": evidence.provider_id,
+                "previous_term": evidence.previous_term,
+                "fencing_high_water_term": evidence.fencing_high_water_term,
+                "idempotency_key": evidence.idempotency_key,
+            }
+            != command.binding()
+        ):
+            raise FederationValidationError(
+                "unverifiable-provider-fence",
+                "fencing_ack_identity",
+                "durable provider fencing evidence no longer matches the promotion",
+            )
+        return evidence
 
     def acknowledge_promotion_fencing(
         self,
@@ -1004,6 +1050,278 @@ class PhaseDControlPlane:
             }
         )
         return self.upsert_promotion_transaction(updated)
+
+    def reserve_promotion_term(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+        *,
+        provider_fence_store: ProviderFenceStore,
+        now: datetime | None = None,
+    ) -> PromotionTransactionRecord:
+        record = self.promotion_transaction(session_id, group_id, promotion_id)
+        if record is None:
+            raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction does not exist")
+        fence = self._verify_persisted_promotion_fence(record, provider_fence_store)
+        if record.reserved_term is not None:
+            if record.reserved_term <= max(record.previous_term or 0, fence.fencing_high_water_term):
+                raise FederationValidationError(
+                    "corrupt-term-reservation",
+                    "reserved_term",
+                    "reserved term does not exceed durable fencing state",
+                )
+            return record
+        if record.state != "fenced-old-authority":
+            raise FederationValidationError("invalid-promotion-stage", "state", "transaction is not ready to reserve a term")
+        updated_at = _utc(now)
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    """SELECT reserved_term, state FROM storage_promotion_transactions
+                       WHERE session_id=? AND group_id=? AND promotion_id=?""",
+                    (session_id, group_id, promotion_id),
+                ).fetchone()
+                if row is None:
+                    raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction disappeared")
+                if row["reserved_term"] is not None:
+                    connection.commit()
+                    return self.promotion_transaction(session_id, group_id, promotion_id)
+                counter = connection.execute(
+                    """SELECT COALESCE(MAX(last_term), 0) FROM storage_fencing_counters
+                       WHERE session_id=? AND group_id=?""",
+                    (session_id, group_id),
+                ).fetchone()[0]
+                reservations = connection.execute(
+                    """SELECT COALESCE(MAX(reserved_term), 0) FROM storage_promotion_transactions
+                       WHERE session_id=? AND group_id=?""",
+                    (session_id, group_id),
+                ).fetchone()[0]
+                event_rows = connection.execute(
+                    """SELECT payload_json FROM storage_control_events
+                       WHERE session_id=? AND event_type=?""",
+                    (session_id, STORAGE_LEADER_GRANTED),
+                ).fetchall()
+                observed = 0
+                for event_row in event_rows:
+                    payload = json.loads(event_row["payload_json"])
+                    if payload.get("group_id") == group_id:
+                        observed = max(observed, int(payload["term"]))
+                reserved_term = max(
+                    record.previous_term or 0,
+                    fence.fencing_high_water_term,
+                    int(counter),
+                    int(reservations),
+                    observed,
+                ) + 1
+                grant_id = self._promotion_grant_id(record, reserved_term)
+                connection.execute(
+                    """UPDATE storage_promotion_transactions
+                       SET reserved_term=?, grant_id=?, grant_status='reserved',
+                           state='allocated-term', failure_code=NULL, failure_reason=NULL,
+                           updated_at=?
+                       WHERE session_id=? AND group_id=? AND promotion_id=?
+                         AND reserved_term IS NULL AND state='fenced-old-authority'""",
+                    (
+                        reserved_term,
+                        grant_id,
+                        updated_at.isoformat().replace("+00:00", "Z"),
+                        session_id,
+                        group_id,
+                        promotion_id,
+                    ),
+                )
+                if connection.total_changes != 1:
+                    raise FederationValidationError(
+                        "concurrent-promotion-change",
+                        "promotion_id",
+                        "term reservation lost a concurrent update",
+                    )
+                connection.execute(
+                    """INSERT INTO storage_fencing_counters
+                       (session_id, group_id, last_term, last_fencing_token)
+                       VALUES (?, ?, ?, 0)
+                       ON CONFLICT(session_id, group_id) DO UPDATE SET
+                           last_term=MAX(last_term, excluded.last_term)""",
+                    (session_id, group_id, reserved_term),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        reserved = self.promotion_transaction(session_id, group_id, promotion_id)
+        if reserved is None:
+            raise FederationValidationError("corrupt-term-reservation", "promotion_id", "reserved transaction is missing")
+        return reserved
+
+    @staticmethod
+    def _promotion_grant_id(record: PromotionTransactionRecord, reserved_term: int) -> str:
+        return "promotion-grant-" + hashlib.sha256(
+            (
+                f"{record.promotion_id}\0{record.session_id}\0{record.group_id}\0"
+                f"{record.selected_provider_id}\0{reserved_term}"
+            ).encode()
+        ).hexdigest()
+
+    @staticmethod
+    def _promotion_grant_idempotency_key(record: PromotionTransactionRecord) -> str:
+        payload = (
+            f"{record.promotion_id}\0{record.session_id}\0{record.group_id}\0"
+            f"{record.selected_provider_id}\0{record.reserved_term}\0"
+            f"{record.selected_manifest_revision}\0{record.selected_manifest_hash}\0"
+            f"{record.selected_report_revision}\0{record.selected_report_hash}"
+        ).encode()
+        return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+    def promotion_grant_command(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+        *,
+        provider_fence_store: ProviderFenceStore,
+    ) -> StorageAuthorityGrantCommand:
+        record = self.promotion_transaction(session_id, group_id, promotion_id)
+        if record is None:
+            raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction does not exist")
+        self._verify_persisted_promotion_fence(record, provider_fence_store)
+        if record.state not in ("allocated-term", "granted-new-authority"):
+            raise FederationValidationError("invalid-promotion-stage", "state", "transaction has no durable term reservation")
+        if record.reserved_term is None or record.grant_id is None:
+            raise FederationValidationError("corrupt-term-reservation", "reserved_term", "durable grant binding is incomplete")
+        if record.grant_id != self._promotion_grant_id(record, record.reserved_term):
+            raise FederationValidationError(
+                "corrupt-term-reservation",
+                "grant_id",
+                "durable grant identity does not match the reserved term and promotion binding",
+            )
+        manifest = self.manifest(session_id, group_id)
+        assessment = self.latest_storage_replica_assessment(session_id, group_id, record.selected_provider_id)
+        if (
+            manifest.revision != record.selected_manifest_revision
+            or manifest.manifest_hash != record.selected_manifest_hash
+            or assessment is None
+            or assessment.report is None
+            or assessment.report_revision != record.selected_report_revision
+            or assessment.report_hash != record.selected_report_hash
+            or not assessment.accepted
+            or not assessment.eligibility
+        ):
+            raise FederationValidationError(
+                "stale-promotion-binding",
+                "promotion_id",
+                "manifest or selected report changed after transaction validation",
+            )
+        return StorageAuthorityGrantCommand(
+            promotion_id=record.promotion_id,
+            session_id=record.session_id,
+            group_id=record.group_id,
+            provider_id=record.selected_provider_id,
+            term=record.reserved_term,
+            manifest_revision=record.selected_manifest_revision,
+            manifest_hash=record.selected_manifest_hash,
+            report_revision=record.selected_report_revision,
+            report_hash=record.selected_report_hash,
+            grant_id=record.grant_id,
+            idempotency_key=self._promotion_grant_idempotency_key(record),
+        )
+
+    def acknowledge_promotion_grant(
+        self,
+        acknowledgement: StorageAuthorityGrantAcknowledgement,
+        *,
+        actor_node_id: str,
+        provider_fence_store: ProviderFenceStore,
+        selected_provider_store: ProviderFenceStore,
+    ) -> PromotionTransactionRecord:
+        record = self.promotion_transaction(
+            acknowledgement.session_id,
+            acknowledgement.group_id,
+            acknowledgement.promotion_id,
+        )
+        if record is None:
+            raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction does not exist")
+        command = self.promotion_grant_command(
+            record.session_id,
+            record.group_id,
+            record.promotion_id,
+            provider_fence_store=provider_fence_store,
+        )
+        provider = self.snapshot(record.session_id).providers.get(record.selected_provider_id)
+        if provider is None or provider.node_id != actor_node_id:
+            raise FederationValidationError(
+                "unauthenticated-grant-ack",
+                "actor_node_id",
+                "authenticated sender does not own the selected provider",
+            )
+        expected = {
+            **command.binding(),
+            "acknowledgement_id": ProviderFenceStore.grant_acknowledgement_identity(command),
+        }
+        actual = {
+            **{
+                field: getattr(acknowledgement, field)
+                for field in command.binding()
+            },
+            "acknowledgement_id": acknowledgement.acknowledgement_id,
+        }
+        if actual != expected:
+            raise FederationValidationError(
+                "grant-ack-mismatch",
+                "acknowledgement",
+                "provider acknowledgement is not bound to the exact durable grant",
+            )
+        durable = selected_provider_store.grant_acknowledgement(record.group_id, record.promotion_id)
+        if durable != acknowledgement:
+            raise FederationValidationError(
+                "missing-durable-grant-evidence",
+                "acknowledgement",
+                "provider-local durable grant does not match the acknowledgement",
+            )
+        if record.state == "granted-new-authority":
+            if record.grant_ack_identity != acknowledgement.acknowledgement_id:
+                raise FederationValidationError("grant-ack-mismatch", "acknowledgement_id", "durable grant evidence changed")
+            return record
+        updated = PromotionTransactionRecord(
+            **{
+                **record.to_dict(),
+                "grant_status": "acknowledged",
+                "grant_acknowledged": True,
+                "grant_ack_identity": acknowledgement.acknowledgement_id,
+                "state": "granted-new-authority",
+                "failure_code": None,
+                "failure_reason": None,
+                "updated_at": acknowledgement.persisted_at,
+            }
+        )
+        return self.upsert_promotion_transaction(updated)
+
+    def record_promotion_grant_delivery_failure(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+        *,
+        reason: str,
+        now: datetime | None = None,
+    ) -> PromotionTransactionRecord:
+        record = self.promotion_transaction(session_id, group_id, promotion_id)
+        if record is None:
+            raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction does not exist")
+        if record.state != "allocated-term":
+            return record
+        return self.upsert_promotion_transaction(
+            PromotionTransactionRecord(
+                **{
+                    **record.to_dict(),
+                    "grant_status": "delivery-failed-retryable",
+                    "failure_code": "grant-delivery-failed",
+                    "failure_reason": reason,
+                    "updated_at": _utc(now),
+                }
+            )
+        )
 
     def submit_storage_replica_report(
         self,
