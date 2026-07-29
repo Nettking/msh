@@ -711,8 +711,8 @@ checkpoints.
   E6.3, and E6.4.
 - Current checkpoint:
   - E6.4 strictly increasing term reservation and idempotent provider-local
-    new-authority grant are complete and validated locally. Commit and push
-    remain for publication.
+    new-authority grant are complete, validated, and pushed as
+    `6dff07862c3a207d412c6b46ab1ab2e7d5f4d78f`.
 - Remaining checkpoints:
   - E6.5 finalization and degraded-state exit.
   - E6.6 full recovery and failure reconciliation.
@@ -788,11 +788,13 @@ checkpoints.
     notices were emitted.
 - Known failures:
   - None in the required local E6.4 validation.
+  - GitHub Actions is pending for the latest branch head; no remote test
+    failure is known.
 - Unresolved questions:
   - None for E6.4. E6.5 must finalize the already acknowledged logical grant
     without issuing a second grant or changing its reserved term.
 - Exact next recommended action:
-  - Commit as `Add idempotent storage authority grant`, push immediately,
-    update PR #122, verify GitHub Actions, and wait for explicit E6.5 approval.
+  - Wait for the latest branch-head GitHub Actions run, review E6.4, and only
+    then explicitly approve E6.5.
 - Safe to resume from current branch head:
-  - yes after the E6.4 commit is pushed; no E6.5 runtime behavior is present.
+  - yes; E6.4 is pushed and no E6.5 runtime behavior is present.
