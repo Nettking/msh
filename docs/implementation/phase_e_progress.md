@@ -515,3 +515,30 @@ branch is ready for remote verification and CI follow-up.
   - Commit `Select complete storage promotion candidates`, push it, and then verify PR #122 and CI from GitHub.
 - Safe to resume from current branch head:
   - yes, after the E4 commit is created and pushed.
+
+## E5 checkpoint record
+
+- Exact base commit: `07055b52e623414ec67c50bdee76bd98a4086c2f` for the E5 worktree state.
+- Current branch: `agent/phase-e-completeness-aware-failover`
+- Draft PR: #122, `Implement Phase E completeness-aware failover`
+- Completed checkpoint: E5
+- Current checkpoint: E5 is complete and validated locally.
+- Files changed:
+  - `catalog/federation/phase_d_control.py`
+  - `catalog/federation/selection.py`
+  - `catalog/federation/tests/test_phase_e4_selection.py`
+  - `catalog/federation/tests/test_phase_e5_degraded_state.py`
+  - `docs/implementation/phase_e_progress.md`
+- Tests run and exact results:
+  - `python -m compileall -q catalog setup_msh.py` via `.venv\Scripts\python.exe` — passed
+  - `pytest -q catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/tests/test_phase_e5_degraded_state.py` — passed
+  - `pytest -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py` — passed
+  - `pytest -q catalog/federation/tests/test_phase2_unit.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_local_storage.py` — passed
+  - `ruff check catalog/federation/__init__.py catalog/federation/selection.py catalog/federation/phase_d_control.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/tests/test_phase_e5_degraded_state.py` — passed
+- Known failures / limitations:
+  - None for the E5 slice after the final validation pass.
+  - PR and CI verification still require GitHub access from a machine with GitHub CLI or browser access.
+- Exact next recommended action:
+  - Commit `Add safe storage degraded state`, push it, and then verify PR #122 and CI from GitHub.
+- Safe to resume from current branch head:
+  - yes, after the E5 commit is created and pushed.

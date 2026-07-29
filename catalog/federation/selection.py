@@ -169,7 +169,7 @@ def select_storage_promotion_candidate(
     candidate_ids = tuple(candidate.provider_id for candidate in candidates)
     if not candidates:
         return StoragePromotionSelection(
-            decision="no-qualified-candidate",
+            decision="storage-degraded",
             selected_provider_id=None,
             selected_role=None,
             candidate_provider_ids=(),

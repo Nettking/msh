@@ -101,6 +101,18 @@ class PhaseDControlPlane:
                     assessment_json TEXT NOT NULL CHECK(json_valid(assessment_json)),
                     PRIMARY KEY(session_id, group_id, provider_id)
                 );
+                CREATE TABLE IF NOT EXISTS storage_degraded_states (
+                    session_id TEXT NOT NULL,
+                    group_id TEXT NOT NULL,
+                    manifest_revision INTEGER NOT NULL CHECK(manifest_revision >= 0),
+                    manifest_hash TEXT NOT NULL,
+                    reason_code TEXT NOT NULL,
+                    reason_detail TEXT NOT NULL,
+                    missing_ranges_json TEXT NOT NULL CHECK(json_valid(missing_ranges_json)),
+                    obligations_json TEXT NOT NULL CHECK(json_valid(obligations_json)),
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(session_id, group_id)
+                );
                 """
             )
 
@@ -550,6 +562,120 @@ class PhaseDControlPlane:
         if row is None:
             return None
         return StorageReplicaAssessment.from_dict(json.loads(row["assessment_json"]))
+
+    def storage_degraded_state(self, session_id: str, group_id: str) -> dict[str, Any] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM storage_degraded_states
+                   WHERE session_id=? AND group_id=?""",
+                (session_id, group_id),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            missing_ranges = json.loads(row["missing_ranges_json"])
+            obligations = json.loads(row["obligations_json"])
+        except json.JSONDecodeError as exc:
+            raise FederationValidationError(
+                "corrupt-storage-degraded-state",
+                "storage_degraded_states",
+                "persisted degraded state is malformed",
+            ) from exc
+        return {
+            "session_id": str(row["session_id"]),
+            "group_id": str(row["group_id"]),
+            "manifest_revision": int(row["manifest_revision"]),
+            "manifest_hash": str(row["manifest_hash"]),
+            "reason_code": str(row["reason_code"]),
+            "reason_detail": str(row["reason_detail"]),
+            "missing_ranges": missing_ranges,
+            "obligations": obligations,
+            "updated_at": str(row["updated_at"]),
+        }
+
+    def set_storage_degraded_state(
+        self,
+        session_id: str,
+        group_id: str,
+        *,
+        manifest: AuthoritativeStorageManifest,
+        reason_code: str,
+        reason_detail: str,
+        missing_ranges: tuple[dict[str, Any], ...],
+        obligations: dict[str, Any],
+        now: datetime | None = None,
+    ) -> dict[str, Any]:
+        session_id = str(session_id)
+        group_id = str(group_id)
+        now = _utc(now)
+        if manifest.session_id != session_id or manifest.group_id != group_id:
+            raise FederationValidationError("manifest-mismatch", "manifest", "degraded state must match the authoritative manifest")
+        if manifest.commit_state.value != "committed":
+            raise FederationValidationError("manifest-not-committed", "manifest", "authoritative manifest must remain committed")
+        payload = {
+            "session_id": session_id,
+            "group_id": group_id,
+            "manifest_revision": manifest.revision,
+            "manifest_hash": manifest.manifest_hash,
+            "reason_code": reason_code,
+            "reason_detail": reason_detail,
+            "missing_ranges": list(missing_ranges),
+            "obligations": obligations,
+            "updated_at": now.isoformat().replace("+00:00", "Z"),
+        }
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    """SELECT * FROM storage_degraded_states
+                       WHERE session_id=? AND group_id=?""",
+                    (session_id, group_id),
+                ).fetchone()
+                if row is not None:
+                    existing = {
+                        "session_id": str(row["session_id"]),
+                        "group_id": str(row["group_id"]),
+                        "manifest_revision": int(row["manifest_revision"]),
+                        "manifest_hash": str(row["manifest_hash"]),
+                        "reason_code": str(row["reason_code"]),
+                        "reason_detail": str(row["reason_detail"]),
+                        "missing_ranges": json.loads(row["missing_ranges_json"]),
+                        "obligations": json.loads(row["obligations_json"]),
+                    }
+                    if existing == {k: payload[k] for k in existing}:
+                        connection.commit()
+                        return {**existing, "updated_at": str(row["updated_at"])}
+                connection.execute(
+                    """INSERT INTO storage_degraded_states
+                       (session_id, group_id, manifest_revision, manifest_hash,
+                        reason_code, reason_detail, missing_ranges_json,
+                        obligations_json, updated_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(session_id, group_id) DO UPDATE SET
+                           manifest_revision=excluded.manifest_revision,
+                           manifest_hash=excluded.manifest_hash,
+                           reason_code=excluded.reason_code,
+                           reason_detail=excluded.reason_detail,
+                           missing_ranges_json=excluded.missing_ranges_json,
+                           obligations_json=excluded.obligations_json,
+                           updated_at=excluded.updated_at""",
+                    (
+                        session_id,
+                        group_id,
+                        manifest.revision,
+                        manifest.manifest_hash,
+                        reason_code,
+                        reason_detail,
+                        json.dumps(list(missing_ranges), sort_keys=True, separators=(",", ":"), allow_nan=False),
+                        json.dumps(obligations, sort_keys=True, separators=(",", ":"), allow_nan=False),
+                        payload["updated_at"],
+                    ),
+                )
+                connection.commit()
+                return payload
+            except Exception:
+                connection.rollback()
+                raise
 
     def submit_storage_replica_report(
         self,

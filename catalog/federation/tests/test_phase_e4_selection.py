@@ -198,7 +198,7 @@ def test_e4_complementary_partials_do_not_produce_false_complete_winner() -> Non
 
     result = select_storage_promotion_candidate(manifest, (partial_a, partial_b))
 
-    assert result.decision == "no-qualified-candidate"
+    assert result.decision == "storage-degraded"
     assert result.selected_provider_id is None
     assert result.reason == "required-committed-data-unavailable"
     assert result.rejected == {
