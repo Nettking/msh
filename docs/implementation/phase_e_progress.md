@@ -478,3 +478,13 @@ E4 only after the remote head is confirmed green.
   - Commit and push the E3 checkpoint, then update the PR description from a machine with GitHub CLI available.
 - Safe to resume from current branch head:
   - yes, once the E3 commit is created and pushed.
+
+## Push status after checkpoint commit
+
+The E3 checkpoint commit was created locally as `a905461` with message
+`Report replica completeness and eligibility` and is now pushed to
+`origin/agent/phase-e-completeness-aware-failover`.
+
+The Git HTTPS helper issue was resolved by pointing `GIT_EXEC_PATH` at the
+bundled Git `bin` directory so `git-remote-https.exe` could be found. The
+branch is ready for remote verification and CI follow-up.
