@@ -44,15 +44,15 @@ has been verified. Do not build from the older Phase D branches.
 | E2 | Completed | Watermarks, missing ranges, conflicts, restart persistence |
 | E3 | Completed | Authenticated replica integrity and eligibility reporting |
 | E4 | Completed | Deterministic complete-candidate selection |
-| E5 | Remaining | Durable safe `storage-degraded` state |
-| E6 | Remaining | Coordinator promotion transaction and idempotency |
+| E5 | Completed | Durable safe `storage-degraded` state |
+| E6 | Paused pending design approval | Coordinator promotion transaction and idempotency |
 | E7 | Remaining | Returning former primary and relay-first catch-up |
 | E8 | Remaining | Diagnostics, end-to-end acceptance, full validation |
 
-Completed checkpoints: E0, E1, E2, E3, E4.
+Completed checkpoints: E0, E1, E2, E3, E4, E5.
 
-Current checkpoint: E4. E4 adds deterministic promotion-candidate selection on
-top of the completed reporting and completeness assessment work.
+Current checkpoint: E5 is complete. E6 implementation is paused pending design
+approval for the coordinator-controlled promotion transaction.
 
 ## Acceptance mapping
 
@@ -545,3 +545,13 @@ branch is ready for remote verification and CI follow-up.
   - Commit `Add safe storage degraded state`, push it, and then verify PR #122 and CI from GitHub.
 - Safe to resume from current branch head:
   - yes, after the E5 commit is created and pushed.
+
+## E6 status
+
+E6 implementation is paused pending explicit design approval. The runtime tree
+has been cleaned back to the preserved E0–E5 state, and the promotion
+transaction requirements are documented in
+`docs/implementation/phase_e6_promotion_transaction_design.md`.
+
+No E6 runtime implementation should be resumed until that design is reviewed
+and approved.
