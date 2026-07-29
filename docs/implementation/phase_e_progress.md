@@ -812,7 +812,8 @@ checkpoints.
   E6.3, E6.4, and E6.5.
 - Current checkpoint:
   - E6.5 promotion finalization and safe degraded-state exit are complete and
-    validated locally. Commit and push remain for publication.
+    validated and pushed as
+    `4c239e19cbfc9613606c349c50b4434f1357833e`.
 - Remaining checkpoints:
   - E6.6 full recovery and failure reconciliation.
   - E7 and E8 remain unstarted.
@@ -877,11 +878,13 @@ checkpoints.
     notices were emitted.
 - Known failures:
   - None in the required local E6.5 validation.
+  - GitHub Actions is pending for the latest branch head; no remote test
+    failure is known.
 - Unresolved questions:
   - None for E6.5. E6.6 must reconcile failures and recovery across all
     persisted stages without weakening these finalization boundaries.
 - Exact next recommended action:
-  - Commit as `Finalize storage authority promotion`, push immediately, update
-    PR #122, verify GitHub Actions, and wait for explicit E6.6 approval.
+  - Wait for the latest branch-head GitHub Actions run, review E6.5, and only
+    then explicitly approve E6.6.
 - Safe to resume from current branch head:
-  - yes after the E6.5 commit is pushed; no E6.6 or E7 runtime work is present.
+  - yes; E6.5 is pushed and no E6.6 or E7 runtime work is present.
