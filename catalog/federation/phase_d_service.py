@@ -18,6 +18,7 @@ from .replication import (
     REPLICATION_SCHEMA,
     ReplicationTransport,
 )
+from .reporting import StorageReplicaReport
 from .storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
@@ -29,6 +30,7 @@ from .storage_protocol import (
     StorageRequestEnvelope,
     StorageResponseEnvelope,
 )
+
 
 class OperationalControlPlane(Protocol):
     def snapshot(self, session_id: str): ...
@@ -104,6 +106,8 @@ class PhaseDStorageService:
 
     async def dispatch(self, envelope: StorageRequestEnvelope) -> StorageResponseEnvelope:
         try:
+            if envelope.operation is StorageOperation.HEALTH:
+                return self._success(envelope, self._report_replica_health(envelope))
             if envelope.operation is not StorageOperation.BATCH_INGEST:
                 return self.local.dispatch(envelope)
             request = BatchIngestRequest.from_dict(envelope.payload)
@@ -190,6 +194,26 @@ class PhaseDStorageService:
             ok=True,
             result=result,
         )
+
+    def _report_replica_health(self, envelope: StorageRequestEnvelope) -> dict[str, object]:
+        report = StorageReplicaReport.from_dict(envelope.payload)
+        if report.provider_id != self.provider_id:
+            raise FederationValidationError(
+                "provider-identity-mismatch",
+                "provider_id",
+                "report provider does not match the hosting provider",
+            )
+        if envelope.actor_node_id != self.provider_id:
+            raise FederationValidationError(
+                "provider-identity-mismatch",
+                "actor_node_id",
+                "authenticated sender does not match the report provider",
+            )
+        assessment = self.control_plane.submit_storage_replica_report(
+            report,
+            actor_node_id=envelope.actor_node_id,
+        )
+        return assessment.to_dict()
 
     def _validate_grant(self, request: BatchIngestRequest, *, require_primary_provider: bool) -> tuple[object, object, dict]:
         authority = request.authority

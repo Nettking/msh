@@ -41,18 +41,19 @@ has been verified. Do not build from the older Phase D branches.
 | --- | --- | --- |
 | E0 | Completed | Contract and acceptance mapping; pure completeness contracts |
 | E1 | Completed | Authoritative manifest persistence and storage-commit integration |
-| E2 | In progress | Watermarks, missing ranges, conflicts, restart persistence |
-| E3 | Remaining | Authenticated replica integrity and eligibility reporting |
+| E2 | Completed | Watermarks, missing ranges, conflicts, restart persistence |
+| E3 | Completed | Authenticated replica integrity and eligibility reporting |
 | E4 | Remaining | Deterministic complete-candidate selection |
 | E5 | Remaining | Durable safe `storage-degraded` state |
 | E6 | Remaining | Coordinator promotion transaction and idempotency |
 | E7 | Remaining | Returning former primary and relay-first catch-up |
 | E8 | Remaining | Diagnostics, end-to-end acceptance, full validation |
 
-Completed checkpoints: E0, E1.
+Completed checkpoints: E0, E1, E2, E3.
 
-Current checkpoint: E2. E1 is complete and validated; E2 work is scoped to
-authoritative watermarks, missing ranges, and restart-safe persistence.
+Current checkpoint: E3. E3 adds authenticated replica reporting and
+eligibility assessment on top of the completed authoritative-manifest and
+watermark work.
 
 ## Acceptance mapping
 
@@ -405,3 +406,75 @@ Exact next recommended action:
 Commit the E2 checkpoint, push it on `agent/phase-e-completeness-aware-failover`,
 and update draft PR #122 with the E2 summary and the PostgreSQL environment
 limitation.
+
+## E3 checkpoint update
+
+The current task moved on from the partial E3 draft by resetting to the clean
+E2 head and implementing a coherent E3 report path on top of it:
+
+- `catalog/federation/reporting.py` defines authenticated replica report and
+  assessment contracts with canonical serialization and deterministic hashes.
+- `catalog/federation/phase_d_control.py` persists the latest accepted report
+  and assessment per `(session_id, group_id, provider_id)` and re-evaluates
+  eligibility from authoritative manifests.
+- `catalog/federation/phase_d_service.py` accepts `storage.health` as the
+  relay-facing report submission path and binds the authenticated sender to the
+  reported provider identity.
+- `catalog/federation/tests/test_phase_e3_reports.py` covers canonical
+  serialization, complete and empty reports, mismatch rejection, stale and
+  conflicting revisions, and authenticated relay submission.
+
+Exact validation for the E3 checkpoint so far:
+
+- `47 passed in 8.52s` for the focused E0/E1/E2/E3 suite.
+- `64 passed in 3.61s` for `catalog/federation/tests/test_phase0.py` and
+  `catalog/federation/tests/test_phase1.py`.
+- `43 passed in 7.83s` for `catalog/federation/tests/test_phase2_unit.py`,
+  `catalog/federation/tests/test_phase_d6_replication.py`, and
+  `catalog/federation/tests/test_local_storage.py`.
+- `All checks passed!` for Ruff on the changed Python files.
+- `python -m compileall -q catalog setup_msh.py` passed.
+
+Known limitations:
+
+- The E3 report tests are intentionally focused on the report/assessment
+  boundary and do not yet introduce E4 selection logic.
+- I did not run the PostgreSQL-specific regression file in this checkpoint
+  because the local environment still does not provide a disposable PostgreSQL
+  service.
+- PR description updates were not possible from this environment because the
+  GitHub CLI is unavailable.
+
+Exact next recommended action:
+
+Commit and push the E3 checkpoint with the specified message, then continue to
+E4 only after the remote head is confirmed green.
+
+## E3 checkpoint record
+
+- Exact base commit: `357200d76f4a2441e7e505c76b6c94fbccdfc12a`
+- Current branch: `agent/phase-e-completeness-aware-failover`
+- Draft PR: #122, `Implement Phase E completeness-aware failover`
+- Completed checkpoint: E3
+- Current checkpoint: E3 is complete and the branch is ready to be pushed as a
+  green checkpoint once commit/push finishes.
+- Files changed:
+  - `catalog/federation/reporting.py`
+  - `catalog/federation/phase_d_control.py`
+  - `catalog/federation/phase_d_service.py`
+  - `catalog/federation/__init__.py`
+  - `catalog/federation/tests/test_phase_e3_reports.py`
+  - `docs/implementation/phase_e_progress.md`
+- Tests run and exact results:
+  - `python -m compileall -q catalog setup_msh.py` — passed
+  - `pytest -q catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py` — `47 passed in 8.52s`
+  - `pytest -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py` — passed
+  - `pytest -q catalog/federation/tests/test_phase2_unit.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_local_storage.py` — passed
+  - `ruff check catalog/federation` — passed after auto-fix
+- Known failures / limitations:
+  - `gh` is not installed in this environment, so the draft PR description could not be updated from here.
+  - No PostgreSQL-backed suite was run in this checkpoint.
+- Exact next recommended action:
+  - Commit and push the E3 checkpoint, then update the PR description from a machine with GitHub CLI available.
+- Safe to resume from current branch head:
+  - yes, once the E3 commit is created and pushed.

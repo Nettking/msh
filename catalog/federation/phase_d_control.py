@@ -26,6 +26,11 @@ from .manifest_store import (
     ManifestCommitIntent,
 )
 from .models import SessionEvent
+from .reporting import (
+    StorageReplicaAssessment,
+    StorageReplicaReport,
+    assess_storage_replica_report,
+)
 from .storage_control_plane import (
     STORAGE_ASSIGNMENT_CHANGED,
     STORAGE_LEADER_GRANTED,
@@ -85,6 +90,16 @@ class PhaseDControlPlane:
                     group_id TEXT NOT NULL,
                     mode TEXT NOT NULL CHECK(mode IN ('primary','one-replica','quorum','all')),
                     PRIMARY KEY(session_id, group_id)
+                );
+                CREATE TABLE IF NOT EXISTS storage_replica_reports (
+                    session_id TEXT NOT NULL,
+                    group_id TEXT NOT NULL,
+                    provider_id TEXT NOT NULL,
+                    report_revision INTEGER NOT NULL CHECK(report_revision >= 0),
+                    report_hash TEXT NOT NULL,
+                    report_json TEXT NOT NULL CHECK(json_valid(report_json)),
+                    assessment_json TEXT NOT NULL CHECK(json_valid(assessment_json)),
+                    PRIMARY KEY(session_id, group_id, provider_id)
                 );
                 """
             )
@@ -492,6 +507,151 @@ class PhaseDControlPlane:
         return AcknowledgementPolicy(
             AcknowledgementMode.PRIMARY if row is None else AcknowledgementMode(row["mode"])
         )
+
+    def _assigned_provider_ids(self, session_id: str, group_id: str) -> tuple[str, ...]:
+        snapshot = self.snapshot(session_id)
+        assignment = snapshot.groups.get(group_id)
+        if assignment is None:
+            return ()
+        return tuple(
+            provider_id
+            for provider_id in (assignment.primary_provider_id, *assignment.replica_provider_ids)
+            if provider_id is not None
+        )
+
+    def latest_storage_replica_report(
+        self,
+        session_id: str,
+        group_id: str,
+        provider_id: str,
+    ) -> StorageReplicaReport | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT report_json FROM storage_replica_reports
+                   WHERE session_id=? AND group_id=? AND provider_id=?""",
+                (session_id, group_id, provider_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return StorageReplicaReport.from_dict(json.loads(row["report_json"]))
+
+    def latest_storage_replica_assessment(
+        self,
+        session_id: str,
+        group_id: str,
+        provider_id: str,
+    ) -> StorageReplicaAssessment | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT assessment_json FROM storage_replica_reports
+                   WHERE session_id=? AND group_id=? AND provider_id=?""",
+                (session_id, group_id, provider_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return StorageReplicaAssessment.from_dict(json.loads(row["assessment_json"]))
+
+    def submit_storage_replica_report(
+        self,
+        report: StorageReplicaReport,
+        *,
+        actor_node_id: str,
+    ) -> StorageReplicaAssessment:
+        if not isinstance(report, StorageReplicaReport):
+            raise FederationValidationError("invalid-object", "report", "must be StorageReplicaReport")
+        if not isinstance(actor_node_id, str) or not actor_node_id.strip():
+            raise FederationValidationError("invalid-id", "actor_node_id", "must be non-empty opaque text")
+        snapshot = self.snapshot(report.session_id)
+        assignment = snapshot.groups.get(report.group_id)
+        provider = snapshot.providers.get(report.provider_id)
+        if provider is None:
+            assessment = StorageReplicaAssessment(
+                session_id=report.session_id,
+                group_id=report.group_id,
+                provider_id=report.provider_id,
+                report_revision=report.report_revision,
+                report_hash=report.report_hash(),
+                accepted=False,
+                eligibility=False,
+                eligibility_reason="provider-not-assigned",
+                assessed_at=report.reported_at,
+                report=report,
+            )
+        else:
+            if provider.node_id != actor_node_id:
+                raise FederationValidationError(
+                    "provider-identity-mismatch",
+                    "provider_id",
+                    "authenticated sender does not match the registered provider",
+                )
+            if report.session_id != provider.session_id:
+                raise FederationValidationError("session-mismatch", "session_id", "provider belongs to another session")
+            if assignment is None or report.group_id != assignment.group_id or report.provider_id not in self._assigned_provider_ids(report.session_id, report.group_id):
+                assessment = StorageReplicaAssessment(
+                    session_id=report.session_id,
+                    group_id=report.group_id,
+                    provider_id=report.provider_id,
+                    report_revision=report.report_revision,
+                    report_hash=report.report_hash(),
+                    accepted=False,
+                    eligibility=False,
+                    eligibility_reason="provider-not-assigned",
+                    assessed_at=report.reported_at,
+                    report=report,
+                )
+            else:
+                authoritative = self.manifest(report.session_id, report.group_id)
+                assessment = assess_storage_replica_report(
+                    report,
+                    authoritative,
+                    assigned_provider_ids=self._assigned_provider_ids(report.session_id, report.group_id),
+                    expected_session_id=report.session_id,
+                    expected_group_id=report.group_id,
+                )
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                row = connection.execute(
+                    """SELECT report_revision, report_hash, report_json, assessment_json
+                       FROM storage_replica_reports
+                       WHERE session_id=? AND group_id=? AND provider_id=?""",
+                    (report.session_id, report.group_id, report.provider_id),
+                ).fetchone()
+                if row is not None:
+                    existing = StorageReplicaReport.from_dict(json.loads(row["report_json"]))
+                    if report.report_revision < existing.report_revision:
+                        raise FederationValidationError("stale-report", "report_revision", "report revision is older than the stored report")
+                    if report.report_revision == existing.report_revision:
+                        if report.report_hash() != existing.report_hash():
+                            raise FederationValidationError("conflicting-report-revision", "report_revision", "duplicate report revision conflicts with stored evidence")
+                        connection.commit()
+                        return StorageReplicaAssessment.from_dict(json.loads(row["assessment_json"]))
+                if assessment.accepted:
+                    connection.execute(
+                        """INSERT INTO storage_replica_reports
+                           (session_id, group_id, provider_id, report_revision, report_hash, report_json, assessment_json)
+                           VALUES (?, ?, ?, ?, ?, ?, ?)
+                           ON CONFLICT(session_id, group_id, provider_id)
+                           DO UPDATE SET
+                               report_revision=excluded.report_revision,
+                               report_hash=excluded.report_hash,
+                               report_json=excluded.report_json,
+                               assessment_json=excluded.assessment_json""",
+                        (
+                            report.session_id,
+                            report.group_id,
+                            report.provider_id,
+                            report.report_revision,
+                            report.report_hash(),
+                            json.dumps(report.to_dict(), sort_keys=True, separators=(",", ":"), allow_nan=False),
+                            json.dumps(assessment.to_dict(), sort_keys=True, separators=(",", ":"), allow_nan=False),
+                        ),
+                    )
+                connection.commit()
+                return assessment
+            except Exception:
+                connection.rollback()
+                raise
 
     def _historical_maxima(self, session_id: str, group_id: str) -> tuple[int, int]:
         term = 0
