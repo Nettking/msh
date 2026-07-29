@@ -686,13 +686,14 @@ checkpoints.
     working-copy notices.
 - Known failures:
   - None in the required local E6.3 validation.
-  - GitHub Actions run `30454459937` (`Phase 2 federation`) is in progress for
-    `7ecc60f`; no remote failure is known.
+  - GitHub Actions is pending for the latest branch head; the run attached
+    directly to `7ecc60f` was cancelled when the handoff-only follow-up commit
+    superseded it. No remote test failure is known.
 - Unresolved questions:
   - None for E6.3. E6.4 must consume the durable fenced stage without weakening
     provider-local high-water enforcement.
 - Exact next recommended action:
-  - Wait for GitHub Actions run `30454459937` to finish, review E6.3, and only
-    then explicitly approve E6.4.
+  - Wait for the latest branch-head GitHub Actions run to finish, review E6.3,
+    and only then explicitly approve E6.4.
 - Safe to resume from current branch head:
   - yes; E6.3 is pushed and no E6.4 runtime work is present.
