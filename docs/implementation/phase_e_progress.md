@@ -43,17 +43,16 @@ has been verified. Do not build from the older Phase D branches.
 | E1 | Completed | Authoritative manifest persistence and storage-commit integration |
 | E2 | Completed | Watermarks, missing ranges, conflicts, restart persistence |
 | E3 | Completed | Authenticated replica integrity and eligibility reporting |
-| E4 | Remaining | Deterministic complete-candidate selection |
+| E4 | Completed | Deterministic complete-candidate selection |
 | E5 | Remaining | Durable safe `storage-degraded` state |
 | E6 | Remaining | Coordinator promotion transaction and idempotency |
 | E7 | Remaining | Returning former primary and relay-first catch-up |
 | E8 | Remaining | Diagnostics, end-to-end acceptance, full validation |
 
-Completed checkpoints: E0, E1, E2, E3.
+Completed checkpoints: E0, E1, E2, E3, E4.
 
-Current checkpoint: E3. E3 adds authenticated replica reporting and
-eligibility assessment on top of the completed authoritative-manifest and
-watermark work.
+Current checkpoint: E4. E4 adds deterministic promotion-candidate selection on
+top of the completed reporting and completeness assessment work.
 
 ## Acceptance mapping
 
@@ -488,3 +487,31 @@ The E3 checkpoint commit was created locally as `a905461` with message
 The Git HTTPS helper issue was resolved by pointing `GIT_EXEC_PATH` at the
 bundled Git `bin` directory so `git-remote-https.exe` could be found. The
 branch is ready for remote verification and CI follow-up.
+
+## E4 checkpoint record
+
+- Exact base commit: `8a6a23c` for the E4 worktree state; the remote branch
+  already contains the E3 checkpoint `a905461` and the doc-only handoff commit
+  `8a6a23c`.
+- Current branch: `agent/phase-e-completeness-aware-failover`
+- Draft PR: #122, `Implement Phase E completeness-aware failover`
+- Completed checkpoint: E4
+- Current checkpoint: E4 is complete and validated locally.
+- Files changed:
+  - `catalog/federation/selection.py`
+  - `catalog/federation/__init__.py`
+  - `catalog/federation/tests/test_phase_e4_selection.py`
+  - `docs/implementation/phase_e_progress.md`
+- Tests run and exact results:
+  - `python -m compileall -q catalog setup_msh.py` via `.venv\Scripts\python.exe` — passed
+  - `pytest -q catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py` — passed
+  - `pytest -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py` — passed
+  - `pytest -q catalog/federation/tests/test_phase2_unit.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_local_storage.py` — passed
+  - `ruff check catalog/federation/__init__.py catalog/federation/selection.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/reporting.py` — passed
+- Known failures / limitations:
+  - None for the E4 slice after the final validation pass.
+  - PR and CI verification still require GitHub access from a machine with GitHub CLI or browser access.
+- Exact next recommended action:
+  - Commit `Select complete storage promotion candidates`, push it, and then verify PR #122 and CI from GitHub.
+- Safe to resume from current branch head:
+  - yes, after the E4 commit is created and pushed.

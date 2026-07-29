@@ -99,6 +99,12 @@ from .reporting import (
     StorageReplicaReport,
     assess_storage_replica_report,
 )
+from .selection import (
+    StoragePromotionCandidate,
+    StoragePromotionSelection,
+    evaluate_storage_promotion_candidate,
+    select_storage_promotion_candidate,
+)
 from .storage_control_plane import (
     STORAGE_ASSIGNMENT_CHANGED,
     STORAGE_GROUP_CREATED,
@@ -224,6 +230,8 @@ __all__ = [
     "StorageManifest",
     "StorageNodeState",
     "StorageOperation",
+    "StoragePromotionCandidate",
+    "StoragePromotionSelection",
     "StorageProvider",
     "StorageProviderRegistration",
     "StorageReadOutcome",
@@ -241,7 +249,9 @@ __all__ = [
     "WriteAuthority",
     "assess_storage_replica_report",
     "classify_idempotent_ingest",
+    "evaluate_storage_promotion_candidate",
     "select_storage_leader",
+    "select_storage_promotion_candidate",
     "validate_primary_write",
     "validate_protocol_version",
 ]
