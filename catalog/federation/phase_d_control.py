@@ -26,6 +26,7 @@ from .manifest_store import (
     ManifestCommitIntent,
 )
 from .models import SessionEvent
+from .promotion_transaction import PromotionTransactionRecord
 from .reporting import (
     StorageReplicaAssessment,
     StorageReplicaReport,
@@ -112,6 +113,31 @@ class PhaseDControlPlane:
                     obligations_json TEXT NOT NULL CHECK(json_valid(obligations_json)),
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY(session_id, group_id)
+                );
+                CREATE TABLE IF NOT EXISTS storage_promotion_transactions (
+                    session_id TEXT NOT NULL,
+                    group_id TEXT NOT NULL,
+                    promotion_id TEXT NOT NULL,
+                    selected_provider_id TEXT NOT NULL,
+                    selected_report_hash TEXT NOT NULL,
+                    selected_report_revision INTEGER NOT NULL CHECK(selected_report_revision >= 0),
+                    selected_manifest_revision INTEGER NOT NULL CHECK(selected_manifest_revision >= 0),
+                    selected_manifest_hash TEXT NOT NULL,
+                    previous_provider_id TEXT,
+                    previous_term INTEGER,
+                    reserved_term INTEGER,
+                    fencing_status TEXT NOT NULL,
+                    fencing_acknowledged INTEGER NOT NULL CHECK(fencing_acknowledged IN (0, 1)),
+                    fencing_ack_identity TEXT,
+                    grant_id TEXT,
+                    grant_status TEXT NOT NULL,
+                    grant_acknowledged INTEGER NOT NULL CHECK(grant_acknowledged IN (0, 1)),
+                    grant_ack_identity TEXT,
+                    state TEXT NOT NULL,
+                    failure_code TEXT,
+                    failure_reason TEXT,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(session_id, group_id, promotion_id)
                 );
                 """
             )
@@ -676,6 +702,101 @@ class PhaseDControlPlane:
             except Exception:
                 connection.rollback()
                 raise
+
+    def promotion_transaction(self, session_id: str, group_id: str, promotion_id: str) -> PromotionTransactionRecord | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM storage_promotion_transactions
+                   WHERE session_id=? AND group_id=? AND promotion_id=?""",
+                (session_id, group_id, promotion_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return PromotionTransactionRecord(
+            schema="msh.storage_promotion_transaction.v1",
+            promotion_id=row["promotion_id"],
+            session_id=row["session_id"],
+            group_id=row["group_id"],
+            selected_provider_id=row["selected_provider_id"],
+            selected_report_hash=row["selected_report_hash"],
+            selected_report_revision=row["selected_report_revision"],
+            selected_manifest_revision=row["selected_manifest_revision"],
+            selected_manifest_hash=row["selected_manifest_hash"],
+            previous_provider_id=row["previous_provider_id"],
+            previous_term=row["previous_term"],
+            reserved_term=row["reserved_term"],
+            fencing_status=row["fencing_status"],
+            fencing_acknowledged=bool(row["fencing_acknowledged"]),
+            fencing_ack_identity=row["fencing_ack_identity"],
+            grant_id=row["grant_id"],
+            grant_status=row["grant_status"],
+            grant_acknowledged=bool(row["grant_acknowledged"]),
+            grant_ack_identity=row["grant_ack_identity"],
+            state=row["state"],
+            failure_code=row["failure_code"],
+            failure_reason=row["failure_reason"],
+            updated_at=row["updated_at"],
+        )
+
+    def upsert_promotion_transaction(self, record: PromotionTransactionRecord) -> PromotionTransactionRecord:
+        with self._connect() as connection:
+            connection.execute(
+                """INSERT INTO storage_promotion_transactions
+                   (session_id, group_id, promotion_id, selected_provider_id,
+                    selected_report_hash, selected_report_revision,
+                    selected_manifest_revision, selected_manifest_hash,
+                    previous_provider_id, previous_term, reserved_term,
+                    fencing_status, fencing_acknowledged, fencing_ack_identity,
+                    grant_id, grant_status, grant_acknowledged, grant_ack_identity,
+                    state, failure_code, failure_reason, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                   ON CONFLICT(session_id, group_id, promotion_id) DO UPDATE SET
+                       selected_provider_id=excluded.selected_provider_id,
+                       selected_report_hash=excluded.selected_report_hash,
+                       selected_report_revision=excluded.selected_report_revision,
+                       selected_manifest_revision=excluded.selected_manifest_revision,
+                       selected_manifest_hash=excluded.selected_manifest_hash,
+                       previous_provider_id=excluded.previous_provider_id,
+                       previous_term=excluded.previous_term,
+                       reserved_term=excluded.reserved_term,
+                       fencing_status=excluded.fencing_status,
+                       fencing_acknowledged=excluded.fencing_acknowledged,
+                       fencing_ack_identity=excluded.fencing_ack_identity,
+                       grant_id=excluded.grant_id,
+                       grant_status=excluded.grant_status,
+                       grant_acknowledged=excluded.grant_acknowledged,
+                       grant_ack_identity=excluded.grant_ack_identity,
+                       state=excluded.state,
+                       failure_code=excluded.failure_code,
+                       failure_reason=excluded.failure_reason,
+                       updated_at=excluded.updated_at""",
+                (
+                    record.session_id,
+                    record.group_id,
+                    record.promotion_id,
+                    record.selected_provider_id,
+                    record.selected_report_hash,
+                    record.selected_report_revision,
+                    record.selected_manifest_revision,
+                    record.selected_manifest_hash,
+                    record.previous_provider_id,
+                    record.previous_term,
+                    record.reserved_term,
+                    record.fencing_status,
+                    int(record.fencing_acknowledged),
+                    record.fencing_ack_identity,
+                    record.grant_id,
+                    record.grant_status,
+                    int(record.grant_acknowledged),
+                    record.grant_ack_identity,
+                    record.state,
+                    record.failure_code,
+                    record.failure_reason,
+                    record.updated_at.isoformat().replace("+00:00", "Z"),
+                ),
+            )
+            connection.commit()
+        return record
 
     def submit_storage_replica_report(
         self,

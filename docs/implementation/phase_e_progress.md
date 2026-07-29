@@ -548,10 +548,42 @@ branch is ready for remote verification and CI follow-up.
 
 ## E6 status
 
-E6 implementation is paused pending explicit design approval. The runtime tree
-has been cleaned back to the preserved E0–E5 state, and the promotion
+E6 design has been approved, and E6.1 is now in progress. The promotion
 transaction requirements are documented in
 `docs/implementation/phase_e6_promotion_transaction_design.md`.
 
-No E6 runtime implementation should be resumed until that design is reviewed
-and approved.
+E6 runtime implementation should proceed only through the approved staged
+checkpoints.
+
+## E6.1 checkpoint record
+
+- Exact base commit: `c296b0f` for the E6.1 worktree state before the design
+  checkpoint and the current E6.1 edits.
+- Current branch: `agent/phase-e-completeness-aware-failover`
+- Draft PR: #122, `Implement Phase E completeness-aware failover`
+- Completed checkpoint: E6.1
+- Current checkpoint: E6.1 transaction model and persistence are complete and
+  validated locally.
+- Files changed:
+  - `catalog/federation/promotion_transaction.py`
+  - `catalog/federation/phase_d_control.py`
+  - `catalog/federation/tests/test_phase_e6_promotion_transaction.py`
+  - `docs/implementation/phase_e_progress.md`
+- Tests run and exact results:
+  - `python -m compileall -q catalog setup_msh.py` via `.venv\Scripts\python.exe` — passed
+  - `pytest -q catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/tests/test_phase_e5_degraded_state.py catalog/federation/tests/test_phase_e6_promotion_transaction.py` — passed
+  - `pytest -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py` — passed
+  - `pytest -q catalog/federation/tests/test_phase2_unit.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_local_storage.py` — passed
+  - `ruff check catalog/federation/phase_d_control.py catalog/federation/promotion_transaction.py catalog/federation/tests/test_phase_e6_promotion_transaction.py` — passed
+- Known failures / limitations:
+  - None for the E6.1 slice after the final validation pass.
+  - The coordinator promotion logic itself is not yet implemented; only the
+    durable transaction model and persistence surface exist at this stage.
+- Remote push status:
+  - Pending for the E6.1 checkpoint.
+- Exact next recommended action:
+  - Commit `Add coordinator controlled storage promotion` for the E6.1
+    persistence checkpoint, push it, and then continue with E6.2 validation
+    and idempotent command creation.
+- Safe to resume from current branch head:
+  - yes, after the E6.1 commit is created and pushed.
