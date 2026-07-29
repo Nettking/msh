@@ -9,6 +9,7 @@ and controlled handover is committed as one SQLite transaction.
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import sqlite3
 import uuid
@@ -27,6 +28,11 @@ from .manifest_store import (
 )
 from .models import SessionEvent
 from .promotion_transaction import PromotionTransactionRecord
+from .provider_fencing import (
+    ProviderFenceStore,
+    StorageFenceAcknowledgement,
+    StorageFenceCommand,
+)
 from .reporting import (
     StorageReplicaAssessment,
     StorageReplicaReport,
@@ -866,6 +872,138 @@ class PhaseDControlPlane:
             failure_reason=None,
             updated_at=reported_at or datetime.now(timezone.utc),
         )
+
+    @staticmethod
+    def _promotion_fence_idempotency_key(record: PromotionTransactionRecord) -> str:
+        payload = (
+            f"{record.promotion_id}\0{record.session_id}\0{record.group_id}\0"
+            f"{record.previous_provider_id}\0{record.previous_term}"
+        ).encode()
+        return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+    def promotion_fencing_command(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+    ) -> StorageFenceCommand:
+        record = self.promotion_transaction(session_id, group_id, promotion_id)
+        if record is None:
+            raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction does not exist")
+        if record.state not in ("validated", "fenced-old-authority"):
+            raise FederationValidationError("invalid-promotion-stage", "state", "transaction is not ready for fencing")
+        if record.previous_provider_id is None or record.previous_term is None:
+            raise FederationValidationError(
+                "missing-previous-authority",
+                "previous_provider_id",
+                "validated transaction has no previous authority to fence",
+            )
+        return StorageFenceCommand(
+            promotion_id=record.promotion_id,
+            session_id=record.session_id,
+            group_id=record.group_id,
+            provider_id=record.previous_provider_id,
+            previous_term=record.previous_term,
+            fencing_high_water_term=record.previous_term,
+            idempotency_key=self._promotion_fence_idempotency_key(record),
+        )
+
+    def acknowledge_promotion_fencing(
+        self,
+        acknowledgement: StorageFenceAcknowledgement,
+        *,
+        actor_node_id: str,
+        provider_fence_store: ProviderFenceStore,
+    ) -> PromotionTransactionRecord:
+        record = self.promotion_transaction(
+            acknowledgement.session_id,
+            acknowledgement.group_id,
+            acknowledgement.promotion_id,
+        )
+        if record is None:
+            raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction does not exist")
+        command = self.promotion_fencing_command(record.session_id, record.group_id, record.promotion_id)
+        provider = self.snapshot(record.session_id).providers.get(command.provider_id)
+        if provider is None or provider.node_id != actor_node_id:
+            raise FederationValidationError(
+                "unauthenticated-fencing-ack",
+                "actor_node_id",
+                "authenticated sender does not own the previous provider",
+            )
+        expected_ack = ProviderFenceStore.acknowledgement_identity(command)
+        expected = {
+            **command.binding(),
+            "acknowledgement_id": expected_ack,
+        }
+        actual = {
+            "promotion_id": acknowledgement.promotion_id,
+            "session_id": acknowledgement.session_id,
+            "group_id": acknowledgement.group_id,
+            "provider_id": acknowledgement.provider_id,
+            "previous_term": acknowledgement.previous_term,
+            "fencing_high_water_term": acknowledgement.fencing_high_water_term,
+            "idempotency_key": acknowledgement.idempotency_key,
+            "acknowledgement_id": acknowledgement.acknowledgement_id,
+        }
+        if actual != expected:
+            raise FederationValidationError(
+                "fencing-ack-mismatch",
+                "acknowledgement",
+                "provider acknowledgement is not bound to the exact durable fencing command",
+            )
+        durable_evidence = provider_fence_store.acknowledgement(command.group_id)
+        if durable_evidence != acknowledgement:
+            raise FederationValidationError(
+                "missing-durable-fencing-evidence",
+                "acknowledgement",
+                "provider-local durable fence does not match the acknowledgement",
+            )
+        if record.state == "fenced-old-authority":
+            if record.fencing_ack_identity != acknowledgement.acknowledgement_id:
+                raise FederationValidationError(
+                    "fencing-ack-mismatch",
+                    "acknowledgement_id",
+                    "completed fencing stage has different durable evidence",
+                )
+            return record
+        updated = PromotionTransactionRecord(
+            **{
+                **record.to_dict(),
+                "fencing_status": "acknowledged",
+                "fencing_acknowledged": True,
+                "fencing_ack_identity": acknowledgement.acknowledgement_id,
+                "state": "fenced-old-authority",
+                "failure_code": None,
+                "failure_reason": None,
+                "updated_at": acknowledgement.persisted_at,
+            }
+        )
+        return self.upsert_promotion_transaction(updated)
+
+    def record_promotion_fencing_delivery_failure(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+        *,
+        reason: str,
+        now: datetime | None = None,
+    ) -> PromotionTransactionRecord:
+        record = self.promotion_transaction(session_id, group_id, promotion_id)
+        if record is None:
+            raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction does not exist")
+        if record.state != "validated":
+            return record
+        updated = PromotionTransactionRecord(
+            **{
+                **record.to_dict(),
+                "fencing_status": "delivery-failed-retryable",
+                "failure_code": "fencing-delivery-failed",
+                "failure_reason": reason,
+                "updated_at": _utc(now),
+            }
+        )
+        return self.upsert_promotion_transaction(updated)
 
     def submit_storage_replica_report(
         self,

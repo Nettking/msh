@@ -617,3 +617,81 @@ checkpoints.
   - Commit `Add coordinator controlled storage promotion` for the E6.2 validation checkpoint, push it, and then proceed to E6.3 old-authority fencing.
 - Safe to resume from current branch head:
   - yes, after the E6.2 commit is created and pushed.
+
+## E6.3 checkpoint record
+
+- Phase E objective:
+  - Promote storage authority only from complete, authenticated evidence while
+    durably fencing obsolete writers and preserving manifest and recovery state.
+- Exact base commit: `9dd9b26bbc432c07106052887f5c15dc12dd9e42`.
+- Current branch: `agent/phase-e-completeness-aware-failover`.
+- Draft PR: #122, `Implement Phase E completeness-aware failover`.
+- Completed checkpoints: E0, E1, E2, E3, E4, E5, E6 design, E6.1, E6.2,
+  and E6.3.
+- Current checkpoint:
+  - E6.3 provider-enforced old-authority fencing is complete and validated
+    locally. The checkpoint commit and push are the remaining publication
+    actions for this task run.
+- Remaining checkpoints:
+  - E6.4 durable term reservation and idempotent new grant.
+  - E6.5 finalization and degraded-state exit.
+  - E6.6 full recovery and failure reconciliation.
+  - E7 and E8 remain unstarted.
+- Architectural decisions:
+  - Provider fencing is stored in a provider-local SQLite ledger using
+    `PRAGMA synchronous=FULL`; the provider acknowledges only after the
+    transaction commits.
+  - A fence command is derived only from the durable validated promotion
+    transaction. Its stable idempotency key binds promotion, session, group,
+    previous provider, and previous term.
+  - The fencing high-water term equals the previous authority term for E6.3.
+    Provider grant validation rejects that term and every lower term.
+  - Coordinator command emission is not evidence. Coordinator advancement
+    requires authenticated sender identity, exact command/acknowledgement
+    binding, and a matching provider-local durable record.
+  - Fencing delivery failure remains retryable at the `validated` transaction
+    stage and does not clear `storage-degraded`, allocate a term, or create a
+    grant.
+- Files changed:
+  - `catalog/federation/provider_fencing.py`
+  - `catalog/federation/phase_d_control.py`
+  - `catalog/federation/__init__.py`
+  - `catalog/federation/tests/test_phase_e63_provider_fencing.py`
+  - `docs/implementation/phase_e_progress.md`
+- Exact provider-side fencing state:
+  - session ID, storage group ID, provider ID, promotion ID, previous term,
+    fencing high-water term, stable idempotency key, deterministic
+    acknowledgement identity, and durable persistence timestamp.
+- Acknowledgement validation:
+  - promotion, session, group, provider, previous term, fencing high-water
+    term, idempotency key, and acknowledgement identity must exactly match the
+    command derived from the persisted transaction;
+  - the authenticated node must own the previous provider;
+  - the provider-local durable acknowledgement must equal the received
+    acknowledgement;
+  - stale, mismatched, unauthenticated, missing, and corrupt evidence fails
+    closed without advancing the transaction.
+- Tests run and exact results:
+  - `.venv\Scripts\python.exe -m compileall -q catalog setup_msh.py` — passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py`
+    — 21 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/tests/test_phase_e5_degraded_state.py catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py`
+    — 76 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py`
+    — 64 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase2_unit.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_local_storage.py`
+    — 43 passed.
+  - `.venv\Scripts\python.exe -m ruff check catalog/federation/__init__.py catalog/federation/phase_d_control.py catalog/federation/provider_fencing.py catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py`
+    — passed.
+  - `git diff --check` — passed; Git reported only expected LF-to-CRLF
+    working-copy notices.
+- Known failures:
+  - None in the required local E6.3 validation.
+- Unresolved questions:
+  - None for E6.3. E6.4 must consume the durable fenced stage without weakening
+    provider-local high-water enforcement.
+- Exact next recommended action:
+  - Commit as `Add provider enforced storage fencing`, push immediately, verify
+    PR #122 and GitHub Actions, then wait for explicit E6.4 approval.
+- Safe to resume from current branch head:
+  - yes after the E6.3 commit is pushed; no E6.4 runtime work is present.

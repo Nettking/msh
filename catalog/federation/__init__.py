@@ -66,6 +66,12 @@ from .phase_d_control import HandoverCommit, PhaseDControlPlane
 from .phase_d_handover import PhaseDHandoverCoordinator
 from .phase_d_service import PhaseDStorageService
 from .postgres_storage import PostgreSQLBatchStorageProvider
+from .provider_fencing import (
+    PROVIDER_FENCE_SCHEMA,
+    ProviderFenceStore,
+    StorageFenceAcknowledgement,
+    StorageFenceCommand,
+)
 from .providers import (
     CapabilityProvider,
     ProviderError,
@@ -142,6 +148,7 @@ __all__ = [
     "DEFAULT_DATASET_SCHEMA_VERSION",
     "MANIFEST_SCHEMA",
     "PHASE_D_SERVICE_REPLICATION_OWNER",
+    "PROVIDER_FENCE_SCHEMA",
     "RECORDER_STORAGE_SCHEMA",
     "RELAY_STORAGE_KIND",
     "REPLICATION_SCHEMA",
@@ -205,6 +212,7 @@ __all__ = [
     "PostgreSQLBatchStorageProvider",
     "ProviderError",
     "ProviderErrorCode",
+    "ProviderFenceStore",
     "RecorderDeliveryRunResult",
     "RelayNodeStorageTransport",
     "RelayStorageEndpoint",
@@ -224,6 +232,8 @@ __all__ = [
     "StorageControlPlaneStore",
     "StorageError",
     "StorageErrorCode",
+    "StorageFenceAcknowledgement",
+    "StorageFenceCommand",
     "StorageGroupAssignment",
     "StorageGroupPolicy",
     "StorageGroupState",
