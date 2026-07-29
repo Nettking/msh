@@ -40,7 +40,7 @@ has been verified. Do not build from the older Phase D branches.
 | Checkpoint | Status | Scope |
 | --- | --- | --- |
 | E0 | Completed | Contract and acceptance mapping; pure completeness contracts |
-| E1 | Current | Authoritative manifest persistence and storage-commit integration |
+| E1 | Completed | Authoritative manifest persistence and storage-commit integration |
 | E2 | Remaining | Watermarks, missing ranges, conflicts, restart persistence |
 | E3 | Remaining | Authenticated replica integrity and eligibility reporting |
 | E4 | Remaining | Deterministic complete-candidate selection |
@@ -49,9 +49,10 @@ has been verified. Do not build from the older Phase D branches.
 | E7 | Remaining | Returning former primary and relay-first catch-up |
 | E8 | Remaining | Diagnostics, end-to-end acceptance, full validation |
 
-Completed checkpoints: E0.
+Completed checkpoints: E0, E1.
 
-Current checkpoint: E1 — Authoritative manifests.
+Current checkpoint: none. E1 is complete and validated; E2 is the next
+checkpoint and has not been started.
 
 ## Acceptance mapping
 
@@ -147,6 +148,40 @@ Exact Phase 4 acceptance ledger:
     filesystem path, DSN, or transport endpoint. The E0 contract models one
     sequence namespace per dataset; multiple physical sources must use distinct
     dataset identities unless a later explicit schema revision generalizes it.
+21. E1 persists coordinator-owned manifest genesis and every immutable revision
+    in SQLite with `WAL`, `synchronous=FULL`, per-group monotonic revisions,
+    predecessor hashes, verified materialized projections, and full-chain
+    verification on both head and historical reads.
+22. A storage write prepares a coordinator manifest intent before provider
+    mutation. The intent contains immutable identity and commit-policy metadata,
+    not the potentially large content body. Finalization updates the intent,
+    manifest revision, head, datasets, and items in one SQLite transaction.
+23. Manifest-intent replay is idempotent across restart, grant renewal, and
+    handover. A policy-satisfied historical intent may be finalized after
+    authority changes, but the resulting manifest term never decreases.
+24. Existing Phase D groups with storage history but no E1 manifest are marked
+    `inventory-required`; they do not receive a silently empty authoritative
+    genesis. Provider inventory must be reconciled before later completeness or
+    eligibility decisions can treat them as authoritative.
+25. Dataset schema name/version are additive same-major request fields with
+    defaults for old peers. They are preserved through recorder delivery,
+    routing, acknowledgement state, replication, filesystem/PostgreSQL provider
+    identity, manifest intent, and authoritative manifest publication.
+26. Provider restart recovery uses a read-only committed-identity lookup. It
+    never replays ingest for a prepared-but-absent write, and it fails on an
+    immutable identity mismatch.
+27. Relay responses are accepted only from the expected authenticated node and
+    session and, when present for rolling compatibility, the expected provider.
+    Malformed or spoofed frames cannot terminate the shared reader loop.
+28. Recorder-facing logical success is accepted only after immutable batch,
+    dataset, schema, item-kind, commit-state, manifest revision, and manifest
+    hash evidence is verified against the coordinator-owned manifest history.
+    A provider cannot self-assert commit and cause removal of a local recorder
+    obligation.
+29. Phase D service-owned replication entries carry an explicit owner marker,
+    are term-scoped, and are not consumed by the generic Phase D replication
+    worker. Replica results must match the full immutable batch identity before
+    acknowledgement.
 
 ## Phase D extension points
 
@@ -178,13 +213,51 @@ Exact Phase 4 acceptance ledger:
 ## Files changed
 
 - `docs/implementation/phase_e_progress.md` — authoritative interruption-safe
-  handoff record and E0 acceptance mapping.
+  handoff record, acceptance mapping, E1 decisions, and exact validation.
 - `catalog/federation/manifest.py` — pure E0 contracts for inclusive sequence
   ranges, immutable committed items, dataset coverage targets, canonical
   per-group manifest chains, and verified SHA-256 hashes.
-- `catalog/federation/tests/test_phase_e0_contracts.py` — E0 contract,
-  serialization, corruption, identity, commit-state, range, and chain tests.
-- `catalog/federation/__init__.py` — exports the additive E0 public contracts.
+- `catalog/federation/manifest_store.py` — E1 durable coordinator-owned
+  manifests, materialized projections, prepared commit intents, corruption
+  verification, atomic finalization, and fail-closed legacy migration state.
+- `catalog/federation/phase_d_control.py` — manifest-store ownership, group
+  genesis, commit-intent preparation/finalization, and manifest reads/history.
+- `catalog/federation/phase_d_service.py` — recoverable manifest integration,
+  read-only restart reconciliation, replica-response validation, and
+  service-owned term-scoped replication delivery.
+- `catalog/federation/phase_d_client.py` — authoritative manifest verification
+  before recorder-visible commit success.
+- `catalog/federation/storage_protocol.py` — additive dataset schema
+  name/version fields.
+- `catalog/federation/commit_tracking.py` — durable schema-aware immutable
+  acknowledgement identity and legacy column migration.
+- `catalog/federation/local_storage.py` — schema-aware read-only committed
+  identity and SQLite migration.
+- `catalog/federation/postgres_storage.py` — equivalent schema-aware identity
+  and PostgreSQL migration.
+- `catalog/federation/recorder_delivery.py` — dataset schema propagation while
+  preserving local-first delivery.
+- `catalog/federation/relay_storage.py` — authenticated response binding and
+  malformed-response isolation.
+- `catalog/federation/replication.py` — service-owned outbox isolation and
+  immutable replica-result validation.
+- `catalog/federation/__init__.py` — exports the additive E0/E1 contracts.
+- `catalog/federation/tests/test_phase_e0_contracts.py` — E0 pure contract
+  tests.
+- `catalog/federation/tests/test_phase_e1_manifest_store.py` — genesis,
+  monotonic revision, restart, duplicate, conflict, transaction, projection,
+  chain-corruption, and legacy migration tests.
+- `catalog/federation/tests/test_phase_e1_service_manifest.py` — primary and
+  replicated commit integration, crash recovery, grant renewal/handover,
+  response authentication, recorder evidence, and legacy acknowledgement tests.
+- `catalog/federation/tests/test_local_storage.py` — dataset/schema identity
+  and legacy filesystem-index migration coverage.
+- `catalog/federation/tests/test_phase_d2_postgres.py` — shared backend schema
+  identity plus isolated PostgreSQL legacy-schema migration coverage.
+- `catalog/federation/tests/test_phase_d6_replication.py` — service-owned
+  outbox isolation regression.
+- `.github/workflows/phase2-federation.yml` — E0/E1 Linux and Windows test
+  coverage.
 
 ## Tests and exact results
 
@@ -225,16 +298,45 @@ E0 checkpoint validation:
 - `git diff --check`:
   passed.
 
+E1 checkpoint validation on the frozen candidate worktree:
+
+- Python compilation:
+  `python -m compileall -q catalog setup_msh.py` passed.
+- Focused E0/E1, filesystem, PostgreSQL-provider, and replication tests:
+  `53 passed, 7 skipped in 24.64s`.
+  All seven skips are PostgreSQL cases because no local PostgreSQL server is
+  running; the filesystem half of parameterized provider tests passed.
+- Full Phase D storage suite plus E0/E1:
+  `91 passed, 7 skipped in 29.08s`.
+- Phase 0/1 regression suite:
+  `64 passed in 4.68s`.
+- Phase 2 federation/node/relay suite:
+  `84 passed, 1 skipped in 48.50s`.
+- Standalone recorder v2 plus recorder control-service compatibility:
+  `20 passed in 1.16s`.
+- Ruff on `catalog/federation`, `catalog/node`, and `catalog/relay` with the
+  repository CI ignore set:
+  passed with `All checks passed!`.
+- Docker Compose base and `relay-dev` profile validation:
+  passed.
+- `git diff --check`:
+  passed.
+- PostgreSQL migration coverage was added to Linux CI using an isolated schema.
+  E0/E1 tests were added to both Linux and Windows CI; remote results are
+  pending the E1 push.
+
 ## Known failures and limitations
 
 - PR #121 is not reviewed or merged. Phase E is therefore a stacked change and
   must retain its exact base until the dependency is resolved.
-- A PostgreSQL server is not currently running locally, so four PostgreSQL
-  cases skip. They passed in PR #121 Linux CI and must run again in Phase E CI.
-- The Phase D relay response path does not yet authenticate the responder
-  against the expected target, and acknowledgement responses are not yet
-  checked against batch identity. E3 must close this before reports or
-  completeness depend on those responses.
+- A PostgreSQL server is not currently running locally, so seven PostgreSQL
+  cases skip. The E1 PostgreSQL migration test and existing provider suite must
+  pass in the draft PR's Linux CI before E1 is treated as independently
+  reviewed.
+- Existing pre-E1 groups are deliberately blocked in `inventory-required`
+  state rather than receiving an unsafe empty manifest. The provider inventory
+  reconciliation that clears this state belongs to later completeness/recovery
+  checkpoints and is not implemented in E1.
 - Phase D storage providers do not persist provider-local fencing high-water
   state. E6/E7 must add it.
 
@@ -251,16 +353,18 @@ E0 checkpoint validation:
 
 ## Exact next recommended action
 
-Commit E0 as `Define Phase E completeness contracts`, push it, and update draft
-PR #122 with the checkpoint results. Then begin E1 by adding a
-coordinator-owned transactional manifest store with a genesis head, monotonic
-per-group revision allocation, immutable item rows, duplicate/conflict
-handling, restart reconstruction, and an explicit commit-evidence integration
-boundary. Do not start E2 until the green E1 checkpoint has been pushed.
+After the E1 checkpoint commit `Add authoritative storage manifests` is pushed,
+inspect its Linux and Windows checks on draft PR #122, especially the
+PostgreSQL migration case. If either check fails, fix only E1 and publish
+another coherent E1 checkpoint before beginning E2. If both are green, a new
+Codex task may begin E2 by reading this file, the draft PR, and checkpoint
+history. Do not start E2 in the current task run.
 
 ## Safe to resume
 
-Yes. E0 is internally coherent and green. After the E0 commit is pushed, the
-branch head is safe to resume from. It adds pure contracts only and does not
-change production runtime behavior. The exact base and stacked-PR dependency
-are recorded above.
+Yes, once the E1 checkpoint commit described above is pushed. The frozen E1
+worktree is internally coherent and locally green; it changes runtime behavior
+only as one integrated authoritative-manifest unit. If interruption occurs
+before that push, the last remote-safe head remains green E0 commit
+`dd923bc30dc5f60b0133bfd90cba312bd596a2b5`. The exact base and stacked-PR
+dependency are recorded above.

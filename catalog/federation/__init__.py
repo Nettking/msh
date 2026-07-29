@@ -5,7 +5,12 @@ from .commit_tracking import DurableAcknowledgementStore, StorageCommitStatus
 from .errors import FederationValidationError
 from .filesystem_storage import FilesystemRecorderStorageProvider
 from .handover import ControlledHandover, HandoverState
-from .local_storage import BatchStorageProvider, FilesystemBatchStorageProvider, LocalStorageService
+from .local_storage import (
+    BatchStorageProvider,
+    CommittedBatchIdentity,
+    FilesystemBatchStorageProvider,
+    LocalStorageService,
+)
 from .logical_storage import (
     CallableStorageTransport,
     LogicalStorageClient,
@@ -21,6 +26,12 @@ from .manifest import (
     ManifestItem,
     ManifestItemKind,
     SequenceRange,
+)
+from .manifest_store import (
+    AuthoritativeManifestStore,
+    ManifestCommitIntent,
+    ManifestCommitResult,
+    ManifestItemProposal,
 )
 from .outbox import OutboxEntry, OutboxState, SQLiteOutbox
 from .phase_d_client import PhaseDIngestOutcome, PhaseDLogicalStorageClient
@@ -44,6 +55,7 @@ from .recorder_delivery import (
 from .registry import LocalCapabilityRegistry
 from .relay_storage import RELAY_STORAGE_KIND, RelayStorageEndpoint
 from .replication import (
+    PHASE_D_SERVICE_REPLICATION_OWNER,
     REPLICATION_SCHEMA,
     CallableReplicationTransport,
     DurableReplicationOutbox,
@@ -89,6 +101,8 @@ from .storage_control_plane import (
     StorageProviderRegistration,
 )
 from .storage_protocol import (
+    DEFAULT_DATASET_SCHEMA_NAME,
+    DEFAULT_DATASET_SCHEMA_VERSION,
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_MAJOR,
     STORAGE_PROTOCOL_VERSION,
@@ -112,6 +126,8 @@ __all__ = [
     "AcknowledgementProgress",
     "DurableAcknowledgementStore",
     "StorageCommitStatus",
+    "DEFAULT_DATASET_SCHEMA_NAME",
+    "DEFAULT_DATASET_SCHEMA_VERSION",
     "ControlledHandover",
     "HandoverState",
     "PhaseDHandoverCoordinator",
@@ -120,6 +136,7 @@ __all__ = [
     "FilesystemBatchStorageProvider",
     "PostgreSQLBatchStorageProvider",
     "BatchStorageProvider",
+    "CommittedBatchIdentity",
     "LocalStorageService",
     "AuthorizedStorageService",
     "StorageWriteAuthorityValidator",
@@ -131,6 +148,10 @@ __all__ = [
     "ManifestItem",
     "ManifestItemKind",
     "SequenceRange",
+    "AuthoritativeManifestStore",
+    "ManifestCommitIntent",
+    "ManifestCommitResult",
+    "ManifestItemProposal",
     "PhaseDLogicalStorageClient",
     "PhaseDIngestOutcome",
     "StorageRoute",
@@ -146,6 +167,7 @@ __all__ = [
     "PhaseDControlPlane",
     "HandoverCommit",
     "REPLICATION_SCHEMA",
+    "PHASE_D_SERVICE_REPLICATION_OWNER",
     "ReplicationTarget",
     "ReplicationTransport",
     "CallableReplicationTransport",

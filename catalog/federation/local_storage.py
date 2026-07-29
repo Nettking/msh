@@ -38,6 +38,14 @@ class BatchStorageProvider(Protocol):
 
     def exists(self, *, session_id: str, group_id: str, batch_id: str) -> bool: ...
 
+    def committed_identity(
+        self,
+        *,
+        session_id: str,
+        group_id: str,
+        batch_id: str,
+    ) -> CommittedBatchIdentity | None: ...
+
     def read(self, *, session_id: str, group_id: str, batch_id: str) -> object | None: ...
 
     def describe(self) -> dict[str, object]: ...
@@ -46,8 +54,12 @@ class BatchStorageProvider(Protocol):
 
 
 @dataclass(frozen=True)
-class _CommittedBatch:
+class CommittedBatchIdentity:
+    dataset_id: str
+    dataset_schema_name: str
+    dataset_schema_version: int
     batch_id: str
+    idempotency_key: str
     content_hash: str
 
 
@@ -82,6 +94,10 @@ class FilesystemBatchStorageProvider:
                     session_id TEXT NOT NULL,
                     group_id TEXT NOT NULL,
                     dataset_id TEXT NOT NULL,
+                    dataset_schema_name TEXT NOT NULL
+                        DEFAULT 'msh.storage.dataset.opaque',
+                    dataset_schema_version INTEGER NOT NULL DEFAULT 1
+                        CHECK(dataset_schema_version > 0),
                     batch_id TEXT NOT NULL,
                     idempotency_key TEXT NOT NULL,
                     content_hash TEXT NOT NULL,
@@ -92,6 +108,24 @@ class FilesystemBatchStorageProvider:
                 )
                 """
             )
+            columns = {
+                row["name"]
+                for row in connection.execute(
+                    "PRAGMA table_info(committed_batches)"
+                )
+            }
+            if "dataset_schema_name" not in columns:
+                connection.execute(
+                    """ALTER TABLE committed_batches
+                       ADD COLUMN dataset_schema_name TEXT NOT NULL
+                       DEFAULT 'msh.storage.dataset.opaque'"""
+                )
+            if "dataset_schema_version" not in columns:
+                connection.execute(
+                    """ALTER TABLE committed_batches
+                       ADD COLUMN dataset_schema_version INTEGER NOT NULL
+                       DEFAULT 1 CHECK(dataset_schema_version > 0)"""
+                )
 
     @staticmethod
     def _safe_component(value: str) -> str:
@@ -109,13 +143,31 @@ class FilesystemBatchStorageProvider:
         session_id, group_id, dataset_id, batch_id = map(self._safe_component, values)
         return Path(session_id) / group_id / dataset_id / f"{batch_id}.json"
 
-    def _by_idempotency(self, connection: sqlite3.Connection, request: BatchIngestRequest) -> _CommittedBatch | None:
+    def _by_idempotency(
+        self,
+        connection: sqlite3.Connection,
+        request: BatchIngestRequest,
+    ) -> CommittedBatchIdentity | None:
         row = connection.execute(
-            """SELECT batch_id, content_hash FROM committed_batches
+            """SELECT dataset_id, dataset_schema_name,
+                      dataset_schema_version, batch_id, idempotency_key,
+                      content_hash
+               FROM committed_batches
                WHERE session_id = ? AND group_id = ? AND idempotency_key = ?""",
             (request.authority.session_id, request.authority.group_id, request.idempotency_key),
         ).fetchone()
-        return None if row is None else _CommittedBatch(row["batch_id"], row["content_hash"])
+        return (
+            None
+            if row is None
+            else CommittedBatchIdentity(
+                row["dataset_id"],
+                row["dataset_schema_name"],
+                int(row["dataset_schema_version"]),
+                row["batch_id"],
+                row["idempotency_key"],
+                row["content_hash"],
+            )
+        )
 
     def ingest(self, request: BatchIngestRequest) -> BatchIngestResult:
         request.validate_content_hash()
@@ -127,6 +179,23 @@ class FilesystemBatchStorageProvider:
             connection.execute("BEGIN IMMEDIATE")
             existing = self._by_idempotency(connection, request)
             if existing is not None:
+                if existing.dataset_id != request.dataset_id:
+                    raise FederationValidationError(
+                        StorageErrorCode.IDEMPOTENCY_CONFLICT.value,
+                        "dataset_id",
+                        "idempotency identity was previously committed to another dataset",
+                    )
+                if (
+                    existing.dataset_schema_name
+                    != request.dataset_schema_name
+                    or existing.dataset_schema_version
+                    != request.dataset_schema_version
+                ):
+                    raise FederationValidationError(
+                        StorageErrorCode.IDEMPOTENCY_CONFLICT.value,
+                        "dataset_schema_name",
+                        "dataset schema changed for an immutable batch",
+                    )
                 state = classify_idempotent_ingest(
                     existing_batch_id=existing.batch_id,
                     existing_content_hash=existing.content_hash,
@@ -136,15 +205,31 @@ class FilesystemBatchStorageProvider:
                 return BatchIngestResult(request.batch_id, request.idempotency_key, request.content_hash, state)
 
             by_batch = connection.execute(
-                """SELECT idempotency_key, content_hash FROM committed_batches
+                """SELECT dataset_id, dataset_schema_name,
+                          dataset_schema_version, idempotency_key, content_hash
+                   FROM committed_batches
                    WHERE session_id = ? AND group_id = ? AND batch_id = ?""",
                 (request.authority.session_id, request.authority.group_id, request.batch_id),
             ).fetchone()
             if by_batch is not None:
+                field = (
+                    "dataset_id"
+                    if by_batch["dataset_id"] != request.dataset_id
+                    else (
+                        "dataset_schema_name"
+                        if (
+                            by_batch["dataset_schema_name"]
+                            != request.dataset_schema_name
+                            or int(by_batch["dataset_schema_version"])
+                            != request.dataset_schema_version
+                        )
+                        else "batch_id"
+                    )
+                )
                 raise FederationValidationError(
                     StorageErrorCode.IDEMPOTENCY_CONFLICT.value,
-                    "batch_id",
-                    "was previously committed with another idempotency key or content hash",
+                    field,
+                    "was previously committed with different immutable batch identity",
                 )
 
             payload = json.dumps(request.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
@@ -158,13 +243,16 @@ class FilesystemBatchStorageProvider:
                 os.replace(temporary_path, final_path)
                 connection.execute(
                     """INSERT INTO committed_batches
-                       (session_id, group_id, dataset_id, batch_id, idempotency_key,
+                       (session_id, group_id, dataset_id, dataset_schema_name,
+                        dataset_schema_version, batch_id, idempotency_key,
                         content_hash, relative_path, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
                         request.authority.session_id,
                         request.authority.group_id,
                         request.dataset_id,
+                        request.dataset_schema_name,
+                        request.dataset_schema_version,
                         request.batch_id,
                         request.idempotency_key,
                         request.content_hash,
@@ -188,12 +276,43 @@ class FilesystemBatchStorageProvider:
         )
 
     def exists(self, *, session_id: str, group_id: str, batch_id: str) -> bool:
+        return (
+            self.committed_identity(
+                session_id=session_id,
+                group_id=group_id,
+                batch_id=batch_id,
+            )
+            is not None
+        )
+
+    def committed_identity(
+        self,
+        *,
+        session_id: str,
+        group_id: str,
+        batch_id: str,
+    ) -> CommittedBatchIdentity | None:
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT 1 FROM committed_batches WHERE session_id = ? AND group_id = ? AND batch_id = ?",
+                """SELECT dataset_id, dataset_schema_name,
+                          dataset_schema_version, batch_id, idempotency_key,
+                          content_hash
+                   FROM committed_batches
+                   WHERE session_id = ? AND group_id = ? AND batch_id = ?""",
                 (session_id, group_id, batch_id),
             ).fetchone()
-        return row is not None
+        return (
+            None
+            if row is None
+            else CommittedBatchIdentity(
+                row["dataset_id"],
+                row["dataset_schema_name"],
+                int(row["dataset_schema_version"]),
+                row["batch_id"],
+                row["idempotency_key"],
+                row["content_hash"],
+            )
+        )
 
     def read(self, *, session_id: str, group_id: str, batch_id: str) -> object | None:
         with self._connect() as connection:

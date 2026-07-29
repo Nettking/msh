@@ -28,6 +28,8 @@ class RecorderStorageClient(Protocol):
         idempotency_key: str,
         content: object,
         created_at: datetime,
+        dataset_schema_name: str = "msh.storage.dataset.opaque",
+        dataset_schema_version: int = 1,
     ) -> PhaseDIngestOutcome: ...
 
 
@@ -62,6 +64,8 @@ class DurableRecorderDeliveryQueue:
         idempotency_key: str,
         content: object,
         created_at: datetime,
+        dataset_schema_name: str = "msh.storage.dataset.opaque",
+        dataset_schema_version: int = 1,
     ):
         content_hash = BatchIngestRequest.calculate_content_hash(content)
         return self.outbox.enqueue(
@@ -71,6 +75,8 @@ class DurableRecorderDeliveryQueue:
             payload={
                 "group_id": group_id,
                 "dataset_id": dataset_id,
+                "dataset_schema_name": dataset_schema_name,
+                "dataset_schema_version": dataset_schema_version,
                 "batch_id": batch_id,
                 "idempotency_key": idempotency_key,
                 "content": content,
@@ -100,6 +106,15 @@ class DurableRecorderDeliveryQueue:
                 outcome = await self.client.ingest_batch(
                     group_id=str(payload["group_id"]),
                     dataset_id=str(payload["dataset_id"]),
+                    dataset_schema_name=str(
+                        payload.get(
+                            "dataset_schema_name",
+                            "msh.storage.dataset.opaque",
+                        )
+                    ),
+                    dataset_schema_version=int(
+                        payload.get("dataset_schema_version", 1)
+                    ),
                     batch_id=str(payload["batch_id"]),
                     idempotency_key=str(payload["idempotency_key"]),
                     content=payload["content"],

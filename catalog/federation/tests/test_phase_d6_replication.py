@@ -6,8 +6,11 @@ from pathlib import Path
 
 from catalog.federation.outbox import OutboxState, SQLiteOutbox
 from catalog.federation.replication import (
+    PHASE_D_SERVICE_REPLICATION_OWNER,
+    REPLICATION_SCHEMA,
     DurableReplicationOutbox,
     ReplicationPlanner,
+    ReplicationRunResult,
     ReplicationWorker,
 )
 from catalog.federation.storage_control_plane import (
@@ -18,6 +21,8 @@ from catalog.federation.storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
     BatchIngestRequest,
+    BatchIngestResult,
+    BatchIngestState,
     StorageResponseEnvelope,
     WriteAuthority,
 )
@@ -34,12 +39,18 @@ class FakeTransport:
         self.calls.append((target_node_id, envelope))
         if self.fail:
             raise RuntimeError("replica unavailable")
+        request = BatchIngestRequest.from_dict(envelope.payload)
         return StorageResponseEnvelope(
             request_id=envelope.request_id,
             protocol=STORAGE_PROTOCOL,
             protocol_version=STORAGE_PROTOCOL_VERSION,
             ok=True,
-            result={"stored": True},
+            result=BatchIngestResult(
+                batch_id=request.batch_id,
+                idempotency_key=request.idempotency_key,
+                content_hash=request.content_hash,
+                state=BatchIngestState.STORED,
+            ).to_dict(),
         )
 
 
@@ -183,3 +194,33 @@ def test_restart_recovers_pending_replication(tmp_path: Path) -> None:
 
     assert result.completed == 2
     assert recovered_outbox.pending() == ()
+
+
+def test_generic_worker_does_not_consume_service_owned_ack_entries(
+    tmp_path: Path,
+) -> None:
+    outbox = SQLiteOutbox(tmp_path / "outbox.sqlite3")
+    request = _request()
+    entry, _created = outbox.enqueue(
+        session_id=request.authority.session_id,
+        destination_id="provider-replica-a",
+        schema_id=REPLICATION_SCHEMA,
+        payload={
+            "delivery_owner": PHASE_D_SERVICE_REPLICATION_OWNER,
+            "request": request.to_dict(),
+        },
+        idempotency_key="service-owned",
+        content_hash=request.content_hash,
+        now=NOW,
+    )
+    worker = ReplicationWorker(
+        outbox=outbox,
+        transport=FakeTransport(),
+        actor_node_id="node-primary",
+        clock=lambda: NOW,
+    )
+
+    result = asyncio.run(worker.run_once())
+
+    assert result == ReplicationRunResult(0, 0, 0)
+    assert outbox.get(entry.outbox_id) == entry

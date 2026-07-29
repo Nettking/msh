@@ -14,6 +14,7 @@ import psycopg
 from psycopg.rows import dict_row
 
 from .errors import FederationValidationError
+from .local_storage import CommittedBatchIdentity
 from .storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
@@ -49,6 +50,10 @@ class PostgreSQLBatchStorageProvider:
                     session_id TEXT NOT NULL,
                     group_id TEXT NOT NULL,
                     dataset_id TEXT NOT NULL,
+                    dataset_schema_name TEXT NOT NULL
+                        DEFAULT 'msh.storage.dataset.opaque',
+                    dataset_schema_version INTEGER NOT NULL
+                        DEFAULT 1 CHECK(dataset_schema_version > 0),
                     batch_id TEXT NOT NULL,
                     idempotency_key TEXT NOT NULL,
                     content_hash TEXT NOT NULL,
@@ -58,6 +63,17 @@ class PostgreSQLBatchStorageProvider:
                     UNIQUE (session_id, group_id, idempotency_key)
                 )
                 """
+            )
+            cursor.execute(
+                """ALTER TABLE msh_storage_batches
+                   ADD COLUMN IF NOT EXISTS dataset_schema_name TEXT NOT NULL
+                   DEFAULT 'msh.storage.dataset.opaque'"""
+            )
+            cursor.execute(
+                """ALTER TABLE msh_storage_batches
+                   ADD COLUMN IF NOT EXISTS dataset_schema_version
+                   INTEGER NOT NULL DEFAULT 1
+                   CHECK(dataset_schema_version > 0)"""
             )
 
     def ingest(self, request: BatchIngestRequest) -> BatchIngestResult:
@@ -71,7 +87,8 @@ class PostgreSQLBatchStorageProvider:
             )
             cursor.execute(
                 """
-                SELECT batch_id, content_hash
+                SELECT dataset_id, dataset_schema_name,
+                       dataset_schema_version, batch_id, content_hash
                 FROM msh_storage_batches
                 WHERE session_id = %s AND group_id = %s AND idempotency_key = %s
                 """,
@@ -83,6 +100,23 @@ class PostgreSQLBatchStorageProvider:
             )
             existing = cursor.fetchone()
             if existing is not None:
+                if existing["dataset_id"] != request.dataset_id:
+                    raise FederationValidationError(
+                        StorageErrorCode.IDEMPOTENCY_CONFLICT.value,
+                        "dataset_id",
+                        "idempotency identity was previously committed to another dataset",
+                    )
+                if (
+                    existing["dataset_schema_name"]
+                    != request.dataset_schema_name
+                    or int(existing["dataset_schema_version"])
+                    != request.dataset_schema_version
+                ):
+                    raise FederationValidationError(
+                        StorageErrorCode.IDEMPOTENCY_CONFLICT.value,
+                        "dataset_schema_name",
+                        "dataset schema changed for an immutable batch",
+                    )
                 state = classify_idempotent_ingest(
                     existing_batch_id=existing["batch_id"],
                     existing_content_hash=existing["content_hash"],
@@ -98,7 +132,8 @@ class PostgreSQLBatchStorageProvider:
 
             cursor.execute(
                 """
-                SELECT idempotency_key, content_hash
+                SELECT dataset_id, dataset_schema_name,
+                       dataset_schema_version, idempotency_key, content_hash
                 FROM msh_storage_batches
                 WHERE session_id = %s AND group_id = %s AND batch_id = %s
                 """,
@@ -106,23 +141,40 @@ class PostgreSQLBatchStorageProvider:
             )
             by_batch = cursor.fetchone()
             if by_batch is not None:
+                field = (
+                    "dataset_id"
+                    if by_batch["dataset_id"] != request.dataset_id
+                    else (
+                        "dataset_schema_name"
+                        if (
+                            by_batch["dataset_schema_name"]
+                            != request.dataset_schema_name
+                            or int(by_batch["dataset_schema_version"])
+                            != request.dataset_schema_version
+                        )
+                        else "batch_id"
+                    )
+                )
                 raise FederationValidationError(
                     StorageErrorCode.IDEMPOTENCY_CONFLICT.value,
-                    "batch_id",
-                    "was previously committed with another idempotency key or content hash",
+                    field,
+                    "was previously committed with different immutable batch identity",
                 )
 
             cursor.execute(
                 """
                 INSERT INTO msh_storage_batches (
-                    session_id, group_id, dataset_id, batch_id,
+                    session_id, group_id, dataset_id, dataset_schema_name,
+                    dataset_schema_version, batch_id,
                     idempotency_key, content_hash, content, created_at
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s::jsonb, %s)
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, %s)
                 """,
                 (
                     authority.session_id,
                     authority.group_id,
                     request.dataset_id,
+                    request.dataset_schema_name,
+                    request.dataset_schema_version,
                     request.batch_id,
                     request.idempotency_key,
                     request.content_hash,
@@ -145,15 +197,46 @@ class PostgreSQLBatchStorageProvider:
         )
 
     def exists(self, *, session_id: str, group_id: str, batch_id: str) -> bool:
+        return (
+            self.committed_identity(
+                session_id=session_id,
+                group_id=group_id,
+                batch_id=batch_id,
+            )
+            is not None
+        )
+
+    def committed_identity(
+        self,
+        *,
+        session_id: str,
+        group_id: str,
+        batch_id: str,
+    ) -> CommittedBatchIdentity | None:
         with self._connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT 1 FROM msh_storage_batches
+                SELECT dataset_id, dataset_schema_name,
+                       dataset_schema_version, batch_id, idempotency_key,
+                       content_hash
+                FROM msh_storage_batches
                 WHERE session_id = %s AND group_id = %s AND batch_id = %s
                 """,
                 (session_id, group_id, batch_id),
             )
-            return cursor.fetchone() is not None
+            row = cursor.fetchone()
+            return (
+                None
+                if row is None
+                else CommittedBatchIdentity(
+                    row["dataset_id"],
+                    row["dataset_schema_name"],
+                    int(row["dataset_schema_version"]),
+                    row["batch_id"],
+                    row["idempotency_key"],
+                    row["content_hash"],
+                )
+            )
 
     def read(self, *, session_id: str, group_id: str, batch_id: str) -> object | None:
         with self._connect() as connection, connection.cursor() as cursor:

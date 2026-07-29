@@ -7,15 +7,22 @@ from collections.abc import Callable
 from datetime import datetime, timezone
 from typing import Protocol
 
-from .commit_tracking import DurableAcknowledgementStore
+from .commit_tracking import DurableAcknowledgementStore, StorageCommitStatus
 from .errors import FederationValidationError
 from .local_storage import BatchStorageProvider, LocalStorageService
+from .manifest import AuthoritativeStorageManifest
+from .manifest_store import ManifestCommitIntent
 from .outbox import OutboxEntry, OutboxState, SQLiteOutbox
-from .replication import REPLICATION_SCHEMA, ReplicationTransport
+from .replication import (
+    PHASE_D_SERVICE_REPLICATION_OWNER,
+    REPLICATION_SCHEMA,
+    ReplicationTransport,
+)
 from .storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
     BatchIngestRequest,
+    BatchIngestResult,
     StorageError,
     StorageErrorCode,
     StorageOperation,
@@ -23,11 +30,42 @@ from .storage_protocol import (
     StorageResponseEnvelope,
 )
 
-
 class OperationalControlPlane(Protocol):
     def snapshot(self, session_id: str): ...
 
     def acknowledgement_policy(self, session_id: str, group_id: str): ...
+
+    def prepare_batch_manifest(
+        self,
+        request: BatchIngestRequest,
+        status: StorageCommitStatus,
+        *,
+        primary_provider_id: str,
+        now: datetime,
+    ) -> ManifestCommitIntent: ...
+
+    def commit_batch_manifest(
+        self,
+        request: BatchIngestRequest,
+        status: StorageCommitStatus,
+        *,
+        primary_provider_id: str,
+        now: datetime,
+    ) -> AuthoritativeStorageManifest: ...
+
+    def pending_batch_manifest_intents(
+        self,
+        *,
+        primary_provider_id: str,
+    ) -> tuple[ManifestCommitIntent, ...]: ...
+
+    def finalize_batch_manifest_intent(
+        self,
+        intent: ManifestCommitIntent,
+        status: StorageCommitStatus,
+        *,
+        now: datetime,
+    ) -> AuthoritativeStorageManifest: ...
 
 
 def _now() -> datetime:
@@ -79,14 +117,17 @@ class PhaseDStorageService:
             if kind == "storage-replication":
                 result = self._ingest_replica(envelope, request)
                 return self._success(envelope, result.to_dict())
-            result, status = await self._ingest_primary(envelope, request)
+            result, status, manifest = await self._ingest_primary(envelope, request)
             if status.committed:
+                assert manifest is not None
                 payload = result.to_dict()
                 payload.update(
                     {
                         "commit_state": "committed",
                         "required_replica_acks": status.required_replica_acks,
                         "acknowledged_replica_ids": list(status.acknowledged_replica_ids),
+                        "manifest_revision": manifest.revision,
+                        "manifest_hash": manifest.manifest_hash,
                     }
                 )
                 return self._success(envelope, payload)
@@ -103,16 +144,30 @@ class PhaseDStorageService:
                 ),
             )
         except FederationValidationError as exc:
+            retryable = exc.code in {
+                "concurrent-control-change",
+                "concurrent-manifest-change",
+                "manifest-commit-not-ready",
+            }
             try:
                 code = StorageErrorCode(exc.code)
             except ValueError:
-                code = StorageErrorCode.INVALID_REQUEST
+                code = (
+                    StorageErrorCode.INTERNAL_ERROR
+                    if retryable
+                    else StorageErrorCode.INVALID_REQUEST
+                )
             return StorageResponseEnvelope(
                 request_id=envelope.request_id,
                 protocol=STORAGE_PROTOCOL,
                 protocol_version=envelope.protocol_version,
                 ok=False,
-                error=StorageError(code=code, message=exc.message, field=exc.field),
+                error=StorageError(
+                    code=code,
+                    message=exc.message,
+                    field=exc.field,
+                    retryable=retryable,
+                ),
             )
         except (OSError, sqlite3.Error, TimeoutError, RuntimeError, TypeError, ValueError) as exc:
             return StorageResponseEnvelope(
@@ -233,7 +288,27 @@ class PhaseDStorageService:
             replica_provider_ids=replica_ids,
             now=self.clock(),
         )
-        prepared = self._prepare_replication(snapshot, request, replica_ids)
+        manifest_intent = self.control_plane.prepare_batch_manifest(
+            request,
+            status,
+            primary_provider_id=self.provider_id,
+            now=self.clock(),
+        )
+        if manifest_intent.primary_provider_id != self.provider_id:
+            raise FederationValidationError(
+                "manifest-intent-primary-conflict",
+                "primary_provider_id",
+                "prepared intent belongs to another primary provider",
+            )
+        already_authoritative = (
+            manifest_intent.committed_revision is not None
+            and status.committed
+        )
+        prepared = (
+            ()
+            if already_authoritative
+            else self._prepare_replication(snapshot, request, replica_ids)
+        )
         result = self.provider.ingest(request)
         status = self.acknowledgements.mark_primary_committed(
             request.authority.session_id,
@@ -252,7 +327,22 @@ class PhaseDStorageService:
                 request.batch_id,
             )
             assert status is not None
-        return result, status
+        manifest = None
+        if status.committed:
+            manifest = self._commit_manifest(request, status)
+        return result, status, manifest
+
+    def _commit_manifest(
+        self,
+        request: BatchIngestRequest,
+        status: StorageCommitStatus,
+    ) -> AuthoritativeStorageManifest:
+        return self.control_plane.commit_batch_manifest(
+            request,
+            status,
+            primary_provider_id=self.provider_id,
+            now=self.clock(),
+        )
 
     def _prepare_replication(self, snapshot, request: BatchIngestRequest, replica_ids: tuple[str, ...]) -> tuple[OutboxEntry, ...]:
         assert self.outbox is not None
@@ -268,12 +358,16 @@ class PhaseDStorageService:
                 destination_id=provider_id,
                 schema_id=REPLICATION_SCHEMA,
                 payload={
+                    "delivery_owner": PHASE_D_SERVICE_REPLICATION_OWNER,
                     "target_node_id": provider.node_id,
                     "target_provider_id": provider_id,
                     "group_id": request.authority.group_id,
                     "request": request.to_dict(),
                 },
-                idempotency_key=f"{request.idempotency_key}:{provider_id}",
+                idempotency_key=(
+                    f"{request.idempotency_key}:{provider_id}:"
+                    f"term-{request.authority.term}"
+                ),
                 content_hash=request.content_hash,
                 now=self.clock(),
             )
@@ -312,7 +406,6 @@ class PhaseDStorageService:
                 continue
             try:
                 await self._deliver_entry(entry)
-                self.outbox.acknowledge(entry.outbox_id, now=self.clock())
                 payload = entry.payload
                 self.acknowledgements.acknowledge(
                     request.authority.session_id,
@@ -321,6 +414,16 @@ class PhaseDStorageService:
                     str(payload["target_provider_id"]),
                     now=self.clock(),
                 )
+                for completed in self.outbox.pending():
+                    if self._same_replica_copy(
+                        completed,
+                        request,
+                        str(payload["target_provider_id"]),
+                    ):
+                        self.outbox.acknowledge(
+                            completed.outbox_id,
+                            now=self.clock(),
+                        )
             except (FederationValidationError, OSError, RuntimeError, TimeoutError, TypeError, ValueError) as exc:
                 self.outbox.record_failure(entry.outbox_id, error=str(exc), now=self.clock())
 
@@ -328,13 +431,46 @@ class PhaseDStorageService:
     def _entry_matches(entry: OutboxEntry, request: BatchIngestRequest) -> bool:
         if entry.schema_id != REPLICATION_SCHEMA or not isinstance(entry.payload, dict):
             return False
+        if (
+            entry.payload.get("delivery_owner")
+            != PHASE_D_SERVICE_REPLICATION_OWNER
+        ):
+            return False
         value = entry.payload.get("request")
         if not isinstance(value, dict):
             return False
+        try:
+            candidate = BatchIngestRequest.from_dict(value)
+        except FederationValidationError:
+            return False
+        return PhaseDStorageService._same_batch_identity(candidate, request)
+
+    @staticmethod
+    def _same_batch_identity(
+        left: BatchIngestRequest,
+        right: BatchIngestRequest,
+    ) -> bool:
         return (
-            value.get("batch_id") == request.batch_id
-            and value.get("authority", {}).get("session_id") == request.authority.session_id
-            and value.get("authority", {}).get("group_id") == request.authority.group_id
+            left.authority.session_id == right.authority.session_id
+            and left.authority.group_id == right.authority.group_id
+            and left.dataset_id == right.dataset_id
+            and left.dataset_schema_name == right.dataset_schema_name
+            and left.dataset_schema_version == right.dataset_schema_version
+            and left.batch_id == right.batch_id
+            and left.idempotency_key == right.idempotency_key
+            and left.content_hash == right.content_hash
+        )
+
+    @staticmethod
+    def _same_replica_copy(
+        entry: OutboxEntry,
+        request: BatchIngestRequest,
+        provider_id: str,
+    ) -> bool:
+        return (
+            isinstance(entry.payload, dict)
+            and entry.payload.get("target_provider_id") == provider_id
+            and PhaseDStorageService._entry_matches(entry, request)
         )
 
     async def _deliver_entry(self, entry: OutboxEntry) -> None:
@@ -380,26 +516,58 @@ class PhaseDStorageService:
                 response.error.field or "replication",
                 response.error.message,
             )
+        result = BatchIngestResult.from_dict(response.result)
+        if (
+            result.batch_id != request.batch_id
+            or result.idempotency_key != request.idempotency_key
+            or result.content_hash != request.content_hash
+        ):
+            raise FederationValidationError(
+                "replication-identity-mismatch",
+                "result",
+                "replica response does not match the immutable batch identity",
+            )
 
     def reconcile_prepared(self) -> int:
-        """Activate intents left prepared after primary storage became durable."""
+        """Recover provider-durable intents and finish eligible manifest commits."""
 
         if self.outbox is None or self.acknowledgements is None:
             return 0
-        activated = 0
+        recovered = 0
         for entry in self.outbox.prepared():
-            if entry.schema_id != REPLICATION_SCHEMA or not isinstance(entry.payload, dict):
+            if (
+                entry.schema_id != REPLICATION_SCHEMA
+                or not isinstance(entry.payload, dict)
+            ):
                 continue
             request_value = entry.payload.get("request")
             if not isinstance(request_value, dict):
                 continue
             request = BatchIngestRequest.from_dict(request_value)
-            if not self.provider.exists(
+            # Recovery is read-only: a PREPARED intent may represent a crash
+            # before provider mutation and must never create a stale write.
+            result = self.provider.committed_identity(
                 session_id=request.authority.session_id,
                 group_id=request.authority.group_id,
                 batch_id=request.batch_id,
-            ):
+            )
+            if result is None:
                 continue
+            if (
+                result.batch_id != request.batch_id
+                or result.idempotency_key != request.idempotency_key
+                or result.content_hash != request.content_hash
+                or result.dataset_id != request.dataset_id
+                or result.dataset_schema_name
+                != request.dataset_schema_name
+                or result.dataset_schema_version
+                != request.dataset_schema_version
+            ):
+                raise FederationValidationError(
+                    "provider-identity-mismatch",
+                    "result",
+                    "durable provider item does not match the recovery intent",
+                )
             self.acknowledgements.mark_primary_committed(
                 request.authority.session_id,
                 request.authority.group_id,
@@ -407,5 +575,57 @@ class PhaseDStorageService:
                 now=self.clock(),
             )
             self.outbox.activate(entry.outbox_id, now=self.clock())
-            activated += 1
-        return activated
+            recovered += 1
+
+        intents = self.control_plane.pending_batch_manifest_intents(
+            primary_provider_id=self.provider_id,
+        )
+        for intent in intents:
+            identity = self.provider.committed_identity(
+                session_id=intent.session_id,
+                group_id=intent.group_id,
+                batch_id=intent.item_id,
+            )
+            if identity is None:
+                continue
+            if (
+                identity.dataset_id != intent.dataset_id
+                or identity.batch_id != intent.item_id
+                or identity.idempotency_key != intent.idempotency_key
+                or identity.content_hash != intent.content_hash
+                or identity.dataset_schema_name != intent.schema_name
+                or identity.dataset_schema_version != intent.schema_version
+            ):
+                raise FederationValidationError(
+                    "provider-identity-mismatch",
+                    "manifest_intent",
+                    "provider item does not match coordinator intent",
+                )
+            status = self.acknowledgements.status(
+                intent.session_id,
+                intent.group_id,
+                intent.item_id,
+            )
+            if status is None:
+                continue
+            status = self.acknowledgements.mark_primary_committed(
+                intent.session_id,
+                intent.group_id,
+                intent.item_id,
+                now=self.clock(),
+            )
+            if not status.committed:
+                continue
+            manifest = self.control_plane.finalize_batch_manifest_intent(
+                intent,
+                status,
+                now=self.clock(),
+            )
+            if manifest.revision < 1:
+                raise FederationValidationError(
+                    "invalid-manifest-revision",
+                    "manifest_revision",
+                    "a committed batch must appear after genesis",
+                )
+            recovered += 1
+        return recovered
