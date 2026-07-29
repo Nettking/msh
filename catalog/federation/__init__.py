@@ -14,6 +14,14 @@ from .logical_storage import (
     StorageRoute,
     StorageRouteResolver,
 )
+from .manifest import (
+    MANIFEST_SCHEMA,
+    AuthoritativeStorageManifest,
+    DatasetManifest,
+    ManifestItem,
+    ManifestItemKind,
+    SequenceRange,
+)
 from .outbox import OutboxEntry, OutboxState, SQLiteOutbox
 from .phase_d_client import PhaseDIngestOutcome, PhaseDLogicalStorageClient
 from .phase_d_control import HandoverCommit, PhaseDControlPlane
@@ -117,6 +125,12 @@ __all__ = [
     "StorageWriteAuthorityValidator",
     "PhaseDStorageService",
     "LogicalStorageClient",
+    "MANIFEST_SCHEMA",
+    "AuthoritativeStorageManifest",
+    "DatasetManifest",
+    "ManifestItem",
+    "ManifestItemKind",
+    "SequenceRange",
     "PhaseDLogicalStorageClient",
     "PhaseDIngestOutcome",
     "StorageRoute",

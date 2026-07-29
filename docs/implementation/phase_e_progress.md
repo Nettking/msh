@@ -26,9 +26,11 @@ correct over the existing relay-first transport.
   Its GitHub Actions run `30409541564` completed successfully on Linux and
   Windows.
 - Current branch: `agent/phase-e-completeness-aware-failover`
-- Draft pull request: pending creation after this bootstrap commit is pushed.
-  Until PR #121 merges, the Phase E PR must target
-  `agent/complete-phase-d-integration` so its diff contains only Phase E.
+- Draft pull request: #122,
+  `https://github.com/Nettking/msh/pull/122`
+- PR title: `Implement Phase E completeness-aware failover`
+- PR base: `agent/complete-phase-d-integration`. Until PR #121 merges, the
+  Phase E PR must keep this target so its diff contains only Phase E.
 
 Do not rebase this branch onto `main` unless PR #121 has merged and the new base
 has been verified. Do not build from the older Phase D branches.
@@ -37,8 +39,8 @@ has been verified. Do not build from the older Phase D branches.
 
 | Checkpoint | Status | Scope |
 | --- | --- | --- |
-| E0 | Current | Contract and acceptance mapping; pure completeness contracts |
-| E1 | Remaining | Authoritative manifest persistence and storage-commit integration |
+| E0 | Completed | Contract and acceptance mapping; pure completeness contracts |
+| E1 | Current | Authoritative manifest persistence and storage-commit integration |
 | E2 | Remaining | Watermarks, missing ranges, conflicts, restart persistence |
 | E3 | Remaining | Authenticated replica integrity and eligibility reporting |
 | E4 | Remaining | Deterministic complete-candidate selection |
@@ -47,9 +49,9 @@ has been verified. Do not build from the older Phase D branches.
 | E7 | Remaining | Returning former primary and relay-first catch-up |
 | E8 | Remaining | Diagnostics, end-to-end acceptance, full validation |
 
-Completed checkpoints: none.
+Completed checkpoints: E0.
 
-Current checkpoint: E0 — Contract and acceptance mapping.
+Current checkpoint: E1 — Authoritative manifests.
 
 ## Acceptance mapping
 
@@ -133,6 +135,18 @@ Exact Phase 4 acceptance ledger:
 17. Direct peer transport, NAT traversal, peer ports, direct encrypted transfer
     streams, transport negotiation, resumable transport chunks, and transport
     performance changes are Phase F and excluded.
+18. The new richer manifest uses
+    `msh.authoritative_storage_manifest.v1`; it does not reuse the incompatible
+    legacy `msh.storage_manifest.v1` model. Existing Phase 0 public models remain
+    backward compatible.
+19. Canonical manifest hashes include schema, session/group, revision, term,
+    predecessor hash, commit state, datasets, and committed items. They exclude
+    wall-clock `updated_at`. Changing the leadership term therefore requires a
+    new manifest revision even when data is unchanged.
+20. `source_id` is a stable logical sequence namespace, never a node address,
+    filesystem path, DSN, or transport endpoint. The E0 contract models one
+    sequence namespace per dataset; multiple physical sources must use distinct
+    dataset identities unless a later explicit schema revision generalizes it.
 
 ## Phase D extension points
 
@@ -163,10 +177,14 @@ Exact Phase 4 acceptance ledger:
 
 ## Files changed
 
-- `docs/implementation/phase_e_progress.md` — created as the authoritative
-  interruption-safe handoff record.
-
-No runtime files have been changed yet.
+- `docs/implementation/phase_e_progress.md` — authoritative interruption-safe
+  handoff record and E0 acceptance mapping.
+- `catalog/federation/manifest.py` — pure E0 contracts for inclusive sequence
+  ranges, immutable committed items, dataset coverage targets, canonical
+  per-group manifest chains, and verified SHA-256 hashes.
+- `catalog/federation/tests/test_phase_e0_contracts.py` — E0 contract,
+  serialization, corruption, identity, commit-state, range, and chain tests.
+- `catalog/federation/__init__.py` — exports the additive E0 public contracts.
 
 ## Tests and exact results
 
@@ -188,14 +206,31 @@ test collection because `psycopg` was absent. This was an environment setup
 failure, not a repository failure; the repository dependencies were then
 installed in ignored `.venv/` and the results above were obtained.
 
+E0 checkpoint validation:
+
+- Focused E0 contracts:
+  `9 passed in 1.62s`.
+- E0 plus Phase 0/1 regression suite:
+  `73 passed in 3.57s`.
+- Phase D regression suite excluding PostgreSQL-backed cases:
+  `49 passed in 6.74s`.
+- Phase 2 node/relay suite:
+  `84 passed, 1 skipped in 61.04s`.
+- Python compilation:
+  `python -m compileall -q catalog setup_msh.py` passed.
+- Ruff on changed Python paths with the repository CI ignore set:
+  passed with `All checks passed!`.
+- Docker Compose base and `relay-dev` profile validation:
+  passed.
+- `git diff --check`:
+  passed.
+
 ## Known failures and limitations
 
 - PR #121 is not reviewed or merged. Phase E is therefore a stacked change and
   must retain its exact base until the dependency is resolved.
 - A PostgreSQL server is not currently running locally, so four PostgreSQL
   cases skip. They passed in PR #121 Linux CI and must run again in Phase E CI.
-- Docker is installed, but sandboxed commands warn that the user Docker config
-  is inaccessible. Compose validation still needs to be run and recorded.
 - The Phase D relay response path does not yet authenticate the responder
   against the expected target, and acknowledgement responses are not yet
   checked against batch identity. E3 must close this before reports or
@@ -216,13 +251,16 @@ installed in ignored `.venv/` and the results above were obtained.
 
 ## Exact next recommended action
 
-Push this documentation-only bootstrap commit, create the draft PR titled
-`Implement Phase E completeness-aware failover` against
-`agent/complete-phase-d-integration`, replace the pending PR entry above with
-the PR number, then complete E0 pure contracts and tests. Do not start E1 until
-the green E0 commit has been pushed and the PR description updated.
+Commit E0 as `Define Phase E completeness contracts`, push it, and update draft
+PR #122 with the checkpoint results. Then begin E1 by adding a
+coordinator-owned transactional manifest store with a genesis head, monotonic
+per-group revision allocation, immutable item rows, duplicate/conflict
+handling, restart reconstruction, and an explicit commit-evidence integration
+boundary. Do not start E2 until the green E1 checkpoint has been pushed.
 
 ## Safe to resume
 
-Yes. This document-only branch state contains no runtime changes and is safe to
-resume from. The exact base and stacked-PR dependency are recorded above.
+Yes. E0 is internally coherent and green. After the E0 commit is pushed, the
+branch head is safe to resume from. It adds pure contracts only and does not
+change production runtime behavior. The exact base and stacked-PR dependency
+are recorded above.
