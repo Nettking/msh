@@ -902,7 +902,8 @@ checkpoints.
   E6.3, E6.4, E6.5, and E6.6.
 - Current checkpoint:
   - E6.6 full restart recovery and duplicate reconciliation are complete and
-    validated locally. Commit and push remain for publication.
+    validated and pushed as
+    `e8a11585d80a94869cccc323d3fcf122d0e0dd8a`.
 - Remaining checkpoints:
   - E7 returning former-primary recovery and relay-first catch-up.
   - E8 diagnostics and end-to-end acceptance.
@@ -990,12 +991,13 @@ checkpoints.
     notices were emitted.
 - Known failures:
   - None in the required local E6.6 validation.
+  - GitHub Actions is pending for the latest branch head; no remote test
+    failure is known.
 - Unresolved questions:
   - E6 must be independently reviewed and explicitly declared complete before
     E7 begins.
 - Exact next recommended action:
-  - Commit as `Add restart safe storage promotion recovery`, push immediately,
-    update PR #122, verify GitHub Actions, and wait for explicit E6 completion
-    review. Do not begin E7.
+  - Wait for the latest branch-head GitHub Actions run and independent E6
+    completion review. Do not begin E7 without explicit approval.
 - Safe to resume from current branch head:
-  - yes after the E6.6 commit is pushed; no E7 runtime work is present.
+  - yes; E6.6 is pushed and no E7 runtime work is present.
