@@ -629,9 +629,8 @@ checkpoints.
 - Completed checkpoints: E0, E1, E2, E3, E4, E5, E6 design, E6.1, E6.2,
   and E6.3.
 - Current checkpoint:
-  - E6.3 provider-enforced old-authority fencing is complete and validated
-    locally. The checkpoint commit and push are the remaining publication
-    actions for this task run.
+  - E6.3 provider-enforced old-authority fencing is complete, validated, and
+    pushed as `7ecc60f3cabfc7750cfa0a8451a4a55406044ca7`.
 - Remaining checkpoints:
   - E6.4 durable term reservation and idempotent new grant.
   - E6.5 finalization and degraded-state exit.
@@ -687,11 +686,13 @@ checkpoints.
     working-copy notices.
 - Known failures:
   - None in the required local E6.3 validation.
+  - GitHub Actions run `30454459937` (`Phase 2 federation`) is in progress for
+    `7ecc60f`; no remote failure is known.
 - Unresolved questions:
   - None for E6.3. E6.4 must consume the durable fenced stage without weakening
     provider-local high-water enforcement.
 - Exact next recommended action:
-  - Commit as `Add provider enforced storage fencing`, push immediately, verify
-    PR #122 and GitHub Actions, then wait for explicit E6.4 approval.
+  - Wait for GitHub Actions run `30454459937` to finish, review E6.3, and only
+    then explicitly approve E6.4.
 - Safe to resume from current branch head:
-  - yes after the E6.3 commit is pushed; no E6.4 runtime work is present.
+  - yes; E6.3 is pushed and no E6.4 runtime work is present.
