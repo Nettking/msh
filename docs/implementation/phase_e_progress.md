@@ -798,3 +798,90 @@ checkpoints.
     then explicitly approve E6.5.
 - Safe to resume from current branch head:
   - yes; E6.4 is pushed and no E6.5 runtime behavior is present.
+
+## E6.5 checkpoint record
+
+- Phase E objective:
+  - Promote storage authority only from complete, authenticated evidence while
+    durably fencing obsolete writers, preserving recovery work, and exiting
+    degraded mode only after an immutable finalization proof exists.
+- Exact base commit: `0df9634a89392793ba919930e9928de3bd44fed6`.
+- Current branch: `agent/phase-e-completeness-aware-failover`.
+- Draft PR: #122, `Implement Phase E completeness-aware failover`.
+- Completed checkpoints: E0, E1, E2, E3, E4, E5, E6 design, E6.1, E6.2,
+  E6.3, E6.4, and E6.5.
+- Current checkpoint:
+  - E6.5 promotion finalization and safe degraded-state exit are complete and
+    validated locally. Commit and push remain for publication.
+- Remaining checkpoints:
+  - E6.6 full recovery and failure reconciliation.
+  - E7 and E8 remain unstarted.
+- Architectural decisions:
+  - Finalization is split into two durable boundaries. The first atomically
+    inserts the immutable finalization record and marks the promotion
+    transaction `finalized`; the second clears only the exact captured
+    degraded-state fingerprint and marks that exit durable.
+  - Finalization revalidates the transaction, current manifest and selected
+    report, provider-local fencing evidence, reserved term, provider-local
+    grant, and exact grant acknowledgement before either boundary.
+  - The final authority identity is a stable SHA-256 binding of the promotion,
+    scope, selected provider, reserved term, grant ID, and grant
+    acknowledgement.
+  - Missing ranges and recovery obligations are copied into the durable
+    finalization record before degraded state is removed, keeping E7 work
+    visible through `promotion_recovery_obligations()`.
+  - The degraded-state fingerprint covers all persisted degraded fields,
+    including manifest, reasons, ranges, obligations, and update timestamp.
+    A newer, missing, or unrelated record is never cleared.
+  - E6.5 does not repeat fencing, reserve another term, deliver another grant,
+    alter the authoritative manifest, implement E6.6 reconciliation, or begin
+    E7 recovery.
+- Files changed:
+  - `catalog/federation/promotion_finalization.py`
+  - `catalog/federation/phase_d_control.py`
+  - `catalog/federation/__init__.py`
+  - `catalog/federation/tests/test_phase_e65_finalization.py`
+  - `docs/implementation/phase_e_progress.md`
+- Durable finalization state:
+  - promotion, session, group, selected provider, new term, manifest
+    revision/hash, report revision/hash, fencing acknowledgement identity,
+    grant acknowledgement identity, final authority identity, degraded-state
+    hash, missing ranges, recovery obligations, completion timestamp, and
+    durable degraded-cleared status.
+- Degraded-state clearing rules:
+  - the finalization record must commit before any clear;
+  - the current degraded record must exactly match the captured fingerprint;
+  - clearing and setting `degraded_cleared` commit in one SQLite transaction;
+  - missing, newer, unrelated, corrupt, incomplete, or contradictory state
+    fails closed;
+  - obligations survive the clear in the finalization record.
+- Restart and duplicate behavior:
+  - restart before finalization leaves `storage-degraded` intact;
+  - restart after finalization persistence resumes only the matching degraded
+    clear;
+  - restart after complete finalization returns the original durable result;
+  - duplicate calls do not fence again, reserve a term, or issue a grant.
+- Tests run and exact results:
+  - `.venv\Scripts\python.exe -m compileall -q catalog setup_msh.py` — passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py catalog/federation/tests/test_phase_e65_finalization.py`
+    — 65 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase_e0_contracts.py catalog/federation/tests/test_phase_e1_manifest_store.py catalog/federation/tests/test_phase_e1_service_manifest.py catalog/federation/tests/test_phase_e2_watermarks.py catalog/federation/tests/test_phase_e3_reports.py catalog/federation/tests/test_phase_e4_selection.py catalog/federation/tests/test_phase_e5_degraded_state.py catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py catalog/federation/tests/test_phase_e65_finalization.py`
+    — 120 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py`
+    — 64 passed.
+  - `.venv\Scripts\python.exe -m pytest -q catalog/federation/tests/test_phase2_unit.py catalog/federation/tests/test_phase_d6_replication.py catalog/federation/tests/test_local_storage.py`
+    — 43 passed.
+  - `.venv\Scripts\python.exe -m ruff check catalog/federation/__init__.py catalog/federation/phase_d_control.py catalog/federation/promotion_finalization.py catalog/federation/provider_fencing.py catalog/federation/tests/test_phase_e6_promotion_transaction.py catalog/federation/tests/test_phase_e63_provider_fencing.py catalog/federation/tests/test_phase_e64_authority_grant.py catalog/federation/tests/test_phase_e65_finalization.py`
+    — passed.
+  - `git diff --check` — passed; only expected LF-to-CRLF working-copy
+    notices were emitted.
+- Known failures:
+  - None in the required local E6.5 validation.
+- Unresolved questions:
+  - None for E6.5. E6.6 must reconcile failures and recovery across all
+    persisted stages without weakening these finalization boundaries.
+- Exact next recommended action:
+  - Commit as `Finalize storage authority promotion`, push immediately, update
+    PR #122, verify GitHub Actions, and wait for explicit E6.6 approval.
+- Safe to resume from current branch head:
+  - yes after the E6.5 commit is pushed; no E6.6 or E7 runtime work is present.

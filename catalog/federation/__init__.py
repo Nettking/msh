@@ -66,6 +66,10 @@ from .phase_d_control import HandoverCommit, PhaseDControlPlane
 from .phase_d_handover import PhaseDHandoverCoordinator
 from .phase_d_service import PhaseDStorageService
 from .postgres_storage import PostgreSQLBatchStorageProvider
+from .promotion_finalization import (
+    PROMOTION_FINALIZATION_SCHEMA,
+    PromotionFinalizationRecord,
+)
 from .provider_fencing import (
     PROVIDER_FENCE_SCHEMA,
     PROVIDER_GRANT_SCHEMA,
@@ -151,6 +155,7 @@ __all__ = [
     "DEFAULT_DATASET_SCHEMA_VERSION",
     "MANIFEST_SCHEMA",
     "PHASE_D_SERVICE_REPLICATION_OWNER",
+    "PROMOTION_FINALIZATION_SCHEMA",
     "PROVIDER_FENCE_SCHEMA",
     "PROVIDER_GRANT_SCHEMA",
     "RECORDER_STORAGE_SCHEMA",
@@ -214,6 +219,7 @@ __all__ = [
     "PhaseDLogicalStorageClient",
     "PhaseDStorageService",
     "PostgreSQLBatchStorageProvider",
+    "PromotionFinalizationRecord",
     "ProviderError",
     "ProviderErrorCode",
     "ProviderFenceStore",

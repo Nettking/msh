@@ -27,6 +27,10 @@ from .manifest_store import (
     ManifestCommitIntent,
 )
 from .models import SessionEvent
+from .promotion_finalization import (
+    PROMOTION_FINALIZATION_SCHEMA,
+    PromotionFinalizationRecord,
+)
 from .promotion_transaction import PromotionTransactionRecord
 from .provider_fencing import (
     ProviderFenceStore,
@@ -146,6 +150,27 @@ class PhaseDControlPlane:
                     failure_reason TEXT,
                     updated_at TEXT NOT NULL,
                     PRIMARY KEY(session_id, group_id, promotion_id)
+                );
+                CREATE TABLE IF NOT EXISTS storage_promotion_finalizations (
+                    session_id TEXT NOT NULL,
+                    group_id TEXT NOT NULL,
+                    promotion_id TEXT NOT NULL,
+                    selected_provider_id TEXT NOT NULL,
+                    new_authority_term INTEGER NOT NULL CHECK(new_authority_term >= 0),
+                    manifest_revision INTEGER NOT NULL CHECK(manifest_revision >= 0),
+                    manifest_hash TEXT NOT NULL,
+                    report_revision INTEGER NOT NULL CHECK(report_revision >= 0),
+                    report_hash TEXT NOT NULL,
+                    fencing_ack_identity TEXT NOT NULL,
+                    grant_ack_identity TEXT NOT NULL,
+                    final_authority_identity TEXT NOT NULL,
+                    degraded_state_hash TEXT NOT NULL,
+                    missing_ranges_json TEXT NOT NULL CHECK(json_valid(missing_ranges_json)),
+                    recovery_obligations_json TEXT NOT NULL CHECK(json_valid(recovery_obligations_json)),
+                    completed_at TEXT NOT NULL,
+                    degraded_cleared INTEGER NOT NULL CHECK(degraded_cleared IN (0, 1)),
+                    PRIMARY KEY(session_id, group_id, promotion_id),
+                    UNIQUE(session_id, group_id, final_authority_identity)
                 );
                 """
             )
@@ -897,6 +922,7 @@ class PhaseDControlPlane:
             "fenced-old-authority",
             "allocated-term",
             "granted-new-authority",
+            "finalized",
         ):
             raise FederationValidationError("invalid-promotion-stage", "state", "transaction is not ready for fencing")
         if record.previous_provider_id is None or record.previous_term is None:
@@ -921,7 +947,7 @@ class PhaseDControlPlane:
         provider_fence_store: ProviderFenceStore,
     ) -> StorageFenceAcknowledgement:
         if (
-            record.state not in ("fenced-old-authority", "allocated-term", "granted-new-authority")
+            record.state not in ("fenced-old-authority", "allocated-term", "granted-new-authority", "finalized")
             or not record.fencing_acknowledged
             or record.fencing_ack_identity is None
         ):
@@ -1186,7 +1212,7 @@ class PhaseDControlPlane:
         if record is None:
             raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction does not exist")
         self._verify_persisted_promotion_fence(record, provider_fence_store)
-        if record.state not in ("allocated-term", "granted-new-authority"):
+        if record.state not in ("allocated-term", "granted-new-authority", "finalized"):
             raise FederationValidationError("invalid-promotion-stage", "state", "transaction has no durable term reservation")
         if record.reserved_term is None or record.grant_id is None:
             raise FederationValidationError("corrupt-term-reservation", "reserved_term", "durable grant binding is incomplete")
@@ -1322,6 +1348,352 @@ class PhaseDControlPlane:
                 }
             )
         )
+
+    @staticmethod
+    def _degraded_state_hash(state: dict[str, Any]) -> str:
+        payload = json.dumps(state, sort_keys=True, separators=(",", ":"), allow_nan=False).encode()
+        return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+    @staticmethod
+    def _final_authority_identity(record: PromotionTransactionRecord) -> str:
+        payload = (
+            f"{record.promotion_id}\0{record.session_id}\0{record.group_id}\0"
+            f"{record.selected_provider_id}\0{record.reserved_term}\0"
+            f"{record.grant_id}\0{record.grant_ack_identity}"
+        ).encode()
+        return "sha256:" + hashlib.sha256(payload).hexdigest()
+
+    def promotion_finalization(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+    ) -> PromotionFinalizationRecord | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM storage_promotion_finalizations
+                   WHERE session_id=? AND group_id=? AND promotion_id=?""",
+                (session_id, group_id, promotion_id),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            missing_ranges = json.loads(row["missing_ranges_json"])
+            obligations = json.loads(row["recovery_obligations_json"])
+            return PromotionFinalizationRecord(
+                schema=PROMOTION_FINALIZATION_SCHEMA,
+                promotion_id=row["promotion_id"],
+                session_id=row["session_id"],
+                group_id=row["group_id"],
+                selected_provider_id=row["selected_provider_id"],
+                new_authority_term=row["new_authority_term"],
+                manifest_revision=row["manifest_revision"],
+                manifest_hash=row["manifest_hash"],
+                report_revision=row["report_revision"],
+                report_hash=row["report_hash"],
+                fencing_ack_identity=row["fencing_ack_identity"],
+                grant_ack_identity=row["grant_ack_identity"],
+                final_authority_identity=row["final_authority_identity"],
+                degraded_state_hash=row["degraded_state_hash"],
+                missing_ranges=tuple(missing_ranges),
+                recovery_obligations=obligations,
+                completed_at=row["completed_at"],
+                degraded_cleared=bool(row["degraded_cleared"]),
+            )
+        except (json.JSONDecodeError, TypeError, ValueError, FederationValidationError) as exc:
+            raise FederationValidationError(
+                "corrupt-promotion-finalization",
+                "storage_promotion_finalizations",
+                "durable finalization state is malformed",
+            ) from exc
+
+    def _validate_promotion_finalization_chain(
+        self,
+        record: PromotionTransactionRecord,
+        *,
+        provider_fence_store: ProviderFenceStore,
+        selected_provider_store: ProviderFenceStore,
+    ) -> StorageAuthorityGrantAcknowledgement:
+        if (
+            record.state not in ("granted-new-authority", "finalized")
+            or record.reserved_term is None
+            or not record.grant_acknowledged
+            or record.grant_ack_identity is None
+            or record.fencing_ack_identity is None
+        ):
+            raise FederationValidationError(
+                "promotion-not-granted",
+                "state",
+                "transaction does not contain a complete durable grant chain",
+            )
+        self._verify_persisted_promotion_fence(record, provider_fence_store)
+        command = self.promotion_grant_command(
+            record.session_id,
+            record.group_id,
+            record.promotion_id,
+            provider_fence_store=provider_fence_store,
+        )
+        grant = selected_provider_store.grant_acknowledgement(record.group_id, record.promotion_id)
+        if (
+            grant is None
+            or grant.acknowledgement_id != record.grant_ack_identity
+            or grant.acknowledgement_id != ProviderFenceStore.grant_acknowledgement_identity(command)
+            or {
+                field: getattr(grant, field)
+                for field in command.binding()
+            }
+            != command.binding()
+            or not selected_provider_store.has_valid_grant(
+                record.group_id,
+                record.promotion_id,
+                record.reserved_term,
+            )
+        ):
+            raise FederationValidationError(
+                "unverifiable-provider-grant",
+                "grant_ack_identity",
+                "durable provider grant no longer matches the promotion transaction",
+            )
+        return grant
+
+    def persist_promotion_finalization(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+        *,
+        provider_fence_store: ProviderFenceStore,
+        selected_provider_store: ProviderFenceStore,
+        now: datetime | None = None,
+    ) -> PromotionFinalizationRecord:
+        record = self.promotion_transaction(session_id, group_id, promotion_id)
+        if record is None:
+            raise FederationValidationError("unknown-promotion", "promotion_id", "promotion transaction does not exist")
+        self._validate_promotion_finalization_chain(
+            record,
+            provider_fence_store=provider_fence_store,
+            selected_provider_store=selected_provider_store,
+        )
+        existing = self.promotion_finalization(session_id, group_id, promotion_id)
+        if existing is not None:
+            expected_identity = self._final_authority_identity(record)
+            if (
+                existing.selected_provider_id != record.selected_provider_id
+                or existing.new_authority_term != record.reserved_term
+                or existing.manifest_revision != record.selected_manifest_revision
+                or existing.manifest_hash != record.selected_manifest_hash
+                or existing.report_revision != record.selected_report_revision
+                or existing.report_hash != record.selected_report_hash
+                or existing.fencing_ack_identity != record.fencing_ack_identity
+                or existing.grant_ack_identity != record.grant_ack_identity
+                or existing.final_authority_identity != expected_identity
+            ):
+                raise FederationValidationError(
+                    "conflicting-promotion-finalization",
+                    "promotion_id",
+                    "durable finalization conflicts with the promotion transaction",
+                )
+            return existing
+        degraded = self.storage_degraded_state(session_id, group_id)
+        if degraded is None:
+            raise FederationValidationError(
+                "missing-storage-degraded-state",
+                "group_id",
+                "promotion finalization requires the degraded state it will exit",
+            )
+        if (
+            degraded["manifest_revision"] != record.selected_manifest_revision
+            or degraded["manifest_hash"] != record.selected_manifest_hash
+        ):
+            raise FederationValidationError(
+                "degraded-state-mismatch",
+                "storage_degraded_state",
+                "degraded state is not bound to the promotion manifest",
+            )
+        completed_at = _utc(now)
+        finalization = PromotionFinalizationRecord(
+            schema=PROMOTION_FINALIZATION_SCHEMA,
+            promotion_id=record.promotion_id,
+            session_id=record.session_id,
+            group_id=record.group_id,
+            selected_provider_id=record.selected_provider_id,
+            new_authority_term=record.reserved_term,
+            manifest_revision=record.selected_manifest_revision,
+            manifest_hash=record.selected_manifest_hash,
+            report_revision=record.selected_report_revision,
+            report_hash=record.selected_report_hash,
+            fencing_ack_identity=record.fencing_ack_identity,
+            grant_ack_identity=record.grant_ack_identity,
+            final_authority_identity=self._final_authority_identity(record),
+            degraded_state_hash=self._degraded_state_hash(degraded),
+            missing_ranges=tuple(degraded["missing_ranges"]),
+            recovery_obligations=degraded["obligations"],
+            completed_at=completed_at,
+            degraded_cleared=False,
+        )
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                head = connection.execute(
+                    """SELECT revision, manifest_hash FROM storage_manifest_heads
+                       WHERE session_id=? AND group_id=?""",
+                    (session_id, group_id),
+                ).fetchone()
+                report = connection.execute(
+                    """SELECT report_revision, report_hash FROM storage_replica_reports
+                       WHERE session_id=? AND group_id=? AND provider_id=?""",
+                    (session_id, group_id, record.selected_provider_id),
+                ).fetchone()
+                if (
+                    head is None
+                    or int(head["revision"]) != record.selected_manifest_revision
+                    or str(head["manifest_hash"]) != record.selected_manifest_hash
+                    or report is None
+                    or int(report["report_revision"]) != record.selected_report_revision
+                    or str(report["report_hash"]) != record.selected_report_hash
+                ):
+                    raise FederationValidationError(
+                        "stale-promotion-binding",
+                        "promotion_id",
+                        "manifest or selected report changed before finalization commit",
+                    )
+                connection.execute(
+                    """INSERT INTO storage_promotion_finalizations
+                       (session_id, group_id, promotion_id, selected_provider_id,
+                        new_authority_term, manifest_revision, manifest_hash,
+                        report_revision, report_hash, fencing_ack_identity,
+                        grant_ack_identity, final_authority_identity,
+                        degraded_state_hash, missing_ranges_json,
+                        recovery_obligations_json, completed_at, degraded_cleared)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0)""",
+                    (
+                        finalization.session_id,
+                        finalization.group_id,
+                        finalization.promotion_id,
+                        finalization.selected_provider_id,
+                        finalization.new_authority_term,
+                        finalization.manifest_revision,
+                        finalization.manifest_hash,
+                        finalization.report_revision,
+                        finalization.report_hash,
+                        finalization.fencing_ack_identity,
+                        finalization.grant_ack_identity,
+                        finalization.final_authority_identity,
+                        finalization.degraded_state_hash,
+                        json.dumps(list(finalization.missing_ranges), sort_keys=True, separators=(",", ":"), allow_nan=False),
+                        json.dumps(finalization.recovery_obligations, sort_keys=True, separators=(",", ":"), allow_nan=False),
+                        finalization.completed_at.isoformat().replace("+00:00", "Z"),
+                    ),
+                )
+                connection.execute(
+                    """UPDATE storage_promotion_transactions
+                       SET state='finalized', updated_at=?
+                       WHERE session_id=? AND group_id=? AND promotion_id=?
+                         AND state='granted-new-authority'""",
+                    (
+                        finalization.completed_at.isoformat().replace("+00:00", "Z"),
+                        session_id,
+                        group_id,
+                        promotion_id,
+                    ),
+                )
+                if connection.total_changes != 2:
+                    raise FederationValidationError(
+                        "concurrent-promotion-change",
+                        "promotion_id",
+                        "promotion changed during finalization",
+                    )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        return finalization
+
+    def complete_promotion_finalization(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+        *,
+        provider_fence_store: ProviderFenceStore,
+        selected_provider_store: ProviderFenceStore,
+        now: datetime | None = None,
+    ) -> PromotionFinalizationRecord:
+        finalization = self.persist_promotion_finalization(
+            session_id,
+            group_id,
+            promotion_id,
+            provider_fence_store=provider_fence_store,
+            selected_provider_store=selected_provider_store,
+            now=now,
+        )
+        if finalization.degraded_cleared:
+            return finalization
+        degraded = self.storage_degraded_state(session_id, group_id)
+        if degraded is None or self._degraded_state_hash(degraded) != finalization.degraded_state_hash:
+            raise FederationValidationError(
+                "degraded-state-mismatch",
+                "storage_degraded_state",
+                "current degraded state is missing, newer, or unrelated",
+            )
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                cursor = connection.execute(
+                    """DELETE FROM storage_degraded_states
+                       WHERE session_id=? AND group_id=? AND manifest_revision=?
+                         AND manifest_hash=? AND reason_code=? AND reason_detail=?
+                         AND missing_ranges_json=? AND obligations_json=? AND updated_at=?""",
+                    (
+                        session_id,
+                        group_id,
+                        degraded["manifest_revision"],
+                        degraded["manifest_hash"],
+                        degraded["reason_code"],
+                        degraded["reason_detail"],
+                        json.dumps(degraded["missing_ranges"], sort_keys=True, separators=(",", ":"), allow_nan=False),
+                        json.dumps(degraded["obligations"], sort_keys=True, separators=(",", ":"), allow_nan=False),
+                        degraded["updated_at"],
+                    ),
+                )
+                if cursor.rowcount != 1:
+                    raise FederationValidationError(
+                        "degraded-state-mismatch",
+                        "storage_degraded_state",
+                        "degraded state changed before it could be cleared",
+                    )
+                connection.execute(
+                    """UPDATE storage_promotion_finalizations SET degraded_cleared=1
+                       WHERE session_id=? AND group_id=? AND promotion_id=?
+                         AND degraded_state_hash=? AND degraded_cleared=0""",
+                    (session_id, group_id, promotion_id, finalization.degraded_state_hash),
+                )
+                connection.commit()
+            except Exception:
+                connection.rollback()
+                raise
+        completed = self.promotion_finalization(session_id, group_id, promotion_id)
+        if completed is None or not completed.degraded_cleared:
+            raise FederationValidationError(
+                "corrupt-promotion-finalization",
+                "degraded_cleared",
+                "degraded exit was not durably recorded",
+            )
+        return completed
+
+    def promotion_recovery_obligations(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+    ) -> dict[str, Any]:
+        finalization = self.promotion_finalization(session_id, group_id, promotion_id)
+        if finalization is None:
+            raise FederationValidationError("unknown-finalization", "promotion_id", "promotion is not finalized")
+        return {
+            "missing_ranges": list(finalization.missing_ranges),
+            "obligations": finalization.recovery_obligations,
+        }
 
     def submit_storage_replica_report(
         self,
