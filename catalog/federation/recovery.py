@@ -2,7 +2,8 @@
 
 The planner remains in :mod:`former_primary_recovery`; relay-first transfer,
 fail-closed verification, authenticated completion, and E8 diagnostics are exposed
-here as one stable import boundary.
+here as one stable import boundary. Phase F transports and Phase G scheduling are
+intentionally outside this module.
 """
 
 from .former_primary_completion import (
