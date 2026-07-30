@@ -1,7 +1,8 @@
 """Public Phase E former-primary recovery surface.
 
-The planner remains in :mod:`former_primary_recovery`; transfer, verification,
-completion, and diagnostics are exposed here as one stable import boundary.
+The planner remains in :mod:`former_primary_recovery`; relay-first transfer,
+fail-closed verification, authenticated completion, and E8 diagnostics are exposed
+here as one stable import boundary.
 """
 
 from .former_primary_completion import (
