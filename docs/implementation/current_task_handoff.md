@@ -1,14 +1,16 @@
 # Current task handoff
 
-Last updated: 2026-07-31 01:20 Europe/Oslo
+Last updated: 2026-07-31 01:34 Europe/Oslo
 
 ## Repository and branch
 
 - Repository: `Nettking/msh`
 - Branch: `agent/phase-e-completeness-aware-failover`
 - Local HEAD: **not established in this execution environment**; no local checkout is available.
-- Validated remote implementation/handoff head before this commit: `b8d6f59205bc8bd8f81947c3faff560c0457ad79`
-- Remote HEAD after this checkpoint: **verify immediately and fast-forward non-force if required**
+- Validated E7.0/E7.1 head: `b8d6f59205bc8bd8f81947c3faff560c0457ad79`
+- E7.0/E7.1 completion handoff: `51e675d1a294dfc6c3fb3eb45fe2e4e32003efb7`
+- E7.2 WIP implementation commit: `8f91dca2c51f4c51e42c9a0699eec65486d75611`
+- Remote HEAD after this handoff checkpoint: **verify and fast-forward non-force if required**
 - Pull request: #122, draft, open, mergeable
 - PR base branch: `agent/complete-phase-d-integration`
 - PR base commit: `05bbfe40dafa2b4661aa313cf7dba25e01a5a90d`
@@ -16,130 +18,110 @@ Last updated: 2026-07-31 01:20 Europe/Oslo
 
 ## Current objective
 
-E7.0/E7.1 is complete. Implement E7.2 relay-first missing-item transfer as the next isolated checkpoint, with durable attempt/result progression, lost-response reconciliation, retryability, preserved former-primary fencing, and Linux/Windows validation. Then continue E7.3-E7.6, E8, Phase E closure, and dependency-ordered PR cleanup. Phase G remains separate; Phase F is excluded.
+Validate and finish E7.2 relay-first transfer with durable progression, retry, lost-response reconciliation, preserved former-primary fencing, and no eligibility/finalization. Then continue E7.3-E7.6, E8, Phase E closure, and dependency-ordered PR cleanup. Phase G remains separate; Phase F is excluded.
 
 ## Confirmed findings
 
 1. E6 is independently complete and green.
-2. E7.0/E7.1 provides validated contracts, deterministic planning, exact authority/manifest/report/fence binding, and a two-table SQLite recovery/item ledger.
-3. Eight focused tests cover present/missing classification, restart/duplicate replay, missing fence, changed authority, manifest change, immutable conflict, unknown extra hashes, and group isolation.
-4. The remote branch/ref discrepancy was recorded and resolved by a non-force fast-forward to `b8d6f59205bc8bd8f81947c3faff560c0457ad79`.
-5. GitHub Actions run `30585683191` completed successfully on Linux and Windows for that exact head.
-6. Linux results:
-   - compilation passed;
-   - Phase 0/1: **64 passed**;
-   - Phase D/E including E7.0/E7.1: **225 passed**;
-   - Phase 2 unit/integration: **85 passed**;
-   - Ruff passed;
-   - Docker Compose base and `relay-dev` passed;
-   - diff hygiene passed.
-7. Windows expanded identity/state/protocol/relay/Phase E matrix: **284 passed, 1 skipped in 93.56s**.
-8. The earlier Ruff `UP037` finding was fixed without behavioral changes or lint suppression.
-9. No runtime, persistence, authority, manifest, report, fencing, Linux, or Windows failure remains in E7.0/E7.1.
-10. The existing `storage-replication` service route can carry E7.2 repairs without Phase F transport.
-11. E7.2 must use the active published primary authority, target the returning provider as assigned replica, verify source content/identity, persist attempts before delivery, reconcile exact target identity after lost responses, and never weaken the old fence.
-12. This environment has no local checkout, no `gh`, no local Ruff, and no shell DNS access to GitHub.
+2. E7.0/E7.1 is complete and green in Actions run `30585683191`: Linux 64 Phase 0/1, 225 Phase D/E, 85 Phase 2, Ruff/Compose/diff hygiene; Windows 284 passed, 1 skipped.
+3. E7.2 must reuse the authenticated existing `storage-replication` path and stop at `verifying`/awaiting final report.
+4. WIP commit `8f91dca2c51f4c51e42c9a0699eec65486d75611` creates `catalog/federation/former_primary_repair.py`.
+5. The new progress store performs compare-and-set record/item transitions over the existing E7 ledger without changing immutable plan bindings.
+6. Attempts are incremented and persisted before send.
+7. Stable item `delivery_id` is also the stable relay request identity across restart/retry.
+8. Before sending, the worker checks the returning provider’s exact committed identity; an exact match reconciles a previously lost response without another send.
+9. Source provider identity, readable content, and content hash are verified before transport.
+10. Delivery uses the E6-published active grant, active primary node identity, returning-provider replica route, and `storage-replication` authorization context.
+11. Successful responses are correlated and bound to batch/idempotency/hash; target durable identity is verified after success before marking `delivered`.
+12. Retryable errors leave items `missing`, persist attempt/error diagnostics, and set record `retryable`.
+13. Source/target identity mismatch, target evidence absence after success, response correlation/identity mismatch, and source corruption move the item to `conflict` and record to `operator-attention`.
+14. When all missing items are `delivered`, the recovery transitions to `verifying`; E7.2 does not submit or accept final reports.
+15. No focused test, public export, Ruff, Linux, or Windows validation has run for E7.2 yet.
+16. Existing tests did not cover the new module because it was just created and is not yet in the workflow.
+17. This environment has no local checkout, no `gh`, no local Ruff, and no shell DNS access to GitHub.
 
 ## Suspected issues not yet confirmed
 
-1. E7.2 needs durable CAS-style item/record state updates without changing the immutable planning bindings.
-2. The recovery record’s present/missing/conflict counts should remain immutable planning counts; current operational status can be computed from item rows.
-3. Lost-response reconciliation requires direct target `committed_identity()` access in the worker in addition to relay transport.
-4. A transfer retry may encounter changed authority/manifest/report; planner revalidation must run before every delivery pass.
+1. The WIP may contain Python/Ruff/runtime defects, especially SQL parameter ordering, expected-state handling, retry transitions, and response error-code conversion.
+2. The retryable final record transition may overwrite a more specific durable delivery error with generic `repair-incomplete` diagnostics.
+3. A stale planner report binding after target persistence is intentionally tolerated only through identity reconciliation before a new final report exists; tests must confirm planner validation remains stable during E7.2.
+4. Concurrent workers are not yet protected by a process-level lock; E7.5 owns concurrency convergence.
 5. E7.3-E7.6 and E8 remain unimplemented.
 
 ## Decisions made and rationale
 
-1. Mark E7.0/E7.1 complete based on the exact green Linux/Windows run.
-2. Implement E7.2 in a separate module rather than expanding the planner further.
-3. Add store methods for durable record-state and item-state transitions using expected-state compare-and-set semantics.
-4. Persist/increment an item attempt before sending; stable `delivery_id` and request identity must survive restarts.
-5. On retry, check target immutable identity first; exact identity means a lost response is reconciled without another transfer.
-6. Retryable transport/provider failures retain the item as missing with durable diagnostics. Source/target immutable conflicts move the recovery to operator-attention.
-7. Do not implement final report eligibility in E7.2; successful transfer ends in verifying/awaiting-report for E7.4.
-8. Keep PR #122 draft and stacked. Merge #121 first after Phase E completion, then retarget/revalidate/merge #122.
+1. Treat `8f91dca2...` as an explicitly unverified WIP checkpoint.
+2. Add focused real-service tests before exporting the API or declaring coherence.
+3. Test successful relay transfer, retry/restart, lost-response reconciliation, duplicate replay, changed authority/fence, and source identity/content failure.
+4. Keep planning counts immutable; compute operational status from item rows.
+5. Do not implement final report/eligibility in this checkpoint.
+6. Do not weaken lint, authority validation, the old fence, or immutable conflict behavior.
+7. Keep PR #122 draft and stacked.
+8. Merge #121 first after Phase E completion, then retarget/revalidate/merge #122.
 9. Do not implement Phase F or start Phase G.
 
 ## Files inspected
 
 - `catalog/federation/former_primary_recovery.py`
-- `catalog/federation/tests/test_phase_e71_former_primary_recovery.py`
-- `catalog/federation/phase_d_service.py`
 - `catalog/federation/replication.py`
+- `catalog/federation/phase_d_service.py`
 - `catalog/federation/local_storage.py`
-- `.github/workflows/phase2-federation.yml`
-- PR #122 metadata
-- Actions run `30585683191`, Linux and Windows jobs/logs
+- `catalog/federation/storage_protocol.py`
+- E7.1 test runtime/fixtures
+- `docs/implementation/current_task_handoff.md`
 
 ## Files changed
 
-Completed E7.0/E7.1 checkpoint:
-
-- `catalog/federation/former_primary_recovery.py`
-- `catalog/federation/tests/test_phase_e71_former_primary_recovery.py`
-- `catalog/federation/__init__.py`
-- `.github/workflows/phase2-federation.yml`
-- `docs/implementation/current_task_handoff.md`
-
-This commit changes only the handoff to record green completion and the exact E7.2 boundary.
+- `catalog/federation/former_primary_repair.py` — new unverified E7.2 durable progress store and relay-first repair worker.
+- `docs/implementation/current_task_handoff.md` — records exact WIP behavior, risks, and next validation action.
 
 ## Exact commands run
 
-GitHub Actions run `30585683191`:
+Connected GitHub operations:
 
 ```text
-python -m compileall catalog setup_msh.py
-python -m pytest -o addopts= -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py
-python -m pytest -o addopts= -q <Phase D/E matrix including test_phase_e71_former_primary_recovery.py>
-python -m pytest -o addopts= -q catalog/federation/tests/test_phase2_unit.py catalog/node/tests catalog/relay/tests
-python -m ruff check catalog/federation catalog/node catalog/relay --ignore I001,RUF022,B008,C408,PLC0206
-docker compose config --quiet
-docker compose --profile relay-dev config --quiet
-git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
+fetch replication transport/worker contracts
+fetch focused E7 recovery store/planner sections
+create catalog/federation/former_primary_repair.py
+commit WIP 8f91dca2c51f4c51e42c9a0699eec65486d75611
+update current_task_handoff.md
 ```
 
-Repository control-plane operations:
-
-```text
-compare d1522c1e... to 6a1c390d...
-update_ref agent/phase-e-completeness-aware-failover -> b8d6f592... force=false
-verify PR #122 head b8d6f592...
-fetch workflow/jobs/logs
-```
+No local executable test or Ruff command has run for E7.2.
 
 ## Exact test results
+
+Latest validated checkpoint remains E7.0/E7.1:
 
 ```text
 Workflow: Phase 2 federation
 Run: 30585683191
 Commit: b8d6f59205bc8bd8f81947c3faff560c0457ad79
+Linux: 64 Phase 0/1; 225 Phase D/E; 85 Phase 2; Ruff/Compose/diff hygiene passed
+Windows: 284 passed, 1 skipped
 Overall: success
-Linux compile: passed
-Linux Phase 0/1: 64 passed
-Linux Phase D/E including E7.0/E7.1: 225 passed
-Linux Phase 2: 85 passed
-Linux Ruff: passed
-Linux Compose: passed
-Linux diff hygiene: passed
-Windows: 284 passed, 1 skipped in 93.56s
 ```
+
+E7.2 WIP: **no tests run**.
 
 ## Known failures
 
-1. No known E7.0/E7.1 failure.
-2. E7.2-E7.6 and E8 are unimplemented.
-3. Phase E progress/PR closure and PR cleanup remain incomplete.
-4. Local full testing is unavailable.
+1. No confirmed E7.2 failure yet because tests have not run.
+2. E7.2 branch state is temporarily unverified and potentially broken.
+3. E7.2 tests, exports, and CI entries are missing.
+4. E7.3-E7.6 and E8 are unimplemented.
+5. Phase E closure and PR cleanup remain incomplete.
+6. Local full testing is unavailable.
 
 ## Uncommitted changes
 
 - No local MSH worktree exists.
-- No meaningful E7.0/E7.1 source/test change remains outside GitHub.
-- E7.2 source and tests have not yet been created.
+- Focused E7.2 tests are not yet durable repository artifacts.
+- Public export and workflow edits are not committed.
 
 ## Unfinished edits or partially implemented logic
 
-- E7.2 relay-first transfer and durable progression.
+- E7.2 focused tests, exports, workflow coverage, remote validation, and defect repair.
 - E7.3 conflict/corruption progression.
 - E7.4 final report/eligibility.
 - E7.5 restart/concurrency.
@@ -150,13 +132,14 @@ Windows: 284 passed, 1 skipped in 93.56s
 
 ## Next exact action
 
-1. Verify the remote head after this documentation checkpoint.
-2. Add E7.2 store transition methods and a separate relay-first repair worker.
-3. Add focused tests for success, retry, lost response, restart, stale authority/fence, source mismatch, and duplicate delivery.
-4. Add Linux/Windows CI coverage, update handoff, validate remotely, and push immediately.
+1. Verify/fast-forward the remote branch to include this handoff and WIP.
+2. Add focused E7.2 real-service tests.
+3. Run syntax compilation where possible.
+4. Add exports and Linux/Windows CI only after test source is committed.
+5. Inspect exact remote failures and record them before fixes.
 
 ## Resume safety
 
 - Safe to resume: **yes**.
-- Expected branch state: **green**.
+- Expected branch state: **temporarily unverified and potentially broken**.
 - PR #122 must remain draft.
