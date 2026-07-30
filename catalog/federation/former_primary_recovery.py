@@ -280,7 +280,7 @@ class FormerPrimaryRecoveryItem:
         now: datetime,
         error_code: str | None = None,
         error_reason: str | None = None,
-    ) -> "FormerPrimaryRecoveryItem":
+    ) -> FormerPrimaryRecoveryItem:
         return cls(
             recovery_id=recovery_id,
             session_id=session_id,
