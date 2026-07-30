@@ -8,6 +8,16 @@ from .acknowledgement import (
 from .commit_tracking import DurableAcknowledgementStore, StorageCommitStatus
 from .errors import FederationValidationError
 from .filesystem_storage import FilesystemRecorderStorageProvider
+from .former_primary_recovery import (
+    FORMER_PRIMARY_RECOVERY_SCHEMA,
+    FormerPrimaryItemStatus,
+    FormerPrimaryRecoveryItem,
+    FormerPrimaryRecoveryPlan,
+    FormerPrimaryRecoveryPlanner,
+    FormerPrimaryRecoveryRecord,
+    FormerPrimaryRecoveryState,
+    FormerPrimaryRecoveryStore,
+)
 from .handover import ControlledHandover, HandoverState
 from .leader_selection import (
     LeaderSelectionResult,
@@ -157,6 +167,7 @@ from .write_authority import AuthorizedStorageService, StorageWriteAuthorityVali
 __all__ = [
     "DEFAULT_DATASET_SCHEMA_NAME",
     "DEFAULT_DATASET_SCHEMA_VERSION",
+    "FORMER_PRIMARY_RECOVERY_SCHEMA",
     "MANIFEST_SCHEMA",
     "PHASE_D_SERVICE_REPLICATION_OWNER",
     "PROMOTION_FINALIZATION_SCHEMA",
@@ -202,6 +213,13 @@ __all__ = [
     "FederationValidationError",
     "FilesystemBatchStorageProvider",
     "FilesystemRecorderStorageProvider",
+    "FormerPrimaryItemStatus",
+    "FormerPrimaryRecoveryItem",
+    "FormerPrimaryRecoveryPlan",
+    "FormerPrimaryRecoveryPlanner",
+    "FormerPrimaryRecoveryRecord",
+    "FormerPrimaryRecoveryState",
+    "FormerPrimaryRecoveryStore",
     "HandoverCommit",
     "HandoverState",
     "LeaderSelectionResult",
