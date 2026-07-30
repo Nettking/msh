@@ -68,13 +68,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git rm -r .phase-e-bootstrap .github/workflows/phase-e-bootstrap.yml
+          git checkout -- .github/workflows/phase2-federation.yml
+          git rm -r .phase-e-bootstrap
           git add \
             catalog/federation/former_primary_repair.py \
             catalog/federation/former_primary_completion.py \
             catalog/federation/tests/test_phase_e72_former_primary_transfer.py \
             catalog/federation/tests/test_phase_e78_former_primary_completion.py \
-            .github/workflows/phase2-federation.yml \
             docs/implementation/phase_e_progress.md \
             docs/implementation/phase_e7_recovery_plan.md
           git config user.name "github-actions[bot]"
