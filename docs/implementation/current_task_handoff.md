@@ -1,72 +1,99 @@
 # Current task handoff
 
-Last updated: 2026-07-30 23:20 Europe/Oslo
+Last updated: 2026-07-30 23:35 Europe/Oslo
 
 ## Repository and branch
 
 - Repository: `Nettking/msh`
 - Branch: `agent/phase-e-completeness-aware-failover`
 - Local HEAD: **not established in this execution environment**; no local checkout is available.
-- Remote HEAD before this checkpoint: `ec9b15528c1edf95ce1c8d64af363283e64235d8`
-- Remote HEAD after this checkpoint: **the commit containing this file; verify immediately after moving the branch ref**
+- Remote HEAD before this checkpoint: `672245313d4411d078ed4dc5150dba8415cc01e5`
+- Remote HEAD after this handoff checkpoint: **verify immediately after commit**
 - Pull request: #122, draft, open, mergeable
 - PR base branch: `agent/complete-phase-d-integration`
 - PR base commit: `05bbfe40dafa2b4661aa313cf7dba25e01a5a90d`
+- Phase D PR #121: still open, draft, mergeable, and unmerged at head `05bbfe40dafa2b4661aa313cf7dba25e01a5a90d`
 
 ## Current objective
 
-Validate and complete E6 by publishing the durable provider grant into coordinator assignment and leader-grant state before clearing `storage-degraded`; then prepare E7 without starting it prematurely.
+Close E6 with an explicit independent completion review and durable documentation, then prepare the exact E7 returning-former-primary recovery plan without starting E7 implementation or Phase F.
 
 ## Confirmed findings
 
-1. The prior E6 recovery path persisted provider fencing, term reservation, provider grant, and finalization, but did not publish the selected provider into coordinator routing state.
-2. The existing remote workflow previously omitted E2–E6. Checkpoint `ec9b15528c1edf95ce1c8d64af363283e64235d8` expanded Linux and Windows CI; run `30581047505` was queued before this implementation checkpoint.
-3. The existing `complete_handover()` pattern confirms the required coordinator event sequence: revoke old grant, change assignment, grant new authority, and advance the fencing counter in one transaction.
-4. The reserved E6 term is already persisted in `storage_fencing_counters`, so the Phase D public handover method cannot be reused directly because it requires a term strictly greater than the recorded maximum.
-5. The implementation in this checkpoint adds a separate durable publication record and atomically appends the three coordinator events while reusing the reserved term and allocating the next fencing token.
-6. Publication is idempotent across restart and duplicate recovery: the durable publication is validated against the reconstructed snapshot before degraded-state clearing.
-7. The former primary is placed once in the replica set, preserving the exact E7 recovery target.
-8. A legacy state where finalization was cleared before publication is repaired by the authoritative `recover_promotion()` entry point.
-9. This environment has no local checkout, no `gh`, and no shell DNS access to GitHub.
+1. Independent review found and recorded that E6.6 did not publish the promoted provider into coordinator assignment and leader-grant state before clearing `storage-degraded`.
+2. The prior GitHub Actions workflow did not execute E2–E6; this was corrected in checkpoint `ec9b15528c1edf95ce1c8d64af363283e64235d8`.
+3. Checkpoint `672245313d4411d078ed4dc5150dba8415cc01e5` added:
+   - durable coordinator publication state,
+   - atomic revoke/assignment/grant events,
+   - monotonic fencing-token allocation while reusing the reserved term,
+   - restart and duplicate reconciliation,
+   - legacy clear-before-publication repair through `recover_promotion()`,
+   - five focused E6.7 tests,
+   - Linux and Windows CI coverage.
+4. GitHub Actions run `30581905829` completed successfully on Linux and Windows.
+5. Linux exact results:
+   - compilation: passed;
+   - Phase 0/1: **64 passed in 0.85s**;
+   - expanded Phase D/E storage suite: **217 passed in 7.71s**;
+   - Phase 2 node/relay integration: **85 passed in 9.57s**;
+   - Ruff: all checks passed;
+   - Docker Compose base and `relay-dev`: passed;
+   - diff hygiene: passed.
+6. Windows completed the expanded identity/state/protocol/relay/Phase E test step successfully.
+7. The final coordinator snapshot after E6 recovery now assigns `provider-new` primary, places `provider-old` once in replicas, replaces the old grant, advances term 5→6 and fencing token 9→10, and only then clears degraded state.
+8. PR #121 remains open and draft, so PR #122 must remain stacked on `agent/complete-phase-d-integration`.
+9. No unresolved PR #122 review threads were present at the last inspection.
+10. This environment has no local checkout, no `gh`, and no shell DNS access to GitHub.
 
 ## Suspected issues not yet confirmed
 
-1. The expanded remote matrix may expose unrelated E2–E6 failures that were previously hidden.
-2. The new publication implementation may need formatting or behavioral adjustment after Linux and Windows execution.
-3. Direct calls to the older finalization stage primitive can still create the legacy clear-before-publication shape; the recovery entry point repairs it, and no runtime call site outside recovery has been identified.
-4. PR #121 status has not yet been rechecked; do not retarget or rebase PR #122.
+1. Direct use of the lower-level `complete_promotion_finalization()` stage primitive can reproduce the pre-E6.7 legacy shape; the authoritative `recover_promotion()` entry point repairs it. A final review must decide whether documenting this as a lower-level compatibility primitive is sufficient or whether a future API-hardening change is required.
+2. E6 progress and design documents still have stale opening status text.
+3. The PR body still describes E6 as pending independent review and does not include E6.7.
+4. E7 durable transaction boundaries and repair-item schema have not yet been approved.
 
 ## Decisions made and rationale
 
-1. Treat `recover_promotion()` as the authoritative end-to-end completion entry point.
-2. Publish coordinator authority after durable finalization and before degraded-state clear.
-3. Store publication term, fencing token, replica set, lease, final authority identity, and control revision in an additive SQLite table.
-4. Use deterministic event IDs scoped by session, group, promotion, and event type.
-5. Fail closed if control state has changed from the validated old primary/grant or if a conflicting term/publication exists.
-6. Include new publication tests in both Linux and Windows CI.
-7. Keep PR #122 draft and do not begin E7 or Phase F until this checkpoint is green and independently reviewed.
+1. Treat `recover_promotion()` as the authoritative E6 completion entry point.
+2. Do not mark E6 complete until its status, review evidence, and PR body are updated together.
+3. Preserve PR #122 as draft and stacked while PR #121 remains unmerged.
+4. E7 preparation must define contracts, persistence, acceptance mapping, failure behavior, and the first checkpoint before implementation begins.
+5. Phase F direct peer transport remains excluded; E7 must use existing relay-first logical storage/replication paths.
 
 ## Files inspected
 
 - `.github/workflows/phase2-federation.yml`
+- `docs/implementation/federated_session_test_matrix.md`
+- `docs/federated_session_network.md`
+- `docs/implementation/phase_e_progress.md`
+- `docs/implementation/phase_e6_promotion_transaction_design.md`
 - `catalog/federation/phase_d_control.py`
 - `catalog/federation/storage_control_plane.py`
+- `catalog/federation/write_authority.py`
+- `catalog/federation/phase_d_service.py`
+- `catalog/federation/promotion_publication.py`
 - `catalog/federation/promotion_recovery.py`
-- `catalog/federation/promotion_finalization.py`
-- E6.3–E6.6 tests
-- Phase E progress and E6 design documents
+- E6.3–E6.7 tests
+- PR #121 and PR #122 metadata
+- Workflow run `30581905829` jobs and Linux logs
 
 ## Files changed
 
-- `catalog/federation/promotion_publication.py` — new atomic, durable, idempotent coordinator-publication stage.
-- `catalog/federation/promotion_recovery.py` — publishes coordinator authority before degraded-state clear.
-- `catalog/federation/tests/test_phase_e67_coordinator_publication.py` — covers routing publication, term/token, restart, duplicate replay, legacy repair, and mismatch failure.
-- `.github/workflows/phase2-federation.yml` — includes the E6.7 test on Linux and Windows.
-- `docs/implementation/current_task_handoff.md` — records the finding, design, implementation, validation, and exact resume state.
+Pushed implementation checkpoint `672245313d4411d078ed4dc5150dba8415cc01e5`:
+
+- `catalog/federation/promotion_publication.py`
+- `catalog/federation/promotion_recovery.py`
+- `catalog/federation/tests/test_phase_e67_coordinator_publication.py`
+- `.github/workflows/phase2-federation.yml`
+- `docs/implementation/current_task_handoff.md`
+
+This checkpoint changes only:
+
+- `docs/implementation/current_task_handoff.md` — records exact green validation and next action.
 
 ## Exact commands run
 
-Shell discovery commands remain:
+Shell discovery:
 
 ```text
 pwd && ls -la && find / -maxdepth 4 -type d -name .git 2>/dev/null | head -50
@@ -74,9 +101,9 @@ gh --version && gh auth status
 mkdir -p /mnt/data/work && cd /mnt/data/work && git clone --branch agent/phase-e-completeness-aware-failover --single-branch https://github.com/Nettking/msh.git msh
 ```
 
-Results: no checkout; `gh` missing; clone failed with `Could not resolve host: github.com`.
+Results: no MSH checkout; `gh: command not found`; clone failed with `Could not resolve host: github.com`.
 
-Static validation executed in the analysis environment:
+Static syntax validation:
 
 ```text
 compile(promotion_publication_source, "promotion_publication.py", "exec")
@@ -84,70 +111,87 @@ compile(promotion_recovery_source, "promotion_recovery.py", "exec")
 compile(test_source, "test_phase_e67_coordinator_publication.py", "exec")
 ```
 
-Result:
+Result: all passed.
+
+Attempted local Ruff:
 
 ```text
-promotion_publication.py: syntax compilation passed (573 lines)
-promotion_recovery.py: syntax compilation passed (387 lines)
-test_phase_e67_coordinator_publication.py: syntax compilation passed (173 lines)
+python -m ruff check /mnt/data/e6check --ignore I001,RUF022,B008,C408,PLC0206
 ```
 
-Connected GitHub operations created blobs, one shared tree, one commit, and a non-force branch update for the prior CI checkpoint. The same atomic object workflow is used for this implementation checkpoint.
+Result: could not run because the analysis environment has no `ruff` package. Remote Ruff subsequently passed.
+
+Connected GitHub operations:
+- fetched PR, files, workflow jobs, and job logs;
+- created blobs and trees;
+- created atomic commits;
+- moved the branch only by non-force fast-forward updates;
+- verified remote heads after each pushed checkpoint.
 
 ## Exact test results
 
-No local pytest execution is possible because no repository checkout is available.
-
-Last verified workflow result:
+GitHub Actions:
 
 ```text
 Workflow: Phase 2 federation
-Run: 30458193257
-Commit: 6350f34b471433ea182fbdcdc8bfd787d268a255
-Conclusion: success
+Run: 30581905829
+Commit: 672245313d4411d078ed4dc5150dba8415cc01e5
+Linux: success
+Windows: success
+Overall: success
 ```
 
-That older run omitted E2–E6.
-
-Expanded-matrix run before this checkpoint:
+Linux:
 
 ```text
-Workflow: Phase 2 federation
-Run: 30581047505
-Commit: ec9b15528c1edf95ce1c8d64af363283e64235d8
-Status observed: queued
+Compile: passed
+Phase 0/1: 64 passed in 0.85s
+Phase D/E storage: 217 passed in 7.71s
+Phase 2 unit/integration: 85 passed in 9.57s
+Ruff: All checks passed
+Compose validation: passed
+Diff hygiene: passed
 ```
 
-This implementation checkpoint requires a new run; exact Linux and Windows results are pending.
+Windows:
+
+```text
+Identity, state, protocol, relay, and expanded Phase E tests: passed
+Job conclusion: success
+```
 
 ## Known failures
 
-1. No local pytest run is available.
-2. E6 progress/design opening status remains stale.
-3. This implementation is not yet remotely validated.
+1. No test failures on remote head `672245313d4411d078ed4dc5150dba8415cc01e5`.
+2. Local testing remains unavailable in this environment.
+3. E6 documentation and PR metadata are stale and not yet closed.
+4. The lower-level finalization primitive remains an API-hardening consideration, not a failing runtime recovery path.
 
 ## Uncommitted changes
 
 - None in a local worktree; no local worktree exists.
-- All five files are committed together through the GitHub object API.
+- No implementation edits are pending outside GitHub.
+- This handoff update is committed directly to the branch.
 
 ## Unfinished edits or partially implemented logic
 
-- Remote CI results have not yet been inspected.
-- Any failures from the expanded matrix have not yet been repaired.
-- E6 progress/design documentation and PR body have not yet been finalized.
-- E7 preparation has not begun.
+- E6 independent completion review document/status update is unfinished.
+- `phase_e_progress.md` and the E6 design opening are stale.
+- PR #122 body is stale.
+- E7 plan document is not yet created.
+- E7 implementation has not started.
 
 ## Next exact action
 
-1. Verify the remote branch head after this checkpoint.
-2. Inspect the new Phase 2 federation workflow run and exact Linux/Windows conclusions.
-3. If failing, record the exact failure before fixing it.
-4. If green, independently review E6.7 invariants and update Phase E progress/design, PR body, and this handoff.
-5. Prepare the exact E7 contract and test plan without implementing E7 until E6 closure is pushed.
+1. Verify the remote head after this handoff commit.
+2. Write the independent E6 completion review and decide the lower-level primitive disposition.
+3. Create the E7 returning-former-primary recovery plan with explicit checkpoints and acceptance IDs.
+4. Update Phase E status documentation and PR #122 body.
+5. Commit and push the E6 closure plus E7 preparation as one coherent checkpoint.
+6. Verify the resulting documentation-only workflow state and remote head.
 
 ## Resume safety
 
 - Safe to resume: **yes**.
-- Expected branch state: **temporarily unverified; CI must determine whether the E6 repair is green**.
-- PR must remain draft.
+- Expected branch state: **green**; the next checkpoint is documentation/planning only.
+- PR #122 must remain draft and stacked on `agent/complete-phase-d-integration`.
