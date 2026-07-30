@@ -1,14 +1,14 @@
 # Current task handoff
 
-Last updated: 2026-07-30 23:51 Europe/Oslo
+Last updated: 2026-07-31 00:02 Europe/Oslo
 
 ## Repository and branch
 
 - Repository: `Nettking/msh`
 - Branch: `agent/phase-e-completeness-aware-failover`
 - Local HEAD: **not established in this execution environment**; no local checkout is available.
-- Remote HEAD before this checkpoint: `175dcfa6ffe9e2db98e4b9b89664ba399fbe09a7`
-- Remote HEAD after this checkpoint: **verify immediately after commit**
+- Remote HEAD before this checkpoint: `dbf7331fa9add648891687a0d783c01159621817`
+- Remote HEAD after this checkpoint: **verify immediately after the atomic branch update**
 - Pull request: #122, draft, open, mergeable
 - PR base branch: `agent/complete-phase-d-integration`
 - PR base commit: `05bbfe40dafa2b4661aa313cf7dba25e01a5a90d`
@@ -16,143 +16,189 @@ Last updated: 2026-07-30 23:51 Europe/Oslo
 
 ## Current objective
 
-Finish all remaining Phase E work: close the final E6 API-surface invariant, implement E7 returning-former-primary recovery, implement E8 diagnostics/end-to-end acceptance, close the Phase E documentation and validation ledger, then clean up the stacked PRs safely. Phase F direct peer transport and Phase G are excluded.
+E6 is independently closed. E7 returning-former-primary recovery is now fully prepared but not implemented in this checkpoint. The next implementation must begin with E7.0/E7.1 only, remain relay-first, and preserve the interruption-safe checkpoint discipline. E8 and PR-stack cleanup remain later Phase E work. Phase F direct peer transport and Phase G are excluded.
 
 ## Confirmed findings
 
-1. E6.7 coordinator publication repair is implemented and green at `672245313d4411d078ed4dc5150dba8415cc01e5`.
-2. Workflow run `30582295842` for `b70b14f5f662262a3b8403b7ed7e2197baf61074` completed successfully.
-3. `phase_e_progress.md` remains stale: it marks E6 paused and E7/E8 remaining.
-4. E7 and E8 have not been implemented or closed in the authoritative progress document.
-5. The only open PRs are #121 and #122. Both are draft and mergeable; #122 is stacked on #121.
-6. `BatchStorageProvider.read()` and `committed_identity()` can support backend-neutral E7 verification.
-7. `PhaseDStorageService` already accepts authenticated `storage-replication` traffic for an assigned replica and validates current primary authority and immutable result identity. E7 can reuse relay-first transport.
-8. `StorageReplicaReport` and coordinator assessment already expose the final verification evidence needed by E7.
-9. There is no durable former-primary recovery transaction or immutable item ledger.
-10. Immutable conflicts cannot be safely overwritten. Missing authoritative items can be repaired automatically; conflicting items must fail closed and remain ineligible.
-11. E8 diagnostics can be a read-only coordinator projection over existing authoritative state.
-12. **Confirmed E6 API-surface safety gap:** `PhaseDControlPlane.complete_promotion_finalization()` is public and can clear the matching degraded state without invoking coordinator publication first. The authoritative recovery path publishes first, but a future direct caller could recreate the pre-E6.7 routing inconsistency.
-13. The full PR diff contains eight references to `complete_promotion_finalization`: one definition, one production call from `promotion_recovery.py`, test-only direct calls in E6.5/E6.6/E6.7, and handoff text. No other production caller exists.
-14. The package exports `recover_storage_promotion`, not the lower-level method, but `PhaseDControlPlane` is public. The invariant should therefore be enforced in the method rather than left to documentation.
-15. Existing tests did not catch this because E6.5 originally treated direct finalization as end-to-end completion before E6.7 introduced coordinator publication.
-16. This environment has no local checkout, no `gh`, and no shell DNS access to GitHub; repository work uses the connected GitHub app and remote Actions validation.
+1. E6.7 coordinator publication repair is implemented at `672245313d4411d078ed4dc5150dba8415cc01e5` and validated on Linux and Windows.
+2. Independent review confirmed the original E6.6 gap: provider authority/finalization could complete without publishing the selected provider into coordinator assignment/grant state. E6.7 fixed it with a durable atomic publication stage.
+3. Independent review also confirmed the workflow previously omitted E2-E6. Linux and Windows now run all E2-E6 tests.
+4. The supported end-to-end E6 entry point is `PhaseDControlPlane.recover_promotion()` / exported `recover_storage_promotion`.
+5. The aggregate PR diff contains no active production bypass of the recovery orchestrator. Direct calls to `complete_promotion_finalization()` occur only in focused compatibility/restart tests; the method remains a lower-level stage primitive rather than the Phase E completion API.
+6. A legacy database cleared before E6.7 publication is repaired idempotently by the authoritative recovery entry point.
+7. E6 is complete; `docs/implementation/phase_e6_completion_review.md` is the authoritative closure record and supersedes stale opening E6 status text in older progress/design documents.
+8. `BatchStorageProvider.read()` and `committed_identity()` can support backend-neutral E7 source and target verification.
+9. `PhaseDStorageService` already provides the authenticated relay-first `storage-replication` path required for missing-item repair.
+10. `StorageReplicaReport` and coordinator assessment already provide the final exact synchronization/eligibility gate.
+11. E7 currently lacks a durable former-primary recovery transaction and immutable item ledger.
+12. Missing authoritative items can be repaired automatically. Conflicting immutable identities or unknown extra hashes cannot be overwritten safely and must remain fail-closed/operator-attention.
+13. E8 diagnostics can be implemented as a read-only projection over authoritative snapshot, manifest, degraded state, recovery state, and latest assessments.
+14. The branch moved concurrently during review. A stale handoff write was rejected by GitHub with HTTP 409, preventing overwrite; all later writes were based on verified current heads.
+15. This environment has no local checkout, no `gh`, and no shell DNS access to GitHub. Repository work uses the connected GitHub app and remote Actions validation.
 
 ## Suspected issues not yet confirmed
 
-1. A returning report behind the current manifest may not identify item IDs directly; planning must compare authoritative immutable identities and fail on unknown extra hashes.
-2. Report submission may need an integration wrapper for final E7 verification; direct coordinator submission already enforces node ownership.
-3. Existing diagnostics completeness against F4-001 through F4-008 is not yet mapped.
-4. PR #121/#122 may require ready-for-review transitions before merge.
+1. A returning report behind the manifest may not identify item IDs directly; E7 planning must use authoritative immutable identities and fail on unknown extra hashes.
+2. The final E7 report may need a small runtime integration wrapper, although direct coordinator submission already authenticates registered node ownership.
+3. E8 field completeness against every F4-001 through F4-008 diagnostic expectation remains to be mapped after E7 state exists.
+4. PR #121/#122 ready-for-review and merge policy remains to be checked only after Phase E is complete.
 
 ## Decisions made and rationale
 
-1. Harden `complete_promotion_finalization()` so it invokes idempotent coordinator publication before any degraded-state clear. This makes direct and orchestrated completion safe.
-2. Keep explicit publication in recovery for action reporting; the method-level call is idempotent defense in depth.
-3. Extend E6.5 tests to prove direct completion publishes assignment/grant and remains restart-idempotent.
-4. Add a dedicated durable E7 recovery module rather than expanding `phase_d_control.py` further.
-5. Persist one recovery record plus one immutable item row per authoritative manifest item.
-6. E7 order: verify E6 finalization/assignment/fence → plan → relay-first delivery of missing items → verify immutable target state/report → coordinator accepts eligible synchronized report → complete.
-7. Never clear or weaken the old provider fence during E7.
-8. Treat conflicts, unknown hashes, source mismatch, manifest/assignment/grant changes, and forged reports as fail-closed/operator-attention.
-9. Implement E8 as a read-only projection plus end-to-end acceptance tests.
-10. Finish E7/E8 before PR merge. Merge order remains #121 first, verify `main`, reconcile #122, validate, then merge #122.
-11. Do not implement Phase F or start Phase G.
+1. Accept E6 as complete because the authoritative runtime path is safe, exported, restart-idempotent, and fully green; the lower-level stage primitive is explicitly not the end-to-end API.
+2. Preserve a dedicated E7 module rather than further expanding `phase_d_control.py`.
+3. Persist one recovery record plus one immutable ledger row per authoritative manifest item before transfer begins.
+4. E7 order: bind E6 proof/current authority/manifest/fence → plan → relay-first missing-item delivery → target identity verification → authenticated synchronized report → eligible assessment → complete.
+5. Never clear or weaken the former primary’s durable fence.
+6. Never automatically overwrite conflicts or unknown extra data.
+7. Start with E7.0/E7.1 contracts, planning, persistence, restart, and negative tests only. Transfer comes after that checkpoint is green.
+8. Implement E8 as a read-only projection and end-to-end acceptance suite after E7 is green.
+9. Keep PR #122 draft and stacked on PR #121. Do not retarget/rebase until PR #121 is safely resolved.
+10. Do not implement Phase F or Phase G.
 
 ## Files inspected
 
 - `docs/implementation/current_task_handoff.md`
 - `docs/implementation/phase_e_progress.md`
+- `docs/implementation/federated_session_test_matrix.md`
+- `docs/federated_session_network.md`
+- `catalog/federation/__init__.py`
+- `catalog/federation/phase_d_control.py`
+- `catalog/federation/promotion_recovery.py`
+- `catalog/federation/promotion_publication.py`
 - `catalog/federation/manifest.py`
 - `catalog/federation/reporting.py`
 - `catalog/federation/replication.py`
 - `catalog/federation/phase_d_service.py`
 - `catalog/federation/local_storage.py`
 - `catalog/federation/storage_protocol.py`
-- `catalog/federation/__init__.py`
-- `catalog/federation/phase_d_control.py`
-- `catalog/federation/promotion_recovery.py`
-- `catalog/federation/tests/test_phase_e65_finalization.py`
-- E6.6/E6.7 test references in the aggregate PR diff
+- E6.5-E6.7 tests
+- aggregate PR #122 diff and exact finalization call references
 - PR #121/#122 metadata and recent commits
+- workflow run `30581905829` jobs/logs
 
 ## Files changed
 
-- `docs/implementation/current_task_handoff.md` — records the confirmed E6 direct-finalization safety gap before fixing it, while preserving the E7/E8 plan.
+This coherent documentation/planning checkpoint adds:
+
+- `docs/implementation/phase_e6_completion_review.md` — independent E6 verdict, defects, invariants, API-surface review, and exact validation.
+- `docs/implementation/phase_e7_recovery_plan.md` — acceptance mapping, invariants, durable schema, recovery stages, failure behavior, checkpoints, and exact first implementation unit.
+- `docs/implementation/current_task_handoff.md` — this interruption-safe resume record.
+
+No runtime code is changed in this checkpoint.
 
 ## Exact commands run
 
-Connected GitHub operations:
+Shell discovery performed earlier:
 
 ```text
-fetch PR #122 metadata repeatedly to detect concurrent branch movement
-fetch commits 9ef0331471ff6ebe5b048a20d1500af9ee7b35e6 and 175dcfa6ffe9e2db98e4b9b89664ba399fbe09a7
-fetch current handoff
-fetch catalog/federation/__init__.py
-fetch catalog/federation/phase_d_control.py and focused finalization range
-fetch catalog/federation/tests/test_phase_e65_finalization.py
-find complete_promotion_finalization in the full PR diff
-attempt stale handoff update; GitHub rejected it with HTTP 409
-update handoff against the current blob SHA
+pwd && ls -la && find / -maxdepth 4 -type d -name .git 2>/dev/null | head -50
+gh --version && gh auth status
+mkdir -p /mnt/data/work && cd /mnt/data/work && git clone --branch agent/phase-e-completeness-aware-failover --single-branch https://github.com/Nettking/msh.git msh
 ```
 
-No shell commands were run.
+Results:
+
+```text
+No MSH checkout found
+gh: command not found
+Clone failed: Could not resolve host: github.com
+```
+
+Connected GitHub operations in the review/preparation unit:
+
+```text
+fetch PR #121/#122 metadata and recent commits
+fetch current handoff repeatedly to reconcile concurrent updates
+fetch focused Phase E runtime, contract, test, and workflow files
+find all complete_promotion_finalization references in the full PR diff
+inspect workflow run 30581905829 and Linux logs
+attempt stale handoff update; GitHub rejected it with HTTP 409
+record the finding against the current blob SHA
+create blobs for the E6 completion review, E7 plan, and final handoff
+create one shared tree and one commit
+update the branch with force=false
+```
 
 ## Exact test results
 
-Latest verified remote result:
-
-```text
-Workflow: Phase 2 federation
-Run: 30582295842
-Commit: b70b14f5f662262a3b8403b7ed7e2197baf61074
-Status: completed
-Conclusion: success
-```
-
-E6.7 implementation evidence:
+Authoritative E6.7 validation:
 
 ```text
 Workflow: Phase 2 federation
 Run: 30581905829
 Commit: 672245313d4411d078ed4dc5150dba8415cc01e5
-Linux: 64 Phase 0/1 passed; 217 Phase D/E passed; 85 Phase 2 passed; Ruff/Compose/diff hygiene passed
-Windows: expanded Phase E step passed
+Linux: success
+Windows: success
 Overall: success
 ```
 
-No new tests were run for this finding-only checkpoint.
+Linux exact results:
+
+```text
+Compilation: passed
+Phase 0/1: 64 passed in 0.85s
+Expanded Phase D/E storage suite: 217 passed in 7.71s
+Phase 2 unit/integration: 85 passed in 9.57s
+Ruff: all checks passed
+Docker Compose base and relay-dev: passed
+Diff hygiene: passed
+```
+
+Windows:
+
+```text
+Expanded identity/state/protocol/relay/Phase E test step: passed
+```
+
+Later documentation-only head validation:
+
+```text
+Workflow: Phase 2 federation
+Run: 30582295842
+Commit: b70b14f5f662262a3b8403b7ed7e2197baf61074
+Conclusion: success
+```
+
+No new tests are required for this documentation-only checkpoint; no runtime files changed.
 
 ## Known failures
 
-1. Direct `complete_promotion_finalization()` can clear degraded state before coordinator publication until the next implementation checkpoint.
-2. E7 and E8 are functionally unfinished.
-3. Phase E status and PR #122 body are stale.
-4. Local testing is unavailable.
+1. No known test failure on the latest validated runtime implementation.
+2. E7 is not implemented.
+3. E8 is not implemented.
+4. Older Phase E progress opening text and PR #122 body remain stale until the PR metadata update following this commit.
+5. Local tests are unavailable in this execution environment.
 
 ## Uncommitted changes
 
 - None in a local worktree; no local worktree exists.
-- This finding record is committed directly through GitHub.
+- The three documentation files are committed atomically through the GitHub object API.
 
 ## Unfinished edits or partially implemented logic
 
-- E6 direct-finalization API hardening is not implemented.
 - E7 durable recovery module/tests are not created.
-- E8 diagnostics/end-to-end acceptance are not created.
-- Phase E closure documentation is incomplete.
-- PR cleanup/merge has not begun.
+- E8 diagnostics/end-to-end tests are not created.
+- The broader Phase E progress ledger still needs final checkpoint updates after E7/E8.
+- PR-stack cleanup/merge has not begun.
 - Phase G is intentionally not started.
 
 ## Next exact action
 
-1. Verify the remote head after this finding checkpoint.
-2. Harden direct finalization and add focused tests as the smallest coherent unit.
-3. Push implementation/tests/handoff together and inspect Linux/Windows CI.
-4. After E6 is fully green, continue the durable E7 recovery checkpoint already designed.
-5. Only after E7 is green, implement E8 diagnostics and acceptance.
+Implement **E7.0 + E7.1 only** from `docs/implementation/phase_e7_recovery_plan.md`:
+
+1. create `catalog/federation/former_primary_recovery.py`;
+2. define validated recovery/item contracts and a durable SQLite store;
+3. bind planning to E6 finalization/publication, current assignment/grant, authoritative manifest, returning provider identity, and provider fence;
+4. persist deterministic `present`, `missing`, or `conflict` item rows before transfer;
+5. add restart, duplicate, stale-authority, missing-fence, changed-manifest, conflict, extra-hash, and per-group-isolation tests;
+6. add the focused test file to Linux and Windows CI;
+7. update this handoff, push immediately, and inspect exact remote results before adding transfer logic.
 
 ## Resume safety
 
 - Safe to resume: **yes**.
-- Expected branch state: **green but with a confirmed direct-finalization safety gap**; this checkpoint changes documentation only.
-- PR #122 must remain draft and stacked until Phase E is complete.
+- Expected branch state: **green**; this checkpoint changes documentation only.
+- E6 is complete.
+- E7 is prepared and not started in this checkpoint.
+- PR #122 must remain draft and stacked.
