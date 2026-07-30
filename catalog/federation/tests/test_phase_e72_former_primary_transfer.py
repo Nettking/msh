@@ -15,7 +15,11 @@ from catalog.federation.outbox import SQLiteOutbox
 from catalog.federation.phase_d_control import PhaseDControlPlane
 from catalog.federation.phase_d_service import PhaseDStorageService
 from catalog.federation.replication import CallableReplicationTransport
-from catalog.federation.storage_protocol import BatchIngestResult, StorageResponseEnvelope
+from catalog.federation.storage_protocol import (
+    BatchIngestResult,
+    BatchIngestState,
+    StorageResponseEnvelope,
+)
 
 from .test_phase_e63_provider_fencing import NOW
 from .test_phase_e71_former_primary_recovery import (
@@ -332,8 +336,7 @@ def test_e72_mismatched_success_response_becomes_operator_attention(
                 batch_id="other-batch",
                 idempotency_key="other-idempotency",
                 content_hash="sha256:" + "f" * 64,
-                persisted=True,
-                duplicate=False,
+                state=BatchIngestState.STORED,
             ).to_dict(),
         )
 
