@@ -11,7 +11,8 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import Any
 
 from .errors import FederationValidationError
 from .former_primary_recovery import (

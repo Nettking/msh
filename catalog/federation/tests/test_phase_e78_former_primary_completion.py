@@ -94,7 +94,6 @@ def _completion_worker(
     control: PhaseDControlPlane | None = None,
     provider=None,
 ) -> FormerPrimaryCompletionWorker:
-    selected_control = control or runtime.control
     selected_planner = planner
     if control is not None:
         selected_planner = FormerPrimaryRecoveryPlanner(

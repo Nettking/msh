@@ -11,7 +11,8 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from collections.abc import Callable
+from typing import ClassVar
 
 from .errors import FederationValidationError
 from .former_primary_recovery import (
@@ -288,7 +289,7 @@ class FormerPrimaryRepairProgressStore:
 class FormerPrimaryRepairWorker:
     """Transfer missing authoritative batches over the existing relay route."""
 
-    _FATAL_CODES = {
+    _FATAL_CODES: ClassVar[set[str]] = {
         "repair-source-identity-mismatch",
         "repair-source-item-missing",
         "repair-source-hash-mismatch",
