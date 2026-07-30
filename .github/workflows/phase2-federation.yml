@@ -89,6 +89,7 @@ jobs:
           catalog/federation/tests/test_phase_e65_finalization.py
           catalog/federation/tests/test_phase_e66_recovery.py
           catalog/federation/tests/test_phase_e67_coordinator_publication.py
+          catalog/federation/tests/test_phase_e71_former_primary_recovery.py
       - name: Phase 2 unit and integration tests
         run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase2_unit.py catalog/node/tests catalog/relay/tests
       - name: Ruff federation code
@@ -146,3 +147,4 @@ jobs:
           catalog/federation/tests/test_phase_e65_finalization.py
           catalog/federation/tests/test_phase_e66_recovery.py
           catalog/federation/tests/test_phase_e67_coordinator_publication.py
+          catalog/federation/tests/test_phase_e71_former_primary_recovery.py
