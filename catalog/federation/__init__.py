@@ -1,6 +1,7 @@
 """Pure domain contracts for federated MSH sessions."""
 
 from .acknowledgement import AcknowledgementMode, AcknowledgementPolicy, AcknowledgementProgress
+from .commit_tracking import DurableAcknowledgementStore, StorageCommitStatus
 from .errors import FederationValidationError
 from .filesystem_storage import FilesystemRecorderStorageProvider
 from .handover import ControlledHandover, HandoverState
@@ -14,6 +15,10 @@ from .logical_storage import (
     StorageRouteResolver,
 )
 from .outbox import OutboxEntry, OutboxState, SQLiteOutbox
+from .phase_d_client import PhaseDIngestOutcome, PhaseDLogicalStorageClient
+from .phase_d_control import HandoverCommit, PhaseDControlPlane
+from .phase_d_handover import PhaseDHandoverCoordinator
+from .phase_d_service import PhaseDStorageService
 from .postgres_storage import PostgreSQLBatchStorageProvider
 from .providers import (
     CapabilityProvider,
@@ -23,7 +28,13 @@ from .providers import (
     StorageReadOutcome,
     StorageWriteOutcome,
 )
+from .recorder_delivery import (
+    RECORDER_STORAGE_SCHEMA,
+    DurableRecorderDeliveryQueue,
+    RecorderDeliveryRunResult,
+)
 from .registry import LocalCapabilityRegistry
+from .relay_storage import RELAY_STORAGE_KIND, RelayStorageEndpoint
 from .replication import (
     REPLICATION_SCHEMA,
     CallableReplicationTransport,
@@ -91,8 +102,11 @@ __all__ = [
     "AcknowledgementMode",
     "AcknowledgementPolicy",
     "AcknowledgementProgress",
+    "DurableAcknowledgementStore",
+    "StorageCommitStatus",
     "ControlledHandover",
     "HandoverState",
+    "PhaseDHandoverCoordinator",
     "FederationValidationError",
     "FilesystemRecorderStorageProvider",
     "FilesystemBatchStorageProvider",
@@ -101,12 +115,22 @@ __all__ = [
     "LocalStorageService",
     "AuthorizedStorageService",
     "StorageWriteAuthorityValidator",
+    "PhaseDStorageService",
     "LogicalStorageClient",
+    "PhaseDLogicalStorageClient",
+    "PhaseDIngestOutcome",
     "StorageRoute",
     "StorageRouteResolver",
     "StorageRequestTransport",
     "CallableStorageTransport",
     "RelayNodeStorageTransport",
+    "RelayStorageEndpoint",
+    "RECORDER_STORAGE_SCHEMA",
+    "DurableRecorderDeliveryQueue",
+    "RecorderDeliveryRunResult",
+    "RELAY_STORAGE_KIND",
+    "PhaseDControlPlane",
+    "HandoverCommit",
     "REPLICATION_SCHEMA",
     "ReplicationTarget",
     "ReplicationTransport",
