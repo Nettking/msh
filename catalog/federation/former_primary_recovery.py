@@ -1,56 +1,82 @@
-"""Durable relay-first recovery for a returning former storage primary."""
+"""Durable E7.0/E7.1 planning for a returning former storage primary.
+
+This module deliberately contains no transfer logic. It binds a recovery plan to
+completed E6 authority evidence, current coordinator state, the authoritative
+manifest, provider-local fencing, and authenticated returning-provider evidence.
+The complete item ledger is persisted atomically before later checkpoints may
+move data.
+"""
 
 from __future__ import annotations
 
 import hashlib
-import json
 import sqlite3
 from collections import Counter
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from pathlib import Path
 from typing import Any, Protocol
 
 from .errors import FederationValidationError
-from .local_storage import BatchStorageProvider
-from .provider_fencing import ProviderFenceStore
-from .replication import ReplicationTransport
-from .reporting import StorageReplicaAssessment, StorageReplicaReport
-from .storage_protocol import (
-    STORAGE_PROTOCOL,
-    STORAGE_PROTOCOL_VERSION,
-    BatchIngestRequest,
-    BatchIngestResult,
-    StorageOperation,
-    StorageRequestEnvelope,
-    WriteAuthority,
+from .local_storage import BatchStorageProvider, CommittedBatchIdentity
+from .manifest import ManifestItem, ManifestItemKind
+from .models import CommitState
+from .promotion_publication import (
+    PromotionPublicationRecord,
+    promotion_publication,
 )
+from .provider_fencing import ProviderFenceStore
+from .reporting import StorageReplicaAssessment
 
 FORMER_PRIMARY_RECOVERY_SCHEMA = "msh.storage_former_primary_recovery.v1"
-_RECOVERY_STATES = {
-    "waiting-report",
-    "planned",
-    "repairing",
-    "awaiting-verification",
-    "completed",
-    "failed",
-}
-_ITEM_STATES = {"pending", "delivered", "verified", "conflict"}
 
 
-def _utc(value: datetime | str | None = None) -> datetime:
+def _text(value: Any, field: str) -> str:
+    if (
+        not isinstance(value, str)
+        or not value.strip()
+        or any(ord(character) < 32 for character in value)
+    ):
+        raise FederationValidationError(
+            "invalid-id",
+            field,
+            "must be non-empty opaque text",
+        )
+    return value
+
+
+def _uint(value: Any, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise FederationValidationError(
+            "invalid-non-negative-integer",
+            field,
+            "must be a non-negative integer",
+        )
+    return value
+
+
+def _utc(value: datetime | str | None = None, field: str = "timestamp") -> datetime:
     if value is None:
-        return datetime.now(timezone.utc)
+        value = datetime.now(timezone.utc)
     if isinstance(value, str):
         try:
             value = datetime.fromisoformat(value.replace("Z", "+00:00"))
         except ValueError as exc:
             raise FederationValidationError(
-                "invalid-timestamp", "timestamp", "must be RFC 3339"
+                "invalid-timestamp",
+                field,
+                "must be RFC 3339",
             ) from exc
-    if not isinstance(value, datetime) or value.tzinfo is None or value.utcoffset() is None:
+    if (
+        not isinstance(value, datetime)
+        or value.tzinfo is None
+        or value.utcoffset() is None
+    ):
         raise FederationValidationError(
-            "invalid-timestamp", "timestamp", "must be timezone-aware"
+            "invalid-timestamp",
+            field,
+            "must be timezone-aware",
         )
     return value.astimezone(timezone.utc)
 
@@ -59,111 +85,280 @@ def _timestamp(value: datetime) -> str:
     return _utc(value).isoformat().replace("+00:00", "Z")
 
 
-def _text(value: Any, field: str) -> str:
-    if not isinstance(value, str) or not value.strip() or any(ord(char) < 32 for char in value):
-        raise FederationValidationError("invalid-id", field, "must be non-empty opaque text")
-    return value
+def _optional_text(value: Any, field: str) -> str | None:
+    return None if value is None else _text(value, field)
+
+
+def _optional_uint(value: Any, field: str) -> int | None:
+    return None if value is None else _uint(value, field)
 
 
 def _recovery_id(
-    promotion_id: str,
+    *,
     session_id: str,
     group_id: str,
-    former_provider_id: str,
+    returning_provider_id: str,
+    promotion_id: str,
+    final_authority_identity: str,
     manifest_hash: str,
 ) -> str:
-    value = (
-        f"{promotion_id}\0{session_id}\0{group_id}\0"
-        f"{former_provider_id}\0{manifest_hash}"
+    payload = (
+        f"{session_id}\0{group_id}\0{returning_provider_id}\0"
+        f"{promotion_id}\0{final_authority_identity}\0{manifest_hash}"
     ).encode()
-    return "former-primary-" + hashlib.sha256(value).hexdigest()
+    return "former-primary-" + hashlib.sha256(payload).hexdigest()
+
+
+def _delivery_id(recovery_id: str, item_id: str) -> str:
+    payload = f"{recovery_id}\0{item_id}".encode()
+    return "repair-item-" + hashlib.sha256(payload).hexdigest()
+
+
+class FormerPrimaryRecoveryState(str, Enum):
+    PLANNED = "planned"
+    TRANSFERRING = "transferring"
+    VERIFYING = "verifying"
+    AWAITING_REPORT = "awaiting-report"
+    COMPLETED = "completed"
+    RETRYABLE = "retryable"
+    OPERATOR_ATTENTION = "operator-attention"
+    FAILED = "failed"
+
+
+class FormerPrimaryItemStatus(str, Enum):
+    PRESENT = "present"
+    MISSING = "missing"
+    DELIVERED = "delivered"
+    VERIFIED = "verified"
+    CONFLICT = "conflict"
+    FAILED = "failed"
 
 
 @dataclass(frozen=True)
-class FormerPrimaryRepairItem:
+class FormerPrimaryRecoveryItem:
+    recovery_id: str
+    session_id: str
+    group_id: str
+    returning_provider_id: str
     item_id: str
+    kind: ManifestItemKind
     dataset_id: str
-    idempotency_key: str
-    content_hash: str
     schema_name: str
     schema_version: int
-    committed_at: datetime
-    state: str = "pending"
-    attempt_count: int = 0
-    last_error: str | None = None
+    idempotency_key: str | None
+    content_hash: str
+    size_bytes: int
+    source_id: str | None
+    first_sequence: int | None
+    last_sequence: int | None
+    commit_state: CommitState
+    status: FormerPrimaryItemStatus
+    delivery_id: str
+    attempt_count: int
+    last_error_code: str | None
+    last_error_reason: str | None
+    updated_at: datetime
 
     def __post_init__(self) -> None:
         for field in (
+            "recovery_id",
+            "session_id",
+            "group_id",
+            "returning_provider_id",
             "item_id",
             "dataset_id",
-            "idempotency_key",
-            "content_hash",
             "schema_name",
-            "state",
+            "content_hash",
+            "delivery_id",
         ):
             object.__setattr__(self, field, _text(getattr(self, field), field))
-        if self.state not in _ITEM_STATES:
+        try:
+            object.__setattr__(self, "kind", ManifestItemKind(self.kind))
+            object.__setattr__(self, "commit_state", CommitState(self.commit_state))
+            object.__setattr__(
+                self,
+                "status",
+                FormerPrimaryItemStatus(self.status),
+            )
+        except ValueError as exc:
             raise FederationValidationError(
-                "invalid-recovery-state", "state", "unknown repair item state"
+                "invalid-recovery-enum",
+                "recovery_item",
+                "contains an unknown enum value",
+            ) from exc
+        if self.commit_state is not CommitState.COMMITTED:
+            raise FederationValidationError(
+                "recovery-item-not-committed",
+                "commit_state",
+                "only authoritative committed items may be recovered",
+            )
+        object.__setattr__(
+            self,
+            "schema_version",
+            _uint(self.schema_version, "schema_version"),
+        )
+        if self.schema_version == 0:
+            raise FederationValidationError(
+                "invalid-positive-integer",
+                "schema_version",
+                "must be greater than zero",
+            )
+        object.__setattr__(self, "size_bytes", _uint(self.size_bytes, "size_bytes"))
+        object.__setattr__(
+            self,
+            "attempt_count",
+            _uint(self.attempt_count, "attempt_count"),
+        )
+        object.__setattr__(
+            self,
+            "idempotency_key",
+            _optional_text(self.idempotency_key, "idempotency_key"),
+        )
+        object.__setattr__(
+            self,
+            "source_id",
+            _optional_text(self.source_id, "source_id"),
+        )
+        object.__setattr__(
+            self,
+            "first_sequence",
+            _optional_uint(self.first_sequence, "first_sequence"),
+        )
+        object.__setattr__(
+            self,
+            "last_sequence",
+            _optional_uint(self.last_sequence, "last_sequence"),
+        )
+        if (self.first_sequence is None) != (self.last_sequence is None):
+            raise FederationValidationError(
+                "invalid-sequence-range",
+                "first_sequence",
+                "sequence endpoints must appear together",
             )
         if (
-            isinstance(self.schema_version, bool)
-            or not isinstance(self.schema_version, int)
-            or self.schema_version <= 0
+            self.first_sequence is not None
+            and self.last_sequence is not None
+            and self.last_sequence < self.first_sequence
         ):
             raise FederationValidationError(
-                "invalid-positive-integer", "schema_version", "must be positive"
+                "invalid-sequence-range",
+                "last_sequence",
+                "must not precede first_sequence",
             )
-        if (
-            isinstance(self.attempt_count, bool)
-            or not isinstance(self.attempt_count, int)
-            or self.attempt_count < 0
-        ):
+        if (self.last_error_code is None) != (self.last_error_reason is None):
             raise FederationValidationError(
-                "invalid-non-negative-integer",
-                "attempt_count",
-                "must be non-negative",
+                "invalid-recovery-error",
+                "last_error_code",
+                "error code and reason must appear together",
             )
-        if self.last_error is not None:
-            object.__setattr__(self, "last_error", _text(self.last_error, "last_error"))
-        object.__setattr__(self, "committed_at", _utc(self.committed_at))
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "item_id": self.item_id,
-            "dataset_id": self.dataset_id,
-            "idempotency_key": self.idempotency_key,
-            "content_hash": self.content_hash,
-            "schema_name": self.schema_name,
-            "schema_version": self.schema_version,
-            "committed_at": _timestamp(self.committed_at),
-            "state": self.state,
-            "attempt_count": self.attempt_count,
-            "last_error": self.last_error,
-        }
+        object.__setattr__(
+            self,
+            "last_error_code",
+            _optional_text(self.last_error_code, "last_error_code"),
+        )
+        object.__setattr__(
+            self,
+            "last_error_reason",
+            _optional_text(self.last_error_reason, "last_error_reason"),
+        )
+        object.__setattr__(
+            self,
+            "updated_at",
+            _utc(self.updated_at, "updated_at"),
+        )
 
     @classmethod
-    def from_dict(cls, value: dict[str, Any]) -> FormerPrimaryRepairItem:
-        return cls(**value)
+    def from_manifest(
+        cls,
+        *,
+        recovery_id: str,
+        session_id: str,
+        group_id: str,
+        returning_provider_id: str,
+        item: ManifestItem,
+        status: FormerPrimaryItemStatus,
+        now: datetime,
+        error_code: str | None = None,
+        error_reason: str | None = None,
+    ) -> "FormerPrimaryRecoveryItem":
+        return cls(
+            recovery_id=recovery_id,
+            session_id=session_id,
+            group_id=group_id,
+            returning_provider_id=returning_provider_id,
+            item_id=item.item_id,
+            kind=item.kind,
+            dataset_id=item.dataset_id,
+            schema_name=item.schema_name,
+            schema_version=item.schema_version,
+            idempotency_key=item.idempotency_key,
+            content_hash=item.content_hash,
+            size_bytes=item.size_bytes,
+            source_id=item.source_id,
+            first_sequence=item.first_sequence,
+            last_sequence=item.last_sequence,
+            commit_state=item.commit_state,
+            status=status,
+            delivery_id=_delivery_id(recovery_id, item.item_id),
+            attempt_count=0,
+            last_error_code=error_code,
+            last_error_reason=error_reason,
+            updated_at=now,
+        )
+
+    def immutable_binding(self) -> tuple[Any, ...]:
+        return (
+            self.recovery_id,
+            self.session_id,
+            self.group_id,
+            self.returning_provider_id,
+            self.item_id,
+            self.kind.value,
+            self.dataset_id,
+            self.schema_name,
+            self.schema_version,
+            self.idempotency_key,
+            self.content_hash,
+            self.size_bytes,
+            self.source_id,
+            self.first_sequence,
+            self.last_sequence,
+            self.commit_state.value,
+            self.delivery_id,
+        )
 
 
 @dataclass(frozen=True)
 class FormerPrimaryRecoveryRecord:
+    schema: str
     recovery_id: str
-    promotion_id: str
     session_id: str
     group_id: str
-    former_provider_id: str
-    active_provider_id: str
+    returning_provider_id: str
+    returning_node_id: str
+    source_provider_id: str
+    source_node_id: str
+    promotion_id: str
+    final_authority_identity: str
+    publication_control_revision: int
     manifest_revision: int
     manifest_hash: str
-    state: str
+    grant_id: str
+    term: int
+    fencing_token: int
+    lease_expires_at: datetime
+    report_revision: int
+    report_hash: str
+    state: FormerPrimaryRecoveryState
+    item_count: int
+    present_count: int
+    missing_count: int
+    conflict_count: int
+    latest_error_code: str | None
+    latest_error_reason: str | None
     created_at: datetime
     updated_at: datetime
-    items: tuple[FormerPrimaryRepairItem, ...]
-    failure_code: str | None = None
-    failure_reason: str | None = None
-    schema: str = FORMER_PRIMARY_RECOVERY_SCHEMA
+    completed_at: datetime | None = None
 
     def __post_init__(self) -> None:
         if self.schema != FORMER_PRIMARY_RECOVERY_SCHEMA:
@@ -174,86 +369,129 @@ class FormerPrimaryRecoveryRecord:
             )
         for field in (
             "recovery_id",
-            "promotion_id",
             "session_id",
             "group_id",
-            "former_provider_id",
-            "active_provider_id",
+            "returning_provider_id",
+            "returning_node_id",
+            "source_provider_id",
+            "source_node_id",
+            "promotion_id",
+            "final_authority_identity",
             "manifest_hash",
-            "state",
+            "grant_id",
+            "report_hash",
         ):
             object.__setattr__(self, field, _text(getattr(self, field), field))
-        if self.state not in _RECOVERY_STATES:
-            raise FederationValidationError(
-                "invalid-recovery-state", "state", "unknown recovery state"
+        for field in (
+            "publication_control_revision",
+            "manifest_revision",
+            "term",
+            "fencing_token",
+            "report_revision",
+            "item_count",
+            "present_count",
+            "missing_count",
+            "conflict_count",
+        ):
+            object.__setattr__(self, field, _uint(getattr(self, field), field))
+        try:
+            object.__setattr__(
+                self,
+                "state",
+                FormerPrimaryRecoveryState(self.state),
             )
+        except ValueError as exc:
+            raise FederationValidationError(
+                "invalid-recovery-state",
+                "state",
+                "unknown former-primary recovery state",
+            ) from exc
         if (
-            isinstance(self.manifest_revision, bool)
-            or not isinstance(self.manifest_revision, int)
-            or self.manifest_revision < 0
+            self.present_count + self.missing_count + self.conflict_count
+            != self.item_count
         ):
             raise FederationValidationError(
-                "invalid-non-negative-integer",
-                "manifest_revision",
-                "must be non-negative",
+                "invalid-recovery-counts",
+                "item_count",
+                "item status counts must equal item_count",
             )
-        if (self.failure_code is None) != (self.failure_reason is None):
+        if (self.latest_error_code is None) != (
+            self.latest_error_reason is None
+        ):
             raise FederationValidationError(
-                "invalid-recovery-failure",
-                "failure_code",
-                "failure code and reason must appear together",
+                "invalid-recovery-error",
+                "latest_error_code",
+                "error code and reason must appear together",
             )
-        if self.failure_code is not None:
-            object.__setattr__(self, "failure_code", _text(self.failure_code, "failure_code"))
-            object.__setattr__(self, "failure_reason", _text(self.failure_reason, "failure_reason"))
-        object.__setattr__(self, "created_at", _utc(self.created_at))
-        object.__setattr__(self, "updated_at", _utc(self.updated_at))
-        object.__setattr__(self, "items", tuple(self.items))
-
-    @property
-    def pending_items(self) -> tuple[FormerPrimaryRepairItem, ...]:
-        return tuple(item for item in self.items if item.state == "pending")
-
-    @property
-    def conflict_items(self) -> tuple[FormerPrimaryRepairItem, ...]:
-        return tuple(item for item in self.items if item.state == "conflict")
-
-    def to_dict(self) -> dict[str, Any]:
-        return {
-            "schema": self.schema,
-            "recovery_id": self.recovery_id,
-            "promotion_id": self.promotion_id,
-            "session_id": self.session_id,
-            "group_id": self.group_id,
-            "former_provider_id": self.former_provider_id,
-            "active_provider_id": self.active_provider_id,
-            "manifest_revision": self.manifest_revision,
-            "manifest_hash": self.manifest_hash,
-            "state": self.state,
-            "failure_code": self.failure_code,
-            "failure_reason": self.failure_reason,
-            "created_at": _timestamp(self.created_at),
-            "updated_at": _timestamp(self.updated_at),
-            "items": [item.to_dict() for item in self.items],
-        }
-
-    @classmethod
-    def from_dict(cls, value: dict[str, Any]) -> FormerPrimaryRecoveryRecord:
-        data = dict(value)
-        data["items"] = tuple(
-            FormerPrimaryRepairItem.from_dict(item) for item in data["items"]
+        object.__setattr__(
+            self,
+            "latest_error_code",
+            _optional_text(self.latest_error_code, "latest_error_code"),
         )
-        return cls(**data)
+        object.__setattr__(
+            self,
+            "latest_error_reason",
+            _optional_text(self.latest_error_reason, "latest_error_reason"),
+        )
+        object.__setattr__(
+            self,
+            "lease_expires_at",
+            _utc(self.lease_expires_at, "lease_expires_at"),
+        )
+        object.__setattr__(
+            self,
+            "created_at",
+            _utc(self.created_at, "created_at"),
+        )
+        object.__setattr__(
+            self,
+            "updated_at",
+            _utc(self.updated_at, "updated_at"),
+        )
+        if self.completed_at is not None:
+            object.__setattr__(
+                self,
+                "completed_at",
+                _utc(self.completed_at, "completed_at"),
+            )
+        if (
+            self.state is FormerPrimaryRecoveryState.COMPLETED
+            and self.completed_at is None
+        ):
+            raise FederationValidationError(
+                "missing-completion-time",
+                "completed_at",
+                "completed recovery requires a completion timestamp",
+            )
+
+    def immutable_binding(self) -> tuple[Any, ...]:
+        return (
+            self.schema,
+            self.recovery_id,
+            self.session_id,
+            self.group_id,
+            self.returning_provider_id,
+            self.returning_node_id,
+            self.source_provider_id,
+            self.source_node_id,
+            self.promotion_id,
+            self.final_authority_identity,
+            self.publication_control_revision,
+            self.manifest_revision,
+            self.manifest_hash,
+            self.grant_id,
+            self.term,
+            self.fencing_token,
+            self.lease_expires_at,
+            self.report_revision,
+            self.report_hash,
+        )
 
 
 @dataclass(frozen=True)
-class FormerPrimaryRecoveryRunResult:
-    status: str
-    code: str
-    reason: str
-    attempted: int
-    delivered: int
+class FormerPrimaryRecoveryPlan:
     record: FormerPrimaryRecoveryRecord
+    items: tuple[FormerPrimaryRecoveryItem, ...]
 
 
 class RecoveryControlPlane(Protocol):
@@ -263,142 +501,417 @@ class RecoveryControlPlane(Protocol):
 
     def manifest(self, session_id: str, group_id: str): ...
 
-    def promotion_transaction(self, session_id: str, group_id: str, promotion_id: str): ...
+    def promotion_transaction(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+    ): ...
 
-    def promotion_finalization(self, session_id: str, group_id: str, promotion_id: str): ...
+    def promotion_finalization(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+    ): ...
 
     def latest_storage_replica_assessment(
-        self, session_id: str, group_id: str, provider_id: str
+        self,
+        session_id: str,
+        group_id: str,
+        provider_id: str,
     ) -> StorageReplicaAssessment | None: ...
-
-    def submit_storage_replica_report(
-        self, report: StorageReplicaReport, *, actor_node_id: str
-    ) -> StorageReplicaAssessment: ...
 
 
 class FormerPrimaryRecoveryStore:
-    """SQLite recovery ledger sharing the coordinator database."""
+    """Durable recovery and immutable item ledger in the coordinator database."""
 
     def __init__(self, database: Path | str) -> None:
         self.database = str(database)
         Path(self.database).parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
-            connection.execute(
+            connection.executescript(
                 """
                 CREATE TABLE IF NOT EXISTS storage_former_primary_recoveries (
                     recovery_id TEXT PRIMARY KEY,
+                    schema TEXT NOT NULL,
                     session_id TEXT NOT NULL,
                     group_id TEXT NOT NULL,
+                    returning_provider_id TEXT NOT NULL,
+                    returning_node_id TEXT NOT NULL,
+                    source_provider_id TEXT NOT NULL,
+                    source_node_id TEXT NOT NULL,
                     promotion_id TEXT NOT NULL,
-                    former_provider_id TEXT NOT NULL,
-                    manifest_revision INTEGER NOT NULL CHECK(manifest_revision >= 0),
+                    final_authority_identity TEXT NOT NULL,
+                    publication_control_revision INTEGER NOT NULL
+                        CHECK(publication_control_revision >= 0),
+                    manifest_revision INTEGER NOT NULL
+                        CHECK(manifest_revision >= 0),
                     manifest_hash TEXT NOT NULL,
+                    grant_id TEXT NOT NULL,
+                    term INTEGER NOT NULL CHECK(term >= 0),
+                    fencing_token INTEGER NOT NULL CHECK(fencing_token >= 0),
+                    lease_expires_at TEXT NOT NULL,
+                    report_revision INTEGER NOT NULL CHECK(report_revision >= 0),
+                    report_hash TEXT NOT NULL,
                     state TEXT NOT NULL,
-                    record_json TEXT NOT NULL CHECK(json_valid(record_json)),
-                    updated_at TEXT NOT NULL
-                )
+                    item_count INTEGER NOT NULL CHECK(item_count >= 0),
+                    present_count INTEGER NOT NULL CHECK(present_count >= 0),
+                    missing_count INTEGER NOT NULL CHECK(missing_count >= 0),
+                    conflict_count INTEGER NOT NULL CHECK(conflict_count >= 0),
+                    latest_error_code TEXT,
+                    latest_error_reason TEXT,
+                    created_at TEXT NOT NULL,
+                    updated_at TEXT NOT NULL,
+                    completed_at TEXT,
+                    UNIQUE(
+                        session_id,
+                        group_id,
+                        returning_provider_id,
+                        promotion_id,
+                        manifest_hash
+                    )
+                );
+                CREATE TABLE IF NOT EXISTS storage_former_primary_recovery_items (
+                    recovery_id TEXT NOT NULL,
+                    session_id TEXT NOT NULL,
+                    group_id TEXT NOT NULL,
+                    returning_provider_id TEXT NOT NULL,
+                    item_id TEXT NOT NULL,
+                    kind TEXT NOT NULL,
+                    dataset_id TEXT NOT NULL,
+                    schema_name TEXT NOT NULL,
+                    schema_version INTEGER NOT NULL CHECK(schema_version > 0),
+                    idempotency_key TEXT,
+                    content_hash TEXT NOT NULL,
+                    size_bytes INTEGER NOT NULL CHECK(size_bytes >= 0),
+                    source_id TEXT,
+                    first_sequence INTEGER,
+                    last_sequence INTEGER,
+                    commit_state TEXT NOT NULL,
+                    status TEXT NOT NULL,
+                    delivery_id TEXT NOT NULL,
+                    attempt_count INTEGER NOT NULL CHECK(attempt_count >= 0),
+                    last_error_code TEXT,
+                    last_error_reason TEXT,
+                    updated_at TEXT NOT NULL,
+                    PRIMARY KEY(recovery_id, item_id),
+                    UNIQUE(recovery_id, delivery_id),
+                    FOREIGN KEY(recovery_id)
+                        REFERENCES storage_former_primary_recoveries(recovery_id)
+                        ON DELETE CASCADE
+                );
                 """
             )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
         connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA busy_timeout=30000")
         connection.execute("PRAGMA synchronous=FULL")
         return connection
 
-    def get(self, recovery_id: str) -> FormerPrimaryRecoveryRecord | None:
-        with self._connect() as connection:
-            row = connection.execute(
-                """SELECT record_json FROM storage_former_primary_recoveries
-                   WHERE recovery_id=?""",
-                (recovery_id,),
-            ).fetchone()
-        return (
-            None
-            if row is None
-            else FormerPrimaryRecoveryRecord.from_dict(json.loads(row["record_json"]))
-        )
-
-    def put(
+    def create_plan(
         self,
         record: FormerPrimaryRecoveryRecord,
-        *,
-        only_if_state: str | None = None,
-    ) -> FormerPrimaryRecoveryRecord:
-        encoded = json.dumps(
-            record.to_dict(),
-            sort_keys=True,
-            separators=(",", ":"),
-            ensure_ascii=False,
-            allow_nan=False,
-        )
+        items: tuple[FormerPrimaryRecoveryItem, ...],
+    ) -> FormerPrimaryRecoveryPlan:
+        ordered = tuple(sorted(items, key=lambda item: item.item_id))
+        if len(ordered) != record.item_count:
+            raise FederationValidationError(
+                "recovery-item-count-mismatch",
+                "items",
+                "item ledger does not match the recovery record",
+            )
+        if any(
+            item.recovery_id != record.recovery_id
+            or item.session_id != record.session_id
+            or item.group_id != record.group_id
+            or item.returning_provider_id != record.returning_provider_id
+            for item in ordered
+        ):
+            raise FederationValidationError(
+                "recovery-item-scope-mismatch",
+                "items",
+                "item ledger differs from recovery scope",
+            )
+        counts = Counter(item.status for item in ordered)
+        if (
+            counts[FormerPrimaryItemStatus.PRESENT] != record.present_count
+            or counts[FormerPrimaryItemStatus.MISSING] != record.missing_count
+            or counts[FormerPrimaryItemStatus.CONFLICT] != record.conflict_count
+        ):
+            raise FederationValidationError(
+                "recovery-item-count-mismatch",
+                "items",
+                "item statuses do not match recovery counts",
+            )
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
             existing = connection.execute(
-                """SELECT record_json, state FROM storage_former_primary_recoveries
+                """SELECT recovery_id FROM storage_former_primary_recoveries
                    WHERE recovery_id=?""",
                 (record.recovery_id,),
             ).fetchone()
-            if existing is None:
-                connection.execute(
-                    """INSERT INTO storage_former_primary_recoveries
-                       (recovery_id, session_id, group_id, promotion_id,
-                        former_provider_id, manifest_revision, manifest_hash,
-                        state, record_json, updated_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (
-                        record.recovery_id,
-                        record.session_id,
-                        record.group_id,
-                        record.promotion_id,
-                        record.former_provider_id,
-                        record.manifest_revision,
-                        record.manifest_hash,
-                        record.state,
-                        encoded,
-                        _timestamp(record.updated_at),
-                    ),
-                )
-            elif only_if_state is not None and existing["state"] != only_if_state:
-                connection.rollback()
+            if existing is not None:
+                connection.commit()
                 restored = self.get(record.recovery_id)
-                assert restored is not None
+                if restored is None:
+                    raise FederationValidationError(
+                        "corrupt-former-primary-recovery",
+                        "recovery_id",
+                        "existing recovery disappeared",
+                    )
+                if restored.record.immutable_binding() != record.immutable_binding():
+                    raise FederationValidationError(
+                        "conflicting-former-primary-recovery",
+                        "recovery_id",
+                        "recovery identity is bound to different authority evidence",
+                    )
                 return restored
-            else:
-                connection.execute(
-                    """UPDATE storage_former_primary_recoveries
-                       SET state=?, record_json=?, updated_at=?
-                       WHERE recovery_id=?""",
-                    (
-                        record.state,
-                        encoded,
-                        _timestamp(record.updated_at),
-                        record.recovery_id,
-                    ),
-                )
+            self._insert_record(connection, record)
+            for item in ordered:
+                self._insert_item(connection, item)
             connection.commit()
         restored = self.get(record.recovery_id)
-        assert restored is not None
+        if restored is None:
+            raise FederationValidationError(
+                "corrupt-former-primary-recovery",
+                "recovery_id",
+                "persisted recovery could not be restored",
+            )
         return restored
 
+    def get(self, recovery_id: str) -> FormerPrimaryRecoveryPlan | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT * FROM storage_former_primary_recoveries
+                   WHERE recovery_id=?""",
+                (recovery_id,),
+            ).fetchone()
+            if row is None:
+                return None
+            item_rows = connection.execute(
+                """SELECT * FROM storage_former_primary_recovery_items
+                   WHERE recovery_id=? ORDER BY item_id""",
+                (recovery_id,),
+            ).fetchall()
+        try:
+            record = self._record_from_row(row)
+            items = tuple(self._item_from_row(item) for item in item_rows)
+        except (
+            KeyError,
+            TypeError,
+            ValueError,
+            FederationValidationError,
+        ) as exc:
+            raise FederationValidationError(
+                "corrupt-former-primary-recovery",
+                "storage_former_primary_recoveries",
+                "durable recovery state is malformed",
+            ) from exc
+        if len(items) != record.item_count:
+            raise FederationValidationError(
+                "corrupt-former-primary-recovery",
+                "item_count",
+                "durable recovery item count is inconsistent",
+            )
+        return FormerPrimaryRecoveryPlan(record, items)
 
-class FormerPrimaryRecoveryCoordinator:
-    """Plan, deliver, and verify former-primary catch-up over relay replication."""
+    def recoveries(
+        self,
+        *,
+        session_id: str,
+        group_id: str,
+        returning_provider_id: str,
+    ) -> tuple[FormerPrimaryRecoveryPlan, ...]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """SELECT recovery_id FROM storage_former_primary_recoveries
+                   WHERE session_id=? AND group_id=?
+                     AND returning_provider_id=?
+                   ORDER BY created_at, recovery_id""",
+                (session_id, group_id, returning_provider_id),
+            ).fetchall()
+        return tuple(
+            plan
+            for row in rows
+            if (plan := self.get(str(row["recovery_id"]))) is not None
+        )
+
+    @staticmethod
+    def _insert_record(
+        connection: sqlite3.Connection,
+        record: FormerPrimaryRecoveryRecord,
+    ) -> None:
+        connection.execute(
+            """INSERT INTO storage_former_primary_recoveries
+               (recovery_id, schema, session_id, group_id,
+                returning_provider_id, returning_node_id,
+                source_provider_id, source_node_id, promotion_id,
+                final_authority_identity, publication_control_revision,
+                manifest_revision, manifest_hash, grant_id, term,
+                fencing_token, lease_expires_at, report_revision,
+                report_hash, state, item_count, present_count,
+                missing_count, conflict_count, latest_error_code,
+                latest_error_reason, created_at, updated_at, completed_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                       ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                record.recovery_id,
+                record.schema,
+                record.session_id,
+                record.group_id,
+                record.returning_provider_id,
+                record.returning_node_id,
+                record.source_provider_id,
+                record.source_node_id,
+                record.promotion_id,
+                record.final_authority_identity,
+                record.publication_control_revision,
+                record.manifest_revision,
+                record.manifest_hash,
+                record.grant_id,
+                record.term,
+                record.fencing_token,
+                _timestamp(record.lease_expires_at),
+                record.report_revision,
+                record.report_hash,
+                record.state.value,
+                record.item_count,
+                record.present_count,
+                record.missing_count,
+                record.conflict_count,
+                record.latest_error_code,
+                record.latest_error_reason,
+                _timestamp(record.created_at),
+                _timestamp(record.updated_at),
+                (
+                    None
+                    if record.completed_at is None
+                    else _timestamp(record.completed_at)
+                ),
+            ),
+        )
+
+    @staticmethod
+    def _insert_item(
+        connection: sqlite3.Connection,
+        item: FormerPrimaryRecoveryItem,
+    ) -> None:
+        connection.execute(
+            """INSERT INTO storage_former_primary_recovery_items
+               (recovery_id, session_id, group_id, returning_provider_id,
+                item_id, kind, dataset_id, schema_name, schema_version,
+                idempotency_key, content_hash, size_bytes, source_id,
+                first_sequence, last_sequence, commit_state, status,
+                delivery_id, attempt_count, last_error_code,
+                last_error_reason, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?,
+                       ?, ?, ?, ?, ?, ?)""",
+            (
+                item.recovery_id,
+                item.session_id,
+                item.group_id,
+                item.returning_provider_id,
+                item.item_id,
+                item.kind.value,
+                item.dataset_id,
+                item.schema_name,
+                item.schema_version,
+                item.idempotency_key,
+                item.content_hash,
+                item.size_bytes,
+                item.source_id,
+                item.first_sequence,
+                item.last_sequence,
+                item.commit_state.value,
+                item.status.value,
+                item.delivery_id,
+                item.attempt_count,
+                item.last_error_code,
+                item.last_error_reason,
+                _timestamp(item.updated_at),
+            ),
+        )
+
+    @staticmethod
+    def _record_from_row(row: sqlite3.Row) -> FormerPrimaryRecoveryRecord:
+        return FormerPrimaryRecoveryRecord(
+            schema=row["schema"],
+            recovery_id=row["recovery_id"],
+            session_id=row["session_id"],
+            group_id=row["group_id"],
+            returning_provider_id=row["returning_provider_id"],
+            returning_node_id=row["returning_node_id"],
+            source_provider_id=row["source_provider_id"],
+            source_node_id=row["source_node_id"],
+            promotion_id=row["promotion_id"],
+            final_authority_identity=row["final_authority_identity"],
+            publication_control_revision=int(row["publication_control_revision"]),
+            manifest_revision=int(row["manifest_revision"]),
+            manifest_hash=row["manifest_hash"],
+            grant_id=row["grant_id"],
+            term=int(row["term"]),
+            fencing_token=int(row["fencing_token"]),
+            lease_expires_at=row["lease_expires_at"],
+            report_revision=int(row["report_revision"]),
+            report_hash=row["report_hash"],
+            state=row["state"],
+            item_count=int(row["item_count"]),
+            present_count=int(row["present_count"]),
+            missing_count=int(row["missing_count"]),
+            conflict_count=int(row["conflict_count"]),
+            latest_error_code=row["latest_error_code"],
+            latest_error_reason=row["latest_error_reason"],
+            created_at=row["created_at"],
+            updated_at=row["updated_at"],
+            completed_at=row["completed_at"],
+        )
+
+    @staticmethod
+    def _item_from_row(row: sqlite3.Row) -> FormerPrimaryRecoveryItem:
+        return FormerPrimaryRecoveryItem(
+            recovery_id=row["recovery_id"],
+            session_id=row["session_id"],
+            group_id=row["group_id"],
+            returning_provider_id=row["returning_provider_id"],
+            item_id=row["item_id"],
+            kind=row["kind"],
+            dataset_id=row["dataset_id"],
+            schema_name=row["schema_name"],
+            schema_version=int(row["schema_version"]),
+            idempotency_key=row["idempotency_key"],
+            content_hash=row["content_hash"],
+            size_bytes=int(row["size_bytes"]),
+            source_id=row["source_id"],
+            first_sequence=row["first_sequence"],
+            last_sequence=row["last_sequence"],
+            commit_state=row["commit_state"],
+            status=row["status"],
+            delivery_id=row["delivery_id"],
+            attempt_count=int(row["attempt_count"]),
+            last_error_code=row["last_error_code"],
+            last_error_reason=row["last_error_reason"],
+            updated_at=row["updated_at"],
+        )
+
+
+class FormerPrimaryRecoveryPlanner:
+    """Create and revalidate deterministic E7.0/E7.1 recovery plans."""
 
     def __init__(
         self,
         *,
         control: RecoveryControlPlane,
-        source_provider: BatchStorageProvider,
-        transport: ReplicationTransport,
+        returning_provider: BatchStorageProvider,
         former_provider_fence_store: ProviderFenceStore,
         clock=lambda: datetime.now(timezone.utc),
     ) -> None:
         self.control = control
-        self.source_provider = source_provider
-        self.transport = transport
+        self.returning_provider = returning_provider
         self.former_provider_fence_store = former_provider_fence_store
         self.clock = clock
         self.store = FormerPrimaryRecoveryStore(control.database)
@@ -409,607 +922,376 @@ class FormerPrimaryRecoveryCoordinator:
         group_id: str,
         promotion_id: str,
         *,
-        former_provider_id: str | None = None,
-    ) -> FormerPrimaryRecoveryRecord:
-        finalization = self.control.promotion_finalization(
-            session_id, group_id, promotion_id
+        returning_provider_id: str | None = None,
+    ) -> FormerPrimaryRecoveryPlan:
+        binding = self._binding(
+            session_id,
+            group_id,
+            promotion_id,
+            returning_provider_id=returning_provider_id,
         )
-        transaction = self.control.promotion_transaction(
-            session_id, group_id, promotion_id
+        recovery_id = _recovery_id(
+            session_id=session_id,
+            group_id=group_id,
+            returning_provider_id=binding["returning_provider_id"],
+            promotion_id=promotion_id,
+            final_authority_identity=binding["finalization"].final_authority_identity,
+            manifest_hash=binding["manifest"].manifest_hash,
         )
-        if finalization is None or transaction is None:
-            raise FederationValidationError(
-                "unknown-promotion-finalization",
-                "promotion_id",
-                "completed promotion evidence is required before recovery",
+        existing = self.store.get(recovery_id)
+        if existing is not None:
+            self._validate_existing(existing, binding)
+            return existing
+
+        report = binding["assessment"].report
+        assert report is not None
+        authoritative_hashes = Counter(
+            item.content_hash for item in binding["manifest"].items
+        )
+        reported_hashes = Counter(report.committed_item_hashes)
+        unknown_hashes = reported_hashes - authoritative_hashes
+        global_error_code: str | None = None
+        global_error_reason: str | None = None
+        if not report.integrity_verified:
+            global_error_code = "returning-provider-integrity-failure"
+            global_error_reason = (
+                "returning provider inventory is not integrity verified"
             )
-        if not finalization.degraded_cleared or transaction.state != "finalized":
+        elif report.manifest_revision > binding["manifest"].revision:
+            global_error_code = "returning-provider-manifest-ahead"
+            global_error_reason = (
+                "returning provider reports a manifest revision ahead of authority"
+            )
+        elif (
+            report.manifest_revision == binding["manifest"].revision
+            and report.manifest_hash != binding["manifest"].manifest_hash
+        ):
+            global_error_code = "returning-provider-manifest-conflict"
+            global_error_reason = (
+                "returning provider reports a conflicting current manifest hash"
+            )
+        elif unknown_hashes:
+            global_error_code = "returning-provider-extra-hash"
+            global_error_reason = (
+                "returning provider reports committed hashes outside authority"
+            )
+
+        now = _utc(self.clock())
+        items: list[FormerPrimaryRecoveryItem] = []
+        available_report_hashes = Counter(report.committed_item_hashes)
+        for manifest_item in binding["manifest"].items:
+            identity = self.returning_provider.committed_identity(
+                session_id=session_id,
+                group_id=group_id,
+                batch_id=manifest_item.item_id,
+            )
+            status, item_error_code, item_error_reason = self._classify_item(
+                manifest_item,
+                identity,
+                available_report_hashes,
+            )
+            items.append(
+                FormerPrimaryRecoveryItem.from_manifest(
+                    recovery_id=recovery_id,
+                    session_id=session_id,
+                    group_id=group_id,
+                    returning_provider_id=binding["returning_provider_id"],
+                    item=manifest_item,
+                    status=status,
+                    now=now,
+                    error_code=item_error_code,
+                    error_reason=item_error_reason,
+                )
+            )
+
+        counts = Counter(item.status for item in items)
+        if counts[FormerPrimaryItemStatus.CONFLICT] and global_error_code is None:
+            global_error_code = "returning-provider-immutable-conflict"
+            global_error_reason = (
+                "returning provider contains conflicting immutable item state"
+            )
+        state = (
+            FormerPrimaryRecoveryState.OPERATOR_ATTENTION
+            if global_error_code is not None
+            else FormerPrimaryRecoveryState.PLANNED
+        )
+        publication: PromotionPublicationRecord = binding["publication"]
+        assessment: StorageReplicaAssessment = binding["assessment"]
+        record = FormerPrimaryRecoveryRecord(
+            schema=FORMER_PRIMARY_RECOVERY_SCHEMA,
+            recovery_id=recovery_id,
+            session_id=session_id,
+            group_id=group_id,
+            returning_provider_id=binding["returning_provider_id"],
+            returning_node_id=binding["returning"].node_id,
+            source_provider_id=binding["source"].provider_id,
+            source_node_id=binding["source"].node_id,
+            promotion_id=promotion_id,
+            final_authority_identity=(
+                binding["finalization"].final_authority_identity
+            ),
+            publication_control_revision=publication.control_revision,
+            manifest_revision=binding["manifest"].revision,
+            manifest_hash=binding["manifest"].manifest_hash,
+            grant_id=publication.grant_id,
+            term=publication.term,
+            fencing_token=publication.fencing_token,
+            lease_expires_at=publication.lease_expires_at,
+            report_revision=assessment.report_revision,
+            report_hash=assessment.report_hash,
+            state=state,
+            item_count=len(items),
+            present_count=counts[FormerPrimaryItemStatus.PRESENT],
+            missing_count=counts[FormerPrimaryItemStatus.MISSING],
+            conflict_count=counts[FormerPrimaryItemStatus.CONFLICT],
+            latest_error_code=global_error_code,
+            latest_error_reason=global_error_reason,
+            created_at=now,
+            updated_at=now,
+        )
+        return self.store.create_plan(record, tuple(items))
+
+    def validate_plan(self, recovery_id: str) -> FormerPrimaryRecoveryPlan:
+        plan = self.store.get(recovery_id)
+        if plan is None:
+            raise FederationValidationError(
+                "unknown-former-primary-recovery",
+                "recovery_id",
+                "durable recovery plan does not exist",
+            )
+        binding = self._binding(
+            plan.record.session_id,
+            plan.record.group_id,
+            plan.record.promotion_id,
+            returning_provider_id=plan.record.returning_provider_id,
+        )
+        self._validate_existing(plan, binding)
+        return plan
+
+    @staticmethod
+    def _classify_item(
+        item: ManifestItem,
+        identity: CommittedBatchIdentity | None,
+        available_report_hashes: Counter[str],
+    ) -> tuple[
+        FormerPrimaryItemStatus,
+        str | None,
+        str | None,
+    ]:
+        if identity is None:
+            return FormerPrimaryItemStatus.MISSING, None, None
+        expected = (
+            item.dataset_id,
+            item.schema_name,
+            item.schema_version,
+            item.item_id,
+            item.idempotency_key,
+            item.content_hash,
+        )
+        actual = (
+            identity.dataset_id,
+            identity.dataset_schema_name,
+            identity.dataset_schema_version,
+            identity.batch_id,
+            identity.idempotency_key,
+            identity.content_hash,
+        )
+        if actual != expected:
+            return (
+                FormerPrimaryItemStatus.CONFLICT,
+                "returning-provider-immutable-conflict",
+                "provider-local identity differs from the authoritative item",
+            )
+        if available_report_hashes[item.content_hash] <= 0:
+            return (
+                FormerPrimaryItemStatus.CONFLICT,
+                "returning-report-identity-mismatch",
+                "provider-local identity is absent from authenticated report evidence",
+            )
+        available_report_hashes[item.content_hash] -= 1
+        return FormerPrimaryItemStatus.PRESENT, None, None
+
+    def _binding(
+        self,
+        session_id: str,
+        group_id: str,
+        promotion_id: str,
+        *,
+        returning_provider_id: str | None,
+    ) -> dict[str, Any]:
+        transaction = self.control.promotion_transaction(
+            session_id,
+            group_id,
+            promotion_id,
+        )
+        finalization = self.control.promotion_finalization(
+            session_id,
+            group_id,
+            promotion_id,
+        )
+        publication = promotion_publication(
+            self.control,
+            session_id,
+            group_id,
+            promotion_id,
+        )
+        if (
+            transaction is None
+            or finalization is None
+            or publication is None
+            or transaction.state != "finalized"
+            or not finalization.degraded_cleared
+            or transaction.previous_provider_id is None
+            or transaction.previous_term is None
+        ):
             raise FederationValidationError(
                 "promotion-not-complete",
                 "promotion_id",
-                "former-primary recovery begins only after completed promotion",
+                "E7 requires completed E6 finalization and publication",
             )
-        former_provider_id = former_provider_id or transaction.previous_provider_id
-        if former_provider_id is None or transaction.previous_term is None:
+        expected_returning = transaction.previous_provider_id
+        returning_provider_id = returning_provider_id or expected_returning
+        if (
+            returning_provider_id != expected_returning
+            or publication.previous_provider_id != expected_returning
+            or publication.selected_provider_id != finalization.selected_provider_id
+            or publication.final_authority_identity
+            != finalization.final_authority_identity
+        ):
             raise FederationValidationError(
-                "missing-former-primary",
-                "former_provider_id",
-                "promotion has no former primary authority",
+                "former-primary-binding-mismatch",
+                "returning_provider_id",
+                "returning provider differs from E6 authority evidence",
+            )
+        snapshot = self.control.snapshot(session_id)
+        assignment = snapshot.groups.get(group_id)
+        grant = snapshot.leader_grants.get(group_id)
+        returning = snapshot.providers.get(returning_provider_id)
+        source = snapshot.providers.get(publication.selected_provider_id)
+        if (
+            assignment is None
+            or assignment.primary_provider_id != publication.selected_provider_id
+            or returning_provider_id not in assignment.replica_provider_ids
+            or returning is None
+            or source is None
+            or grant is None
+            or grant.get("provider_id") != publication.selected_provider_id
+            or grant.get("grant_id") != publication.grant_id
+            or int(grant.get("term", -1)) != publication.term
+            or int(grant.get("fencing_token", -1))
+            != publication.fencing_token
+            or _utc(
+                str(grant.get("lease_expires_at")),
+                "lease_expires_at",
+            )
+            != publication.lease_expires_at
+        ):
+            raise FederationValidationError(
+                "former-primary-authority-mismatch",
+                "group_id",
+                "current assignment or grant differs from E6 publication",
             )
         self._validate_fence(
             session_id,
             group_id,
-            former_provider_id,
+            returning_provider_id,
+            promotion_id,
             transaction.previous_term,
         )
-        snapshot = self.control.snapshot(session_id)
-        assignment = snapshot.groups.get(group_id)
-        grant = snapshot.leader_grants.get(group_id)
-        if (
-            assignment is None
-            or assignment.primary_provider_id != finalization.selected_provider_id
-            or former_provider_id not in assignment.replica_provider_ids
-            or grant is None
-            or grant.get("provider_id") != finalization.selected_provider_id
-            or int(grant.get("term", -1)) != finalization.new_authority_term
-        ):
-            raise FederationValidationError(
-                "former-primary-assignment-mismatch",
-                "group_id",
-                "promotion must be published and former primary assigned replica",
-            )
         manifest = self.control.manifest(session_id, group_id)
-        recovery_id = _recovery_id(
-            promotion_id,
+        assessment = self.control.latest_storage_replica_assessment(
             session_id,
             group_id,
-            former_provider_id,
-            manifest.manifest_hash,
+            returning_provider_id,
         )
-        existing = self.store.get(recovery_id)
-        if existing is not None and existing.state != "waiting-report":
-            return existing
-
-        now = _utc(self.clock())
-        assessment = self.control.latest_storage_replica_assessment(
-            session_id, group_id, former_provider_id
-        )
-        report = None if assessment is None else assessment.report
-        if report is None:
-            waiting = self._record(
-                recovery_id,
-                promotion_id,
-                session_id,
-                group_id,
-                former_provider_id,
-                finalization.selected_provider_id,
-                manifest,
-                "waiting-report",
-                now,
-                existing=existing,
-            )
-            return self.store.put(waiting)
-
-        if report.provider_id != former_provider_id:
+        if assessment is None or assessment.report is None:
             raise FederationValidationError(
-                "returning-report-provider-mismatch",
-                "provider_id",
-                "report does not belong to the former primary",
-            )
-        authoritative = Counter(item.content_hash for item in manifest.items)
-        reported = Counter(report.committed_item_hashes)
-        failure_code: str | None = None
-        failure_reason: str | None = None
-        if not report.integrity_verified:
-            failure_code = "returning-provider-integrity-failure"
-            failure_reason = "returning provider inventory is not integrity verified"
-        elif reported - authoritative:
-            failure_code = "returning-provider-extra-or-conflicting-items"
-            failure_reason = (
-                "returning provider reports hashes outside authoritative state"
-            )
-
-        available = Counter(report.committed_item_hashes)
-        items: list[FormerPrimaryRepairItem] = []
-        for manifest_item in manifest.items:
-            state = "conflict" if failure_code is not None else "pending"
-            if failure_code is None and available[manifest_item.content_hash] > 0:
-                available[manifest_item.content_hash] -= 1
-                state = "verified"
-            items.append(
-                FormerPrimaryRepairItem(
-                    item_id=manifest_item.item_id,
-                    dataset_id=manifest_item.dataset_id,
-                    idempotency_key=(
-                        manifest_item.idempotency_key or manifest_item.item_id
-                    ),
-                    content_hash=manifest_item.content_hash,
-                    schema_name=manifest_item.schema_name,
-                    schema_version=manifest_item.schema_version,
-                    committed_at=manifest_item.committed_at,
-                    state=state,
-                )
-            )
-        state = (
-            "failed"
-            if failure_code is not None
-            else (
-                "planned"
-                if any(item.state == "pending" for item in items)
-                else "awaiting-verification"
-            )
-        )
-        planned = FormerPrimaryRecoveryRecord(
-            recovery_id=recovery_id,
-            promotion_id=promotion_id,
-            session_id=session_id,
-            group_id=group_id,
-            former_provider_id=former_provider_id,
-            active_provider_id=finalization.selected_provider_id,
-            manifest_revision=manifest.revision,
-            manifest_hash=manifest.manifest_hash,
-            state=state,
-            failure_code=failure_code,
-            failure_reason=failure_reason,
-            created_at=now if existing is None else existing.created_at,
-            updated_at=now,
-            items=tuple(items),
-        )
-        return self.store.put(
-            planned,
-            only_if_state="waiting-report" if existing is not None else None,
-        )
-
-    async def run_once(
-        self,
-        recovery_id: str,
-        *,
-        limit: int = 100,
-    ) -> FormerPrimaryRecoveryRunResult:
-        if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
-            raise FederationValidationError("invalid-limit", "limit", "must be positive")
-        record = self._required(recovery_id)
-        if record.state == "completed":
-            return self._result(
-                "completed", "recovery-complete", "recovery already completed", record
-            )
-        if record.state == "failed":
-            return self._result(
-                "operator-attention",
-                record.failure_code or "recovery-failed",
-                record.failure_reason or "recovery failed",
-                record,
-            )
-        if record.state == "waiting-report":
-            return self._result(
-                "retryable",
                 "returning-report-required",
-                "returning provider must submit inventory evidence before repair",
-                record,
-            )
-        self._revalidate(record)
-        if not record.pending_items:
-            waiting = self._save(replace(record, state="awaiting-verification"))
-            return self._result(
-                "retryable",
-                "verification-report-required",
-                "synchronized provider report is required",
-                waiting,
-            )
-
-        record = self._save(replace(record, state="repairing"))
-        attempted = 0
-        delivered = 0
-        for item in record.pending_items[:limit]:
-            attempted += 1
-            try:
-                await self._deliver(record, item)
-                record = self._replace_item(
-                    record,
-                    replace(
-                        item,
-                        state="delivered",
-                        attempt_count=item.attempt_count + 1,
-                        last_error=None,
-                    ),
-                )
-                delivered += 1
-            except FederationValidationError as exc:
-                if exc.code in {
-                    "recovery-source-item-missing",
-                    "recovery-source-hash-mismatch",
-                    "recovery-source-identity-mismatch",
-                    "repair-identity-mismatch",
-                }:
-                    record = self._replace_item(
-                        record,
-                        replace(
-                            item,
-                            state="conflict",
-                            attempt_count=item.attempt_count + 1,
-                            last_error=str(exc),
-                        ),
-                    )
-                    failed = self._save(
-                        replace(
-                            record,
-                            state="failed",
-                            failure_code=exc.code,
-                            failure_reason=str(exc),
-                        )
-                    )
-                    return FormerPrimaryRecoveryRunResult(
-                        "operator-attention",
-                        exc.code,
-                        str(exc),
-                        attempted,
-                        delivered,
-                        failed,
-                    )
-                record = self._retry_item(record, item, exc)
-            except (
-                OSError,
-                RuntimeError,
-                TimeoutError,
-                TypeError,
-                ValueError,
-            ) as exc:
-                record = self._retry_item(record, item, exc)
-
-        record = self._save(
-            replace(
-                record,
-                state=(
-                    "planned"
-                    if record.pending_items
-                    else "awaiting-verification"
-                ),
-            )
-        )
-        return FormerPrimaryRecoveryRunResult(
-            "retryable",
-            (
-                "repair-incomplete"
-                if record.pending_items
-                else "verification-report-required"
-            ),
-            (
-                "one or more authoritative items remain undelivered"
-                if record.pending_items
-                else "missing items delivered; synchronized report is required"
-            ),
-            attempted,
-            delivered,
-            record,
-        )
-
-    def verify(
-        self,
-        recovery_id: str,
-        report: StorageReplicaReport,
-        *,
-        actor_node_id: str,
-    ) -> FormerPrimaryRecoveryRecord:
-        record = self._required(recovery_id)
-        if record.state == "completed":
-            return record
-        self._revalidate(record)
-        if record.pending_items:
-            raise FederationValidationError(
-                "recovery-items-pending",
-                "recovery_id",
-                "all missing items must be delivered before verification",
+                "returning_provider_id",
+                "authenticated returning-provider evidence is required",
             )
         if (
-            report.session_id != record.session_id
-            or report.group_id != record.group_id
-            or report.provider_id != record.former_provider_id
-            or report.manifest_revision != record.manifest_revision
-            or report.manifest_hash != record.manifest_hash
+            not assessment.accepted
+            or assessment.report.session_id != session_id
+            or assessment.report.group_id != group_id
+            or assessment.report.provider_id != returning_provider_id
         ):
             raise FederationValidationError(
-                "recovery-report-mismatch",
+                "returning-report-rejected",
                 "report",
-                "verification report differs from durable recovery bindings",
+                "latest returning-provider evidence is not accepted for this scope",
             )
-        assessment = self.control.submit_storage_replica_report(
-            report,
-            actor_node_id=actor_node_id,
-        )
-        if not assessment.accepted:
-            return self._save(
-                replace(
-                    record,
-                    state="failed",
-                    failure_code="returning-provider-report-rejected",
-                    failure_reason=assessment.eligibility_reason,
-                )
-            )
-        if not assessment.eligibility:
-            if assessment.eligibility_reason in {
-                "committed-hash-conflict",
-                "integrity-failure",
-            }:
-                return self._save(
-                    replace(
-                        record,
-                        state="failed",
-                        failure_code="returning-provider-verification-failed",
-                        failure_reason=assessment.eligibility_reason,
-                    )
-                )
-            return self._save(replace(record, state="awaiting-verification"))
-        verified = tuple(replace(item, state="verified", last_error=None) for item in record.items)
-        return self._save(replace(record, state="completed", items=verified))
-
-    def _record(
-        self,
-        recovery_id: str,
-        promotion_id: str,
-        session_id: str,
-        group_id: str,
-        former_provider_id: str,
-        active_provider_id: str,
-        manifest: Any,
-        state: str,
-        now: datetime,
-        *,
-        existing: FormerPrimaryRecoveryRecord | None,
-    ) -> FormerPrimaryRecoveryRecord:
-        return FormerPrimaryRecoveryRecord(
-            recovery_id=recovery_id,
-            promotion_id=promotion_id,
-            session_id=session_id,
-            group_id=group_id,
-            former_provider_id=former_provider_id,
-            active_provider_id=active_provider_id,
-            manifest_revision=manifest.revision,
-            manifest_hash=manifest.manifest_hash,
-            state=state,
-            created_at=now if existing is None else existing.created_at,
-            updated_at=now,
-            items=tuple(
-                FormerPrimaryRepairItem(
-                    item_id=item.item_id,
-                    dataset_id=item.dataset_id,
-                    idempotency_key=item.idempotency_key or item.item_id,
-                    content_hash=item.content_hash,
-                    schema_name=item.schema_name,
-                    schema_version=item.schema_version,
-                    committed_at=item.committed_at,
-                )
-                for item in manifest.items
-            ),
-        )
-
-    def _required(self, recovery_id: str) -> FormerPrimaryRecoveryRecord:
-        record = self.store.get(recovery_id)
-        if record is None:
-            raise FederationValidationError(
-                "unknown-former-primary-recovery",
-                "recovery_id",
-                "recovery record does not exist",
-            )
-        return record
-
-    def _save(
-        self,
-        record: FormerPrimaryRecoveryRecord,
-    ) -> FormerPrimaryRecoveryRecord:
-        return self.store.put(replace(record, updated_at=_utc(self.clock())))
-
-    def _replace_item(
-        self,
-        record: FormerPrimaryRecoveryRecord,
-        replacement: FormerPrimaryRepairItem,
-    ) -> FormerPrimaryRecoveryRecord:
-        items = tuple(
-            replacement if item.item_id == replacement.item_id else item
-            for item in record.items
-        )
-        return self._save(replace(record, items=items))
-
-    def _retry_item(
-        self,
-        record: FormerPrimaryRecoveryRecord,
-        item: FormerPrimaryRepairItem,
-        error: Exception,
-    ) -> FormerPrimaryRecoveryRecord:
-        return self._replace_item(
-            record,
-            replace(
-                item,
-                state="pending",
-                attempt_count=item.attempt_count + 1,
-                last_error=str(error),
-            ),
-        )
-
-    @staticmethod
-    def _result(
-        status: str,
-        code: str,
-        reason: str,
-        record: FormerPrimaryRecoveryRecord,
-    ) -> FormerPrimaryRecoveryRunResult:
-        return FormerPrimaryRecoveryRunResult(status, code, reason, 0, 0, record)
+        return {
+            "transaction": transaction,
+            "finalization": finalization,
+            "publication": publication,
+            "snapshot": snapshot,
+            "assignment": assignment,
+            "grant": grant,
+            "returning": returning,
+            "source": source,
+            "manifest": manifest,
+            "assessment": assessment,
+            "returning_provider_id": returning_provider_id,
+        }
 
     def _validate_fence(
         self,
         session_id: str,
         group_id: str,
-        former_provider_id: str,
+        returning_provider_id: str,
+        promotion_id: str,
         previous_term: int,
     ) -> None:
         store = self.former_provider_fence_store
+        evidence = store.acknowledgement(group_id)
         if (
-            store.provider_id != former_provider_id
-            or store.session_id != session_id
+            store.session_id != session_id
+            or store.provider_id != returning_provider_id
+            or evidence is None
+            or evidence.promotion_id != promotion_id
+            or evidence.provider_id != returning_provider_id
+            or evidence.previous_term != previous_term
+            or evidence.fencing_high_water_term < previous_term
             or store.high_water_term(group_id) < previous_term
         ):
             raise FederationValidationError(
                 "former-primary-not-fenced",
-                "former_provider_id",
-                "durable former-primary fence is missing or stale",
+                "returning_provider_id",
+                "durable former-primary fence is missing, stale, or unrelated",
             )
 
-    def _revalidate(self, record: FormerPrimaryRecoveryRecord) -> None:
-        transaction = self.control.promotion_transaction(
-            record.session_id,
-            record.group_id,
-            record.promotion_id,
-        )
-        if transaction is None or transaction.previous_term is None:
-            raise FederationValidationError(
-                "promotion-state-missing",
-                "promotion_id",
-                "durable promotion state is unavailable",
-            )
-        self._validate_fence(
-            record.session_id,
-            record.group_id,
-            record.former_provider_id,
-            transaction.previous_term,
-        )
-        manifest = self.control.manifest(record.session_id, record.group_id)
-        if (
-            manifest.revision != record.manifest_revision
-            or manifest.manifest_hash != record.manifest_hash
-        ):
-            raise FederationValidationError(
-                "recovery-manifest-changed",
-                "manifest_hash",
-                "authoritative manifest changed during recovery",
-            )
-        snapshot = self.control.snapshot(record.session_id)
-        assignment = snapshot.groups.get(record.group_id)
-        grant = snapshot.leader_grants.get(record.group_id)
-        if (
-            assignment is None
-            or assignment.primary_provider_id != record.active_provider_id
-            or record.former_provider_id not in assignment.replica_provider_ids
-            or grant is None
-            or grant.get("provider_id") != record.active_provider_id
-        ):
-            raise FederationValidationError(
-                "recovery-authority-changed",
-                "group_id",
-                "assignment or active authority changed during recovery",
-            )
-
-    async def _deliver(
-        self,
-        record: FormerPrimaryRecoveryRecord,
-        item: FormerPrimaryRepairItem,
+    @staticmethod
+    def _validate_existing(
+        plan: FormerPrimaryRecoveryPlan,
+        binding: dict[str, Any],
     ) -> None:
-        snapshot = self.control.snapshot(record.session_id)
-        active = snapshot.providers.get(record.active_provider_id)
-        returning = snapshot.providers.get(record.former_provider_id)
-        grant = snapshot.leader_grants.get(record.group_id)
-        if active is None or returning is None or grant is None:
-            raise FederationValidationError(
-                "recovery-provider-unavailable",
-                "provider_id",
-                "active or returning provider registration is unavailable",
-            )
-        identity = self.source_provider.committed_identity(
-            session_id=record.session_id,
-            group_id=record.group_id,
-            batch_id=item.item_id,
-        )
+        record = plan.record
+        publication: PromotionPublicationRecord = binding["publication"]
+        assessment: StorageReplicaAssessment = binding["assessment"]
         if (
-            identity is None
-            or identity.dataset_id != item.dataset_id
-            or identity.dataset_schema_name != item.schema_name
-            or identity.dataset_schema_version != item.schema_version
-            or identity.idempotency_key != item.idempotency_key
-            or identity.content_hash != item.content_hash
+            record.final_authority_identity
+            != binding["finalization"].final_authority_identity
+            or record.publication_control_revision
+            != publication.control_revision
+            or record.manifest_revision != binding["manifest"].revision
+            or record.manifest_hash != binding["manifest"].manifest_hash
+            or record.grant_id != publication.grant_id
+            or record.term != publication.term
+            or record.fencing_token != publication.fencing_token
+            or record.lease_expires_at != publication.lease_expires_at
         ):
             raise FederationValidationError(
-                "recovery-source-identity-mismatch",
-                "item_id",
-                "active primary identity differs from the manifest",
+                "former-primary-replan-required",
+                "recovery_id",
+                "manifest or active authority changed after planning",
             )
-        content = self.source_provider.read(
-            session_id=record.session_id,
-            group_id=record.group_id,
-            batch_id=item.item_id,
-        )
-        if content is None:
-            raise FederationValidationError(
-                "recovery-source-item-missing",
-                "item_id",
-                "active primary cannot read an authoritative item",
-            )
-        if BatchIngestRequest.calculate_content_hash(content) != item.content_hash:
-            raise FederationValidationError(
-                "recovery-source-hash-mismatch",
-                "content_hash",
-                "active primary content differs from the manifest",
-            )
-        request = BatchIngestRequest(
-            authority=WriteAuthority(
-                session_id=record.session_id,
-                group_id=record.group_id,
-                actor_node_id=active.node_id,
-                grant_id=str(grant["grant_id"]),
-                term=int(grant["term"]),
-                fencing_token=int(grant["fencing_token"]),
-                lease_expires_at=grant["lease_expires_at"],
-            ),
-            dataset_id=item.dataset_id,
-            batch_id=item.item_id,
-            idempotency_key=item.idempotency_key,
-            content_hash=item.content_hash,
-            content=content,
-            created_at=item.committed_at,
-            dataset_schema_name=item.schema_name,
-            dataset_schema_version=item.schema_version,
-        )
-        envelope = StorageRequestEnvelope(
-            request_id=(
-                f"former-primary-repair-{record.recovery_id}-"
-                f"{item.item_id}-{item.attempt_count}"
-            ),
-            protocol=STORAGE_PROTOCOL,
-            protocol_version=STORAGE_PROTOCOL_VERSION,
-            operation=StorageOperation.BATCH_INGEST,
-            session_id=record.session_id,
-            actor_node_id=active.node_id,
-            authorization_context={
-                "kind": "storage-replication",
-                "group_id": record.group_id,
-                "provider_id": record.former_provider_id,
-                "recovery_id": record.recovery_id,
-                "promotion_id": record.promotion_id,
-            },
-            payload=request.to_dict(),
-        )
-        response = await self.transport.request(
-            target_node_id=returning.node_id,
-            envelope=envelope,
-        )
-        if response.request_id != envelope.request_id:
-            raise FederationValidationError(
-                "response-request-mismatch",
-                "request_id",
-                "repair response belongs to another request",
-            )
-        if not response.ok:
-            assert response.error is not None
-            raise FederationValidationError(
-                response.error.code.value,
-                response.error.field or "recovery",
-                response.error.message,
-            )
-        result = BatchIngestResult.from_dict(response.result)
         if (
-            result.batch_id != request.batch_id
-            or result.idempotency_key != request.idempotency_key
-            or result.content_hash != request.content_hash
+            record.report_revision != assessment.report_revision
+            or record.report_hash != assessment.report_hash
         ):
             raise FederationValidationError(
-                "repair-identity-mismatch",
-                "result",
-                "returning provider response differs from authoritative item",
+                "former-primary-report-changed",
+                "report_revision",
+                "returning-provider evidence changed after planning",
             )
