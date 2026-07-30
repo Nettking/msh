@@ -65,7 +65,7 @@ jobs:
         run: python -m compileall catalog setup_msh.py
       - name: Phase 0 and 1 regressions
         run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py
-      - name: Phase D storage tests
+      - name: Phase D and E storage tests
         run: >-
           python -m pytest -o addopts= -q
           catalog/federation/tests/test_storage_protocol.py
@@ -76,6 +76,20 @@ jobs:
           catalog/federation/tests/test_phase_d5_logical_storage.py
           catalog/federation/tests/test_phase_d6_replication.py
           catalog/federation/tests/test_phase_d7_d8_ack_handover.py
+          catalog/federation/tests/test_phase_e0_contracts.py
+          catalog/federation/tests/test_phase_e1_manifest_store.py
+          catalog/federation/tests/test_phase_e1_service_manifest.py
+          catalog/federation/tests/test_phase_e2_watermarks.py
+          catalog/federation/tests/test_phase_e3_reports.py
+          catalog/federation/tests/test_phase_e4_selection.py
+          catalog/federation/tests/test_phase_e5_degraded_state.py
+          catalog/federation/tests/test_phase_e6_promotion_transaction.py
+          catalog/federation/tests/test_phase_e63_provider_fencing.py
+          catalog/federation/tests/test_phase_e64_authority_grant.py
+          catalog/federation/tests/test_phase_e65_finalization.py
+          catalog/federation/tests/test_phase_e66_recovery.py
+          catalog/federation/tests/test_phase_e67_coordinator_publication.py
+          catalog/federation/tests/test_phase_e71_former_primary_recovery.py
       - name: Phase 2 unit and integration tests
         run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase2_unit.py catalog/node/tests catalog/relay/tests
       - name: Ruff federation code
@@ -105,7 +119,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -c constraints-phase2.txt
           python -m pip install pytest
-      - name: Identity, state, protocol, and relay tests
+      - name: Identity, state, protocol, relay, and Phase E tests
         run: >-
           python -m pytest -o addopts= -q
           catalog/node/tests/test_identity.py
@@ -113,8 +127,24 @@ jobs:
           catalog/node/tests/test_client.py
           catalog/relay/tests/test_service.py
           catalog/federation/tests/test_phase2_unit.py
+          catalog/federation/tests/test_storage_protocol.py
+          catalog/federation/tests/test_local_storage.py
           catalog/federation/tests/test_phase_d3_control_plane.py
           catalog/federation/tests/test_phase_d4_write_authority.py
           catalog/federation/tests/test_phase_d5_logical_storage.py
           catalog/federation/tests/test_phase_d6_replication.py
           catalog/federation/tests/test_phase_d7_d8_ack_handover.py
+          catalog/federation/tests/test_phase_e0_contracts.py
+          catalog/federation/tests/test_phase_e1_manifest_store.py
+          catalog/federation/tests/test_phase_e1_service_manifest.py
+          catalog/federation/tests/test_phase_e2_watermarks.py
+          catalog/federation/tests/test_phase_e3_reports.py
+          catalog/federation/tests/test_phase_e4_selection.py
+          catalog/federation/tests/test_phase_e5_degraded_state.py
+          catalog/federation/tests/test_phase_e6_promotion_transaction.py
+          catalog/federation/tests/test_phase_e63_provider_fencing.py
+          catalog/federation/tests/test_phase_e64_authority_grant.py
+          catalog/federation/tests/test_phase_e65_finalization.py
+          catalog/federation/tests/test_phase_e66_recovery.py
+          catalog/federation/tests/test_phase_e67_coordinator_publication.py
+          catalog/federation/tests/test_phase_e71_former_primary_recovery.py

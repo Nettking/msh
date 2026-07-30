@@ -23,6 +23,11 @@ class StorageCommitStatus:
     session_id: str
     group_id: str
     batch_id: str
+    idempotency_key: str
+    content_hash: str
+    dataset_id: str
+    dataset_schema_name: str
+    dataset_schema_version: int
     primary_committed: bool
     required_replica_acks: int
     assigned_replica_ids: tuple[str, ...]
@@ -51,6 +56,12 @@ class DurableAcknowledgementStore:
                     batch_id TEXT NOT NULL,
                     idempotency_key TEXT NOT NULL,
                     content_hash TEXT NOT NULL,
+                    dataset_id TEXT NOT NULL
+                        DEFAULT 'legacy-unknown-dataset',
+                    dataset_schema_name TEXT NOT NULL
+                        DEFAULT 'msh.storage.dataset.opaque',
+                    dataset_schema_version INTEGER NOT NULL DEFAULT 1
+                        CHECK(dataset_schema_version > 0),
                     required_replica_acks INTEGER NOT NULL CHECK(required_replica_acks >= 0),
                     primary_committed INTEGER NOT NULL DEFAULT 0 CHECK(primary_committed IN (0,1)),
                     created_at TEXT NOT NULL,
@@ -74,6 +85,30 @@ class DurableAcknowledgementStore:
                     ON storage_commit_replicas(provider_id, acknowledged, session_id, group_id, batch_id);
                 """
             )
+            columns = {
+                row["name"]
+                for row in connection.execute(
+                    "PRAGMA table_info(storage_commits)"
+                )
+            }
+            if "dataset_id" not in columns:
+                connection.execute(
+                    """ALTER TABLE storage_commits
+                       ADD COLUMN dataset_id TEXT NOT NULL
+                       DEFAULT 'legacy-unknown-dataset'"""
+                )
+            if "dataset_schema_name" not in columns:
+                connection.execute(
+                    """ALTER TABLE storage_commits
+                       ADD COLUMN dataset_schema_name TEXT NOT NULL
+                       DEFAULT 'msh.storage.dataset.opaque'"""
+                )
+            if "dataset_schema_version" not in columns:
+                connection.execute(
+                    """ALTER TABLE storage_commits
+                       ADD COLUMN dataset_schema_version INTEGER NOT NULL
+                       DEFAULT 1 CHECK(dataset_schema_version > 0)"""
+                )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
@@ -124,14 +159,19 @@ class DurableAcknowledgementStore:
                     connection.execute(
                         """INSERT INTO storage_commits
                            (session_id, group_id, batch_id, idempotency_key, content_hash,
-                            required_replica_acks, primary_committed, created_at, updated_at)
-                           VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?)""",
+                            dataset_id, dataset_schema_name,
+                            dataset_schema_version, required_replica_acks,
+                            primary_committed, created_at, updated_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)""",
                         (
                             authority.session_id,
                             authority.group_id,
                             request.batch_id,
                             request.idempotency_key,
                             request.content_hash,
+                            request.dataset_id,
+                            request.dataset_schema_name,
+                            request.dataset_schema_version,
                             required,
                             stamp,
                             stamp,
@@ -148,6 +188,11 @@ class DurableAcknowledgementStore:
                     if (
                         row["idempotency_key"] != request.idempotency_key
                         or row["content_hash"] != request.content_hash
+                        or row["dataset_id"] != request.dataset_id
+                        or row["dataset_schema_name"]
+                        != request.dataset_schema_name
+                        or int(row["dataset_schema_version"])
+                        != request.dataset_schema_version
                         or int(row["required_replica_acks"]) != required
                     ):
                         raise FederationValidationError(
@@ -242,7 +287,10 @@ class DurableAcknowledgementStore:
     def status(self, session_id: str, group_id: str, batch_id: str) -> StorageCommitStatus | None:
         with self._connect() as connection:
             row = connection.execute(
-                """SELECT primary_committed, required_replica_acks FROM storage_commits
+                """SELECT idempotency_key, content_hash, dataset_id,
+                          dataset_schema_name, dataset_schema_version,
+                          primary_committed, required_replica_acks
+                   FROM storage_commits
                    WHERE session_id=? AND group_id=? AND batch_id=?""",
                 (session_id, group_id, batch_id),
             ).fetchone()
@@ -270,6 +318,11 @@ class DurableAcknowledgementStore:
             session_id,
             group_id,
             batch_id,
+            str(row["idempotency_key"]),
+            str(row["content_hash"]),
+            str(row["dataset_id"]),
+            str(row["dataset_schema_name"]),
+            int(row["dataset_schema_version"]),
             bool(row["primary_committed"]),
             int(row["required_replica_acks"]),
             replicas,

@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import json
 from collections.abc import Mapping
+from dataclasses import dataclass
 from typing import Any, Protocol
 
 from .errors import FederationValidationError
@@ -39,6 +40,14 @@ class AsyncStorageService(Protocol):
     async def dispatch(self, envelope: StorageRequestEnvelope) -> StorageResponseEnvelope: ...
 
 
+@dataclass(frozen=True)
+class _PendingRequest:
+    future: asyncio.Future[StorageResponseEnvelope]
+    session_id: str
+    target_node_id: str
+    provider_id: str
+
+
 class RelayStorageEndpoint:
     """Own one node client's application relay queue for storage traffic.
 
@@ -60,7 +69,7 @@ class RelayStorageEndpoint:
         self.relay_client = relay_client
         self.services = dict(services or {})
         self.request_timeout = float(request_timeout)
-        self._pending: dict[str, asyncio.Future[StorageResponseEnvelope]] = {}
+        self._pending: dict[str, _PendingRequest] = {}
         self._reader_task: asyncio.Task[None] | None = None
         self._handler_tasks: set[asyncio.Task[None]] = set()
         self._closed = False
@@ -92,9 +101,9 @@ class RelayStorageEndpoint:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._handler_tasks.clear()
         error = RuntimeError("relay storage endpoint closed")
-        for future in tuple(self._pending.values()):
-            if not future.done():
-                future.set_exception(error)
+        for pending in tuple(self._pending.values()):
+            if not pending.future.done():
+                pending.future.set_exception(error)
         self._pending.clear()
 
     async def request(
@@ -115,7 +124,12 @@ class RelayStorageEndpoint:
             )
         loop = asyncio.get_running_loop()
         future: asyncio.Future[StorageResponseEnvelope] = loop.create_future()
-        self._pending[envelope.request_id] = future
+        self._pending[envelope.request_id] = _PendingRequest(
+            future,
+            envelope.session_id,
+            target_node_id,
+            provider_id,
+        )
         try:
             delivery = await self.relay_client.send_message(
                 session_id=envelope.session_id,
@@ -160,7 +174,7 @@ class RelayStorageEndpoint:
                     continue
                 message_kind = payload.get("message")
                 if message_kind == "response":
-                    self._accept_response(payload)
+                    self._accept_response(message, payload)
                     continue
                 if message_kind == "request":
                     task = asyncio.create_task(self._handle_request(message, payload))
@@ -170,16 +184,20 @@ class RelayStorageEndpoint:
         except asyncio.CancelledError:
             raise
         except Exception as exc:  # noqa: BLE001
-            for future in tuple(self._pending.values()):
-                if not future.done():
-                    future.set_exception(exc)
+            for pending in tuple(self._pending.values()):
+                if not pending.future.done():
+                    pending.future.set_exception(exc)
 
     def _finish_handler(self, task: asyncio.Task[None]) -> None:
         self._handler_tasks.discard(task)
         if not task.cancelled():
             task.exception()
 
-    def _accept_response(self, payload: dict[str, Any]) -> None:
+    def _accept_response(
+        self,
+        relay_message: Any,
+        payload: dict[str, Any],
+    ) -> None:
         frame = payload.get("frame")
         if not isinstance(frame, str):
             return
@@ -187,10 +205,34 @@ class RelayStorageEndpoint:
             response_value = json.loads(frame)
         except json.JSONDecodeError:
             return
-        response = StorageResponseEnvelope.from_dict(response_value)
-        future = self._pending.get(response.request_id)
-        if future is not None and not future.done():
-            future.set_result(response)
+        if not isinstance(response_value, dict):
+            return
+        request_id = response_value.get("request_id")
+        if not isinstance(request_id, str):
+            return
+        pending = self._pending.get(request_id)
+        if pending is None:
+            return
+        response_provider_id = payload.get("provider_id")
+        if (
+            getattr(relay_message, "actor_node_id", None)
+            != pending.target_node_id
+            or getattr(relay_message, "session_id", None) != pending.session_id
+            or (
+                response_provider_id is not None
+                and response_provider_id != pending.provider_id
+            )
+        ):
+            return
+        try:
+            response = StorageResponseEnvelope.from_dict(response_value)
+        except FederationValidationError:
+            # A malformed response must not terminate the shared reader loop.
+            # The expected request remains pending so a valid authenticated
+            # response can still arrive before its timeout.
+            return
+        if not pending.future.done():
+            pending.future.set_result(response)
 
     async def _handle_request(self, relay_message: Any, payload: dict[str, Any]) -> None:
         frame = payload.get("frame")
@@ -263,6 +305,7 @@ class RelayStorageEndpoint:
             payload={
                 "kind": RELAY_STORAGE_KIND,
                 "message": "response",
+                "provider_id": provider_id,
                 "frame": json.dumps(
                     response.to_dict(),
                     sort_keys=True,

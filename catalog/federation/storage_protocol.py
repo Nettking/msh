@@ -20,6 +20,8 @@ JSON = dict[str, Any]
 STORAGE_PROTOCOL = "msh-storage-v1"
 STORAGE_PROTOCOL_MAJOR = 1
 STORAGE_PROTOCOL_VERSION = "1.0"
+DEFAULT_DATASET_SCHEMA_NAME = "msh.storage.dataset.opaque"
+DEFAULT_DATASET_SCHEMA_VERSION = 1
 
 
 def _required_text(value: Any, field: str) -> str:
@@ -365,12 +367,34 @@ class BatchIngestRequest:
     content_hash: str
     content: Any
     created_at: datetime
+    dataset_schema_name: str = DEFAULT_DATASET_SCHEMA_NAME
+    dataset_schema_version: int = DEFAULT_DATASET_SCHEMA_VERSION
 
     def __post_init__(self) -> None:
         if not isinstance(self.authority, WriteAuthority):
             raise FederationValidationError("invalid-object", "authority", "must be WriteAuthority")
         for name in ("dataset_id", "batch_id", "idempotency_key", "content_hash"):
             object.__setattr__(self, name, _required_text(getattr(self, name), name))
+        object.__setattr__(
+            self,
+            "dataset_schema_name",
+            _required_text(self.dataset_schema_name, "dataset_schema_name"),
+        )
+        schema_version = _uint(
+            self.dataset_schema_version,
+            "dataset_schema_version",
+        )
+        if schema_version == 0:
+            raise FederationValidationError(
+                "invalid-positive-integer",
+                "dataset_schema_version",
+                "must be greater than zero",
+            )
+        object.__setattr__(
+            self,
+            "dataset_schema_version",
+            schema_version,
+        )
         if not self.content_hash.startswith("sha256:") or len(self.content_hash) != 71:
             raise FederationValidationError(
                 "invalid-content-hash", "content_hash", "must use sha256:<64 lowercase hex characters>"
@@ -427,6 +451,14 @@ class BatchIngestRequest:
             content_hash=value["content_hash"],
             content=value["content"],
             created_at=value["created_at"],
+            dataset_schema_name=value.get(
+                "dataset_schema_name",
+                DEFAULT_DATASET_SCHEMA_NAME,
+            ),
+            dataset_schema_version=value.get(
+                "dataset_schema_version",
+                DEFAULT_DATASET_SCHEMA_VERSION,
+            ),
         )
 
     def to_dict(self) -> JSON:
@@ -439,6 +471,8 @@ class BatchIngestRequest:
             "content_hash": self.content_hash,
             "content": self.content,
             "created_at": _timestamp(self.created_at),
+            "dataset_schema_name": self.dataset_schema_name,
+            "dataset_schema_version": self.dataset_schema_version,
         }
 
 

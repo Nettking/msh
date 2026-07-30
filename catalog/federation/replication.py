@@ -14,12 +14,14 @@ from .storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
     BatchIngestRequest,
+    BatchIngestResult,
     StorageOperation,
     StorageRequestEnvelope,
     StorageResponseEnvelope,
 )
 
 REPLICATION_SCHEMA = "msh.storage_replication.v1"
+PHASE_D_SERVICE_REPLICATION_OWNER = "phase-d-storage-service"
 
 
 def _now() -> datetime:
@@ -144,7 +146,16 @@ class ReplicationWorker:
             raise FederationValidationError(
                 "invalid-limit", "limit", "must be a positive integer"
             )
-        due = self.outbox.pending(now=self.clock())[:limit]
+        due = tuple(
+            entry
+            for entry in self.outbox.pending(now=self.clock())
+            if entry.schema_id == REPLICATION_SCHEMA
+            and (
+                not isinstance(entry.payload, dict)
+                or entry.payload.get("delivery_owner")
+                != PHASE_D_SERVICE_REPLICATION_OWNER
+            )
+        )[:limit]
         completed = 0
         failed = 0
         for entry in due:
@@ -215,4 +226,15 @@ class ReplicationWorker:
                 response.error.code.value,
                 response.error.field or "replication",
                 response.error.message,
+            )
+        result = BatchIngestResult.from_dict(response.result)
+        if (
+            result.batch_id != request.batch_id
+            or result.idempotency_key != request.idempotency_key
+            or result.content_hash != request.content_hash
+        ):
+            raise FederationValidationError(
+                "replication-identity-mismatch",
+                "result",
+                "replica response does not match the immutable batch identity",
             )

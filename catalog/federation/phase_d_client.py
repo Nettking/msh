@@ -8,6 +8,7 @@ from datetime import datetime
 from typing import Protocol
 
 from .errors import FederationValidationError
+from .manifest import ManifestItemKind
 from .storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
@@ -107,6 +108,8 @@ class PhaseDLogicalStorageClient:
         idempotency_key: str,
         content: object,
         created_at: datetime,
+        dataset_schema_name: str = "msh.storage.dataset.opaque",
+        dataset_schema_version: int = 1,
     ) -> PhaseDIngestOutcome:
         placeholder = BatchIngestRequest(
             authority=WriteAuthority(
@@ -124,6 +127,8 @@ class PhaseDLogicalStorageClient:
             content_hash=BatchIngestRequest.calculate_content_hash(content),
             content=content,
             created_at=created_at,
+            dataset_schema_name=dataset_schema_name,
+            dataset_schema_version=dataset_schema_version,
         )
         return await self.ingest(placeholder)
 
@@ -152,6 +157,8 @@ class PhaseDLogicalStorageClient:
             content_hash=request.content_hash,
             content=request.content,
             created_at=request.created_at,
+            dataset_schema_name=request.dataset_schema_name,
+            dataset_schema_version=request.dataset_schema_version,
         )
         response = await self.transport.request(
             target_node_id=route.node_id,
@@ -171,10 +178,85 @@ class PhaseDLogicalStorageClient:
             ),
         )
         if response.ok:
-            assert response.result is not None
+            value = response.result
+            if not isinstance(value, dict):
+                return self._invalid_success("storage success payload is missing")
+            try:
+                result = BatchIngestResult.from_dict(value)
+            except FederationValidationError as exc:
+                return self._invalid_success(exc.message)
+            if (
+                result.batch_id != request.batch_id
+                or result.idempotency_key != request.idempotency_key
+                or result.content_hash != request.content_hash
+            ):
+                return self._invalid_success(
+                    "storage success identity does not match the requested batch"
+                )
+            manifest_revision = value.get("manifest_revision")
+            manifest_hash = value.get("manifest_hash")
+            if (
+                value.get("commit_state") != "committed"
+                or isinstance(manifest_revision, bool)
+                or not isinstance(manifest_revision, int)
+                or manifest_revision < 1
+                or not isinstance(manifest_hash, str)
+                or len(manifest_hash) != 71
+                or not manifest_hash.startswith("sha256:")
+                or any(
+                    character not in "0123456789abcdef"
+                    for character in manifest_hash[7:]
+                )
+            ):
+                return self._invalid_success(
+                    "storage success lacks valid authoritative manifest evidence"
+                )
+            history_reader = getattr(
+                self.control_plane,
+                "manifest_history",
+                None,
+            )
+            if not callable(history_reader):
+                return self._invalid_success(
+                    "authoritative manifest verification is unavailable"
+                )
+            try:
+                history = history_reader(self.session_id, group_id)
+                manifest = history[manifest_revision]
+            except (
+                FederationValidationError,
+                IndexError,
+                TypeError,
+                ValueError,
+            ) as exc:
+                return self._invalid_success(
+                    f"manifest evidence cannot be verified: {exc}"
+                )
+            item = next(
+                (
+                    candidate
+                    for candidate in manifest.items
+                    if candidate.item_id == request.batch_id
+                ),
+                None,
+            )
+            if (
+                manifest.revision != manifest_revision
+                or manifest.manifest_hash != manifest_hash
+                or item is None
+                or item.kind is not ManifestItemKind.BATCH
+                or item.dataset_id != request.dataset_id
+                or item.schema_name != request.dataset_schema_name
+                or item.schema_version != request.dataset_schema_version
+                or item.idempotency_key != request.idempotency_key
+                or item.content_hash != request.content_hash
+            ):
+                return self._invalid_success(
+                    "manifest does not contain the acknowledged batch"
+                )
             return PhaseDIngestOutcome(
                 committed=True,
-                result=BatchIngestResult.from_dict(response.result),
+                result=result,
             )
         assert response.error is not None
         if response.error.retryable:
@@ -188,6 +270,15 @@ class PhaseDLogicalStorageClient:
             response.error.code.value,
             response.error.field or "storage",
             response.error.message,
+        )
+
+    @staticmethod
+    def _invalid_success(message: str) -> PhaseDIngestOutcome:
+        return PhaseDIngestOutcome(
+            committed=False,
+            retryable=True,
+            error_code="invalid-storage-response",
+            message=message,
         )
 
     async def exists(self, *, group_id: str, batch_id: str) -> bool:

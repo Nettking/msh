@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+import sqlite3
 from datetime import datetime, timedelta, timezone
 
 from catalog.federation.local_storage import FilesystemBatchStorageProvider, LocalStorageService
@@ -56,10 +58,86 @@ def test_filesystem_provider_stores_reads_and_survives_restart(tmp_path):
     result = provider.ingest(request)
     assert result.state is BatchIngestState.STORED
     assert provider.exists(session_id="session-1", group_id="storage-main", batch_id="batch-1")
+    identity = provider.committed_identity(
+        session_id="session-1",
+        group_id="storage-main",
+        batch_id="batch-1",
+    )
+    assert identity is not None
+    assert identity.dataset_id == request.dataset_id
+    assert identity.dataset_schema_name == request.dataset_schema_name
+    assert identity.dataset_schema_version == request.dataset_schema_version
+    assert identity.idempotency_key == request.idempotency_key
+    assert identity.content_hash == request.content_hash
     assert provider.read(session_id="session-1", group_id="storage-main", batch_id="batch-1") == request.content
 
     restarted = FilesystemBatchStorageProvider(tmp_path)
     assert restarted.read(session_id="session-1", group_id="storage-main", batch_id="batch-1") == request.content
+
+
+def test_filesystem_provider_migrates_legacy_index_without_losing_identity(
+    tmp_path,
+):
+    request = _request({"sequence": 1, "value": 42})
+    relative_path = "session-1/storage-main/telemetry/batch-1.json"
+    final_path = tmp_path / "batches" / relative_path
+    final_path.parent.mkdir(parents=True)
+    final_path.write_text(
+        json.dumps(request.to_dict(), sort_keys=True, separators=(",", ":")),
+        encoding="utf-8",
+    )
+    database = tmp_path / "storage-index.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.executescript(
+            """
+            CREATE TABLE committed_batches (
+                session_id TEXT NOT NULL,
+                group_id TEXT NOT NULL,
+                dataset_id TEXT NOT NULL,
+                batch_id TEXT NOT NULL,
+                idempotency_key TEXT NOT NULL,
+                content_hash TEXT NOT NULL,
+                relative_path TEXT NOT NULL,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY (session_id, group_id, batch_id),
+                UNIQUE (session_id, group_id, idempotency_key)
+            );
+            """
+        )
+        connection.execute(
+            """INSERT INTO committed_batches
+               (session_id, group_id, dataset_id, batch_id, idempotency_key,
+                content_hash, relative_path, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                request.authority.session_id,
+                request.authority.group_id,
+                request.dataset_id,
+                request.batch_id,
+                request.idempotency_key,
+                request.content_hash,
+                relative_path,
+                request.created_at.isoformat(),
+            ),
+        )
+
+    provider = FilesystemBatchStorageProvider(tmp_path)
+    identity = provider.committed_identity(
+        session_id=request.authority.session_id,
+        group_id=request.authority.group_id,
+        batch_id=request.batch_id,
+    )
+
+    assert identity is not None
+    assert identity.dataset_id == request.dataset_id
+    assert identity.dataset_schema_name == "msh.storage.dataset.opaque"
+    assert identity.dataset_schema_version == 1
+    assert provider.read(
+        session_id=request.authority.session_id,
+        group_id=request.authority.group_id,
+        batch_id=request.batch_id,
+    ) == request.content
+    assert provider.ingest(request).state is BatchIngestState.ALREADY_STORED
 
 
 def test_identical_retry_is_idempotent(tmp_path):
@@ -87,6 +165,48 @@ def test_same_batch_with_another_key_is_rejected(tmp_path):
     response = service.dispatch(_envelope(_request({"value": 1}, key="idem-2")))
     assert not response.ok
     assert response.error.code is StorageErrorCode.IDEMPOTENCY_CONFLICT
+
+
+def test_idempotency_identity_cannot_move_between_datasets(tmp_path):
+    provider = FilesystemBatchStorageProvider(tmp_path)
+    original = _request({"value": 1})
+    provider.ingest(original)
+    moved = BatchIngestRequest(
+        authority=original.authority,
+        dataset_id="another-dataset",
+        batch_id=original.batch_id,
+        idempotency_key=original.idempotency_key,
+        content_hash=original.content_hash,
+        content=original.content,
+        created_at=original.created_at,
+    )
+    response = LocalStorageService(provider).dispatch(_envelope(moved))
+
+    assert not response.ok
+    assert response.error.code is StorageErrorCode.IDEMPOTENCY_CONFLICT
+    assert response.error.field == "dataset_id"
+
+
+def test_idempotency_identity_cannot_change_dataset_schema(tmp_path):
+    provider = FilesystemBatchStorageProvider(tmp_path)
+    original = _request({"value": 1})
+    provider.ingest(original)
+    changed = BatchIngestRequest(
+        authority=original.authority,
+        dataset_id=original.dataset_id,
+        batch_id=original.batch_id,
+        idempotency_key=original.idempotency_key,
+        content_hash=original.content_hash,
+        content=original.content,
+        created_at=original.created_at,
+        dataset_schema_name="msh.telemetry.observations",
+        dataset_schema_version=2,
+    )
+    response = LocalStorageService(provider).dispatch(_envelope(changed))
+
+    assert not response.ok
+    assert response.error.code is StorageErrorCode.IDEMPOTENCY_CONFLICT
+    assert response.error.field == "dataset_schema_name"
 
 
 def test_dispatcher_describe_health_exists_and_read(tmp_path):
