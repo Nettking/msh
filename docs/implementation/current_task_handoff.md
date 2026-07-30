@@ -1,58 +1,55 @@
 # Current task handoff
 
-Last updated: 2026-07-31 00:27 Europe/Oslo
+Last updated: 2026-07-31 00:39 Europe/Oslo
 
 ## Repository and branch
 
 - Repository: `Nettking/msh`
 - Branch: `agent/phase-e-completeness-aware-failover`
 - Local HEAD: **not established in this execution environment**; no local checkout is available.
-- Remote HEAD before this checkpoint: `2d987a22ab392130972e3e752de2b892eff9c902`
-- Remote HEAD after this checkpoint: **verify immediately after commit**
-- Pull request: #122, draft, open, mergeable before this runtime checkpoint
+- Remote HEAD before this handoff checkpoint: `e1fc20066af91b12f7bfea0f05cb3ab18c6ff9d9`
+- Remote HEAD after this handoff checkpoint: **verify immediately after commit**
+- Pull request: #122, draft, open, mergeable before validation
 - PR base branch: `agent/complete-phase-d-integration`
 - PR base commit: `05bbfe40dafa2b4661aa313cf7dba25e01a5a90d`
 - Phase D PR: #121, draft, open, mergeable, base `main`
 
 ## Current objective
 
-E6 is independently complete. Finish E7 and E8 with interruption-safe green checkpoints, close Phase E documentation, then merge and clean up PR #121 and PR #122 in dependency order. Phase G remains a separate later update. Phase F direct peer transport is excluded.
+Validate E7.0/E7.1 contracts, deterministic planning, two-table durable ledger, restart/duplicate replay, and negative cases on Linux and Windows. Begin E7.2 only if this checkpoint is green. Finish E7/E8 and then merge/clean PR #121 and #122. Phase G remains a separate later update; Phase F is excluded.
 
 ## Confirmed findings
 
-1. E6.7 is complete and green; `docs/implementation/phase_e6_completion_review.md` is authoritative.
-2. `docs/implementation/phase_e7_recovery_plan.md` requires E7.0/E7.1 to become green before transfer logic begins.
-3. WIP commit `d48b3b5c0ff582d3942206bbf63c3a64eff58788` prematurely included transfer and verification logic and used a one-row JSON ledger.
-4. That checkpoint-order/persistence deviation was recorded before correction in commit `cda0f907350d658879708984f0c8521f5bec68eb`.
-5. Commit `2d987a22ab392130972e3e752de2b892eff9c902` replaced the WIP module with an E7.0/E7.1-only implementation.
-6. The corrected module contains no relay transfer or final-report completion path.
-7. The corrected implementation defines validated recovery, item, state, status, and plan contracts.
-8. It persists an explicit recovery table plus a separate immutable per-item ledger table in the coordinator SQLite database.
-9. One atomic transaction persists the full plan before later transfer may begin.
-10. Planning binds E6 transaction/finalization/publication evidence, current assignment/grant, manifest revision/hash, returning/source provider registrations, authenticated latest report, and exact provider-local fence evidence.
-11. Exact provider-local immutable identities are `present`; absent identities are `missing`; identity/report mismatch is `conflict`.
-12. Unknown extra hashes, integrity failure, current-revision hash conflict, manifest-ahead evidence, and immutable item conflicts produce durable `operator-attention` plans without overwriting data.
-13. Duplicate planning reuses the same deterministic recovery identity and durable ledger; changed manifest/authority/report requires replan or fails validation.
-14. The corrected module passes Python syntax compilation in the temporary analysis environment.
-15. No pytest or Ruff validation has run yet. The branch is still temporarily unverified.
-16. This environment has no local checkout, no `gh`, no local Ruff, and no shell DNS access to GitHub.
+1. E6 is independently complete and green.
+2. The original over-broad E7 WIP was recorded and corrected before tests.
+3. Commit `2d987a22ab392130972e3e752de2b892eff9c902` implements E7.0/E7.1 only, with no transfer logic.
+4. Commit `79d110468f20159ea1d8e32493779a90757a265e` adds eight focused E7.0/E7.1 tests.
+5. Commit `971ed463516d2809b4671e60683adb7b9e0a221c` exports the E7 recovery contracts, store, plan, and planner.
+6. Commit `e1fc20066af91b12f7bfea0f05cb3ab18c6ff9d9` adds the E7.0/E7.1 test file to Linux and Windows CI.
+7. Tests cover deterministic missing-item planning, exact present identities, restart/duplicate replay, missing fence, changed assignment/authority, manifest change, immutable conflict, unknown extra hash, and per-group persistence isolation.
+8. The planner binds E6 finalization/publication, current assignment/grant, authoritative manifest, latest authenticated report, provider registrations, and exact provider-local fence evidence.
+9. The store persists one recovery row and one immutable ledger row per authoritative manifest item atomically.
+10. No relay transfer or final report completion path exists in this checkpoint.
+11. Module and test sources pass Python syntax compilation in the temporary analysis environment.
+12. No pytest/Ruff/CI result has yet been observed for the current checkpoint.
+13. This environment has no local checkout, no `gh`, no local Ruff, and no shell DNS access to GitHub.
 
 ## Suspected issues not yet confirmed
 
-1. The corrected module may contain runtime import, SQLite, protocol, type, or Ruff defects not visible through syntax compilation.
-2. The focused tests may expose assumptions about E6 fixtures, report replacement, publication lease binding, or provider identity lookup.
-3. Public exports and CI workflow coverage are not yet committed.
+1. Runtime tests may reveal report replacement, fixture timing, grant lease, SQLite, enum, import, or assertion defects.
+2. Ruff may identify style defects not caught by syntax compilation.
+3. Windows may expose SQLite/file semantics not seen on Linux.
 4. E7.2-E7.6 and E8 remain unimplemented.
-5. PR merge policy and branch cleanup remain to be checked after Phase E is fully green.
+5. PR cleanup remains blocked until Phase E is complete and green.
 
 ## Decisions made and rationale
 
-1. Treat `2d987a22ab392130972e3e752de2b892eff9c902` as a recoverable WIP implementation milestone, not a completed checkpoint.
-2. Add focused E7.0/E7.1 tests immediately, then public exports and Linux/Windows workflow coverage.
-3. Do not begin transfer until the resulting checkpoint is green.
-4. Never weaken the former-primary fence or overwrite conflicting immutable state.
+1. Treat the current head as a coherent but unverified E7.0/E7.1 checkpoint.
+2. Do not begin transfer logic until Linux and Windows are green.
+3. Record exact CI failures here before fixing any defect.
+4. Preserve the durable fence and immutable conflict fail-closed behavior.
 5. Keep PR #122 draft and stacked.
-6. Merge #121 first with history preserved, then retarget and revalidate #122 before merging it.
+6. Merge #121 first with history preserved after Phase E completion, then retarget/revalidate/merge #122.
 7. Do not implement Phase F or start Phase G.
 
 ## Files inspected
@@ -60,15 +57,20 @@ E6 is independently complete. Finish E7 and E8 with interruption-safe green chec
 - `docs/implementation/current_task_handoff.md`
 - `docs/implementation/phase_e7_recovery_plan.md`
 - `catalog/federation/former_primary_recovery.py`
-- `catalog/federation/promotion_publication.py`
-- E6.3-E6.7 fixture/test helpers
+- `catalog/federation/tests/test_phase_e71_former_primary_recovery.py`
 - `catalog/federation/__init__.py`
 - `.github/workflows/phase2-federation.yml`
+- E6 promotion/publication/recovery fixtures and runtime paths
 
 ## Files changed
 
-- `catalog/federation/former_primary_recovery.py` — replaced in `2d987a22ab392130972e3e752de2b892eff9c902` with E7.0/E7.1 contracts, deterministic planner, two-table durable ledger, duplicate/restart replay, and plan revalidation only.
-- `docs/implementation/current_task_handoff.md` — records this implementation milestone before tests.
+Current E7.0/E7.1 checkpoint:
+
+- `catalog/federation/former_primary_recovery.py` — E7 contracts, deterministic planner, plan validation, two-table durable recovery/item ledger.
+- `catalog/federation/tests/test_phase_e71_former_primary_recovery.py` — eight focused acceptance tests.
+- `catalog/federation/__init__.py` — public E7 API exports.
+- `.github/workflows/phase2-federation.yml` — Linux and Windows E7.0/E7.1 execution.
+- `docs/implementation/current_task_handoff.md` — exact checkpoint and validation state.
 
 ## Exact commands run
 
@@ -76,22 +78,24 @@ Static validation:
 
 ```text
 compile(e71_module_source, "former_primary_recovery.py", "exec")
+compile(e71_test_source, "test_phase_e71_former_primary_recovery.py", "exec")
 ```
 
-Result: passed.
+Result: both passed.
 
 Connected GitHub operations:
 
 ```text
-fetch approved E7 plan and current WIP module
-replace catalog/federation/former_primary_recovery.py
-commit 2d987a22ab392130972e3e752de2b892eff9c902
-update current task handoff
+replace former_primary_recovery.py with E7.0/E7.1-only implementation
+create test_phase_e71_former_primary_recovery.py
+update catalog/federation/__init__.py exports
+update phase2-federation.yml Linux and Windows test lists
+update current_task_handoff.md
 ```
 
 ## Exact test results
 
-No pytest or Ruff result exists for E7.0/E7.1 yet.
+Current checkpoint: **pending remote validation**.
 
 Latest validated pre-E7 runtime:
 
@@ -105,36 +109,36 @@ Windows: success
 
 ## Known failures
 
-1. E7.0/E7.1 code is not yet executable-test validated.
-2. Focused test file, public exports, and CI coverage are missing.
+1. No confirmed E7.0/E7.1 test failure yet; validation has not been inspected.
+2. Current branch is unverified until Actions completes.
 3. E7.2-E7.6 and E8 are unimplemented.
-4. Phase E progress and PR closure metadata remain incomplete.
+4. Phase E progress/PR closure metadata remain incomplete.
 5. PR cleanup/merge has not begun.
 6. Local full testing is unavailable.
 
 ## Uncommitted changes
 
 - No local MSH worktree exists.
-- A syntactically compiled focused E7.0/E7.1 test source remains only in the temporary analysis workspace and must be pushed next.
-- Export and workflow changes are not committed.
+- No meaningful E7.0/E7.1 source/test edit remains only in the temporary workspace.
+- No implementation edit is pending outside GitHub for this checkpoint.
 
 ## Unfinished edits or partially implemented logic
 
-- E7.0/E7.1 tests and CI integration are unfinished.
-- E7.2 relay-first transfer, E7.3 conflict/corruption progression, E7.4 final report, E7.5 replay/concurrency, and E7.6 end-to-end acceptance have not begun.
-- E8 diagnostics and final acceptance are unimplemented.
-- Phase E closure and PR cleanup remain unfinished.
+- Remote E7.0/E7.1 validation is pending.
+- E7.2 relay-first transfer, E7.3 conflict/corruption progression, E7.4 final report, E7.5 concurrency/restart, E7.6 end-to-end acceptance remain.
+- E8 diagnostics and final acceptance remain.
+- Phase E closure and PR cleanup remain.
 - Phase G is intentionally not started.
 
 ## Next exact action
 
 1. Verify remote head after this handoff commit.
-2. Commit eight focused E7.0/E7.1 tests.
-3. Add public exports and Linux/Windows workflow coverage.
-4. Run GitHub Actions and record exact failures or green results before transfer work.
+2. Fetch the Actions run for the resulting head.
+3. Inspect exact Linux/Windows steps and logs.
+4. Record any defect before fixing it; if green, mark E7.0/E7.1 complete and begin E7.2.
 
 ## Resume safety
 
 - Safe to resume: **yes**.
-- Expected branch state: **temporarily unverified and potentially broken**.
+- Expected branch state: **temporarily unverified**.
 - PR #122 must remain draft.
