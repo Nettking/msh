@@ -1,56 +1,67 @@
 # Current task handoff
 
-Last updated: 2026-07-30 22:41 Europe/Oslo
+Last updated: 2026-07-30 22:52 Europe/Oslo
 
 ## Repository and branch
 
 - Repository: `Nettking/msh`
 - Branch: `agent/phase-e-completeness-aware-failover`
 - Local HEAD: **not established in this execution environment**. No local checkout is available.
-- Remote HEAD inspected before this handoff commit: `6350f34b471433ea182fbdcdc8bfd787d268a255`
-- Remote HEAD after this handoff commit: **verify immediately after creation**
-- Pull request: #122, draft, open, mergeable
+- Remote HEAD before this finding checkpoint: `a7ceb8ec9fc9271983d58b134187af8861a8910e`
+- Remote HEAD after this finding checkpoint: **verify immediately after creation**
+- Pull request: #122, draft, open
 - PR base branch: `agent/complete-phase-d-integration`
 - PR base commit: `05bbfe40dafa2b4661aa313cf7dba25e01a5a90d`
 
 ## Current objective
 
-Independently review Phase E checkpoint E6, finish E6 if the implementation and acceptance evidence are complete, durably record the conclusion, then prepare the exact E7 implementation plan without starting unsafe or unscoped Phase F work.
+Repair the confirmed E6 coordinator-publication gap, validate that a completed promotion changes the authoritative assignment and leader grant used by logical routing, then independently close E6 and prepare the exact E7 plan.
 
 ## Confirmed findings
 
-1. PR #122 is open, draft, mergeable, and has no unresolved inline review threads.
-2. PR #122 currently contains 21 commits, 37 changed files, 12,969 additions, and 147 deletions.
-3. The remote branch head inspected before this handoff was `6350f34b471433ea182fbdcdc8bfd787d268a255`.
-4. GitHub Actions workflow `Phase 2 federation`, run `30458193257`, completed successfully for remote head `6350f34b471433ea182fbdcdc8bfd787d268a255`.
-5. The PR body records E6.6 implementation commit `e8a1158` and states that E6 still requires green CI and an explicit independent completion review before E7.
-6. `docs/implementation/phase_e_progress.md` is stale at its checkpoint table: it still says E6 is paused pending design approval even though E6.3 through E6.6 are implemented and pushed.
-7. This execution environment has no local MSH checkout, no `gh` executable, and the shell cannot resolve `github.com`. Repository reads and writes remain available through the connected GitHub application.
+1. PR #122 is open and draft and has no unresolved inline review threads.
+2. The pre-handoff implementation head was `6350f34b471433ea182fbdcdc8bfd787d268a255`; GitHub Actions workflow `Phase 2 federation`, run `30458193257`, completed successfully for that commit.
+3. The interruption-safe handoff was created and pushed as `a7ceb8ec9fc9271983d58b134187af8861a8910e`.
+4. `docs/implementation/phase_e_progress.md` is stale at its checkpoint table and opening narrative: it still says E6 is paused pending design approval although E6.1–E6.6 are implemented.
+5. **Confirmed E6 completion defect:** `persist_promotion_finalization()` inserts `storage_promotion_finalizations` and marks the promotion transaction `finalized`; `complete_promotion_finalization()` then deletes the matching `storage_degraded_states` row. Neither method appends `STORAGE_ASSIGNMENT_CHANGED` nor `STORAGE_LEADER_GRANTED` coordinator events, and neither updates the control-plane snapshot to make `selected_provider_id` the primary with the reserved term/grant.
+6. The active logical storage path reads assignment and leader-grant authority from `StorageControlPlaneSnapshot`; therefore a completed E6 promotion can clear degraded mode while coordinator routing and write-authority validation still expose the old primary/grant.
+7. The E6 fixture starts with `provider-old` as primary, `provider-new` as replica, and an old leader grant at term 5. The E6.5 and E6.6 success tests assert provider-local grant/finalization/degraded-state behavior but never assert `control.snapshot(...).groups[...]` or `leader_grants[...]` after completion. This is why the existing green tests did not catch the coordinator-publication gap.
+8. The written E6 acceptance mapping explicitly requires assignment/grant consistency and logical routing changes without recorder reconfiguration. The current implementation does not yet satisfy that requirement.
+9. This execution environment has no local MSH checkout, no `gh` executable, and the shell cannot resolve `github.com`. Repository reads and writes remain available through the connected GitHub application.
 
 ## Suspected issues not yet confirmed
 
-1. The E6 code may satisfy its implementation tests while the authoritative progress document and acceptance traceability remain incomplete or inconsistent.
-2. The current workflow result proves the configured Phase 2 federation workflow is green, but it has not yet been confirmed that every E6 acceptance item is represented by a specific test or explicit invariant review.
-3. It is not yet confirmed whether PR #121 has changed status; PR #122 must not be retargeted or rebased until that is checked.
+1. Publication of assignment and leader-grant events must be made crash-safe and idempotent with finalization; it is not yet determined whether the safest boundary is the first finalization transaction or a new explicit publication stage.
+2. The promoted assignment must preserve a deterministic replica set, likely moving the former primary into replicas without duplicating the selected provider; exact expected behavior must be derived from Phase D assignment semantics and E7 requirements.
+3. The new coordinator grant needs a fencing token as well as the reserved term. E6 currently reserves only `reserved_term`; the correct monotonic fencing-token allocation and persistence path must be confirmed before implementation.
+4. It is not yet confirmed whether PR #121 has changed status; PR #122 must not be retargeted or rebased until checked.
 
 ## Decisions made and rationale
 
-1. Treat `docs/implementation/current_task_handoff.md` as a required part of every coherent checkpoint.
-2. Record findings before any fix.
-3. Do not mark E6 complete solely from the PR body. Perform an independent acceptance review against `docs/implementation/phase_e_progress.md`, E6 tests, promotion/fencing/finalization/recovery code, and CI evidence.
-4. Do not start E7 until E6 documentation and acceptance traceability are coherent and pushed.
-5. Do not implement Phase F.
-6. Because the local shell cannot access GitHub, use the connected GitHub app for durable repository inspection and writes; use GitHub Actions as remote validation where a local test run is impossible.
+1. E6 cannot be declared complete while coordinator assignment and grant publication are absent.
+2. Record the defect and test gap before changing code, as required by the interruption-safe workflow.
+3. Do not patch finalization by calling public `change_assignment()` and `grant_leader()` after degraded clear; that would introduce crash windows and duplicate event risk. First inspect the existing atomic `complete_handover()` pattern and event-store schema, then design a transactionally durable and replay-safe publication boundary.
+4. Add tests that fail on the current implementation by asserting the final snapshot, logical routing inputs, old-grant replacement, monotonic term/token, restart replay, and duplicate recovery behavior.
+5. Keep PR #122 draft and do not begin E7 or Phase F.
+6. Because local validation is unavailable, make the smallest coherent repository edits through the GitHub app and rely on the branch workflow for execution, recording exact remote outcomes.
 
 ## Files inspected
 
 - `docs/implementation/phase_e_progress.md`
-- PR #122 metadata, body, and aggregate diff
-- PR #122 review threads
+- `docs/implementation/phase_e6_promotion_transaction_design.md`
+- `docs/implementation/current_task_handoff.md`
+- `catalog/federation/promotion_transaction.py`
+- `catalog/federation/provider_fencing.py`
+- `catalog/federation/phase_d_control.py`
+- `catalog/federation/tests/test_phase_e5_degraded_state.py`
+- `catalog/federation/tests/test_phase_e63_provider_fencing.py`
+- `catalog/federation/tests/test_phase_e65_finalization.py`
+- `catalog/federation/tests/test_phase_e66_recovery.py`
+- PR #122 metadata, changed-file list, workflow state, and review threads
 
 ## Files changed
 
-- `docs/implementation/current_task_handoff.md` — created as the durable interruption-safe recovery record.
+- `docs/implementation/current_task_handoff.md` — created and now updated with the confirmed E6 coordinator-publication defect and evidence.
 
 ## Exact commands run
 
@@ -74,24 +85,24 @@ mkdir -p /mnt/data/work && cd /mnt/data/work && git clone --branch agent/phase-e
 
 Result: failed with `Could not resolve host: github.com`.
 
-Connected GitHub operations:
+Connected GitHub operations performed:
 
 ```text
 fetch PR #122
 get PR #122 metadata
 fetch workflow runs for commit 6350f34b471433ea182fbdcdc8bfd787d268a255
 list PR #122 review threads
-fetch docs/implementation/phase_e_progress.md from agent/phase-e-completeness-aware-failover
-fetch docs/implementation/current_task_handoff.md from agent/phase-e-completeness-aware-failover
+list PR #122 changed filenames
+fetch focused files and line ranges listed under Files inspected
+create docs/implementation/current_task_handoff.md
+verify PR head became a7ceb8ec9fc9271983d58b134187af8861a8910e
 ```
-
-The last fetch returned 404, confirming the handoff file did not exist before this commit.
 
 ## Exact test results
 
 No local tests were run because no local checkout is available and the shell cannot access GitHub.
 
-Verified remote result:
+Verified remote result before the handoff-only commit:
 
 ```text
 Workflow: Phase 2 federation
@@ -101,7 +112,7 @@ Status: completed
 Conclusion: success
 ```
 
-Previously recorded E6.6 local validation from the PR body, not independently rerun in this execution environment:
+Previously recorded E6.6 local validation, not independently rerun here:
 
 ```text
 93 focused E6 tests passed
@@ -113,37 +124,39 @@ Ruff passed
 Diff hygiene passed
 ```
 
+Important coverage gap: those E6 tests do not assert that finalization updates the coordinator snapshot assignment or leader grant.
+
 ## Known failures
 
-1. `gh` is unavailable in the shell.
-2. Shell network resolution for `github.com` fails.
-3. A local checkout and local HEAD cannot currently be established.
-4. `docs/implementation/phase_e_progress.md` has a stale E6 status table and narrative.
+1. E6 completed promotion does not yet publish the new primary assignment and coordinator leader grant.
+2. `gh` is unavailable in the shell.
+3. Shell network resolution for `github.com` fails.
+4. A local checkout and local HEAD cannot currently be established.
+5. `docs/implementation/phase_e_progress.md` has a stale E6 status table and narrative.
 
 ## Uncommitted changes
 
 - None in a local worktree; no local worktree exists.
-- This handoff creation is being committed directly through the GitHub app.
+- This finding record is being committed directly through the GitHub app.
 
 ## Unfinished edits or partially implemented logic
 
-- No implementation edits have begun in this execution.
-- E6 independent acceptance review is incomplete.
-- E6 documentation/status correction has not yet been made.
-- E7 preparation has not yet begun.
+- No code fix has begun.
+- Atomic/replay-safe coordinator publication design is not yet selected.
+- Failing regression tests for routing publication have not yet been added.
+- E6 documentation/status correction is pending.
+- E7 preparation has not begun.
 
 ## Next exact action
 
-1. Verify the remote branch head after this handoff commit.
-2. Inspect the E6 implementation files and E6 test files in focused slices.
-3. Map each E6 acceptance requirement to implementation evidence and tests.
-4. Record any defect or coverage gap here before changing code.
-5. If E6 is complete, update `phase_e_progress.md`, this handoff, and PR #122 together; run the smallest available remote validation and push the checkpoint.
-6. If a defect is found, record evidence first, then implement the smallest coherent fix and push immediately.
+1. Verify the remote branch head after this finding checkpoint.
+2. Inspect `StorageControlPlaneStore` event persistence and `PhaseDControlPlane.complete_handover()` to identify the existing atomic assignment/grant pattern and fencing-token allocation.
+3. Decide and record the E6 publication transaction boundary.
+4. Add the smallest failing tests for snapshot assignment/grant and restart/duplicate publication.
+5. Implement publication atomically and idempotently, update this handoff, and trigger remote validation.
 
 ## Resume safety
 
 - Safe to resume: **yes**.
-- Branch expected state: **green**, based on the verified successful workflow for the pre-handoff remote head.
-- This handoff-only commit is not expected to affect tests.
+- Branch expected state: **green but functionally incomplete for E6 acceptance**. The new commit changes documentation only.
 - PR must remain draft.
