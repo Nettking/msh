@@ -672,8 +672,6 @@ class FormerPrimaryRepairWorker:
         target_side: bool,
     ) -> None:
         expected = (
-            item.session_id,
-            item.group_id,
             item.dataset_id,
             item.schema_name,
             item.schema_version,
@@ -682,8 +680,6 @@ class FormerPrimaryRepairWorker:
             item.content_hash,
         )
         actual = (
-            identity.session_id,
-            identity.group_id,
             identity.dataset_id,
             identity.dataset_schema_name,
             identity.dataset_schema_version,
