@@ -707,5 +707,3 @@ class FormerPrimaryRepairWorker:
         plan: FormerPrimaryRecoveryPlan,
     ) -> FormerPrimaryRepairRunResult:
         return FormerPrimaryRepairRunResult(status, code, reason, 0, 0, 0, plan)
-
-
