@@ -1,53 +1,46 @@
 # Current task handoff
 
-Last updated: 2026-07-30 23:01 Europe/Oslo
+Last updated: 2026-07-30 23:08 Europe/Oslo
 
 ## Repository and branch
 
 - Repository: `Nettking/msh`
 - Branch: `agent/phase-e-completeness-aware-failover`
-- Local HEAD: **not established in this execution environment**. No local checkout is available.
-- Remote HEAD before this finding checkpoint: `9844e437dbe70aad6f660efa40bceb139cf23d3f`
-- Remote HEAD after this finding checkpoint: **verify immediately after creation**
+- Local HEAD: **not established in this execution environment**; no local checkout is available.
+- Remote HEAD before this checkpoint: `0e4330a15d3a369679f43d3d333fb91b1f29004b`
+- Remote HEAD after this checkpoint: **the commit containing this file; verify immediately after moving the branch ref**
 - Pull request: #122, draft, open, mergeable
 - PR base branch: `agent/complete-phase-d-integration`
 - PR base commit: `05bbfe40dafa2b4661aa313cf7dba25e01a5a90d`
 
 ## Current objective
 
-Repair the confirmed E6 coordinator-publication gap, extend CI so E2–E6 are actually executed, validate that completed promotion changes the authoritative assignment and leader grant used by logical routing, then independently close E6 and prepare E7.
+Repair the confirmed E6 coordinator-publication gap, validate completed promotion through the expanded Linux and Windows matrix, independently close E6, and prepare E7 without starting Phase F.
 
 ## Confirmed findings
 
-1. PR #122 is open, draft, mergeable, and has no unresolved inline review threads.
-2. The pre-handoff implementation head was `6350f34b471433ea182fbdcdc8bfd787d268a255`; GitHub Actions workflow `Phase 2 federation`, run `30458193257`, completed successfully for that commit.
-3. The interruption-safe handoff was created and pushed as `a7ceb8ec9fc9271983d58b134187af8861a8910e`; the E6 routing finding was pushed as `9844e437dbe70aad6f660efa40bceb139cf23d3f`.
-4. `docs/implementation/phase_e_progress.md` is stale at its checkpoint table and opening narrative: it still says E6 is paused pending design approval although E6.1–E6.6 are implemented.
-5. **Confirmed E6 completion defect:** `persist_promotion_finalization()` inserts `storage_promotion_finalizations` and marks the promotion transaction `finalized`; `complete_promotion_finalization()` then deletes the matching `storage_degraded_states` row. Neither method appends `STORAGE_ASSIGNMENT_CHANGED` nor `STORAGE_LEADER_GRANTED` coordinator events, and neither updates the control-plane snapshot to make `selected_provider_id` the primary with the reserved term/grant.
-6. The active logical storage path reads assignment and leader-grant authority from `StorageControlPlaneSnapshot`; therefore a completed E6 promotion can clear degraded mode while coordinator routing and write-authority validation still expose the old primary/grant.
-7. The E6 fixture starts with `provider-old` as primary, `provider-new` as replica, and an old leader grant at term 5/fencing token 9. The E6.5 and E6.6 success tests assert provider-local grant/finalization/degraded-state behavior but never assert `control.snapshot(...).groups[...]` or `leader_grants[...]` after completion. This is why the existing local suites did not catch the coordinator-publication gap.
-8. The written E6 acceptance mapping explicitly requires assignment/grant consistency and logical routing changes without recorder reconfiguration. The current implementation does not yet satisfy that requirement.
-9. **Confirmed CI coverage defect:** `.github/workflows/phase2-federation.yml` executes E0 and E1 tests only. Both Linux and Windows lists stop at `test_phase_e1_service_manifest.py`; none of `test_phase_e2_watermarks.py`, `test_phase_e3_reports.py`, `test_phase_e4_selection.py`, `test_phase_e5_degraded_state.py`, or any E6 test file is run remotely.
-10. The successful workflow run therefore proves only the configured older matrix is green; it does not validate E2–E6. Existing tests did not catch this because local checkpoint commands were run manually and the workflow was never extended alongside later checkpoints.
-11. This execution environment has no local MSH checkout, no `gh` executable, and the shell cannot resolve `github.com`. Repository reads and writes remain available through the connected GitHub application.
+1. E6.1–E6.6 are implemented, but the opening status in `phase_e_progress.md` is stale.
+2. A completed E6 promotion currently persists provider-local authority and finalization, then clears `storage-degraded`, without publishing `STORAGE_ASSIGNMENT_CHANGED` and `STORAGE_LEADER_GRANTED` into coordinator state.
+3. Logical routing and coordinator write-authority validation use `StorageControlPlaneSnapshot`; therefore the old primary/grant can remain visible after nominal completion.
+4. Existing E6.5/E6.6 tests do not assert final snapshot assignment, leader grant, fencing token, routing input, or control-event counts.
+5. The previous GitHub Actions success on implementation head `6350f34b471433ea182fbdcdc8bfd787d268a255` did not execute E2–E6 tests.
+6. `.github/workflows/phase2-federation.yml` has now been extended in this checkpoint to execute all existing E2–E6 tests on Linux and Windows.
+7. This environment has no local MSH checkout, no `gh`, and no shell DNS access to GitHub; connected GitHub operations remain available.
 
 ## Suspected issues not yet confirmed
 
-1. Publication of assignment and leader-grant events must be crash-safe and idempotent with finalization; it is not yet determined whether the safest boundary is the first finalization transaction or a recoverable publication step before degraded clear.
-2. The promoted assignment should move the former primary into replicas without duplicating the selected provider; exact behavior must remain compatible with E7 returning-former-primary recovery.
-3. The new coordinator grant needs a monotonic fencing token as well as the reserved term. E6 currently reserves only `reserved_term`; publication must allocate and persist/reconcile the token safely.
-4. It is not yet confirmed whether PR #121 has changed status; PR #122 must not be retargeted or rebased until checked.
+1. The safest publication boundary is likely a recoverable step after durable finalization and before degraded-state clear.
+2. Publication must allocate a strictly increasing coordinator fencing token while reusing the already reserved term.
+3. The former primary should become a replica exactly once so E7 can recover it.
+4. PR #121 status has not yet been rechecked; do not retarget or rebase PR #122.
 
 ## Decisions made and rationale
 
-1. E6 cannot be declared complete while coordinator assignment and grant publication are absent.
-2. CI must be extended to E2–E6 before a future green result is treated as evidence for phase completion.
-3. Record defects and test gaps before changing code.
-4. Do not patch finalization by calling public `change_assignment()` and `grant_leader()` after degraded clear; that would introduce crash windows and duplicate event risk.
-5. Use an idempotent publication step after durable finalization and before degraded-state clear unless inspection proves atomic inclusion in finalization is simpler and migration-safe. Recovery must reconcile a committed publication before clearing degraded state.
-6. Add tests that fail on the current implementation by asserting final snapshot assignment/grant, old-grant replacement, monotonic term/token, restart replay, duplicate recovery, and event counts.
-7. Keep PR #122 draft and do not begin E7 or Phase F.
-8. Because local validation is unavailable, make small coherent repository edits through the GitHub app and use the expanded branch workflow for execution, recording exact remote outcomes.
+1. Do not declare E6 complete until coordinator assignment/grant publication is durable and tested.
+2. Expand CI before relying on another green result.
+3. Do not call public `change_assignment()` and `grant_leader()` after degraded clear; that creates unsafe partial windows.
+4. Implement publication as one SQLite transaction with revision checking and idempotent snapshot reconciliation.
+5. Keep PR #122 draft. Do not implement E7 or Phase F during the E6 repair.
 
 ## Files inspected
 
@@ -55,62 +48,48 @@ Repair the confirmed E6 coordinator-publication gap, extend CI so E2–E6 are ac
 - `docs/implementation/phase_e_progress.md`
 - `docs/implementation/phase_e6_promotion_transaction_design.md`
 - `docs/implementation/current_task_handoff.md`
+- `catalog/federation/phase_d_control.py`
+- `catalog/federation/storage_control_plane.py`
 - `catalog/federation/promotion_transaction.py`
 - `catalog/federation/promotion_finalization.py`
 - `catalog/federation/promotion_recovery.py`
 - `catalog/federation/provider_fencing.py`
-- `catalog/federation/storage_control_plane.py`
-- `catalog/federation/phase_d_control.py`
-- `catalog/federation/tests/test_phase_e5_degraded_state.py`
-- `catalog/federation/tests/test_phase_e63_provider_fencing.py`
-- `catalog/federation/tests/test_phase_e65_finalization.py`
-- `catalog/federation/tests/test_phase_e66_recovery.py`
-- PR #122 metadata, changed-file list, workflow state, and review threads
+- E5 and E6 test files
 
 ## Files changed
 
-- `docs/implementation/current_task_handoff.md` — created and updated with the E6 coordinator-publication defect and missing CI coverage.
+- `.github/workflows/phase2-federation.yml` — added E2, E3, E4, E5, E6.1/2, E6.3, E6.4, E6.5, and E6.6 tests to Linux and Windows.
+- `docs/implementation/current_task_handoff.md` — recorded this validation milestone and resume state.
 
 ## Exact commands run
 
-Shell commands:
+Shell:
 
 ```text
 pwd && ls -la && find / -maxdepth 4 -type d -name .git 2>/dev/null | head -50
 ```
 
-Result: no MSH checkout found; only unrelated `.git` directories under `/opt`.
+Result: no MSH checkout.
 
 ```text
 gh --version && gh auth status
 ```
 
-Result: failed with `gh: command not found`.
+Result: `gh: command not found`.
 
 ```text
 mkdir -p /mnt/data/work && cd /mnt/data/work && git clone --branch agent/phase-e-completeness-aware-failover --single-branch https://github.com/Nettking/msh.git msh
 ```
 
-Result: failed with `Could not resolve host: github.com`.
+Result: `Could not resolve host: github.com`.
 
-Connected GitHub operations performed:
-
-```text
-fetch PR #122
-get PR #122 metadata
-fetch workflow runs for commit 6350f34b471433ea182fbdcdc8bfd787d268a255
-list PR #122 review threads
-list PR #122 changed filenames
-fetch focused files and line ranges listed under Files inspected
-create and update docs/implementation/current_task_handoff.md
-verify remote heads a7ceb8ec9fc9271983d58b134187af8861a8910e and 9844e437dbe70aad6f660efa40bceb139cf23d3f
-```
+Connected GitHub operations include PR/commit/workflow inspection, focused file reads, handoff commits, and this atomic workflow-plus-handoff checkpoint.
 
 ## Exact test results
 
-No local tests were run because no local checkout is available and the shell cannot access GitHub.
+No local tests could be run in this environment.
 
-Verified remote result before the handoff-only commits:
+Previously verified remote result:
 
 ```text
 Workflow: Phase 2 federation
@@ -120,58 +99,48 @@ Status: completed
 Conclusion: success
 ```
 
-This result is now known not to include E2–E6 tests.
+That run did not include E2–E6.
 
-Previously recorded E6.6 local validation, not independently rerun here:
+Previously recorded local E6.6 results, not independently rerun here:
 
 ```text
 93 focused E6 tests passed
 148 E0–E6.6 tests passed
 64 Phase 0/1 tests passed
 43 relevant Phase 2/replication/storage tests passed
-Python compilation passed
-Ruff passed
-Diff hygiene passed
+Compilation, Ruff, and diff hygiene passed
 ```
 
-Important coverage gaps:
-
-- E6 local tests did not assert coordinator snapshot assignment or leader grant after completion.
-- GitHub Actions did not execute any E2–E6 test file.
+Validation for this checkpoint: workflow YAML was reviewed structurally; GitHub Actions result is pending after push.
 
 ## Known failures
 
-1. E6 completed promotion does not yet publish the new primary assignment and coordinator leader grant.
-2. Remote CI does not currently execute E2–E6 tests.
-3. `gh` is unavailable in the shell.
-4. Shell network resolution for `github.com` fails.
-5. A local checkout and local HEAD cannot currently be established.
-6. `docs/implementation/phase_e_progress.md` has a stale E6 status table and narrative.
+1. Coordinator assignment/grant publication after E6 promotion is still missing.
+2. No local test execution is possible in this environment.
+3. `phase_e_progress.md` opening E6 status is stale.
 
 ## Uncommitted changes
 
 - None in a local worktree; no local worktree exists.
-- This finding record is being committed directly through the GitHub app.
+- The workflow and handoff are committed together through the GitHub object API.
 
 ## Unfinished edits or partially implemented logic
 
-- No code fix has begun.
-- Atomic/replay-safe coordinator publication is not yet implemented.
-- Regression tests for routing publication have not yet been added.
-- CI workflow has not yet been extended.
-- E6 documentation/status correction is pending.
+- Coordinator publication repair has not begun.
+- Publication regression tests have not been added.
+- E6 progress/design documentation is not yet corrected.
 - E7 preparation has not begun.
 
 ## Next exact action
 
-1. Verify the remote branch head after this finding checkpoint.
-2. Extend the Linux and Windows workflow matrices to execute E2–E6 tests; commit and push that validation-only unit.
-3. Implement a recoverable coordinator-publication step after durable finalization and before degraded clear, with monotonic fencing-token allocation and exact snapshot reconciliation.
-4. Add a new focused E6 publication test file and include it in CI.
-5. Trigger remote validation, inspect exact failures, and iterate in small pushed checkpoints.
+1. Verify the new remote head and inspect the expanded workflow run.
+2. Add a focused E6 coordinator-publication test file.
+3. Implement idempotent atomic publication in the recovery path before degraded clear.
+4. Push implementation, tests, and handoff together.
+5. Inspect Linux and Windows results before declaring E6 complete.
 
 ## Resume safety
 
 - Safe to resume: **yes**.
-- Branch expected state: **green under the old matrix but functionally incomplete for E6 acceptance**. This commit changes documentation only.
+- Expected branch state: **CI pending; functionally incomplete for E6 until coordinator publication is repaired**.
 - PR must remain draft.
