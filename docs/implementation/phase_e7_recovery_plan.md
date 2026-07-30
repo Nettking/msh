@@ -1,6 +1,6 @@
 # Phase E7 returning former-primary recovery plan
 
-Status: **prepared; implementation not started**
+Status: **implemented; pending final CI and merge validation**
 
 Date: 2026-07-30
 
@@ -257,3 +257,16 @@ Begin with **E7.0 + E7.1 only**:
 ## Completion gate
 
 E7 is complete only when all checkpoints are green, the authoritative progress document is updated, E8 diagnostics expose the recovery state and eligibility reasons, and the end-to-end matrix proves that a fenced former primary returns as an exact synchronized replica without regaining obsolete authority.
+
+
+## Implementation completion
+
+E7.2-E7.6 are implemented by `former_primary_repair.py` and
+`former_primary_completion.py`. The implementation reuses the existing
+`storage-replication` relay path, verifies source and target immutable identity,
+reconciles lost responses, persists retry/conflict/completion evidence, requires a
+new authenticated synchronized report, and exposes E8 operator diagnostics.
+
+The checkpoint is accepted only after Linux and Windows CI are green and the
+completion PR is merged to `main`. Phase F direct transport and Phase G scheduling
+remain excluded.
