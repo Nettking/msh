@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, Literal
 
 from .errors import FederationValidationError
 from .promotion_finalization import PromotionFinalizationRecord
+from .promotion_publication import publish_storage_promotion
 from .promotion_transaction import PromotionTransactionRecord
 from .provider_fencing import ProviderFenceStore
 
@@ -22,7 +23,12 @@ _LOCKS_GUARD = threading.Lock()
 _RECOVERY_LOCKS: dict[tuple[str, str, str, str], threading.Lock] = {}
 
 
-def _recovery_lock(database: str, session_id: str, group_id: str, promotion_id: str) -> threading.Lock:
+def _recovery_lock(
+    database: str,
+    session_id: str,
+    group_id: str,
+    promotion_id: str,
+) -> threading.Lock:
     key = (str(Path(database).resolve()), session_id, group_id, promotion_id)
     with _LOCKS_GUARD:
         return _RECOVERY_LOCKS.setdefault(key, threading.Lock())
@@ -74,7 +80,9 @@ def _validate_stage_shape(record: PromotionTransactionRecord) -> None:
             "state",
             f"{record.state} contradicts its durable evidence",
         )
-    if record.state == "failed" and (record.failure_code is None or record.failure_reason is None):
+    if record.state == "failed" and (
+        record.failure_code is None or record.failure_reason is None
+    ):
         raise FederationValidationError(
             "corrupt-failed-promotion",
             "failure_code",
@@ -128,7 +136,11 @@ def recover_storage_promotion(
     with lock:
         for _ in range(10):
             try:
-                record = control.promotion_transaction(session_id, group_id, promotion_id)
+                record = control.promotion_transaction(
+                    session_id,
+                    group_id,
+                    promotion_id,
+                )
                 if record is None:
                     return _result(
                         status="operator-attention",
@@ -151,28 +163,42 @@ def recover_storage_promotion(
                 control.revalidate_promotion_bindings(record)
 
                 if record.state == "validated":
-                    command = control.promotion_fencing_command(session_id, group_id, promotion_id)
+                    command = control.promotion_fencing_command(
+                        session_id,
+                        group_id,
+                        promotion_id,
+                    )
                     evidence = provider_fence_store.acknowledgement(group_id)
                     if evidence is None:
                         if not fencing_delivery_available:
-                            retryable = control.record_promotion_fencing_delivery_failure(
-                                session_id,
-                                group_id,
-                                promotion_id,
-                                reason="previous provider unavailable; fencing delivery remains retryable",
-                                now=now,
+                            retryable = (
+                                control.record_promotion_fencing_delivery_failure(
+                                    session_id,
+                                    group_id,
+                                    promotion_id,
+                                    reason=(
+                                        "previous provider unavailable; fencing "
+                                        "delivery remains retryable"
+                                    ),
+                                    now=now,
+                                )
                             )
                             return _result(
                                 status="retryable",
                                 stage="validated",
                                 code="fencing-delivery-unavailable",
-                                reason=retryable.failure_reason or "fencing delivery unavailable",
+                                reason=(
+                                    retryable.failure_reason
+                                    or "fencing delivery unavailable"
+                                ),
                                 actions=actions,
                                 transaction=retryable,
                             )
                         evidence = provider_fence_store.apply(command, now=now)
                         actions.append("persisted-provider-fence")
-                    previous = control.snapshot(session_id).providers.get(record.previous_provider_id or "")
+                    previous = control.snapshot(session_id).providers.get(
+                        record.previous_provider_id or ""
+                    )
                     if previous is None:
                         raise FederationValidationError(
                             "previous-provider-missing",
@@ -205,21 +231,32 @@ def recover_storage_promotion(
                         promotion_id,
                         provider_fence_store=provider_fence_store,
                     )
-                    evidence = selected_provider_store.grant_acknowledgement(group_id, promotion_id)
+                    evidence = selected_provider_store.grant_acknowledgement(
+                        group_id,
+                        promotion_id,
+                    )
                     if evidence is None:
                         if not grant_delivery_available:
-                            retryable = control.record_promotion_grant_delivery_failure(
-                                session_id,
-                                group_id,
-                                promotion_id,
-                                reason="selected provider unavailable; grant delivery remains retryable",
-                                now=now,
+                            retryable = (
+                                control.record_promotion_grant_delivery_failure(
+                                    session_id,
+                                    group_id,
+                                    promotion_id,
+                                    reason=(
+                                        "selected provider unavailable; grant "
+                                        "delivery remains retryable"
+                                    ),
+                                    now=now,
+                                )
                             )
                             return _result(
                                 status="retryable",
                                 stage="allocated-term",
                                 code="grant-delivery-unavailable",
-                                reason=retryable.failure_reason or "grant delivery unavailable",
+                                reason=(
+                                    retryable.failure_reason
+                                    or "grant delivery unavailable"
+                                ),
                                 actions=actions,
                                 transaction=retryable,
                             )
@@ -227,14 +264,18 @@ def recover_storage_promotion(
                             command,
                             expected_promotion_id=record.promotion_id,
                             expected_group_id=record.group_id,
-                            expected_manifest_revision=record.selected_manifest_revision,
+                            expected_manifest_revision=(
+                                record.selected_manifest_revision
+                            ),
                             expected_manifest_hash=record.selected_manifest_hash,
                             expected_report_revision=record.selected_report_revision,
                             expected_report_hash=record.selected_report_hash,
                             now=now,
                         )
                         actions.append("persisted-provider-grant")
-                    selected = control.snapshot(session_id).providers.get(record.selected_provider_id)
+                    selected = control.snapshot(session_id).providers.get(
+                        record.selected_provider_id
+                    )
                     if selected is None:
                         raise FederationValidationError(
                             "selected-provider-missing",
@@ -268,6 +309,15 @@ def recover_storage_promotion(
                         group_id,
                         promotion_id,
                     )
+                    _publication, published = publish_storage_promotion(
+                        control,
+                        session_id,
+                        group_id,
+                        promotion_id,
+                        now=now,
+                    )
+                    if published:
+                        actions.append("published-coordinator-authority")
                     finalization = control.complete_promotion_finalization(
                         session_id,
                         group_id,
@@ -291,15 +341,26 @@ def recover_storage_promotion(
                         status="completed",
                         stage="finalized",
                         code="promotion-finalized",
-                        reason="durable promotion finalization is complete",
+                        reason=(
+                            "durable promotion finalization and coordinator "
+                            "publication are complete"
+                        ),
                         actions=actions,
-                        transaction=control.promotion_transaction(session_id, group_id, promotion_id),
+                        transaction=control.promotion_transaction(
+                            session_id,
+                            group_id,
+                            promotion_id,
+                        ),
                         finalization=finalization,
                     )
             except FederationValidationError as exc:
                 transaction = None
                 try:
-                    transaction = control.promotion_transaction(session_id, group_id, promotion_id)
+                    transaction = control.promotion_transaction(
+                        session_id,
+                        group_id,
+                        promotion_id,
+                    )
                 except FederationValidationError:
                     pass
                 return _result(
@@ -314,7 +375,13 @@ def recover_storage_promotion(
             status="operator-attention",
             stage="recovery-loop",
             code="promotion-recovery-did-not-converge",
-            reason="promotion recovery exceeded the bounded durable stage count",
+            reason=(
+                "promotion recovery exceeded the bounded durable stage count"
+            ),
             actions=actions,
-            transaction=control.promotion_transaction(session_id, group_id, promotion_id),
+            transaction=control.promotion_transaction(
+                session_id,
+                group_id,
+                promotion_id,
+            ),
         )
