@@ -1,0 +1,101 @@
+name: Apply Phase E lint cleanup
+
+on:
+  push:
+    branches: [agent/complete-phase-e-recovery]
+    paths:
+      - ".phase-e-lint-fix.py"
+      - ".github/workflows/phase-e-lint-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply fixed reviewed replacements
+        shell: python
+        run: |
+          from pathlib import Path
+
+          completion = Path("catalog/federation/former_primary_completion.py")
+          text = completion.read_text(encoding="utf-8")
+          old = "from pathlib import Path\nfrom typing import Any, Callable\n"
+          new = "from pathlib import Path\nfrom collections.abc import Callable\nfrom typing import Any\n"
+          if text.count(old) != 1:
+              raise SystemExit("completion import block mismatch")
+          completion.write_text(text.replace(old, new), encoding="utf-8")
+
+          repair = Path("catalog/federation/former_primary_repair.py")
+          text = repair.read_text(encoding="utf-8")
+          old_import = "from pathlib import Path\nfrom typing import Any, Callable\n"
+          new_import = "from pathlib import Path\nfrom collections.abc import Callable\nfrom typing import ClassVar\n"
+          old_codes = '''    _FATAL_CODES = {
+                  "repair-source-identity-mismatch",
+                  "repair-source-item-missing",
+                  "repair-source-hash-mismatch",
+                  "repair-target-identity-conflict",
+                  "repair-target-evidence-missing",
+                  "repair-response-identity-mismatch",
+                  "response-request-mismatch",
+                  "idempotency-conflict",
+                  "content-hash-mismatch",
+                  "unauthorized",
+                  "not-primary",
+                  "stale-term",
+                  "stale-fencing-token",
+                  "lease-expired",
+                  "unknown-grant",
+                  "repair-item-unsupported",
+              }
+          '''
+          new_codes = '''    _FATAL_CODES: ClassVar[frozenset[str]] = frozenset(
+                  {
+                      "repair-source-identity-mismatch",
+                      "repair-source-item-missing",
+                      "repair-source-hash-mismatch",
+                      "repair-target-identity-conflict",
+                      "repair-target-evidence-missing",
+                      "repair-response-identity-mismatch",
+                      "response-request-mismatch",
+                      "idempotency-conflict",
+                      "content-hash-mismatch",
+                      "unauthorized",
+                      "not-primary",
+                      "stale-term",
+                      "stale-fencing-token",
+                      "lease-expired",
+                      "unknown-grant",
+                      "repair-item-unsupported",
+                  }
+              )
+          '''
+          if text.count(old_import) != 1:
+              raise SystemExit("repair import block mismatch")
+          if text.count(old_codes) != 1:
+              raise SystemExit("fatal-code block mismatch")
+          repair.write_text(
+              text.replace(old_import, new_import).replace(old_codes, new_codes),
+              encoding="utf-8",
+          )
+
+          test_path = Path("catalog/federation/tests/test_phase_e78_former_primary_completion.py")
+          text = test_path.read_text(encoding="utf-8")
+          old_line = "    selected_control = control or runtime.control\n"
+          if text.count(old_line) != 1:
+              raise SystemExit("unused test variable mismatch")
+          test_path.write_text(text.replace(old_line, ""), encoding="utf-8")
+      - name: Commit reviewed cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .phase-e-lint-fix.py
+          git add catalog/federation/former_primary_completion.py catalog/federation/former_primary_repair.py catalog/federation/tests/test_phase_e78_former_primary_completion.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Clean Phase E recovery lint"
+          git push origin HEAD:agent/complete-phase-e-recovery
