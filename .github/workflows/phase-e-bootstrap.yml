@@ -7,6 +7,13 @@ on:
     paths:
       - ".phase-e-bootstrap/**"
       - ".github/workflows/phase-e-bootstrap.yml"
+  pull_request:
+    branches:
+      - main
+    types: [opened, reopened, synchronize]
+    paths:
+      - ".phase-e-bootstrap/**"
+      - ".github/workflows/phase-e-bootstrap.yml"
 
 permissions:
   contents: write
@@ -22,6 +29,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify and extract payload
         shell: bash
         run: |
