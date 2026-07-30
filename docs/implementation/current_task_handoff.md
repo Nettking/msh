@@ -1,144 +1,145 @@
 # Current task handoff
 
-Last updated: 2026-07-31 00:39 Europe/Oslo
+Last updated: 2026-07-31 00:52 Europe/Oslo
 
 ## Repository and branch
 
 - Repository: `Nettking/msh`
 - Branch: `agent/phase-e-completeness-aware-failover`
 - Local HEAD: **not established in this execution environment**; no local checkout is available.
-- Remote HEAD before this handoff checkpoint: `e1fc20066af91b12f7bfea0f05cb3ab18c6ff9d9`
-- Remote HEAD after this handoff checkpoint: **verify immediately after commit**
-- Pull request: #122, draft, open, mergeable before validation
+- Remote HEAD before this finding checkpoint: `9c7bea0c00b505ee84a5daccc9637eee8b75c08f`
+- Remote HEAD after this checkpoint: **verify immediately after commit**
+- Pull request: #122, draft, open, mergeable
 - PR base branch: `agent/complete-phase-d-integration`
 - PR base commit: `05bbfe40dafa2b4661aa313cf7dba25e01a5a90d`
 - Phase D PR: #121, draft, open, mergeable, base `main`
 
 ## Current objective
 
-Validate E7.0/E7.1 contracts, deterministic planning, two-table durable ledger, restart/duplicate replay, and negative cases on Linux and Windows. Begin E7.2 only if this checkpoint is green. Finish E7/E8 and then merge/clean PR #121 and #122. Phase G remains a separate later update; Phase F is excluded.
+Fix the single confirmed E7.0/E7.1 lint defect, rerun Linux and Windows validation, and mark E7.0/E7.1 complete only when the full matrix is green. Then implement E7.2-E7.6, E8, Phase E closure, and dependency-ordered PR cleanup. Phase G remains separate and Phase F is excluded.
 
 ## Confirmed findings
 
 1. E6 is independently complete and green.
-2. The original over-broad E7 WIP was recorded and corrected before tests.
-3. Commit `2d987a22ab392130972e3e752de2b892eff9c902` implements E7.0/E7.1 only, with no transfer logic.
-4. Commit `79d110468f20159ea1d8e32493779a90757a265e` adds eight focused E7.0/E7.1 tests.
-5. Commit `971ed463516d2809b4671e60683adb7b9e0a221c` exports the E7 recovery contracts, store, plan, and planner.
-6. Commit `e1fc20066af91b12f7bfea0f05cb3ab18c6ff9d9` adds the E7.0/E7.1 test file to Linux and Windows CI.
-7. Tests cover deterministic missing-item planning, exact present identities, restart/duplicate replay, missing fence, changed assignment/authority, manifest change, immutable conflict, unknown extra hash, and per-group persistence isolation.
-8. The planner binds E6 finalization/publication, current assignment/grant, authoritative manifest, latest authenticated report, provider registrations, and exact provider-local fence evidence.
-9. The store persists one recovery row and one immutable ledger row per authoritative manifest item atomically.
-10. No relay transfer or final report completion path exists in this checkpoint.
-11. Module and test sources pass Python syntax compilation in the temporary analysis environment.
-12. No pytest/Ruff/CI result has yet been observed for the current checkpoint.
-13. This environment has no local checkout, no `gh`, no local Ruff, and no shell DNS access to GitHub.
+2. E7.0/E7.1 is implemented with deterministic planning and a two-table SQLite recovery/item ledger; no transfer logic is present.
+3. Eight focused E7.0/E7.1 tests and Linux/Windows workflow coverage are committed.
+4. GitHub Actions run `30584898607` executed on head `9c7bea0c00b505ee84a5daccc9637eee8b75c08f`.
+5. Linux compilation passed.
+6. Linux Phase 0/1 regressions passed: **64 passed in 0.90s**.
+7. Linux expanded Phase D/E storage suite, including all eight E7.0/E7.1 tests, passed: **225 passed in 9.38s**.
+8. Linux Phase 2 unit/integration passed: **85 passed in 9.79s**.
+9. Linux failed only at Ruff with one fixable `UP037` finding in `catalog/federation/former_primary_recovery.py:283`: the return annotation `"FormerPrimaryRecoveryItem"` must be unquoted because postponed annotations are already enabled.
+10. Compose validation and diff hygiene were skipped only because Ruff stopped the Linux job.
+11. Windows was still running its expanded test step when this finding was recorded; a newer commit may cancel and replace that run.
+12. Existing tests did not catch the issue because it is a lint-only style rule; compile and pytest correctly accepted the annotation.
+13. No runtime, persistence, authority, fence, manifest, or E7 planning failure was observed.
+14. This environment has no local checkout, no `gh`, no local Ruff, and no shell DNS access to GitHub.
 
 ## Suspected issues not yet confirmed
 
-1. Runtime tests may reveal report replacement, fixture timing, grant lease, SQLite, enum, import, or assertion defects.
-2. Ruff may identify style defects not caught by syntax compilation.
-3. Windows may expose SQLite/file semantics not seen on Linux.
-4. E7.2-E7.6 and E8 remain unimplemented.
-5. PR cleanup remains blocked until Phase E is complete and green.
+1. Windows E7.0/E7.1 result remains pending/replaced by the next run.
+2. The one-line Ruff correction is expected to be behavior-neutral but requires a full rerun.
+3. E7.2-E7.6 and E8 remain unimplemented.
+4. PR cleanup remains blocked until Phase E is complete.
 
 ## Decisions made and rationale
 
-1. Treat the current head as a coherent but unverified E7.0/E7.1 checkpoint.
-2. Do not begin transfer logic until Linux and Windows are green.
-3. Record exact CI failures here before fixing any defect.
-4. Preserve the durable fence and immutable conflict fail-closed behavior.
-5. Keep PR #122 draft and stacked.
-6. Merge #121 first with history preserved after Phase E completion, then retarget/revalidate/merge #122.
-7. Do not implement Phase F or start Phase G.
+1. Record the exact Ruff defect and why tests did not catch it before editing.
+2. Apply only the one-line annotation correction; do not change behavior in this fix.
+3. Rerun the full workflow rather than treating prior green tests as sufficient.
+4. Do not begin transfer logic until Linux and Windows are fully green.
+5. Preserve former-primary fencing and immutable conflict fail-closed behavior.
+6. Keep PR #122 draft and stacked.
+7. Merge #121 first with history preserved after Phase E completion, then retarget/revalidate/merge #122.
+8. Do not implement Phase F or start Phase G.
 
 ## Files inspected
 
+- `catalog/federation/former_primary_recovery.py`
+- `catalog/federation/tests/test_phase_e71_former_primary_recovery.py`
+- `.github/workflows/phase2-federation.yml`
+- GitHub Actions run `30584898607` jobs and Linux logs
 - `docs/implementation/current_task_handoff.md`
-- `docs/implementation/phase_e7_recovery_plan.md`
+
+## Files changed
+
+Current implementation checkpoint:
+
 - `catalog/federation/former_primary_recovery.py`
 - `catalog/federation/tests/test_phase_e71_former_primary_recovery.py`
 - `catalog/federation/__init__.py`
 - `.github/workflows/phase2-federation.yml`
-- E6 promotion/publication/recovery fixtures and runtime paths
 
-## Files changed
+This finding checkpoint changes:
 
-Current E7.0/E7.1 checkpoint:
-
-- `catalog/federation/former_primary_recovery.py` — E7 contracts, deterministic planner, plan validation, two-table durable recovery/item ledger.
-- `catalog/federation/tests/test_phase_e71_former_primary_recovery.py` — eight focused acceptance tests.
-- `catalog/federation/__init__.py` — public E7 API exports.
-- `.github/workflows/phase2-federation.yml` — Linux and Windows E7.0/E7.1 execution.
-- `docs/implementation/current_task_handoff.md` — exact checkpoint and validation state.
+- `docs/implementation/current_task_handoff.md` — exact Ruff failure, passing test counts, cause, and next action.
 
 ## Exact commands run
 
-Static validation:
+GitHub Actions run `30584898607` executed:
 
 ```text
-compile(e71_module_source, "former_primary_recovery.py", "exec")
-compile(e71_test_source, "test_phase_e71_former_primary_recovery.py", "exec")
+python -m compileall catalog setup_msh.py
+python -m pytest -o addopts= -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py
+python -m pytest -o addopts= -q <Phase D/E matrix including test_phase_e71_former_primary_recovery.py>
+python -m pytest -o addopts= -q catalog/federation/tests/test_phase2_unit.py catalog/node/tests catalog/relay/tests
+python -m ruff check catalog/federation catalog/node catalog/relay --ignore I001,RUF022,B008,C408,PLC0206
 ```
 
-Result: both passed.
-
-Connected GitHub operations:
+Connected inspection:
 
 ```text
-replace former_primary_recovery.py with E7.0/E7.1-only implementation
-create test_phase_e71_former_primary_recovery.py
-update catalog/federation/__init__.py exports
-update phase2-federation.yml Linux and Windows test lists
-update current_task_handoff.md
+fetch workflow run 30584898607 jobs
+fetch Linux job 91013909363 logs
+find exact pytest counts and Ruff error
+update current task handoff before fixing
 ```
 
 ## Exact test results
 
-Current checkpoint: **pending remote validation**.
-
-Latest validated pre-E7 runtime:
-
 ```text
-Workflow: Phase 2 federation
-Run: 30581905829
-Commit: 672245313d4411d078ed4dc5150dba8415cc01e5
-Linux: success — 64 Phase 0/1, 217 Phase D/E, 85 Phase 2; Ruff, Compose, diff hygiene passed
-Windows: success
+Compile: passed
+Phase 0/1: 64 passed in 0.90s
+Phase D/E including E7.0/E7.1: 225 passed in 9.38s
+Phase 2 unit/integration: 85 passed in 9.79s
+Ruff: failed with one UP037 at former_primary_recovery.py:283
+Compose: skipped after Ruff failure
+Diff hygiene: skipped after Ruff failure
+Windows: still running/replaced by newer checkpoint
 ```
 
 ## Known failures
 
-1. No confirmed E7.0/E7.1 test failure yet; validation has not been inspected.
-2. Current branch is unverified until Actions completes.
-3. E7.2-E7.6 and E8 are unimplemented.
-4. Phase E progress/PR closure metadata remain incomplete.
-5. PR cleanup/merge has not begun.
+1. `UP037` in `former_primary_recovery.py:283`: remove quotes from `FormerPrimaryRecoveryItem` return annotation.
+2. Current workflow conclusion is failure because Ruff failed.
+3. Full Windows result is not yet final.
+4. E7.2-E7.6 and E8 are unimplemented.
+5. Phase E progress/PR closure and PR cleanup remain incomplete.
 6. Local full testing is unavailable.
 
 ## Uncommitted changes
 
 - No local MSH worktree exists.
-- No meaningful E7.0/E7.1 source/test edit remains only in the temporary workspace.
-- No implementation edit is pending outside GitHub for this checkpoint.
+- The exact one-line annotation fix is not yet committed.
+- No other code change is planned for this repair.
 
 ## Unfinished edits or partially implemented logic
 
-- Remote E7.0/E7.1 validation is pending.
-- E7.2 relay-first transfer, E7.3 conflict/corruption progression, E7.4 final report, E7.5 concurrency/restart, E7.6 end-to-end acceptance remain.
-- E8 diagnostics and final acceptance remain.
+- Apply the one-line Ruff fix and rerun full CI.
+- E7.0/E7.1 completion status remains pending green validation.
+- E7.2-E7.6 and E8 remain.
 - Phase E closure and PR cleanup remain.
 - Phase G is intentionally not started.
 
 ## Next exact action
 
-1. Verify remote head after this handoff commit.
-2. Fetch the Actions run for the resulting head.
-3. Inspect exact Linux/Windows steps and logs.
-4. Record any defect before fixing it; if green, mark E7.0/E7.1 complete and begin E7.2.
+1. Verify remote head after this finding checkpoint.
+2. Change `) -> "FormerPrimaryRecoveryItem":` to `) -> FormerPrimaryRecoveryItem:`.
+3. Update handoff with the implementation commit.
+4. Inspect the replacement Linux/Windows workflow to full completion.
 
 ## Resume safety
 
 - Safe to resume: **yes**.
-- Expected branch state: **temporarily unverified**.
+- Expected branch state: **temporarily failing only Ruff UP037**.
 - PR #122 must remain draft.
