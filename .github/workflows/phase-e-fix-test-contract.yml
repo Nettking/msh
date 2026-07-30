@@ -1,0 +1,61 @@
+name: Correct Phase E forged-response test
+
+on:
+  push:
+    branches:
+      - agent/complete-phase-e-recovery
+    paths:
+      - ".github/workflows/phase-e-fix-test-contract.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  correct:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.sha }}
+      - name: Correct outdated BatchIngestResult construction
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path("catalog/federation/tests/test_phase_e72_former_primary_transfer.py")
+          text = path.read_text(encoding="utf-8")
+          old_import = "from catalog.federation.storage_protocol import BatchIngestResult, StorageResponseEnvelope"
+          new_import = "from catalog.federation.storage_protocol import (\n    BatchIngestResult,\n    BatchIngestState,\n    StorageResponseEnvelope,\n)"
+          old_result = '''            result=BatchIngestResult(
+              batch_id="other-batch",
+              idempotency_key="other-idempotency",
+              content_hash="sha256:" + "f" * 64,
+              persisted=True,
+              duplicate=False,
+          ).to_dict(),
+          '''
+          new_result = '''            result=BatchIngestResult(
+              batch_id="other-batch",
+              idempotency_key="other-idempotency",
+              content_hash="sha256:" + "f" * 64,
+              state=BatchIngestState.STORED,
+          ).to_dict(),
+          '''
+          if text.count(old_import) != 1:
+              raise SystemExit("storage protocol import was not found exactly once")
+          if text.count(old_result) != 1:
+              raise SystemExit("outdated forged result block was not found exactly once")
+          text = text.replace(old_import, new_import, 1)
+          text = text.replace(old_result, new_result, 1)
+          path.write_text(text, encoding="utf-8")
+      - name: Commit correction and remove helper workflow
+        shell: bash
+        run: |
+          set -euo pipefail
+          git rm .github/workflows/phase-e-fix-test-contract.yml
+          git add catalog/federation/tests/test_phase_e72_former_primary_transfer.py
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Fix Phase E forged response test contract"
+          git push origin HEAD:agent/complete-phase-e-recovery
