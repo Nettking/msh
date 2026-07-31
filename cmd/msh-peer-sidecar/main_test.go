@@ -6,8 +6,20 @@ import (
 	"testing"
 	"time"
 
+	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
+	ma "github.com/multiformats/go-multiaddr"
 )
+
+func directAddress(t *testing.T, h host.Host) string {
+	t.Helper()
+	addresses := h.Addrs()
+	if len(addresses) == 0 {
+		t.Fatal("host did not expose a direct listen address")
+	}
+	peerSuffix := ma.StringCast("/p2p/" + h.ID().String())
+	return addresses[0].Encapsulate(peerSuffix).String()
+}
 
 func TestDirectEncryptedStreamBetweenReachablePeers(t *testing.T) {
 	t.Parallel()
@@ -39,16 +51,12 @@ func TestDirectEncryptedStreamBetweenReachablePeers(t *testing.T) {
 		})
 	})
 
-	ready := newSidecar(hostB, nil).readyEvent()
-	if len(ready.ListenAddrs) == 0 {
-		t.Fatal("host B did not expose a direct listen address")
-	}
 	payload := json.RawMessage(`{"ciphertext":"opaque"}`)
 	response, err := sendRequest(
 		ctx,
 		hostA,
 		hostB.ID().String(),
-		ready.ListenAddrs[0],
+		directAddress(t, hostB),
 		"test-correlation",
 		payload,
 	)
@@ -77,13 +85,12 @@ func TestTargetPeerIdentityMustMatchMultiaddr(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer hostB.Close()
-	ready := newSidecar(hostB, nil).readyEvent()
 
 	_, err = sendRequest(
 		ctx,
 		hostA,
 		hostA.ID().String(),
-		ready.ListenAddrs[0],
+		directAddress(t, hostB),
 		"identity-mismatch",
 		json.RawMessage(`{}`),
 	)
