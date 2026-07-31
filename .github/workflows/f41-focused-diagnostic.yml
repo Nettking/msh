@@ -1,0 +1,83 @@
+name: Focused F4.1 diagnostic
+
+on:
+  push:
+    branches:
+      - agent/phase-f41-live-former-primary-catchup
+    paths:
+      - ".github/workflows/f41-focused-diagnostic.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/phase-f41-live-former-primary-catchup
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install focused dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest
+      - name: Patch progress semantics and run focused acceptance
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('catalog/federation/live_catchup.py')
+          text = path.read_text()
+          if 'from collections import Counter\n' not in text:
+              text = text.replace(
+                  'import sqlite3\nimport uuid\n',
+                  'import sqlite3\nimport uuid\nfrom collections import Counter\n',
+                  1,
+              )
+          old = '''                record = self.catchup_store.save(\n                    replace(record, updated_at=self.clock())\n                )\n                try:\n'''
+          new = '''                record = self.catchup_store.save(\n                    replace(record, updated_at=self.clock())\n                )\n                current = self._item(record, current.item_id)\n                try:\n'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          old = '''            or set(report.committed_item_hashes)\n            != {item.content_hash for item in verifying.items}\n'''
+          new = '''            or Counter(report.committed_item_hashes)\n            != Counter(item.content_hash for item in verifying.items)\n'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          old = '''                        StorageErrorCode.STALE_FENCING_TOKEN.value,\n                    }\n'''
+          new = '''                        StorageErrorCode.STALE_FENCING_TOKEN.value,\n                        StorageErrorCode.INVALID_REQUEST.value,\n                    }\n'''
+          if old in text:
+              text = text.replace(old, new, 1)
+          path.write_text(text)
+
+          agent = Path('catalog/node/live_storage_agent.py')
+          text = agent.read_text().replace(
+              '        self.storage.service.recovery_authority_node_id = (control_authority_node_id)\n',
+              '        self.storage.service.recovery_authority_node_id = control_authority_node_id\n',
+              1,
+          )
+          agent.write_text(text)
+
+          workflow = Path('.github/workflows/phase2-federation.yml')
+          text = workflow.read_text()
+          anchor = '          catalog/node/tests/test_live_storage_failover.py\n'
+          addition = anchor + '          catalog/node/tests/test_live_storage_catchup.py\n'
+          if addition not in text:
+              text = text.replace(anchor, addition, 1)
+          workflow.write_text(text)
+          PY
+          set +e
+          python -m pytest -o addopts= -q catalog/node/tests/test_live_storage_catchup.py > f41-focused-result.txt 2>&1
+          status=$?
+          echo "exit_status=${status}" >> f41-focused-result.txt
+          cat f41-focused-result.txt
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/federation/live_catchup.py catalog/node/live_storage_agent.py .github/workflows/phase2-federation.yml f41-focused-result.txt
+          git commit -m "Run focused F4.1 resume verification"
+          git push origin HEAD:agent/phase-f41-live-former-primary-catchup
