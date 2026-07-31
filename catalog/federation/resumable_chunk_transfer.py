@@ -25,14 +25,12 @@ from cryptography.hazmat.primitives.asymmetric.x25519 import (
 from .adaptive_transport import DirectTransportUnavailable
 from .direct_peer import (
     DirectPacketChannel,
-    DirectPeerDescriptor,
     NodeSigningCredentials,
     PeerStreamOpen,
 )
 from .errors import FederationOperationError, FederationValidationError
 from .object_transfer import (
     DEFAULT_TRANSFER_CHUNK_BYTES,
-    MAX_TRANSFER_CHUNK_BYTES,
     MAX_TRANSFER_OBJECT_BYTES,
     ObjectTransferChunk,
     ObjectTransferManifest,
