@@ -70,7 +70,7 @@ class PeerStreamVerifier:
             )
         try:
             public_key = self.resolve_public_key(frame.source_node_id)
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise FederationValidationError(
                 "peer-identity-resolution-failed",
                 "source_node_id",
@@ -86,7 +86,7 @@ class PeerStreamVerifier:
             signature_valid = self.verify_signature(
                 public_key, frame.signing_bytes(), frame.signature
             )
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             raise FederationValidationError(
                 "peer-signature-verification-failed",
                 "signature",
