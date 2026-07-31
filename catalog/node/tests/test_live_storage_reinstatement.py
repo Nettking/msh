@@ -339,7 +339,8 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
                         created_at=NOW,
                     )
                     assert committed.committed
-                    assert committed.required_replica_acks == 0
+                    assert committed.result is not None
+                    assert committed.result.required_replica_acks == 0
                 return await original_publish(plan, target_node_ids)
 
             channel.publish = publish_with_admission_write
@@ -442,8 +443,9 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
                 created_at=NOW,
             )
             assert final_write.committed
-            assert final_write.required_replica_acks == 1
-            assert final_write.acknowledged_replica_ids == (
+            assert final_write.result is not None
+            assert final_write.result.required_replica_acks == 1
+            assert final_write.result.acknowledged_replica_ids == (
                 "provider-primary",
             )
             for agent in (former_primary, promoted):

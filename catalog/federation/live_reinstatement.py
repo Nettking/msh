@@ -312,7 +312,6 @@ class LiveReinstatementRecord:
             self.lease_expires_at,
             self.catchup_report_revision,
             self.catchup_report_hash,
-            self.degraded_state_hash,
             self.created_at,
         )
 
@@ -1009,12 +1008,22 @@ class LiveFormerPrimaryReinstatementCoordinator:
                     "reinstatement-tail-catchup-required",
                     assessment.eligibility_reason,
                 )
+            degraded = self.control_plane.storage_degraded_state(
+                record.session_id, record.group_id
+            )
+            if not self._matching_degraded_record(degraded, record, failover):
+                raise FederationValidationError(
+                    "reinstatement-degraded-state-mismatch",
+                    "storage_degraded_state",
+                    "degraded state is missing or unrelated to this failover",
+                )
             record = self.store.save(
                 replace(
                     record,
                     state=_STATE_REPORT_ACCEPTED,
                     final_report_revision=assessment.report_revision,
                     final_report_hash=assessment.report_hash,
+                    degraded_state_hash=_degraded_hash(degraded),
                     latest_error_code=None,
                     latest_error_reason=None,
                     updated_at=self.clock(),
@@ -1382,11 +1391,11 @@ class LiveFormerPrimaryReinstatementCoordinator:
         degraded = self.control_plane.storage_degraded_state(
             record.session_id, record.group_id
         )
-        if degraded is None or _degraded_hash(degraded) != record.degraded_state_hash:
+        if not self._matching_degraded_record(degraded, record, failover):
             raise FederationValidationError(
                 "reinstatement-degraded-state-changed",
                 "storage_degraded_state",
-                "degraded state is missing, newer, or unrelated",
+                "degraded state is missing or unrelated to this failover",
             )
         if require_manifest:
             manifest = self.control_plane.manifest(record.session_id, record.group_id)
@@ -1494,6 +1503,33 @@ class LiveFormerPrimaryReinstatementCoordinator:
             and assessment.report is not None
             and assessment.report_hash == report.report_hash()
             and assessment.report.to_dict() == report.to_dict()
+        )
+
+    @staticmethod
+    def _matching_degraded_record(
+        degraded: dict[str, Any] | None,
+        record: LiveReinstatementRecord,
+        failover: LiveFailoverRecord,
+    ) -> bool:
+        if degraded is None:
+            return False
+        obligations = degraded.get("obligations")
+        revision = degraded.get("manifest_revision")
+        return (
+            degraded.get("session_id") == record.session_id
+            and degraded.get("group_id") == record.group_id
+            and isinstance(revision, int)
+            and not isinstance(revision, bool)
+            and revision >= record.manifest_revision
+            and degraded.get("reason_code")
+            == "automatic-failover-redundancy-lost"
+            and isinstance(obligations, dict)
+            and obligations.get("action")
+            == "restore-replication-and-acknowledgement-policy"
+            and obligations.get("failed_provider_id")
+            == record.returning_provider_id
+            and obligations.get("previous_acknowledgement_mode")
+            == failover.previous_acknowledgement_mode.value
         )
 
     @staticmethod
