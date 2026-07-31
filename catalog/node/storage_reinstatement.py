@@ -1,4 +1,4 @@
-"""Run one safe F4.2 former-primary replica reinstatement over the relay."""
+"""Run one restart-safe F4.2 former-primary replica reinstatement over the relay."""
 
 from __future__ import annotations
 
