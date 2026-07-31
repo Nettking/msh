@@ -348,7 +348,7 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
                 returning_provider_id="provider-primary",
             )
             channel.publish = original_publish
-            assert first_reinstatement.status == "retryable"
+            assert first_reinstatement.status == "retryable", first_reinstatement.to_dict()
             assert (
                 first_reinstatement.code
                 == "reinstatement-tail-catchup-required"
