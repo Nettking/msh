@@ -329,6 +329,12 @@ def test_three_machine_deployment_survives_normal_restart(tmp_path: Path) -> Non
             assert commit.required_replica_acks == 1
             assert commit.acknowledged_replica_ids == ("provider-replica",)
 
+            # The physical runbook invokes probe-write and provision as
+            # separate CLI processes. Release the probe endpoint's receive
+            # loop before the authority publishes restart control directly.
+            await authority_endpoint.close()
+            authority_endpoint = None
+
             primary_before = _storage_evidence(
                 deployment,
                 primary,
