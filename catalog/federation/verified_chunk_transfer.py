@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import base64
 import hashlib
 import json
@@ -86,7 +87,13 @@ def _bounded(value: Any, field: str) -> str:
     return value
 
 
-def _integer(value: Any, field: str, *, minimum: int = 0, maximum: int | None = None) -> int:
+def _integer(
+    value: Any,
+    field: str,
+    *,
+    minimum: int = 0,
+    maximum: int | None = None,
+) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
         raise FederationValidationError(
             "invalid-object-transfer-runtime-integer",
@@ -128,7 +135,9 @@ def _b64encode(value: bytes) -> str:
 def _b64decode(value: Any, field: str) -> bytes:
     if not isinstance(value, str) or not value:
         raise FederationValidationError(
-            "invalid-object-transfer-key", field, "must be canonical base64url text"
+            "invalid-object-transfer-key",
+            field,
+            "must be canonical base64url text",
         )
     try:
         decoded = base64.b64decode(
@@ -138,11 +147,15 @@ def _b64decode(value: Any, field: str) -> bytes:
         )
     except (ValueError, base64.binascii.Error) as exc:
         raise FederationValidationError(
-            "invalid-object-transfer-key", field, "must be canonical base64url text"
+            "invalid-object-transfer-key",
+            field,
+            "must be canonical base64url text",
         ) from exc
     if len(decoded) != 32 or _b64encode(decoded) != value:
         raise FederationValidationError(
-            "invalid-object-transfer-key", field, "must encode exactly 32 bytes"
+            "invalid-object-transfer-key",
+            field,
+            "must encode exactly 32 bytes",
         )
     return decoded
 
@@ -158,7 +171,9 @@ def _public_key_text(public_key: X25519PublicKey) -> str:
 def _public_key(value: Any, field: str) -> X25519PublicKey:
     if not isinstance(value, str) or not value.startswith("x25519:"):
         raise FederationValidationError(
-            "unsupported-object-transfer-key", field, "expected an X25519 public key"
+            "unsupported-object-transfer-key",
+            field,
+            "expected an X25519 public key",
         )
     return X25519PublicKey.from_public_bytes(
         _b64decode(value.removeprefix("x25519:"), field)
@@ -186,24 +201,34 @@ class ObjectTransferAck:
         object.__setattr__(self, "object_id", _bounded(self.object_id, "object_id"))
         if self.action not in _ACTIONS:
             raise FederationValidationError(
-                "invalid-object-transfer-action", "action", "unsupported transfer action"
+                "invalid-object-transfer-action",
+                "action",
+                "unsupported transfer action",
             )
         if any(
             not isinstance(value, bool)
             for value in (self.accepted, self.retryable, self.duplicate)
         ):
             raise FederationValidationError(
-                "invalid-object-transfer-ack-boolean", "ack", "flags must be booleans"
+                "invalid-object-transfer-ack-boolean",
+                "ack",
+                "flags must be booleans",
             )
         if self.chunk_index is not None:
             object.__setattr__(
-                self, "chunk_index", _integer(self.chunk_index, "chunk_index")
+                self,
+                "chunk_index",
+                _integer(self.chunk_index, "chunk_index"),
             )
         object.__setattr__(
-            self, "accepted_chunks", _integer(self.accepted_chunks, "accepted_chunks")
+            self,
+            "accepted_chunks",
+            _integer(self.accepted_chunks, "accepted_chunks"),
         )
         object.__setattr__(
-            self, "remaining_chunks", _integer(self.remaining_chunks, "remaining_chunks")
+            self,
+            "remaining_chunks",
+            _integer(self.remaining_chunks, "remaining_chunks"),
         )
         if self.next_missing_index is not None:
             object.__setattr__(
@@ -215,11 +240,15 @@ class ObjectTransferAck:
             object.__setattr__(self, "error_code", _bounded(self.error_code, "error_code"))
         if self.accepted and (self.retryable or self.error_code is not None):
             raise FederationValidationError(
-                "invalid-object-transfer-ack", "accepted", "accepted ack cannot request retry"
+                "invalid-object-transfer-ack",
+                "accepted",
+                "accepted ack cannot request retry",
             )
         if not self.accepted and self.error_code is None:
             raise FederationValidationError(
-                "invalid-object-transfer-ack", "error_code", "rejected ack requires an error"
+                "invalid-object-transfer-ack",
+                "error_code",
+                "rejected ack requires an error",
             )
         if self.receipt is not None and (
             not isinstance(self.receipt, dict)
@@ -229,7 +258,9 @@ class ObjectTransferAck:
             or self.action != "complete"
         ):
             raise FederationValidationError(
-                "invalid-object-transfer-receipt", "receipt", "unexpected receipt"
+                "invalid-object-transfer-receipt",
+                "receipt",
+                "unexpected receipt",
             )
         object.__setattr__(self, "protocol_version", _protocol(self.protocol_version))
 
@@ -240,7 +271,9 @@ class ObjectTransferAck:
             or value.get("schema") != DIRECT_OBJECT_TRANSFER_ACK_SCHEMA
         ):
             raise ProtocolCompatibilityError(
-                "unsupported-object-transfer-ack", "schema", "unexpected ack schema"
+                "unsupported-object-transfer-ack",
+                "schema",
+                "unexpected ack schema",
             )
         fields = {
             "protocol_version",
@@ -288,19 +321,15 @@ class _CipherContext:
 
     @property
     def source(self) -> str:
-        return (
-            self.opening.source_node_id
-            if self.direction == "request"
-            else self.opening.target_node_id
-        )
+        if self.direction == "request":
+            return self.opening.source_node_id
+        return self.opening.target_node_id
 
     @property
     def target(self) -> str:
-        return (
-            self.opening.target_node_id
-            if self.direction == "request"
-            else self.opening.source_node_id
-        )
+        if self.direction == "request":
+            return self.opening.target_node_id
+        return self.opening.source_node_id
 
     def value(self) -> JSON:
         return {
@@ -405,17 +434,17 @@ def _decrypt(
         ) from exc
 
 
-def _verify_signature(
+def _verify_frame_signature(
     frame: PeerStreamFrame,
     source_node_id: str,
     resolve_public_key: Callable[[str], str | None],
     verify_signature: Callable[[str, bytes, str], bool],
 ) -> None:
-    key = resolve_public_key(source_node_id)
+    public_key = resolve_public_key(source_node_id)
     if (
         frame.source_node_id != source_node_id
-        or not isinstance(key, str)
-        or not verify_signature(key, frame.signing_bytes(), frame.signature)
+        or not isinstance(public_key, str)
+        or not verify_signature(public_key, frame.signing_bytes(), frame.signature)
     ):
         raise FederationValidationError(
             "invalid-object-transfer-frame-signature",
@@ -425,10 +454,10 @@ def _verify_signature(
 
 
 @dataclass
-class _Inbound:
+class _InboundTransfer:
     peer_id: str
     opening: PeerStreamOpen
-    secret: bytes
+    shared_secret: bytes
     last_sequence: int = -1
     manifest: ObjectTransferManifest | None = None
     receiver: ObjectTransferReceiver | None = None
@@ -458,10 +487,16 @@ class VerifiedChunkTransferEndpoint:
         self.resolve_public_key = resolve_public_key
         self.verify_signature = verify_signature
         self.max_attempts = _integer(
-            max_attempts, "max_attempts", minimum=1, maximum=32
+            max_attempts,
+            "max_attempts",
+            minimum=1,
+            maximum=32,
         )
         self.max_sequence_gap = _integer(
-            max_sequence_gap, "max_sequence_gap", minimum=1, maximum=4096
+            max_sequence_gap,
+            "max_sequence_gap",
+            minimum=1,
+            maximum=4096,
         )
         self.max_inbound_transfers = _integer(
             max_inbound_transfers,
@@ -483,7 +518,7 @@ class VerifiedChunkTransferEndpoint:
         self._private_key = X25519PrivateKey.generate()
         self._descriptor: DirectPeerDescriptor | None = None
         self._peers: dict[str, DirectPeerDescriptor] = {}
-        self._inbound: OrderedDict[tuple[str, str], _Inbound] = OrderedDict()
+        self._inbound: OrderedDict[tuple[str, str], _InboundTransfer] = OrderedDict()
         self._started = False
 
     @property
@@ -499,7 +534,9 @@ class VerifiedChunkTransferEndpoint:
     def register_peer(self, descriptor: DirectPeerDescriptor) -> None:
         if descriptor.node_id == self.node_id:
             raise FederationValidationError(
-                "object-transfer-self-route", "node_id", "cannot register the local node"
+                "object-transfer-self-route",
+                "node_id",
+                "cannot register the local node",
             )
         self._peers[descriptor.node_id] = descriptor
 
@@ -523,7 +560,7 @@ class VerifiedChunkTransferEndpoint:
         self._inbound.clear()
         await self.channel.close()
         self._started = False
-        self._temporary.cleanup()
+        await asyncio.to_thread(self._temporary.cleanup)
 
     async def send_bytes(
         self,
@@ -537,13 +574,11 @@ class VerifiedChunkTransferEndpoint:
     ) -> VerifiedObjectTransfer:
         if not isinstance(content, bytes):
             raise FederationValidationError(
-                "invalid-object-transfer-content", "content", "must be bytes"
+                "invalid-object-transfer-content",
+                "content",
+                "must be bytes",
             )
-        with tempfile.NamedTemporaryFile(
-            prefix="msh-f642-source-", delete=False
-        ) as handle:
-            source = Path(handle.name)
-            handle.write(content)
+        source = await asyncio.to_thread(self._write_temporary_source, content)
         try:
             return await self.send_file(
                 target_node_id=target_node_id,
@@ -554,7 +589,7 @@ class VerifiedChunkTransferEndpoint:
                 chunk_size=chunk_size,
             )
         finally:
-            source.unlink(missing_ok=True)
+            await asyncio.to_thread(source.unlink, missing_ok=True)
 
     async def send_file(
         self,
@@ -574,7 +609,12 @@ class VerifiedChunkTransferEndpoint:
                 f"no explicit direct transfer route for {target_node_id}",
             )
         source = Path(source_path)
-        manifest = self._file_manifest(source, object_id, chunk_size)
+        manifest = await asyncio.to_thread(
+            self._file_manifest,
+            source,
+            object_id,
+            chunk_size,
+        )
         ephemeral = X25519PrivateKey.generate()
         opening = PeerStreamOpen.create(
             session_id=session_id,
@@ -586,58 +626,98 @@ class VerifiedChunkTransferEndpoint:
             ephemeral_public_key=_public_key_text(ephemeral.public_key()),
             sign=self.credentials.sign,
         )
-        secret = ephemeral.exchange(
+        shared_secret = ephemeral.exchange(
             _public_key(target.encryption_public_key, "encryption_public_key")
         )
         sequence = 0
+        completed = False
         try:
             _, sequence = await self._send(
                 target,
                 opening,
-                secret,
+                shared_secret,
                 sequence,
                 manifest,
                 "manifest",
                 {"manifest": manifest.to_dict()},
             )
-            with source.open("rb") as handle:
-                for index in range(manifest.chunk_count):
-                    data = handle.read(manifest.expected_chunk_length(index))
-                    chunk = ObjectTransferChunk.create(
-                        manifest=manifest,
-                        index=index,
-                        data=data,
-                    )
-                    _, sequence = await self._send(
-                        target,
-                        opening,
-                        secret,
-                        sequence,
-                        manifest,
-                        "chunk",
-                        {"chunk": chunk.to_dict()},
-                        chunk_index=index,
-                    )
-                if handle.read(1):
+            for index in range(manifest.chunk_count):
+                expected_length = manifest.expected_chunk_length(index)
+                data = await asyncio.to_thread(
+                    self._read_source_chunk,
+                    source,
+                    index * manifest.chunk_size,
+                    expected_length,
+                )
+                if len(data) != expected_length:
                     raise FederationValidationError(
                         "object-transfer-source-size-changed",
                         "source_path",
-                        "source file grew during transfer",
+                        "source file size changed during transfer",
                     )
+                chunk = ObjectTransferChunk.create(
+                    manifest=manifest,
+                    index=index,
+                    data=data,
+                )
+                _, sequence = await self._send(
+                    target,
+                    opening,
+                    shared_secret,
+                    sequence,
+                    manifest,
+                    "chunk",
+                    {"chunk": chunk.to_dict()},
+                    chunk_index=index,
+                )
+            source_size = (await asyncio.to_thread(source.stat)).st_size
+            if source_size != manifest.total_size:
+                raise FederationValidationError(
+                    "object-transfer-source-size-changed",
+                    "source_path",
+                    "source file size changed during transfer",
+                )
             ack, sequence = await self._send(
                 target,
                 opening,
-                secret,
+                shared_secret,
                 sequence,
                 manifest,
                 "complete",
                 {},
             )
-            del sequence
-            return self._receipt(ack, manifest)
-        except Exception:
-            await self._abort(target, opening, secret, sequence, manifest)
-            raise
+            receipt = self._receipt(ack, manifest)
+            completed = True
+            return receipt
+        finally:
+            if not completed:
+                await self._abort(
+                    target,
+                    opening,
+                    shared_secret,
+                    sequence,
+                    manifest,
+                )
+
+    @staticmethod
+    def _write_temporary_source(content: bytes) -> Path:
+        with tempfile.NamedTemporaryFile(prefix="msh-f642-source-", delete=False) as handle:
+            handle.write(content)
+            handle.flush()
+            return Path(handle.name)
+
+    @staticmethod
+    def _read_source_chunk(source: Path, offset: int, length: int) -> bytes:
+        try:
+            with source.open("rb") as handle:
+                handle.seek(offset)
+                return handle.read(length)
+        except OSError as exc:
+            raise FederationOperationError(
+                "object-transfer-source-unavailable",
+                "source file could not be read",
+                "source_path",
+            ) from exc
 
     @staticmethod
     def _file_manifest(
@@ -683,7 +763,7 @@ class VerifiedChunkTransferEndpoint:
         self,
         target: DirectPeerDescriptor,
         opening: PeerStreamOpen,
-        secret: bytes,
+        shared_secret: bytes,
         sequence: int,
         manifest: ObjectTransferManifest,
         action: str,
@@ -693,31 +773,36 @@ class VerifiedChunkTransferEndpoint:
     ) -> tuple[ObjectTransferAck, int]:
         last_error: BaseException | None = None
         for _ in range(self.max_attempts):
-            current = sequence
+            current_sequence = sequence
             sequence += 1
             try:
-                ack = await self._send_once(
+                acknowledgement = await self._send_once(
                     target,
                     opening,
-                    secret,
-                    current,
+                    shared_secret,
+                    current_sequence,
                     action,
                     message,
                 )
             except (OSError, TimeoutError, DirectTransportUnavailable) as exc:
                 last_error = exc
                 continue
-            self._validate_ack(ack, manifest, action, chunk_index)
-            if ack.accepted:
-                return ack, sequence
-            if not ack.retryable:
+            self._validate_ack(
+                acknowledgement,
+                manifest,
+                action,
+                chunk_index,
+            )
+            if acknowledgement.accepted:
+                return acknowledgement, sequence
+            if not acknowledgement.retryable:
                 raise FederationOperationError(
-                    ack.error_code or "object-transfer-rejected",
+                    acknowledgement.error_code or "object-transfer-rejected",
                     "remote endpoint rejected the transfer action",
                     action,
                 )
             last_error = FederationOperationError(
-                ack.error_code or "object-transfer-retry-requested",
+                acknowledgement.error_code or "object-transfer-retry-requested",
                 "remote endpoint requested retransmission",
                 action,
             )
@@ -730,7 +815,7 @@ class VerifiedChunkTransferEndpoint:
         self,
         target: DirectPeerDescriptor,
         opening: PeerStreamOpen,
-        secret: bytes,
+        shared_secret: bytes,
         sequence: int,
         action: str,
         message: Mapping[str, Any],
@@ -745,7 +830,7 @@ class VerifiedChunkTransferEndpoint:
             opening,
             "request",
             sequence,
-            secret,
+            shared_secret,
             _canonical(plaintext),
             self.credentials.sign,
         )
@@ -777,15 +862,20 @@ class VerifiedChunkTransferEndpoint:
                 "sequence",
                 "ack does not match the current transfer attempt",
             )
-        _verify_signature(
+        _verify_frame_signature(
             response_frame,
             target.node_id,
             self.resolve_public_key,
             self.verify_signature,
         )
-        plaintext = _decrypt(opening, "response", response_frame, secret)
+        decrypted = _decrypt(
+            opening,
+            "response",
+            response_frame,
+            shared_secret,
+        )
         try:
-            return ObjectTransferAck.from_dict(json.loads(plaintext))
+            return ObjectTransferAck.from_dict(json.loads(decrypted))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise FederationValidationError(
                 "invalid-object-transfer-response",
@@ -797,7 +887,7 @@ class VerifiedChunkTransferEndpoint:
         self,
         target: DirectPeerDescriptor,
         opening: PeerStreamOpen,
-        secret: bytes,
+        shared_secret: bytes,
         sequence: int,
         manifest: ObjectTransferManifest,
     ) -> None:
@@ -805,7 +895,7 @@ class VerifiedChunkTransferEndpoint:
             await self._send_once(
                 target,
                 opening,
-                secret,
+                shared_secret,
                 sequence,
                 "abort",
                 {
@@ -813,7 +903,13 @@ class VerifiedChunkTransferEndpoint:
                     "object_id": manifest.object_id,
                 },
             )
-        except Exception:
+        except (
+            OSError,
+            TimeoutError,
+            DirectTransportUnavailable,
+            FederationOperationError,
+            FederationValidationError,
+        ):
             return
 
     @staticmethod
@@ -822,7 +918,9 @@ class VerifiedChunkTransferEndpoint:
             size = len(_canonical(value))
         except (TypeError, ValueError) as exc:
             raise FederationValidationError(
-                "invalid-object-transfer-packet", field, "must be canonical JSON"
+                "invalid-object-transfer-packet",
+                field,
+                "must be canonical JSON",
             ) from exc
         if size > MAX_DIRECT_OBJECT_TRANSFER_PACKET_BYTES:
             raise FederationValidationError(
@@ -833,15 +931,15 @@ class VerifiedChunkTransferEndpoint:
 
     @staticmethod
     def _validate_ack(
-        ack: ObjectTransferAck,
+        acknowledgement: ObjectTransferAck,
         manifest: ObjectTransferManifest,
         action: str,
         chunk_index: int | None,
     ) -> None:
         if (
-            ack.transfer_id,
-            ack.object_id,
-            ack.action,
+            acknowledgement.transfer_id,
+            acknowledgement.object_id,
+            acknowledgement.action,
         ) != (
             manifest.transfer_id,
             manifest.object_id,
@@ -852,7 +950,11 @@ class VerifiedChunkTransferEndpoint:
                 "ack",
                 "ack belongs to another transfer action",
             )
-        if action == "chunk" and ack.accepted and ack.chunk_index is None:
+        if (
+            action == "chunk"
+            and acknowledgement.accepted
+            and acknowledgement.chunk_index is None
+        ):
             raise FederationValidationError(
                 "object-transfer-ack-index-missing",
                 "chunk_index",
@@ -860,8 +962,8 @@ class VerifiedChunkTransferEndpoint:
             )
         if (
             action == "chunk"
-            and ack.chunk_index is not None
-            and ack.chunk_index != chunk_index
+            and acknowledgement.chunk_index is not None
+            and acknowledgement.chunk_index != chunk_index
         ):
             raise FederationValidationError(
                 "object-transfer-ack-index-mismatch",
@@ -871,10 +973,10 @@ class VerifiedChunkTransferEndpoint:
 
     @staticmethod
     def _receipt(
-        ack: ObjectTransferAck,
+        acknowledgement: ObjectTransferAck,
         manifest: ObjectTransferManifest,
     ) -> VerifiedObjectTransfer:
-        value = ack.receipt
+        value = acknowledgement.receipt
         if not isinstance(value, dict):
             raise FederationValidationError(
                 "missing-object-transfer-receipt",
@@ -913,7 +1015,9 @@ class VerifiedChunkTransferEndpoint:
         self._check_packet_size(packet, "packet")
         if packet.get("schema") != DIRECT_OBJECT_TRANSFER_PACKET_SCHEMA:
             raise FederationValidationError(
-                "invalid-object-transfer-packet", "schema", "unexpected transfer packet"
+                "invalid-object-transfer-packet",
+                "schema",
+                "unexpected transfer packet",
             )
         opening = PeerStreamOpen.from_dict(packet.get("open"))
         if opening.target_node_id != self.node_id:
@@ -941,7 +1045,7 @@ class VerifiedChunkTransferEndpoint:
                 "transfer open is not signed by the enrolled source node",
             )
         frame = PeerStreamFrame.from_dict(packet.get("frame"))
-        _verify_signature(
+        _verify_frame_signature(
             frame,
             opening.source_node_id,
             self.resolve_public_key,
@@ -951,10 +1055,10 @@ class VerifiedChunkTransferEndpoint:
         inbound = self._inbound.get(key)
         if inbound is None:
             self._reserve_capacity()
-            inbound = _Inbound(
+            inbound = _InboundTransfer(
                 peer_id=source_peer_id,
                 opening=opening,
-                secret=self._private_key.exchange(
+                shared_secret=self._private_key.exchange(
                     _public_key(opening.ephemeral_public_key, "ephemeral_public_key")
                 ),
             )
@@ -979,16 +1083,21 @@ class VerifiedChunkTransferEndpoint:
                 "sequence",
                 "frame sequence gap exceeds the bounded retry window",
             )
-        plaintext = _decrypt(opening, "request", frame, inbound.secret)
+        decrypted = _decrypt(
+            opening,
+            "request",
+            frame,
+            inbound.shared_secret,
+        )
         inbound.last_sequence = frame.sequence
-        message = self._message(plaintext)
-        ack = self._apply(inbound, message)
+        message = self._message(decrypted)
+        acknowledgement = self._apply(inbound, message)
         response_frame = _encrypt(
             opening,
             "response",
             frame.sequence,
-            inbound.secret,
-            _canonical(ack.to_dict()),
+            inbound.shared_secret,
+            _canonical(acknowledgement.to_dict()),
             self.credentials.sign,
         )
         response = {
@@ -1013,9 +1122,9 @@ class VerifiedChunkTransferEndpoint:
         )
 
     @staticmethod
-    def _message(plaintext: bytes) -> JSON:
+    def _message(decrypted: bytes) -> JSON:
         try:
-            value = json.loads(plaintext)
+            value = json.loads(decrypted)
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise FederationValidationError(
                 "invalid-object-transfer-message",
@@ -1034,14 +1143,22 @@ class VerifiedChunkTransferEndpoint:
         _protocol(value.get("protocol_version"))
         if value.get("action") not in _ACTIONS:
             raise FederationValidationError(
-                "invalid-object-transfer-action", "action", "unsupported transfer action"
+                "invalid-object-transfer-action",
+                "action",
+                "unsupported transfer action",
             )
         return value
 
-    def _apply(self, inbound: _Inbound, message: JSON) -> ObjectTransferAck:
+    def _apply(
+        self,
+        inbound: _InboundTransfer,
+        message: JSON,
+    ) -> ObjectTransferAck:
         action = message["action"]
         if action == "manifest":
-            return self._manifest(inbound, message.get("manifest"))
+            return self._apply_manifest(inbound, message.get("manifest"))
+        if action == "abort":
+            return self._apply_abort(inbound, message)
         if inbound.manifest is None or inbound.receiver is None:
             raise FederationValidationError(
                 "object-transfer-manifest-required",
@@ -1049,13 +1166,14 @@ class VerifiedChunkTransferEndpoint:
                 "manifest must be accepted before transfer data",
             )
         if action == "chunk":
-            return self._chunk(inbound, message.get("chunk"))
-        if action == "complete":
-            return self._complete(inbound)
-        inbound.receiver.abort()
-        return self._ack(inbound, "abort", accepted=True)
+            return self._apply_chunk(inbound, message.get("chunk"))
+        return self._apply_complete(inbound)
 
-    def _manifest(self, inbound: _Inbound, value: Any) -> ObjectTransferAck:
+    def _apply_manifest(
+        self,
+        inbound: _InboundTransfer,
+        value: Any,
+    ) -> ObjectTransferAck:
         manifest = ObjectTransferManifest.from_dict(value)
         if inbound.opening.stream_id != f"object-{manifest.transfer_id}":
             raise FederationValidationError(
@@ -1065,7 +1183,12 @@ class VerifiedChunkTransferEndpoint:
             )
         if inbound.manifest is not None:
             if inbound.manifest == manifest:
-                return self._ack(inbound, "manifest", accepted=True, duplicate=True)
+                return self._ack(
+                    inbound,
+                    "manifest",
+                    accepted=True,
+                    duplicate=True,
+                )
             raise FederationValidationError(
                 "object-transfer-conflicting-manifest",
                 "manifest",
@@ -1075,24 +1198,53 @@ class VerifiedChunkTransferEndpoint:
         inbound.receiver = ObjectTransferReceiver(manifest, self.store)
         return self._ack(inbound, "manifest", accepted=True)
 
-    def _chunk(self, inbound: _Inbound, value: Any) -> ObjectTransferAck:
+    def _apply_abort(
+        self,
+        inbound: _InboundTransfer,
+        message: JSON,
+    ) -> ObjectTransferAck:
+        if inbound.receiver is not None:
+            inbound.receiver.abort()
+        transfer_id = (
+            inbound.manifest.transfer_id
+            if inbound.manifest is not None
+            else _bounded(message.get("transfer_id"), "transfer_id")
+        )
+        object_id = (
+            inbound.manifest.object_id
+            if inbound.manifest is not None
+            else _bounded(message.get("object_id"), "object_id")
+        )
+        return ObjectTransferAck(
+            transfer_id=transfer_id,
+            object_id=object_id,
+            action="abort",
+            accepted=True,
+            retryable=False,
+        )
+
+    def _apply_chunk(
+        self,
+        inbound: _InboundTransfer,
+        value: Any,
+    ) -> ObjectTransferAck:
         assert inbound.receiver is not None
         try:
             chunk = ObjectTransferChunk.from_dict(value)
             accepted = inbound.receiver.accept(chunk)
-        except FederationValidationError as exc:
+        except (FederationOperationError, FederationValidationError) as exc:
             status = inbound.receiver.status()
+            retryable = isinstance(exc, FederationValidationError) and exc.code in {
+                "invalid-object-transfer-encoding",
+                "object-transfer-chunk-length-mismatch",
+                "object-transfer-chunk-hash-mismatch",
+                "object-transfer-chunk-size-mismatch",
+            }
             return self._ack(
                 inbound,
                 "chunk",
                 accepted=False,
-                retryable=exc.code
-                in {
-                    "invalid-object-transfer-encoding",
-                    "object-transfer-chunk-length-mismatch",
-                    "object-transfer-chunk-hash-mismatch",
-                    "object-transfer-chunk-size-mismatch",
-                },
+                retryable=retryable,
                 error_code=exc.code,
                 status=status,
             )
@@ -1104,16 +1256,14 @@ class VerifiedChunkTransferEndpoint:
             chunk_index=chunk.index,
         )
 
-    def _complete(self, inbound: _Inbound) -> ObjectTransferAck:
+    def _apply_complete(self, inbound: _InboundTransfer) -> ObjectTransferAck:
         assert inbound.receiver is not None
         assert inbound.manifest is not None
         duplicate = inbound.receipt is not None
         if inbound.receipt is None:
             try:
                 receipt = inbound.receiver.verify_complete()
-                path = self.store.publish_verified(inbound.manifest, receipt)
-                inbound.receipt = receipt
-                inbound.published_path = path
+                published_path = self.store.publish_verified(inbound.manifest, receipt)
             except (FederationOperationError, FederationValidationError) as exc:
                 return self._ack(
                     inbound,
@@ -1122,6 +1272,8 @@ class VerifiedChunkTransferEndpoint:
                     retryable=False,
                     error_code=exc.code,
                 )
+            inbound.receipt = receipt
+            inbound.published_path = published_path
         return self._ack(
             inbound,
             "complete",
@@ -1132,7 +1284,7 @@ class VerifiedChunkTransferEndpoint:
 
     @staticmethod
     def _ack(
-        inbound: _Inbound,
+        inbound: _InboundTransfer,
         action: str,
         *,
         accepted: bool,
@@ -1145,7 +1297,7 @@ class VerifiedChunkTransferEndpoint:
     ) -> ObjectTransferAck:
         assert inbound.manifest is not None
         assert inbound.receiver is not None
-        status = status or inbound.receiver.status()
+        current_status = status or inbound.receiver.status()
         return ObjectTransferAck(
             transfer_id=inbound.manifest.transfer_id,
             object_id=inbound.manifest.object_id,
@@ -1154,9 +1306,13 @@ class VerifiedChunkTransferEndpoint:
             retryable=retryable,
             duplicate=duplicate,
             chunk_index=chunk_index,
-            accepted_chunks=status.accepted_chunks,
-            remaining_chunks=len(status.missing_chunks),
-            next_missing_index=status.missing_chunks[0] if status.missing_chunks else None,
+            accepted_chunks=current_status.accepted_chunks,
+            remaining_chunks=len(current_status.missing_chunks),
+            next_missing_index=(
+                current_status.missing_chunks[0]
+                if current_status.missing_chunks
+                else None
+            ),
             error_code=error_code,
             receipt=receipt,
         )
