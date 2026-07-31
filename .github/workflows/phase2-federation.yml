@@ -121,13 +121,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -c constraints-phase2.txt
           python -m pip install pytest
-      - name: Identity, state, protocol, relay, and Phase E tests
+      - name: Identity, state, protocol, relay, and Phase F tests
         run: >-
           python -m pytest -o addopts= -q
           catalog/node/tests/test_identity.py
           catalog/node/tests/test_state.py
           catalog/node/tests/test_client.py
           catalog/node/tests/test_storage_agent.py
+          catalog/node/tests/test_live_storage_replication.py
           catalog/relay/tests/test_service.py
           catalog/federation/tests/test_phase2_unit.py
           catalog/federation/tests/test_storage_protocol.py
