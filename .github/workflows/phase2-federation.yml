@@ -4,54 +4,156 @@ on:
   pull_request:
     paths:
       - "catalog/federation/**"
+      - "catalog/node/**"
+      - "catalog/relay/**"
+      - "docker-compose.yml"
+      - "requirements.txt"
+      - "constraints-phase2.txt"
+      - ".github/workflows/phase2-federation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/federation/**"
+      - "catalog/node/**"
+      - "catalog/relay/**"
+      - "docker-compose.yml"
+      - "requirements.txt"
+      - "constraints-phase2.txt"
       - ".github/workflows/phase2-federation.yml"
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: phase2-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  apply-f41-python-patch:
+  linux:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: msh
+          POSTGRES_PASSWORD: msh
+          POSTGRES_DB: msh_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U msh -d msh_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MSH_TEST_POSTGRES_DSN: postgresql://msh:msh@127.0.0.1:5432/msh_test
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: agent/phase-f41-live-former-primary-catchup
           fetch-depth: 0
-      - name: Apply final fail-closed Python changes
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
         run: |
-          python - <<'PY'
-          from pathlib import Path
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile
+        run: python -m compileall catalog setup_msh.py
+      - name: Phase 0 and 1 regressions
+        run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py
+      - name: Phase D and E storage tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/test_storage_protocol.py
+          catalog/federation/tests/test_local_storage.py
+          catalog/federation/tests/test_phase_d2_postgres.py
+          catalog/federation/tests/test_phase_d3_control_plane.py
+          catalog/federation/tests/test_phase_d4_write_authority.py
+          catalog/federation/tests/test_phase_d5_logical_storage.py
+          catalog/federation/tests/test_phase_d6_replication.py
+          catalog/federation/tests/test_phase_d7_d8_ack_handover.py
+          catalog/federation/tests/test_phase_e0_contracts.py
+          catalog/federation/tests/test_phase_e1_manifest_store.py
+          catalog/federation/tests/test_phase_e1_service_manifest.py
+          catalog/federation/tests/test_phase_e2_watermarks.py
+          catalog/federation/tests/test_phase_e3_reports.py
+          catalog/federation/tests/test_phase_e4_selection.py
+          catalog/federation/tests/test_phase_e5_degraded_state.py
+          catalog/federation/tests/test_phase_e6_promotion_transaction.py
+          catalog/federation/tests/test_phase_e63_provider_fencing.py
+          catalog/federation/tests/test_phase_e64_authority_grant.py
+          catalog/federation/tests/test_phase_e65_finalization.py
+          catalog/federation/tests/test_phase_e66_recovery.py
+          catalog/federation/tests/test_phase_e67_coordinator_publication.py
+          catalog/federation/tests/test_phase_e71_former_primary_recovery.py
+          catalog/federation/tests/test_phase_e72_former_primary_transfer.py
+          catalog/federation/tests/test_phase_e78_former_primary_completion.py
+      - name: Phase 2 unit and integration tests
+        run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase2_unit.py catalog/node/tests catalog/relay/tests
+      - name: Ruff federation code
+        run: >-
+          python -m ruff check catalog/federation catalog/node catalog/relay
+          --ignore I001,RUF022,B008,C408,PLC0206
+      - name: Compose validation
+        run: |
+          docker compose config --quiet
+          docker compose --profile relay-dev config --quiet
+      - name: Diff hygiene
+        run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
 
-          path = Path('catalog/federation/live_catchup.py')
-          text = path.read_text()
-          if 'from collections import Counter\n' not in text:
-              text = text.replace(
-                  'import sqlite3\nimport uuid\n',
-                  'import sqlite3\nimport uuid\nfrom collections import Counter\n',
-                  1,
-              )
-          old = '''                record = self.catchup_store.save(\n                    replace(record, updated_at=self.clock())\n                )\n                try:\n'''
-          new = '''                record = self.catchup_store.save(\n                    replace(record, updated_at=self.clock())\n                )\n                current = self._item(record, current.item_id)\n                try:\n'''
-          if old in text:
-              text = text.replace(old, new, 1)
-          elif new not in text:
-              raise SystemExit('attempt counter anchor missing')
-          old = '''                        StorageErrorCode.STALE_FENCING_TOKEN.value,\n                    }\n'''
-          new = '''                        StorageErrorCode.STALE_FENCING_TOKEN.value,\n                        StorageErrorCode.INVALID_REQUEST.value,\n                    }\n'''
-          if old in text:
-              text = text.replace(old, new, 1)
-          elif new not in text:
-              raise SystemExit('fatal error anchor missing')
-          old = '''        if (\n            not assessment.accepted\n            or report.manifest_revision != verifying.manifest_revision\n            or report.manifest_hash != verifying.manifest_hash\n            or not report.integrity_verified\n            or report.synchronization_state != "synchronized"\n            or set(report.committed_item_hashes)\n            != {item.content_hash for item in verifying.items}\n        ):\n            raise FederationValidationError(\n                "live-catchup-final-report-incomplete",\n                "report",\n                "returning provider did not prove complete synchronized content",\n            )\n'''
-          new = '''        if not assessment.accepted:\n            raise FederationValidationError(\n                "live-catchup-final-report-rejected",\n                "report",\n                assessment.eligibility_reason,\n            )\n        if report.manifest_revision != verifying.manifest_revision:\n            raise FederationValidationError(\n                "live-catchup-final-report-revision-mismatch",\n                "manifest_revision",\n                "final report revision differs from the recovery manifest",\n            )\n        if report.manifest_hash != verifying.manifest_hash:\n            raise FederationValidationError(\n                "live-catchup-final-report-hash-mismatch",\n                "manifest_hash",\n                "final report hash differs from the recovery manifest",\n            )\n        if not report.integrity_verified:\n            raise FederationValidationError(\n                "live-catchup-final-report-integrity-failed",\n                "integrity_verified",\n                ",".join(report.eligibility_reasons),\n            )\n        if report.synchronization_state != "synchronized":\n            raise FederationValidationError(\n                "live-catchup-final-report-not-synchronized",\n                "synchronization_state",\n                report.synchronization_state,\n            )\n        expected_hashes = Counter(\n            item.content_hash for item in verifying.items\n        )\n        reported_hashes = Counter(report.committed_item_hashes)\n        if reported_hashes != expected_hashes:\n            raise FederationValidationError(\n                "live-catchup-final-report-evidence-mismatch",\n                "committed_item_hashes",\n                (\n                    f"expected {dict(expected_hashes)}, "\n                    f"received {dict(reported_hashes)}"\n                ),\n            )\n'''
-          if old not in text:
-              raise SystemExit('final verification anchor missing')
-          path.write_text(text.replace(old, new, 1))
-          PY
-          python -m py_compile catalog/federation/live_catchup.py
-          git diff --check
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add catalog/federation/live_catchup.py
-          git commit -m "Clarify and harden F4.1 final verification"
-          git push origin HEAD:agent/phase-f41-live-former-primary-catchup
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest
+      - name: Identity, state, protocol, relay, and Phase F tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/node/tests/test_identity.py
+          catalog/node/tests/test_state.py
+          catalog/node/tests/test_client.py
+          catalog/node/tests/test_storage_agent.py
+          catalog/node/tests/test_live_storage_replication.py
+          catalog/node/tests/test_live_storage_failover.py
+          catalog/node/tests/test_live_storage_catchup.py
+          catalog/node/tests/test_verified_live_failover.py
+          catalog/relay/tests/test_service.py
+          catalog/federation/tests/test_phase2_unit.py
+          catalog/federation/tests/test_storage_protocol.py
+          catalog/federation/tests/test_local_storage.py
+          catalog/federation/tests/test_phase_d3_control_plane.py
+          catalog/federation/tests/test_phase_d4_write_authority.py
+          catalog/federation/tests/test_phase_d5_logical_storage.py
+          catalog/federation/tests/test_phase_d6_replication.py
+          catalog/federation/tests/test_phase_d7_d8_ack_handover.py
+          catalog/federation/tests/test_phase_e0_contracts.py
+          catalog/federation/tests/test_phase_e1_manifest_store.py
+          catalog/federation/tests/test_phase_e1_service_manifest.py
+          catalog/federation/tests/test_phase_e2_watermarks.py
+          catalog/federation/tests/test_phase_e3_reports.py
+          catalog/federation/tests/test_phase_e4_selection.py
+          catalog/federation/tests/test_phase_e5_degraded_state.py
+          catalog/federation/tests/test_phase_e6_promotion_transaction.py
+          catalog/federation/tests/test_phase_e63_provider_fencing.py
+          catalog/federation/tests/test_phase_e64_authority_grant.py
+          catalog/federation/tests/test_phase_e65_finalization.py
+          catalog/federation/tests/test_phase_e66_recovery.py
+          catalog/federation/tests/test_phase_e67_coordinator_publication.py
+          catalog/federation/tests/test_phase_e71_former_primary_recovery.py
+          catalog/federation/tests/test_phase_e72_former_primary_transfer.py
+          catalog/federation/tests/test_phase_e78_former_primary_completion.py
