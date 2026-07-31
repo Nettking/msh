@@ -1,0 +1,57 @@
+name: Phase F6.4.2 verified chunk transfer
+
+on:
+  pull_request:
+    paths:
+      - "catalog/federation/object_transfer.py"
+      - "catalog/federation/object_transfer_staging.py"
+      - "catalog/federation/verified_chunk_transfer.py"
+      - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
+      - ".github/workflows/phase-f642-verified-chunk-transfer.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/federation/object_transfer.py"
+      - "catalog/federation/object_transfer_staging.py"
+      - "catalog/federation/verified_chunk_transfer.py"
+      - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
+      - ".github/workflows/phase-f642-verified-chunk-transfer.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f642-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verified-transfer:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest
+      - name: Compile F6.4.2
+        run: >-
+          python -m compileall
+          catalog/federation/object_transfer.py
+          catalog/federation/object_transfer_staging.py
+          catalog/federation/verified_chunk_transfer.py
+          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
+      - name: F6.4.1 and F6.4.2 tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/test_phase_f641_chunk_contract.py
+          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
