@@ -5,6 +5,7 @@ import base64
 import copy
 from collections.abc import Callable
 from types import SimpleNamespace
+from typing import ClassVar
 
 import pytest
 from cryptography.exceptions import InvalidSignature
@@ -66,7 +67,7 @@ def _verify(public_key: str, value: bytes, signature: str) -> bool:
 
 
 class _MemoryChannel:
-    registry: dict[str, _MemoryChannel] = {}
+    registry: ClassVar[dict[str, _MemoryChannel]] = {}
 
     def __init__(self, peer_id: str) -> None:
         self.peer_id = peer_id
