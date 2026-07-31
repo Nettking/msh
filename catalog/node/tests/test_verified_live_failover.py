@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timezone
 from types import SimpleNamespace
 
@@ -138,6 +139,21 @@ class _CommittedControl:
             groups={"storage-main": SimpleNamespace()},
             providers={
                 "provider-replica": SimpleNamespace(node_id="replica-node")
+            },
+        )
+
+
+class _DetectedControl:
+    def snapshot(self, session_id: str):
+        assert session_id == "session-1"
+        return SimpleNamespace(
+            groups={
+                "storage-main": SimpleNamespace(
+                    primary_provider_id="provider-primary"
+                )
+            },
+            providers={
+                "provider-primary": SimpleNamespace(node_id="primary-node")
             },
         )
 
@@ -293,6 +309,38 @@ def test_failover_always_requests_new_evidence_for_current_outage(tmp_path) -> N
         assert channel.requests[0]["report_revision"] == 8
         assert channel.requests[0]["failover_id"] == "observation-1"
         assert control.submissions == [(fresh_report, "replica-node")]
+
+    asyncio.run(scenario())
+
+
+def test_detected_failover_does_not_reissue_stale_primary_control(tmp_path) -> None:
+    async def scenario() -> None:
+        store = LiveFailoverStore(tmp_path / "failover.sqlite3")
+        store.save(
+            replace(
+                _record(_plan()),
+                state="detected",
+                publication=None,
+            )
+        )
+        channel = _PublicationChannel(fail=False)
+        coordinator = _coordinator(
+            control=_DetectedControl(),
+            channel=channel,
+            store=store,
+        )
+
+        await coordinator._handle_refresh_request(
+            "primary-node",
+            "session-1",
+            {"provider_id": "provider-primary"},
+        )
+
+        assert channel.plans == []
+        assert channel.targets == []
+        active = store.active("session-1", "storage-main")
+        assert active is not None
+        assert active.state == "detected"
 
     asyncio.run(scenario())
 
