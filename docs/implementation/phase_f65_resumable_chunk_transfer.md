@@ -100,7 +100,8 @@ It removes:
 - managed source files created by `send_bytes()`.
 
 Completed receipts and published objects are preserved. The caller controls
-the age threshold; the default is 24 hours.
+the age threshold; the default is 24 hours. Cleanup is a storage-space
+maintenance action only; it does not alter membership or write authority.
 
 ## Acceptance coverage
 
