@@ -624,13 +624,14 @@ class LiveCatchupStore:
                     session_id TEXT NOT NULL,
                     group_id TEXT NOT NULL,
                     returning_provider_id TEXT NOT NULL,
+                    manifest_hash TEXT NOT NULL,
                     state TEXT NOT NULL,
                     record_json TEXT NOT NULL CHECK(json_valid(record_json)),
                     updated_at TEXT NOT NULL,
-                    UNIQUE(session_id, group_id, returning_provider_id, manifest_hash)
-                )""".replace(
-                    ", manifest_hash)", ")"
-                )
+                    UNIQUE(
+                        session_id, group_id, returning_provider_id, manifest_hash
+                    )
+                )"""
             )
 
     def _connect(self) -> sqlite3.Connection:
@@ -672,8 +673,8 @@ class LiveCatchupStore:
             connection.execute(
                 """INSERT INTO storage_live_catchups
                    (recovery_id, session_id, group_id, returning_provider_id,
-                    state, record_json, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?)
+                    manifest_hash, state, record_json, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                    ON CONFLICT(recovery_id) DO UPDATE SET
                      state=excluded.state,
                      record_json=excluded.record_json,
@@ -683,6 +684,7 @@ class LiveCatchupStore:
                     record.session_id,
                     record.group_id,
                     record.returning_provider_id,
+                    record.manifest_hash,
                     record.state,
                     _json(record.to_dict()),
                     _stamp(record.updated_at),
