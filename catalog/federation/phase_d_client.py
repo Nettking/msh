@@ -60,12 +60,16 @@ class _Route:
 class PhaseDLogicalStorageClient:
     """Address storage by session/group while deriving primary authority dynamically.
 
-    When ``acknowledgements`` is supplied, the client is the coordinator-side
+    When ``acknowledgements`` is supplied, this client is the coordinator-side
     distributed commit boundary. It persists a manifest intent before the remote
     provider is called and advances the coordinator-owned manifest only after an
     authenticated successful response contains evidence satisfying the frozen
-    acknowledgement policy. This keeps manifest authority central even when the
-    storage service runs on another machine.
+    acknowledgement policy.
+
+    The remote provider may keep its own local manifest as restart evidence. That
+    local chain is not the distributed authority and may have another revision
+    after a primary change. In distributed mode, the coordinator-finalized chain
+    is therefore the manifest reference used for acceptance.
     """
 
     def __init__(
@@ -278,16 +282,19 @@ class PhaseDLogicalStorageClient:
             return self._invalid_success(
                 "storage success identity does not match the requested batch"
             )
-        manifest_revision = value.get("manifest_revision")
-        manifest_hash = value.get("manifest_hash")
+        remote_manifest_revision = value.get("manifest_revision")
+        remote_manifest_hash = value.get("manifest_hash")
         if not self._valid_manifest_reference(
             value,
-            manifest_revision,
-            manifest_hash,
+            remote_manifest_revision,
+            remote_manifest_hash,
         ):
             return self._invalid_success(
-                "storage success lacks valid authoritative manifest evidence"
+                "storage success lacks valid manifest evidence"
             )
+
+        authoritative_revision = remote_manifest_revision
+        authoritative_hash = remote_manifest_hash
         if intent is not None:
             try:
                 coordinated = self._finalize_distributed_manifest(
@@ -299,13 +306,9 @@ class PhaseDLogicalStorageClient:
                 return self._invalid_success(
                     f"distributed manifest evidence was rejected: {exc.message}"
                 )
-            if (
-                coordinated.revision != manifest_revision
-                or coordinated.manifest_hash != manifest_hash
-            ):
-                return self._invalid_success(
-                    "primary and coordinator manifest evidence differ"
-                )
+            authoritative_revision = coordinated.revision
+            authoritative_hash = coordinated.manifest_hash
+
         history_reader = getattr(
             self.control_plane,
             "manifest_history",
@@ -317,7 +320,7 @@ class PhaseDLogicalStorageClient:
             )
         try:
             history = history_reader(self.session_id, group_id)
-            manifest = history[manifest_revision]
+            manifest = history[authoritative_revision]
         except (
             FederationValidationError,
             IndexError,
@@ -336,8 +339,8 @@ class PhaseDLogicalStorageClient:
             None,
         )
         if (
-            manifest.revision != manifest_revision
-            or manifest.manifest_hash != manifest_hash
+            manifest.revision != authoritative_revision
+            or manifest.manifest_hash != authoritative_hash
             or item is None
             or item.kind is not ManifestItemKind.BATCH
             or item.dataset_id != request.dataset_id

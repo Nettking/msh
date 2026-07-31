@@ -129,6 +129,8 @@ jobs:
           catalog/node/tests/test_client.py
           catalog/node/tests/test_storage_agent.py
           catalog/node/tests/test_live_storage_replication.py
+          catalog/node/tests/test_live_storage_failover.py
+          catalog/node/tests/test_verified_live_failover.py
           catalog/relay/tests/test_service.py
           catalog/federation/tests/test_phase2_unit.py
           catalog/federation/tests/test_storage_protocol.py
