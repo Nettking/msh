@@ -15,12 +15,10 @@ from catalog.federation.errors import FederationValidationError
 from catalog.federation.live_failover import (
     LiveFailoverStore,
     StorageControlRelayChannel,
+    StorageFailoverCoordinator,
 )
 from catalog.federation.phase_d_control import PhaseDControlPlane
 from catalog.federation.relay_storage import RelayStorageEndpoint
-from catalog.federation.verified_live_failover import (
-    VerifiedStorageFailoverCoordinator,
-)
 
 from .client import RelayNodeClient
 from .state import EnrollmentState
@@ -97,7 +95,7 @@ async def _connect_authority(
 async def _run(arguments: argparse.Namespace) -> int:
     client: RelayNodeClient | None = None
     endpoint: RelayStorageEndpoint | None = None
-    failover: VerifiedStorageFailoverCoordinator | None = None
+    failover: StorageFailoverCoordinator | None = None
     try:
         client = await _connect_authority(arguments)
         endpoint = RelayStorageEndpoint(
@@ -110,7 +108,7 @@ async def _run(arguments: argparse.Namespace) -> int:
             endpoint,
             timeout=arguments.request_timeout,
         )
-        failover = VerifiedStorageFailoverCoordinator(
+        failover = StorageFailoverCoordinator(
             session_coordinator=SessionCoordinator(
                 Path(arguments.relay_control_database)
             ),
