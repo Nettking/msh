@@ -103,9 +103,15 @@ class PhaseDStorageService:
         self.replication_transport = replication_transport
         self.clock = clock
         self.local = LocalStorageService(provider)
+        self.recovery_authority_node_id: str | None = None
 
     async def dispatch(self, envelope: StorageRequestEnvelope) -> StorageResponseEnvelope:
         try:
+            from .live_catchup import dispatch_live_catchup_request
+
+            catchup = dispatch_live_catchup_request(self, envelope)
+            if catchup is not None:
+                return catchup
             if envelope.operation is StorageOperation.HEALTH:
                 return self._success(envelope, self._report_replica_health(envelope))
             if envelope.operation is not StorageOperation.BATCH_INGEST:
