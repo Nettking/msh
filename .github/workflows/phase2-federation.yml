@@ -173,6 +173,7 @@ jobs:
           catalog/node/tests/test_physical_storage_recovery.py
           catalog/node/tests/test_phase_f61_transport.py
           catalog/node/tests/test_phase_f62_direct_peer.py
+          catalog/node/tests/test_phase_f63_relay_loss_continuity.py
           catalog/node/tests/test_live_storage_replication.py
           catalog/node/tests/test_live_storage_failover.py
           catalog/node/tests/test_live_storage_catchup.py
