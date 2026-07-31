@@ -471,7 +471,7 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
                 group_id="storage-main",
                 returning_provider_id="provider-primary",
             )
-            assert replay.status == "completed"
+            assert replay.status == "completed", replay.to_dict()
             assert replay.reinstatement_id == completed.reinstatement_id
         finally:
             for task in bootstrap_tasks:

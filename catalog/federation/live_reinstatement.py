@@ -460,7 +460,7 @@ class LiveReinstatementStore:
             row = connection.execute(
                 """SELECT * FROM storage_live_reinstatements
                    WHERE session_id=? AND group_id=? AND returning_provider_id=?
-                   ORDER BY updated_at DESC LIMIT 1""",
+                   ORDER BY updated_at DESC, rowid DESC LIMIT 1""",
                 (session_id, group_id, returning_provider_id),
             ).fetchone()
         return None if row is None else self._decode(row)
@@ -476,7 +476,7 @@ class LiveReinstatementStore:
                 """SELECT * FROM storage_live_reinstatements
                    WHERE session_id=? AND group_id=? AND returning_provider_id=?
                      AND state NOT IN ('rolled-back','completed','operator-attention')
-                   ORDER BY updated_at DESC""",
+                   ORDER BY updated_at DESC, rowid DESC""",
                 (session_id, group_id, returning_provider_id),
             ).fetchall()
         if len(rows) > 1:
@@ -798,6 +798,7 @@ class LiveFormerPrimaryReinstatementCoordinator:
                     self.session_id, group_id, returning_provider_id
                 )
                 if latest is not None and latest.state == _STATE_COMPLETED:
+                    self._validate_completed(latest)
                     return self._result(
                         "completed",
                         "live-reinstatement-complete",
@@ -1413,6 +1414,46 @@ class LiveFormerPrimaryReinstatementCoordinator:
                 "reinstatement-failover-mismatch",
                 "failover_id",
                 "failover acknowledgement binding changed",
+            )
+
+    def _validate_completed(self, record: LiveReinstatementRecord) -> None:
+        self._validate_restored(record)
+        self._failover(record)
+        snapshot = self.control_plane.snapshot(record.session_id)
+        grant = snapshot.leader_grants.get(record.group_id)
+        if (
+            grant is None
+            or grant.get("provider_id") != record.source_provider_id
+            or grant.get("grant_id") != record.grant_id
+            or int(grant.get("term", -1)) != record.term
+            or int(grant.get("fencing_token", -1)) != record.fencing_token
+            or _utc(str(grant.get("lease_expires_at")))
+            != record.lease_expires_at
+        ):
+            raise FederationValidationError(
+                "reinstatement-authority-changed",
+                "grant_id",
+                "completed reinstatement no longer matches primary authority",
+            )
+        assessment = self.control_plane.latest_storage_replica_assessment(
+            record.session_id,
+            record.group_id,
+            record.returning_provider_id,
+        )
+        if (
+            record.final_publication is None
+            or record.final_report_revision is None
+            or record.final_report_hash is None
+            or assessment is None
+            or not assessment.accepted
+            or not assessment.eligibility
+            or assessment.report_revision != record.final_report_revision
+            or assessment.report_hash != record.final_report_hash
+        ):
+            raise FederationValidationError(
+                "reinstatement-completion-evidence-changed",
+                "final_report",
+                "completed replica proof is missing or no longer current",
             )
 
     def _validate_restored(self, record: LiveReinstatementRecord) -> None:
