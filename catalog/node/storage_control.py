@@ -9,10 +9,10 @@ import os
 import sys
 from pathlib import Path
 
+from catalog.federation.control_relay import FramedStorageControlRelayPublisher
 from catalog.federation.control_sync import (
     StorageControlPlan,
     StorageControlPublicationStore,
-    StorageControlRelayPublisher,
 )
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.phase_d_control import PhaseDControlPlane
@@ -141,7 +141,7 @@ async def _publish(arguments: argparse.Namespace) -> int:
                     "session_id",
                     "invitation joined a different session",
                 )
-        result = await StorageControlRelayPublisher(
+        result = await FramedStorageControlRelayPublisher(
             client, timeout=arguments.timeout
         ).publish(plan, tuple(arguments.target_node_id))
         print(
