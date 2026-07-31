@@ -20,6 +20,15 @@ from catalog.federation.control_sync import (
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.live_failover import STORAGE_CONTROL_REFRESH_MESSAGE
 from catalog.federation.models import CapabilityStatus
+from catalog.federation.storage_protocol import (
+    STORAGE_PROTOCOL,
+    BatchIngestRequest,
+    StorageError,
+    StorageErrorCode,
+    StorageOperation,
+    StorageRequestEnvelope,
+    StorageResponseEnvelope,
+)
 
 from .state import EnrollmentState, NodeStateError
 from .storage_agent import (
@@ -33,14 +42,48 @@ from .storage_agent import (
 DEFAULT_CONTROL_SYNC_TIMEOUT = 30.0
 
 
+class _TrustedControlWriteGate:
+    """Reject every local mutation while trusted control is unavailable."""
+
+    def __init__(self, service: Any, ready_event: asyncio.Event) -> None:
+        self.service = service
+        self.ready_event = ready_event
+
+    async def dispatch(
+        self,
+        envelope: StorageRequestEnvelope,
+    ) -> StorageResponseEnvelope:
+        if (
+            envelope.operation is StorageOperation.BATCH_INGEST
+            and not self.ready_event.is_set()
+        ):
+            return StorageResponseEnvelope(
+                request_id=envelope.request_id,
+                protocol=STORAGE_PROTOCOL,
+                protocol_version=envelope.protocol_version,
+                ok=False,
+                error=StorageError(
+                    code=StorageErrorCode.NOT_PRIMARY,
+                    message=(
+                        "storage provider is locally fenced until fresh signed "
+                        "control is verified"
+                    ),
+                    field="provider_id",
+                    retryable=True,
+                ),
+            )
+        return await self.service.dispatch(envelope)
+
+
 class LiveStorageNodeAgent:
     """Compose the F1 storage service with authenticated live control updates.
 
-    A node that loses its relay connection durably revokes every local primary
-    grant before reconnecting.  Its saved capability is also changed to
-    unavailable, so the shared client cannot automatically re-advertise a stale
-    ready primary.  A fresh signed control publication is required before the
-    provider becomes ready again.
+    A node that loses its relay connection immediately closes a provider-local
+    write gate and advertises itself as unavailable.  The gate opens only after
+    a signed control publication from the pinned authority has been verified.
+    This blocks stale-primary revival without rewriting the signed local control
+    history, so an unchanged authority can safely be reconfirmed after a short
+    connection interruption.
     """
 
     def __init__(
@@ -61,6 +104,13 @@ class LiveStorageNodeAgent:
         self.replica_store = StorageControlReplicaStore(config.control_database)
         self.control_ready_event = asyncio.Event()
         self.control_waiting_event = asyncio.Event()
+        self.storage.endpoint.register_service(
+            config.provider_id,
+            _TrustedControlWriteGate(
+                self.storage.service,
+                self.control_ready_event,
+            ),
+        )
         self._control_task: asyncio.Task[None] | None = None
         self._connection_task: asyncio.Task[None] | None = None
         self._refresh_lock = asyncio.Lock()
@@ -229,21 +279,13 @@ class LiveStorageNodeAgent:
         self.control_ready_event.clear()
         self.control_waiting_event.set()
         snapshot = self.control.snapshot(self.storage.config.session_id)
-        fenced: list[str] = []
-        for group_id, assignment in sorted(snapshot.groups.items()):
-            if assignment.primary_provider_id != self.storage.config.provider_id:
-                continue
-            grant = snapshot.leader_grants.get(group_id)
-            if grant is None or grant.get("provider_id") != self.storage.config.provider_id:
-                continue
-            self.control.revoke_leader(
-                self.storage.config.session_id,
-                self.control_authority_node_id,
-                group_id,
-                str(grant["grant_id"]),
+        self._self_fenced_groups = tuple(
+            sorted(
+                group_id
+                for group_id, assignment in snapshot.groups.items()
+                if assignment.primary_provider_id == self.storage.config.provider_id
             )
-            fenced.append(group_id)
-        self._self_fenced_groups = tuple(fenced)
+        )
         self._last_self_fence_reason = reason
         self._persist_unavailable_capability()
         if announce_unavailable and self.client.connected_event.is_set():
