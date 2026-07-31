@@ -469,6 +469,7 @@ class LiveCatchupRecord:
     items: tuple[LiveCatchupItem, ...]
     final_report_revision: int | None
     final_report_hash: str | None
+    final_report: StorageReplicaReport | None
     latest_error_code: str | None
     latest_error_reason: str | None
     created_at: datetime
@@ -513,13 +514,20 @@ class LiveCatchupRecord:
         object.__setattr__(self, "lease_expires_at", _utc(self.lease_expires_at))
         object.__setattr__(self, "created_at", _utc(self.created_at))
         object.__setattr__(self, "updated_at", _utc(self.updated_at))
-        if (self.final_report_revision is None) != (self.final_report_hash is None):
+        final_values = (
+            self.final_report_revision,
+            self.final_report_hash,
+            self.final_report,
+        )
+        if any(value is None for value in final_values) and not all(
+            value is None for value in final_values
+        ):
             raise FederationValidationError(
                 "invalid-live-catchup-final-report",
-                "final_report_revision",
-                "final report revision and hash must appear together",
+                "final_report",
+                "final report, revision, and hash must appear together",
             )
-        if self.final_report_revision is not None:
+        if self.final_report is not None:
             object.__setattr__(
                 self,
                 "final_report_revision",
@@ -530,6 +538,23 @@ class LiveCatchupRecord:
                 "final_report_hash",
                 _text(self.final_report_hash, "final_report_hash"),
             )
+            report = self.final_report
+            if (
+                report.report_revision != self.final_report_revision
+                or report.report_hash() != self.final_report_hash
+                or report.session_id != self.session_id
+                or report.group_id != self.group_id
+                or report.provider_id != self.returning_provider_id
+                or report.manifest_revision != self.manifest_revision
+                or report.manifest_hash != self.manifest_hash
+                or not report.integrity_verified
+                or report.synchronization_state != "synchronized"
+            ):
+                raise FederationValidationError(
+                    "invalid-live-catchup-final-report",
+                    "final_report",
+                    "stored report is not complete and bound to this recovery",
+                )
         if (self.latest_error_code is None) != (self.latest_error_reason is None):
             raise FederationValidationError(
                 "invalid-live-catchup-error",
@@ -592,6 +617,9 @@ class LiveCatchupRecord:
             "items": [item.to_dict() for item in self.items],
             "final_report_revision": self.final_report_revision,
             "final_report_hash": self.final_report_hash,
+            "final_report": (
+                None if self.final_report is None else self.final_report.to_dict()
+            ),
             "latest_error_code": self.latest_error_code,
             "latest_error_reason": self.latest_error_reason,
             "created_at": _stamp(self.created_at),
@@ -607,6 +635,12 @@ class LiveCatchupRecord:
         restored = dict(value)
         restored["items"] = tuple(
             LiveCatchupItem.from_dict(item) for item in value.get("items", ())
+        )
+        final_report = value.get("final_report")
+        restored["final_report"] = (
+            None
+            if final_report is None
+            else StorageReplicaReport.from_dict(final_report)
         )
         return cls(**restored)
 
@@ -1014,6 +1048,7 @@ class LiveFormerPrimaryCatchupCoordinator:
             items=tuple(items),
             final_report_revision=None,
             final_report_hash=None,
+            final_report=None,
             latest_error_code=None if conflict is None else conflict.code,
             latest_error_reason=None if conflict is None else str(conflict),
             created_at=created,
@@ -1114,6 +1149,7 @@ class LiveFormerPrimaryCatchupCoordinator:
                 state=_STATE_CAUGHT_UP,
                 final_report_revision=assessment.report_revision,
                 final_report_hash=assessment.report_hash,
+                final_report=report,
                 updated_at=self.clock(),
             )
         )

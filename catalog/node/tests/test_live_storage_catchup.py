@@ -343,18 +343,22 @@ def test_live_catchup_repairs_only_missing_batches_and_keeps_node_unassigned(
             assert primary.status()["provider"]["groups"] == [
                 {"group_id": "storage-main", "role": "unassigned"}
             ]
-            assessment = control.latest_storage_replica_assessment(
+            assert completed.record.final_report is not None
+            assert completed.record.final_report.provider_id == "provider-primary"
+            assert completed.record.final_report.integrity_verified
+            assert (
+                completed.record.final_report.synchronization_state
+                == "synchronized"
+            )
+            assert (
+                completed.record.final_report.report_hash()
+                == completed.record.final_report_hash
+            )
+            assert control.latest_storage_replica_assessment(
                 session_id,
                 "storage-main",
                 "provider-primary",
-            )
-            assert assessment is not None
-            assert not assessment.accepted
-            assert not assessment.eligibility
-            assert assessment.eligibility_reason == "provider-not-assigned"
-            assert assessment.report is not None
-            assert assessment.report.integrity_verified
-            assert assessment.report.synchronization_state == "synchronized"
+            ) is None
             assert primary.storage.inbound_listener_ports == ()
             assert replica.storage.inbound_listener_ports == ()
         finally:
