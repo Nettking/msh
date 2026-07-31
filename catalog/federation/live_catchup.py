@@ -1066,12 +1066,6 @@ class LiveFormerPrimaryCatchupCoordinator:
             )
         )
         report, assessment = await self._request_report(binding)
-        if not assessment.accepted:
-            raise FederationValidationError(
-                "live-catchup-final-report-rejected",
-                "report",
-                assessment.eligibility_reason,
-            )
         if report.manifest_revision != verifying.manifest_revision:
             raise FederationValidationError(
                 "live-catchup-final-report-revision-mismatch",
@@ -1176,6 +1170,29 @@ class LiveFormerPrimaryCatchupCoordinator:
             report,
             actor_node_id=binding["returning"].node_id,
         )
+        if (
+            assessment.accepted
+            or assessment.eligibility
+            or assessment.eligibility_reason != "provider-not-assigned"
+        ):
+            raise FederationValidationError(
+                "live-catchup-report-assignment-changed",
+                "assessment",
+                (
+                    "F4.1 requires a registered provider that remains "
+                    "unassigned throughout catch-up"
+                ),
+            )
+        if (
+            assessment.report is None
+            or assessment.report_hash != report.report_hash()
+            or assessment.report.to_dict() != report.to_dict()
+        ):
+            raise FederationValidationError(
+                "live-catchup-report-persistence-mismatch",
+                "assessment",
+                "persisted assessment is not bound to the authenticated report",
+            )
         return report, assessment
 
     async def _inspect(

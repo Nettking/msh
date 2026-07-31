@@ -349,7 +349,9 @@ def test_live_catchup_repairs_only_missing_batches_and_keeps_node_unassigned(
                 "provider-primary",
             )
             assert assessment is not None
-            assert assessment.accepted
+            assert not assessment.accepted
+            assert not assessment.eligibility
+            assert assessment.eligibility_reason == "provider-not-assigned"
             assert assessment.report is not None
             assert assessment.report.integrity_verified
             assert assessment.report.synchronization_state == "synchronized"
