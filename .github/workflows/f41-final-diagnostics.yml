@@ -31,28 +31,24 @@ jobs:
                   'import sqlite3\nimport uuid\nfrom collections import Counter\n',
                   1,
               )
-
           old = '''                record = self.catchup_store.save(\n                    replace(record, updated_at=self.clock())\n                )\n                try:\n'''
           new = '''                record = self.catchup_store.save(\n                    replace(record, updated_at=self.clock())\n                )\n                current = self._item(record, current.item_id)\n                try:\n'''
           if old in text:
               text = text.replace(old, new, 1)
           elif new not in text:
               raise SystemExit('attempt counter anchor missing')
-
           old = '''                        StorageErrorCode.STALE_FENCING_TOKEN.value,\n                    }\n'''
           new = '''                        StorageErrorCode.STALE_FENCING_TOKEN.value,\n                        StorageErrorCode.INVALID_REQUEST.value,\n                    }\n'''
           if old in text:
               text = text.replace(old, new, 1)
           elif new not in text:
               raise SystemExit('fatal error anchor missing')
-
           old = '''        if (\n            not assessment.accepted\n            or report.manifest_revision != verifying.manifest_revision\n            or report.manifest_hash != verifying.manifest_hash\n            or not report.integrity_verified\n            or report.synchronization_state != "synchronized"\n            or set(report.committed_item_hashes)\n            != {item.content_hash for item in verifying.items}\n        ):\n            raise FederationValidationError(\n                "live-catchup-final-report-incomplete",\n                "report",\n                "returning provider did not prove complete synchronized content",\n            )\n'''
           new = '''        if not assessment.accepted:\n            raise FederationValidationError(\n                "live-catchup-final-report-rejected",\n                "report",\n                assessment.eligibility_reason,\n            )\n        if report.manifest_revision != verifying.manifest_revision:\n            raise FederationValidationError(\n                "live-catchup-final-report-revision-mismatch",\n                "manifest_revision",\n                "final report revision differs from the recovery manifest",\n            )\n        if report.manifest_hash != verifying.manifest_hash:\n            raise FederationValidationError(\n                "live-catchup-final-report-hash-mismatch",\n                "manifest_hash",\n                "final report hash differs from the recovery manifest",\n            )\n        if not report.integrity_verified:\n            raise FederationValidationError(\n                "live-catchup-final-report-integrity-failed",\n                "integrity_verified",\n                ",".join(report.eligibility_reasons),\n            )\n        if report.synchronization_state != "synchronized":\n            raise FederationValidationError(\n                "live-catchup-final-report-not-synchronized",\n                "synchronization_state",\n                report.synchronization_state,\n            )\n        expected_hashes = Counter(\n            item.content_hash for item in verifying.items\n        )\n        reported_hashes = Counter(report.committed_item_hashes)\n        if reported_hashes != expected_hashes:\n            raise FederationValidationError(\n                "live-catchup-final-report-evidence-mismatch",\n                "committed_item_hashes",\n                (\n                    f"expected {dict(expected_hashes)}, "\n                    f"received {dict(reported_hashes)}"\n                ),\n            )\n'''
           if old not in text:
               raise SystemExit('final verification anchor missing')
           text = text.replace(old, new, 1)
           path.write_text(text)
-
           workflow = Path('.github/workflows/phase2-federation.yml')
           workflow_text = workflow.read_text()
           anchor = '          catalog/node/tests/test_live_storage_failover.py\n'
@@ -71,3 +67,5 @@ jobs:
           git add catalog/federation/live_catchup.py .github/workflows/phase2-federation.yml
           git commit -m "Clarify and harden F4.1 final verification"
           git push origin HEAD:agent/phase-f41-live-former-primary-catchup
+
+# trigger
