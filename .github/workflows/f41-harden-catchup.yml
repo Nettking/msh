@@ -1,0 +1,88 @@
+name: Harden F4.1 catch-up
+
+on:
+  push:
+    branches:
+      - agent/phase-f41-live-former-primary-catchup
+    paths:
+      - ".github/workflows/f41-harden-catchup.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/phase-f41-live-former-primary-catchup
+          fetch-depth: 0
+      - name: Apply bounded hardening changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('catalog/federation/live_catchup.py')
+          text = path.read_text()
+          text = text.replace(
+              'import sqlite3\nimport uuid\n',
+              'import sqlite3\nimport uuid\nfrom collections import Counter\n',
+              1,
+          )
+          old = '''                """CREATE TABLE IF NOT EXISTS storage_live_catchups (\n                    recovery_id TEXT PRIMARY KEY,\n                    session_id TEXT NOT NULL,\n                    group_id TEXT NOT NULL,\n                    returning_provider_id TEXT NOT NULL,\n                    state TEXT NOT NULL,\n                    record_json TEXT NOT NULL CHECK(json_valid(record_json)),\n                    updated_at TEXT NOT NULL,\n                    UNIQUE(session_id, group_id, returning_provider_id, manifest_hash)\n                )""".replace(\n                    ", manifest_hash)", ")"\n                )\n'''
+          new = '''                """CREATE TABLE IF NOT EXISTS storage_live_catchups (\n                    recovery_id TEXT PRIMARY KEY,\n                    session_id TEXT NOT NULL,\n                    group_id TEXT NOT NULL,\n                    returning_provider_id TEXT NOT NULL,\n                    manifest_hash TEXT NOT NULL,\n                    state TEXT NOT NULL,\n                    record_json TEXT NOT NULL CHECK(json_valid(record_json)),\n                    updated_at TEXT NOT NULL,\n                    UNIQUE(\n                        session_id, group_id, returning_provider_id, manifest_hash\n                    )\n                )"""\n'''
+          if old not in text:
+              raise SystemExit('schema anchor missing')
+          text = text.replace(old, new, 1)
+          old = '''                   (recovery_id, session_id, group_id, returning_provider_id,\n                    state, record_json, updated_at)\n                   VALUES (?, ?, ?, ?, ?, ?, ?)\n'''
+          new = '''                   (recovery_id, session_id, group_id, returning_provider_id,\n                    manifest_hash, state, record_json, updated_at)\n                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)\n'''
+          if old not in text:
+              raise SystemExit('insert columns anchor missing')
+          text = text.replace(old, new, 1)
+          old = '''                    record.returning_provider_id,\n                    record.state,\n                    _json(record.to_dict()),\n'''
+          new = '''                    record.returning_provider_id,\n                    record.manifest_hash,\n                    record.state,\n                    _json(record.to_dict()),\n'''
+          if old not in text:
+              raise SystemExit('insert values anchor missing')
+          text = text.replace(old, new, 1)
+          old = '''                record = self.catchup_store.save(\n                    replace(record, updated_at=self.clock())\n                )\n                try:\n'''
+          new = '''                record = self.catchup_store.save(\n                    replace(record, updated_at=self.clock())\n                )\n                current = self._item(record, current.item_id)\n                try:\n'''
+          if old not in text:
+              raise SystemExit('attempt anchor missing')
+          text = text.replace(old, new, 1)
+          old = '''            or set(report.committed_item_hashes)\n            != {item.content_hash for item in verifying.items}\n'''
+          new = '''            or Counter(report.committed_item_hashes)\n            != Counter(item.content_hash for item in verifying.items)\n'''
+          if old not in text:
+              raise SystemExit('report comparison anchor missing')
+          text = text.replace(old, new, 1)
+          old = '''                        StorageErrorCode.STALE_FENCING_TOKEN.value,\n                    }\n'''
+          new = '''                        StorageErrorCode.STALE_FENCING_TOKEN.value,\n                        StorageErrorCode.INVALID_REQUEST.value,\n                    }\n'''
+          if old not in text:
+              raise SystemExit('fatal code anchor missing')
+          text = text.replace(old, new, 1)
+          path.write_text(text)
+
+          agent = Path('catalog/node/live_storage_agent.py')
+          text = agent.read_text().replace(
+              '        self.storage.service.recovery_authority_node_id = (control_authority_node_id)\n',
+              '        self.storage.service.recovery_authority_node_id = control_authority_node_id\n',
+              1,
+          )
+          agent.write_text(text)
+
+          workflow = Path('.github/workflows/phase2-federation.yml')
+          text = workflow.read_text()
+          anchor = '          catalog/node/tests/test_live_storage_failover.py\n'
+          addition = anchor + '          catalog/node/tests/test_live_storage_catchup.py\n'
+          if addition not in text:
+              if anchor not in text:
+                  raise SystemExit('Windows test anchor missing')
+              text = text.replace(anchor, addition, 1)
+          workflow.write_text(text)
+          PY
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/federation/live_catchup.py catalog/node/live_storage_agent.py .github/workflows/phase2-federation.yml
+          git commit -m "Harden F4.1 durability and test wiring"
+          git push origin HEAD:agent/phase-f41-live-former-primary-catchup
