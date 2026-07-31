@@ -1,0 +1,137 @@
+name: Phase F6 direct transport closeout
+
+on:
+  pull_request:
+    paths:
+      - "catalog/federation/adaptive_transport.py"
+      - "catalog/federation/peer_stream.py"
+      - "catalog/federation/peer_stream_verifier.py"
+      - "catalog/federation/direct_peer.py"
+      - "catalog/federation/libp2p_sidecar.py"
+      - "catalog/federation/object_transfer.py"
+      - "catalog/federation/object_transfer_staging.py"
+      - "catalog/federation/verified_chunk_transfer.py"
+      - "catalog/federation/resumable_chunk_transfer.py"
+      - "catalog/federation/tests/test_phase_f641_chunk_contract.py"
+      - "catalog/node/tests/test_phase_f61_transport.py"
+      - "catalog/node/tests/test_phase_f62_direct_peer.py"
+      - "catalog/node/tests/test_phase_f63_relay_loss_continuity.py"
+      - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
+      - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
+      - "cmd/msh-peer-sidecar/**"
+      - "docs/federated_session_network.md"
+      - "docs/implementation/federated_session_agent_handoff.md"
+      - "docs/implementation/federated_session_test_matrix.md"
+      - "docs/implementation/phase_f6_closeout.md"
+      - ".github/workflows/phase-f6-closeout.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/federation/adaptive_transport.py"
+      - "catalog/federation/peer_stream.py"
+      - "catalog/federation/peer_stream_verifier.py"
+      - "catalog/federation/direct_peer.py"
+      - "catalog/federation/libp2p_sidecar.py"
+      - "catalog/federation/object_transfer.py"
+      - "catalog/federation/object_transfer_staging.py"
+      - "catalog/federation/verified_chunk_transfer.py"
+      - "catalog/federation/resumable_chunk_transfer.py"
+      - "catalog/federation/tests/test_phase_f641_chunk_contract.py"
+      - "catalog/node/tests/test_phase_f61_transport.py"
+      - "catalog/node/tests/test_phase_f62_direct_peer.py"
+      - "catalog/node/tests/test_phase_f63_relay_loss_continuity.py"
+      - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
+      - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
+      - "cmd/msh-peer-sidecar/**"
+      - "docs/federated_session_network.md"
+      - "docs/implementation/federated_session_agent_handoff.md"
+      - "docs/implementation/federated_session_test_matrix.md"
+      - "docs/implementation/phase_f6_closeout.md"
+      - ".github/workflows/phase-f6-closeout.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f6-closeout-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  direct-transport-closeout:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "cmd/msh-peer-sidecar/go.mod"
+          cache: false
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Verify Go node-agent boundary
+        working-directory: cmd/msh-peer-sidecar
+        run: |
+          go mod tidy
+          go test ./...
+          go build -trimpath .
+      - name: Compile complete F6 boundary
+        run: >-
+          python -m compileall
+          catalog/federation/adaptive_transport.py
+          catalog/federation/peer_stream.py
+          catalog/federation/peer_stream_verifier.py
+          catalog/federation/direct_peer.py
+          catalog/federation/libp2p_sidecar.py
+          catalog/federation/object_transfer.py
+          catalog/federation/object_transfer_staging.py
+          catalog/federation/verified_chunk_transfer.py
+          catalog/federation/resumable_chunk_transfer.py
+          catalog/federation/tests/test_phase_f641_chunk_contract.py
+          catalog/node/tests/test_phase_f61_transport.py
+          catalog/node/tests/test_phase_f62_direct_peer.py
+          catalog/node/tests/test_phase_f63_relay_loss_continuity.py
+          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
+          catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
+      - name: Phase 5 direct transport acceptance matrix
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/node/tests/test_phase_f61_transport.py
+          catalog/node/tests/test_phase_f62_direct_peer.py
+          catalog/node/tests/test_phase_f63_relay_loss_continuity.py
+          catalog/federation/tests/test_phase_f641_chunk_contract.py
+          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
+          catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
+      - name: Ruff complete F6 boundary
+        run: >-
+          python -m ruff check
+          catalog/federation/adaptive_transport.py
+          catalog/federation/peer_stream.py
+          catalog/federation/peer_stream_verifier.py
+          catalog/federation/direct_peer.py
+          catalog/federation/libp2p_sidecar.py
+          catalog/federation/object_transfer.py
+          catalog/federation/object_transfer_staging.py
+          catalog/federation/verified_chunk_transfer.py
+          catalog/federation/resumable_chunk_transfer.py
+          catalog/federation/tests/test_phase_f641_chunk_contract.py
+          catalog/node/tests/test_phase_f61_transport.py
+          catalog/node/tests/test_phase_f62_direct_peer.py
+          catalog/node/tests/test_phase_f63_relay_loss_continuity.py
+          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
+          catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
+          --ignore I001,RUF022,B008,C408,PLC0206
+      - name: Diff hygiene
+        run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
