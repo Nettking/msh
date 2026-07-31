@@ -133,8 +133,8 @@ class LiveStorageNodeAgent:
         """Make live join replay-safe while retaining fail-closed rollback.
 
         The relay may emit the first session event immediately after the accepted
-        response.  The shared receiver must therefore have a durable membership
-        row before that event can arrive.  A rejected or mismatched invitation
+        response. The shared receiver must therefore have a durable membership
+        row before that event can arrive. A rejected or mismatched invitation
         rolls the provisional row back to the removed state.
         """
 
@@ -182,11 +182,26 @@ class LiveStorageNodeAgent:
         actor_node_id: str,
         payload: dict[str, Any],
     ) -> None:
-        plan_value = payload.get("plan")
+        plan_value: Any = None
         publication_id = None
         publication_revision = None
         content_hash = None
         try:
+            frame = payload.get("frame")
+            if not isinstance(frame, str):
+                raise FederationValidationError(
+                    "invalid-storage-control-frame",
+                    "frame",
+                    "signed control plan must be a JSON frame",
+                )
+            try:
+                plan_value = json.loads(frame)
+            except json.JSONDecodeError as exc:
+                raise FederationValidationError(
+                    "invalid-storage-control-frame",
+                    "frame",
+                    "signed control plan frame is not valid JSON",
+                ) from exc
             plan = StorageControlPlan.from_dict(plan_value)
             publication_id = plan.publication_id
             publication_revision = plan.publication_revision
