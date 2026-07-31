@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import copy
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 import pytest
 
