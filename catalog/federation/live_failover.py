@@ -945,6 +945,16 @@ class StorageFailoverCoordinator:
         provider = snapshot.providers.get(provider_id)
         if provider is None or provider.node_id != actor_node_id:
             return
+        for group_id, assignment in snapshot.groups.items():
+            if assignment.primary_provider_id != provider_id:
+                continue
+            active = self.failover_store.active(self.session_id, group_id)
+            if (
+                active is not None
+                and active.failed_provider_id == provider_id
+                and active.state == "detected"
+            ):
+                return
         await self.publish_current((actor_node_id,))
 
     async def run_forever(self, *, scan_interval: float = 2.0) -> None:
