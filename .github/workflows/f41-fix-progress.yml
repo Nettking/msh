@@ -71,3 +71,5 @@ jobs:
           git add catalog/federation/live_catchup.py catalog/node/live_storage_agent.py .github/workflows/phase2-federation.yml
           git commit -m "Preserve F4.1 progress and exact evidence"
           git push origin HEAD:agent/phase-f41-live-former-primary-catchup
+
+# retry trigger
