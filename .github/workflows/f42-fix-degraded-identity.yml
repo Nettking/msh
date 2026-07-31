@@ -1,0 +1,46 @@
+name: Fix F4.2 degraded identity
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/f42-fix-degraded-identity.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Separate degraded identity from manifest progress
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('catalog/federation/live_reinstatement.py')
+          text = path.read_text()
+
+          old = '''        obligations = degraded.get("obligations")\n        revision = degraded.get("manifest_revision")\n        return (\n            degraded.get("session_id") == record.session_id\n            and degraded.get("group_id") == record.group_id\n            and isinstance(revision, int)\n            and not isinstance(revision, bool)\n            and revision >= record.manifest_revision\n            and degraded.get("reason_code")\n'''
+          new = '''        obligations = degraded.get("obligations")\n        return (\n            degraded.get("session_id") == record.session_id\n            and degraded.get("group_id") == record.group_id\n            and degraded.get("reason_code")\n'''
+          if old not in text:
+              raise SystemExit('record degraded identity anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = '''            degraded.get("session_id") == catchup.session_id\n            and degraded.get("group_id") == catchup.group_id\n            and degraded.get("manifest_revision") == catchup.manifest_revision\n            and degraded.get("manifest_hash") == catchup.manifest_hash\n            and degraded.get("reason_code")\n'''
+          new = '''            degraded.get("session_id") == catchup.session_id\n            and degraded.get("group_id") == catchup.group_id\n            and degraded.get("reason_code")\n'''
+          if old not in text:
+              raise SystemExit('catchup degraded identity anchor missing')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          python -m py_compile catalog/federation/live_reinstatement.py
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add catalog/federation/live_reinstatement.py
+          git commit -m 'Separate degraded identity from manifest progress'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
