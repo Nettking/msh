@@ -12,6 +12,7 @@ import hashlib
 import json
 import sqlite3
 import uuid
+from collections import Counter
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
@@ -820,6 +821,7 @@ class LiveFormerPrimaryCatchupCoordinator:
                 record = self.catchup_store.save(
                     replace(record, updated_at=self.clock())
                 )
+                current = self._item(record, current.item_id)
                 try:
                     source = await self._inspect(
                         binding["source"].node_id,
@@ -869,6 +871,7 @@ class LiveFormerPrimaryCatchupCoordinator:
                         StorageErrorCode.UNKNOWN_GRANT.value,
                         StorageErrorCode.STALE_TERM.value,
                         StorageErrorCode.STALE_FENCING_TOKEN.value,
+                        StorageErrorCode.INVALID_REQUEST.value,
                     }
                     updated = replace(
                         self._item(record, current.item_id),
@@ -1063,19 +1066,48 @@ class LiveFormerPrimaryCatchupCoordinator:
             )
         )
         report, assessment = await self._request_report(binding)
-        if (
-            not assessment.accepted
-            or report.manifest_revision != verifying.manifest_revision
-            or report.manifest_hash != verifying.manifest_hash
-            or not report.integrity_verified
-            or report.synchronization_state != "synchronized"
-            or set(report.committed_item_hashes)
-            != {item.content_hash for item in verifying.items}
-        ):
+        if not assessment.accepted:
             raise FederationValidationError(
-                "live-catchup-final-report-incomplete",
+                "live-catchup-final-report-rejected",
                 "report",
-                "returning provider did not prove complete synchronized content",
+                assessment.eligibility_reason,
+            )
+        if report.manifest_revision != verifying.manifest_revision:
+            raise FederationValidationError(
+                "live-catchup-final-report-revision-mismatch",
+                "manifest_revision",
+                "final report revision differs from the recovery manifest",
+            )
+        if report.manifest_hash != verifying.manifest_hash:
+            raise FederationValidationError(
+                "live-catchup-final-report-hash-mismatch",
+                "manifest_hash",
+                "final report hash differs from the recovery manifest",
+            )
+        if not report.integrity_verified:
+            raise FederationValidationError(
+                "live-catchup-final-report-integrity-failed",
+                "integrity_verified",
+                ",".join(report.eligibility_reasons),
+            )
+        if report.synchronization_state != "synchronized":
+            raise FederationValidationError(
+                "live-catchup-final-report-not-synchronized",
+                "synchronization_state",
+                report.synchronization_state,
+            )
+        expected_hashes = Counter(
+            item.content_hash for item in verifying.items
+        )
+        reported_hashes = Counter(report.committed_item_hashes)
+        if reported_hashes != expected_hashes:
+            raise FederationValidationError(
+                "live-catchup-final-report-evidence-mismatch",
+                "committed_item_hashes",
+                (
+                    f"expected {dict(expected_hashes)}, "
+                    f"received {dict(reported_hashes)}"
+                ),
             )
         latest = self._binding(
             verifying.group_id,
