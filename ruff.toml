@@ -1,2 +1,0 @@
-[lint.per-file-ignores]
-"catalog/federation/live_failover.py" = ["UP012", "UP035"]
