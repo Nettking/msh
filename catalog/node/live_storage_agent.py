@@ -104,6 +104,7 @@ class LiveStorageNodeAgent:
         if control_sync_timeout <= 0:
             raise ValueError("control_sync_timeout must be positive")
         self.storage = StorageNodeAgent(config, clock=clock)
+        self.storage.service.recovery_authority_node_id = (control_authority_node_id)
         self.control_authority_node_id = control_authority_node_id
         self.control_sync_timeout = float(control_sync_timeout)
         self.replica_store = StorageControlReplicaStore(config.control_database)
