@@ -357,7 +357,21 @@ def test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(
             assert promotion.term == 2
             assert promotion.fencing_token == 2
 
+            assessment = control.latest_storage_replica_assessment(
+                session_id,
+                "storage-main",
+                "provider-replica",
+            )
+            assert assessment is not None
+            assert assessment.accepted
+            assert assessment.eligibility
+            assert assessment.report is not None
+            assert assessment.report.integrity_verified
+            assert assessment.report.manifest_revision == manifest.revision
+            assert assessment.report.manifest_hash == manifest.manifest_hash
+
             promoted_snapshot = control.snapshot(session_id)
+            assert promoted_snapshot.revision > pre_failover_revision
             assignment = promoted_snapshot.groups["storage-main"]
             grant = promoted_snapshot.leader_grants["storage-main"]
             assert assignment.primary_provider_id == "provider-replica"
@@ -400,12 +414,16 @@ def test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(
                 batch_id="batch-2",
             ) == second_content
 
-            failover_id = StorageFailoverCoordinator._failover_id(
+            observation_id = StorageFailoverCoordinator._observation_id(
                 session_id,
                 "storage-main",
                 "provider-primary",
+                "grant-1",
+            )
+            failover_id = StorageFailoverCoordinator._failover_id(
+                observation_id,
                 "provider-replica",
-                pre_failover_revision,
+                assessment.report_hash,
             )
             durable = LiveFailoverStore(failover_store_path).get(
                 session_id,
@@ -415,6 +433,8 @@ def test_primary_loss_promotes_complete_replica_and_old_grant_stays_fenced(
             assert durable is not None
             assert durable.state == "published"
             assert durable.publication is not None
+            assert durable.selected_report_revision == assessment.report_revision
+            assert durable.selected_report_hash == assessment.report_hash
 
             primary = LiveStorageNodeAgent(
                 primary_config,
