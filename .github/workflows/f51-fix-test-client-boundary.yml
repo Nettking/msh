@@ -1,0 +1,36 @@
+name: Fix F5.1 test client boundary
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/f51-fix-test-client-boundary.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Separate probe and provision receive loops
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("catalog/node/tests/test_three_machine_deployment.py")
+          text = path.read_text(encoding="utf-8")
+          old = '''            assert commit.required_replica_acks == 1\n            assert commit.acknowledged_replica_ids == ("provider-replica",)\n\n            primary_before = _storage_evidence(\n'''
+          new = '''            assert commit.required_replica_acks == 1\n            assert commit.acknowledged_replica_ids == ("provider-replica",)\n\n            # The physical runbook invokes probe-write and provision as\n            # separate CLI processes. Release the probe endpoint's receive\n            # loop before the authority publishes restart control directly.\n            await authority_endpoint.close()\n            authority_endpoint = None\n\n            primary_before = _storage_evidence(\n'''
+          assert text.count(old) == 1
+          path.write_text(text.replace(old, new), encoding="utf-8")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/node/tests/test_three_machine_deployment.py
+          git commit -m "Separate F5.1 probe and provision clients"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
