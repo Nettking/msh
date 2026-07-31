@@ -14,10 +14,11 @@ import hashlib
 import json
 import sqlite3
 import uuid
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Awaitable, Callable, Protocol
+from typing import Any, Protocol
 
 from catalog.node.identity import NodeCredentials
 
@@ -1430,7 +1431,7 @@ class StorageFailoverCoordinator:
         value = (
             f"{session_id}\0{group_id}\0{failed_provider_id}\0"
             f"{source_grant_id}"
-        ).encode("utf-8")
+        ).encode()
         return "sha256:" + hashlib.sha256(value).hexdigest()
 
     @staticmethod
@@ -1441,5 +1442,5 @@ class StorageFailoverCoordinator:
     ) -> str:
         value = (
             f"{observation_id}\0{promoted_provider_id}\0{report_hash}"
-        ).encode("utf-8")
+        ).encode()
         return "sha256:" + hashlib.sha256(value).hexdigest()
