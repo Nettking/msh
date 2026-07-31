@@ -140,7 +140,7 @@ class AdaptiveStorageTransport:
         if self._decision_observer is not None:
             try:
                 self._decision_observer(decision)
-            except Exception:
+            except Exception:  # noqa: BLE001
                 # Disable a faulty diagnostic sink without blocking relay traffic.
                 self._decision_observer = None
         try:
