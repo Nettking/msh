@@ -1514,13 +1514,9 @@ class LiveFormerPrimaryReinstatementCoordinator:
         if degraded is None:
             return False
         obligations = degraded.get("obligations")
-        revision = degraded.get("manifest_revision")
         return (
             degraded.get("session_id") == record.session_id
             and degraded.get("group_id") == record.group_id
-            and isinstance(revision, int)
-            and not isinstance(revision, bool)
-            and revision >= record.manifest_revision
             and degraded.get("reason_code")
             == "automatic-failover-redundancy-lost"
             and isinstance(obligations, dict)
@@ -1544,8 +1540,6 @@ class LiveFormerPrimaryReinstatementCoordinator:
         return (
             degraded.get("session_id") == catchup.session_id
             and degraded.get("group_id") == catchup.group_id
-            and degraded.get("manifest_revision") == catchup.manifest_revision
-            and degraded.get("manifest_hash") == catchup.manifest_hash
             and degraded.get("reason_code")
             == "automatic-failover-redundancy-lost"
             and isinstance(obligations, dict)
