@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from catalog.federation.acknowledgement import AcknowledgementMode
+from catalog.federation.commit_tracking import DurableAcknowledgementStore
 from catalog.federation.control_relay import FramedStorageControlRelayPublisher
 from catalog.federation.control_sync import (
     StorageControlPlan,
@@ -370,6 +371,10 @@ def test_two_live_storage_nodes_replicate_and_replica_restarts(
                 actor_node_id=authority.node_id,
                 control_plane=authority_control,
                 transport=authority_endpoint,
+                acknowledgements=DurableAcknowledgementStore(
+                    tmp_path / "authority-acks.sqlite3"
+                ),
+                clock=lambda: NOW,
             )
             content = {
                 "source": "f2-live-replication",
@@ -394,6 +399,12 @@ def test_two_live_storage_nodes_replicate_and_replica_restarts(
                 group_id="storage-main",
                 batch_id="batch-1",
             ) == content
+            authority_manifest = authority_control.manifest(
+                session_id,
+                "storage-main",
+            )
+            assert authority_manifest.revision == 1
+            assert authority_manifest.items[0].item_id == "batch-1"
 
             stable_replica_id = replica.node_id
             await replica.close()
