@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import asyncio
 import base64
+
 import pytest
 from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.primitives import serialization
@@ -15,16 +17,16 @@ from catalog.federation.adaptive_transport import (
     DirectTransportState,
     TransportKind,
 )
+from catalog.federation.errors import (
+    FederationValidationError,
+    ProtocolCompatibilityError,
+)
 from catalog.federation.peer_stream import (
     PEER_STREAM_CIPHER_SUITE,
     PeerStreamFrame,
     peer_stream_nonce,
 )
 from catalog.federation.peer_stream_verifier import PeerStreamVerifier
-from catalog.federation.errors import (
-    FederationValidationError,
-    ProtocolCompatibilityError,
-)
 
 
 def _b64(value: bytes) -> str:
@@ -71,15 +73,16 @@ class _Relay:
         return self.response
 
 
-@pytest.mark.asyncio
-async def test_f61_adaptive_transport_remains_relay_only() -> None:
+def test_f61_adaptive_transport_remains_relay_only() -> None:
     response = object()
     relay = _Relay(response=response)
     decisions = []
     transport = AdaptiveStorageTransport(relay, decision_observer=decisions.append)
     envelope = object()
 
-    returned = await transport.request(target_node_id="node-target", envelope=envelope)
+    returned = asyncio.run(
+        transport.request(target_node_id="node-target", envelope=envelope)
+    )
 
     assert returned is response
     assert relay.calls == [("node-target", envelope)]
@@ -99,15 +102,14 @@ async def test_f61_adaptive_transport_remains_relay_only() -> None:
     }
 
 
-@pytest.mark.asyncio
-async def test_f61_ready_diagnostic_state_cannot_activate_direct_transport() -> None:
+def test_f61_ready_diagnostic_state_cannot_activate_direct_transport() -> None:
     relay = _Relay()
     transport = AdaptiveStorageTransport(
         relay,
         direct_state=DirectTransportState.READY,
     )
 
-    await transport.request(target_node_id="node-target", envelope=object())
+    asyncio.run(transport.request(target_node_id="node-target", envelope=object()))
 
     status = transport.status().to_dict()
     assert status["selected_transport"] == "relay"
@@ -117,8 +119,7 @@ async def test_f61_ready_diagnostic_state_cannot_activate_direct_transport() -> 
     assert status["last_reason"] == "direct-not-enabled-until-f62"
 
 
-@pytest.mark.asyncio
-async def test_f61_diagnostic_observer_cannot_block_relay() -> None:
+def test_f61_diagnostic_observer_cannot_block_relay() -> None:
     relay = _Relay()
 
     def broken_observer(_decision) -> None:
@@ -128,21 +129,24 @@ async def test_f61_diagnostic_observer_cannot_block_relay() -> None:
         relay,
         decision_observer=broken_observer,
     )
-    response = await transport.request(
-        target_node_id="node-target",
-        envelope=object(),
+    response = asyncio.run(
+        transport.request(
+            target_node_id="node-target",
+            envelope=object(),
+        )
     )
 
     assert response is relay.response
     assert transport.status().last_outcome == "succeeded"
 
 
-@pytest.mark.asyncio
-async def test_f61_relay_failure_is_not_hidden() -> None:
+def test_f61_relay_failure_is_not_hidden() -> None:
     transport = AdaptiveStorageTransport(_Relay(error=RuntimeError("offline")))
 
     with pytest.raises(RuntimeError, match="offline"):
-        await transport.request(target_node_id="node-target", envelope=object())
+        asyncio.run(
+            transport.request(target_node_id="node-target", envelope=object())
+        )
 
     assert transport.status().to_dict()["last_outcome"] == "failed"
 
