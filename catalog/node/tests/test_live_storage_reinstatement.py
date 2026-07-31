@@ -226,14 +226,15 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
             await asyncio.wait_for(former_bootstrap, TIMEOUT)
             await asyncio.wait_for(promoted_bootstrap, TIMEOUT)
 
+            acknowledgements = DurableAcknowledgementStore(
+                tmp_path / "authority-acks.sqlite3"
+            )
             logical = PhaseDLogicalStorageClient(
                 session_id=session_id,
                 actor_node_id=authority.node_id,
                 control_plane=control,
                 transport=authority_endpoint,
-                acknowledgements=DurableAcknowledgementStore(
-                    tmp_path / "authority-acks.sqlite3"
-                ),
+                acknowledgements=acknowledgements,
                 clock=lambda: NOW,
             )
             contents = {
@@ -339,8 +340,12 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
                         created_at=NOW,
                     )
                     assert committed.committed
-                    assert committed.result is not None
-                    assert committed.result.required_replica_acks == 0
+                    admission_status = acknowledgements.status(
+                        session_id, "storage-main", "batch-4"
+                    )
+                    assert admission_status is not None
+                    assert admission_status.required_replica_acks == 0
+                    assert admission_status.acknowledged_replica_ids == ()
                 return await original_publish(plan, target_node_ids)
 
             channel.publish = publish_with_admission_write
@@ -446,9 +451,12 @@ def test_live_reinstatement_restores_replica_and_acknowledgement_policy(
                 created_at=NOW,
             )
             assert final_write.committed
-            assert final_write.result is not None
-            assert final_write.result.required_replica_acks == 1
-            assert final_write.result.acknowledged_replica_ids == (
+            final_status = acknowledgements.status(
+                session_id, "storage-main", "batch-5"
+            )
+            assert final_status is not None
+            assert final_status.required_replica_acks == 1
+            assert final_status.acknowledged_replica_ids == (
                 "provider-primary",
             )
             for agent in (former_primary, promoted):
