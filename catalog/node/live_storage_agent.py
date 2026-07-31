@@ -7,6 +7,9 @@ import asyncio
 import json
 import os
 import sys
+import uuid
+from contextlib import suppress
+from dataclasses import replace
 from typing import Any
 
 from catalog.federation.control_sync import (
@@ -15,6 +18,8 @@ from catalog.federation.control_sync import (
     StorageControlReplicaStore,
 )
 from catalog.federation.errors import FederationValidationError
+from catalog.federation.live_failover import STORAGE_CONTROL_REFRESH_MESSAGE
+from catalog.federation.models import CapabilityStatus
 
 from .state import EnrollmentState, NodeStateError
 from .storage_agent import (
@@ -29,7 +34,14 @@ DEFAULT_CONTROL_SYNC_TIMEOUT = 30.0
 
 
 class LiveStorageNodeAgent:
-    """Compose the F1 storage service with authenticated live control updates."""
+    """Compose the F1 storage service with authenticated live control updates.
+
+    A node that loses its relay connection durably revokes every local primary
+    grant before reconnecting.  Its saved capability is also changed to
+    unavailable, so the shared client cannot automatically re-advertise a stale
+    ready primary.  A fresh signed control publication is required before the
+    provider becomes ready again.
+    """
 
     def __init__(
         self,
@@ -50,7 +62,11 @@ class LiveStorageNodeAgent:
         self.control_ready_event = asyncio.Event()
         self.control_waiting_event = asyncio.Event()
         self._control_task: asyncio.Task[None] | None = None
+        self._connection_task: asyncio.Task[None] | None = None
+        self._refresh_lock = asyncio.Lock()
         self._closed = False
+        self._self_fenced_groups: tuple[str, ...] = ()
+        self._last_self_fence_reason: str | None = None
 
     @property
     def node_id(self) -> str:
@@ -88,6 +104,16 @@ class LiveStorageNodeAgent:
                 DEFAULT_ENROLLMENT_TOKEN_ENV,
                 "first startup requires a protected enrollment token",
             )
+
+        latest = self.replica_store.latest(self.storage.config.session_id)
+        cached_primary = False
+        if latest is not None:
+            latest.verify(expected_authority_node_id=self.control_authority_node_id)
+            self.storage.validate_control_state()
+            cached_primary = self._local_is_primary()
+            if cached_primary:
+                self._persist_unavailable_capability()
+
         await self.client.connect(
             enrollment_token=(
                 enrollment_token
@@ -110,33 +136,38 @@ class LiveStorageNodeAgent:
                 self._control_loop(),
                 name=f"msh-storage-control-{self.node_id}",
             )
-            latest = self.replica_store.latest(self.storage.config.session_id)
-            if latest is not None:
-                latest.verify(
-                    expected_authority_node_id=self.control_authority_node_id
-                )
-                self.storage.validate_control_state()
-                self.control_ready_event.set()
-            else:
+            if latest is None:
                 self.control_waiting_event.set()
                 await asyncio.wait_for(
                     self.control_ready_event.wait(),
                     timeout=self.control_sync_timeout,
                 )
+            elif cached_primary:
+                await self._enter_safe_state(
+                    reason="primary-bootstrap-refresh",
+                    announce_unavailable=True,
+                )
+                await self._request_control_refresh()
+                await asyncio.wait_for(
+                    self.control_ready_event.wait(),
+                    timeout=self.control_sync_timeout,
+                )
+            else:
+                self._validate_local_control()
+                self.control_ready_event.set()
+                self.control_waiting_event.clear()
             self.storage.service.reconcile_prepared()
             await self.client.announce_capability(self.storage.capability())
+            self._connection_task = asyncio.create_task(
+                self._connection_watch_loop(),
+                name=f"msh-storage-connection-watch-{self.node_id}",
+            )
         except BaseException:
             await self.close(error_code="storage-control-bootstrap-failed")
             raise
 
     async def _join_configured_session(self, invitation: str) -> None:
-        """Make live join replay-safe while retaining fail-closed rollback.
-
-        The relay may emit the first session event immediately after the accepted
-        response. The shared receiver must therefore have a durable membership
-        row before that event can arrive. A rejected or mismatched invitation
-        rolls the provisional row back to the removed state.
-        """
+        """Make live join replay-safe while retaining fail-closed rollback."""
 
         session_id = self.storage.config.session_id
         self.client.state.join_session(session_id, now=self.storage._clock())
@@ -157,6 +188,118 @@ class LiveStorageNodeAgent:
             except NodeStateError:
                 pass
             raise
+
+    def _local_is_primary(self) -> bool:
+        snapshot = self.control.snapshot(self.storage.config.session_id)
+        return any(
+            assignment.primary_provider_id == self.storage.config.provider_id
+            for assignment in snapshot.groups.values()
+        )
+
+    def _validate_local_control(self) -> None:
+        self.storage.validate_control_state()
+        snapshot = self.control.snapshot(self.storage.config.session_id)
+        for group_id, assignment in snapshot.groups.items():
+            if assignment.primary_provider_id != self.storage.config.provider_id:
+                continue
+            grant = snapshot.leader_grants.get(group_id)
+            if grant is None or grant.get("provider_id") != self.storage.config.provider_id:
+                raise StorageNodeAgentError(
+                    "storage-primary-fenced",
+                    "group_id",
+                    "a local primary requires a fresh coordinator grant",
+                )
+
+    def _persist_unavailable_capability(self) -> None:
+        capability = replace(
+            self.storage.capability(),
+            status=CapabilityStatus.UNAVAILABLE,
+            announced_at=self.storage._clock(),
+        )
+        save = getattr(self.client.state, "save_capability", None)
+        if callable(save):
+            save(capability, now=self.storage._clock())
+
+    async def _enter_safe_state(
+        self,
+        *,
+        reason: str,
+        announce_unavailable: bool,
+    ) -> None:
+        self.control_ready_event.clear()
+        self.control_waiting_event.set()
+        snapshot = self.control.snapshot(self.storage.config.session_id)
+        fenced: list[str] = []
+        for group_id, assignment in sorted(snapshot.groups.items()):
+            if assignment.primary_provider_id != self.storage.config.provider_id:
+                continue
+            grant = snapshot.leader_grants.get(group_id)
+            if grant is None or grant.get("provider_id") != self.storage.config.provider_id:
+                continue
+            self.control.revoke_leader(
+                self.storage.config.session_id,
+                self.control_authority_node_id,
+                group_id,
+                str(grant["grant_id"]),
+            )
+            fenced.append(group_id)
+        self._self_fenced_groups = tuple(fenced)
+        self._last_self_fence_reason = reason
+        self._persist_unavailable_capability()
+        if announce_unavailable and self.client.connected_event.is_set():
+            capability = replace(
+                self.storage.capability(),
+                status=CapabilityStatus.UNAVAILABLE,
+                announced_at=self.storage._clock(),
+            )
+            await self.client.announce_capability(capability)
+
+    async def _request_control_refresh(self) -> None:
+        async with self._refresh_lock:
+            latest = self.replica_store.latest(self.storage.config.session_id)
+            delivery = await self.client.send_message(
+                session_id=self.storage.config.session_id,
+                target_node_id=self.control_authority_node_id,
+                request_id=f"control-refresh-{self.node_id}-{uuid.uuid4().hex}",
+                payload={
+                    "kind": STORAGE_CONTROL_RELAY_KIND,
+                    "message": STORAGE_CONTROL_REFRESH_MESSAGE,
+                    "provider_id": self.storage.config.provider_id,
+                    "known_publication_revision": (
+                        None if latest is None else latest.publication_revision
+                    ),
+                },
+            )
+            if not isinstance(delivery, dict) or delivery.get("delivered") is not True:
+                raise StorageNodeAgentError(
+                    "storage-control-refresh-delivery-failed",
+                    "control_authority_node_id",
+                    "relay did not deliver the refresh request to the control authority",
+                )
+
+    async def _connection_watch_loop(self) -> None:
+        while not self._closed:
+            await self.client.disconnected_event.wait()
+            if self._closed:
+                return
+            await self._enter_safe_state(
+                reason="relay-disconnected",
+                announce_unavailable=False,
+            )
+            await self.client.connected_event.wait()
+            if self._closed:
+                return
+            try:
+                await self._request_control_refresh()
+                await asyncio.wait_for(
+                    self.control_ready_event.wait(),
+                    timeout=self.control_sync_timeout,
+                )
+            except (FederationValidationError, TimeoutError):
+                if self.client.connected_event.is_set():
+                    await self.client.disconnect(
+                        error_code="storage-control-refresh-failed"
+                    )
 
     async def _control_loop(self) -> None:
         while True:
@@ -211,7 +354,7 @@ class LiveStorageNodeAgent:
                 self.control,
                 expected_authority_node_id=self.control_authority_node_id,
             )
-            self.storage.validate_control_state()
+            self._validate_local_control()
             response: dict[str, Any] = {
                 "kind": STORAGE_CONTROL_RELAY_KIND,
                 "message": "response",
@@ -222,6 +365,8 @@ class LiveStorageNodeAgent:
                 "local_control_revision": result.local_control_revision,
             }
             self.control_ready_event.set()
+            self.control_waiting_event.clear()
+            self._self_fenced_groups = ()
             if self.client.connected_event.is_set():
                 await self.client.announce_capability(self.storage.capability())
         except FederationValidationError as exc:
@@ -272,11 +417,23 @@ class LiveStorageNodeAgent:
     async def close(self, *, error_code: str | None = None) -> None:
         if self._closed:
             return
+        with suppress(Exception):
+            await self._enter_safe_state(
+                reason=error_code or "storage-node-stopped",
+                announce_unavailable=True,
+            )
         self._closed = True
-        task, self._control_task = self._control_task, None
-        if task is not None:
+        tasks = tuple(
+            task
+            for task in (self._connection_task, self._control_task)
+            if task is not None
+        )
+        self._connection_task = None
+        self._control_task = None
+        for task in tasks:
             task.cancel()
-            await asyncio.gather(task, return_exceptions=True)
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
         await self.storage.endpoint.close()
         if self.client.connected_event.is_set():
             await self.client.disconnect(error_code=error_code)
@@ -286,12 +443,14 @@ class LiveStorageNodeAgent:
         latest = self.replica_store.latest(self.storage.config.session_id)
         value["control_sync"] = {
             "authority_node_id": self.control_authority_node_id,
-            "ready": self.control_ready_event.is_set() or latest is not None,
+            "ready": self.control_ready_event.is_set(),
             "publication_id": None if latest is None else latest.publication_id,
             "publication_revision": (
                 None if latest is None else latest.publication_revision
             ),
             "content_hash": None if latest is None else latest.content_hash,
+            "self_fenced_groups": list(self._self_fenced_groups),
+            "last_self_fence_reason": self._last_self_fence_reason,
         }
         return value
 
