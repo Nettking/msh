@@ -1,4 +1,4 @@
-"""Phase F6.1 relay-only adaptive storage transport boundary."""
+"""Adaptive relay/direct storage transport selection for Phase F6."""
 
 from __future__ import annotations
 
@@ -19,6 +19,14 @@ class StorageRequestTransport(Protocol):
         target_node_id: str,
         envelope: StorageRequestEnvelope,
     ) -> StorageResponseEnvelope: ...
+
+
+class DirectTransportUnavailable(RuntimeError):
+    """Expected direct-path establishment or liveness failure eligible for relay fallback."""
+
+    def __init__(self, code: str, message: str) -> None:
+        super().__init__(message)
+        self.code = code
 
 
 class TransportKind(str, Enum):
@@ -49,6 +57,7 @@ class TransportDecision:
 
 @dataclass(frozen=True)
 class AdaptiveTransportStatus:
+    direct_transport_enabled: bool
     direct_state: DirectTransportState
     selected_transport: TransportKind
     request_count: int
@@ -61,7 +70,7 @@ class AdaptiveTransportStatus:
     def to_dict(self) -> dict[str, Any]:
         return {
             "schema": ADAPTIVE_TRANSPORT_STATUS_SCHEMA,
-            "direct_transport_enabled": False,
+            "direct_transport_enabled": self.direct_transport_enabled,
             "direct_state": self.direct_state.value,
             "selected_transport": self.selected_transport.value,
             "request_count": self.request_count,
@@ -74,22 +83,23 @@ class AdaptiveTransportStatus:
 
 
 class AdaptiveStorageTransport:
-    """Relay-only F6.1 transport boundary with explicit future direct state.
+    """Prefer a ready direct transport and preserve relay as bounded fallback.
 
-    F6.1 never calls a direct transport. Even when reachability is reported as
-    ``ready``, the decision remains relay with a stable reason explaining that the
-    direct implementation belongs to F6.2. This prevents a diagnostic state from
-    accidentally becoming an authority or correctness decision.
+    Only ``DirectTransportUnavailable`` permits downgrade to relay. Protocol,
+    identity, signature, and ciphertext validation errors fail closed and are not
+    hidden by fallback.
     """
 
     def __init__(
         self,
         relay_transport: StorageRequestTransport,
         *,
+        direct_transport: StorageRequestTransport | None = None,
         direct_state: DirectTransportState = DirectTransportState.DISABLED,
         decision_observer: Callable[[TransportDecision], None] | None = None,
     ) -> None:
         self._relay_transport = relay_transport
+        self._direct_transport = direct_transport
         self._direct_state = DirectTransportState(direct_state)
         self._decision_observer = decision_observer
         self._request_count = 0
@@ -104,8 +114,6 @@ class AdaptiveStorageTransport:
         return self._direct_state
 
     def report_direct_state(self, state: DirectTransportState) -> None:
-        """Update diagnostics only; it cannot activate a direct data path."""
-
         self._direct_state = DirectTransportState(state)
         self._last_decision = self._decide()
 
@@ -115,6 +123,7 @@ class AdaptiveStorageTransport:
     def status(self) -> AdaptiveTransportStatus:
         decision = self._last_decision
         return AdaptiveTransportStatus(
+            direct_transport_enabled=self._direct_transport is not None,
             direct_state=self._direct_state,
             selected_transport=decision.selected,
             request_count=self._request_count,
@@ -134,15 +143,35 @@ class AdaptiveStorageTransport:
         decision = self._decide()
         self._last_decision = decision
         self._request_count += 1
-        self._relay_request_count += 1
-        if self._direct_state is not DirectTransportState.DISABLED:
-            self._fallback_count += 1
-        if self._decision_observer is not None:
+        self._observe(decision)
+
+        if decision.selected is TransportKind.DIRECT:
+            self._direct_request_count += 1
+            direct_transport = self._direct_transport
+            if direct_transport is None:
+                raise RuntimeError("direct transport decision without an implementation")
             try:
-                self._decision_observer(decision)
-            except Exception:  # noqa: BLE001
-                # Disable a faulty diagnostic sink without blocking relay traffic.
-                self._decision_observer = None
+                response = await direct_transport.request(
+                    target_node_id=target_node_id,
+                    envelope=envelope,
+                )
+            except DirectTransportUnavailable:
+                self._fallback_count += 1
+                fallback = TransportDecision(
+                    selected=TransportKind.RELAY,
+                    direct_state=DirectTransportState.UNAVAILABLE,
+                    reason="direct-failed-relay-fallback",
+                )
+                self._last_decision = fallback
+                self._observe(fallback)
+            else:
+                self._last_outcome = "succeeded"
+                return response
+
+        elif self._direct_state is not DirectTransportState.DISABLED:
+            self._fallback_count += 1
+
+        self._relay_request_count += 1
         try:
             response = await self._relay_transport.request(
                 target_node_id=target_node_id,
@@ -154,7 +183,24 @@ class AdaptiveStorageTransport:
         self._last_outcome = "succeeded"
         return response
 
+    def _observe(self, decision: TransportDecision) -> None:
+        if self._decision_observer is None:
+            return
+        try:
+            self._decision_observer(decision)
+        except Exception:  # noqa: BLE001
+            self._decision_observer = None
+
     def _decide(self) -> TransportDecision:
+        if (
+            self._direct_transport is not None
+            and self._direct_state is DirectTransportState.READY
+        ):
+            return TransportDecision(
+                selected=TransportKind.DIRECT,
+                direct_state=self._direct_state,
+                reason="direct-ready-f62",
+            )
         reasons = {
             DirectTransportState.DISABLED: "direct-disabled-f61",
             DirectTransportState.CONNECTING: "direct-connecting-relay-selected",

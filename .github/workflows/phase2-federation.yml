@@ -6,6 +6,7 @@ on:
       - "catalog/federation/**"
       - "catalog/node/**"
       - "catalog/relay/**"
+      - "cmd/msh-peer-sidecar/**"
       - "docker-compose.yml"
       - "requirements.txt"
       - "constraints-phase2.txt"
@@ -16,6 +17,7 @@ on:
       - "catalog/federation/**"
       - "catalog/node/**"
       - "catalog/relay/**"
+      - "cmd/msh-peer-sidecar/**"
       - "docker-compose.yml"
       - "requirements.txt"
       - "constraints-phase2.txt"
@@ -56,11 +58,38 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "cmd/msh-peer-sidecar/go.mod"
+          cache: false
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -c constraints-phase2.txt
           python -m pip install pytest ruff
+      - name: Go direct peer sidecar
+        working-directory: cmd/msh-peer-sidecar
+        run: |
+          go mod tidy
+          echo BEGIN_GO_MOD
+          cat go.mod
+          echo END_GO_MOD
+          echo BEGIN_GO_SUM
+          cat go.sum
+          echo END_GO_SUM
+          go test ./...
+          mkdir -p ../../build
+          go build -trimpath -o ../../build/msh-peer-sidecar .
+      - name: Capture Go module lock
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: f62-go-module-lock
+          path: |
+            cmd/msh-peer-sidecar/go.mod
+            cmd/msh-peer-sidecar/go.sum
+          if-no-files-found: error
+          retention-days: 1
       - name: Compile
         run: python -m compileall catalog setup_msh.py
       - name: Phase 0 and 1 regressions
@@ -116,11 +145,22 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "cmd/msh-peer-sidecar/go.mod"
+          cache: false
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -c constraints-phase2.txt
           python -m pip install pytest
+      - name: Go direct peer sidecar
+        working-directory: cmd/msh-peer-sidecar
+        run: |
+          go mod tidy
+          go test ./...
+          New-Item -ItemType Directory -Force -Path ../../build
+          go build -trimpath -o ../../build/msh-peer-sidecar.exe .
       - name: Identity, state, protocol, relay, and Phase F tests
         run: >-
           python -m pytest -o addopts= -q
@@ -132,6 +172,7 @@ jobs:
           catalog/node/tests/test_physical_storage_failover.py
           catalog/node/tests/test_physical_storage_recovery.py
           catalog/node/tests/test_phase_f61_transport.py
+          catalog/node/tests/test_phase_f62_direct_peer.py
           catalog/node/tests/test_live_storage_replication.py
           catalog/node/tests/test_live_storage_failover.py
           catalog/node/tests/test_live_storage_catchup.py
