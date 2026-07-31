@@ -91,6 +91,31 @@ async def _enroll(relay: RelayServer, client: RelayNodeClient) -> None:
     await client.connect(enrollment_token=str(token))
 
 
+async def _wait_for_control_waiting(
+    agent: LiveStorageNodeAgent,
+    bootstrap: asyncio.Task[None],
+) -> None:
+    waiter = asyncio.create_task(agent.control_waiting_event.wait())
+    try:
+        done, _pending = await asyncio.wait(
+            {waiter, bootstrap},
+            timeout=TIMEOUT,
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        if bootstrap in done:
+            await bootstrap
+            if not agent.control_waiting_event.is_set():
+                raise AssertionError(
+                    "storage bootstrap completed without persisted control or waiting state"
+                )
+        if waiter not in done and not agent.control_waiting_event.is_set():
+            raise TimeoutError("storage node did not reach control waiting state")
+    finally:
+        if not waiter.done():
+            waiter.cancel()
+        await asyncio.gather(waiter, return_exceptions=True)
+
+
 def test_signed_control_plan_is_idempotent_and_tampering_fails_closed(
     tmp_path: Path,
 ) -> None:
@@ -166,6 +191,7 @@ def test_two_live_storage_nodes_replicate_and_replica_restarts(
         primary: LiveStorageNodeAgent | None = None
         replica: LiveStorageNodeAgent | None = None
         authority_endpoint: RelayStorageEndpoint | None = None
+        bootstrap_tasks: list[asyncio.Task[None]] = []
         try:
             relay = RelayServer(
                 SessionCoordinator(
@@ -308,8 +334,11 @@ def test_two_live_storage_nodes_replicate_and_replica_restarts(
                     session_invitation=str(replica_invitation["token"]),
                 )
             )
-            await asyncio.wait_for(primary.control_waiting_event.wait(), TIMEOUT)
-            await asyncio.wait_for(replica.control_waiting_event.wait(), TIMEOUT)
+            bootstrap_tasks.extend((primary_bootstrap, replica_bootstrap))
+            await asyncio.gather(
+                _wait_for_control_waiting(primary, primary_bootstrap),
+                _wait_for_control_waiting(replica, replica_bootstrap),
+            )
 
             published = await StorageControlRelayPublisher(
                 authority,
@@ -383,6 +412,11 @@ def test_two_live_storage_nodes_replicate_and_replica_restarts(
             ) == content
             assert replica.status()["control_sync"]["publication_revision"] == 1
         finally:
+            for task in bootstrap_tasks:
+                if not task.done():
+                    task.cancel()
+            if bootstrap_tasks:
+                await asyncio.gather(*bootstrap_tasks, return_exceptions=True)
             if authority_endpoint is not None:
                 await authority_endpoint.close()
             if primary is not None:
