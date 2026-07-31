@@ -1,0 +1,52 @@
+name: Fix F4.2 acknowledgement evidence
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/f42-fix-ack-evidence.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Verify coordinator acknowledgement journal
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('catalog/node/tests/test_live_storage_reinstatement.py')
+          text = path.read_text()
+
+          old = '''            logical = PhaseDLogicalStorageClient(\n                session_id=session_id,\n                actor_node_id=authority.node_id,\n                control_plane=control,\n                transport=authority_endpoint,\n                acknowledgements=DurableAcknowledgementStore(\n                    tmp_path / "authority-acks.sqlite3"\n                ),\n                clock=lambda: NOW,\n            )\n'''
+          new = '''            acknowledgements = DurableAcknowledgementStore(\n                tmp_path / "authority-acks.sqlite3"\n            )\n            logical = PhaseDLogicalStorageClient(\n                session_id=session_id,\n                actor_node_id=authority.node_id,\n                control_plane=control,\n                transport=authority_endpoint,\n                acknowledgements=acknowledgements,\n                clock=lambda: NOW,\n            )\n'''
+          if old not in text:
+              raise SystemExit('logical client anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = '''                    assert committed.committed\n                    assert committed.result is not None\n                    assert committed.result.required_replica_acks == 0\n'''
+          new = '''                    assert committed.committed\n                    admission_status = acknowledgements.status(\n                        session_id, "storage-main", "batch-4"\n                    )\n                    assert admission_status is not None\n                    assert admission_status.required_replica_acks == 0\n                    assert admission_status.acknowledged_replica_ids == ()\n'''
+          if old not in text:
+              raise SystemExit('admission acknowledgement anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = '''            assert final_write.committed\n            assert final_write.result is not None\n            assert final_write.result.required_replica_acks == 1\n            assert final_write.result.acknowledged_replica_ids == (\n                "provider-primary",\n            )\n'''
+          new = '''            assert final_write.committed\n            final_status = acknowledgements.status(\n                session_id, "storage-main", "batch-5"\n            )\n            assert final_status is not None\n            assert final_status.required_replica_acks == 1\n            assert final_status.acknowledged_replica_ids == (\n                "provider-primary",\n            )\n'''
+          if old not in text:
+              raise SystemExit('final acknowledgement anchor missing')
+          path.write_text(text.replace(old, new, 1))
+          PY
+          python -m py_compile catalog/node/tests/test_live_storage_reinstatement.py
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add catalog/node/tests/test_live_storage_reinstatement.py
+          git commit -m 'Verify F4.2 acknowledgement journal'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
