@@ -1,0 +1,45 @@
+name: Fix F4.1 import boundary
+
+on:
+  push:
+    branches:
+      - agent/phase-f41-live-former-primary-catchup
+    paths:
+      - ".github/workflows/f41-fix-import.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/phase-f41-live-former-primary-catchup
+          fetch-depth: 0
+      - name: Remove federation-to-node runtime type import
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('catalog/federation/live_catchup.py')
+          text = path.read_text()
+          text = text.replace(
+              'from catalog.node.identity import NodeCredentials\n\n',
+              '',
+              1,
+          )
+          text = text.replace(
+              '        credentials: NodeCredentials,\n',
+              '        credentials: Any,\n',
+              1,
+          )
+          path.write_text(text)
+          PY
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/federation/live_catchup.py
+          git commit -m "Remove F4.1 federation-node import cycle"
+          git push origin HEAD:agent/phase-f41-live-former-primary-catchup
