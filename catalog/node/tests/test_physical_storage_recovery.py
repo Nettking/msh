@@ -25,7 +25,6 @@ from catalog.federation.live_reinstatement import (
     LiveFormerPrimaryReinstatementCoordinator,
 )
 from catalog.federation.phase_d_client import PhaseDLogicalStorageClient
-from catalog.federation.phase_d_control import PhaseDControlPlane
 from catalog.federation.relay_storage import RelayStorageEndpoint
 from catalog.node.client import RelayNodeClient
 from catalog.node.live_storage_agent import LiveStorageNodeAgent
