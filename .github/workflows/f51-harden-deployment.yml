@@ -1,0 +1,72 @@
+name: Apply F5.1 deployment hardening
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/f51-harden-deployment.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Harden deployment and restart synchronization
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          deployment_path = Path("catalog/node/storage_deployment.py")
+          text = deployment_path.read_text(encoding="utf-8")
+
+          old = '''    except ValueError:\n        return False\n\n\ndef _canonical_hash(value: Any) -> str:\n'''
+          new = '''    except ValueError:\n        return False\n\n\ndef _allow_insecure_loopback(relay_url: str) -> bool:\n    return urlparse(relay_url).scheme == "ws" and _relay_is_safe(relay_url)\n\n\ndef _canonical_hash(value: Any) -> str:\n'''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+
+          old = '''        display_name=deployment.authority_display_name,\n        request_timeout=timeout,\n    )\n'''
+          new = '''        display_name=deployment.authority_display_name,\n        allow_insecure_local=_allow_insecure_loopback(deployment.relay_url),\n        request_timeout=timeout,\n    )\n'''
+          assert text.count(old) == 3
+          text = text.replace(old, new)
+
+          old = '''    assignment = control.snapshot(deployment.session_id).groups[deployment.group_id]\n    expected_replicas = (deployment.replica.provider_id,)\n    if assignment.primary_provider_id is None and not assignment.replica_provider_ids:\n        control.change_assignment(\n            deployment.session_id,\n            actor,\n            deployment.group_id,\n            deployment.primary.provider_id,\n            expected_replicas,\n        )\n    elif (\n        assignment.primary_provider_id != deployment.primary.provider_id\n        or tuple(assignment.replica_provider_ids) != expected_replicas\n    ):\n        raise StorageDeploymentError(\n            "deployment-assignment-conflict",\n            "group_id",\n            "existing assignment differs from the F5.1 topology",\n        )\n    control.set_acknowledgement_policy(\n        deployment.session_id, deployment.group_id, _EXPECTED_ACK_MODE\n    )\n'''
+          new = '''    assignment = control.snapshot(deployment.session_id).groups[deployment.group_id]\n    expected_replicas = (deployment.replica.provider_id,)\n    new_assignment = (\n        assignment.primary_provider_id is None\n        and not assignment.replica_provider_ids\n    )\n    if new_assignment:\n        control.change_assignment(\n            deployment.session_id,\n            actor,\n            deployment.group_id,\n            deployment.primary.provider_id,\n            expected_replicas,\n        )\n    elif (\n        assignment.primary_provider_id != deployment.primary.provider_id\n        or tuple(assignment.replica_provider_ids) != expected_replicas\n    ):\n        raise StorageDeploymentError(\n            "deployment-assignment-conflict",\n            "group_id",\n            "existing assignment differs from the F5.1 topology",\n        )\n    policy = control.acknowledgement_policy(\n        deployment.session_id, deployment.group_id\n    )\n    if new_assignment:\n        if policy.mode is not AcknowledgementMode.PRIMARY:\n            raise StorageDeploymentError(\n                "deployment-policy-conflict",\n                "acknowledgement_mode",\n                "new groups must begin with the default primary-only policy",\n            )\n        control.set_acknowledgement_policy(\n            deployment.session_id, deployment.group_id, _EXPECTED_ACK_MODE\n        )\n    elif policy.mode is not _EXPECTED_ACK_MODE:\n        raise StorageDeploymentError(\n            "deployment-policy-conflict",\n            "acknowledgement_mode",\n            "existing deployment is not in normal one-replica mode",\n        )\n    if control.storage_degraded_state(\n        deployment.session_id, deployment.group_id\n    ) is not None:\n        raise StorageDeploymentError(\n            "deployment-is-degraded",\n            "storage_degraded_state",\n            "F5.1 provisioning cannot overwrite a degraded deployment",\n        )\n'''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+
+          old = '''    elif grant.get("provider_id") != deployment.primary.provider_id:\n        raise StorageDeploymentError(\n            "deployment-grant-conflict",\n            "group_id",\n            "existing leader grant belongs to another provider",\n        )\n    return control\n'''
+          new = '''    else:\n        try:\n            lease_expires_at = datetime.fromisoformat(\n                str(grant.get("lease_expires_at")).replace("Z", "+00:00")\n            ).astimezone(timezone.utc)\n        except (TypeError, ValueError) as exc:\n            raise StorageDeploymentError(\n                "deployment-grant-conflict",\n                "lease_expires_at",\n                "existing leader grant has an invalid lease",\n            ) from exc\n        if (\n            grant.get("provider_id") != deployment.primary.provider_id\n            or lease_expires_at <= timestamp\n        ):\n            raise StorageDeploymentError(\n                "deployment-grant-conflict",\n                "group_id",\n                "existing leader grant is expired or belongs to another provider",\n            )\n    return control\n'''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+
+          old = '''        if status is None or not status.committed:\n            raise StorageDeploymentError(\n                "deployment-probe-acknowledgement-missing",\n                "batch_id",\n                "coordinator acknowledgement journal did not commit the probe",\n            )\n        manifest = control.manifest(deployment.session_id, deployment.group_id)\n'''
+          new = '''        if status is None or not status.committed:\n            raise StorageDeploymentError(\n                "deployment-probe-acknowledgement-missing",\n                "batch_id",\n                "coordinator acknowledgement journal did not commit the probe",\n            )\n        if (\n            status.required_replica_acks != 1\n            or status.acknowledged_replica_ids\n            != (deployment.replica.provider_id,)\n        ):\n            raise StorageDeploymentError(\n                "deployment-probe-acknowledgement-mismatch",\n                "acknowledged_replica_ids",\n                "probe must be acknowledged by exactly the configured replica",\n            )\n        manifest = control.manifest(deployment.session_id, deployment.group_id)\n'''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+
+          old = '''    status = agent.status()\n    identity = agent.provider.committed_identity(\n'''
+          new = '''    latest = agent.replica_store.latest(deployment.session_id)\n    if latest is None:\n        raise StorageDeploymentError(\n            "deployment-control-missing",\n            "control_sync",\n            "storage node has no durable signed control publication",\n        )\n    latest.verify(expected_authority_node_id=deployment.authority_node_id)\n    agent.storage.validate_control_state()\n    status = agent.status()\n    status["control_sync"]["ready"] = True\n    status["control_sync"]["ready_source"] = "durable-verified"\n    identity = agent.provider.committed_identity(\n'''
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+
+          deployment_path.write_text(text, encoding="utf-8")
+
+          test_path = Path("catalog/node/tests/test_three_machine_deployment.py")
+          test = test_path.read_text(encoding="utf-8")
+          old = '''            primary_restart = asyncio.create_task(primary.bootstrap())\n            replica_restart = asyncio.create_task(replica.bootstrap())\n            bootstrap_tasks.extend((primary_restart, replica_restart))\n            await asyncio.sleep(0.1)\n            restart_plan = StorageControlPublicationStore(\n'''
+          new = '''            primary_restart = asyncio.create_task(primary.bootstrap())\n            replica_restart = asyncio.create_task(replica.bootstrap())\n            bootstrap_tasks.extend((primary_restart, replica_restart))\n            await asyncio.gather(\n                _wait_for_control_waiting(primary, primary_restart),\n                asyncio.wait_for(replica_restart, TIMEOUT),\n            )\n            await asyncio.wait_for(\n                primary.client.connected_event.wait(), TIMEOUT\n            )\n            await asyncio.wait_for(\n                replica.client.connected_event.wait(), TIMEOUT\n            )\n            restart_plan = StorageControlPublicationStore(\n'''
+          assert test.count(old) == 1
+          test = test.replace(old, new)
+          test_path.write_text(test, encoding="utf-8")
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/node/storage_deployment.py catalog/node/tests/test_three_machine_deployment.py
+          git commit -m "Harden F5.1 deployment and restart evidence"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
