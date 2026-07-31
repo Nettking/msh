@@ -17,8 +17,6 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from catalog.node.identity import NodeCredentials
-
 from .errors import FederationValidationError
 from .live_failover import (
     LIVE_FAILOVER_SCHEMA,
@@ -728,7 +726,7 @@ class LiveFormerPrimaryCatchupCoordinator:
         control_plane: Any,
         failover_store: LiveFailoverStore,
         transport: Any,
-        credentials: NodeCredentials,
+        credentials: Any,
         catchup_store: LiveCatchupStore,
         session_id: str,
         clock: Any = _now,
