@@ -1,0 +1,73 @@
+name: Wire F4.1 catch-up
+
+on:
+  push:
+    branches:
+      - agent/phase-f41-live-former-primary-catchup
+    paths:
+      - ".github/workflows/f41-wire-catchup.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/phase-f41-live-former-primary-catchup
+          fetch-depth: 0
+      - name: Wire recovery dispatcher
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          service = Path('catalog/federation/phase_d_service.py')
+          text = service.read_text()
+          old = 'from .errors import FederationValidationError\n'
+          new = old + 'from .live_catchup import dispatch_live_catchup_request\n'
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('phase_d_service import anchor missing')
+              text = text.replace(old, new, 1)
+          old = '        self.local = LocalStorageService(provider)\n'
+          new = old + '        self.recovery_authority_node_id: str | None = None\n'
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('phase_d_service init anchor missing')
+              text = text.replace(old, new, 1)
+          old = '        try:\n            if envelope.operation is StorageOperation.HEALTH:\n'
+          new = (
+              '        try:\n'
+              '            catchup = dispatch_live_catchup_request(self, envelope)\n'
+              '            if catchup is not None:\n'
+              '                return catchup\n'
+              '            if envelope.operation is StorageOperation.HEALTH:\n'
+          )
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('phase_d_service dispatch anchor missing')
+              text = text.replace(old, new, 1)
+          service.write_text(text)
+
+          agent = Path('catalog/node/live_storage_agent.py')
+          text = agent.read_text()
+          old = '        self.storage = StorageNodeAgent(config, clock=clock)\n'
+          new = (
+              old
+              + '        self.storage.service.recovery_authority_node_id = ('
+              'control_authority_node_id)\n'
+          )
+          if new not in text:
+              if old not in text:
+                  raise SystemExit('live_storage_agent anchor missing')
+              text = text.replace(old, new, 1)
+          agent.write_text(text)
+          PY
+          git diff --check
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/federation/phase_d_service.py catalog/node/live_storage_agent.py
+          git commit -m "Wire live storage nodes for F4.1 catch-up"
+          git push origin HEAD:agent/phase-f41-live-former-primary-catchup
