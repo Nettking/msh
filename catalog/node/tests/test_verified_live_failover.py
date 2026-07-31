@@ -15,15 +15,13 @@ from catalog.federation.live_failover import (
     LIVE_FAILOVER_SCHEMA,
     LiveFailoverRecord,
     LiveFailoverStore,
+    StorageFailoverCoordinator,
 )
 from catalog.federation.reporting import (
     REPORT_PROTOCOL_VERSION,
     REPORT_SCHEMA,
     StorageReplicaAssessment,
     StorageReplicaReport,
-)
-from catalog.federation.verified_live_failover import (
-    VerifiedStorageFailoverCoordinator,
 )
 
 NOW = datetime(2026, 7, 31, 9, 0, tzinfo=timezone.utc)
@@ -232,8 +230,8 @@ def _coordinator(
     control,
     channel,
     store: LiveFailoverStore,
-) -> VerifiedStorageFailoverCoordinator:
-    return VerifiedStorageFailoverCoordinator(
+) -> StorageFailoverCoordinator:
+    return StorageFailoverCoordinator(
         session_coordinator=_StatusCoordinator(),
         control_plane=control,
         publication_store=SimpleNamespace(),
@@ -247,7 +245,7 @@ def _coordinator(
     )
 
 
-def test_verified_policy_never_reuses_an_older_accepted_report(tmp_path) -> None:
+def test_failover_always_requests_new_evidence_for_current_outage(tmp_path) -> None:
     async def scenario() -> None:
         previous_report = _report(7)
         fresh_report = _report(8)
