@@ -1018,6 +1018,44 @@ def verify_evidence(
         control.get("degraded_state") is None,
         "F5.1 ends in normal redundant operation",
     )
+    relay = authority.get("relay") if isinstance(authority.get("relay"), dict) else {}
+    relay_nodes = {
+        item.get("node_id"): item
+        for item in relay.get("nodes", [])
+        if isinstance(item, dict)
+    }
+    relay_capabilities = [
+        item
+        for item in relay.get("capabilities", [])
+        if isinstance(item, dict)
+    ]
+    storage_nodes = (deployment.primary, deployment.replica)
+    check(
+        "relay-connections",
+        all(
+            isinstance(relay_nodes.get(node.node_id), dict)
+            and relay_nodes[node.node_id].get("connection_state") == "connected"
+            and relay_nodes[node.node_id].get("revoked") is not True
+            for node in storage_nodes
+        ),
+        "primary and replica have active non-revoked relay connections",
+    )
+    check(
+        "relay-storage-capabilities",
+        all(
+            any(
+                capability.get("node_id") == node.node_id
+                and capability.get("type") == "storage-provider"
+                and capability.get("status") == "ready"
+                and isinstance(capability.get("properties"), dict)
+                and capability["properties"].get("provider_id")
+                == node.provider_id
+                for capability in relay_capabilities
+            )
+            for node in storage_nodes
+        ),
+        "primary and replica advertise ready storage capabilities",
+    )
 
     def validate_storage(
         before: dict[str, Any],

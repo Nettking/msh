@@ -438,6 +438,7 @@ The verifier checks:
 - C remains replica before and after restart;
 - both nodes have verified signed control;
 - both providers remain registered and assignable;
+- both storage nodes are connected and advertise a `ready` storage capability;
 - neither storage node exposes an inbound application port;
 - `ONE_REPLICA` remains active;
 - the primary grant remains bound to B;

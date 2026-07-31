@@ -86,6 +86,7 @@ def _storage_evidence(
 def _authority_evidence(
     deployment: ThreeMachineDeployment,
     control: PhaseDControlPlane,
+    relay_status: dict[str, object],
 ) -> dict[str, object]:
     snapshot = control.snapshot(deployment.session_id)
     assignment = snapshot.groups[deployment.group_id]
@@ -123,7 +124,10 @@ def _authority_evidence(
                 ],
             },
         },
-        "relay": {"nodes": [], "capabilities": []},
+        "relay": {
+            "nodes": relay_status.get("nodes", []),
+            "capabilities": relay_status.get("capabilities", []),
+        },
     }
 
 
@@ -401,7 +405,11 @@ def test_three_machine_deployment_survives_normal_restart(tmp_path: Path) -> Non
             )
             report = verify_evidence(
                 deployment,
-                authority=_authority_evidence(deployment, control),
+                authority=_authority_evidence(
+                    deployment,
+                    control,
+                    await authority.coordinator_status(),
+                ),
                 primary_before=primary_before,
                 replica_before=replica_before,
                 primary_after=primary_after,
