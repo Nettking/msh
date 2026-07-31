@@ -1,0 +1,66 @@
+name: Fix F4.2 completed replay
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/f42-fix-completed-replay.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.ref }}
+          fetch-depth: 0
+      - name: Make completed replay deterministic and fail closed
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('catalog/federation/live_reinstatement.py')
+          text = path.read_text()
+
+          old = '''                   WHERE session_id=? AND group_id=? AND returning_provider_id=?\n                   ORDER BY updated_at DESC LIMIT 1""",\n'''
+          new = '''                   WHERE session_id=? AND group_id=? AND returning_provider_id=?\n                   ORDER BY updated_at DESC, rowid DESC LIMIT 1""",\n'''
+          if old not in text:
+              raise SystemExit('latest ordering anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = '''                     AND state NOT IN ('rolled-back','completed','operator-attention')\n                   ORDER BY updated_at DESC""",\n'''
+          new = '''                     AND state NOT IN ('rolled-back','completed','operator-attention')\n                   ORDER BY updated_at DESC, rowid DESC""",\n'''
+          if old not in text:
+              raise SystemExit('active ordering anchor missing')
+          text = text.replace(old, new, 1)
+
+          old = '''                if latest is not None and latest.state == _STATE_COMPLETED:\n                    return self._result(\n                        "completed",\n                        "live-reinstatement-complete",\n                        "former primary is already a verified replica",\n                        latest,\n                    )\n'''
+          new = '''                if latest is not None and latest.state == _STATE_COMPLETED:\n                    self._validate_completed(latest)\n                    return self._result(\n                        "completed",\n                        "live-reinstatement-complete",\n                        "former primary is already a verified replica",\n                        latest,\n                    )\n'''
+          if old not in text:
+              raise SystemExit('completed replay anchor missing')
+          text = text.replace(old, new, 1)
+
+          anchor = '''    def _validate_restored(self, record: LiveReinstatementRecord) -> None:\n'''
+          helper = '''    def _validate_completed(self, record: LiveReinstatementRecord) -> None:\n        self._validate_restored(record)\n        self._failover(record)\n        snapshot = self.control_plane.snapshot(record.session_id)\n        grant = snapshot.leader_grants.get(record.group_id)\n        if (\n            grant is None\n            or grant.get("provider_id") != record.source_provider_id\n            or grant.get("grant_id") != record.grant_id\n            or int(grant.get("term", -1)) != record.term\n            or int(grant.get("fencing_token", -1)) != record.fencing_token\n            or _utc(str(grant.get("lease_expires_at")))\n            != record.lease_expires_at\n        ):\n            raise FederationValidationError(\n                "reinstatement-authority-changed",\n                "grant_id",\n                "completed reinstatement no longer matches primary authority",\n            )\n        assessment = self.control_plane.latest_storage_replica_assessment(\n            record.session_id,\n            record.group_id,\n            record.returning_provider_id,\n        )\n        if (\n            record.final_publication is None\n            or record.final_report_revision is None\n            or record.final_report_hash is None\n            or assessment is None\n            or not assessment.accepted\n            or not assessment.eligibility\n            or assessment.report_revision != record.final_report_revision\n            or assessment.report_hash != record.final_report_hash\n        ):\n            raise FederationValidationError(\n                "reinstatement-completion-evidence-changed",\n                "final_report",\n                "completed replica proof is missing or no longer current",\n            )\n\n'''
+          if anchor not in text:
+              raise SystemExit('completed validator insertion anchor missing')
+          path.write_text(text.replace(anchor, helper + anchor, 1))
+
+          test = Path('catalog/node/tests/test_live_storage_reinstatement.py')
+          test_text = test.read_text()
+          old = '''            assert replay.status == "completed"\n            assert replay.reinstatement_id == completed.reinstatement_id\n'''
+          new = '''            assert replay.status == "completed", replay.to_dict()\n            assert replay.reinstatement_id == completed.reinstatement_id\n'''
+          if old not in test_text:
+              raise SystemExit('replay assertion anchor missing')
+          test.write_text(test_text.replace(old, new, 1))
+          PY
+          python -m py_compile catalog/federation/live_reinstatement.py catalog/node/tests/test_live_storage_reinstatement.py
+          git diff --check
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add catalog/federation/live_reinstatement.py catalog/node/tests/test_live_storage_reinstatement.py
+          git commit -m 'Make F4.2 completed replay deterministic'
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
