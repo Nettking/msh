@@ -308,7 +308,7 @@ def test_live_catchup_repairs_only_missing_batches_and_keeps_node_unassigned(
                 group_id="storage-main",
                 returning_provider_id="provider-primary",
             )
-            assert completed.status == "caught-up"
+            assert completed.status == "caught-up", completed.to_dict()
             assert completed.attempted == 1
             assert completed.delivered == 1
             assert completed.record is not None
@@ -372,6 +372,6 @@ def test_live_catchup_repairs_only_missing_batches_and_keeps_node_unassigned(
             if authority is not None and authority.connected_event.is_set():
                 await authority.disconnect()
             if relay is not None:
-                await relay.close()
+                await relay.stop()
 
     asyncio.run(scenario())
