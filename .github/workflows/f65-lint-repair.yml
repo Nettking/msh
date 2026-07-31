@@ -1,0 +1,43 @@
+name: F6.5 isolated lint repair
+
+on:
+  push:
+    branches:
+      - agent/phase-f65-durable-resume
+    paths:
+      - ".github/workflows/f65-lint-repair.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/phase-f65-durable-resume
+      - name: Remove two unused imports and self-delete
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("catalog/federation/resumable_chunk_transfer.py")
+          text = path.read_text(encoding="utf-8")
+          old_peer = "    DirectPacketChannel,\n    DirectPeerDescriptor,\n    NodeSigningCredentials,\n"
+          new_peer = "    DirectPacketChannel,\n    NodeSigningCredentials,\n"
+          old_chunk = "    DEFAULT_TRANSFER_CHUNK_BYTES,\n    MAX_TRANSFER_CHUNK_BYTES,\n    MAX_TRANSFER_OBJECT_BYTES,\n"
+          new_chunk = "    DEFAULT_TRANSFER_CHUNK_BYTES,\n    MAX_TRANSFER_OBJECT_BYTES,\n"
+          assert text.count(old_peer) == 1
+          assert text.count(old_chunk) == 1
+          path.write_text(
+              text.replace(old_peer, new_peer).replace(old_chunk, new_chunk),
+              encoding="utf-8",
+          )
+          Path(".github/workflows/f65-lint-repair.yml").unlink()
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix F6.5 lint imports"
+          git push
