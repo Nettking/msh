@@ -9,7 +9,6 @@ from typing import Protocol
 
 from .commit_tracking import DurableAcknowledgementStore, StorageCommitStatus
 from .errors import FederationValidationError
-from .live_catchup import dispatch_live_catchup_request
 from .local_storage import BatchStorageProvider, LocalStorageService
 from .manifest import AuthoritativeStorageManifest
 from .manifest_store import ManifestCommitIntent
@@ -108,6 +107,8 @@ class PhaseDStorageService:
 
     async def dispatch(self, envelope: StorageRequestEnvelope) -> StorageResponseEnvelope:
         try:
+            from .live_catchup import dispatch_live_catchup_request
+
             catchup = dispatch_live_catchup_request(self, envelope)
             if catchup is not None:
                 return catchup
