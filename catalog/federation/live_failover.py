@@ -1,8 +1,8 @@
 """Automatic relay-aware failover for live storage providers.
 
-The relay connection is the only application route to a storage node.  When it
-is lost, the coordinator marks the node and its capabilities unavailable while
-the node durably revokes any local primary grant before reconnecting.  F3 then
+The relay connection is the only application route to a storage node. When it
+is lost, the coordinator sees the node and its capabilities become unavailable,
+while the node closes a provider-local write gate before reconnecting. F3 then
 promotes only an online assigned replica that returns fresh, authenticated proof
 that every authoritative manifest item is still present and intact.
 """
@@ -1098,13 +1098,10 @@ class StorageFailoverCoordinator:
                 )
             ):
                 continue
-            current = self.control_plane.latest_storage_replica_assessment(
+            previous = self.control_plane.latest_storage_replica_assessment(
                 self.session_id, manifest.group_id, provider_id
             )
-            if self._assessment_current(current, manifest):
-                assessments.append(current)
-                continue
-            revision = 1 if current is None else current.report_revision + 1
+            revision = 1 if previous is None else previous.report_revision + 1
             try:
                 report = await self.channel.request_replica_report(
                     failover_id=observation_id,
