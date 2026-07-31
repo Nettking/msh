@@ -140,15 +140,15 @@ class AdaptiveStorageTransport:
         if self._decision_observer is not None:
             try:
                 self._decision_observer(decision)
-            except Exception:  # noqa: BLE001
-                # Diagnostics must never block the correctness-preserving relay path.
-                pass
+            except Exception:
+                # Disable a faulty diagnostic sink without blocking relay traffic.
+                self._decision_observer = None
         try:
             response = await self._relay_transport.request(
                 target_node_id=target_node_id,
                 envelope=envelope,
             )
-        except Exception:  # noqa: BLE001
+        except Exception:
             self._last_outcome = "failed"
             raise
         self._last_outcome = "succeeded"
