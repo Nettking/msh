@@ -18,11 +18,15 @@ from catalog.federation.control_sync import (
     StorageControlReplicaStore,
 )
 from catalog.federation.errors import FederationValidationError
-from catalog.federation.live_failover import STORAGE_CONTROL_REFRESH_MESSAGE
+from catalog.federation.live_failover import (
+    STORAGE_CONTROL_REFRESH_MESSAGE,
+    STORAGE_FAILOVER_RELAY_KIND,
+    build_live_replica_report,
+)
+from catalog.federation.manifest import AuthoritativeStorageManifest
 from catalog.federation.models import CapabilityStatus
 from catalog.federation.storage_protocol import (
     STORAGE_PROTOCOL,
-    BatchIngestRequest,
     StorageError,
     StorageErrorCode,
     StorageOperation,
@@ -79,11 +83,9 @@ class LiveStorageNodeAgent:
     """Compose the F1 storage service with authenticated live control updates.
 
     A node that loses its relay connection immediately closes a provider-local
-    write gate and advertises itself as unavailable.  The gate opens only after
+    write gate and advertises itself as unavailable. The gate opens only after
     a signed control publication from the pinned authority has been verified.
-    This blocks stale-primary revival without rewriting the signed local control
-    history, so an unchanged authority can safely be reconfirmed after a short
-    connection interruption.
+    This blocks stale-primary revival without rewriting signed control history.
     """
 
     def __init__(
@@ -94,7 +96,10 @@ class LiveStorageNodeAgent:
         control_sync_timeout: float = DEFAULT_CONTROL_SYNC_TIMEOUT,
         clock: Any | None = None,
     ) -> None:
-        if not isinstance(control_authority_node_id, str) or not control_authority_node_id:
+        if (
+            not isinstance(control_authority_node_id, str)
+            or not control_authority_node_id
+        ):
             raise ValueError("control_authority_node_id must be non-empty text")
         if control_sync_timeout <= 0:
             raise ValueError("control_sync_timeout must be positive")
@@ -148,7 +153,10 @@ class LiveStorageNodeAgent:
                 "node_id",
                 "a revoked node cannot start a storage provider",
             )
-        if enrollment_state == EnrollmentState.UNENROLLED.value and not enrollment_token:
+        if (
+            enrollment_state == EnrollmentState.UNENROLLED.value
+            and not enrollment_token
+        ):
             raise StorageNodeAgentError(
                 "storage-node-enrollment-required",
                 DEFAULT_ENROLLMENT_TOKEN_ENV,
@@ -158,7 +166,9 @@ class LiveStorageNodeAgent:
         latest = self.replica_store.latest(self.storage.config.session_id)
         cached_primary = False
         if latest is not None:
-            latest.verify(expected_authority_node_id=self.control_authority_node_id)
+            latest.verify(
+                expected_authority_node_id=self.control_authority_node_id
+            )
             self.storage.validate_control_state()
             cached_primary = self._local_is_primary()
             if cached_primary:
@@ -172,7 +182,9 @@ class LiveStorageNodeAgent:
             )
         )
         try:
-            joined = {item.session_id for item in self.client.state.joined_sessions()}
+            joined = {
+                item.session_id for item in self.client.state.joined_sessions()
+            }
             if self.storage.config.session_id not in joined:
                 if not session_invitation:
                     raise StorageNodeAgentError(
@@ -253,7 +265,10 @@ class LiveStorageNodeAgent:
             if assignment.primary_provider_id != self.storage.config.provider_id:
                 continue
             grant = snapshot.leader_grants.get(group_id)
-            if grant is None or grant.get("provider_id") != self.storage.config.provider_id:
+            if (
+                grant is None
+                or grant.get("provider_id") != self.storage.config.provider_id
+            ):
                 raise StorageNodeAgentError(
                     "storage-primary-fenced",
                     "group_id",
@@ -283,7 +298,8 @@ class LiveStorageNodeAgent:
             sorted(
                 group_id
                 for group_id, assignment in snapshot.groups.items()
-                if assignment.primary_provider_id == self.storage.config.provider_id
+                if assignment.primary_provider_id
+                == self.storage.config.provider_id
             )
         )
         self._last_self_fence_reason = reason
@@ -312,11 +328,14 @@ class LiveStorageNodeAgent:
                     ),
                 },
             )
-            if not isinstance(delivery, dict) or delivery.get("delivered") is not True:
+            if (
+                not isinstance(delivery, dict)
+                or delivery.get("delivered") is not True
+            ):
                 raise StorageNodeAgentError(
                     "storage-control-refresh-delivery-failed",
                     "control_authority_node_id",
-                    "relay did not deliver the refresh request to the control authority",
+                    "relay did not deliver refresh to the control authority",
                 )
 
     async def _connection_watch_loop(self) -> None:
@@ -347,11 +366,7 @@ class LiveStorageNodeAgent:
         while True:
             message = await self.storage.endpoint.receive_other()
             payload = getattr(message, "payload", None)
-            if (
-                not isinstance(payload, dict)
-                or payload.get("kind") != STORAGE_CONTROL_RELAY_KIND
-                or payload.get("message") != "plan"
-            ):
+            if not isinstance(payload, dict):
                 continue
             actor_node_id = getattr(message, "actor_node_id", None)
             session_id = getattr(message, "session_id", None)
@@ -360,7 +375,107 @@ class LiveStorageNodeAgent:
                 or session_id != self.storage.config.session_id
             ):
                 continue
-            await self._apply_control_message(actor_node_id, payload)
+            kind = payload.get("kind")
+            message_kind = payload.get("message")
+            if kind == STORAGE_CONTROL_RELAY_KIND and message_kind == "plan":
+                await self._apply_control_message(actor_node_id, payload)
+            elif (
+                kind == STORAGE_FAILOVER_RELAY_KIND
+                and message_kind == "report-request"
+            ):
+                await self._handle_report_request(actor_node_id, payload)
+
+    async def _handle_report_request(
+        self,
+        actor_node_id: str,
+        payload: dict[str, Any],
+    ) -> None:
+        failover_id = payload.get("failover_id")
+        provider_id = payload.get("provider_id")
+        try:
+            if provider_id != self.storage.config.provider_id:
+                raise FederationValidationError(
+                    "live-replica-provider-mismatch",
+                    "provider_id",
+                    "report request targets another provider",
+                )
+            frame = payload.get("manifest_frame")
+            if not isinstance(frame, str):
+                raise FederationValidationError(
+                    "invalid-live-manifest-frame",
+                    "manifest_frame",
+                    "report request requires a JSON manifest frame",
+                )
+            try:
+                manifest_value = json.loads(frame)
+            except json.JSONDecodeError as exc:
+                raise FederationValidationError(
+                    "invalid-live-manifest-frame",
+                    "manifest_frame",
+                    "manifest frame is not valid JSON",
+                ) from exc
+            manifest = AuthoritativeStorageManifest.from_dict(manifest_value)
+            if manifest.session_id != self.storage.config.session_id:
+                raise FederationValidationError(
+                    "live-replica-session-mismatch",
+                    "session_id",
+                    "manifest belongs to another session",
+                )
+            report_revision = payload.get("report_revision")
+            if (
+                isinstance(report_revision, bool)
+                or not isinstance(report_revision, int)
+                or report_revision < 1
+            ):
+                raise FederationValidationError(
+                    "invalid-live-report-revision",
+                    "report_revision",
+                    "must be a positive integer",
+                )
+            reported_at = payload.get("reported_at")
+            if not isinstance(reported_at, str):
+                raise FederationValidationError(
+                    "invalid-timestamp",
+                    "reported_at",
+                    "must be RFC 3339 text",
+                )
+            report = build_live_replica_report(
+                self.provider,
+                manifest,
+                provider_id=self.storage.config.provider_id,
+                report_revision=report_revision,
+                reported_at=reported_at,
+            )
+            response: dict[str, Any] = {
+                "kind": STORAGE_FAILOVER_RELAY_KIND,
+                "message": "report-response",
+                "status": "reported",
+                "failover_id": failover_id,
+                "provider_id": provider_id,
+                "report": report.to_dict(),
+            }
+        except FederationValidationError as exc:
+            response = {
+                "kind": STORAGE_FAILOVER_RELAY_KIND,
+                "message": "report-response",
+                "status": "rejected",
+                "failover_id": failover_id,
+                "provider_id": provider_id,
+                "error": {
+                    "code": exc.code,
+                    "field": exc.field,
+                    "message": exc.message,
+                },
+            }
+        await self.client.send_message(
+            session_id=self.storage.config.session_id,
+            target_node_id=actor_node_id,
+            request_id=(
+                f"failover-report-response-{failover_id or 'invalid'}-"
+                f"{self.node_id}-{uuid.uuid4().hex}"
+            ),
+            payload=response,
+        )
 
     async def _apply_control_message(
         self,
@@ -432,7 +547,10 @@ class LiveStorageNodeAgent:
         await self.client.send_message(
             session_id=self.storage.config.session_id,
             target_node_id=actor_node_id,
-            request_id=f"control-response-{publication_id or 'invalid'}-{self.node_id}",
+            request_id=(
+                f"control-response-{publication_id or 'invalid'}-"
+                f"{self.node_id}-{uuid.uuid4().hex}"
+            ),
             payload=response,
         )
 
@@ -539,7 +657,11 @@ def main() -> int:
         return 130
     except (FederationValidationError, TimeoutError) as exc:
         if isinstance(exc, FederationValidationError):
-            error = {"code": exc.code, "field": exc.field, "message": exc.message}
+            error = {
+                "code": exc.code,
+                "field": exc.field,
+                "message": exc.message,
+            }
         else:
             error = {
                 "code": "storage-control-timeout",
