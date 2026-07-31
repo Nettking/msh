@@ -8,10 +8,10 @@ from pathlib import Path
 import pytest
 
 from catalog.federation.acknowledgement import AcknowledgementMode
+from catalog.federation.control_relay import FramedStorageControlRelayPublisher
 from catalog.federation.control_sync import (
     StorageControlPlan,
     StorageControlPublicationStore,
-    StorageControlRelayPublisher,
     StorageControlReplicaStore,
 )
 from catalog.federation.coordinator import SessionCoordinator
@@ -340,7 +340,7 @@ def test_two_live_storage_nodes_replicate_and_replica_restarts(
                 _wait_for_control_waiting(replica, replica_bootstrap),
             )
 
-            published = await StorageControlRelayPublisher(
+            published = await FramedStorageControlRelayPublisher(
                 authority,
                 timeout=TIMEOUT,
             ).publish(
