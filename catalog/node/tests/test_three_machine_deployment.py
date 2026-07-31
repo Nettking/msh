@@ -361,7 +361,16 @@ def test_three_machine_deployment_survives_normal_restart(tmp_path: Path) -> Non
             primary_restart = asyncio.create_task(primary.bootstrap())
             replica_restart = asyncio.create_task(replica.bootstrap())
             bootstrap_tasks.extend((primary_restart, replica_restart))
-            await asyncio.sleep(0.1)
+            await asyncio.gather(
+                _wait_for_control_waiting(primary, primary_restart),
+                asyncio.wait_for(replica_restart, TIMEOUT),
+            )
+            await asyncio.wait_for(
+                primary.client.connected_event.wait(), TIMEOUT
+            )
+            await asyncio.wait_for(
+                replica.client.connected_event.wait(), TIMEOUT
+            )
             restart_plan = StorageControlPublicationStore(
                 tmp_path / "publications.sqlite3"
             ).issue(control, authority.credentials, session_id, now=NOW + timedelta(seconds=1))

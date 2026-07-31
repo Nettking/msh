@@ -154,6 +154,10 @@ def _relay_is_safe(relay_url: str) -> bool:
         return False
 
 
+def _allow_insecure_loopback(relay_url: str) -> bool:
+    return urlparse(relay_url).scheme == "ws" and _relay_is_safe(relay_url)
+
+
 def _canonical_hash(value: Any) -> str:
     encoded = json.dumps(
         value,
@@ -551,7 +555,11 @@ def ensure_initial_control(
             )
     assignment = control.snapshot(deployment.session_id).groups[deployment.group_id]
     expected_replicas = (deployment.replica.provider_id,)
-    if assignment.primary_provider_id is None and not assignment.replica_provider_ids:
+    new_assignment = (
+        assignment.primary_provider_id is None
+        and not assignment.replica_provider_ids
+    )
+    if new_assignment:
         control.change_assignment(
             deployment.session_id,
             actor,
@@ -568,9 +576,33 @@ def ensure_initial_control(
             "group_id",
             "existing assignment differs from the F5.1 topology",
         )
-    control.set_acknowledgement_policy(
-        deployment.session_id, deployment.group_id, _EXPECTED_ACK_MODE
+    policy = control.acknowledgement_policy(
+        deployment.session_id, deployment.group_id
     )
+    if new_assignment:
+        if policy.mode is not AcknowledgementMode.PRIMARY:
+            raise StorageDeploymentError(
+                "deployment-policy-conflict",
+                "acknowledgement_mode",
+                "new groups must begin with the default primary-only policy",
+            )
+        control.set_acknowledgement_policy(
+            deployment.session_id, deployment.group_id, _EXPECTED_ACK_MODE
+        )
+    elif policy.mode is not _EXPECTED_ACK_MODE:
+        raise StorageDeploymentError(
+            "deployment-policy-conflict",
+            "acknowledgement_mode",
+            "existing deployment is not in normal one-replica mode",
+        )
+    if control.storage_degraded_state(
+        deployment.session_id, deployment.group_id
+    ) is not None:
+        raise StorageDeploymentError(
+            "deployment-is-degraded",
+            "storage_degraded_state",
+            "F5.1 provisioning cannot overwrite a degraded deployment",
+        )
     snapshot = control.snapshot(deployment.session_id)
     grant = snapshot.leader_grants.get(deployment.group_id)
     if grant is None:
@@ -588,12 +620,26 @@ def ensure_initial_control(
             lease_expires_at=timestamp + timedelta(seconds=lease_seconds),
             occurred_at=timestamp,
         )
-    elif grant.get("provider_id") != deployment.primary.provider_id:
-        raise StorageDeploymentError(
-            "deployment-grant-conflict",
-            "group_id",
-            "existing leader grant belongs to another provider",
-        )
+    else:
+        try:
+            lease_expires_at = datetime.fromisoformat(
+                str(grant.get("lease_expires_at")).replace("Z", "+00:00")
+            ).astimezone(timezone.utc)
+        except (TypeError, ValueError) as exc:
+            raise StorageDeploymentError(
+                "deployment-grant-conflict",
+                "lease_expires_at",
+                "existing leader grant has an invalid lease",
+            ) from exc
+        if (
+            grant.get("provider_id") != deployment.primary.provider_id
+            or lease_expires_at <= timestamp
+        ):
+            raise StorageDeploymentError(
+                "deployment-grant-conflict",
+                "group_id",
+                "existing leader grant is expired or belongs to another provider",
+            )
     return control
 
 
@@ -623,6 +669,7 @@ async def provision_and_publish(
         state_directory=authority_state_directory,
         relay_url=deployment.relay_url,
         display_name=deployment.authority_display_name,
+        allow_insecure_local=_allow_insecure_loopback(deployment.relay_url),
         request_timeout=timeout,
     )
     await client.connect()
@@ -670,6 +717,7 @@ async def probe_write(
         state_directory=authority_state_directory,
         relay_url=deployment.relay_url,
         display_name=deployment.authority_display_name,
+        allow_insecure_local=_allow_insecure_loopback(deployment.relay_url),
         request_timeout=timeout,
     )
     await client.connect()
@@ -705,6 +753,16 @@ async def probe_write(
                 "deployment-probe-acknowledgement-missing",
                 "batch_id",
                 "coordinator acknowledgement journal did not commit the probe",
+            )
+        if (
+            status.required_replica_acks != 1
+            or status.acknowledged_replica_ids
+            != (deployment.replica.provider_id,)
+        ):
+            raise StorageDeploymentError(
+                "deployment-probe-acknowledgement-mismatch",
+                "acknowledged_replica_ids",
+                "probe must be acknowledged by exactly the configured replica",
             )
         manifest = control.manifest(deployment.session_id, deployment.group_id)
         item = next((value for value in manifest.items if value.item_id == batch_id), None)
@@ -770,7 +828,18 @@ def storage_evidence(
             "node_id",
             "local persistent identity differs from the public topology",
         )
+    latest = agent.replica_store.latest(deployment.session_id)
+    if latest is None:
+        raise StorageDeploymentError(
+            "deployment-control-missing",
+            "control_sync",
+            "storage node has no durable signed control publication",
+        )
+    latest.verify(expected_authority_node_id=deployment.authority_node_id)
+    agent.storage.validate_control_state()
     status = agent.status()
+    status["control_sync"]["ready"] = True
+    status["control_sync"]["ready_source"] = "durable-verified"
     identity = agent.provider.committed_identity(
         session_id=deployment.session_id,
         group_id=deployment.group_id,
@@ -826,6 +895,7 @@ async def authority_evidence(
         state_directory=authority_state_directory,
         relay_url=deployment.relay_url,
         display_name=deployment.authority_display_name,
+        allow_insecure_local=_allow_insecure_loopback(deployment.relay_url),
         request_timeout=timeout,
     )
     await client.connect()
