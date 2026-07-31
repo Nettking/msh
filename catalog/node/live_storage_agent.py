@@ -16,7 +16,7 @@ from catalog.federation.control_sync import (
 )
 from catalog.federation.errors import FederationValidationError
 
-from .state import EnrollmentState
+from .state import EnrollmentState, NodeStateError
 from .storage_agent import (
     DEFAULT_ENROLLMENT_TOKEN_ENV,
     DEFAULT_SESSION_INVITATION_ENV,
@@ -104,13 +104,7 @@ class LiveStorageNodeAgent:
                         DEFAULT_SESSION_INVITATION_ENV,
                         "first session join requires a protected invitation token",
                     )
-                session = await self.client.join_session(session_invitation)
-                if session.get("session_id") != self.storage.config.session_id:
-                    raise StorageNodeAgentError(
-                        "storage-node-session-mismatch",
-                        "session_id",
-                        "the invitation joined a different session than configured",
-                    )
+                await self._join_configured_session(session_invitation)
             await self.storage.endpoint.start()
             self._control_task = asyncio.create_task(
                 self._control_loop(),
@@ -133,6 +127,35 @@ class LiveStorageNodeAgent:
             await self.client.announce_capability(self.storage.capability())
         except BaseException:
             await self.close(error_code="storage-control-bootstrap-failed")
+            raise
+
+    async def _join_configured_session(self, invitation: str) -> None:
+        """Make live join replay-safe while retaining fail-closed rollback.
+
+        The relay may emit the first session event immediately after the accepted
+        response.  The shared receiver must therefore have a durable membership
+        row before that event can arrive.  A rejected or mismatched invitation
+        rolls the provisional row back to the removed state.
+        """
+
+        session_id = self.storage.config.session_id
+        self.client.state.join_session(session_id, now=self.storage._clock())
+        try:
+            session = await self.client.join_session(invitation)
+            if session.get("session_id") != session_id:
+                raise StorageNodeAgentError(
+                    "storage-node-session-mismatch",
+                    "session_id",
+                    "the invitation joined a different session than configured",
+                )
+        except BaseException:
+            try:
+                self.client.state.remove_session(
+                    session_id,
+                    now=self.storage._clock(),
+                )
+            except NodeStateError:
+                pass
             raise
 
     async def _control_loop(self) -> None:
