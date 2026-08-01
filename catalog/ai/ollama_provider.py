@@ -5,8 +5,8 @@ from __future__ import annotations
 import hashlib
 import re
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 from catalog.federation.errors import FederationValidationError
 
