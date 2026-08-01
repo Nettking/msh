@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
-import sqlite3
 from pathlib import Path
 
 from catalog.federation.errors import FederationValidationError
 
 from .artifact_authority import SQLiteArtifactAuthority
-from .artifact_contracts import ArtifactGrant, ArtifactGrantScope, ArtifactInputReference, OutputPlacementPolicy, _text
+from .artifact_contracts import (
+    ArtifactGrant,
+    ArtifactGrantScope,
+    ArtifactInputReference,
+    OutputPlacementPolicy,
+    _text,
+)
 from .lifecycle_store import SQLiteJobLifecycleStore
 
 
@@ -48,6 +53,32 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
         now,
     ) -> ArtifactGrant:
         coordinator_node_id = _text(coordinator_node_id, "coordinator_node_id")
+        snapshot = self.job_store.snapshot(job_id)
+        declared_inputs = {
+            (
+                reference.reference_id,
+                reference.session_id,
+                reference.schema_name,
+                reference.content_hash,
+                reference.size_bytes,
+            )
+            for reference in snapshot.job.inputs
+        }
+        for reference in input_references:
+            descriptor = self.artifact(reference.artifact_id)
+            declared = (
+                reference.artifact_id,
+                reference.session_id,
+                reference.schema_id,
+                reference.content_hash,
+                descriptor.size_bytes,
+            )
+            if declared not in declared_inputs:
+                raise FederationValidationError(
+                    "undeclared-job-input",
+                    "input_references",
+                    "artifact input is not declared by the job contract",
+                )
         grant = super().issue_grant(
             job_id,
             coordinator_node_id=coordinator_node_id,
