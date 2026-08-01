@@ -213,7 +213,7 @@ def test_f75_cancel_before_claim_is_idempotent(tmp_path: Path) -> None:
     )
 
     assert first.snapshot.job.status is JobStatus.CANCELLED
-    assert first.snapshot.cancellation_reason == "operator-request" if False else True
+    assert first.snapshot.job.cancellation_reason == "operator-request"
     assert replay == first
     assert store.snapshot(job.job_id).ownership is None
 
