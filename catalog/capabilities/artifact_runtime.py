@@ -66,6 +66,12 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
         }
         for reference in input_references:
             descriptor = self.artifact(reference.artifact_id)
+            if descriptor.job_id != reference.job_id:
+                raise FederationValidationError(
+                    "input-reference-provenance-mismatch",
+                    "input_references",
+                    "input reference source job does not match the registered artifact",
+                )
             declared = (
                 reference.artifact_id,
                 reference.session_id,
