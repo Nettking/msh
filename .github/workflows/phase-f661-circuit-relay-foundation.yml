@@ -1,0 +1,51 @@
+name: Phase F6.6.1 circuit relay foundation
+
+on:
+  pull_request:
+    paths:
+      - "cmd/msh-peer-sidecar/**"
+      - "docs/implementation/phase_f661_circuit_relay_foundation.md"
+      - ".github/workflows/phase-f661-circuit-relay-foundation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "cmd/msh-peer-sidecar/**"
+      - "docs/implementation/phase_f661_circuit_relay_foundation.md"
+      - ".github/workflows/phase-f661-circuit-relay-foundation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f661-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  circuit-relay-foundation:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "cmd/msh-peer-sidecar/go.mod"
+          cache: false
+      - name: Verify module lock
+        working-directory: cmd/msh-peer-sidecar
+        run: |
+          go mod tidy
+          git diff --exit-code -- go.mod go.sum
+      - name: Circuit relay tests
+        working-directory: cmd/msh-peer-sidecar
+        run: go test ./... -count=1
+      - name: Build sidecar
+        working-directory: cmd/msh-peer-sidecar
+        run: go build -trimpath .
+      - name: Diff hygiene
+        run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
