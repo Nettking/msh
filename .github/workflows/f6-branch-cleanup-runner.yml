@@ -1,0 +1,81 @@
+name: One-time F6 branch cleanup
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - ".github/workflows/f6-branch-cleanup-runner.yml"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  delete-f6-branches:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'agent/phase-f6-cleanup-runner' &&
+      github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify closeout and delete authorized refs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const expectedMain = '2067a00510338fe8c6e869be0672de3bb3e42c3b';
+            const { owner, repo } = context.repo;
+            const main = await github.rest.git.getRef({ owner, repo, ref: 'heads/main' });
+            if (main.data.object.sha !== expectedMain) {
+              core.setFailed(`main moved: expected ${expectedMain}, got ${main.data.object.sha}`);
+              return;
+            }
+
+            const branches = [
+              'agent/phase-f61-transport-foundation',
+              'agent/phase-f62-direct-peer-stream',
+              'agent/phase-f63-relay-loss-continuity',
+              'agent/phase-f641-chunk-contract',
+              'agent/phase-f642-verified-chunk-transfer',
+              'agent/phase-f65-durable-resume',
+              'agent/phase-f6-closeout',
+              'agent/phase-f661-circuit-relay-foundation',
+              'agent/phase-f662-session-route-rendezvous',
+              'agent/phase-f6-final-closeout',
+            ];
+
+            for (const branch of branches) {
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+                await github.rest.git.deleteRef({ owner, repo, ref: `heads/${branch}` });
+                core.info(`deleted ${branch}`);
+              } catch (error) {
+                if (error.status === 404) {
+                  core.info(`already absent ${branch}`);
+                  continue;
+                }
+                throw error;
+              }
+            }
+
+            const remaining = [];
+            for (const branch of branches) {
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+                remaining.push(branch);
+              } catch (error) {
+                if (error.status !== 404) throw error;
+              }
+            }
+            if (remaining.length) {
+              core.setFailed(`branches remain: ${remaining.join(', ')}`);
+              return;
+            }
+
+            core.info('all authorized F6 branches deleted');
+            await github.rest.git.deleteRef({
+              owner,
+              repo,
+              ref: 'heads/agent/phase-f6-cleanup-runner',
+            });
+            core.info('deleted temporary cleanup runner branch');
