@@ -1,4 +1,4 @@
-name: Phase F6 direct transport closeout
+name: Phase F6 transport closeout
 
 on:
   pull_request:
@@ -12,18 +12,26 @@ on:
       - "catalog/federation/object_transfer_staging.py"
       - "catalog/federation/verified_chunk_transfer.py"
       - "catalog/federation/resumable_chunk_transfer.py"
+      - "catalog/federation/session_route_rendezvous.py"
+      - "catalog/node/route_rendezvous.py"
+      - "catalog/relay/route_rendezvous.py"
       - "catalog/federation/tests/test_phase_f641_chunk_contract.py"
       - "catalog/node/tests/test_phase_f61_transport.py"
       - "catalog/node/tests/test_phase_f62_direct_peer.py"
       - "catalog/node/tests/test_phase_f63_relay_loss_continuity.py"
       - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
       - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
+      - "catalog/relay/tests/test_phase_f662_route_rendezvous.py"
       - "cmd/msh-peer-sidecar/**"
       - "docs/federated_session_network.md"
       - "docs/implementation/federated_session_agent_handoff.md"
       - "docs/implementation/federated_session_test_matrix.md"
       - "docs/implementation/phase_f6_closeout.md"
+      - "docs/implementation/phase_f661_circuit_relay_foundation.md"
+      - "docs/implementation/phase_f662_session_route_rendezvous.md"
       - ".github/workflows/phase-f6-closeout.yml"
+      - ".github/workflows/phase-f661-circuit-relay.yml"
+      - ".github/workflows/phase-f662-session-route-rendezvous.yml"
   push:
     branches: [main]
     paths:
@@ -36,18 +44,26 @@ on:
       - "catalog/federation/object_transfer_staging.py"
       - "catalog/federation/verified_chunk_transfer.py"
       - "catalog/federation/resumable_chunk_transfer.py"
+      - "catalog/federation/session_route_rendezvous.py"
+      - "catalog/node/route_rendezvous.py"
+      - "catalog/relay/route_rendezvous.py"
       - "catalog/federation/tests/test_phase_f641_chunk_contract.py"
       - "catalog/node/tests/test_phase_f61_transport.py"
       - "catalog/node/tests/test_phase_f62_direct_peer.py"
       - "catalog/node/tests/test_phase_f63_relay_loss_continuity.py"
       - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
       - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
+      - "catalog/relay/tests/test_phase_f662_route_rendezvous.py"
       - "cmd/msh-peer-sidecar/**"
       - "docs/federated_session_network.md"
       - "docs/implementation/federated_session_agent_handoff.md"
       - "docs/implementation/federated_session_test_matrix.md"
       - "docs/implementation/phase_f6_closeout.md"
+      - "docs/implementation/phase_f661_circuit_relay_foundation.md"
+      - "docs/implementation/phase_f662_session_route_rendezvous.md"
       - ".github/workflows/phase-f6-closeout.yml"
+      - ".github/workflows/phase-f661-circuit-relay.yml"
+      - ".github/workflows/phase-f662-session-route-rendezvous.yml"
 
 permissions:
   contents: read
@@ -57,13 +73,13 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  direct-transport-closeout:
+  transport-closeout:
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
         with:
@@ -85,6 +101,7 @@ jobs:
         working-directory: cmd/msh-peer-sidecar
         run: |
           go mod tidy
+          git diff --exit-code -- go.mod go.sum
           go test ./...
           go build -trimpath .
       - name: Compile complete F6 boundary
@@ -99,13 +116,17 @@ jobs:
           catalog/federation/object_transfer_staging.py
           catalog/federation/verified_chunk_transfer.py
           catalog/federation/resumable_chunk_transfer.py
+          catalog/federation/session_route_rendezvous.py
+          catalog/node/route_rendezvous.py
+          catalog/relay/route_rendezvous.py
           catalog/federation/tests/test_phase_f641_chunk_contract.py
           catalog/node/tests/test_phase_f61_transport.py
           catalog/node/tests/test_phase_f62_direct_peer.py
           catalog/node/tests/test_phase_f63_relay_loss_continuity.py
           catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
           catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
-      - name: Phase 5 direct transport acceptance matrix
+          catalog/relay/tests/test_phase_f662_route_rendezvous.py
+      - name: Phase 5 transport acceptance matrix
         run: >-
           python -m pytest -o addopts= -q
           catalog/node/tests/test_phase_f61_transport.py
@@ -114,6 +135,7 @@ jobs:
           catalog/federation/tests/test_phase_f641_chunk_contract.py
           catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
           catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
+          catalog/relay/tests/test_phase_f662_route_rendezvous.py
       - name: Ruff complete F6 boundary
         run: >-
           python -m ruff check
@@ -126,12 +148,16 @@ jobs:
           catalog/federation/object_transfer_staging.py
           catalog/federation/verified_chunk_transfer.py
           catalog/federation/resumable_chunk_transfer.py
+          catalog/federation/session_route_rendezvous.py
+          catalog/node/route_rendezvous.py
+          catalog/relay/route_rendezvous.py
           catalog/federation/tests/test_phase_f641_chunk_contract.py
           catalog/node/tests/test_phase_f61_transport.py
           catalog/node/tests/test_phase_f62_direct_peer.py
           catalog/node/tests/test_phase_f63_relay_loss_continuity.py
           catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
           catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
+          catalog/relay/tests/test_phase_f662_route_rendezvous.py
           --ignore I001,RUF022,B008,C408,PLC0206
       - name: Diff hygiene
         run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD

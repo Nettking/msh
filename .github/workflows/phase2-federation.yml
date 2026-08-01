@@ -11,6 +11,8 @@ on:
       - "requirements.txt"
       - "constraints-phase2.txt"
       - ".github/workflows/phase2-federation.yml"
+      - ".github/workflows/phase-f6-closeout.yml"
+      - "docs/implementation/phase_f6_closeout.md"
   push:
     branches: [main]
     paths:
@@ -22,6 +24,8 @@ on:
       - "requirements.txt"
       - "constraints-phase2.txt"
       - ".github/workflows/phase2-federation.yml"
+      - ".github/workflows/phase-f6-closeout.yml"
+      - "docs/implementation/phase_f6_closeout.md"
 
 permissions:
   contents: read
