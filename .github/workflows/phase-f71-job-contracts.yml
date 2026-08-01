@@ -1,0 +1,64 @@
+name: Phase F7.1 job contracts
+
+on:
+  pull_request:
+    paths:
+      - "catalog/capabilities/**"
+      - ".github/workflows/phase-f71-job-contracts.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/capabilities/**"
+      - ".github/workflows/phase-f71-job-contracts.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f71-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  job-contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile F7.1
+        run: >-
+          python -m compileall
+          catalog/capabilities
+      - name: F7.1 and affected federation tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/capabilities/tests
+          catalog/federation/tests/test_phase0.py
+          catalog/federation/tests/test_phase1.py
+      - name: Ruff F7.1
+        run: >-
+          python -m ruff check
+          catalog/capabilities
+          --ignore I001,RUF022,B008,C408,PLC0206
+
+  repository-hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Validate diff hygiene
+        run: git diff --check HEAD^ HEAD
