@@ -35,7 +35,7 @@ class RouteRendezvousRelayServer(RelayServer):
         self.route_registry = route_registry or SessionRouteRegistry()
 
     def _route_now(self):
-        return self.coordinator._clock()  # noqa: SLF001 - shared internal clock boundary
+        return self.coordinator._clock()
 
     async def _dispatch(
         self, record: _LiveConnection, request: RelayEnvelope
