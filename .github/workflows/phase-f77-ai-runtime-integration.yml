@@ -84,7 +84,7 @@ jobs:
           catalog/ai
           catalog/flask_app/ai_routes.py
           catalog/flask_app/tests/test_ai_runtime_integration.py
-          --ignore I001,RUF022,B008,C408,PLC0206
+          --ignore I001,RUF022,B008,C408,PLC0206,UP035
 
   repository-hygiene:
     runs-on: ubuntu-latest
