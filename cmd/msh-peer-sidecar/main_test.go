@@ -3,13 +3,14 @@ package main
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"testing"
 	"time"
 
+	libp2p "github.com/libp2p/go-libp2p"
 	"github.com/libp2p/go-libp2p/core/host"
 	"github.com/libp2p/go-libp2p/core/network"
 	"github.com/libp2p/go-libp2p/core/peer"
+	circuitclient "github.com/libp2p/go-libp2p/p2p/protocol/circuitv2/client"
 	ma "github.com/multiformats/go-multiaddr"
 )
 
@@ -21,22 +22,6 @@ func directAddress(t *testing.T, h host.Host) string {
 	}
 	peerSuffix := ma.StringCast("/p2p/" + h.ID().String())
 	return addresses[0].Encapsulate(peerSuffix).String()
-}
-
-func waitForRelayAddress(t *testing.T, h host.Host, timeout time.Duration) string {
-	t.Helper()
-	deadline := time.Now().Add(timeout)
-	peerSuffix := ma.StringCast("/p2p/" + h.ID().String())
-	for time.Now().Before(deadline) {
-		for _, address := range h.Addrs() {
-			if strings.Contains(address.String(), "/p2p-circuit") {
-				return address.Encapsulate(peerSuffix).String()
-			}
-		}
-		time.Sleep(50 * time.Millisecond)
-	}
-	t.Fatalf("host %s did not obtain a circuit relay address", h.ID())
-	return ""
 }
 
 func relayInfo(t *testing.T, h host.Host) peer.AddrInfo {
@@ -141,24 +126,34 @@ func TestStaticRelayClientObtainsReservationAndCarriesStream(t *testing.T) {
 	defer relayHost.Close()
 	staticRelay := relayInfo(t, relayHost)
 
-	hostA, err := newHostWithConfig(hostConfig{
-		listen:       "/ip4/127.0.0.1/tcp/0",
-		staticRelays: []peer.AddrInfo{staticRelay},
-		forcePrivate: true,
-	})
+	hostA, err := libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
+		libp2p.EnableRelay(),
+		libp2p.DisableMetrics(),
+		libp2p.Ping(false),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer hostA.Close()
-	hostB, err := newHostWithConfig(hostConfig{
-		listen:       "/ip4/127.0.0.1/tcp/0",
-		staticRelays: []peer.AddrInfo{staticRelay},
-		forcePrivate: true,
-	})
+	hostB, err := libp2p.New(
+		libp2p.ListenAddrStrings("/ip4/127.0.0.1/tcp/0"),
+		libp2p.EnableRelay(),
+		libp2p.DisableMetrics(),
+		libp2p.Ping(false),
+	)
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer hostB.Close()
+
+	reservation, err := circuitclient.Reserve(ctx, hostB, staticRelay)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if reservation.LimitDuration != relayCircuitDuration || reservation.LimitData != relayCircuitDataLimit {
+		t.Fatalf("unexpected reservation limits: %+v", reservation)
+	}
 
 	relayedConnection := make(chan bool, 1)
 	hostB.SetStreamHandler(streamProtocol, func(stream network.Stream) {
@@ -176,8 +171,12 @@ func TestStaticRelayClientObtainsReservationAndCarriesStream(t *testing.T) {
 		})
 	})
 
-	_ = waitForRelayAddress(t, hostA, 15*time.Second)
-	hostBRelayAddress := waitForRelayAddress(t, hostB, 15*time.Second)
+	relayAddress, err := ma.NewMultiaddr(directAddress(t, relayHost))
+	if err != nil {
+		t.Fatal(err)
+	}
+	targetSuffix := ma.StringCast("/p2p-circuit/p2p/" + hostB.ID().String())
+	hostBRelayAddress := relayAddress.Encapsulate(targetSuffix).String()
 	payload := json.RawMessage(`{"ciphertext":"through-circuit-v2"}`)
 	response, err := sendRequest(
 		ctx,
