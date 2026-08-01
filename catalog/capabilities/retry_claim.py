@@ -15,6 +15,7 @@ from .job_store import (
     _lease_window,
     _text,
     _timestamp,
+    _utc,
 )
 from .jobs import AttemptStatus, JobAttempt, JobStatus
 
@@ -120,8 +121,6 @@ def claim_retry(
                     "status",
                     "job has no pending retry",
                 )
-            from .job_store import _utc
-
             if now < _utc(retry_row["retry_not_before"], "retry_not_before"):
                 raise FederationValidationError(
                     "retry-backoff-active",
