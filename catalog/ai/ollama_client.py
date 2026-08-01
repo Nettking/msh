@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import os
-import socket
 from urllib import error, request
 
 DEFAULT_MODEL = os.environ.get("MSH_AI_MODEL", "qwen2.5-coder:7b")
@@ -78,11 +77,11 @@ def chat(
             raw = response.read()
     except error.HTTPError as exc:  # pragma: no cover - local runtime dependent
         raise _http_error(exc.code) from exc
-    except (TimeoutError, socket.timeout) as exc:  # pragma: no cover
+    except TimeoutError as exc:  # pragma: no cover
         raise OllamaError("Ollama request timed out.", code="ollama-timeout") from exc
     except error.URLError as exc:  # pragma: no cover
         reason = getattr(exc, "reason", None)
-        if isinstance(reason, (TimeoutError, socket.timeout)):
+        if isinstance(reason, TimeoutError):
             raise OllamaError("Ollama request timed out.", code="ollama-timeout") from exc
         raise OllamaError(
             "Ollama is unavailable on the configured private connection.",
