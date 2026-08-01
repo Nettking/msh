@@ -1,0 +1,99 @@
+name: Phase F7.7 AI runtime integration
+
+on:
+  pull_request:
+    paths:
+      - "catalog/ai/**"
+      - "catalog/flask_app/ai_routes.py"
+      - "catalog/flask_app/templates/ai_explainer.html"
+      - "catalog/flask_app/static/js/ai-explainer.js"
+      - "catalog/flask_app/services/server_setup_service.py"
+      - "catalog/flask_app/tests/test_ai_explainer_chat.py"
+      - "catalog/flask_app/tests/test_ai_runtime_integration.py"
+      - "catalog/flask_app/tests/test_connected_ai_provider.py"
+      - "catalog/flask_app/tests/test_model_provider_compose.py"
+      - "catalog/capabilities/**"
+      - ".github/workflows/phase-f77-ai-runtime-integration.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/ai/**"
+      - "catalog/flask_app/ai_routes.py"
+      - "catalog/flask_app/templates/ai_explainer.html"
+      - "catalog/flask_app/static/js/ai-explainer.js"
+      - "catalog/flask_app/services/server_setup_service.py"
+      - "catalog/flask_app/tests/test_ai_explainer_chat.py"
+      - "catalog/flask_app/tests/test_ai_runtime_integration.py"
+      - "catalog/flask_app/tests/test_connected_ai_provider.py"
+      - "catalog/flask_app/tests/test_model_provider_compose.py"
+      - "catalog/capabilities/**"
+      - ".github/workflows/phase-f77-ai-runtime-integration.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f77-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ai-runtime:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile F7.7 AI and capability boundaries
+        run: >-
+          python -m compileall
+          catalog/ai
+          catalog/capabilities
+          catalog/flask_app/ai_routes.py
+          catalog/flask_app/tests/test_ai_explainer_chat.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/flask_app/tests/test_model_provider_compose.py
+      - name: F7.7 AI, F7 capability and affected federation tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/ai/tests
+          catalog/flask_app/tests/test_ai_explainer_chat.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/flask_app/tests/test_model_provider_compose.py
+          catalog/capabilities/tests
+          catalog/relay/tests/test_phase_f74_capability_dispatch.py
+          catalog/relay/tests/test_phase_f75_retry_cancellation.py
+          catalog/federation/tests/test_phase0.py
+          catalog/federation/tests/test_phase1.py
+      - name: Ruff F7.7 scope
+        run: >-
+          python -m ruff check
+          catalog/ai
+          catalog/flask_app/ai_routes.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          --ignore I001,RUF022,B008,C408,PLC0206
+
+  repository-hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Validate diff hygiene
+        run: git diff --check HEAD^ HEAD
