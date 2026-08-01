@@ -1,7 +1,8 @@
-"""Versioned, transport-independent job contracts for distributed capabilities.
+"""Pure, versioned job contracts for distributed MSH capabilities.
 
-This module contains pure domain logic only. It does not dispatch work, claim
-ownership, contact providers, or alter the existing MSH AI/runtime flow.
+The module defines data and deterministic state validation only. It does not
+perform provider selection, dispatch, ownership, storage, networking, or runtime
+integration.
 """
 
 from __future__ import annotations
@@ -12,10 +13,7 @@ from dataclasses import dataclass, replace
 from enum import Enum
 from typing import Any, ClassVar, Self
 
-from catalog.federation.errors import (
-    FederationValidationError,
-    ProtocolCompatibilityError,
-)
+from catalog.federation.errors import FederationValidationError, ProtocolCompatibilityError
 
 JOBS_PROTOCOL = "msh-jobs"
 JOBS_PROTOCOL_VERSION = "1.0"
@@ -32,13 +30,11 @@ MAX_REFERENCE_COUNT = 128
 MAX_ATTEMPTS = 32
 MAX_TIMEOUT_SECONDS = 7 * 24 * 60 * 60
 
-_SCHEMA_PATTERN = re.compile(r"^(?P<name>msh\.[a-z0-9.-]+)\.v(?P<major>[0-9]+)$")
-_HASH_PATTERN = re.compile(r"^sha256:[0-9a-f]{64}$")
+_SCHEMA_RE = re.compile(r"^(?P<name>msh\.[a-z0-9.-]+)\.v(?P<major>[0-9]+)$")
+_HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 
 class JobStatus(str, Enum):
-    """Monotonic logical status for one job."""
-
     SUBMITTED = "submitted"
     QUEUED = "queued"
     ACTIVE = "active"
@@ -51,8 +47,6 @@ class JobStatus(str, Enum):
 
 
 class AttemptStatus(str, Enum):
-    """Monotonic status for one immutable attempt generation."""
-
     PENDING = "pending"
     ASSIGNED = "assigned"
     ACCEPTED = "accepted"
@@ -65,15 +59,10 @@ class AttemptStatus(str, Enum):
     LOST = "lost"
 
 
-_TERMINAL_JOB_STATUSES = frozenset(
-    {
-        JobStatus.SUCCEEDED,
-        JobStatus.FAILED,
-        JobStatus.CANCELLED,
-        JobStatus.TIMED_OUT,
-    }
+_TERMINAL_JOBS = frozenset(
+    {JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED, JobStatus.TIMED_OUT}
 )
-_TERMINAL_ATTEMPT_STATUSES = frozenset(
+_TERMINAL_ATTEMPTS = frozenset(
     {
         AttemptStatus.SUCCEEDED,
         AttemptStatus.FAILED,
@@ -82,134 +71,114 @@ _TERMINAL_ATTEMPT_STATUSES = frozenset(
         AttemptStatus.LOST,
     }
 )
-_ACTIVE_ATTEMPT_STATUSES = frozenset(set(AttemptStatus) - _TERMINAL_ATTEMPT_STATUSES)
+_ACTIVE_ATTEMPTS = frozenset(set(AttemptStatus) - _TERMINAL_ATTEMPTS)
+_ERROR_ATTEMPTS = frozenset(
+    {AttemptStatus.FAILED, AttemptStatus.TIMED_OUT, AttemptStatus.LOST}
+)
 
-_ALLOWED_JOB_TRANSITIONS: dict[JobStatus, frozenset[JobStatus]] = {
-    JobStatus.SUBMITTED: frozenset(
-        {JobStatus.QUEUED, JobStatus.CANCELLATION_REQUESTED}
-    ),
-    JobStatus.QUEUED: frozenset(
-        {
-            JobStatus.ACTIVE,
-            JobStatus.CANCELLATION_REQUESTED,
-            JobStatus.FAILED,
-            JobStatus.TIMED_OUT,
-        }
-    ),
-    JobStatus.ACTIVE: frozenset(
-        {
-            JobStatus.RETRY_WAIT,
-            JobStatus.CANCELLATION_REQUESTED,
-            JobStatus.SUCCEEDED,
-            JobStatus.FAILED,
-            JobStatus.TIMED_OUT,
-        }
-    ),
-    JobStatus.RETRY_WAIT: frozenset(
-        {
-            JobStatus.ACTIVE,
-            JobStatus.CANCELLATION_REQUESTED,
-            JobStatus.FAILED,
-            JobStatus.TIMED_OUT,
-        }
-    ),
-    JobStatus.CANCELLATION_REQUESTED: frozenset(
-        {
-            JobStatus.SUCCEEDED,
-            JobStatus.FAILED,
-            JobStatus.CANCELLED,
-            JobStatus.TIMED_OUT,
-        }
-    ),
-    JobStatus.SUCCEEDED: frozenset(),
-    JobStatus.FAILED: frozenset(),
-    JobStatus.CANCELLED: frozenset(),
-    JobStatus.TIMED_OUT: frozenset(),
+_JOB_TRANSITIONS = {
+    JobStatus.SUBMITTED: {JobStatus.QUEUED, JobStatus.CANCELLATION_REQUESTED},
+    JobStatus.QUEUED: {
+        JobStatus.ACTIVE,
+        JobStatus.CANCELLATION_REQUESTED,
+        JobStatus.FAILED,
+        JobStatus.TIMED_OUT,
+    },
+    JobStatus.ACTIVE: {
+        JobStatus.RETRY_WAIT,
+        JobStatus.CANCELLATION_REQUESTED,
+        JobStatus.SUCCEEDED,
+        JobStatus.FAILED,
+        JobStatus.TIMED_OUT,
+    },
+    JobStatus.RETRY_WAIT: {
+        JobStatus.ACTIVE,
+        JobStatus.CANCELLATION_REQUESTED,
+        JobStatus.FAILED,
+        JobStatus.TIMED_OUT,
+    },
+    JobStatus.CANCELLATION_REQUESTED: {
+        JobStatus.SUCCEEDED,
+        JobStatus.FAILED,
+        JobStatus.CANCELLED,
+        JobStatus.TIMED_OUT,
+    },
+    JobStatus.SUCCEEDED: set(),
+    JobStatus.FAILED: set(),
+    JobStatus.CANCELLED: set(),
+    JobStatus.TIMED_OUT: set(),
 }
 
-_ALLOWED_ATTEMPT_TRANSITIONS: dict[AttemptStatus, frozenset[AttemptStatus]] = {
-    AttemptStatus.PENDING: frozenset(
-        {AttemptStatus.ASSIGNED, AttemptStatus.CANCELLATION_REQUESTED}
-    ),
-    AttemptStatus.ASSIGNED: frozenset(
-        {
-            AttemptStatus.ACCEPTED,
-            AttemptStatus.CANCELLATION_REQUESTED,
-            AttemptStatus.FAILED,
-            AttemptStatus.TIMED_OUT,
-            AttemptStatus.LOST,
-        }
-    ),
-    AttemptStatus.ACCEPTED: frozenset(
-        {
-            AttemptStatus.RUNNING,
-            AttemptStatus.CANCELLATION_REQUESTED,
-            AttemptStatus.FAILED,
-            AttemptStatus.TIMED_OUT,
-            AttemptStatus.LOST,
-        }
-    ),
-    AttemptStatus.RUNNING: frozenset(
-        {
-            AttemptStatus.CANCELLATION_REQUESTED,
-            AttemptStatus.SUCCEEDED,
-            AttemptStatus.FAILED,
-            AttemptStatus.TIMED_OUT,
-            AttemptStatus.LOST,
-        }
-    ),
-    AttemptStatus.CANCELLATION_REQUESTED: frozenset(
-        {
-            AttemptStatus.SUCCEEDED,
-            AttemptStatus.FAILED,
-            AttemptStatus.CANCELLED,
-            AttemptStatus.TIMED_OUT,
-            AttemptStatus.LOST,
-        }
-    ),
-    AttemptStatus.SUCCEEDED: frozenset(),
-    AttemptStatus.FAILED: frozenset(),
-    AttemptStatus.CANCELLED: frozenset(),
-    AttemptStatus.TIMED_OUT: frozenset(),
-    AttemptStatus.LOST: frozenset(),
+_ATTEMPT_TRANSITIONS = {
+    AttemptStatus.PENDING: {
+        AttemptStatus.ASSIGNED,
+        AttemptStatus.CANCELLATION_REQUESTED,
+    },
+    AttemptStatus.ASSIGNED: {
+        AttemptStatus.ACCEPTED,
+        AttemptStatus.CANCELLATION_REQUESTED,
+        AttemptStatus.FAILED,
+        AttemptStatus.TIMED_OUT,
+        AttemptStatus.LOST,
+    },
+    AttemptStatus.ACCEPTED: {
+        AttemptStatus.RUNNING,
+        AttemptStatus.CANCELLATION_REQUESTED,
+        AttemptStatus.FAILED,
+        AttemptStatus.TIMED_OUT,
+        AttemptStatus.LOST,
+    },
+    AttemptStatus.RUNNING: {
+        AttemptStatus.CANCELLATION_REQUESTED,
+        AttemptStatus.SUCCEEDED,
+        AttemptStatus.FAILED,
+        AttemptStatus.TIMED_OUT,
+        AttemptStatus.LOST,
+    },
+    AttemptStatus.CANCELLATION_REQUESTED: {
+        AttemptStatus.SUCCEEDED,
+        AttemptStatus.FAILED,
+        AttemptStatus.CANCELLED,
+        AttemptStatus.TIMED_OUT,
+        AttemptStatus.LOST,
+    },
+    AttemptStatus.SUCCEEDED: set(),
+    AttemptStatus.FAILED: set(),
+    AttemptStatus.CANCELLED: set(),
+    AttemptStatus.TIMED_OUT: set(),
+    AttemptStatus.LOST: set(),
 }
 
 
-def _bounded_text(value: Any, field: str, *, max_bytes: int = MAX_TEXT_BYTES) -> str:
+def _text(value: Any, field: str, *, maximum: int = MAX_TEXT_BYTES) -> str:
     if not isinstance(value, str) or not value or value != value.strip():
         raise FederationValidationError(
             "invalid-text", field, "must be non-empty text without surrounding whitespace"
         )
     if any(ord(character) < 32 for character in value):
+        raise FederationValidationError("invalid-text", field, "must not contain control characters")
+    if len(value.encode("utf-8")) > maximum:
         raise FederationValidationError(
-            "invalid-text", field, "must not contain control characters"
-        )
-    if len(value.encode("utf-8")) > max_bytes:
-        raise FederationValidationError(
-            "text-too-large", field, f"must not exceed {max_bytes} UTF-8 bytes"
+            "text-too-large", field, f"must not exceed {maximum} UTF-8 bytes"
         )
     return value
 
 
 def _optional_text(value: Any, field: str) -> str | None:
-    if value is None:
-        return None
-    return _bounded_text(value, field)
+    return None if value is None else _text(value, field)
 
 
-def _positive_int(value: Any, field: str, *, maximum: int | None = None) -> int:
+def _positive(value: Any, field: str, *, maximum: int | None = None) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
         raise FederationValidationError(
             "invalid-positive-integer", field, "must be a positive integer"
         )
     if maximum is not None and value > maximum:
-        raise FederationValidationError(
-            "integer-too-large", field, f"must not exceed {maximum}"
-        )
+        raise FederationValidationError("integer-too-large", field, f"must not exceed {maximum}")
     return value
 
 
-def _non_negative_int(value: Any, field: str) -> int:
+def _non_negative(value: Any, field: str) -> int:
     if isinstance(value, bool) or not isinstance(value, int) or value < 0:
         raise FederationValidationError(
             "invalid-non-negative-integer", field, "must be a non-negative integer"
@@ -217,7 +186,13 @@ def _non_negative_int(value: Any, field: str) -> int:
     return value
 
 
-def _json_object(value: Any, field: str) -> dict[str, Any]:
+def _array(value: Any, field: str) -> tuple[Any, ...]:
+    if not isinstance(value, (list, tuple)):
+        raise FederationValidationError("invalid-array", field, "must be an array")
+    return tuple(value)
+
+
+def _object(value: Any, field: str) -> dict[str, Any]:
     if not isinstance(value, dict) or any(not isinstance(key, str) for key in value):
         raise FederationValidationError(
             "invalid-object", field, "must be an object with string keys"
@@ -231,48 +206,50 @@ def _json_object(value: Any, field: str) -> dict[str, Any]:
     return dict(value)
 
 
-def _enum(value: Any, enum_type: type[Enum], field: str) -> Any:
+def _enum(value: Any, kind: type[Enum], field: str) -> Any:
     try:
-        return enum_type(value)
+        return kind(value)
     except (TypeError, ValueError) as exc:
         raise FederationValidationError(
-            "invalid-enum", field, f"unknown {enum_type.__name__} value"
+            "invalid-enum", field, f"unknown {kind.__name__} value"
         ) from exc
 
 
-def _schema_major(value: Any, expected_schema: str, field: str = "schema") -> int:
-    schema = _bounded_text(value, field)
-    match = _SCHEMA_PATTERN.fullmatch(schema)
-    expected = _SCHEMA_PATTERN.fullmatch(expected_schema)
-    if match is None or expected is None or match.group("name") != expected.group("name"):
+def _required(value: dict[str, Any], names: tuple[str, ...]) -> None:
+    for name in names:
+        if name not in value:
+            raise FederationValidationError("missing-field", name, "is required")
+
+
+def _schema(value: Any, expected: str) -> int:
+    actual_text = _text(value, "schema")
+    actual = _SCHEMA_RE.fullmatch(actual_text)
+    wanted = _SCHEMA_RE.fullmatch(expected)
+    if actual is None or wanted is None or actual.group("name") != wanted.group("name"):
         raise ProtocolCompatibilityError(
-            "unsupported-schema", field, f"expected {expected_schema}, received {schema!r}"
+            "unsupported-schema", "schema", f"expected {expected}, received {actual_text!r}"
         )
-    major = int(match.group("major"))
-    expected_major = int(expected.group("major"))
+    major = int(actual.group("major"))
+    expected_major = int(wanted.group("major"))
     if major != expected_major:
         raise ProtocolCompatibilityError(
             "unsupported-schema-major",
-            field,
+            "schema",
             f"supported major is {expected_major}, received {major}",
         )
     return major
 
 
 def protocol_major(value: Any, field: str = "protocol_version") -> int:
-    version = _bounded_text(value, field)
-    try:
-        major_text, *minor = version.split(".", 1)
-        major = int(major_text)
-        if major < 0 or (minor and (not minor[0] or not minor[0].isdigit())):
-            raise ValueError
-    except ValueError as exc:
+    version = _text(value, field)
+    parts = version.split(".", 1)
+    if not parts[0].isdigit() or (len(parts) == 2 and not parts[1].isdigit()):
         raise ProtocolCompatibilityError(
             "invalid-protocol-version",
             field,
             "must be a numeric major or major.minor version",
-        ) from exc
-    return major
+        )
+    return int(parts[0])
 
 
 def validate_jobs_protocol(value: Any) -> int:
@@ -286,24 +263,10 @@ def validate_jobs_protocol(value: Any) -> int:
     return major
 
 
-def _required_fields(value: dict[str, Any], required: tuple[str, ...]) -> None:
-    missing = [field for field in required if field not in value]
-    if missing:
-        raise FederationValidationError("missing-field", missing[0], "is required")
-
-
-def _sequence(value: Any, field: str) -> tuple[Any, ...]:
-    if not isinstance(value, (list, tuple)):
-        raise FederationValidationError("invalid-array", field, "must be an array")
-    return tuple(value)
-
-
 def validate_job_transition(current: JobStatus | str, target: JobStatus | str) -> JobStatus:
     current_status = _enum(current, JobStatus, "current_status")
     target_status = _enum(target, JobStatus, "target_status")
-    if target_status == current_status:
-        return target_status
-    if target_status not in _ALLOWED_JOB_TRANSITIONS[current_status]:
+    if target_status != current_status and target_status not in _JOB_TRANSITIONS[current_status]:
         raise FederationValidationError(
             "invalid-job-transition",
             "status",
@@ -317,9 +280,7 @@ def validate_attempt_transition(
 ) -> AttemptStatus:
     current_status = _enum(current, AttemptStatus, "current_status")
     target_status = _enum(target, AttemptStatus, "target_status")
-    if target_status == current_status:
-        return target_status
-    if target_status not in _ALLOWED_ATTEMPT_TRANSITIONS[current_status]:
+    if target_status != current_status and target_status not in _ATTEMPT_TRANSITIONS[current_status]:
         raise FederationValidationError(
             "invalid-attempt-transition",
             "status",
@@ -331,7 +292,6 @@ def validate_attempt_transition(
 @dataclass(frozen=True)
 class CapabilityRequirement:
     SCHEMA: ClassVar[str] = CAPABILITY_REQUIREMENT_SCHEMA
-
     capability_type: str
     protocol: str
     protocol_version: str
@@ -339,35 +299,18 @@ class CapabilityRequirement:
 
     def __post_init__(self) -> None:
         for name in ("capability_type", "protocol", "protocol_version"):
-            object.__setattr__(self, name, _bounded_text(getattr(self, name), name))
-        protocol_major(self.protocol_version, "protocol_version")
-        object.__setattr__(
-            self, "requirements", _json_object(self.requirements, "requirements")
-        )
+            object.__setattr__(self, name, _text(getattr(self, name), name))
+        protocol_major(self.protocol_version)
+        object.__setattr__(self, "requirements", _object(self.requirements, "requirements"))
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> Self:
         if not isinstance(value, dict):
-            raise FederationValidationError(
-                "invalid-object", "capability", "must be an object"
-            )
-        _required_fields(
-            value,
-            (
-                "schema",
-                "capability_type",
-                "protocol",
-                "protocol_version",
-                "requirements",
-            ),
-        )
-        _schema_major(value["schema"], cls.SCHEMA)
-        return cls(
-            capability_type=value["capability_type"],
-            protocol=value["protocol"],
-            protocol_version=value["protocol_version"],
-            requirements=value["requirements"],
-        )
+            raise FederationValidationError("invalid-object", "capability", "must be an object")
+        names = ("schema", "capability_type", "protocol", "protocol_version", "requirements")
+        _required(value, names)
+        _schema(value["schema"], cls.SCHEMA)
+        return cls(**{name: value[name] for name in names if name != "schema"})
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -382,7 +325,6 @@ class CapabilityRequirement:
 @dataclass(frozen=True)
 class ArtifactReference:
     SCHEMA: ClassVar[str] = ARTIFACT_REFERENCE_SCHEMA
-
     reference_id: str
     session_id: str
     schema_name: str
@@ -392,9 +334,9 @@ class ArtifactReference:
 
     def __post_init__(self) -> None:
         for name in ("reference_id", "session_id", "schema_name", "media_type"):
-            object.__setattr__(self, name, _bounded_text(getattr(self, name), name))
+            object.__setattr__(self, name, _text(getattr(self, name), name))
         content_hash = _optional_text(self.content_hash, "content_hash")
-        if content_hash is not None and _HASH_PATTERN.fullmatch(content_hash) is None:
+        if content_hash is not None and _HASH_RE.fullmatch(content_hash) is None:
             raise FederationValidationError(
                 "invalid-content-hash",
                 "content_hash",
@@ -402,9 +344,7 @@ class ArtifactReference:
             )
         object.__setattr__(self, "content_hash", content_hash)
         if self.size_bytes is not None:
-            object.__setattr__(
-                self, "size_bytes", _non_negative_int(self.size_bytes, "size_bytes")
-            )
+            object.__setattr__(self, "size_bytes", _non_negative(self.size_bytes, "size_bytes"))
         if (self.content_hash is None) != (self.size_bytes is None):
             raise FederationValidationError(
                 "incomplete-artifact-identity",
@@ -418,22 +358,11 @@ class ArtifactReference:
             raise FederationValidationError(
                 "invalid-object", "artifact_reference", "must be an object"
             )
-        _required_fields(
-            value,
-            (
-                "schema",
-                "reference_id",
-                "session_id",
-                "schema_name",
-                "media_type",
-            ),
-        )
-        _schema_major(value["schema"], cls.SCHEMA)
+        names = ("schema", "reference_id", "session_id", "schema_name", "media_type")
+        _required(value, names)
+        _schema(value["schema"], cls.SCHEMA)
         return cls(
-            reference_id=value["reference_id"],
-            session_id=value["session_id"],
-            schema_name=value["schema_name"],
-            media_type=value["media_type"],
+            **{name: value[name] for name in names if name != "schema"},
             content_hash=value.get("content_hash"),
             size_bytes=value.get("size_bytes"),
         )
@@ -453,20 +382,15 @@ class ArtifactReference:
 @dataclass(frozen=True)
 class RetryPolicy:
     SCHEMA: ClassVar[str] = RETRY_POLICY_SCHEMA
-
     max_attempts: int
     backoff_seconds: tuple[int, ...]
     retryable_error_codes: tuple[str, ...]
 
     def __post_init__(self) -> None:
-        object.__setattr__(
-            self,
-            "max_attempts",
-            _positive_int(self.max_attempts, "max_attempts", maximum=MAX_ATTEMPTS),
-        )
+        object.__setattr__(self, "max_attempts", _positive(self.max_attempts, "max_attempts", maximum=MAX_ATTEMPTS))
         backoff = tuple(
-            _non_negative_int(value, f"backoff_seconds[{index}]")
-            for index, value in enumerate(_sequence(self.backoff_seconds, "backoff_seconds"))
+            _non_negative(item, f"backoff_seconds[{index}]")
+            for index, item in enumerate(_array(self.backoff_seconds, "backoff_seconds"))
         )
         if len(backoff) != self.max_attempts - 1:
             raise FederationValidationError(
@@ -474,11 +398,9 @@ class RetryPolicy:
                 "backoff_seconds",
                 "must contain exactly one delay for each possible retry",
             )
-        if any(value > MAX_TIMEOUT_SECONDS for value in backoff):
+        if any(item > MAX_TIMEOUT_SECONDS for item in backoff):
             raise FederationValidationError(
-                "backoff-too-large",
-                "backoff_seconds",
-                f"each delay must not exceed {MAX_TIMEOUT_SECONDS}",
+                "backoff-too-large", "backoff_seconds", "contains an excessive delay"
             )
         if tuple(sorted(backoff)) != backoff:
             raise FederationValidationError(
@@ -486,58 +408,40 @@ class RetryPolicy:
                 "backoff_seconds",
                 "delays must be monotonically non-decreasing",
             )
-        object.__setattr__(self, "backoff_seconds", backoff)
-
-        error_codes = tuple(
-            _bounded_text(code, f"retryable_error_codes[{index}]")
-            for index, code in enumerate(
-                _sequence(self.retryable_error_codes, "retryable_error_codes")
-            )
+        codes = tuple(
+            _text(item, f"retryable_error_codes[{index}]")
+            for index, item in enumerate(_array(self.retryable_error_codes, "retryable_error_codes"))
         )
-        if len(set(error_codes)) != len(error_codes):
+        if len(codes) != len(set(codes)):
             raise FederationValidationError(
-                "duplicate-error-code",
-                "retryable_error_codes",
-                "must not contain duplicates",
+                "duplicate-error-code", "retryable_error_codes", "must not contain duplicates"
             )
-        object.__setattr__(self, "retryable_error_codes", error_codes)
+        object.__setattr__(self, "backoff_seconds", backoff)
+        object.__setattr__(self, "retryable_error_codes", codes)
 
     def allows_retry(self, *, attempt_number: int, error_code: str) -> bool:
-        attempt = _positive_int(
-            attempt_number, "attempt_number", maximum=MAX_ATTEMPTS
-        )
-        code = _bounded_text(error_code, "error_code")
-        return attempt < self.max_attempts and code in self.retryable_error_codes
+        attempt = _positive(attempt_number, "attempt_number", maximum=MAX_ATTEMPTS)
+        return attempt < self.max_attempts and _text(error_code, "error_code") in self.retryable_error_codes
 
     def delay_after(self, attempt_number: int) -> int:
-        attempt = _positive_int(
-            attempt_number, "attempt_number", maximum=MAX_ATTEMPTS
-        )
+        attempt = _positive(attempt_number, "attempt_number", maximum=MAX_ATTEMPTS)
         if attempt >= self.max_attempts:
             raise FederationValidationError(
-                "retry-exhausted",
-                "attempt_number",
-                "no retry delay exists after the final attempt",
+                "retry-exhausted", "attempt_number", "no retry exists after the final attempt"
             )
         return self.backoff_seconds[attempt - 1]
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> Self:
         if not isinstance(value, dict):
-            raise FederationValidationError(
-                "invalid-object", "retry_policy", "must be an object"
-            )
-        _required_fields(
-            value,
-            ("schema", "max_attempts", "backoff_seconds", "retryable_error_codes"),
-        )
-        _schema_major(value["schema"], cls.SCHEMA)
+            raise FederationValidationError("invalid-object", "retry_policy", "must be an object")
+        names = ("schema", "max_attempts", "backoff_seconds", "retryable_error_codes")
+        _required(value, names)
+        _schema(value["schema"], cls.SCHEMA)
         return cls(
             max_attempts=value["max_attempts"],
-            backoff_seconds=_sequence(value["backoff_seconds"], "backoff_seconds"),
-            retryable_error_codes=_sequence(
-                value["retryable_error_codes"], "retryable_error_codes"
-            ),
+            backoff_seconds=_array(value["backoff_seconds"], "backoff_seconds"),
+            retryable_error_codes=_array(value["retryable_error_codes"], "retryable_error_codes"),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -552,7 +456,6 @@ class RetryPolicy:
 @dataclass(frozen=True)
 class TimeoutPolicy:
     SCHEMA: ClassVar[str] = TIMEOUT_POLICY_SCHEMA
-
     overall_timeout_seconds: int
     queue_timeout_seconds: int
     start_timeout_seconds: int
@@ -560,26 +463,16 @@ class TimeoutPolicy:
     cancellation_grace_seconds: int
 
     def __post_init__(self) -> None:
-        for name in (
+        names = (
             "overall_timeout_seconds",
             "queue_timeout_seconds",
             "start_timeout_seconds",
             "run_timeout_seconds",
             "cancellation_grace_seconds",
-        ):
-            object.__setattr__(
-                self,
-                name,
-                _positive_int(
-                    getattr(self, name), name, maximum=MAX_TIMEOUT_SECONDS
-                ),
-            )
-        if self.overall_timeout_seconds < max(
-            self.queue_timeout_seconds,
-            self.start_timeout_seconds,
-            self.run_timeout_seconds,
-            self.cancellation_grace_seconds,
-        ):
+        )
+        for name in names:
+            object.__setattr__(self, name, _positive(getattr(self, name), name, maximum=MAX_TIMEOUT_SECONDS))
+        if self.overall_timeout_seconds < max(getattr(self, name) for name in names[1:]):
             raise FederationValidationError(
                 "invalid-overall-timeout",
                 "overall_timeout_seconds",
@@ -589,10 +482,8 @@ class TimeoutPolicy:
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> Self:
         if not isinstance(value, dict):
-            raise FederationValidationError(
-                "invalid-object", "timeout_policy", "must be an object"
-            )
-        required = (
+            raise FederationValidationError("invalid-object", "timeout_policy", "must be an object")
+        names = (
             "schema",
             "overall_timeout_seconds",
             "queue_timeout_seconds",
@@ -600,9 +491,9 @@ class TimeoutPolicy:
             "run_timeout_seconds",
             "cancellation_grace_seconds",
         )
-        _required_fields(value, required)
-        _schema_major(value["schema"], cls.SCHEMA)
-        return cls(**{name: value[name] for name in required if name != "schema"})
+        _required(value, names)
+        _schema(value["schema"], cls.SCHEMA)
+        return cls(**{name: value[name] for name in names if name != "schema"})
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -618,30 +509,17 @@ class TimeoutPolicy:
 @dataclass(frozen=True)
 class JobAttempt:
     SCHEMA: ClassVar[str] = ATTEMPT_SCHEMA
-
     attempt_id: str
     attempt_number: int
     status: AttemptStatus
     error_code: str | None = None
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "attempt_id", _bounded_text(self.attempt_id, "attempt_id"))
-        object.__setattr__(
-            self,
-            "attempt_number",
-            _positive_int(
-                self.attempt_number, "attempt_number", maximum=MAX_ATTEMPTS
-            ),
-        )
+        object.__setattr__(self, "attempt_id", _text(self.attempt_id, "attempt_id"))
+        object.__setattr__(self, "attempt_number", _positive(self.attempt_number, "attempt_number", maximum=MAX_ATTEMPTS))
         object.__setattr__(self, "status", _enum(self.status, AttemptStatus, "status"))
-        object.__setattr__(
-            self, "error_code", _optional_text(self.error_code, "error_code")
-        )
-        if self.error_code is not None and self.status not in {
-            AttemptStatus.FAILED,
-            AttemptStatus.TIMED_OUT,
-            AttemptStatus.LOST,
-        }:
+        object.__setattr__(self, "error_code", _optional_text(self.error_code, "error_code"))
+        if self.error_code is not None and self.status not in _ERROR_ATTEMPTS:
             raise FederationValidationError(
                 "unexpected-error-code",
                 "error_code",
@@ -650,29 +528,20 @@ class JobAttempt:
 
     @property
     def terminal(self) -> bool:
-        return self.status in _TERMINAL_ATTEMPT_STATUSES
+        return self.status in _TERMINAL_ATTEMPTS
 
-    def transition_to(
-        self, target: AttemptStatus | str, *, error_code: str | None = None
-    ) -> Self:
-        next_status = validate_attempt_transition(self.status, target)
-        next_error = error_code
-        if next_status not in {
-            AttemptStatus.FAILED,
-            AttemptStatus.TIMED_OUT,
-            AttemptStatus.LOST,
-        }:
-            next_error = None
-        return replace(self, status=next_status, error_code=next_error)
+    def transition_to(self, target: AttemptStatus | str, *, error_code: str | None = None) -> Self:
+        status = validate_attempt_transition(self.status, target)
+        retained = self.error_code if status == self.status and error_code is None else error_code
+        return replace(self, status=status, error_code=retained if status in _ERROR_ATTEMPTS else None)
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> Self:
         if not isinstance(value, dict):
-            raise FederationValidationError(
-                "invalid-object", "attempt", "must be an object"
-            )
-        _required_fields(value, ("schema", "attempt_id", "attempt_number", "status"))
-        _schema_major(value["schema"], cls.SCHEMA)
+            raise FederationValidationError("invalid-object", "attempt", "must be an object")
+        names = ("schema", "attempt_id", "attempt_number", "status")
+        _required(value, names)
+        _schema(value["schema"], cls.SCHEMA)
         return cls(
             attempt_id=value["attempt_id"],
             attempt_number=value["attempt_number"],
@@ -692,10 +561,7 @@ class JobAttempt:
 
 @dataclass(frozen=True)
 class JobContract:
-    """One validated job request and its deterministic logical state snapshot."""
-
     SCHEMA: ClassVar[str] = JOB_SCHEMA
-
     job_id: str
     session_id: str
     request_id: str
@@ -712,51 +578,20 @@ class JobContract:
 
     def __post_init__(self) -> None:
         for name in ("job_id", "session_id", "request_id", "idempotency_key"):
-            object.__setattr__(self, name, _bounded_text(getattr(self, name), name))
+            object.__setattr__(self, name, _text(getattr(self, name), name))
         validate_jobs_protocol(self.protocol_version)
         if not isinstance(self.capability, CapabilityRequirement):
-            object.__setattr__(
-                self,
-                "capability",
-                CapabilityRequirement.from_dict(self.capability),
-            )
+            object.__setattr__(self, "capability", CapabilityRequirement.from_dict(self.capability))
+        if not isinstance(self.retry_policy, RetryPolicy):
+            object.__setattr__(self, "retry_policy", RetryPolicy.from_dict(self.retry_policy))
+        if not isinstance(self.timeout_policy, TimeoutPolicy):
+            object.__setattr__(self, "timeout_policy", TimeoutPolicy.from_dict(self.timeout_policy))
         object.__setattr__(self, "status", _enum(self.status, JobStatus, "status"))
-        object.__setattr__(
-            self,
-            "cancellation_reason",
-            _optional_text(self.cancellation_reason, "cancellation_reason"),
-        )
+        object.__setattr__(self, "cancellation_reason", _optional_text(self.cancellation_reason, "cancellation_reason"))
 
-        inputs = tuple(
-            item if isinstance(item, ArtifactReference) else ArtifactReference.from_dict(item)
-            for item in _sequence(self.inputs, "inputs")
-        )
-        outputs = tuple(
-            item if isinstance(item, ArtifactReference) else ArtifactReference.from_dict(item)
-            for item in _sequence(self.outputs, "outputs")
-        )
-        if len(inputs) > MAX_REFERENCE_COUNT or len(outputs) > MAX_REFERENCE_COUNT:
-            raise FederationValidationError(
-                "too-many-references",
-                "inputs",
-                f"inputs and outputs are each limited to {MAX_REFERENCE_COUNT}",
-            )
-        for field, references in (("inputs", inputs), ("outputs", outputs)):
-            ids = [reference.reference_id for reference in references]
-            if len(ids) != len(set(ids)):
-                raise FederationValidationError(
-                    "duplicate-reference", field, "reference_id values must be unique"
-                )
-            for reference in references:
-                if reference.session_id != self.session_id:
-                    raise FederationValidationError(
-                        "cross-session-reference",
-                        field,
-                        "artifact references must belong to the job session",
-                    )
-        if set(item.reference_id for item in inputs).intersection(
-            item.reference_id for item in outputs
-        ):
+        inputs = self._references(self.inputs, "inputs")
+        outputs = self._references(self.outputs, "outputs")
+        if {item.reference_id for item in inputs} & {item.reference_id for item in outputs}:
             raise FederationValidationError(
                 "input-output-reference-conflict",
                 "outputs",
@@ -765,22 +600,37 @@ class JobContract:
         object.__setattr__(self, "inputs", inputs)
         object.__setattr__(self, "outputs", outputs)
 
-        if not isinstance(self.retry_policy, RetryPolicy):
-            object.__setattr__(
-                self, "retry_policy", RetryPolicy.from_dict(self.retry_policy)
-            )
-        if not isinstance(self.timeout_policy, TimeoutPolicy):
-            object.__setattr__(
-                self, "timeout_policy", TimeoutPolicy.from_dict(self.timeout_policy)
-            )
-
         attempts = tuple(
             item if isinstance(item, JobAttempt) else JobAttempt.from_dict(item)
-            for item in _sequence(self.attempts, "attempts")
+            for item in _array(self.attempts, "attempts")
         )
-        expected_numbers = tuple(range(1, len(attempts) + 1))
-        actual_numbers = tuple(item.attempt_number for item in attempts)
-        if actual_numbers != expected_numbers:
+        self._validate_attempts(attempts)
+        object.__setattr__(self, "attempts", attempts)
+
+    def _references(self, values: Any, field: str) -> tuple[ArtifactReference, ...]:
+        references = tuple(
+            item if isinstance(item, ArtifactReference) else ArtifactReference.from_dict(item)
+            for item in _array(values, field)
+        )
+        if len(references) > MAX_REFERENCE_COUNT:
+            raise FederationValidationError(
+                "too-many-references", field, f"must not exceed {MAX_REFERENCE_COUNT}"
+            )
+        identities = [item.reference_id for item in references]
+        if len(identities) != len(set(identities)):
+            raise FederationValidationError(
+                "duplicate-reference", field, "reference_id values must be unique"
+            )
+        if any(item.session_id != self.session_id for item in references):
+            raise FederationValidationError(
+                "cross-session-reference",
+                field,
+                "artifact references must belong to the job session",
+            )
+        return references
+
+    def _validate_attempts(self, attempts: tuple[JobAttempt, ...]) -> None:
+        if tuple(item.attempt_number for item in attempts) != tuple(range(1, len(attempts) + 1)):
             raise FederationValidationError(
                 "nonmonotonic-attempt-generation",
                 "attempts",
@@ -788,47 +638,35 @@ class JobContract:
             )
         if len(attempts) > self.retry_policy.max_attempts:
             raise FederationValidationError(
-                "too-many-attempts",
-                "attempts",
-                "attempt count exceeds retry policy",
+                "too-many-attempts", "attempts", "attempt count exceeds retry policy"
             )
-        attempt_ids = [attempt.attempt_id for attempt in attempts]
-        if len(attempt_ids) != len(set(attempt_ids)):
+        ids = [item.attempt_id for item in attempts]
+        if len(ids) != len(set(ids)):
             raise FederationValidationError(
                 "duplicate-attempt-id", "attempts", "attempt_id values must be unique"
             )
-        active_attempts = [
-            attempt for attempt in attempts if attempt.status in _ACTIVE_ATTEMPT_STATUSES
-        ]
-        if len(active_attempts) > 1:
+        active = [item for item in attempts if item.status in _ACTIVE_ATTEMPTS]
+        successes = [item for item in attempts if item.status == AttemptStatus.SUCCEEDED]
+        if len(active) > 1:
             raise FederationValidationError(
-                "multiple-active-attempts",
-                "attempts",
-                "at most one attempt may be active",
+                "multiple-active-attempts", "attempts", "at most one attempt may be active"
             )
-        successful_attempts = [
-            attempt for attempt in attempts if attempt.status == AttemptStatus.SUCCEEDED
-        ]
-        if len(successful_attempts) > 1:
+        if len(successes) > 1:
             raise FederationValidationError(
-                "multiple-successful-attempts",
-                "attempts",
-                "at most one attempt may succeed",
+                "multiple-successful-attempts", "attempts", "at most one attempt may succeed"
             )
         if self.status == JobStatus.SUBMITTED and attempts:
             raise FederationValidationError(
-                "attempt-before-queue",
-                "attempts",
-                "submitted jobs cannot already contain attempts",
+                "attempt-before-queue", "attempts", "submitted jobs cannot contain attempts"
             )
-        if self.status == JobStatus.ACTIVE and len(active_attempts) != 1:
+        if self.status == JobStatus.ACTIVE and len(active) != 1:
             raise FederationValidationError(
                 "active-job-attempt-mismatch",
                 "attempts",
                 "an active job must have exactly one active attempt",
             )
         if self.status == JobStatus.RETRY_WAIT:
-            if active_attempts or not attempts:
+            if active or not attempts:
                 raise FederationValidationError(
                     "retry-wait-attempt-mismatch",
                     "attempts",
@@ -836,27 +674,23 @@ class JobContract:
                 )
             if len(attempts) >= self.retry_policy.max_attempts:
                 raise FederationValidationError(
-                    "retry-exhausted",
-                    "attempts",
-                    "retry-wait is invalid after the final allowed attempt",
+                    "retry-exhausted", "attempts", "retry policy has no remaining attempt"
                 )
-        if self.status == JobStatus.SUCCEEDED and len(successful_attempts) != 1:
+        if self.status == JobStatus.SUCCEEDED and len(successes) != 1:
             raise FederationValidationError(
                 "successful-job-attempt-mismatch",
                 "attempts",
                 "a succeeded job must contain exactly one succeeded attempt",
             )
-        if self.status != JobStatus.SUCCEEDED and successful_attempts:
+        if self.status != JobStatus.SUCCEEDED and successes:
             raise FederationValidationError(
                 "premature-successful-attempt",
                 "attempts",
                 "a successful attempt requires succeeded job status",
             )
-        if self.status in _TERMINAL_JOB_STATUSES and active_attempts:
+        if self.status in _TERMINAL_JOBS and active:
             raise FederationValidationError(
-                "terminal-job-active-attempt",
-                "attempts",
-                "terminal jobs cannot contain an active attempt",
+                "terminal-job-active-attempt", "attempts", "terminal jobs cannot be active"
             )
         if self.cancellation_reason is not None and self.status not in {
             JobStatus.CANCELLATION_REQUESTED,
@@ -865,41 +699,36 @@ class JobContract:
             raise FederationValidationError(
                 "unexpected-cancellation-reason",
                 "cancellation_reason",
-                "is only valid after cancellation has been requested",
+                "is only valid after cancellation is requested",
             )
-        object.__setattr__(self, "attempts", attempts)
 
     @property
     def terminal(self) -> bool:
-        return self.status in _TERMINAL_JOB_STATUSES
+        return self.status in _TERMINAL_JOBS
 
     def transition_to(
         self, target: JobStatus | str, *, cancellation_reason: str | None = None
     ) -> Self:
-        next_status = validate_job_transition(self.status, target)
-        next_reason = self.cancellation_reason
-        if next_status == JobStatus.CANCELLATION_REQUESTED:
-            if cancellation_reason is None and self.status == JobStatus.CANCELLATION_REQUESTED:
-                if next_reason is None:
-                    raise FederationValidationError(
-                        "missing-cancellation-reason",
-                        "cancellation_reason",
-                        "is required when cancellation is requested",
-                    )
-            else:
-                next_reason = _bounded_text(cancellation_reason, "cancellation_reason")
-        elif next_status not in {
-            JobStatus.CANCELLATION_REQUESTED,
-            JobStatus.CANCELLED,
-        }:
-            next_reason = None
-        return replace(self, status=next_status, cancellation_reason=next_reason)
+        status = validate_job_transition(self.status, target)
+        reason = self.cancellation_reason
+        if status == JobStatus.CANCELLATION_REQUESTED:
+            if cancellation_reason is not None:
+                reason = _text(cancellation_reason, "cancellation_reason")
+            elif reason is None:
+                raise FederationValidationError(
+                    "missing-cancellation-reason",
+                    "cancellation_reason",
+                    "is required when cancellation is requested",
+                )
+        elif status not in {JobStatus.CANCELLATION_REQUESTED, JobStatus.CANCELLED}:
+            reason = None
+        return replace(self, status=status, cancellation_reason=reason)
 
     @classmethod
     def from_dict(cls, value: dict[str, Any]) -> Self:
         if not isinstance(value, dict):
             raise FederationValidationError("invalid-object", "job", "must be an object")
-        required = (
+        names = (
             "schema",
             "protocol_version",
             "job_id",
@@ -914,8 +743,8 @@ class JobContract:
             "status",
             "attempts",
         )
-        _required_fields(value, required)
-        _schema_major(value["schema"], cls.SCHEMA)
+        _required(value, names)
+        _schema(value["schema"], cls.SCHEMA)
         return cls(
             job_id=value["job_id"],
             session_id=value["session_id"],
@@ -924,27 +753,25 @@ class JobContract:
             capability=CapabilityRequirement.from_dict(value["capability"]),
             inputs=tuple(
                 ArtifactReference.from_dict(item)
-                for item in _sequence(value["inputs"], "inputs")
+                for item in _array(value["inputs"], "inputs")
             ),
             outputs=tuple(
                 ArtifactReference.from_dict(item)
-                for item in _sequence(value["outputs"], "outputs")
+                for item in _array(value["outputs"], "outputs")
             ),
             retry_policy=RetryPolicy.from_dict(value["retry_policy"]),
             timeout_policy=TimeoutPolicy.from_dict(value["timeout_policy"]),
             status=value["status"],
             attempts=tuple(
                 JobAttempt.from_dict(item)
-                for item in _sequence(value["attempts"], "attempts")
+                for item in _array(value["attempts"], "attempts")
             ),
             cancellation_reason=value.get("cancellation_reason"),
             protocol_version=value["protocol_version"],
         )
 
     @classmethod
-    def from_json(
-        cls, value: str | bytes, *, max_bytes: int = MAX_JOB_MESSAGE_BYTES
-    ) -> Self:
+    def from_json(cls, value: str | bytes, *, max_bytes: int = MAX_JOB_MESSAGE_BYTES) -> Self:
         if isinstance(value, str):
             encoded = value.encode("utf-8")
         elif isinstance(value, bytes):
@@ -958,12 +785,11 @@ class JobContract:
                 "message-too-large", "job", f"exceeds {max_bytes} bytes"
             )
         try:
-            parsed = json.loads(encoded.decode("utf-8"))
+            return cls.from_dict(json.loads(encoded.decode("utf-8")))
         except (UnicodeDecodeError, json.JSONDecodeError) as exc:
             raise FederationValidationError(
                 "malformed-message", "job", "must be valid UTF-8 JSON"
             ) from exc
-        return cls.from_dict(parsed)
 
     def to_dict(self) -> dict[str, Any]:
         return {
