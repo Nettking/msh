@@ -1,0 +1,86 @@
+name: Phase F7.6 artifact authorization
+
+on:
+  pull_request:
+    paths:
+      - "catalog/capabilities/**"
+      - "catalog/federation/object_transfer.py"
+      - "catalog/federation/resumable_chunk_transfer.py"
+      - "catalog/federation/tests/test_phase_f641_chunk_contract.py"
+      - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
+      - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
+      - ".github/workflows/phase-f76-artifact-authorization.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/capabilities/**"
+      - "catalog/federation/object_transfer.py"
+      - "catalog/federation/resumable_chunk_transfer.py"
+      - "catalog/federation/tests/test_phase_f641_chunk_contract.py"
+      - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
+      - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
+      - ".github/workflows/phase-f76-artifact-authorization.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f76-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  artifact-authorization:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile F7.6 and F6 transfer boundary
+        run: >-
+          python -m compileall
+          catalog/capabilities
+          catalog/federation/object_transfer.py
+          catalog/federation/resumable_chunk_transfer.py
+          catalog/federation/tests/test_phase_f641_chunk_contract.py
+          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
+          catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
+      - name: F7 capability, F6 transfer and affected federation tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/capabilities/tests
+          catalog/federation/tests/test_phase_f641_chunk_contract.py
+          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
+          catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
+          catalog/relay/tests/test_phase_f74_capability_dispatch.py
+          catalog/relay/tests/test_phase_f75_retry_cancellation.py
+          catalog/federation/tests/test_phase0.py
+          catalog/federation/tests/test_phase1.py
+      - name: Ruff F7.6 scope
+        run: >-
+          python -m ruff check
+          catalog/capabilities
+          --ignore I001,RUF022,B008,C408,PLC0206
+
+  repository-hygiene:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+      - name: Validate diff hygiene
+        run: git diff --check HEAD^ HEAD
