@@ -2,23 +2,27 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 from catalog.federation.errors import FederationValidationError
 
-from .artifact_authority import SQLiteArtifactAuthority
+from .artifact_authority import ArtifactPublicationResult, SQLiteArtifactAuthority
 from .artifact_contracts import (
+    ArtifactDescriptor,
     ArtifactGrant,
     ArtifactGrantScope,
     ArtifactInputReference,
+    ArtifactPublication,
     OutputPlacementPolicy,
+    _canonical,
     _text,
 )
 from .lifecycle_store import SQLiteJobLifecycleStore
 
 
 class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
-    """Use the F7 database path and retain the granting coordinator durably."""
+    """Use the F7 database path and retain issuers and policies durably."""
 
     def __init__(
         self,
@@ -29,13 +33,22 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
         resolved = job_store.database if database_path is None else database_path
         super().__init__(job_store, database_path=resolved)
         with self._connect() as connection:
-            connection.execute(
-                """CREATE TABLE IF NOT EXISTS capability_artifact_grant_issuers (
-                       grant_id TEXT PRIMARY KEY,
-                       coordinator_node_id TEXT NOT NULL,
-                       FOREIGN KEY(grant_id)
-                           REFERENCES capability_artifact_grants(grant_id)
-                   )"""
+            connection.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS capability_artifact_grant_issuers (
+                    grant_id TEXT PRIMARY KEY,
+                    coordinator_node_id TEXT NOT NULL,
+                    FOREIGN KEY(grant_id)
+                        REFERENCES capability_artifact_grants(grant_id)
+                );
+                CREATE TABLE IF NOT EXISTS capability_artifact_grant_policies (
+                    grant_id TEXT PRIMARY KEY,
+                    policy_json TEXT NOT NULL CHECK(json_valid(policy_json)),
+                    fingerprint TEXT NOT NULL,
+                    FOREIGN KEY(grant_id)
+                        REFERENCES capability_artifact_grants(grant_id)
+                );
+                """
             )
 
     def issue_grant(
@@ -97,14 +110,20 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
             expires_at=expires_at,
             now=now,
         )
+        policy_json = None if placement_policy is None else _canonical(placement_policy.to_dict())
+        policy_fingerprint = (
+            None
+            if placement_policy is None
+            else self._fingerprint(placement_policy.to_dict())
+        )
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
-            row = connection.execute(
+            issuer = connection.execute(
                 """SELECT coordinator_node_id
                    FROM capability_artifact_grant_issuers WHERE grant_id=?""",
                 (grant.grant_id,),
             ).fetchone()
-            if row is not None and row["coordinator_node_id"] != coordinator_node_id:
+            if issuer is not None and issuer["coordinator_node_id"] != coordinator_node_id:
                 connection.rollback()
                 raise FederationValidationError(
                     "grant-issuer-conflict",
@@ -116,6 +135,32 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
                    (grant_id, coordinator_node_id) VALUES(?, ?)""",
                 (grant.grant_id, coordinator_node_id),
             )
+            persisted = connection.execute(
+                """SELECT policy_json, fingerprint
+                   FROM capability_artifact_grant_policies WHERE grant_id=?""",
+                (grant.grant_id,),
+            ).fetchone()
+            if policy_json is None:
+                if persisted is not None:
+                    connection.rollback()
+                    raise FederationValidationError(
+                        "grant-policy-conflict",
+                        "placement_policy",
+                        "grant replay changed its placement authority",
+                    )
+            elif persisted is None:
+                connection.execute(
+                    """INSERT INTO capability_artifact_grant_policies
+                       (grant_id, policy_json, fingerprint) VALUES(?, ?, ?)""",
+                    (grant.grant_id, policy_json, policy_fingerprint),
+                )
+            elif persisted["fingerprint"] != policy_fingerprint:
+                connection.rollback()
+                raise FederationValidationError(
+                    "grant-policy-conflict",
+                    "placement_policy",
+                    "grant replay changed its placement authority",
+                )
             connection.commit()
         return grant
 
@@ -134,6 +179,101 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
                 "artifact grant has no durable issuer",
             )
         return row["coordinator_node_id"]
+
+    def grant_policy(self, grant_id: str) -> OutputPlacementPolicy | None:
+        grant_id = _text(grant_id, "grant_id")
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT policy_json FROM capability_artifact_grant_policies
+                   WHERE grant_id=?""",
+                (grant_id,),
+            ).fetchone()
+        return (
+            None
+            if row is None
+            else OutputPlacementPolicy.from_dict(json.loads(row["policy_json"]))
+        )
+
+    def _fence_policy(
+        self,
+        grant_id: str,
+        supplied: OutputPlacementPolicy,
+    ) -> OutputPlacementPolicy:
+        if not isinstance(supplied, OutputPlacementPolicy):
+            raise FederationValidationError(
+                "invalid-placement-policy",
+                "placement_policy",
+                "must be an OutputPlacementPolicy",
+            )
+        issued = self.grant_policy(grant_id)
+        if issued is None:
+            raise FederationValidationError(
+                "placement-policy-not-granted",
+                "grant_id",
+                "grant has no output placement authority",
+            )
+        broader = (
+            supplied.policy_id != issued.policy_id
+            or supplied.session_id != issued.session_id
+            or supplied.job_id != issued.job_id
+            or supplied.endpoint_kind != issued.endpoint_kind
+            or supplied.endpoint_id != issued.endpoint_id
+            or supplied.namespace != issued.namespace
+            or not set(supplied.allowed_schema_ids).issubset(issued.allowed_schema_ids)
+            or supplied.max_artifact_bytes > issued.max_artifact_bytes
+            or supplied.max_artifacts > issued.max_artifacts
+            or supplied.resumable_threshold_bytes > issued.resumable_threshold_bytes
+            or supplied.expires_at > issued.expires_at
+        )
+        if broader:
+            raise FederationValidationError(
+                "placement-policy-widening",
+                "placement_policy",
+                "worker-supplied placement policy exceeds the issued authority",
+            )
+        return supplied
+
+    def authorize_output(
+        self,
+        grant_id: str,
+        descriptor: ArtifactDescriptor,
+        placement_policy: OutputPlacementPolicy,
+        *,
+        authenticated_session_id: str,
+        authenticated_worker_node_id: str,
+        provider_id: str,
+        now,
+    ) -> None:
+        fenced = self._fence_policy(grant_id, placement_policy)
+        return super().authorize_output(
+            grant_id,
+            descriptor,
+            fenced,
+            authenticated_session_id=authenticated_session_id,
+            authenticated_worker_node_id=authenticated_worker_node_id,
+            provider_id=provider_id,
+            now=now,
+        )
+
+    def publish(
+        self,
+        publication: ArtifactPublication,
+        placement_policy: OutputPlacementPolicy,
+        *,
+        authenticated_session_id: str,
+        authenticated_worker_node_id: str,
+        provider_id: str,
+        now,
+    ) -> ArtifactPublicationResult:
+        fenced = self._fence_policy(publication.grant_id, placement_policy)
+        return super().publish(
+            publication,
+            fenced,
+            authenticated_session_id=authenticated_session_id,
+            authenticated_worker_node_id=authenticated_worker_node_id,
+            provider_id=provider_id,
+            now=now,
+        )
 
     def revoke(
         self,
