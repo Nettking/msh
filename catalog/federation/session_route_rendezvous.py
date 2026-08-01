@@ -126,7 +126,7 @@ class SessionRouteDescriptor:
             multiaddr=self.multiaddr,
             encryption_public_key=self.encryption_public_key,
         )
-        if f"/p2p/{direct.peer_id}" not in direct.multiaddr:
+        if not direct.multiaddr.endswith(f"/p2p/{direct.peer_id}"):
             raise FederationValidationError(
                 "session-route-peer-mismatch",
                 "multiaddr",
