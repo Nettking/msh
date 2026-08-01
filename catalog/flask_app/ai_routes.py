@@ -1,18 +1,24 @@
 from __future__ import annotations
 
+from uuid import uuid4
+
 from flask import Blueprint, jsonify, render_template, request
 
 from catalog.ai.grounding import append_grounding_warning
-from catalog.ai.ollama_client import DEFAULT_BASE_URL, DEFAULT_MODEL, OllamaError, chat
+from catalog.ai.ollama_client import DEFAULT_BASE_URL, DEFAULT_MODEL, chat
+from catalog.ai.ollama_provider import OllamaLanguageModelProvider
 from catalog.ai.prompts import SYSTEM_PROMPT, build_extractive_prompt, build_prompt
 from catalog.ai.rag import format_context, retrieve
 from catalog.ai.repo_index import load_or_build_chunks, repo_root_from
+from catalog.ai.runtime import AIRuntimePolicy, LanguageModelRuntime
+from catalog.ai.runtime_contracts import AIModality, AIRuntimeError, AIRuntimeRequest
 from catalog.ai.symbols import build_symbols
 
 from .services.ai_answer_formatting_service import render_safe_markdown
 from .services.server_setup_service import ai_provider_label, load_settings
 
 ai_web = Blueprint("ai_web", __name__)
+AI_RUNTIME_SESSION_ID = "local-ai"
 
 
 def _ai_defaults() -> tuple[str, str, str]:
@@ -25,6 +31,41 @@ def _ai_defaults() -> tuple[str, str, str]:
     return DEFAULT_MODEL, DEFAULT_BASE_URL, "Default Ollama"
 
 
+def _build_ai_runtime(
+    *,
+    model: str,
+    base_url: str,
+    provider_name: str,
+) -> LanguageModelRuntime:
+    """Build the compatibility runtime without exposing the Ollama endpoint."""
+    provider = OllamaLanguageModelProvider(
+        session_id=AI_RUNTIME_SESSION_ID,
+        display_name=provider_name,
+        base_url=base_url,
+        models=(model,),
+        chat_callable=chat,
+    )
+    return LanguageModelRuntime(
+        session_id=AI_RUNTIME_SESSION_ID,
+        providers=(provider,),
+        policy=AIRuntimePolicy(max_fallbacks=0),
+    )
+
+
+def _empty_result(*, error: str = "") -> dict[str, object]:
+    return {
+        "answer": "",
+        "context": "",
+        "sources": [],
+        "error": error,
+        "error_code": "",
+        "selection_status": None,
+        "selected_provider_name": "",
+        "provider_attempts": [],
+        "provider_status": [],
+    }
+
+
 def _answer_question(
     question: str,
     *,
@@ -32,6 +73,8 @@ def _answer_question(
     base_url: str,
     dry_run: bool,
     extractive: bool,
+    provider_name: str = "Configured provider",
+    runtime: LanguageModelRuntime | None = None,
 ) -> dict[str, object]:
     root = repo_root_from()
     chunks = load_or_build_chunks(root)
@@ -40,20 +83,66 @@ def _answer_question(
     sources = [chunk.source_label() for chunk in selected]
     context = format_context(selected)
     if not selected:
-        return {"answer": "", "context": "", "sources": [], "error": "No relevant repository context found."}
+        result = _empty_result(error="No relevant repository context found.")
+        result.update({"context": "", "sources": []})
+        return result
+    runtime = runtime or _build_ai_runtime(
+        model=model,
+        base_url=base_url,
+        provider_name=provider_name,
+    )
     if dry_run:
-        return {"answer": "", "context": context, "sources": sources, "error": ""}
+        result = _empty_result()
+        result.update(
+            {
+                "context": context,
+                "sources": sources,
+                "provider_status": list(runtime.provider_status()),
+            }
+        )
+        return result
+    prompt_builder = build_extractive_prompt if extractive else build_prompt
+    prompt = prompt_builder(question, context, sources=sources)
+    request_token = uuid4().hex
+    logical_request = AIRuntimeRequest(
+        request_id=f"request-{request_token}",
+        session_id=runtime.session_id,
+        idempotency_key=f"request-{request_token}",
+        model=model,
+        modality=AIModality.TEXT,
+        prompt=prompt,
+        system_prompt=SYSTEM_PROMPT,
+        timeout_seconds=120,
+    )
     try:
-        prompt_builder = build_extractive_prompt if extractive else build_prompt
-        prompt = prompt_builder(question, context, sources=sources)
-        answer = chat(prompt=prompt, system_prompt=SYSTEM_PROMPT, model=model, base_url=base_url)
-    except OllamaError as exc:
-        return {"answer": "", "context": context, "sources": sources, "error": str(exc)}
+        runtime_result = runtime.execute(logical_request)
+    except AIRuntimeError as exc:
+        payload = exc.to_dict()
+        return {
+            "answer": "",
+            "context": context,
+            "sources": sources,
+            "error": exc.message,
+            "error_code": exc.code,
+            "selection_status": payload["selection"],
+            "selected_provider_name": (
+                ""
+                if exc.selection is None
+                else exc.selection.selected_provider_name or ""
+            ),
+            "provider_attempts": payload["attempts"],
+            "provider_status": list(runtime.provider_status()),
+        }
     return {
-        "answer": append_grounding_warning(answer, selected),
+        "answer": append_grounding_warning(runtime_result.content, selected),
         "context": context,
         "sources": sources,
         "error": "",
+        "error_code": "",
+        "selection_status": runtime_result.selection.to_dict(),
+        "selected_provider_name": runtime_result.provider_name,
+        "provider_attempts": [item.to_dict() for item in runtime_result.attempts],
+        "provider_status": list(runtime.provider_status()),
     }
 
 
@@ -64,11 +153,15 @@ def _render_ai_page(
     dry_run: bool,
     extractive: bool,
     ai_provider_name: str,
-    ollama_base_url: str,
     answer: str = "",
     context: str = "",
     sources: list[str] | None = None,
     error: str = "",
+    error_code: str = "",
+    selection_status: dict[str, object] | None = None,
+    selected_provider_name: str = "",
+    provider_attempts: list[dict[str, object]] | None = None,
+    provider_status: list[dict[str, object]] | None = None,
 ):
     return render_template(
         "ai_explainer.html",
@@ -77,25 +170,34 @@ def _render_ai_page(
         dry_run=dry_run,
         extractive=extractive,
         ai_provider_name=ai_provider_name,
-        ollama_base_url=ollama_base_url,
+        selected_provider_name=selected_provider_name or ai_provider_name,
+        selection_status=selection_status,
+        provider_attempts=provider_attempts or [],
+        provider_status=provider_status or [],
         answer=answer,
         answer_html=render_safe_markdown(answer),
         context=context,
         sources=sources or [],
         error=error,
+        error_code=error_code,
     )
 
 
 @ai_web.get("/ai")
 def ai_page():
     model, base_url, provider_name = _ai_defaults()
+    runtime = _build_ai_runtime(
+        model=model,
+        base_url=base_url,
+        provider_name=provider_name,
+    )
     return _render_ai_page(
         question="",
         model=model,
         dry_run=False,
         extractive=False,
         ai_provider_name=provider_name,
-        ollama_base_url=base_url,
+        provider_status=list(runtime.provider_status()),
     )
 
 
@@ -107,22 +209,24 @@ def ai_ask():
     dry_run = request.form.get("dry_run") == "1"
     extractive = request.form.get("extractive") == "1"
     if not question:
-        result = {"answer": "", "context": "", "sources": [], "error": "Question is required."}
+        result = _empty_result(error="Question is required.")
     else:
         result = _answer_question(
             question,
             model=model,
             base_url=base_url,
+            provider_name=provider_name,
             dry_run=dry_run,
             extractive=extractive,
         )
+    effective_provider = str(result.get("selected_provider_name") or provider_name)
     if request.accept_mimetypes.best == "application/json":
         payload = {
             **result,
             "answer_html": render_safe_markdown(str(result["answer"])),
             "question": question,
             "model": model,
-            "provider_name": provider_name,
+            "provider_name": effective_provider,
             "dry_run": dry_run,
             "extractive": extractive,
         }
@@ -134,6 +238,5 @@ def ai_ask():
         dry_run=dry_run,
         extractive=extractive,
         ai_provider_name=provider_name,
-        ollama_base_url=base_url,
         **result,
     )
