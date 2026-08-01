@@ -147,6 +147,19 @@ class ArtifactResultCoordinator:
                     "job_id",
                     "result publication requires active ownership",
                 )
+            same_committed_result = (
+                committed.attempt_id == publication.attempt_id
+                and committed.provider_id == publication.provider_id
+                and committed.lease_id == publication.lease_id
+                and committed.lease_generation == publication.lease_generation
+                and committed.reference == reference
+            )
+            if not same_committed_result:
+                raise FederationValidationError(
+                    "result-commit-conflict",
+                    "publication",
+                    "job already has a different committed result",
+                )
             persisted = self.authority.publication(publication.publication_id)
             if persisted != publication:
                 raise FederationValidationError(
@@ -171,28 +184,16 @@ class ArtifactResultCoordinator:
                     "grant_id",
                     "durable publication no longer matches its grant identity",
                 )
-            if (
-                committed.attempt_id == publication.attempt_id
-                and committed.provider_id == publication.provider_id
-                and committed.lease_id == publication.lease_id
-                and committed.lease_generation == publication.lease_generation
-                and committed.reference == reference
-            ):
-                return PublishedJobResult(
-                    artifact_publication=ArtifactPublicationResult(
-                        publication=persisted,
-                        changed=False,
-                    ),
-                    result_mutation=ResultMutation(
-                        snapshot=snapshot,
-                        result=committed,
-                        changed=False,
-                    ),
-                )
-            raise FederationValidationError(
-                "result-commit-conflict",
-                "publication",
-                "job already has a different committed result",
+            return PublishedJobResult(
+                artifact_publication=ArtifactPublicationResult(
+                    publication=persisted,
+                    changed=False,
+                ),
+                result_mutation=ResultMutation(
+                    snapshot=snapshot,
+                    result=committed,
+                    changed=False,
+                ),
             )
         if ownership.granted_by_coordinator_id != self.coordinator_node_id:
             raise FederationValidationError(
