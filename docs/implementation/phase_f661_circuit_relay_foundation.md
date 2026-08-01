@@ -68,7 +68,9 @@ The relay service uses explicit limits rather than unbounded forwarding:
 - maximum relayed data per direction and circuit: 64 MiB;
 - bounded AutoNAT service request rates.
 
-Private relay addresses remain filtered in normal service mode. The test-only host configuration may allow loopback relay addresses so GitHub Actions can exercise the same circuit-v2 protocol without public infrastructure.
+Private relay addresses remain filtered in normal service mode. The test-only host configuration may accept loopback reservation addresses so GitHub Actions can exercise the same circuit-v2 protocol without public infrastructure.
+
+The pinned go-libp2p AutoRelay implementation deliberately removes private and loopback relay addresses from its advertised address set. The focused CI therefore does not pretend that a loopback AutoRelay advertisement is equivalent to a routable deployment. It performs an explicit circuit-v2 reservation and dial for the local datapath proof, while separately validating that production relay-client mode configures static AutoRelay candidates and DCUtR correctly.
 
 ## Ready event
 
@@ -90,12 +92,13 @@ The focused Go tests prove:
 
 1. the original directly reachable encrypted stream still works;
 2. target peer identity must still match the supplied multiaddress;
-3. a bounded relay service accepts reservations from two private relay clients;
-4. both clients obtain circuit-v2 addresses;
+3. a bounded relay service accepts an explicit circuit-v2 reservation from a private test client;
+4. a second relay-capable client can dial the reserved peer through a constructed circuit-v2 route;
 5. the existing opaque MSH wire message crosses a connection reported by libp2p as `Limited`, proving circuit-v2 carriage rather than a direct socket;
-6. relay-client readiness reports hole-punching and relay configuration accurately;
-7. malformed, duplicate, conflicting or circuit-containing relay bootstrap configuration fails closed;
-8. relay resource limits remain explicit and bounded.
+6. the reservation returns the configured circuit duration and data limits;
+7. relay-client readiness reports static AutoRelay, hole-punching and reachability configuration accurately;
+8. malformed, duplicate, conflicting or circuit-containing relay bootstrap configuration fails closed;
+9. relay resource limits remain explicit and bounded.
 
 The focused workflow builds and tests the Go sidecar on Linux and Windows. Existing Phase 2 and F6 closeout workflows also run because the sidecar changed.
 
