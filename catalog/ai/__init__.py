@@ -26,6 +26,7 @@ from .runtime_contracts import (
     AIRuntimeResult,
     AISelectionStatus,
 )
+from .runtime_manager import ConfiguredLanguageModelRuntimeManager
 
 __all__ = [
     "AI_ATTEMPT_SCHEMA",
@@ -44,6 +45,7 @@ __all__ = [
     "AIRuntimeRequest",
     "AIRuntimeResult",
     "AISelectionStatus",
+    "ConfiguredLanguageModelRuntimeManager",
     "LANGUAGE_MODEL_CAPABILITY",
     "LANGUAGE_MODEL_PROTOCOL",
     "LANGUAGE_MODEL_PROTOCOL_VERSION",
