@@ -7,10 +7,7 @@ from threading import Barrier
 
 import pytest
 
-from catalog.capabilities.artifact_contracts import (
-    ArtifactGrantScope,
-    ArtifactInputReference,
-)
+from catalog.capabilities.artifact_contracts import ArtifactGrantScope
 from catalog.capabilities.artifact_publication import ArtifactResultCoordinator
 from catalog.capabilities.tests.test_artifact_authorization import (
     ENDPOINT,
@@ -85,6 +82,43 @@ def test_f76_parallel_publications_cannot_exceed_artifact_count(
 
     assert [outcome[0] for outcome in outcomes].count("success") == 1
     assert [outcome[0] for outcome in outcomes].count("artifact-count-limit") == 1
+
+
+def test_f76_stale_publication_reservation_is_recovered(tmp_path: Path) -> None:
+    _, authority = _authority(tmp_path)
+    _output_grant(authority)
+    publication = _publication()
+    with authority._connect() as connection:
+        connection.execute(
+            """INSERT INTO capability_artifact_publication_reservations(
+                   publication_id, grant_id, artifact_id,
+                   reservation_token, reserved_at
+               ) VALUES(?, ?, ?, ?, ?)""",
+            (
+                publication.publication_id,
+                publication.grant_id,
+                publication.descriptor.artifact_id,
+                "abandoned-token",
+                "2026-08-01T12:59:00Z",
+            ),
+        )
+
+    result = authority.publish(
+        publication,
+        _placement(max_artifacts=1),
+        authenticated_session_id=SESSION,
+        authenticated_worker_node_id="worker-a",
+        provider_id="provider-a",
+        now=NOW + timedelta(seconds=5),
+    )
+
+    assert result.changed
+    with authority._connect() as connection:
+        remaining = connection.execute(
+            """SELECT COUNT(*) AS count
+               FROM capability_artifact_publication_reservations"""
+        ).fetchone()["count"]
+    assert remaining == 0
 
 
 def test_f76_terminal_replay_requires_same_authenticated_worker(tmp_path: Path) -> None:
@@ -200,7 +234,3 @@ def test_f76_malformed_input_reference_fails_closed(tmp_path: Path) -> None:
             now=NOW + timedelta(seconds=3),
         )
     assert invalid.value.code == "invalid-input-reference"
-
-
-def test_f76_reference_type_remains_explicit() -> None:
-    assert ArtifactInputReference.__name__ == "ArtifactInputReference"
