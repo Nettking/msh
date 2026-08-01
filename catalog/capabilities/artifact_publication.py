@@ -76,6 +76,31 @@ class ArtifactResultCoordinator:
         command_id = _text(command_id, "command_id")
         now = _utc(now, "now")
         snapshot = self.job_store.snapshot(publication.job_id)
+        reference = self._reference(publication)
+        declaration = next(
+            (
+                candidate
+                for candidate in snapshot.job.outputs
+                if candidate.reference_id == reference.reference_id
+            ),
+            None,
+        )
+        if declaration is None:
+            raise FederationValidationError(
+                "undeclared-result-reference",
+                "descriptor.artifact_id",
+                "artifact ID must match a declared job output reference",
+            )
+        if (
+            declaration.session_id != reference.session_id
+            or declaration.schema_name != reference.schema_name
+            or declaration.media_type != reference.media_type
+        ):
+            raise FederationValidationError(
+                "declared-output-identity-mismatch",
+                "descriptor",
+                "artifact session, schema, and media type must match the declared output",
+            )
         ownership = snapshot.ownership
         if ownership is None:
             committed = self.job_store.result_commit(publication.job_id)
@@ -85,7 +110,6 @@ class ArtifactResultCoordinator:
                     "job_id",
                     "result publication requires active ownership",
                 )
-            reference = self._reference(publication)
             if (
                 committed.attempt_id == publication.attempt_id
                 and committed.provider_id == publication.provider_id
@@ -144,7 +168,7 @@ class ArtifactResultCoordinator:
             lease_generation=publication.lease_generation,
             command_id=command_id,
             expected_revision=current.revision,
-            reference=self._reference(publication),
+            reference=reference,
             now=now,
         )
         return PublishedJobResult(
