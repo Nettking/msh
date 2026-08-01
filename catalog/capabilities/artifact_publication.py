@@ -7,11 +7,9 @@ from datetime import datetime
 
 from catalog.federation.errors import FederationValidationError
 
-from .artifact_authority import (
-    ArtifactPublicationResult,
-    SQLiteArtifactAuthority,
-)
+from .artifact_authority import ArtifactPublicationResult
 from .artifact_contracts import ArtifactPublication, OutputPlacementPolicy, _text, _utc
+from .artifact_runtime import SQLiteCapabilityArtifactAuthority
 from .jobs import ArtifactReference
 from .lifecycle_contracts import ResultCommit
 from .lifecycle_store import ResultMutation, SQLiteJobLifecycleStore
@@ -41,7 +39,7 @@ class ArtifactResultCoordinator:
 
     def __init__(
         self,
-        authority: SQLiteArtifactAuthority,
+        authority: SQLiteCapabilityArtifactAuthority,
         job_store: SQLiteJobLifecycleStore,
         *,
         coordinator_node_id: str,
@@ -95,16 +93,11 @@ class ArtifactResultCoordinator:
                 and committed.lease_generation == publication.lease_generation
                 and committed.reference == reference
             ):
-                artifact_result = self.authority.publish(
-                    publication,
-                    placement_policy,
-                    authenticated_session_id=authenticated_session_id,
-                    authenticated_worker_node_id=authenticated_worker_node_id,
-                    provider_id=provider_id,
-                    now=now,
-                )
                 return PublishedJobResult(
-                    artifact_publication=artifact_result,
+                    artifact_publication=ArtifactPublicationResult(
+                        publication=publication,
+                        changed=False,
+                    ),
                     result_mutation=ResultMutation(
                         snapshot=snapshot,
                         result=committed,
