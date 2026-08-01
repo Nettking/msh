@@ -73,8 +73,33 @@ class ArtifactResultCoordinator:
                 "publication",
                 "must be an ArtifactPublication",
             )
+        authenticated_session_id = _text(
+            authenticated_session_id, "authenticated_session_id"
+        )
+        authenticated_worker_node_id = _text(
+            authenticated_worker_node_id, "authenticated_worker_node_id"
+        )
+        provider_id = _text(provider_id, "provider_id")
         command_id = _text(command_id, "command_id")
         now = _utc(now, "now")
+        if authenticated_session_id != publication.session_id:
+            raise FederationValidationError(
+                "cross-session-artifact-access",
+                "authenticated_session_id",
+                "publication belongs to a different authenticated session",
+            )
+        if authenticated_worker_node_id != publication.worker_node_id:
+            raise FederationValidationError(
+                "artifact-worker-mismatch",
+                "authenticated_worker_node_id",
+                "publication belongs to a different worker",
+            )
+        if provider_id != publication.provider_id:
+            raise FederationValidationError(
+                "artifact-provider-mismatch",
+                "provider_id",
+                "publication belongs to a different provider",
+            )
         if publication.published_at > now:
             raise FederationValidationError(
                 "artifact-publication-in-future",
@@ -122,6 +147,30 @@ class ArtifactResultCoordinator:
                     "job_id",
                     "result publication requires active ownership",
                 )
+            persisted = self.authority.publication(publication.publication_id)
+            if persisted != publication:
+                raise FederationValidationError(
+                    "publication-replay-conflict",
+                    "publication_id",
+                    "terminal replay must match the durable publication exactly",
+                )
+            grant = self.authority.grant(publication.grant_id)
+            if (
+                self.authority.grant_issuer(grant.grant_id)
+                != self.coordinator_node_id
+                or grant.session_id != publication.session_id
+                or grant.job_id != publication.job_id
+                or grant.attempt_id != publication.attempt_id
+                or grant.lease_id != publication.lease_id
+                or grant.lease_generation != publication.lease_generation
+                or grant.provider_id != publication.provider_id
+                or grant.worker_node_id != publication.worker_node_id
+            ):
+                raise FederationValidationError(
+                    "publication-grant-context-mismatch",
+                    "grant_id",
+                    "durable publication no longer matches its grant identity",
+                )
             if (
                 committed.attempt_id == publication.attempt_id
                 and committed.provider_id == publication.provider_id
@@ -131,7 +180,7 @@ class ArtifactResultCoordinator:
             ):
                 return PublishedJobResult(
                     artifact_publication=ArtifactPublicationResult(
-                        publication=publication,
+                        publication=persisted,
                         changed=False,
                     ),
                     result_mutation=ResultMutation(
