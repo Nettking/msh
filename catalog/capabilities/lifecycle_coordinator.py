@@ -200,8 +200,22 @@ class ResilientDispatchCoordinator:
                 result=committed,
             )
 
+        terminal_states = {
+            DispatchState.SUCCEEDED,
+            DispatchState.FAILED,
+            DispatchState.REJECTED,
+        }
         for event in response.events:
             attempt = self._attempt(current, request.attempt_id)
+            if (
+                event.state in terminal_states
+                and event.occurred_at >= ownership.lease_expires_at
+            ):
+                return CompletionOutcome(
+                    CompletionDisposition.STALE_IGNORED,
+                    current,
+                    result=committed,
+                )
             if event.state is DispatchState.ACCEPTED:
                 if attempt.status in {
                     AttemptStatus.ACCEPTED,
@@ -326,15 +340,18 @@ class ResilientDispatchCoordinator:
                 reason=reason,
             )
         )
-        requested = self.store.request_cancellation(
-            job_id,
-            coordinator_id=self.coordinator_node_id,
-            cancellation_id=cancellation_id,
-            command_id=f"{cancellation_id}:request",
-            expected_revision=current.revision,
-            reason=reason,
-            now=now,
-        ).snapshot
+        if current.job.status is JobStatus.CANCELLATION_REQUESTED:
+            requested = current
+        else:
+            requested = self.store.request_cancellation(
+                job_id,
+                coordinator_id=self.coordinator_node_id,
+                cancellation_id=cancellation_id,
+                command_id=f"{cancellation_id}:request",
+                expected_revision=current.revision,
+                reason=reason,
+                now=now,
+            ).snapshot
         if request is None:
             return requested
         try:
@@ -422,6 +439,26 @@ class JobLifecycleCoordinator:
         audit = self.store.audit_trail(job_id)
         submitted_at = audit[0].event_at if audit else snapshot.updated_at
         policy = snapshot.job.timeout_policy
+
+        if snapshot.job.status is JobStatus.CANCELLATION_REQUESTED:
+            deadline = snapshot.updated_at + timedelta(
+                seconds=policy.cancellation_grace_seconds
+            )
+            if now >= deadline:
+                updated = self.store.force_cancellation(
+                    job_id,
+                    coordinator_id=self.coordinator_node_id,
+                    command_id=f"{command_prefix}:force-cancel",
+                    expected_revision=snapshot.revision,
+                    now=now,
+                ).snapshot
+                return LifecycleDecision(
+                    LifecycleAction.CANCELLATION_FORCED,
+                    "cancellation-grace-expired",
+                    updated,
+                )
+            return LifecycleDecision(LifecycleAction.NONE, None, snapshot)
+
         if now >= submitted_at + timedelta(
             seconds=policy.overall_timeout_seconds
         ):
@@ -453,25 +490,6 @@ class JobLifecycleCoordinator:
                 "overall-timeout",
                 updated,
             )
-
-        if snapshot.job.status is JobStatus.CANCELLATION_REQUESTED:
-            deadline = snapshot.updated_at + timedelta(
-                seconds=policy.cancellation_grace_seconds
-            )
-            if now >= deadline:
-                updated = self.store.force_cancellation(
-                    job_id,
-                    coordinator_id=self.coordinator_node_id,
-                    command_id=f"{command_prefix}:force-cancel",
-                    expected_revision=snapshot.revision,
-                    now=now,
-                ).snapshot
-                return LifecycleDecision(
-                    LifecycleAction.CANCELLATION_FORCED,
-                    "cancellation-grace-expired",
-                    updated,
-                )
-            return LifecycleDecision(LifecycleAction.NONE, None, snapshot)
 
         if snapshot.ownership is None:
             if snapshot.job.status in {
