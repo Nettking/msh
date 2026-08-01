@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 from pathlib import Path
+from uuid import uuid4
 
 from catalog.federation.errors import FederationValidationError
 
@@ -17,9 +19,12 @@ from .artifact_contracts import (
     OutputPlacementPolicy,
     _canonical,
     _text,
+    _timestamp,
     _utc,
 )
 from .lifecycle_store import SQLiteJobLifecycleStore
+
+PUBLICATION_RESERVATION_SECONDS = 30
 
 
 class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
@@ -53,6 +58,8 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
                     publication_id TEXT PRIMARY KEY,
                     grant_id TEXT NOT NULL,
                     artifact_id TEXT NOT NULL,
+                    reservation_token TEXT NOT NULL,
+                    reserved_at TEXT NOT NULL,
                     FOREIGN KEY(grant_id)
                         REFERENCES capability_artifact_grants(grant_id)
                 );
@@ -60,6 +67,29 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
                     ON capability_artifact_publication_reservations(grant_id);
                 """
             )
+            columns = {
+                row["name"]
+                for row in connection.execute(
+                    "PRAGMA table_info(capability_artifact_publication_reservations)"
+                ).fetchall()
+            }
+            if not {"reservation_token", "reserved_at"}.issubset(columns):
+                connection.executescript(
+                    """
+                    DROP TABLE capability_artifact_publication_reservations;
+                    CREATE TABLE capability_artifact_publication_reservations (
+                        publication_id TEXT PRIMARY KEY,
+                        grant_id TEXT NOT NULL,
+                        artifact_id TEXT NOT NULL,
+                        reservation_token TEXT NOT NULL,
+                        reserved_at TEXT NOT NULL,
+                        FOREIGN KEY(grant_id)
+                            REFERENCES capability_artifact_grants(grant_id)
+                    );
+                    CREATE INDEX idx_capability_artifact_reservations_grant
+                        ON capability_artifact_publication_reservations(grant_id);
+                    """
+                )
 
     def issue_grant(
         self,
@@ -361,32 +391,58 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
             )
         fenced = self._fence_policy(publication.grant_id, placement_policy)
         now = _utc(now, "now")
+        reservation_token = uuid4().hex
         reserved = False
+        cutoff = _timestamp(
+            now - timedelta(seconds=PUBLICATION_RESERVATION_SECONDS)
+        )
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
+            connection.execute(
+                """DELETE FROM capability_artifact_publication_reservations
+                   WHERE reserved_at <= ?
+                     AND publication_id NOT IN (
+                         SELECT publication_id
+                         FROM capability_artifact_publications
+                     )""",
+                (cutoff,),
+            )
             persisted = connection.execute(
                 """SELECT 1 FROM capability_artifact_publications
                    WHERE publication_id=?""",
                 (publication.publication_id,),
             ).fetchone()
-            own_reservation = connection.execute(
-                """SELECT grant_id, artifact_id
-                   FROM capability_artifact_publication_reservations
-                   WHERE publication_id=?""",
-                (publication.publication_id,),
-            ).fetchone()
-            if own_reservation is not None and (
-                own_reservation["grant_id"] != publication.grant_id
-                or own_reservation["artifact_id"]
-                != publication.descriptor.artifact_id
-            ):
-                connection.rollback()
-                raise FederationValidationError(
-                    "publication-reservation-conflict",
-                    "publication_id",
-                    "publication ID is reserved for different authority",
+            if persisted is not None:
+                connection.execute(
+                    """DELETE FROM capability_artifact_publication_reservations
+                       WHERE publication_id=?""",
+                    (publication.publication_id,),
                 )
-            if persisted is None and own_reservation is None:
+            else:
+                own_reservation = connection.execute(
+                    """SELECT grant_id, artifact_id
+                       FROM capability_artifact_publication_reservations
+                       WHERE publication_id=?""",
+                    (publication.publication_id,),
+                ).fetchone()
+                if own_reservation is not None:
+                    if (
+                        own_reservation["grant_id"] != publication.grant_id
+                        or own_reservation["artifact_id"]
+                        != publication.descriptor.artifact_id
+                    ):
+                        connection.rollback()
+                        raise FederationValidationError(
+                            "publication-reservation-conflict",
+                            "publication_id",
+                            "publication ID is reserved for different authority",
+                        )
+                    connection.rollback()
+                    raise FederationValidationError(
+                        "publication-in-progress",
+                        "publication_id",
+                        "the same publication is already being committed",
+                    )
                 published_count = connection.execute(
                     """SELECT COUNT(*) AS count
                        FROM capability_artifact_publications WHERE grant_id=?""",
@@ -418,12 +474,16 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
                         "placement policy artifact count is exhausted",
                     )
                 connection.execute(
-                    """INSERT INTO capability_artifact_publication_reservations
-                       (publication_id, grant_id, artifact_id) VALUES(?, ?, ?)""",
+                    """INSERT INTO capability_artifact_publication_reservations(
+                           publication_id, grant_id, artifact_id,
+                           reservation_token, reserved_at
+                       ) VALUES(?, ?, ?, ?, ?)""",
                     (
                         publication.publication_id,
                         publication.grant_id,
                         publication.descriptor.artifact_id,
+                        reservation_token,
+                        _timestamp(now),
                     ),
                 )
                 reserved = True
@@ -443,8 +503,8 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
                     connection.execute("BEGIN IMMEDIATE")
                     connection.execute(
                         """DELETE FROM capability_artifact_publication_reservations
-                           WHERE publication_id=?""",
-                        (publication.publication_id,),
+                           WHERE publication_id=? AND reservation_token=?""",
+                        (publication.publication_id, reservation_token),
                     )
                     connection.commit()
 
