@@ -26,11 +26,24 @@
   {% endif %}
 {%- endmacro %}
 
+{% macro runtime_status(selection_status, selected_provider_name, provider_attempts) -%}
+  {% if selection_status %}
+  <div class="ai-runtime-status" data-ai-runtime-status>
+    <span>Provider decision</span>
+    <strong>{{ selected_provider_name }}</strong>
+    <small>{{ selection_status.reason|replace('-', ' ') }}</small>
+    {% if provider_attempts|length > 1 %}
+    <small>{{ provider_attempts|length }} provider attempts</small>
+    {% endif %}
+  </div>
+  {% endif %}
+{%- endmacro %}
+
 {% block body %}
 <section
   class="ai-chat"
   data-ai-chat
-  data-provider="{{ ai_provider_name }}"
+  data-provider="{{ selected_provider_name or ai_provider_name }}"
 >
   <header class="ai-chat__header">
     <div>
@@ -38,10 +51,10 @@
       <h2>AI Explainer</h2>
       <p>Ask a question about how MSH works.</p>
     </div>
-    <div class="ai-chat__connection" title="{{ ollama_base_url }}">
+    <div class="ai-chat__connection">
       <span class="ai-chat__connection-dot" aria-hidden="true"></span>
       <span>
-        <strong>{{ ai_provider_name }}</strong>
+        <strong>{{ selected_provider_name or ai_provider_name }}</strong>
         <small>{{ model }}</small>
       </span>
     </div>
@@ -82,6 +95,7 @@
         {% else %}
         <div class="ai-answer"><p>Retrieved context is ready. Open <strong>Inspect sources</strong> to review it.</p></div>
         {% endif %}
+        {{ runtime_status(selection_status, selected_provider_name, provider_attempts) }}
         {{ evidence_panel(sources, context) }}
       </div>
     </article>
@@ -119,7 +133,21 @@
             <input type="checkbox" name="dry_run" value="1" {% if dry_run %}checked{% endif %}>
             Preview retrieved context without asking the model
           </label>
-          <p>Provider: <strong>{{ ai_provider_name }}</strong><br><code>{{ ollama_base_url }}</code></p>
+          <p>Configured provider: <strong>{{ ai_provider_name }}</strong></p>
+          {% if provider_status %}
+          <details>
+            <summary>Available provider capabilities</summary>
+            <ul>
+              {% for provider in provider_status %}
+              <li>
+                <strong>{{ provider.provider_name }}</strong>
+                · {{ provider.status }}
+                · {{ provider.active_jobs }}/{{ provider.max_concurrent_jobs }} active
+              </li>
+              {% endfor %}
+            </ul>
+          </details>
+          {% endif %}
           <a href="{{ url_for('web.startup', edit='1', step='ai') }}">Change connection</a>
         </div>
       </details>
