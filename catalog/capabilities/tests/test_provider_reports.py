@@ -8,6 +8,7 @@ import pytest
 from catalog.capabilities.provider_reports import (
     PROVIDER_REPORT_PROTOCOL_VERSION,
     ProviderResourceReport,
+    ProviderSelectionPolicy,
     ProviderStatus,
     provider_protocol_satisfies,
 )
@@ -146,3 +147,28 @@ def test_f72_011_malformed_and_oversized_report_json_is_rejected() -> None:
 
 def test_f72_012_default_report_protocol_version_is_supported() -> None:
     assert _report().report_protocol_version == PROVIDER_REPORT_PROTOCOL_VERSION
+
+
+def test_f72_031_selection_policy_round_trip_ignores_additive_fields() -> None:
+    policy = ProviderSelectionPolicy(
+        minimum_available_slots=2,
+        max_queue_depth=4,
+        max_utilization_millis=700,
+        preferred_node_id="node-local",
+        excluded_capability_ids=("provider-b", "provider-a"),
+    )
+    value = policy.to_dict()
+    value["future_optional_field"] = True
+
+    assert ProviderSelectionPolicy.from_dict(value) == policy
+    assert policy.excluded_capability_ids == ("provider-a", "provider-b")
+
+
+def test_f72_032_selection_policy_schema_major_is_fail_closed() -> None:
+    value = ProviderSelectionPolicy().to_dict()
+    value["schema"] = "msh.capability-selection-policy.v2"
+
+    with pytest.raises(ProtocolCompatibilityError) as exc_info:
+        ProviderSelectionPolicy.from_dict(value)
+
+    assert exc_info.value.code == "unsupported-schema-major"
