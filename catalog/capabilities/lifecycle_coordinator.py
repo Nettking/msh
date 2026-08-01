@@ -32,6 +32,7 @@ from .lifecycle_contracts import (
 from .lifecycle_store import SQLiteJobLifecycleStore
 from .provider_reports import ProviderResourceReport, ProviderSelectionPolicy
 from .provider_selection import ProviderSelection, select_provider
+from .retry_claim import attempt_owner, claim_retry
 
 
 @dataclass(frozen=True)
@@ -570,6 +571,70 @@ class JobLifecycleCoordinator:
         now: datetime,
     ) -> ReassignmentOutcome:
         snapshot = self.store.snapshot(job_id)
+        base_policy = policy or ProviderSelectionPolicy()
+        ownership = snapshot.ownership
+        if snapshot.job.status is JobStatus.ACTIVE and ownership is not None:
+            if ownership.attempt_number <= 1:
+                raise FederationValidationError(
+                    "reassignment-replay-conflict",
+                    "attempt_number",
+                    "active first-attempt ownership is not a retry replay",
+                )
+            if (
+                ownership.attempt_id != attempt_id
+                or ownership.lease_id != lease_id
+                or ownership.lease_expires_at != _utc(
+                    lease_expires_at, "lease_expires_at"
+                )
+            ):
+                raise FederationValidationError(
+                    "reassignment-replay-conflict",
+                    "lease_id",
+                    "active retry ownership differs from the replayed command",
+                )
+            source_provider_id = attempt_owner(
+                self.store,
+                job_id,
+                ownership.attempt_number - 1,
+            )
+            assigned_reports = tuple(
+                report
+                for report in reports
+                if report.capability_id == ownership.owner_provider_id
+            )
+            if len(assigned_reports) != 1:
+                raise FederationValidationError(
+                    "assigned-provider-report-missing",
+                    "reports",
+                    "replayed retry requires one report for the durable owner",
+                )
+            selection = select_provider(
+                snapshot.job,
+                assigned_reports,
+                evaluated_at=now,
+                policy=replace(
+                    base_policy,
+                    excluded_capability_ids=tuple(
+                        sorted(
+                            set(base_policy.excluded_capability_ids)
+                            | {source_provider_id}
+                        )
+                    ),
+                ),
+            )
+            if selection.selected_capability_id != ownership.owner_provider_id:
+                raise FederationValidationError(
+                    "assigned-provider-not-eligible",
+                    "reports",
+                    "durable retry owner is no longer eligible for dispatch",
+                )
+            assert selection.selected_node_id is not None
+            return ReassignmentOutcome(
+                selection=selection,
+                snapshot=snapshot,
+                target_node_id=selection.selected_node_id,
+            )
+
         retry = self.store.retry_state(job_id)
         if snapshot.job.status is not JobStatus.RETRY_WAIT or retry is None:
             raise FederationValidationError(
@@ -577,7 +642,6 @@ class JobLifecycleCoordinator:
                 "status",
                 "job has no retry to reassign",
             )
-        base_policy = policy or ProviderSelectionPolicy()
         excluded = tuple(
             sorted(
                 set(base_policy.excluded_capability_ids)
@@ -602,21 +666,15 @@ class JobLifecycleCoordinator:
                 "reports",
                 "no new qualified worker is available",
             )
-        queued = self.store.activate_retry(
-            job_id,
-            coordinator_id=self.coordinator_node_id,
-            command_id=f"{command_prefix}:activate",
-            expected_revision=snapshot.revision,
-            now=now,
-        ).snapshot
-        claimed = self.store.claim(
+        claimed = claim_retry(
+            self.store,
             job_id,
             coordinator_id=self.coordinator_node_id,
             owner_provider_id=selection.selected_capability_id,
             attempt_id=attempt_id,
             lease_id=lease_id,
             command_id=f"{command_prefix}:claim",
-            expected_revision=queued.revision,
+            expected_revision=snapshot.revision,
             lease_expires_at=lease_expires_at,
             now=now,
         ).snapshot
