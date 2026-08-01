@@ -75,6 +75,18 @@ class ArtifactResultCoordinator:
             )
         command_id = _text(command_id, "command_id")
         now = _utc(now, "now")
+        if publication.published_at > now:
+            raise FederationValidationError(
+                "artifact-publication-in-future",
+                "published_at",
+                "publication time cannot be later than coordinator receipt time",
+            )
+        if publication.descriptor.created_at > publication.published_at:
+            raise FederationValidationError(
+                "artifact-created-after-publication",
+                "descriptor.created_at",
+                "artifact creation must not follow publication",
+            )
         snapshot = self.job_store.snapshot(publication.job_id)
         reference = self._reference(publication)
         declaration = next(
@@ -138,6 +150,12 @@ class ArtifactResultCoordinator:
                 "publication-coordinator-mismatch",
                 "coordinator_node_id",
                 "only the granting coordinator may publish the result",
+            )
+        if publication.published_at >= ownership.lease_expires_at:
+            raise FederationValidationError(
+                "artifact-publication-after-lease",
+                "published_at",
+                "publication at or after lease expiry is stale",
             )
         if (
             ownership.attempt_id != publication.attempt_id
