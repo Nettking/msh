@@ -363,3 +363,47 @@ def test_f72_030_selection_does_not_mutate_job_or_reports() -> None:
 
     assert job == original_job
     assert report == original_report
+
+
+def test_f72_033_capability_and_protocol_mismatches_are_rejected() -> None:
+    wrong_type = evaluate_provider_candidate(
+        _job(),
+        _report(capability_type="compute-worker"),
+        evaluated_at=NOW,
+    )
+    wrong_protocol = evaluate_provider_candidate(
+        _job(),
+        _report(protocol="openai-chat"),
+        evaluated_at=NOW,
+    )
+    old_minor = evaluate_provider_candidate(
+        _job(
+            capability=CapabilityRequirement(
+                capability_type="language-model",
+                protocol="ollama-chat",
+                protocol_version="1.2",
+                requirements={
+                    "model": "qwen3-vl:4b",
+                    "modalities": ["text", "vision"],
+                    "features": {"streaming": True},
+                },
+            )
+        ),
+        _report(protocol_version="1.1"),
+        evaluated_at=NOW,
+    )
+
+    assert "capability-type-mismatch" in wrong_type.reasons
+    assert "capability-protocol-mismatch" in wrong_protocol.reasons
+    assert "capability-protocol-version-incompatible" in old_minor.reasons
+
+
+def test_f72_034_minimum_available_slots_is_explicit_policy() -> None:
+    candidate = evaluate_provider_candidate(
+        _job(),
+        _report(max_concurrent_jobs=4, active_jobs=2),
+        evaluated_at=NOW,
+        policy=ProviderSelectionPolicy(minimum_available_slots=3),
+    )
+
+    assert "insufficient-available-slots" in candidate.reasons
