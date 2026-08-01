@@ -327,7 +327,7 @@ class SessionRouteRegistry:
             valid_signature = verify_signature(
                 public_key, descriptor.signing_bytes(), descriptor.signature
             )
-        except Exception as exc:  # noqa: BLE001 - cryptographic verifier boundary
+        except Exception as exc:
             raise FederationValidationError(
                 "invalid-session-route-signature",
                 "signature",
