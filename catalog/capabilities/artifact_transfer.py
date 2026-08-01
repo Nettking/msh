@@ -15,6 +15,7 @@ from catalog.federation.object_transfer import (
 )
 
 from .artifact_contracts import ArtifactDescriptor, OutputPlacementPolicy, _text
+from .artifact_endpoint import validate_logical_artifact_endpoint
 
 
 class ArtifactTransferMode(str, Enum):
@@ -36,6 +37,7 @@ class ArtifactTransferPlan:
                 "descriptor",
                 "must be an ArtifactDescriptor",
             )
+        validate_logical_artifact_endpoint(self.descriptor.endpoint_id)
         object.__setattr__(
             self,
             "placement_policy_id",
@@ -117,6 +119,8 @@ class F6ArtifactTransferPlanner:
                 "placement_policy",
                 "must be an OutputPlacementPolicy",
             )
+        validate_logical_artifact_endpoint(descriptor.endpoint_id)
+        validate_logical_artifact_endpoint(placement_policy.endpoint_id)
         if not placement_policy.accepts(descriptor, now=now):
             raise FederationValidationError(
                 "artifact-placement-rejected",
