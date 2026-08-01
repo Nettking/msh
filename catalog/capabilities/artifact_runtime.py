@@ -17,6 +17,7 @@ from .artifact_contracts import (
     OutputPlacementPolicy,
     _canonical,
     _text,
+    _utc,
 )
 from .lifecycle_store import SQLiteJobLifecycleStore
 
@@ -48,6 +49,15 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
                     FOREIGN KEY(grant_id)
                         REFERENCES capability_artifact_grants(grant_id)
                 );
+                CREATE TABLE IF NOT EXISTS capability_artifact_publication_reservations (
+                    publication_id TEXT PRIMARY KEY,
+                    grant_id TEXT NOT NULL,
+                    artifact_id TEXT NOT NULL,
+                    FOREIGN KEY(grant_id)
+                        REFERENCES capability_artifact_grants(grant_id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_capability_artifact_reservations_grant
+                    ON capability_artifact_publication_reservations(grant_id);
                 """
             )
 
@@ -78,6 +88,12 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
             for reference in snapshot.job.inputs
         }
         for reference in input_references:
+            if not isinstance(reference, ArtifactInputReference):
+                raise FederationValidationError(
+                    "invalid-input-reference",
+                    "input_references",
+                    "must contain ArtifactInputReference values",
+                )
             descriptor = self.artifact(reference.artifact_id)
             if descriptor.job_id != reference.job_id:
                 raise FederationValidationError(
@@ -110,7 +126,11 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
             expires_at=expires_at,
             now=now,
         )
-        policy_json = None if placement_policy is None else _canonical(placement_policy.to_dict())
+        policy_json = (
+            None
+            if placement_policy is None
+            else _canonical(placement_policy.to_dict())
+        )
         policy_fingerprint = (
             None
             if placement_policy is None
@@ -123,7 +143,10 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
                    FROM capability_artifact_grant_issuers WHERE grant_id=?""",
                 (grant.grant_id,),
             ).fetchone()
-            if issuer is not None and issuer["coordinator_node_id"] != coordinator_node_id:
+            if (
+                issuer is not None
+                and issuer["coordinator_node_id"] != coordinator_node_id
+            ):
                 connection.rollback()
                 raise FederationValidationError(
                     "grant-issuer-conflict",
@@ -194,6 +217,22 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
             else OutputPlacementPolicy.from_dict(json.loads(row["policy_json"]))
         )
 
+    def publication(self, publication_id: str) -> ArtifactPublication:
+        publication_id = _text(publication_id, "publication_id")
+        with self._connect() as connection:
+            row = connection.execute(
+                """SELECT publication_json
+                   FROM capability_artifact_publications WHERE publication_id=?""",
+                (publication_id,),
+            ).fetchone()
+        if row is None:
+            raise FederationValidationError(
+                "publication-not-found",
+                "publication_id",
+                "artifact publication does not exist",
+            )
+        return ArtifactPublication.from_dict(json.loads(row["publication_json"]))
+
     def _fence_policy(
         self,
         grant_id: str,
@@ -219,10 +258,13 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
             or supplied.endpoint_kind != issued.endpoint_kind
             or supplied.endpoint_id != issued.endpoint_id
             or supplied.namespace != issued.namespace
-            or not set(supplied.allowed_schema_ids).issubset(issued.allowed_schema_ids)
+            or not set(supplied.allowed_schema_ids).issubset(
+                issued.allowed_schema_ids
+            )
             or supplied.max_artifact_bytes > issued.max_artifact_bytes
             or supplied.max_artifacts > issued.max_artifacts
-            or supplied.resumable_threshold_bytes > issued.resumable_threshold_bytes
+            or supplied.resumable_threshold_bytes
+            > issued.resumable_threshold_bytes
             or supplied.expires_at > issued.expires_at
         )
         if broader:
@@ -244,16 +286,62 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
         provider_id: str,
         now,
     ) -> None:
+        if not isinstance(descriptor, ArtifactDescriptor):
+            raise FederationValidationError(
+                "invalid-artifact-descriptor",
+                "descriptor",
+                "must be an ArtifactDescriptor",
+            )
         fenced = self._fence_policy(grant_id, placement_policy)
-        return super().authorize_output(
-            grant_id,
-            descriptor,
-            fenced,
+        grant = self.grant(grant_id)
+        now = _utc(now, "now")
+        self._validate_context(
+            grant,
             authenticated_session_id=authenticated_session_id,
             authenticated_worker_node_id=authenticated_worker_node_id,
             provider_id=provider_id,
             now=now,
         )
+        allowed = (
+            ArtifactGrantScope.WRITE_OUTPUT in grant.scopes
+            and grant.permits_output(descriptor)
+            and fenced.accepts(descriptor, now=now)
+            and fenced.endpoint_id == grant.endpoint_id
+            and fenced.namespace == grant.output_namespace
+        )
+        if not allowed:
+            self._deny(
+                code="artifact-output-not-granted",
+                field="descriptor",
+                message=(
+                    "output does not match the explicit grant and placement policy"
+                ),
+                session_id=grant.session_id,
+                job_id=grant.job_id,
+                actor_node_id=authenticated_worker_node_id,
+                event_at=now,
+                grant_id=grant.grant_id,
+                artifact_id=descriptor.artifact_id,
+            )
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            self._audit(
+                connection,
+                event_type="output-authorized",
+                session_id=grant.session_id,
+                job_id=grant.job_id,
+                actor_node_id=authenticated_worker_node_id,
+                event_at=now,
+                grant_id=grant.grant_id,
+                artifact_id=descriptor.artifact_id,
+                details={
+                    "endpoint_id": descriptor.endpoint_id,
+                    "object_key": descriptor.object_key,
+                    "size_bytes": descriptor.size_bytes,
+                    "schema_id": descriptor.schema_id,
+                },
+            )
+            connection.commit()
 
     def publish(
         self,
@@ -265,15 +353,100 @@ class SQLiteCapabilityArtifactAuthority(SQLiteArtifactAuthority):
         provider_id: str,
         now,
     ) -> ArtifactPublicationResult:
+        if not isinstance(publication, ArtifactPublication):
+            raise FederationValidationError(
+                "invalid-artifact-publication",
+                "publication",
+                "must be an ArtifactPublication",
+            )
         fenced = self._fence_policy(publication.grant_id, placement_policy)
-        return super().publish(
-            publication,
-            fenced,
-            authenticated_session_id=authenticated_session_id,
-            authenticated_worker_node_id=authenticated_worker_node_id,
-            provider_id=provider_id,
-            now=now,
-        )
+        now = _utc(now, "now")
+        reserved = False
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            persisted = connection.execute(
+                """SELECT 1 FROM capability_artifact_publications
+                   WHERE publication_id=?""",
+                (publication.publication_id,),
+            ).fetchone()
+            own_reservation = connection.execute(
+                """SELECT grant_id, artifact_id
+                   FROM capability_artifact_publication_reservations
+                   WHERE publication_id=?""",
+                (publication.publication_id,),
+            ).fetchone()
+            if own_reservation is not None and (
+                own_reservation["grant_id"] != publication.grant_id
+                or own_reservation["artifact_id"]
+                != publication.descriptor.artifact_id
+            ):
+                connection.rollback()
+                raise FederationValidationError(
+                    "publication-reservation-conflict",
+                    "publication_id",
+                    "publication ID is reserved for different authority",
+                )
+            if persisted is None and own_reservation is None:
+                published_count = connection.execute(
+                    """SELECT COUNT(*) AS count
+                       FROM capability_artifact_publications WHERE grant_id=?""",
+                    (publication.grant_id,),
+                ).fetchone()["count"]
+                reserved_count = connection.execute(
+                    """SELECT COUNT(*) AS count
+                       FROM capability_artifact_publication_reservations
+                       WHERE grant_id=?""",
+                    (publication.grant_id,),
+                ).fetchone()["count"]
+                if published_count + reserved_count >= fenced.max_artifacts:
+                    grant = self.grant(publication.grant_id)
+                    self._audit(
+                        connection,
+                        event_type="access-denied",
+                        session_id=grant.session_id,
+                        job_id=grant.job_id,
+                        actor_node_id=authenticated_worker_node_id,
+                        event_at=now,
+                        grant_id=grant.grant_id,
+                        artifact_id=publication.descriptor.artifact_id,
+                        details={"reason_code": "artifact-count-limit"},
+                    )
+                    connection.commit()
+                    raise FederationValidationError(
+                        "artifact-count-limit",
+                        "max_artifacts",
+                        "placement policy artifact count is exhausted",
+                    )
+                connection.execute(
+                    """INSERT INTO capability_artifact_publication_reservations
+                       (publication_id, grant_id, artifact_id) VALUES(?, ?, ?)""",
+                    (
+                        publication.publication_id,
+                        publication.grant_id,
+                        publication.descriptor.artifact_id,
+                    ),
+                )
+                reserved = True
+            connection.commit()
+        try:
+            return super().publish(
+                publication,
+                fenced,
+                authenticated_session_id=authenticated_session_id,
+                authenticated_worker_node_id=authenticated_worker_node_id,
+                provider_id=provider_id,
+                now=now,
+            )
+        finally:
+            if reserved:
+                with self._connect() as connection:
+                    connection.execute("BEGIN IMMEDIATE")
+                    connection.execute(
+                        """DELETE FROM capability_artifact_publication_reservations
+                           WHERE publication_id=?""",
+                        (publication.publication_id,),
+                    )
+                    connection.commit()
 
     def revoke(
         self,
