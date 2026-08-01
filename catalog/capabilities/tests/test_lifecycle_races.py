@@ -66,9 +66,9 @@ def _job(
         ),
         timeout_policy=TimeoutPolicy(
             overall_timeout_seconds=overall_timeout_seconds,
-            queue_timeout_seconds=20,
-            start_timeout_seconds=10,
-            run_timeout_seconds=30,
+            queue_timeout_seconds=min(20, overall_timeout_seconds),
+            start_timeout_seconds=min(10, overall_timeout_seconds),
+            run_timeout_seconds=min(30, overall_timeout_seconds),
             cancellation_grace_seconds=cancellation_grace_seconds,
         ),
     )
@@ -166,7 +166,7 @@ def test_durable_cancellation_precedes_overall_timeout(
     store = SQLiteJobLifecycleStore(tmp_path / "jobs.sqlite3")
     job = _job(
         job_id="job-cancel-precedence",
-        overall_timeout_seconds=5,
+        overall_timeout_seconds=10,
         cancellation_grace_seconds=10,
     )
     _owned(store, job, lease_expires_at=NOW + timedelta(seconds=60))
@@ -177,7 +177,7 @@ def test_durable_cancellation_precedes_overall_timeout(
         command_id="cancel-precedence:request",
         expected_revision=2,
         reason="operator-request",
-        now=NOW + timedelta(seconds=1),
+        now=NOW + timedelta(seconds=9),
     ).snapshot
     coordinator = JobLifecycleCoordinator(
         store,
@@ -187,12 +187,12 @@ def test_durable_cancellation_precedes_overall_timeout(
 
     while_grace_active = coordinator.evaluate(
         job.job_id,
-        now=NOW + timedelta(seconds=6),
+        now=NOW + timedelta(seconds=11),
         command_prefix="cancel-race",
     )
     after_grace = coordinator.evaluate(
         job.job_id,
-        now=NOW + timedelta(seconds=12),
+        now=NOW + timedelta(seconds=20),
         command_prefix="cancel-race",
     )
 
