@@ -20,8 +20,9 @@ from .artifact_contracts import (
     ArtifactPublication,
     OutputPlacementPolicy,
 )
+from .artifact_endpoint import validate_logical_artifact_endpoint
 from .artifact_publication import ArtifactResultCoordinator, PublishedJobResult
-from .artifact_runtime import SQLiteCapabilityArtifactAuthority
+from .artifact_secure_runtime import SQLiteCapabilityArtifactAuthority
 from .artifact_transfer import (
     ArtifactTransferMode,
     ArtifactTransferPlan,
@@ -261,5 +262,6 @@ __all__ = [
     "validate_attempt_transition",
     "validate_job_transition",
     "validate_jobs_protocol",
+    "validate_logical_artifact_endpoint",
     "validate_provider_report_protocol",
 ]
