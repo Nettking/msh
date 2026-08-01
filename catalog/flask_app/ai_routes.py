@@ -118,7 +118,7 @@ def _answer_question(
         model=model,
         modality=AIModality.TEXT,
         prompt=prompt,
-        system_prompt=SYSTEM_PROMPT,
+        system_prompt=SYSTEM_PROMPT.strip(),
         timeout_seconds=120,
     )
     try:
