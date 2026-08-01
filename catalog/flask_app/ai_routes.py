@@ -28,7 +28,7 @@ AI_RUNTIME_MANAGER = ConfiguredLanguageModelRuntimeManager(
 def _ai_defaults() -> tuple[str, str, str]:
     try:
         settings = load_settings()
-    except Exception:
+    except (OSError, TypeError, ValueError):
         return DEFAULT_MODEL, DEFAULT_BASE_URL, "Default Ollama"
     if settings.configured and settings.user_setup_complete and settings.ai_enabled and settings.ai_model:
         return settings.ai_model, settings.ollama_base_url, ai_provider_label(settings)
