@@ -1,0 +1,58 @@
+name: Phase F6.6.2 session route rendezvous
+
+on:
+  pull_request:
+    paths:
+      - "catalog/federation/session_route_rendezvous.py"
+      - "catalog/node/route_rendezvous.py"
+      - "catalog/relay/route_rendezvous.py"
+      - "catalog/relay/tests/test_phase_f662_route_rendezvous.py"
+      - "docs/implementation/phase_f662_session_route_rendezvous.md"
+      - ".github/workflows/phase-f662-session-route-rendezvous.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/federation/session_route_rendezvous.py"
+      - "catalog/node/route_rendezvous.py"
+      - "catalog/relay/route_rendezvous.py"
+      - "catalog/relay/tests/test_phase_f662_route_rendezvous.py"
+      - "docs/implementation/phase_f662_session_route_rendezvous.md"
+      - ".github/workflows/phase-f662-session-route-rendezvous.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f662-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  session-route-rendezvous:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile F6.6.2 boundary
+        run: |
+          python -m compileall catalog/federation/session_route_rendezvous.py catalog/node/route_rendezvous.py catalog/relay/route_rendezvous.py catalog/relay/tests/test_phase_f662_route_rendezvous.py
+      - name: Session route rendezvous tests
+        run: python -m pytest -o addopts= -q catalog/relay/tests/test_phase_f662_route_rendezvous.py
+      - name: Ruff F6.6.2 boundary
+        run: python -m ruff check catalog/federation/session_route_rendezvous.py catalog/node/route_rendezvous.py catalog/relay/route_rendezvous.py catalog/relay/tests/test_phase_f662_route_rendezvous.py --ignore I001,RUF022,B008,C408,PLC0206
+      - name: Diff hygiene
+        run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
