@@ -7,9 +7,7 @@ import pytest
 
 from catalog.capabilities.artifact_contracts import ArtifactGrantScope
 from catalog.capabilities.artifact_publication import ArtifactResultCoordinator
-from catalog.federation.errors import FederationValidationError
-
-from .test_artifact_authorization import (
+from catalog.capabilities.tests.test_artifact_authorization import (
     ENDPOINT,
     JOB_ID,
     NOW,
@@ -19,6 +17,7 @@ from .test_artifact_authorization import (
     _placement,
     _publication,
 )
+from catalog.federation.errors import FederationValidationError
 
 
 def _grant_output(authority) -> None:
