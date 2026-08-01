@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import io
-import socket
 from urllib import error
 
 import pytest
@@ -90,11 +89,11 @@ def test_ollama_http_failures_are_structured_without_endpoint_leak(
     assert "private diagnostic" not in str(failed.value)
 
 
-def test_ollama_socket_timeout_is_structured(monkeypatch) -> None:
+def test_ollama_timeout_is_structured(monkeypatch) -> None:
     monkeypatch.setattr(
         ollama_client.request,
         "urlopen",
-        lambda *_args, **_kwargs: (_ for _ in ()).throw(socket.timeout()),
+        lambda *_args, **_kwargs: (_ for _ in ()).throw(TimeoutError()),
     )
 
     with pytest.raises(OllamaError) as failed:
