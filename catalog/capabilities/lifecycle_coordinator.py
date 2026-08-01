@@ -162,7 +162,14 @@ class ResilientDispatchCoordinator:
                 result=committed,
             )
         if current.job.terminal:
-            if committed is not None and response.state is DispatchState.SUCCEEDED:
+            same_committed_attempt = (
+                committed is not None
+                and committed.attempt_id == request.attempt_id
+                and committed.provider_id == request.provider_id
+                and committed.lease_id == request.lease_id
+                and committed.lease_generation == request.lease_generation
+            )
+            if same_committed_attempt and response.state is DispatchState.SUCCEEDED:
                 try:
                     reference = self._reference(response.events[-1])
                 except FederationValidationError:
@@ -304,6 +311,8 @@ class ResilientDispatchCoordinator:
         now: datetime,
     ) -> DurableJobSnapshot:
         current = self.store.snapshot(job_id)
+        if current.job.status is JobStatus.CANCELLED:
+            return current
         ownership = current.ownership
         request = (
             None
