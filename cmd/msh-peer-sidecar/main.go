@@ -434,7 +434,11 @@ func sendRequest(
 	if err := h.Connect(requestContext, *info); err != nil {
 		return wireMessage{}, fmt.Errorf("connect direct peer: %w", err)
 	}
-	stream, err := h.NewStream(requestContext, info.ID, streamProtocol)
+	streamContext := requestContext
+	if strings.Contains(targetMultiaddr, "/p2p-circuit") {
+		streamContext = network.WithAllowLimitedConn(requestContext, "msh-circuit-v2")
+	}
+	stream, err := h.NewStream(streamContext, info.ID, streamProtocol)
 	if err != nil {
 		return wireMessage{}, fmt.Errorf("open direct stream: %w", err)
 	}
