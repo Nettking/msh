@@ -6,11 +6,11 @@ from flask import Blueprint, jsonify, render_template, request
 
 from catalog.ai.grounding import append_grounding_warning
 from catalog.ai.ollama_client import DEFAULT_BASE_URL, DEFAULT_MODEL, chat
-from catalog.ai.ollama_provider import OllamaLanguageModelProvider
 from catalog.ai.prompts import SYSTEM_PROMPT, build_extractive_prompt, build_prompt
 from catalog.ai.rag import format_context, retrieve
 from catalog.ai.repo_index import load_or_build_chunks, repo_root_from
-from catalog.ai.runtime import AIRuntimePolicy, LanguageModelRuntime
+from catalog.ai.runtime import AIRuntimePolicy, LanguageModelProvider, LanguageModelRuntime
+from catalog.ai.runtime_manager import ConfiguredLanguageModelRuntimeManager
 from catalog.ai.runtime_contracts import AIModality, AIRuntimeError, AIRuntimeRequest
 from catalog.ai.symbols import build_symbols
 
@@ -19,6 +19,10 @@ from .services.server_setup_service import ai_provider_label, load_settings
 
 ai_web = Blueprint("ai_web", __name__)
 AI_RUNTIME_SESSION_ID = "local-ai"
+AI_RUNTIME_MANAGER = ConfiguredLanguageModelRuntimeManager(
+    session_id=AI_RUNTIME_SESSION_ID,
+    policy=AIRuntimePolicy(max_pending_requests=32, max_fallbacks=1),
+)
 
 
 def _ai_defaults() -> tuple[str, str, str]:
@@ -31,24 +35,27 @@ def _ai_defaults() -> tuple[str, str, str]:
     return DEFAULT_MODEL, DEFAULT_BASE_URL, "Default Ollama"
 
 
+def register_language_model_provider(provider: LanguageModelProvider) -> None:
+    """Register an additional session-bound provider for normal AI requests."""
+    AI_RUNTIME_MANAGER.register(provider)
+
+
+def unregister_language_model_provider(capability_id: str) -> bool:
+    return AI_RUNTIME_MANAGER.unregister(capability_id)
+
+
 def _build_ai_runtime(
     *,
     model: str,
     base_url: str,
     provider_name: str,
 ) -> LanguageModelRuntime:
-    """Build the compatibility runtime without exposing the Ollama endpoint."""
-    provider = OllamaLanguageModelProvider(
-        session_id=AI_RUNTIME_SESSION_ID,
-        display_name=provider_name,
+    """Reuse one bounded runtime without exposing the private Ollama endpoint."""
+    return AI_RUNTIME_MANAGER.runtime_for(
+        model=model,
         base_url=base_url,
-        models=(model,),
+        provider_name=provider_name,
         chat_callable=chat,
-    )
-    return LanguageModelRuntime(
-        session_id=AI_RUNTIME_SESSION_ID,
-        providers=(provider,),
-        policy=AIRuntimePolicy(max_fallbacks=0),
     )
 
 
