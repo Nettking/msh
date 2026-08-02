@@ -81,10 +81,11 @@
       {% if provider.allowed_actions %}
       <div class="overview-decision__actions">
         {% for action in provider.allowed_actions %}
-        <form method="post" action="{{ url_for('provider_federation_web.provider_action', capability_id=provider.capability_id, action=action.value) }}">
+        <form method="post" action="{{ url_for('provider_federation_web.provider_action_html', capability_id=provider.capability_id, action=action.value) }}">
           <input type="hidden" name="_csrf_token" value="{{ provider_federation_csrf_token }}">
           {% if action.value != 'request' %}<input type="hidden" name="expected_revision" value="{{ provider.enrollment_revision }}">{% endif %}
-          {% if action.value in ['suspend', 'revoke'] %}<input type="hidden" name="reason_code" value="operator-{{ action.value }}d">{% endif %}
+          {% if action.value == 'suspend' %}<input type="hidden" name="reason_code" value="operator-suspended">{% endif %}
+          {% if action.value == 'revoke' %}<input type="hidden" name="reason_code" value="operator-revoked">{% endif %}
           <button type="submit" class="{% if action.value == 'approve' %}button-primary{% endif %}">{{ action.value|title }}</button>
         </form>
         {% endfor %}
