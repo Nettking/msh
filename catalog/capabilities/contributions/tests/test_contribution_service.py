@@ -86,6 +86,7 @@ def snapshot() -> DeviceInspectionSnapshot:
 
 
 def environment(tmp_path):
+    current = [NOW]
     recorder = RecorderAuthority()
     ai_active = set()
     compute_active = set()
@@ -111,7 +112,7 @@ def environment(tmp_path):
                 }
             ),
         ),
-        now=lambda: NOW,
+        now=lambda: current[0],
     )
     service = ContributionService(
         generator=generator,
@@ -149,7 +150,7 @@ def environment(tmp_path):
                 ),
             ),
         ),
-        now=lambda: NOW,
+        now=lambda: current[0],
     )
     candidates = {
         candidate.capability_type: candidate
@@ -163,6 +164,7 @@ def environment(tmp_path):
         compute_active,
         storage_assigned,
         fences,
+        current,
     )
 
 
@@ -176,6 +178,7 @@ def test_simultaneous_capabilities_are_independent_and_ai_grants_nothing_else(
         ai_active,
         compute_active,
         storage_assigned,
+        _,
         _,
     ) = environment(tmp_path)
 
@@ -196,7 +199,7 @@ def test_simultaneous_capabilities_are_independent_and_ai_grants_nothing_else(
 
 
 def test_storage_is_candidate_only_until_control_plane_assignment(tmp_path) -> None:
-    service, candidates, _, _, _, storage_assigned, _ = environment(tmp_path)
+    service, candidates, _, _, _, storage_assigned, _, _ = environment(tmp_path)
     storage = candidates["storage"]
 
     pending = service.enable(storage.candidate_id)
@@ -212,7 +215,7 @@ def test_storage_is_candidate_only_until_control_plane_assignment(tmp_path) -> N
 
 
 def test_disable_and_suspend_fence_future_use_without_membership_deletion(tmp_path) -> None:
-    service, candidates, recorder, ai_active, compute_active, _, fences = environment(
+    service, candidates, recorder, ai_active, compute_active, _, fences, _ = environment(
         tmp_path
     )
     membership = {"device-1"}
@@ -232,3 +235,22 @@ def test_disable_and_suspend_fence_future_use_without_membership_deletion(tmp_pa
     assert not ai_active
     assert membership == {"device-1"}
     assert recorder.calls == []
+
+
+def test_expired_evidence_suspends_and_still_allows_disable(tmp_path) -> None:
+    service, candidates, _, _, compute_active, _, fences, current = environment(
+        tmp_path
+    )
+    compute_id = candidates["compute"].candidate_id
+    service.enable(compute_id)
+
+    current[0] = NOW + timedelta(minutes=11)
+    reconciled = {item.candidate_id: item for item in service.reconcile()}
+
+    assert reconciled[compute_id].activation_state is ContributionActivationState.SUSPENDED
+    assert not compute_active
+    assert fences["compute"]
+
+    disabled = service.disable(compute_id)
+    assert disabled.desired_state is ContributionDesiredState.DISABLED
+    assert disabled.activation_state is ContributionActivationState.INACTIVE
