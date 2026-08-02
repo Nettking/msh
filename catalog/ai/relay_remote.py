@@ -19,6 +19,7 @@ from catalog.federation.errors import (
 from .remote_contracts import (
     RemoteAIInvocationRequest,
     RemoteAIInvocationResponse,
+    _node_id,
 )
 from .remote_provider import (
     RemoteAIHealthAuthority,
@@ -124,7 +125,7 @@ class RemoteAIProviderHost:
         )
         actual = (
             _logical_id(provider.capability_id, "provider.capability_id"),
-            _logical_id(provider.node_id, "provider.node_id"),
+            _node_id(provider.node_id, "provider.node_id"),
             _logical_id(provider.session_id, "provider.session_id"),
             provider.protocol,
             provider.protocol_version,
@@ -675,7 +676,7 @@ class BlockingRelayAIInvocationTransport(RemoteAIInvocationTransport):
             )
         self.endpoint = endpoint
         self.event_loop = event_loop
-        self.target_node_id = _logical_id(target_node_id, "target_node_id")
+        self.target_node_id = _node_id(target_node_id, "target_node_id")
         self.capability_id = _logical_id(capability_id, "capability_id")
         self.poll_interval_seconds = float(poll_interval_seconds)
 
