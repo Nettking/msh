@@ -1,21 +1,41 @@
 # Federation v1 closeout plan
 
-Status: approved stabilization plan. No new federation feature work is authorized until this closeout is complete or the repository owner explicitly changes the priority.
+Status: amended stabilization plan. The technical Federation v1 baseline remains valid, but release publication is paused while the explicitly approved capability-first onboarding work is implemented and accepted.
+
+## Owner-approved amendment — 2026-08-02
+
+The original feature freeze has been explicitly changed by the repository owner.
+
+Capability-first onboarding and the Federation product UI are now approved compatible `1.x` product work. The authoritative plan is:
+
+- `docs/implementation/capability_first_federation_plan.md`
+
+The amendment changes the product path, not the validated authority core:
+
+- users will no longer choose one mutually exclusive permanent deployment role;
+- devices may contribute several capabilities simultaneously;
+- setup will discover or create a federation, inspect the device, run suitable benchmarks, and ask which contributions to enable;
+- `session_id` remains an internal compatibility and isolation boundary during this migration;
+- membership, provider health, storage authority, job ownership, leases, fencing, and artifact grants remain authoritative;
+- benchmark results provide evidence only and never grant authority by themselves;
+- release-candidate acceptance must use the new onboarding flow rather than the old role-first wizard.
+
+Cleanup work may continue only when it does not overlap active onboarding implementation. Shared setup, Flask navigation, and federation product files are reserved for the capability-first plan until its integration wave is complete.
 
 ## Objective
 
-Convert the completed federation implementation into a stable, documented, supportable **MSH Federation v1.0** release.
+Convert the completed federation implementation into a stable, documented, supportable MSH Federation release with a capability-first user experience.
 
-The closeout is a sequence of small, independently reviewable changes. Cleanup must never remove a path merely because it looks old. Every deletion requires dependency evidence and regression validation.
+The closeout remains a sequence of small, independently reviewable changes. Cleanup must never remove a path merely because it looks old. Every deletion requires dependency evidence and regression validation.
 
 ## Fixed decisions
 
-- The completed federation work is named **MSH Federation v1.0**.
-- F8.7 is the technical implementation baseline.
+- The completed federation technical baseline remains **MSH Federation v1.0** through F8.7.
 - V1 is for explicitly trusted devices and providers.
 - Runtime authority and security boundaries from the completed phases remain unchanged.
-- Feature expansion is frozen during closeout.
-- UI and documentation product improvements are saved in the post-v1 roadmap and are not lost when prototypes or stale files are removed.
+- Capability-first onboarding is an approved compatible product-layer change before release publication.
+- The internal session boundary remains during the compatible migration.
+- UI and documentation improvements must not invent a second authority source.
 - No implementation branch is deleted without separate explicit owner approval.
 - No release tag is created before exact release acceptance.
 
@@ -23,7 +43,7 @@ The closeout is a sequence of small, independently reviewable changes. Cleanup m
 
 ### V1-A — audit and release boundary
 
-Deliverables:
+Completed deliverables:
 
 - repository audit;
 - v1 scope definition;
@@ -32,55 +52,30 @@ Deliverables:
 - current handoff replacement;
 - first deletion-candidate classification.
 
-Exit criteria:
-
-- no runtime behavior changed;
-- no existing path deleted;
-- future UI/docs intent is recorded;
-- the next cleanup action is unambiguous.
-
 ### V1-B — exact path-level cleanup manifest
 
-Deliver one table covering every proposed deletion or relocation:
+Completed deliverable: one path-level manifest covering proposed deletion, relocation, consolidation, archive, and defer decisions.
 
-| Path | Classification | Evidence | Replacement/migration | Required tests | Decision |
-| --- | --- | --- | --- | --- | --- |
-
-Minimum candidate groups:
-
-- `graphify-out/`;
-- all content under `new-stuff/`;
-- `catalog/webapp/`;
-- `legacy/`;
-- deprecated/manual/deep runner scripts;
-- stale handoff and implementation-plan documents;
-- redundant phase workflows;
-- committed generated output or caches elsewhere in the tree.
-
-Evidence must include searches for imports, commands, Compose references, setup references, tests, documentation links, AI indexing, runner discovery, and workflows.
-
-Exit criteria:
-
-- every path has a keep, consolidate, archive, delete, or defer decision;
-- no directory-level deletion relies only on naming;
-- uncertain candidates remain deferred.
+The manifest remains useful for cleanup, but any setup/UI decision that conflicts with the newer capability-first plan is superseded by that plan.
 
 ### V1-C — generated output and experiment cleanup
 
-Expected scope:
+Progress:
 
-- remove confirmed generated `graphify-out/` content;
-- update `.gitignore`;
-- remove or relocate confirmed unsupported `new-stuff/` experiments;
-- retain the Markdown viewer requirements as roadmap acceptance criteria rather than production code;
-- remove generated experiment output;
-- add an `experiments/README.md` only if supported research experiments remain.
+- generated `graphify-out/` content was removed and ignored;
+- the integrated `/docs` reader was implemented and accepted;
+- the standalone Markdown viewer is now a separately approved deletion candidate;
+- other `new-stuff/` experiments remain separate owner decisions.
 
-Exit criteria:
+Remaining cleanup must not edit the shared onboarding integration files while capability-first implementation is active.
 
-- production tree contains no unclassified experiment directory;
-- no generated cache or analysis snapshot is committed by default;
-- compile, tests, Compose, and diff hygiene are green.
+### CF0-CF8 — capability-first onboarding and Federation UI
+
+The complete decomposition, compatibility rules, parallel-agent ownership, acceptance, and stop conditions are defined in:
+
+- `docs/implementation/capability_first_federation_plan.md`
+
+This work is inserted before release-candidate acceptance.
 
 ### V1-D — obsolete implementation cleanup
 
@@ -88,14 +83,13 @@ Expected scope after dependency proof:
 
 - remove duplicate old web implementation if `catalog/webapp/` has no supported entry point;
 - reduce `legacy/` to explicitly justified historical/reference material;
-- remove obsolete scripts and their stale documentation;
+- remove obsolete scripts and stale documentation;
 - update AI grounding/indexing when indexed paths change;
-- remove dead tests only when the corresponding unsupported implementation is removed and equivalent product behavior remains covered.
+- remove dead tests only when equivalent product behavior remains covered.
 
 Exit criteria:
 
 - one supported Flask application path;
-- one documented runtime path per deployment role;
 - no hidden duplicate behavior relied upon by setup or Compose;
 - full affected regression suites green.
 
@@ -116,14 +110,16 @@ docs/
   history/
 ```
 
-Required public documents:
+Required public documents now include:
 
 - product overview;
 - quick start;
-- installation and roles;
-- create and join a federation;
+- installation and capability-first onboarding;
+- federation discovery, verification, join, reconnect, and local creation;
+- device inspection and benchmarks;
+- contribution management;
 - device and provider administration;
-- storage, AI, and compute guides;
+- storage, AI, compute, and recorder guides;
 - security/trust model;
 - backup, restart, recovery, and upgrade;
 - troubleshooting;
@@ -142,22 +138,23 @@ Exit criteria:
 
 - a new user can identify the correct first document;
 - current behavior is described without phase archaeology;
-- no canonical page presents completed development as pending;
-- docs are ready to be served by the later integrated `/docs` update.
+- setup documentation does not instruct a new user to select a permanent device role;
+- technical session terminology is kept out of ordinary onboarding guidance;
+- `/docs` exposes the canonical structure correctly.
 
 ### V1-F — permanent regression gate
 
 Deliver:
 
-- one named Federation v1 release workflow;
+- one named Federation release workflow;
 - Linux and Windows coverage;
-- complete identity, session, relay, transport, storage, failover, capability, AI, compute, artifact, Flask, setup, and compatibility matrix;
+- complete identity, membership/session compatibility, relay, transport, storage, failover, capability, benchmark, contribution, AI, compute, recorder, artifact, Flask, onboarding, migration, and compatibility matrix;
 - compile, Ruff, Compose, diff hygiene, and documentation-link checks;
 - retained focused component workflows only where they add fault isolation.
 
 Exit criteria:
 
-- the v1 gate is equivalent to or stronger than the union of required closeout gates;
+- the release gate is equivalent to or stronger than the union of required closeout gates;
 - completed phase names are no longer the only permanent quality signal;
 - no workflow is deleted before replacement evidence exists.
 
@@ -166,13 +163,18 @@ Exit criteria:
 Required acceptance:
 
 - fresh checkout installation on Linux and Windows;
-- first-run setup without old state;
-- documented start/stop/upgrade path;
-- two independently persisted devices;
-- session create, invite, join, disconnect, reconnect, restart, revoke;
+- first-run capability-first onboarding without old state;
+- stable device identity creation;
+- existing federation discovery and verified join;
+- safe local federation creation when no candidate exists;
+- returning-device reconnect and restart;
+- migration from every supported old deployment mode;
+- one device contributing multiple capabilities simultaneously;
+- benchmark execution, expiry, invalidation, rerun, skip, and failure behavior;
 - storage replication and controlled failover;
-- AI provider approval, use, suspension/revocation, and recovery;
-- compute provider approval, dispatch, duplicate suppression, suspension/revocation, and recovery;
+- AI contribution enable/use/disable/recovery;
+- compute contribution enable/dispatch/duplicate suppression/disable/recovery;
+- recorder plus AI on the same device;
 - safe diagnostics without secret/private endpoint leakage;
 - backup/recovery rehearsal;
 - all user commands and docs links checked.
@@ -184,34 +186,52 @@ Record exact hardware/network constraints and do not overclaim unsupported publi
 Deliver:
 
 - `CHANGELOG.md`;
-- v1 release notes;
+- release notes;
 - exact version declaration;
 - verified release commit;
-- `v1.0.0` tag;
+- release tag;
 - updated original federation issue/status;
 - post-release branch-cleanup proposal presented separately.
 
 Exit criteria:
 
-- tag points to the validated commit;
+- the tag points to the validated commit;
 - release notes match actual scope and limitations;
-- no pending mandatory closeout action is hidden in a historical plan.
+- no pending mandatory onboarding, migration, or closeout action is hidden in a historical plan.
+
+## Parallel-work policy
+
+The capability-first plan is designed for parallel agents, but parallelism must not create overlapping edits.
+
+- CF1 contracts merge first.
+- Benchmarking, discovery, and new UI-shell work may then run concurrently on separate branches.
+- Contribution services and safe projections may run concurrently after their prerequisites merge.
+- one integration agent exclusively owns shared Flask/setup files;
+- one independent acceptance agent owns the final regression and migration proof;
+- every agent declares exact path ownership in its PR.
 
 ## Stop conditions
 
 Stop and report rather than broaden scope when:
 
-- a deletion candidate has an unresolved runtime or documentation dependency;
-- a test indicates lost compatibility, authority weakening, split brain, stale execution, or data risk;
+- discovery would require unauthenticated trust;
+- a benchmark would run arbitrary remotely supplied code;
+- a benchmark result is treated as authority;
+- migration would silently enable a contribution not previously configured;
+- a user-facing simplification would weaken membership, revocation, lease, fencing, storage, job, or artifact checks;
+- two active agents need to edit the same shared integration file;
+- removing `session_id` becomes necessary for a compatible unit;
 - public documentation would require claiming behavior not demonstrated by acceptance;
-- cleanup requires a new feature rather than removal/consolidation;
-- a future roadmap item is being pulled into v1 without explicit approval.
+- cleanup requires a new unrelated feature;
+- a test indicates lost compatibility, split brain, stale execution, or data risk.
 
 ## Next exact action
 
-Proceed to **V1-B** only:
+Proceed with **CF1 only**:
 
-1. build the exact path-level cleanup manifest;
-2. verify dependencies for `graphify-out/`, `new-stuff/`, `catalog/webapp/`, `legacy/`, stale implementation documents, and old workflows;
-3. propose the first deletion batch;
-4. do not delete anything until that manifest is reviewed.
+1. add pure capability-first onboarding contracts;
+2. add `federation_id` to internal-session compatibility mapping;
+3. add a read-only migration preview from every existing deployment mode;
+4. add exhaustive tests;
+5. do not change the current setup UI in CF1;
+6. merge CF1 before creating the parallel benchmark, discovery, and UI-shell branches.

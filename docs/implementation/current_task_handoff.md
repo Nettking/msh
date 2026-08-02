@@ -6,126 +6,129 @@ Last updated: 2026-08-02 Europe/Oslo
 
 - Repository: `Nettking/msh`
 - Default branch: `main`
-- Current development mode: Federation v1 release stabilization with one explicitly approved documentation feature
-- Latest merge: `41934cd3b3907c4847fb788a3fd9f9647e165969` — integrated repository documentation browser
-- Pull request: `#160` — merged
-- Federation release name: **MSH Federation v1.0**
-- Published `v1.0.0` release: not yet created
+- Current planning branch: `agent/capability-first-onboarding-plan`
+- Technical federation baseline: complete through F8.7
+- Latest merged product change: `41934cd3b3907c4847fb788a3fd9f9647e165969` — integrated repository documentation browser
+- Published release tag: not yet created
 
-## Completed technical baseline
+## Completed baseline
 
-The federated implementation is complete through F8.7 and merged to `main`.
+The validated federation implementation includes:
 
-The validated baseline includes:
-
-- authenticated node identity, sessions, membership, ordered events, replay, and revocation;
+- authenticated persistent node identity, membership/session compatibility, ordered events, replay, and revocation;
 - storage primary/replica authority, replication, fencing, completeness-aware failover, and recovery;
 - direct encrypted transport, relay fallback, rendezvous, and resumable verified transfer;
 - multi-provider AI and compute scheduling, durable job ownership, dispatch, retry, cancellation, stale-worker fencing, and artifact authorization;
 - trusted-provider enrollment, expiring health, remote AI binding, compute activation, operator-safe projection, and restart reconciliation;
-- final federation acceptance on Linux and Windows.
+- Linux and Windows federation acceptance.
 
-## Stabilization work completed
+## Stabilization and documentation work completed
 
-### V1-A
+- V1-A audit, scope, closeout, roadmap, and handoff foundation;
+- V1-B cleanup manifest;
+- Graphify generated-output deletion and ignore rule;
+- integrated `/docs` reader in the normal Flask application;
+- manual `/docs` acceptance on the owner's laptop: passed;
+- the standalone Markdown prototype is now superseded and remains only until a separate deletion change.
 
-Established the Federation v1 scope, repository audit, closeout plan, post-v1 roadmap, and stabilization handoff.
+## Product-direction decision
 
-### V1-B
+The repository owner has explicitly replaced role-first setup as the planned product direction.
 
-Commit `6fc2502ed0c39cdcdb5ead59a27c956c9831baf0` created the exact cleanup manifest and deletion-batch ordering.
+New product model:
 
-### V1-C batch 1
+- every installation is one persistent MSH device;
+- a device may contribute several capabilities simultaneously;
+- setup discovers or creates a federation before asking for contributions;
+- MSH inspects the device and runs suitable bounded benchmarks;
+- the user enables any combination of recommended contributions;
+- returning trusted devices reconnect automatically;
+- storage primary/replica, job owner, membership administration, leases, fencing, and artifact grants remain internal authority states rather than device identities.
 
-Commit `5cb2f780c4f6748f0232dd19a4a151010ec8d3f2` removed all tracked `graphify-out/**` content and added `/graphify-out/` to `.gitignore`.
+The internal `session_id` boundary remains for compatibility. The UI uses Federation as the product concept.
 
-## Integrated documentation browser completed
+## Authoritative active plan
 
-The repository owner explicitly promoted the integrated documentation reader from the future roadmap into the current next step.
+- `docs/implementation/capability_first_federation_plan.md`
 
-Merge commit:
+The plan defines:
 
-- `41934cd3b3907c4847fb788a3fd9f9647e165969`
+- discovery, verification, join, reconnect, and local federation creation;
+- device inspection;
+- versioned AI, compute, storage, network, and data-source benchmarks;
+- contribution candidates and contribution intents;
+- legacy deployment-mode migration;
+- Federation information architecture;
+- CF0-CF8 implementation sequence;
+- explicit parallel-agent file ownership and merge ordering;
+- Linux/Windows, migration, security, restart, and end-to-end acceptance.
 
-Implemented behavior:
+## Plans adjusted
 
-- the existing MSH Flask application serves documentation at `/docs` on the normal port `5000`;
-- the browser reads canonical Markdown from the repository root `docs/` directory;
-- it does not run a second Flask server or use the prototype's sample documentation folder;
-- navigation follows the real nested directory structure;
-- the first H1 is used as the display title where available;
-- active files and ancestor folders are marked and expanded;
-- document pages include breadcrumbs and an on-page heading index;
-- tables, fenced code, headings, lists, blockquotes, and admonitions render as HTML;
-- relative links between Markdown files are rewritten to `/docs/...` routes;
-- supported local images are served through a restricted documentation asset route;
-- traversal outside the documentation root is rejected;
-- symlink escapes and arbitrary file serving are not permitted;
-- the interface is responsive and includes a mobile documentation drawer;
-- no external font or CDN is required;
-- documentation remains available while MSH is waiting for its runtime startup choice;
-- `start.cmd` displays `http://localhost:5000/docs` after startup;
-- the normal Docker image includes `/app/docs` because the repository is copied into the image.
+The following documents are aligned with the new direction:
 
-Production files:
+- `docs/roadmap/post_v1_product_roadmap.md`;
+- `docs/implementation/federation_v1_closeout_plan.md`;
+- `docs/releases/federation_v1_scope.md`;
+- this handoff.
 
-- `catalog/flask_app/docs_routes.py`
-- `catalog/flask_app/templates/docs_viewer.html`
-- `catalog/flask_app/static/css/docs.css`
-- `catalog/flask_app/static/js/docs-navigation.js`
-- `catalog/flask_app/tests/test_docs_viewer.py`
+The previous roadmap assumptions about a user choosing one role, manually creating/resuming a technical session, and treating provider approval as the primary setup journey are superseded.
 
-Supporting changes:
+## Parallel-agent strategy
 
-- `catalog/flask_app/app.py` registers the documentation blueprint before the runtime gate;
-- `requirements.txt` includes `Markdown>=3.5,<4`;
-- `start.cmd` reports the documentation URL;
-- the operator-surface workflow permanently runs the documentation and Windows-start regression tests.
+Parallel work begins only after CF1 contracts merge.
 
-## Validation completed
+Wave 1 can use three agents concurrently on disjoint paths:
 
-Operator-surface matrix:
+1. benchmark/inspection engine;
+2. federation discovery and verified-join adapter;
+3. new onboarding/Federation UI templates, CSS, and JavaScript only.
 
-- Ubuntu: 321 tests passed;
-- Windows: 321 tests passed;
-- Flask and affected package compilation: passed on Ubuntu and Windows;
-- Ruff: passed on Ubuntu and Windows;
-- Docker Compose validation: passed on Ubuntu and Windows;
-- diff hygiene: passed on Ubuntu and Windows.
+Wave 2 can use two agents concurrently:
 
-Broader federation matrix:
+1. contribution recommendation/activation service;
+2. safe Federation projections.
 
-- Phase 2/federation Linux job: passed;
-- Phase 2/federation Windows job: passed;
-- direct-peer sidecar checks: passed;
-- federation identity, protocol, relay, storage, and Phase F regressions: passed.
+One later integration agent exclusively owns shared files such as:
 
-Manual browser acceptance on the owner's laptop remains pending.
+- `catalog/flask_app/app.py`;
+- `catalog/flask_app/routes.py`;
+- `catalog/flask_app/server_setup_routes.py`;
+- `catalog/flask_app/services/server_setup_service.py`;
+- `catalog/flask_app/templates/base.html`;
+- `catalog/flask_app/templates/startup.html`;
+- `setup_msh.py`;
+- `.env.example`.
 
-## Prototype decision
-
-`new-stuff/md_viewer/**` remains in the repository temporarily as the original design reference.
-
-Do not delete it until the owner has tested the integrated `/docs` implementation and confirmed that the useful visual and interaction behavior has been retained. After acceptance, compare the integrated implementation against the eight prototype files and delete the prototype only if no unique behavior still needs preservation.
+An independent acceptance agent owns final migration fixtures, CI additions, and end-to-end validation.
 
 ## Current exact action
 
-Perform only the laptop acceptance test:
+Proceed with **CF1 only**:
 
-1. update the local `main` checkout;
-2. rebuild and start the Flask container using the normal Windows startup path;
-3. open `http://localhost:5000/docs`;
-4. verify the real repository documentation tree, document rendering, nested navigation, mobile layout if relevant, and relative links;
-5. record any concrete defect before beginning another cleanup group.
+1. add pure versioned onboarding contracts;
+2. add `federation_id` to internal-session compatibility mapping;
+3. add a read-only migration preview from every existing deployment mode;
+4. prove that migration never silently enables a new contribution;
+5. add malformed-state, serialization, compatibility, and migration tests;
+6. do not change the current setup UI;
+7. merge CF1 before creating the parallel Wave 1 branches.
 
-Do not continue to another deletion group until this manual acceptance result is known.
+## Do not do yet
+
+- do not remove `session_id` from protocols or persistence;
+- do not replace the current setup UI before CF1-CF4 services exist;
+- do not let benchmark success grant authority;
+- do not enable storage or compute contributions automatically during migration;
+- do not let multiple agents edit shared Flask/setup files concurrently;
+- do not delete the old role-first path until CF7 acceptance passes;
+- do not mix unrelated cleanup into CF1.
 
 ## Resume safety
 
 - Safe to resume: yes.
-- Current technical baseline: Federation implementation complete through F8.7.
-- Graphify cleanup: complete.
-- Integrated `/docs`: implemented, merged, and CI validated.
-- Manual laptop acceptance: pending.
-- Standalone Markdown prototype: retained pending acceptance.
-- Next proposed unit after acceptance: decide whether `new-stuff/md_viewer/**` can be deleted.
+- Technical baseline: complete through F8.7.
+- `/docs`: implemented, CI validated, and manually accepted.
+- Capability-first direction: approved and planned.
+- Runtime implementation of capability-first onboarding: not started.
+- Next unit: CF1 contracts and migration preview only.
