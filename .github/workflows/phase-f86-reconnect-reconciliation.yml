@@ -1,0 +1,89 @@
+name: Phase F8.6 reconnect reconciliation
+
+on:
+  pull_request:
+    paths:
+      - "catalog/capabilities/reconciliation.py"
+      - "catalog/capabilities/relay_dispatch.py"
+      - "catalog/capabilities/tests/test_reconciliation.py"
+      - "catalog/ai/remote_provider.py"
+      - "catalog/ai/runtime_manager.py"
+      - "catalog/relay/tests/test_phase_f86_reconciliation.py"
+      - "docs/implementation/phase_f86_plan.md"
+      - ".github/workflows/phase-f86-reconnect-reconciliation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/capabilities/reconciliation.py"
+      - "catalog/capabilities/relay_dispatch.py"
+      - "catalog/capabilities/tests/test_reconciliation.py"
+      - "catalog/ai/remote_provider.py"
+      - "catalog/ai/runtime_manager.py"
+      - "catalog/relay/tests/test_phase_f86_reconciliation.py"
+      - "docs/implementation/phase_f86_plan.md"
+      - ".github/workflows/phase-f86-reconnect-reconciliation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f86-reconciliation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  reconciliation:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile F8.6 boundaries
+        run: >-
+          python -m compileall
+          catalog/capabilities
+          catalog/ai
+          catalog/flask_app
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+          catalog/relay/tests/test_phase_f84_compute_worker_activation.py
+      - name: F8.6 and affected regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/capabilities/tests
+          catalog/ai/tests
+          catalog/relay/tests/test_phase_f74_capability_dispatch.py
+          catalog/relay/tests/test_phase_f75_retry_cancellation.py
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+          catalog/relay/tests/test_phase_f84_compute_worker_activation.py
+          catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/federation/tests/test_phase0.py
+          catalog/federation/tests/test_phase1.py
+          catalog/federation/tests/test_phase2_unit.py
+      - name: Ruff F8.6 boundaries
+        run: >-
+          python -m ruff check
+          catalog/capabilities/reconciliation.py
+          catalog/capabilities/relay_dispatch.py
+          catalog/capabilities/tests/test_reconciliation.py
+          catalog/ai/remote_provider.py
+          catalog/ai/runtime_manager.py
+          --ignore I001,RUF022,B008,C408,PLC0206,UP035
+      - name: Compose validation
+        run: docker compose config --quiet
+      - name: Diff hygiene
+        run: git diff --check origin/main...HEAD
