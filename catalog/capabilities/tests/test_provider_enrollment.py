@@ -255,10 +255,15 @@ def test_approval_is_durable_and_supports_multiple_same_type_providers(
         actor_node_id=owner.identity.node_id,
         capability_type="language-model",
     )
-    assert [record.capability_id for record in eligible] == [
+    assert {record.capability_id for record in eligible} == {
         "language-owner",
         "language-provider",
+    }
+    ordering = [
+        (record.capability_type, record.node_id, record.capability_id)
+        for record in eligible
     ]
+    assert ordering == sorted(ordering)
     assert all(record.revision == 2 for record in eligible)
 
     public_record = eligible[0].to_dict()
