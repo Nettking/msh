@@ -87,6 +87,28 @@ class RelayDispatchEndpoint:
             )
         self.workers[provider_id] = worker
 
+    def unregister_worker(
+        self,
+        provider_id: str,
+        *,
+        expected_worker: Any | None = None,
+    ) -> bool:
+        """Remove one exact local worker without affecting a replacement."""
+
+        if not isinstance(provider_id, str) or not provider_id:
+            raise ValueError("provider_id must be non-empty text")
+        current = self.workers.get(provider_id)
+        if current is None:
+            return False
+        if expected_worker is not None and current is not expected_worker:
+            raise FederationValidationError(
+                "worker-registration-changed",
+                "provider_id",
+                "registered worker differs from the expected activation",
+            )
+        self.workers.pop(provider_id)
+        return True
+
     async def start(self) -> None:
         if self._closed:
             raise RuntimeError("relay dispatch endpoint is closed")
