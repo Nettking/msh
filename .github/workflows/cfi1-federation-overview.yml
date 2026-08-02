@@ -1,0 +1,86 @@
+name: CFI-1 Federation overview
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cfi1-federation-overview.yml"
+      - "catalog/flask_app/app.py"
+      - "catalog/flask_app/federation_routes.py"
+      - "catalog/flask_app/services/federation_projection_service.py"
+      - "catalog/flask_app/templates/federation_overview.html"
+      - "catalog/flask_app/templates/federation/**"
+      - "catalog/flask_app/static/css/federation.css"
+      - "catalog/flask_app/tests/test_federation_overview_route.py"
+      - "catalog/federation/projections/**"
+  push:
+    branches:
+      - main
+      - "agent/cfi1-*"
+    paths:
+      - ".github/workflows/cfi1-federation-overview.yml"
+      - "catalog/flask_app/app.py"
+      - "catalog/flask_app/federation_routes.py"
+      - "catalog/flask_app/services/federation_projection_service.py"
+      - "catalog/flask_app/templates/federation_overview.html"
+      - "catalog/flask_app/templates/federation/**"
+      - "catalog/flask_app/static/css/federation.css"
+      - "catalog/flask_app/tests/test_federation_overview_route.py"
+      - "catalog/federation/projections/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cfi1-federation-overview-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  federation-overview:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile CFI-1 integration
+        run: >-
+          python -m compileall -q
+          catalog/flask_app/federation_routes.py
+          catalog/flask_app/services/federation_projection_service.py
+          catalog/flask_app/tests/test_federation_overview_route.py
+      - name: Run focused and affected tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_federation_overview_route.py
+          catalog/flask_app/tests/test_cf5_ui_shell.py
+          catalog/federation/tests/test_federation_projections.py
+          catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_docs_viewer.py
+      - name: Ruff CFI-1 integration
+        run: >-
+          python -m ruff check
+          catalog/flask_app/app.py
+          catalog/flask_app/federation_routes.py
+          catalog/flask_app/services/federation_projection_service.py
+          catalog/flask_app/tests/test_federation_overview_route.py
+      - name: Diff hygiene
+        shell: bash
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git diff --check "origin/${{ github.base_ref }}...HEAD"
+          else
+            git diff --check HEAD^ HEAD
+          fi
