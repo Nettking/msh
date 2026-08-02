@@ -56,7 +56,7 @@ def _safe_mapping(value: object) -> dict[str, Any]:
         return {}
     try:
         return assert_public_projection(dict(value), "adapter.mapping")
-    except Exception:
+    except Exception:  # noqa: BLE001
         return {}
 
 
