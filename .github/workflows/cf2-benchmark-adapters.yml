@@ -61,7 +61,7 @@ jobs:
           catalog/capabilities/tests/test_benchmarking_adapters.py
       - name: Ruff CF2 adapters
         run: >-
-          python -m ruff check --ignore BLE001,I001
+          python -m ruff check --ignore I001
           catalog/capabilities/benchmarking/adapters
           catalog/capabilities/benchmarking/__init__.py
           catalog/capabilities/tests/test_benchmarking_adapters.py
