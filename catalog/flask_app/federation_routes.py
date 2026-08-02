@@ -7,8 +7,10 @@ from flask import (
     Response,
     current_app,
     make_response,
+    redirect,
     render_template,
     request,
+    url_for,
 )
 
 from catalog.federation.projections import (
@@ -71,6 +73,8 @@ def _serve_read_only_federation_before_runtime_gate() -> Response | None:
 
 @federation_web.get("/federation", strict_slashes=False)
 def overview() -> Response:
+    if request.query_string:
+        return redirect(url_for("federation_web.overview"))
     return _overview_response()
 
 
