@@ -348,6 +348,6 @@ def test_f83_remote_provider_invokes_once_over_authenticated_relay(
             if owner is not None:
                 await owner.disconnect()
             if relay is not None:
-                await relay.close()
+                await relay.stop()
 
     asyncio.run(scenario())
