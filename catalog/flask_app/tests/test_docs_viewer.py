@@ -76,7 +76,7 @@ def test_docs_render_markdown_and_rewrite_local_links(tmp_path: Path) -> None:
     body = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert '<table>' in body
+    assert "<table>" in body
     assert 'class="admonition note"' in body
     assert 'href="/docs/guide/setup.md#install"' in body
     assert 'src="/docs/_assets/images/diagram.png"' in body
@@ -100,9 +100,8 @@ def test_docs_asset_route_is_limited_to_document_images(tmp_path: Path) -> None:
 def test_docs_reject_path_traversal(tmp_path: Path) -> None:
     app = _app(tmp_path)
 
-    with app.test_request_context("/docs"):
-        with pytest.raises(NotFound):
-            _safe_path("../outside.md")
+    with app.test_request_context("/docs"), pytest.raises(NotFound):
+        _safe_path("../outside.md")
 
 
 def test_docs_are_available_before_a_later_runtime_gate(tmp_path: Path) -> None:
