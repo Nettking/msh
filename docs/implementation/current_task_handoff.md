@@ -8,7 +8,7 @@ Last updated: 2026-08-02 Europe/Oslo
 - Default branch: `main`
 - Current development mode: Federation v1 release stabilization
 - Runtime feature expansion: frozen until v1 closeout or separate owner approval
-- Latest planning commit at this checkpoint: `48d0f52aa1000a50e0ccc0f78e00708ace8bc64b`
+- Latest planning commit at this checkpoint: `6fc2502ed0c39cdcdb5ead59a27c956c9831baf0`
 
 ## Completed technical baseline
 
@@ -23,7 +23,7 @@ The validated baseline includes:
 - explicit trusted-provider enrollment, expiring health, remote AI binding, compute activation, operator-safe projection, and restart reconciliation;
 - final F8 closeout acceptance on Linux and Windows.
 
-The implementation is now named **MSH Federation v1.0** for release-stabilization purposes. The `v1.0.0` release has not yet been published.
+The implementation is named **MSH Federation v1.0** for release-stabilization purposes. The `v1.0.0` release has not yet been published.
 
 ## Current objective
 
@@ -31,84 +31,124 @@ Complete the repository, documentation, product, and release cleanup required fo
 
 Do not start additional federation features during this work.
 
-## V1-A completed
-
-The following planning documents are now canonical:
+## Canonical stabilization documents
 
 - `docs/releases/federation_v1_scope.md`
 - `docs/implementation/federation_v1_repository_audit.md`
 - `docs/implementation/federation_v1_closeout_plan.md`
+- `docs/implementation/federation_v1_cleanup_manifest.md`
 - `docs/roadmap/post_v1_product_roadmap.md`
 
-The roadmap explicitly preserves future work for:
+The roadmap preserves future work for integrated `/docs`, canonical user documentation, guided Federation UI, device/provider/storage/activity/troubleshooting pages, and later federation expansion.
 
-- integrated documentation at `/docs` inside the existing Flask application;
-- canonical user documentation structure;
-- guided Federation UI;
-- device, provider, storage, activity, and troubleshooting pages;
-- later observability, network-operation, scheduling, organization, and less-trusted-provider phases.
+## V1-A completed
 
-The prototype under `new-stuff/md_viewer/` is therefore no longer the only record of the intended documentation reader behavior.
+V1-A established the v1 scope, repository audit, closeout plan, future roadmap, and current stabilization handoff.
 
-## Audit findings requiring follow-up
+No runtime behavior or existing path was removed.
 
-High-confidence cleanup candidates after final dependency verification:
+## V1-B completed
 
-- generated `graphify-out/` reports, manifests, and cache;
-- the standalone `new-stuff/md_viewer/` prototype after its requirements were preserved in the roadmap;
-- other unclassified files under `new-stuff/` after individual review;
-- the stale phase-era handoffs and superseded implementation plans after historical decisions are separated.
+Commit:
 
-Verify-before-deletion candidates:
+- `6fc2502ed0c39cdcdb5ead59a27c956c9831baf0` — exact cleanup manifest and deletion-batch ordering.
 
-- `catalog/webapp/`, which appears to duplicate the supported `catalog/flask_app/` surface;
-- `legacy/`, because AI grounding and documentation still mention it;
-- deprecated, manual, deep, and legacy runner scripts;
-- old phase workflows that may still provide unique regression coverage.
+The manifest records path classification, dependency evidence, replacement or migration, required tests, and decision for:
 
-No runtime file, existing documentation file, branch, workflow, or generated directory has been deleted during V1-A.
+- generated `graphify-out/` files and cache;
+- all identified `new-stuff/` experiment families;
+- the archived `catalog/webapp/` Streamlit workspace;
+- `legacy/` and ambiguous top-level `git/` markers;
+- automatic, manual, deep, hidden, and legacy runner scripts;
+- stale implementation plans and handoffs;
+- durable closeouts, contracts, runbooks, and technical decisions;
+- phase-specific GitHub Actions workflows.
 
-## Important safety decisions
+No file, directory, workflow, branch, runtime source, dependency, setup path, or Compose configuration was deleted or changed during V1-B.
+
+## Confirmed cleanup decisions
+
+### Ready for the first deletion change
+
+`graphify-out/**` is generated analysis output with no supported runtime role.
+
+The first recommended deletion batch is limited to:
+
+1. delete every tracked path under `graphify-out/**`;
+2. add `/graphify-out/` to `.gitignore`;
+3. remove only references that incorrectly treat generated reports as canonical documentation.
+
+### Strong later deletion candidate
+
+`catalog/webapp/**` is explicitly archived, outside the default runtime/dependency/operator path, and replaced by `catalog/flask_app/`.
+
+It must still receive a dedicated deletion change with import, launcher, Compose, Flask-regression, documentation, and AI-index checks.
+
+### Preserved future UI and docs work
+
+`new-stuff/md_viewer/**` is a standalone prototype, not the production architecture. Its intended `/docs` and guided-UI behavior is preserved in `docs/roadmap/post_v1_product_roadmap.md` for V1.1.
+
+The prototype can be removed later without losing the approved product direction.
+
+### Experiments requiring owner preservation decision
+
+The remaining `new-stuff/` image, Windows desktop, walkthrough, and goal-agent experiments are not Federation v1 product code. Before deletion, decide whether the useful code should be exported to a separate experiments repository.
+
+`new-stuff/step2.py` also requires comparison with normal Flask tests so unique walkthrough expectations are not lost.
+
+### Runner scripts
+
+The following are intentionally supported and must not be deleted merely because they are manual or deep:
+
+- `data_pr_day`;
+- `find_stops`;
+- `data_analysis`;
+- `ml_analysis`.
+
+`corrolation_machine_pairs` is the current runner-visible legacy deletion candidate and needs a focused usage check.
+
+### Historical documentation
+
+Completed plans and handoffs should be consolidated and removed only after unique durable decisions are mapped to closeouts, contracts, runbooks, or v1 reference documentation.
+
+F6, F7, and F8 closeouts remain durable release evidence and should be archived rather than deleted.
+
+### Workflows
+
+Phase workflows remain in place. A permanent v1 validation workflow may replace them only after exact test, OS, service, Ruff, Compose, and diff-hygiene coverage is mapped and proven equivalent.
+
+## Safety decisions
 
 - Never remove a candidate based only on its name or age.
-- Check imports, dynamic discovery, setup, Compose, launch commands, tests, documentation links, AI indexing, and workflow references.
-- Preserve final closeout and durable authority/security decisions as historical evidence.
-- Do not weaken storage, provider, scheduling, artifact, or identity authority separation.
+- Every deletion change must attach an exact tracked-file inventory and reference search.
+- Preserve authority, fencing, recovery, scheduling, artifact, and identity boundaries.
 - Do not delete implementation branches without separate explicit owner approval.
 - Do not tag `v1.0.0` before exact release acceptance.
-- Do not pull post-v1 UI or documentation implementation into the cleanup phase without explicit approval.
-
-## Current changes
-
-Documentation-only commits on `main`:
-
-- `7751ccaf8330f37b9fb5920c145e20242b504c3b` — temporary audit placeholder created during connector publishing;
-- `c2f70269804cef03a9271b266d40c9a4b9ed6dbf` — immediately replaced the placeholder with the complete audit;
-- `6abe2be72c57c0bebd7d7ec222de14d69a4e8b44` — Federation v1 scope;
-- `f6a29d70207b80dffbda5d4db248f7cbbf06f29e` — Federation v1 closeout plan;
-- `48d0f52aa1000a50e0ccc0f78e00708ace8bc64b` — post-v1 product roadmap.
-
-No executable source or test behavior changed.
+- Do not implement post-v1 UI or documentation features during cleanup unless separately approved.
+- Workflow consolidation must not reduce validation coverage merely to reduce file count.
 
 ## Validation
 
-This checkpoint changes Markdown documentation only. Runtime tests were not rerun for V1-A because no executable, dependency, setup, Compose, workflow, or runtime configuration file changed.
+V1-B changed Markdown documentation only.
 
-The later cleanup changes must run the checks specified in `federation_v1_repository_audit.md` and `federation_v1_closeout_plan.md`.
+Runtime tests were not rerun because no executable source, dependency, setup, Compose, workflow, or runtime configuration changed.
+
+Repository evidence was checked through current files, commit history, code search, archived-module declarations, root requirements, AI indexing behavior, script catalog classification, and workflow inventory.
 
 ## Next exact action
 
-Proceed with **V1-B: exact path-level cleanup manifest** only.
+Request owner approval for **V1-C cleanup batch 1 only**:
 
-1. Inventory every file under `graphify-out/`, `new-stuff/`, `catalog/webapp/`, and `legacy/`.
-2. Inventory stale implementation plans, handoffs, and phase workflows.
-3. For each proposed deletion or relocation, record dependency evidence, replacement/migration, required tests, and decision.
-4. Present the first deletion batch for owner review.
-5. Do not delete anything during the manifest step.
+- remove tracked `graphify-out/**`;
+- add `/graphify-out/` to `.gitignore`;
+- run the low-risk reference and smoke validation documented in the cleanup manifest;
+- do not touch `new-stuff/`, `catalog/webapp/`, old plans, workflows, branches, or runtime code in that batch.
 
 ## Resume safety
 
 - Safe to resume: yes.
 - Current technical baseline: Federation implementation complete through F8.7.
 - Current work boundary: release stabilization and cleanup only.
-- Next authorized unit: V1-B manifest, no deletions.
+- V1-A: complete.
+- V1-B: complete.
+- Next proposed unit: V1-C batch 1, pending explicit approval.
