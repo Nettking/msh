@@ -1,0 +1,87 @@
+name: Phase F8.3 trusted remote AI binding
+
+on:
+  pull_request:
+    paths:
+      - "catalog/ai/**"
+      - "catalog/capabilities/provider_enrollment.py"
+      - "catalog/capabilities/provider_health.py"
+      - "catalog/capabilities/provider_reports.py"
+      - "catalog/capabilities/provider_selection.py"
+      - "catalog/relay/tests/test_phase_f83_remote_ai_binding.py"
+      - "docs/implementation/phase_f8_plan.md"
+      - ".github/workflows/phase-f83-remote-ai-binding.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/ai/**"
+      - "catalog/capabilities/provider_enrollment.py"
+      - "catalog/capabilities/provider_health.py"
+      - "catalog/capabilities/provider_reports.py"
+      - "catalog/capabilities/provider_selection.py"
+      - "catalog/relay/tests/test_phase_f83_remote_ai_binding.py"
+      - "docs/implementation/phase_f8_plan.md"
+      - ".github/workflows/phase-f83-remote-ai-binding.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f83-remote-ai-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  remote-ai:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile F8.3 boundaries
+        run: >-
+          python -m compileall
+          catalog/ai
+          catalog/capabilities/provider_enrollment.py
+          catalog/capabilities/provider_health.py
+          catalog/capabilities/provider_reports.py
+          catalog/capabilities/provider_selection.py
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+      - name: F8.3 and affected regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/ai/tests
+          catalog/flask_app/tests/test_ai_explainer_chat.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/flask_app/tests/test_model_provider_compose.py
+          catalog/capabilities/tests
+          catalog/relay/tests/test_phase_f74_capability_dispatch.py
+          catalog/relay/tests/test_phase_f75_retry_cancellation.py
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+          catalog/federation/tests/test_phase0.py
+          catalog/federation/tests/test_phase1.py
+          catalog/federation/tests/test_phase2_unit.py
+      - name: Ruff F8.3 boundaries
+        run: >-
+          python -m ruff check
+          catalog/ai
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+          --ignore I001,RUF022,B008,C408,PLC0206,UP035
+      - name: Compose validation
+        run: docker compose config --quiet
+      - name: Diff hygiene
+        run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD

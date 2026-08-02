@@ -1,6 +1,33 @@
-"""Read-only AI explainer and logical language-model runtime helpers."""
+"""Read-only AI explainer, local runtime, and trusted remote model helpers."""
 
+from .federated_runtime import TrustedFederatedLanguageModelRuntime
 from .ollama_provider import OllamaLanguageModelProvider, logical_provider_id
+from .relay_remote import (
+    RELAY_REMOTE_AI_KIND,
+    BlockingRelayAIInvocationTransport,
+    RelayRemoteAIEndpoint,
+    RemoteAIProviderHost,
+)
+from .remote_contracts import (
+    MAX_REMOTE_AI_CONTROL_MESSAGE_BYTES,
+    MAX_REMOTE_AI_INVOCATION_TTL_SECONDS,
+    REMOTE_AI_PROTOCOL,
+    REMOTE_AI_PROTOCOL_MAJOR,
+    REMOTE_AI_PROTOCOL_VERSION,
+    REMOTE_AI_REQUEST_SCHEMA,
+    REMOTE_AI_RESPONSE_SCHEMA,
+    RemoteAIInvocationOutcome,
+    RemoteAIInvocationRequest,
+    RemoteAIInvocationResponse,
+    validate_remote_ai_protocol,
+)
+from .remote_provider import (
+    RemoteAIHealthAuthority,
+    RemoteAIInvocationTransport,
+    RemoteLanguageModelProvider,
+    RemoteLanguageModelSnapshot,
+    TrustedRemoteLanguageModelBinder,
+)
 from .runtime import (
     AIProviderInvocationError,
     AIRuntimePolicy,
@@ -45,12 +72,33 @@ __all__ = [
     "AIRuntimeRequest",
     "AIRuntimeResult",
     "AISelectionStatus",
+    "BlockingRelayAIInvocationTransport",
     "ConfiguredLanguageModelRuntimeManager",
     "LANGUAGE_MODEL_CAPABILITY",
     "LANGUAGE_MODEL_PROTOCOL",
     "LANGUAGE_MODEL_PROTOCOL_VERSION",
     "LanguageModelProvider",
     "LanguageModelRuntime",
+    "MAX_REMOTE_AI_CONTROL_MESSAGE_BYTES",
+    "MAX_REMOTE_AI_INVOCATION_TTL_SECONDS",
     "OllamaLanguageModelProvider",
+    "RELAY_REMOTE_AI_KIND",
+    "REMOTE_AI_PROTOCOL",
+    "REMOTE_AI_PROTOCOL_MAJOR",
+    "REMOTE_AI_PROTOCOL_VERSION",
+    "REMOTE_AI_REQUEST_SCHEMA",
+    "REMOTE_AI_RESPONSE_SCHEMA",
+    "RelayRemoteAIEndpoint",
+    "RemoteAIHealthAuthority",
+    "RemoteAIInvocationOutcome",
+    "RemoteAIInvocationRequest",
+    "RemoteAIInvocationResponse",
+    "RemoteAIInvocationTransport",
+    "RemoteAIProviderHost",
+    "RemoteLanguageModelProvider",
+    "RemoteLanguageModelSnapshot",
+    "TrustedFederatedLanguageModelRuntime",
+    "TrustedRemoteLanguageModelBinder",
     "logical_provider_id",
+    "validate_remote_ai_protocol",
 ]
