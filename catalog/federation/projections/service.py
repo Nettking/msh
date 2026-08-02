@@ -5,10 +5,7 @@ from __future__ import annotations
 from .detail_pages import DetailProjectionMixin
 from .models import FederationPage, FederationViewModel
 from .overview_page import OverviewProjectionMixin
-from .service_core import (
-    FederationProjectionCore,
-    ProjectionAdapters as ProjectionAdapters,
-)
+from .service_core import FederationProjectionCore, ProjectionAdapters
 
 
 class FederationProjectionService(
