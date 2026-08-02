@@ -20,7 +20,6 @@ from catalog.federation.onboarding_models import (
 from ..inspection import InspectionContext, InspectionFinding
 from ..runner import BenchmarkExecutionContext, BenchmarkObservation
 from .common import (
-    MAX_ADAPTER_TARGETS,
     MAX_PROBE_PAYLOAD_BYTES,
     MAX_PROBE_RESPONSE_BYTES,
     bounded_positive_int,
@@ -33,6 +32,7 @@ from .common import (
 
 OLLAMA_BENCHMARK_ID = "benchmark.ai.ollama-inference.v1"
 OLLAMA_PREREQUISITE = "ollama-model-available"
+MAX_OLLAMA_TARGETS = 8
 
 JsonRequester = Callable[
     [str, str, Mapping[str, Any] | None, float, int], Mapping[str, Any]
@@ -198,7 +198,7 @@ class OllamaBenchmarkAdapter:
         trusted_host_predicate: HostPredicate | None = None,
         monotonic: Callable[[], float] = time.monotonic,
     ) -> None:
-        if not targets or len(targets) > MAX_ADAPTER_TARGETS:
+        if not targets or len(targets) > MAX_OLLAMA_TARGETS:
             raise ValueError("Ollama targets must be explicitly bounded")
         predicate = trusted_host_predicate or _loopback_host
         by_id: dict[str, OllamaProbeTarget] = {}
@@ -236,17 +236,21 @@ class OllamaBenchmarkAdapter:
                     target.max_response_bytes,
                 )
                 models = tags.get("models", ())
-                names = {
-                    item.get("name") or item.get("model")
-                    for item in models
-                    if isinstance(item, Mapping)
-                } if isinstance(models, Sequence) else set()
+                names = (
+                    {
+                        item.get("name") or item.get("model")
+                        for item in models
+                        if isinstance(item, Mapping)
+                    }
+                    if isinstance(models, Sequence)
+                    else set()
+                )
                 detected.append(target.service_id)
                 if target.model in names:
                     available = True
                 else:
                     warnings.append("A configured Ollama model is not currently available")
-            except Exception:
+            except Exception:  # noqa: BLE001 - probe failures become safe evidence
                 warnings.append("A trusted local Ollama target could not be inspected")
         prerequisites = (OLLAMA_PREREQUISITE,) if available else ()
         recommended = (self.definition.benchmark_id,) if available else ()
@@ -297,7 +301,7 @@ class OllamaBenchmarkAdapter:
                 timeout,
                 target.max_response_bytes,
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - inference failures become safe evidence
             return BenchmarkObservation(
                 state=BenchmarkState.FAILED,
                 recommendation=BenchmarkRecommendation.NOT_RECOMMENDED,
