@@ -52,7 +52,7 @@ def _safe_failure_result(
     reason: str,
 ) -> FederationDiscoveryResult:
     digest = hashlib.sha256(
-        f"msh-onboarding-source-failure-v1\0{source_index}".encode("utf-8")
+        f"msh-onboarding-source-failure-v1\0{source_index}".encode()
     ).hexdigest()
     return FederationDiscoveryResult(
         discovery_id=f"discovery-unavailable-{digest[:24]}",
@@ -176,7 +176,7 @@ class FederationOnboardingDiscoveryService:
                 )
                 self._blocked_local_creation = True
                 continue
-            except Exception:
+            except Exception:  # noqa: BLE001 - sources are an untrusted boundary
                 failures.append(
                     _safe_failure_result(
                         source_index=source_index,
@@ -302,7 +302,7 @@ class FederationOnboardingDiscoveryService:
             and record.candidate.auto_accept_authorized
         )
         if verification_required and (
-            verification_code is None
+            not isinstance(verification_code, str)
             or not hmac.compare_digest(
                 verification_code,
                 record.result.verification_code,
