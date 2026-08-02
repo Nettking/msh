@@ -352,7 +352,7 @@ class RemoteAIProviderHost:
                 retryable=exc.retryable,
                 completed_at=self._clock(),
             )
-        except Exception:
+        except Exception:  # noqa: BLE001 - isolate provider plugin
             return RemoteAIInvocationResponse.failed(
                 request,
                 error_code="provider-internal-error",
@@ -542,7 +542,7 @@ class RelayRemoteAIEndpoint:
                     task.add_done_callback(self._finish_handler)
         except asyncio.CancelledError:
             raise
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - isolate relay reader
             for pending in tuple(self._pending.values()):
                 if not pending.future.done():
                     pending.future.set_exception(exc)
@@ -558,7 +558,7 @@ class RelayRemoteAIEndpoint:
             return
         try:
             response = RemoteAIInvocationResponse.from_json(frame)
-        except Exception as exc:
+        except FederationValidationError as exc:
             for pending in tuple(self._pending.values()):
                 if not pending.future.done():
                     pending.future.set_exception(exc)
@@ -612,7 +612,7 @@ class RelayRemoteAIEndpoint:
             return
         try:
             request = RemoteAIInvocationRequest.from_json(frame)
-        except Exception:
+        except FederationValidationError:
             return
         actor = getattr(message, "actor_node_id", None)
         session = getattr(message, "session_id", None)
