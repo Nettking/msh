@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Callable
 
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import AuthenticationError, FederationOperationError
