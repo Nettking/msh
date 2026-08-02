@@ -344,9 +344,9 @@ def test_f83_remote_provider_invokes_once_over_authenticated_relay(
                     return_exceptions=True,
                 )
             if provider_node is not None:
-                await provider_node.close()
+                await provider_node.disconnect()
             if owner is not None:
-                await owner.close()
+                await owner.disconnect()
             if relay is not None:
                 await relay.close()
 
