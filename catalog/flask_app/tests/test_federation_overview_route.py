@@ -323,7 +323,8 @@ def test_authorized_composition_uses_only_server_bound_context() -> None:
 
     response = app.test_client().get(
         "/federation?session_id=session-attacker&actor_node_id=node-attacker"
-        "&include_technical=1"
+        "&include_technical=1",
+        follow_redirects=True,
     )
     page = response.get_data(as_text=True)
 
