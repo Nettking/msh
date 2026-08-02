@@ -115,6 +115,7 @@ class RemoteAIHealthAuthority:
         capability_id: str,
         *,
         provider_generation: int | None = None,
+        report_revision: int | None = None,
     ) -> ProviderHealthRecord:
         capability_id = _logical_id(capability_id, "capability_id")
         observation = self.health.observe(
@@ -149,6 +150,16 @@ class RemoteAIHealthAuthority:
                 "provider_generation",
                 "must be a positive integer",
             )
+        if report_revision is not None and (
+            isinstance(report_revision, bool)
+            or not isinstance(report_revision, int)
+            or report_revision < 0
+        ):
+            raise FederationValidationError(
+                "invalid-report-revision",
+                "report_revision",
+                "must be a non-negative integer",
+            )
         if (
             provider_generation is not None
             and record.provider_generation != provider_generation
@@ -157,6 +168,12 @@ class RemoteAIHealthAuthority:
                 "remote-provider-generation-mismatch",
                 "remote adapter generation is not the current provider generation",
                 "provider_generation",
+            )
+        if report_revision is not None and record.report_revision != report_revision:
+            raise FederationOperationError(
+                "remote-provider-report-revision-mismatch",
+                "remote adapter report revision is no longer current",
+                "report_revision",
             )
         report = record.report
         if report.capability_type != LANGUAGE_MODEL_CAPABILITY:
@@ -184,10 +201,12 @@ class RemoteAIHealthAuthority:
         capability_id: str,
         *,
         provider_generation: int | None = None,
+        report_revision: int | None = None,
     ) -> RemoteLanguageModelSnapshot:
         record = self.current_record(
             capability_id,
             provider_generation=provider_generation,
+            report_revision=report_revision,
         )
         attributes = record.report.attributes
         models_value = attributes.get("models")
@@ -278,7 +297,12 @@ class RemoteLanguageModelProvider:
                 "must be a positive integer",
             )
         self._provider_generation = provider_generation
-        initial = self._snapshot()
+        initial = self._authority.current_snapshot(
+            self._capability_id,
+            provider_generation=self._provider_generation,
+        )
+        self._health_report_revision = initial.record.report_revision
+        self._enrollment_revision = initial.record.enrollment_revision
         self._node_id = initial.record.node_id
         self._session_id = initial.record.session_id
         self._protocol = initial.report.protocol
@@ -289,8 +313,15 @@ class RemoteLanguageModelProvider:
         snapshot = self._authority.current_snapshot(
             self._capability_id,
             provider_generation=self._provider_generation,
+            report_revision=self._health_report_revision,
         )
-        if hasattr(self, "_node_id") and snapshot.record.node_id != self._node_id:
+        if snapshot.record.enrollment_revision != self._enrollment_revision:
+            raise FederationOperationError(
+                "remote-provider-enrollment-revision-mismatch",
+                "remote adapter enrollment revision is no longer current",
+                "enrollment_revision",
+            )
+        if snapshot.record.node_id != self._node_id:
             raise FederationOperationError(
                 "remote-provider-node-changed",
                 "provider identity moved to another node",
@@ -305,6 +336,14 @@ class RemoteLanguageModelProvider:
     @property
     def provider_generation(self) -> int:
         return self._provider_generation
+
+    @property
+    def health_report_revision(self) -> int:
+        return self._health_report_revision
+
+    @property
+    def enrollment_revision(self) -> int:
+        return self._enrollment_revision
 
     @property
     def node_id(self) -> str:
