@@ -73,7 +73,7 @@ class AIContributionAdapter:
         manager: Any,
         *,
         provider_factory: Callable[[ContributionCandidate], Any],
-    ) -> "AIContributionAdapter":
+    ) -> AIContributionAdapter:
         def enable(candidate: ContributionCandidate) -> None:
             provider_id = cls._provider_id(candidate)
             if provider_id in manager.additional_provider_ids():
