@@ -1,0 +1,56 @@
+{% from 'federation/_status_badge.html' import status_badge %}
+{% macro contribution_card(contribution, interactive=False) -%}
+<article
+  class="contribution-card contribution-card--{{ contribution.recommendation|default('available') }}{% if contribution.policy_state == 'blocked' %} is-blocked{% endif %}"
+  data-contribution-card="{{ contribution.candidate_id }}"
+>
+  <header class="contribution-card__header">
+    <div>
+      <span class="contribution-card__type">{{ contribution.type_label }}</span>
+      <h3>{{ contribution.label }}</h3>
+    </div>
+    {{ status_badge(contribution.recommendation, contribution.recommendation_label) }}
+  </header>
+  <p>{{ contribution.description }}</p>
+
+  {% if contribution.capacity %}
+  <dl class="contribution-card__facts">
+    {% for fact in contribution.capacity %}
+    <div><dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd></div>
+    {% endfor %}
+  </dl>
+  {% endif %}
+
+  {% if contribution.missing_prerequisites %}
+  <div class="contribution-card__notice" role="note">
+    <strong>Before this can be enabled</strong>
+    <ul>
+      {% for prerequisite in contribution.missing_prerequisites %}<li>{{ prerequisite }}</li>{% endfor %}
+    </ul>
+  </div>
+  {% endif %}
+
+  {% if interactive %}
+  <fieldset class="contribution-choice"{% if contribution.policy_state == 'blocked' %} disabled{% endif %}>
+    <legend>Contribution choice</legend>
+    {% for choice in contribution.choices %}
+    <label>
+      <input
+        type="radio"
+        name="{{ contribution.input_name }}"
+        value="{{ choice.value }}"
+        data-contribution-choice
+        {% if choice.value == contribution.desired_state %}checked{% endif %}
+      >
+      <span><strong>{{ choice.label }}</strong><small>{{ choice.description }}</small></span>
+    </label>
+    {% endfor %}
+  </fieldset>
+  {% else %}
+  <footer class="contribution-card__footer">
+    {{ status_badge(contribution.activation_state, contribution.activation_label) }}
+    {% if contribution.detail_url %}<a href="{{ contribution.detail_url }}">View details</a>{% endif %}
+  </footer>
+  {% endif %}
+</article>
+{%- endmacro %}

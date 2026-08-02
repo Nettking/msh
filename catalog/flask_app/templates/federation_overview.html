@@ -1,0 +1,125 @@
+{% extends 'base.html' %}
+{% from 'federation/_status_badge.html' import status_badge %}
+{% from 'federation/_section_nav.html' import section_nav %}
+{% from 'federation/_empty_state.html' import empty_state %}
+{% from 'federation/_contribution_card.html' import contribution_card %}
+{% block body %}
+{% set vm = federation_overview if federation_overview is defined else view_model %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/federation.css') }}">
+
+<section class="federation-shell">
+  <header class="federation-hero">
+    <div>
+      <span class="federation-eyebrow">Federation</span>
+      <h2>{{ vm.title }}</h2>
+      <p>{{ vm.intro }}</p>
+    </div>
+    <div class="federation-hero__state">
+      {{ status_badge(vm.state, vm.state_label, True) }}
+      <span>{{ vm.updated_label }}</span>
+    </div>
+  </header>
+
+  {{ section_nav(vm.sections, vm.active_section) }}
+
+  {% if vm.degraded.visible %}
+  <section class="federation-degraded" role="alert">
+    <div><span class="federation-eyebrow">Needs attention</span><h3>{{ vm.degraded.title }}</h3><p>{{ vm.degraded.message }}</p></div>
+    <a class="federation-button federation-button--primary" href="{{ vm.degraded.action.url }}">{{ vm.degraded.action.label }}</a>
+  </section>
+  {% endif %}
+
+  {% if vm.recommended_action %}
+  <section class="recommended-action">
+    <div><span class="federation-eyebrow">Recommended next action</span><h3>{{ vm.recommended_action.title }}</h3><p>{{ vm.recommended_action.message }}</p></div>
+    <a class="federation-button federation-button--primary" href="{{ vm.recommended_action.url }}">{{ vm.recommended_action.label }}</a>
+  </section>
+  {% endif %}
+
+  <div class="federation-summary-grid">
+    {% for card in vm.summary_cards %}
+    <article class="federation-summary-card">
+      <span>{{ card.label }}</span>
+      <strong>{{ card.value }}</strong>
+      <p>{{ card.detail }}</p>
+      {% if card.state %}{{ status_badge(card.state, card.state_label) }}{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+
+  <div class="federation-dashboard-grid">
+    <section class="federation-panel federation-panel--device">
+      <header class="federation-panel__header">
+        <div><span class="federation-eyebrow">This device</span><h3>{{ vm.device.label }}</h3><p>{{ vm.device.summary }}</p></div>
+        {{ status_badge(vm.device.state, vm.device.state_label) }}
+      </header>
+      <dl class="federation-detail-list">
+        {% for detail in vm.device.details %}<div><dt>{{ detail.label }}</dt><dd>{{ detail.value }}</dd></div>{% endfor %}
+      </dl>
+      <a class="federation-text-link" href="{{ vm.device.detail_url }}">Open this device</a>
+    </section>
+
+    <section class="federation-panel federation-panel--benchmarks">
+      <header class="federation-panel__header">
+        <div><span class="federation-eyebrow">Benchmarks</span><h3>{{ vm.benchmarks.title }}</h3><p>{{ vm.benchmarks.summary }}</p></div>
+        {{ status_badge(vm.benchmarks.state, vm.benchmarks.state_label) }}
+      </header>
+      {% if vm.benchmarks['items'] %}
+      <ul class="benchmark-overview-list">
+        {% for benchmark in vm.benchmarks['items'] %}
+        <li><div><strong>{{ benchmark.label }}</strong><span>{{ benchmark.detail }}</span></div>{{ status_badge(benchmark.state, benchmark.state_label) }}</li>
+        {% endfor %}
+      </ul>
+      {% else %}
+        {{ empty_state('No benchmark results yet', 'Run recommended checks to see suitability and freshness here.', vm.benchmarks.empty_action, 'information') }}
+      {% endif %}
+      <a class="federation-text-link" href="{{ vm.benchmarks.detail_url }}">Open benchmarks</a>
+    </section>
+  </div>
+
+  <section class="federation-panel">
+    <header class="federation-panel__header">
+      <div><span class="federation-eyebrow">Contributions</span><h3>Services from this device</h3><p>Capability choices are independent and can be changed without removing the device.</p></div>
+      <a class="federation-text-link" href="{{ vm.services_url }}">Manage services</a>
+    </header>
+    {% if vm.contributions %}
+    <div class="contribution-grid contribution-grid--overview">
+      {% for contribution in vm.contributions %}{{ contribution_card(contribution, False) }}{% endfor %}
+    </div>
+    {% else %}
+      {{ empty_state('No active contributions', 'This device is connected but is not currently contributing a service.', vm.empty_contributions_action, 'information') }}
+    {% endif %}
+  </section>
+
+  <div class="federation-dashboard-grid federation-dashboard-grid--lower">
+    <section class="federation-panel">
+      <header class="federation-panel__header"><div><span class="federation-eyebrow">Devices</span><h3>{{ vm.devices.title }}</h3><p>{{ vm.devices.summary }}</p></div><a class="federation-text-link" href="{{ vm.devices.detail_url }}">View all</a></header>
+      {% if vm.devices['items'] %}
+      <ul class="federation-entity-list">
+        {% for device in vm.devices['items'] %}<li><div><strong>{{ device.label }}</strong><span>{{ device.detail }}</span></div>{{ status_badge(device.state, device.state_label) }}</li>{% endfor %}
+      </ul>
+      {% else %}<p class="federation-muted">No other trusted device is connected.</p>{% endif %}
+    </section>
+
+    <section class="federation-panel">
+      <header class="federation-panel__header"><div><span class="federation-eyebrow">Activity</span><h3>Recent changes</h3><p>Safe operational events from this federation.</p></div><a class="federation-text-link" href="{{ vm.activity.detail_url }}">View activity</a></header>
+      {% if vm.activity['items'] %}
+      <ol class="federation-activity-list">
+        {% for event in vm.activity['items'] %}<li><span class="federation-activity-list__time">{{ event.time_label }}</span><div><strong>{{ event.title }}</strong><p>{{ event.message }}</p></div></li>{% endfor %}
+      </ol>
+      {% else %}<p class="federation-muted">No recent activity is available.</p>{% endif %}
+    </section>
+  </div>
+
+  <details class="federation-technical-details">
+    <summary>Show technical details</summary>
+    <dl>{% for detail in vm.technical_details %}<div><dt>{{ detail.label }}</dt><dd><code>{{ detail.value }}</code></dd></div>{% endfor %}</dl>
+    <p>Private addresses, credentials, and local provider configuration are intentionally not displayed.</p>
+  </details>
+
+  <footer class="federation-footer-help">
+    <span>Need help understanding this page?</span>
+    <a href="{{ vm.docs_url }}">Open Federation documentation</a>
+  </footer>
+</section>
+{% endblock %}

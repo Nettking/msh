@@ -1,0 +1,25 @@
+      <section class="onboarding-panel" data-step-panel="identity" aria-labelledby="identity-heading">
+        <header class="onboarding-panel__header">
+          <div>
+            <span class="onboarding-panel__step">Step 1 of 6</span>
+            <h3 id="identity-heading">Identify this device</h3>
+            <p>MSH uses one stable identity for this installation so it can reconnect safely later.</p>
+          </div>
+          {{ status_badge(vm.device.identity_state, vm.device.identity_state_label) }}
+        </header>
+
+        <div class="identity-card">
+          <div class="identity-card__mark" aria-hidden="true">MSH</div>
+          <div>
+            <span>Device name</span>
+            <strong>{{ vm.device.label }}</strong>
+            <code>{{ vm.device.id }}</code>
+          </div>
+        </div>
+
+        {% if vm.device.notice %}<p class="federation-notice">{{ vm.device.notice }}</p>{% endif %}
+        <div class="onboarding-actions">
+          <span></span>
+          <button class="federation-button federation-button--primary" type="button" data-next-step>Continue to federation</button>
+        </div>
+      </section>

@@ -1,0 +1,21 @@
+      <section class="onboarding-panel" data-step-panel="contributions" aria-labelledby="contributions-heading">
+        <header class="onboarding-panel__header">
+          <div>
+            <span class="onboarding-panel__step">Step 5 of 6</span>
+            <h3 id="contributions-heading">Choose what this device contributes</h3>
+            <p>Enable any suitable combination. Each choice is independent and can be changed later.</p>
+          </div>
+          <span class="federation-selection-count" data-selection-count aria-live="polite"></span>
+        </header>
+
+        <form method="post" action="{{ vm.actions.contributions_url }}" data-contribution-form>
+          {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+          <div class="contribution-grid">
+            {% for contribution in vm.contributions %}{{ contribution_card(contribution, True) }}{% endfor %}
+          </div>
+          <div class="onboarding-actions">
+            <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
+            <button class="federation-button federation-button--primary" type="submit">Save contribution choices</button>
+          </div>
+        </form>
+      </section>
