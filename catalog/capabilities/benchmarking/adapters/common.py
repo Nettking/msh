@@ -52,7 +52,7 @@ def bounded_positive_int(
 
 def bounded_seconds(value: object, field: str, *, maximum: float) -> float:
     if isinstance(value, bool):
-        raise ValueError(f"{field} must be a positive number")
+        raise TypeError(f"{field} must be a positive number")
     try:
         result = float(value)
     except (TypeError, ValueError) as exc:
