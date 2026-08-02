@@ -1,4 +1,5 @@
 flask
+Markdown>=3.5,<4
 pandas
 matplotlib
 numpy
