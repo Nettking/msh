@@ -158,7 +158,11 @@ class SummaryCard:
                 safe_text(getattr(self, name), f"summary_card.{name}"),
             )
         if self.state is not None:
-            object.__setattr__(self, "state", safe_text(self.state, "summary_card.state"))
+            object.__setattr__(
+                self,
+                "state",
+                safe_text(self.state, "summary_card.state"),
+            )
         if self.state_label is not None:
             object.__setattr__(
                 self,
@@ -266,8 +270,16 @@ class FederationViewModel:
         object.__setattr__(self, "state", _enum(self.state, ProjectionState, "state"))
         object.__setattr__(self, "title", safe_text(self.title, "title"))
         object.__setattr__(self, "intro", safe_text(self.intro, "intro"))
-        object.__setattr__(self, "state_label", safe_text(self.state_label, "state_label"))
-        object.__setattr__(self, "generated_at", _utc(self.generated_at, "generated_at"))
+        object.__setattr__(
+            self,
+            "state_label",
+            safe_text(self.state_label, "state_label"),
+        )
+        object.__setattr__(
+            self,
+            "generated_at",
+            _utc(self.generated_at, "generated_at"),
+        )
         if not self.sections:
             raise FederationValidationError(
                 "missing-projection-sections",
@@ -325,7 +337,7 @@ class FederationViewModel:
         if overlap:
             raise FederationValidationError(
                 "reserved-projection-key",
-                f"content.{sorted(overlap)[0]}",
+                f"content.{min(overlap)}",
                 "is owned by the common projection envelope",
             )
         assert_public_projection(self.content, "content")
