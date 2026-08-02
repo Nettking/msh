@@ -6,7 +6,7 @@ Audit baseline: `ba954c91fa5f0cbd075b2210fbb1fcc717df8fa8` on `main`.
 
 Audit date: 2026-08-02, Europe/Oslo.
 
-This document records what the capability-first work actually provides after the merged CF1-CF6 branches. It is based on repository code, tests, workflow definitions, Flask composition, setup behavior, and persisted-state boundaries at the baseline commit. Pull-request descriptions were used only as navigation aids and not as proof of product completion.
+This document records what the capability-first work actually provides after the merged CF1-CF6 branches. It is based on repository code, tests, workflow definitions and recorded workflow runs, Flask composition, setup behavior, and persisted-state boundaries at the baseline commit. Pull-request descriptions were used as navigation aids and were checked against code and available GitHub Actions evidence.
 
 ## Classification vocabulary
 
@@ -50,10 +50,10 @@ The correct overall classification is therefore:
 | CF1 — onboarding models | Versioned discovery, federation binding, inspection, benchmark, candidate, and intent models exist with canonical serialization, validation, bounded public data, and protocol-major rejection. | **contract complete**; **isolated implementation complete**; **regression tested** |
 | CF1 — federation/session compatibility | A deterministic public `federation_id` mapping over the existing internal session boundary exists. No protocol or persistence field is renamed. | **contract complete**; **isolated implementation complete**; **regression tested** |
 | CF1 — legacy migration | A read-only migration preview exists for supported legacy modes. It preserves existing configured behavior in preview form and keeps compute and storage disabled. It does not write a new onboarding document or migrate a running installation. | **contract complete**; **isolated implementation complete**; **regression tested** |
-| CF2 — generic benchmark registry, runner, validity, safety, and store | The repository contains a generic trusted-local-probe framework with timeout/cancellation signaling, concurrency bounds, fingerprints, safe diagnostics, immutable SQLite results, and restart-safe run-ID reservations. | **contract complete** for the kernel; **isolated implementation complete** for the kernel; **regression tested** by focused tests |
-| CF2 — device inspection framework | A generic inspection service and probe seam exist. | **contract complete** for the seam; **isolated implementation complete**; **regression tested** by focused tests |
+| CF2 — generic benchmark registry, runner, validity, safety, and store | The repository contains a generic trusted-local-probe framework with timeout/cancellation signaling, concurrency bounds, fingerprints, safe diagnostics, immutable SQLite results, and restart-safe run-ID reservations. | **contract complete** for the kernel; **isolated implementation complete** for the kernel; **regression tested** |
+| CF2 — device inspection framework | A generic inspection service and probe seam exist. | **contract complete** for the seam; **isolated implementation complete**; **regression tested** |
 | CF2 — concrete benchmark families | The planned migrated AI benchmark, MTConnect candidate adapter, and concrete compute, storage, and authenticated-network benchmark implementations are not present in the CF2 package. The current setup AI probe remains separate in the legacy setup service. | not complete |
-| CF2 — platform gate | Focused CF2 tests exist, but PR #164 did not add a dedicated Linux/Windows CF2 workflow. No merged permanent release gate was found that names the new CF2 package as a capability-first boundary. | no dedicated cross-platform gate confirmed |
+| CF2 — platform gate | PR #164 added no dedicated CF2 workflow. Its head nevertheless ran successfully on Ubuntu and Windows through the existing Phase F8.5 operator-surface matrix, which executes `catalog/capabilities/tests` and therefore included the focused CF2 tests. | **regression tested** across CI platforms; no named CF2 gate; not a composed capability-first gate |
 | CF3 — bounded discovery and candidate selection | Configured and relay-resolver discovery adapters exist; safe public results exclude private join material. Several candidates require selection, and discovery failure blocks unsafe local creation. | **contract complete**; **isolated implementation complete**; **regression tested** |
 | CF3 — verified join, reconnect, and local creation | The service composes existing `SessionCoordinator` enrollment, invitation, membership, and session authority. Reconnect revalidates existing membership and does not mint trust. | **isolated implementation complete**; **regression tested** |
 | CF3 — product discovery | No supported Flask/setup flow instantiates the discovery service. The implemented sources are configured/relay adapters, not proof of general local-network discovery on real installations. | not **integrated**; not **end-to-end accepted** |
@@ -74,15 +74,24 @@ No CF1-CF6 deliverable is classified as **manually verified on a real Windows in
 
 ## Automated gates that actually exist
 
-Dedicated focused workflow definitions exist for:
+The audit verified successful workflow conclusions on the merged PR heads:
 
-- CF1 contracts: Ubuntu and Windows compile, focused tests, Ruff, and diff hygiene;
-- CF3 discovery: Ubuntu and Windows compile, focused discovery tests, an affected Phase 2 authority subset, Ruff, and diff hygiene;
-- CF4 contribution service: Ubuntu and Windows compile, focused tests, selected authority/reconciliation/AI/recorder regressions, Ruff, and diff hygiene;
-- CF5 UI shell: Ubuntu and Windows standalone template tests, JavaScript syntax, fixture parsing, Ruff, and diff hygiene;
-- CF6 projections: Ubuntu and Windows compile, focused tests, Ruff, and diff hygiene.
+- CF1: the dedicated CF1 Ubuntu/Windows workflow and the existing Phase 2 federation workflow succeeded;
+- CF2: the existing Phase F8.5 Ubuntu/Windows workflow succeeded and included the focused CF2 tests through `catalog/capabilities/tests`; no dedicated CF2 workflow exists;
+- CF3: the dedicated CF3 Ubuntu/Windows workflow and the existing Phase 2 federation workflow succeeded;
+- CF4: the dedicated CF4 Ubuntu/Windows workflow succeeded, together with the existing affected capability/provider workflows triggered by the changed package;
+- CF5: the dedicated CF5 Ubuntu/Windows workflow and the existing Phase F8.5 workflow succeeded;
+- CF6: the dedicated CF6 Ubuntu/Windows workflow and the existing Phase 2 federation workflow succeeded.
 
-CF2 contains focused test files but no dedicated CF2 workflow was merged with PR #164. The audit found no permanent capability-first release workflow that composes CF1-CF6 through Flask/setup/runtime on both operating systems.
+The dedicated component workflow definitions cover:
+
+- CF1 contracts: compile, focused tests, Ruff, and diff hygiene;
+- CF3 discovery: compile, focused discovery tests, an affected Phase 2 authority subset, Ruff, and diff hygiene;
+- CF4 contribution service: compile, focused tests, selected authority/reconciliation/AI/recorder regressions, Ruff, and diff hygiene;
+- CF5 UI shell: standalone template tests, JavaScript syntax, fixture parsing, Ruff, and diff hygiene;
+- CF6 projections: compile, focused tests, Ruff, and diff hygiene.
+
+No permanent capability-first release workflow composes CF1-CF6 through Flask/setup/runtime on both operating systems.
 
 These are valuable component gates. They are not evidence for:
 
