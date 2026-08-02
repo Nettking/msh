@@ -10,7 +10,10 @@ from catalog.capabilities.provider_reports import (
     ProviderResourceReport,
     ProviderStatus,
 )
-from catalog.federation.errors import FederationValidationError
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
 
 from .remote_contracts import _node_id
 from .runtime import (
@@ -130,7 +133,7 @@ class TrustedFederatedLanguageModelRuntime(LanguageModelRuntime):
             if callable(source):
                 try:
                     external = source(now)
-                except Exception:  # fail closed on unavailable remote health
+                except (FederationOperationError, FederationValidationError):
                     external = None
                 if external is None:
                     continue
