@@ -23,7 +23,8 @@ The operator surface is an authority-neutral projection and command adapter. It 
 - server-side binding of actor/session context through an injected operator surface; browser input cannot select or impersonate an actor node;
 - POST-only state-changing routes with exact action allow-listing, expected revision, bounded safe reason codes, and generated idempotency IDs when none are supplied;
 - graceful unavailable responses when no federation operator surface is configured;
-- focused Linux and Windows CI plus complete affected F8.1-F8.4, F7, Flask, relay, and Phase 2 regressions.
+- focused Linux and Windows CI plus complete affected F8.1-F8.4, F7, Flask, relay, and Phase 2 regressions;
+- explicit reuse of the existing authenticated F8.3 relay acceptance as a regression boundary for the F8.5 language-model eligibility projection.
 
 ## Safety boundaries
 
