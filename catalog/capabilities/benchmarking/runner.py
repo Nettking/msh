@@ -5,10 +5,10 @@ from __future__ import annotations
 import queue
 import threading
 import time
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable
+from typing import Any
 
 from catalog.federation.onboarding_models import (
     BenchmarkRecommendation,
@@ -254,7 +254,7 @@ class BenchmarkRunner:
             try:
                 value = entry.probe(context)
                 output.put_nowait(("result", value))
-            except BaseException as exc:  # contained and converted without traceback
+            except Exception as exc:  # noqa: BLE001 - isolate probe failures
                 try:
                     output.put_nowait(("error", exc))
                 except queue.Full:
