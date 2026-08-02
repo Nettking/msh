@@ -1,100 +1,141 @@
 # Post-v1 product roadmap
 
-Status: preserved future plan. This roadmap records approved future directions so repository cleanup can remove prototypes and stale planning files without losing intended product work.
+Status: active product roadmap. The repository owner has explicitly promoted capability-first onboarding and Federation UI into current planned work.
 
-This roadmap is not part of the MSH Federation v1.0 release contract unless an item is explicitly promoted into a release plan.
+This roadmap separates product experience from the internal authority model. User-facing flows should be simple, but every action must still use authenticated, revision-fenced, fail-closed backend authority.
 
 ## Planning principles
 
-- Finish and stabilize v1 before expanding federation behavior.
-- Prefer small compatible `1.x` product updates before a broader `2.0` trust or protocol change.
-- Keep user-facing concepts simpler than internal authority and fencing models.
-- Integrate future UI and documentation into the existing Flask-first application.
-- Do not run a second Flask application for documentation.
-- Do not expose private endpoints or weaken existing authority boundaries to simplify UX.
-- Every guided action must still use the same authenticated, revision-fenced, and fail-closed backend authority.
+- Treat every installation as one persistent MSH device, not one permanent deployment role.
+- Let one device contribute several independent capabilities simultaneously.
+- Discover and benchmark before asking the user what the device should contribute.
+- Keep connection, benchmark evidence, contribution intent, provider health, selection, and authority as separate concepts.
+- Preserve the validated Federation v1 protocol and authority core while simplifying the product surface.
+- Keep `session_id` as an internal compatibility boundary until a separate protocol-major migration is approved.
+- Prefer small compatible `1.x` updates before broader trust or protocol changes.
+- Integrate UI and documentation into the existing Flask-first application.
+- Do not expose private endpoints or weaken authority boundaries to simplify setup.
+- Structure implementation so independent agents can work in parallel on non-overlapping paths.
 
-## V1.1 — integrated documentation and guided federation UI
+## Completed V1.1 foundation — integrated documentation
 
-Purpose: make the completed v1 capabilities understandable and operable without requiring users to read implementation plans or know internal protocol terminology.
+The read-only documentation browser is implemented and accepted at `/docs` in the existing Flask application.
 
-### Integrated `/docs`
+Delivered behavior includes:
 
-Deliver a read-only documentation reader inside the existing MSH Flask application:
+- canonical repository `docs/` content;
+- nested navigation, titles, breadcrumbs, and responsive layout;
+- Markdown tables, code, headings, lists, blockquotes, and admonitions;
+- relative document links and restricted local images;
+- path-traversal and symlink-escape protection;
+- no second Flask server;
+- no external font or CDN requirement;
+- availability before runtime startup.
 
-- base route: `/docs`;
-- reads canonical Markdown from the repository `docs/` tree;
-- nested folder navigation;
-- clear document titles and breadcrumbs;
-- responsive/mobile navigation;
-- fenced code, tables, admonitions, headings, and stable anchors;
-- relative links between Markdown documents;
-- safe local images and assets;
-- path-traversal and symlink escape protection;
-- controlled not-found behavior;
-- available before runtime startup and, where appropriate, in recorder-only mode;
-- no external font or CDN dependency required for basic reading;
-- no upload, edit, or arbitrary file browsing capability;
-- direct links from relevant UI errors and help panels.
+The standalone `new-stuff/md_viewer/` prototype is now superseded and may be removed in a separately approved cleanup change after final comparison.
 
-The visual and interaction ideas from `new-stuff/md_viewer/` are preserved as design input, including the hierarchical reading experience. The prototype itself is not the production architecture and may be deleted after these requirements are retained here.
+## Active V1.1 direction — capability-first onboarding and Federation UI
 
-### Canonical documentation information architecture
+Purpose: make MSH quick to start and understandable without requiring users to choose a technical device role, manually manage a session, or understand provider enrollment before the system has inspected the machine.
 
-Proposed public structure:
+The authoritative implementation plan is:
+
+- `docs/implementation/capability_first_federation_plan.md`
+
+### Product model
+
+An MSH device may contribute any supported combination of:
+
+- workbench/UI;
+- recording and data-source access;
+- language-model service;
+- registered compute handlers;
+- storage capacity;
+- explicitly configured network/relay assistance;
+- future supported capabilities.
+
+Storage primary/replica, job owner, administrator, membership, lease, fencing, and artifact-grant roles remain internal authority states. They are not the permanent product identity of the device.
+
+### First-run flow
 
 ```text
-docs/
-  index.md
-  getting-started/
-  user-guides/
-  federation-v1/
-  administration/
-  troubleshooting/
-  reference/
-  developer/
-  history/
+Identity
+  -> discover, verify, join, or create a federation
+  -> inspect this device
+  -> run recommended benchmarks
+  -> choose one or more contributions
+  -> finish on Federation overview
 ```
 
-Default navigation must prioritize current user tasks. Historical phase records must not appear as the main onboarding path.
+Returning trusted devices reconnect automatically and rerun only expired or invalidated checks.
 
-### Guided Federation UI
+### Federation discovery
 
-Add a coherent System → Federation area:
+Discovery should:
+
+- find existing trusted federation candidates where supported;
+- show a friendly identity and verification code;
+- require one first-time confirmation by default;
+- reconnect automatically after trust is persisted;
+- create a local federation when none exists;
+- support explicit authenticated auto-accept policy only in controlled deployments;
+- never treat network presence as authority.
+
+### Benchmarks
+
+Add a versioned local benchmark framework for:
+
+- language models;
+- explicitly registered compute handlers;
+- storage-provider candidates;
+- authenticated network paths;
+- data-source and recorder suitability.
+
+Benchmarks describe suitability and capacity. They never approve membership, grant provider authority, assign storage roles, dispatch jobs, or grant artifact access by themselves.
+
+### Contribution activation
+
+The user chooses which suitable capabilities the device should contribute. Federation policy then determines whether the contribution can activate automatically or requires an administrative decision.
+
+One device must be able to contribute several capabilities at the same time. Enabling one contribution must not grant unrelated authority.
+
+### Federation information architecture
 
 ```text
 Federation
   Overview
-  Create or join
+  This device
   Devices
-  Providers
+  Services
+  Benchmarks
   Storage
+  Jobs
   Activity
-  Troubleshooting
+  Settings
 ```
 
 #### Overview
 
 Show:
 
-- whether this device belongs to a federation session;
-- current role and ownership state;
+- connection state;
 - connected and unavailable devices;
-- pending approvals;
+- active contributions;
+- pending or blocked actions;
 - storage health and degraded state;
-- active AI and compute provider counts;
+- active AI and compute capacity;
 - one recommended next action.
 
-#### Create or join
+#### This device
 
-Provide guided flows for:
+Show:
 
-- create a federation;
-- generate a time-limited invitation;
-- join using an invitation;
-- verify the expected owner/session identity;
-- recover from expired or invalid invitations;
-- explain LAN/VPN/relay requirements in user language.
+- stable friendly identity;
+- inspection state;
+- available contribution candidates;
+- benchmark freshness and recommendations;
+- enabled contributions;
+- safe enable, disable, rerun, and repair actions.
 
 #### Devices
 
@@ -102,67 +143,85 @@ Show:
 
 - this device versus connected devices;
 - friendly name and verified logical identity;
-- member state;
-- last current health/connectivity observation;
-- contributed provider types;
-- safe owner actions such as revoke membership;
+- member/connectivity state;
+- contributed service types;
+- safe revoke or repair actions where authorized;
 - advanced identity and revision details only on demand.
 
-#### Providers
+#### Services
 
-Show a task-focused approval inbox:
+Show:
 
-- pending provider requests;
-- provider type and contributing device;
-- what approval permits and does not permit;
-- approve, suspend, resume where supported, and revoke;
+- available language-model, compute, recorder/data-source, and other service contributions;
+- contributing device;
 - current availability and expiry;
-- reason codes translated into user guidance;
+- safe reason codes translated into user guidance;
 - no credentials, private endpoints, prompts, results, handler paths, or storage authority leakage.
+
+#### Benchmarks
+
+Show:
+
+- recommended, running, passed, expired, skipped, and failed checks;
+- bounded metrics and clear recommendations;
+- why a result became invalid;
+- rerun and cancel controls;
+- clear separation between benchmark success and contribution activation.
 
 #### Storage
 
 Show:
 
+- storage candidates separately from assigned primary/replica state;
 - current primary and replicas;
 - completeness and synchronization status;
 - degraded state and why no candidate is eligible;
-- last successful replication evidence;
-- controlled handover/recovery actions only where safe and already supported;
+- safe controlled handover/recovery actions already supported;
 - advanced terms, leases, fencing, watermarks, and missing ranges behind an expert panel.
+
+#### Jobs
+
+Show:
+
+- bounded safe job status;
+- selected service type and contributing device;
+- queued, running, retrying, cancelled, succeeded, and failed state;
+- no prompt, artifact, credential, or private handler leakage by default.
 
 #### Activity
 
-Show a bounded, safe timeline of:
+Show a bounded safe timeline of:
 
 - joins and revocations;
-- provider requests and decisions;
-- health expiry and recovery;
+- inspection and benchmark outcomes;
+- contribution enable/disable decisions;
+- provider health expiry and recovery;
 - storage assignment and failover decisions;
-- reconnect/reconciliation outcomes;
-- no secret or private payload content.
+- reconnect/reconciliation outcomes.
 
-#### Troubleshooting
+#### Settings
 
-Use guided diagnosis rather than raw state dumps:
+Show:
 
-1. identify the failed task;
-2. show the specific failed precondition;
-3. explain the likely cause;
-4. offer one safe next action;
-5. link directly to the matching `/docs` section;
-6. provide advanced evidence for technical users.
+- federation identity and trust policy;
+- first-time device acceptance policy;
+- contribution defaults;
+- benchmark expiry/rerun policy;
+- advanced compatibility details;
+- no raw secret material.
 
 ### User-language policy
 
 Prefer:
 
 - This device
+- Federation
 - Connected device
-- Waiting for approval
-- Approved
+- Available contribution
+- Run benchmark
+- Recommended
+- Enabled
 - Temporarily unavailable
-- Suspended
 - Access removed
 - Storage is synchronized
 - Storage needs attention
@@ -170,6 +229,7 @@ Prefer:
 
 Hide by default:
 
+- internal session ID;
 - generation fencing;
 - report revision;
 - lease generation;
@@ -181,18 +241,21 @@ The internal values remain available in advanced diagnostics and logs.
 
 ### V1.1 acceptance
 
-- a new user can create or join a federation using only the UI and user guide;
-- a federation owner can understand and decide a provider request;
-- a user can identify why a provider or replica is unavailable;
-- every error state links to current documentation;
-- `/docs` works on desktop and mobile;
-- documentation rendering cannot escape the allowed docs root;
+- a fresh user completes setup without selecting a permanent device role;
+- an existing trusted federation is discovered and joined through a verified flow;
+- no candidate causes a local federation to be created safely;
+- one device contributes recorder and AI simultaneously;
+- benchmark success alone grants no authority;
+- old deployment-mode settings migrate without data loss or silent new contributions;
+- a returning device reconnects automatically;
+- Federation UI works on desktop and mobile;
+- every error state offers a safe next action and relevant `/docs` link;
 - existing v1 regression gates remain green;
 - no new authority source is introduced by the UI.
 
 ## V1.2 — operational administration and observability
 
-Purpose: make trusted federation easier to operate over time without changing its trust model.
+Purpose: make a trusted federation easier to operate over time without changing its trust model.
 
 Planned areas:
 
@@ -200,28 +263,28 @@ Planned areas:
 - clearer component readiness and dependency state;
 - structured operational logs;
 - bounded metrics and alert hooks;
-- session/provider/storage event history;
+- contribution, storage, and job history;
 - backup status and recovery rehearsal guidance;
 - upgrade readiness and compatibility checks;
-- operator export of safe diagnostics bundles;
+- safe diagnostics bundles;
 - soak, restart, and controlled failure testing;
-- clearer relay/direct-route visibility without exposing private addresses broadly.
+- clearer relay/direct-route visibility without broadly exposing private addresses.
 
 ## V1.3 — improved local and connected AI experience
 
 Planned areas:
 
-- guided connection testing;
+- richer model suitability benchmarks;
 - clearer model/provider readiness;
 - safe provider-choice explanation;
 - streaming responses where compatible;
 - cancellation UX;
-- bounded durable request history without storing secret prompts by accident;
+- bounded durable request history without storing secret prompts accidentally;
 - model lifecycle and warm-up status;
 - better fallback explanation;
 - explicit context/privacy controls.
 
-This update must not turn a language-model provider into a storage or command-execution authority.
+This update must not turn a language-model contribution into storage, artifact, or command-execution authority.
 
 ## V2.0 candidate — broader network operation
 
@@ -233,7 +296,8 @@ Potential scope:
 - certificate and key rotation workflows;
 - multi-route policy;
 - stronger production abuse controls;
-- upgrade and protocol negotiation across deployed versions.
+- upgrade and protocol negotiation across deployed versions;
+- possible internal `session_id` terminology or protocol migration.
 
 A V2.0 plan must define migration and compatibility before implementation begins.
 
@@ -277,12 +341,14 @@ This remains deliberately late and separately gated:
 
 No current v1 or planned 1.x UI should imply that unknown third-party execution is safe.
 
-## Promotion rule
+## Promotion and parallel-work rule
 
 A roadmap item becomes active work only when:
 
 1. the repository owner explicitly selects it;
 2. a bounded implementation plan defines authority and compatibility impact;
 3. current v1 tests remain mandatory;
-4. the work is separated from unrelated cleanup;
-5. exit criteria and deferrals are written before implementation.
+4. work is separated from unrelated cleanup;
+5. exit criteria and deferrals are written before implementation;
+6. parallel agents receive non-overlapping file ownership and a frozen shared contract;
+7. one integration agent owns shared Flask/setup files.
