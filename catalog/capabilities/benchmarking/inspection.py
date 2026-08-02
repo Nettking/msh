@@ -5,10 +5,10 @@ from __future__ import annotations
 import os
 import platform
 import shutil
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from catalog.federation.onboarding_models import DeviceInspectionSnapshot
 from catalog.federation.redaction import REDACTED
@@ -154,7 +154,7 @@ class DeviceInspector:
                     _safe_values(finding.recommended_benchmark_ids)
                 )
                 warnings.extend(safe_diagnostics(*finding.warnings))
-            except Exception as exc:
+            except Exception as exc:  # noqa: BLE001 - isolate local probes
                 warnings.extend(safe_diagnostics(exc))
 
         registered = set(benchmark_ids)
