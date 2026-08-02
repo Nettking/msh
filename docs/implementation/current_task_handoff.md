@@ -8,7 +8,7 @@ Last updated: 2026-08-02 Europe/Oslo
 - Default branch: `main`
 - Current development mode: Federation v1 release stabilization
 - Runtime feature expansion: frozen until v1 closeout or separate owner approval
-- Latest planning commit at this checkpoint: `6fc2502ed0c39cdcdb5ead59a27c956c9831baf0`
+- Latest cleanup commit: `5cb2f780c4f6748f0232dd19a4a151010ec8d3f2`
 
 ## Completed technical baseline
 
@@ -53,96 +53,76 @@ Commit:
 
 - `6fc2502ed0c39cdcdb5ead59a27c956c9831baf0` — exact cleanup manifest and deletion-batch ordering.
 
-The manifest records path classification, dependency evidence, replacement or migration, required tests, and decision for:
+The manifest records path classification, dependency evidence, replacement or migration, required tests, and decision for generated output, experiments, archived UI, legacy markers, scripts, phase documentation, and workflows.
 
-- generated `graphify-out/` files and cache;
-- all identified `new-stuff/` experiment families;
-- the archived `catalog/webapp/` Streamlit workspace;
-- `legacy/` and ambiguous top-level `git/` markers;
-- automatic, manual, deep, hidden, and legacy runner scripts;
-- stale implementation plans and handoffs;
-- durable closeouts, contracts, runbooks, and technical decisions;
-- phase-specific GitHub Actions workflows.
+## V1-C batch 1 completed
 
-No file, directory, workflow, branch, runtime source, dependency, setup path, or Compose configuration was deleted or changed during V1-B.
+Commit:
+
+- `5cb2f780c4f6748f0232dd19a4a151010ec8d3f2` — remove all tracked `graphify-out/**` content and add `/graphify-out/` to `.gitignore`.
+
+Validation performed:
+
+- the complete commit comparison contains only removal of `graphify-out/**` plus one `.gitignore` line;
+- a direct fetch of `graphify-out/GRAPH_REPORT.md` now returns not found;
+- `/graphify-out/` is present in `.gitignore`;
+- no runtime source, dependency, setup path, Compose configuration, workflow, test, or supported documentation file changed;
+- no runtime tests were rerun because the removed files were generated analysis output outside the runtime and test paths.
+
+Graphify remains usable locally, but newly generated `graphify-out/` content will remain untracked.
 
 ## Confirmed cleanup decisions
 
-### Ready for the first deletion change
+### Completed deletion
 
-`graphify-out/**` is generated analysis output with no supported runtime role.
+- `graphify-out/**` — deleted and ignored.
 
-The first recommended deletion batch is limited to:
+### Next deletion-list group for owner review
 
-1. delete every tracked path under `graphify-out/**`;
-2. add `/graphify-out/` to `.gitignore`;
-3. remove only references that incorrectly treat generated reports as canonical documentation.
+`new-stuff/md_viewer/**` is a standalone Flask prototype, not the production documentation architecture.
+
+Its intended product direction is already preserved in `docs/roadmap/post_v1_product_roadmap.md`:
+
+- integrated `/docs` inside the existing Flask application;
+- canonical content from repository `docs/`;
+- guided Federation UI and user-facing navigation;
+- no separate Flask process.
+
+No `new-stuff/md_viewer/**` path may be deleted until the owner explicitly approves this group after review.
 
 ### Strong later deletion candidate
 
-`catalog/webapp/**` is explicitly archived, outside the default runtime/dependency/operator path, and replaced by `catalog/flask_app/`.
-
-It must still receive a dedicated deletion change with import, launcher, Compose, Flask-regression, documentation, and AI-index checks.
-
-### Preserved future UI and docs work
-
-`new-stuff/md_viewer/**` is a standalone prototype, not the production architecture. Its intended `/docs` and guided-UI behavior is preserved in `docs/roadmap/post_v1_product_roadmap.md` for V1.1.
-
-The prototype can be removed later without losing the approved product direction.
+`catalog/webapp/**` is explicitly archived, outside the default runtime/dependency/operator path, and replaced by `catalog/flask_app/`. It requires a dedicated review and validation batch.
 
 ### Experiments requiring owner preservation decision
 
-The remaining `new-stuff/` image, Windows desktop, walkthrough, and goal-agent experiments are not Federation v1 product code. Before deletion, decide whether the useful code should be exported to a separate experiments repository.
-
-`new-stuff/step2.py` also requires comparison with normal Flask tests so unique walkthrough expectations are not lost.
+The remaining `new-stuff/` image, Windows desktop, walkthrough, and goal-agent experiments are not Federation v1 product code. Before deletion, decide whether useful code should be exported to a separate experiments repository.
 
 ### Runner scripts
 
-The following are intentionally supported and must not be deleted merely because they are manual or deep:
+The supported manual and deep analysis scripts remain in v1. `corrolation_machine_pairs` requires a focused later usage review.
 
-- `data_pr_day`;
-- `find_stops`;
-- `data_analysis`;
-- `ml_analysis`.
+### Historical documentation and workflows
 
-`corrolation_machine_pairs` is the current runner-visible legacy deletion candidate and needs a focused usage check.
-
-### Historical documentation
-
-Completed plans and handoffs should be consolidated and removed only after unique durable decisions are mapped to closeouts, contracts, runbooks, or v1 reference documentation.
-
-F6, F7, and F8 closeouts remain durable release evidence and should be archived rather than deleted.
-
-### Workflows
-
-Phase workflows remain in place. A permanent v1 validation workflow may replace them only after exact test, OS, service, Ruff, Compose, and diff-hygiene coverage is mapped and proven equivalent.
+Completed plans require unique-decision comparison before deletion. Durable closeouts and technical decisions must be archived or consolidated. Phase workflows remain until a permanent v1 gate proves equivalent coverage.
 
 ## Safety decisions
 
 - Never remove a candidate based only on its name or age.
-- Every deletion change must attach an exact tracked-file inventory and reference search.
+- Every deletion group is reviewed with the owner before implementation.
 - Preserve authority, fencing, recovery, scheduling, artifact, and identity boundaries.
 - Do not delete implementation branches without separate explicit owner approval.
 - Do not tag `v1.0.0` before exact release acceptance.
 - Do not implement post-v1 UI or documentation features during cleanup unless separately approved.
-- Workflow consolidation must not reduce validation coverage merely to reduce file count.
-
-## Validation
-
-V1-B changed Markdown documentation only.
-
-Runtime tests were not rerun because no executable source, dependency, setup, Compose, workflow, or runtime configuration changed.
-
-Repository evidence was checked through current files, commit history, code search, archived-module declarations, root requirements, AI indexing behavior, script catalog classification, and workflow inventory.
 
 ## Next exact action
 
-Request owner approval for **V1-C cleanup batch 1 only**:
+Review **`new-stuff/md_viewer/**` only** with the owner:
 
-- remove tracked `graphify-out/**`;
-- add `/graphify-out/` to `.gitignore`;
-- run the low-risk reference and smoke validation documented in the cleanup manifest;
-- do not touch `new-stuff/`, `catalog/webapp/`, old plans, workflows, branches, or runtime code in that batch.
+1. verify the exact prototype file list;
+2. confirm that all useful product requirements are preserved in the post-v1 roadmap;
+3. decide whether any visual or implementation detail needs to be extracted before deletion;
+4. do not delete the prototype until explicit approval is given.
 
 ## Resume safety
 
@@ -151,4 +131,5 @@ Request owner approval for **V1-C cleanup batch 1 only**:
 - Current work boundary: release stabilization and cleanup only.
 - V1-A: complete.
 - V1-B: complete.
-- Next proposed unit: V1-C batch 1, pending explicit approval.
+- V1-C batch 1: complete.
+- Next proposed unit: review `new-stuff/md_viewer/**`, no deletion without approval.
