@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import threading
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from dataclasses import replace
 
 from catalog.federation.errors import FederationValidationError
@@ -135,7 +135,10 @@ class ConfiguredLanguageModelRuntimeManager:
         self._configured_provider: _ManagedOllamaLanguageModelProvider | None = None
         self._runtime: LanguageModelRuntime | None = None
 
-    def register(self, provider: LanguageModelProvider) -> None:
+    def _validated_provider(
+        self,
+        provider: LanguageModelProvider,
+    ) -> tuple[str, LanguageModelProvider]:
         capability_id = _logical_id(
             getattr(provider, "capability_id", None), "capability_id"
         )
@@ -148,6 +151,14 @@ class ConfiguredLanguageModelRuntimeManager:
                 "provider.session_id",
                 "provider must belong to the managed runtime session",
             )
+        return capability_id, provider
+
+    def _invalidate_runtime(self) -> None:
+        self._configured_provider = None
+        self._runtime = None
+
+    def register(self, provider: LanguageModelProvider) -> None:
+        capability_id, provider = self._validated_provider(provider)
         with self._lock:
             if capability_id in self._additional:
                 raise FederationValidationError(
@@ -156,17 +167,74 @@ class ConfiguredLanguageModelRuntimeManager:
                     "provider is already registered",
                 )
             self._additional[capability_id] = provider
-            self._configured_provider = None
-            self._runtime = None
+            self._invalidate_runtime()
 
     def unregister(self, capability_id: str) -> bool:
         capability_id = _logical_id(capability_id, "capability_id")
         with self._lock:
             removed = self._additional.pop(capability_id, None) is not None
             if removed:
-                self._configured_provider = None
-                self._runtime = None
+                self._invalidate_runtime()
             return removed
+
+    def replace_registered(
+        self,
+        providers: Iterable[LanguageModelProvider],
+        *,
+        replace_capability_ids: Iterable[str],
+    ) -> tuple[LanguageModelProvider, ...]:
+        """Atomically replace one explicitly owned subset of additional providers."""
+
+        replacement_ids = tuple(
+            sorted(
+                {
+                    _logical_id(item, "replace_capability_ids")
+                    for item in replace_capability_ids
+                }
+            )
+        )
+        replacement_set = set(replacement_ids)
+        normalized: dict[str, LanguageModelProvider] = {}
+        for provider in providers:
+            capability_id, validated = self._validated_provider(provider)
+            if capability_id in normalized:
+                raise FederationValidationError(
+                    "duplicate-ai-provider",
+                    "capability_id",
+                    "replacement contains duplicate provider identities",
+                )
+            if capability_id not in replacement_set:
+                raise FederationValidationError(
+                    "unowned-ai-provider-replacement",
+                    "capability_id",
+                    "replacement provider must be included in the explicit owned set",
+                )
+            normalized[capability_id] = validated
+        with self._lock:
+            previous = tuple(
+                self._additional[capability_id]
+                for capability_id in replacement_ids
+                if capability_id in self._additional
+            )
+            unchanged = (
+                tuple(sorted(normalized))
+                == tuple(
+                    capability_id
+                    for capability_id in replacement_ids
+                    if capability_id in self._additional
+                )
+                and all(
+                    self._additional.get(capability_id) is provider
+                    for capability_id, provider in normalized.items()
+                )
+            )
+            if unchanged:
+                return previous
+            for capability_id in replacement_ids:
+                self._additional.pop(capability_id, None)
+            self._additional.update(normalized)
+            self._invalidate_runtime()
+            return previous
 
     def runtime_for(
         self,
@@ -216,3 +284,10 @@ class ConfiguredLanguageModelRuntimeManager:
     def additional_provider_ids(self) -> tuple[str, ...]:
         with self._lock:
             return tuple(sorted(self._additional))
+
+    def additional_providers(self) -> tuple[LanguageModelProvider, ...]:
+        with self._lock:
+            return tuple(
+                self._additional[capability_id]
+                for capability_id in sorted(self._additional)
+            )
