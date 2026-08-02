@@ -1,0 +1,52 @@
+      <section class="onboarding-panel" data-step-panel="federation" aria-labelledby="federation-heading">
+        <header class="onboarding-panel__header">
+          <div>
+            <span class="onboarding-panel__step">Step 2 of 6</span>
+            <h3 id="federation-heading">Connect to a federation</h3>
+            <p>Choose a trusted federation that MSH discovered, or create one on this device.</p>
+          </div>
+          {{ status_badge(vm.federation.state, vm.federation.state_label, True) }}
+        </header>
+
+        {% if vm.federation.candidates %}
+        <form method="post" action="{{ vm.actions.federation_url }}" class="federation-candidate-form">
+          {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+          <fieldset>
+            <legend>Discovered federations</legend>
+            <div class="federation-candidate-grid">
+              {% for candidate in vm.federation.candidates %}
+              <label class="federation-candidate{% if candidate.selected %} is-selected{% endif %}">
+                <input type="radio" name="discovery_id" value="{{ candidate.discovery_id }}" {% if candidate.selected %}checked{% endif %} {% if not candidate.available %}disabled{% endif %}>
+                <span class="federation-candidate__main">
+                  <strong>{{ candidate.label }}</strong>
+                  <small>{{ candidate.transport_label }}</small>
+                </span>
+                {{ status_badge(candidate.state, candidate.state_label) }}
+                <span class="federation-candidate__verification"><span>Verification code</span><code>{{ candidate.verification_code }}</code></span>
+                <span class="federation-candidate__fingerprint">{{ candidate.fingerprint }}</span>
+                {% if candidate.reason %}<span class="federation-candidate__reason">{{ candidate.reason }}</span>{% endif %}
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+          <div class="onboarding-inline-actions">
+            <button class="federation-button federation-button--primary" type="submit" name="intent" value="join">Verify and join</button>
+            <button class="federation-button federation-button--secondary" type="submit" name="intent" value="refresh">Scan again</button>
+          </div>
+        </form>
+        {% else %}
+          {{ empty_state('No federation found yet', 'Create a federation on this device or scan the trusted network again.', vm.federation.empty_action, 'information') }}
+        {% endif %}
+
+        <form method="post" action="{{ vm.actions.federation_url }}" class="local-federation-action">
+          {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+          <input type="hidden" name="intent" value="create-local">
+          <div><strong>Start locally instead</strong><span>Create a federation on this device when no suitable federation is available.</span></div>
+          <button class="federation-button federation-button--secondary" type="submit">Create local federation</button>
+        </form>
+
+        <div class="onboarding-actions">
+          <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
+          <button class="federation-button federation-button--primary" type="button" data-next-step>Continue to inspection</button>
+        </div>
+      </section>

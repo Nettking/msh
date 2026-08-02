@@ -1,0 +1,24 @@
+{% macro onboarding_stepper(steps, current_step, completed_steps) -%}
+<nav class="onboarding-stepper" aria-label="Onboarding progress">
+  <ol>
+    {% for step in steps %}
+    {% set complete = step.key in completed_steps %}
+    {% set current = step.key == current_step %}
+    <li class="onboarding-stepper__item{% if complete %} is-complete{% endif %}{% if current %} is-current{% endif %}">
+      <button
+        type="button"
+        data-step-target="{{ step.key }}"
+        {% if current %}aria-current="step"{% endif %}
+        {% if not step.available %}disabled aria-disabled="true"{% endif %}
+      >
+        <span class="onboarding-stepper__number" aria-hidden="true">{% if complete %}✓{% else %}{{ loop.index }}{% endif %}</span>
+        <span class="onboarding-stepper__copy">
+          <strong>{{ step.label }}</strong>
+          <small>{{ step.summary }}</small>
+        </span>
+      </button>
+    </li>
+    {% endfor %}
+  </ol>
+</nav>
+{%- endmacro %}

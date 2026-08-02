@@ -1,0 +1,41 @@
+      <section class="onboarding-panel" data-step-panel="benchmarks" aria-labelledby="benchmarks-heading">
+        <header class="onboarding-panel__header">
+          <div>
+            <span class="onboarding-panel__step">Step 4 of 6</span>
+            <h3 id="benchmarks-heading">Check capability suitability</h3>
+            <p>Benchmarks are bounded local checks. Passing a benchmark does not enable or authorize a contribution.</p>
+          </div>
+          {{ status_badge(vm.benchmark_summary.state, vm.benchmark_summary.label, True) }}
+        </header>
+
+        <div class="benchmark-list">
+          {% for benchmark in vm.benchmarks %}
+          <article class="benchmark-card benchmark-card--{{ benchmark.state }}" data-benchmark-card="{{ benchmark.id }}">
+            <header>
+              <div><span>{{ benchmark.capability_label }}</span><h4>{{ benchmark.label }}</h4></div>
+              {{ status_badge(benchmark.state, benchmark.state_label, True) }}
+            </header>
+            <p>{{ benchmark.summary }}</p>
+            {% if benchmark.metrics %}<dl>{% for metric in benchmark.metrics %}<div><dt>{{ metric.label }}</dt><dd>{{ metric.value }}</dd></div>{% endfor %}</dl>{% endif %}
+            {% if benchmark.diagnostic %}<p class="benchmark-card__diagnostic">{{ benchmark.diagnostic }}</p>{% endif %}
+            <form method="post" action="{{ benchmark.action_url }}" data-benchmark-form>
+              {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+              <input type="hidden" name="benchmark_id" value="{{ benchmark.id }}">
+              <button class="federation-button federation-button--secondary" type="submit" {% if not benchmark.can_run %}disabled{% endif %}>{{ benchmark.action_label }}</button>
+              {% if benchmark.expires_label %}<small>{{ benchmark.expires_label }}</small>{% endif %}
+            </form>
+          </article>
+          {% endfor %}
+        </div>
+
+        <form method="post" action="{{ vm.actions.skip_benchmarks_url }}" class="benchmark-skip">
+          {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+          <div><strong>Continue without optional checks</strong><span>Skipped benchmarks remain visible and never enable a contribution automatically.</span></div>
+          <button class="federation-button federation-button--ghost" type="submit">Skip optional benchmarks</button>
+        </form>
+
+        <div class="onboarding-actions">
+          <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
+          <button class="federation-button federation-button--primary" type="button" data-next-step>Review contributions</button>
+        </div>
+      </section>

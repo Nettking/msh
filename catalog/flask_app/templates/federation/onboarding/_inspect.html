@@ -1,0 +1,40 @@
+      <section class="onboarding-panel" data-step-panel="inspect" aria-labelledby="inspect-heading">
+        <header class="onboarding-panel__header">
+          <div>
+            <span class="onboarding-panel__step">Step 3 of 6</span>
+            <h3 id="inspect-heading">Inspect this device</h3>
+            <p>Review supported local services and data sources before running any bounded checks.</p>
+          </div>
+          {{ status_badge(vm.inspection.state, vm.inspection.state_label, True) }}
+        </header>
+
+        <dl class="inspection-facts">
+          {% for fact in vm.inspection.observations %}<div><dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd></div>{% endfor %}
+        </dl>
+
+        <div class="inspection-columns">
+          <section>
+            <h4>Supported services</h4>
+            {% if vm.inspection.services %}<ul class="federation-list">{% for service in vm.inspection.services %}<li><strong>{{ service.label }}</strong><span>{{ service.summary }}</span></li>{% endfor %}</ul>{% else %}<p>No supported local service was detected.</p>{% endif %}
+          </section>
+          <section>
+            <h4>Data sources</h4>
+            {% if vm.inspection.data_sources %}<ul class="federation-list">{% for source in vm.inspection.data_sources %}<li><strong>{{ source.label }}</strong><span>{{ source.summary }}</span></li>{% endfor %}</ul>{% else %}<p>No supported data source was detected.</p>{% endif %}
+          </section>
+        </div>
+
+        {% if vm.inspection.warnings %}
+        <div class="federation-warning" role="alert"><strong>Review before continuing</strong><ul>{% for warning in vm.inspection.warnings %}<li>{{ warning }}</li>{% endfor %}</ul></div>
+        {% endif %}
+
+        <form method="post" action="{{ vm.actions.inspect_url }}" class="onboarding-inline-actions">
+          {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+          <button class="federation-button federation-button--secondary" type="submit">Run inspection again</button>
+          <span>Inspection revision {{ vm.inspection.revision }}</span>
+        </form>
+
+        <div class="onboarding-actions">
+          <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
+          <button class="federation-button federation-button--primary" type="button" data-next-step>Continue to benchmarks</button>
+        </div>
+      </section>

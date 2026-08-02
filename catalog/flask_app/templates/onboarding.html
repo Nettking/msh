@@ -1,0 +1,72 @@
+{% extends 'base.html' %}
+{% from 'federation/_status_badge.html' import status_badge %}
+{% from 'federation/_empty_state.html' import empty_state %}
+{% from 'federation/_onboarding_stepper.html' import onboarding_stepper %}
+{% from 'federation/_contribution_card.html' import contribution_card %}
+{% block body %}
+{% set vm = onboarding if onboarding is defined else view_model %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/federation.css') }}">
+
+<section
+  class="onboarding-shell"
+  data-onboarding-shell
+  data-current-step="{{ vm.current_step }}"
+  data-progress-revision="{{ vm.progress_revision }}"
+  data-storage-key="{{ vm.storage_key }}"
+>
+  <header class="onboarding-hero">
+    <div class="onboarding-hero__copy">
+      <span class="federation-eyebrow">Capability-first setup</span>
+      <h2>{{ vm.page_title }}</h2>
+      <p>{{ vm.page_intro }}</p>
+    </div>
+    <div class="onboarding-hero__meta">
+      {{ status_badge(vm.overall_state, vm.overall_state_label, True) }}
+      <a href="{{ vm.actions.docs_url }}">Open setup documentation</a>
+    </div>
+  </header>
+
+  {% if vm.migration.visible %}
+  <aside class="migration-panel" aria-labelledby="migration-title">
+    <div>
+      <span class="federation-eyebrow">Existing installation found</span>
+      <h3 id="migration-title">Your current behavior will be carried forward</h3>
+      <p>MSH recognized the previous <strong>{{ vm.migration.source_label }}</strong> setup. Review the capabilities below before anything new is enabled.</p>
+    </div>
+    <div class="migration-panel__columns">
+      <section>
+        <h4>Kept as configured</h4>
+        <ul>{% for item in vm.migration.preserved %}<li>{{ item }}</li>{% endfor %}</ul>
+      </section>
+      <section>
+        <h4>Needs review</h4>
+        <ul>{% for item in vm.migration.warnings %}<li>{{ item }}</li>{% endfor %}</ul>
+      </section>
+    </div>
+    <p class="migration-panel__privacy">Private connection details remain local and are not shown on this page.</p>
+  </aside>
+  {% endif %}
+
+  <div class="onboarding-layout">
+    {{ onboarding_stepper(vm.steps, vm.current_step, vm.completed_steps) }}
+
+    <div class="onboarding-workspace">
+      <p class="onboarding-progress-label" id="onboarding-progress-label" aria-live="polite"></p>
+
+      {% include 'federation/onboarding/_identity.html' %}
+
+      {% include 'federation/onboarding/_federation.html' %}
+
+      {% include 'federation/onboarding/_inspect.html' %}
+
+      {% include 'federation/onboarding/_benchmarks.html' %}
+
+      {% include 'federation/onboarding/_contributions.html' %}
+
+      {% include 'federation/onboarding/_finish.html' %}
+
+    </div>
+  </div>
+</section>
+<script defer src="{{ url_for('static', filename='js/onboarding.js') }}"></script>
+{% endblock %}

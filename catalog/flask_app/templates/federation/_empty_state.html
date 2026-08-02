@@ -1,0 +1,12 @@
+{% macro empty_state(title, message, action=None, tone='neutral') -%}
+<section class="federation-empty federation-empty--{{ tone }}" role="status">
+  <span class="federation-empty__mark" aria-hidden="true"></span>
+  <div>
+    <h3>{{ title }}</h3>
+    <p>{{ message }}</p>
+    {% if action %}
+    <a class="federation-button federation-button--secondary" href="{{ action.url }}">{{ action.label }}</a>
+    {% endif %}
+  </div>
+</section>
+{%- endmacro %}

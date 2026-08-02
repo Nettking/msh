@@ -1,0 +1,28 @@
+      <section class="onboarding-panel" data-step-panel="finish" aria-labelledby="finish-heading">
+        <header class="onboarding-panel__header">
+          <div>
+            <span class="onboarding-panel__step">Step 6 of 6</span>
+            <h3 id="finish-heading">{{ vm.finish.title }}</h3>
+            <p>{{ vm.finish.message }}</p>
+          </div>
+          {{ status_badge(vm.finish.state, vm.finish.state_label, True) }}
+        </header>
+
+        <div class="finish-summary">
+          {% for item in vm.finish.summary %}
+          <article><span>{{ item.label }}</span><strong>{{ item.value }}</strong><p>{{ item.detail }}</p></article>
+          {% endfor %}
+        </div>
+
+        {% if vm.finish.next_action %}
+        <section class="recommended-action">
+          <div><span class="federation-eyebrow">Recommended next action</span><h4>{{ vm.finish.next_action.title }}</h4><p>{{ vm.finish.next_action.message }}</p></div>
+          <a class="federation-button federation-button--primary" href="{{ vm.finish.next_action.url }}" data-finish-link>{{ vm.finish.next_action.label }}</a>
+        </section>
+        {% endif %}
+
+        <div class="onboarding-actions">
+          <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
+          <a class="federation-button federation-button--secondary" href="{{ vm.actions.overview_url }}" data-finish-link>Open Federation overview</a>
+        </div>
+      </section>
