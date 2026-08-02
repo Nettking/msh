@@ -107,7 +107,7 @@ class ContributionService:
         )
 
     def disable(self, candidate_id: str) -> ContributionIntent:
-        recommendation = self._recommendation(candidate_id)
+        recommendation = self._recommendation(candidate_id, require_current=False)
         candidate = recommendation.candidate
         adapter = self._adapter(candidate)
         outcome = adapter.disable(candidate)
@@ -121,7 +121,7 @@ class ContributionService:
         )
 
     def ask_later(self, candidate_id: str) -> ContributionIntent:
-        recommendation = self._recommendation(candidate_id)
+        recommendation = self._recommendation(candidate_id, require_current=False)
         candidate = recommendation.candidate
         outcome = self._adapter(candidate).disable(candidate)
         return self._store.transition(
@@ -134,7 +134,7 @@ class ContributionService:
         )
 
     def suspend(self, candidate_id: str, *, reason: str) -> ContributionIntent:
-        recommendation = self._recommendation(candidate_id)
+        recommendation = self._recommendation(candidate_id, require_current=False)
         candidate = recommendation.candidate
         current = self._store.get(candidate_id)
         desired = (
@@ -165,6 +165,23 @@ class ContributionService:
                 continue
             candidate = recommendation.candidate
             adapter = self._adapter(candidate)
+            if (
+                candidate.expires_at <= self._now()
+                and current.desired_state is ContributionDesiredState.ENABLED
+            ):
+                outcome = adapter.suspend(
+                    candidate,
+                    reason="Contribution inspection or benchmark evidence expired.",
+                )
+                reconciled.append(
+                    self._persist(
+                        candidate,
+                        desired=current.desired_state,
+                        evaluation=PolicyEvaluation(current.policy_state),
+                        outcome=outcome,
+                    )
+                )
+                continue
             if current.desired_state in {
                 ContributionDesiredState.DISABLED,
                 ContributionDesiredState.ASK_LATER,
@@ -232,14 +249,19 @@ class ContributionService:
             decided_at=self._now(),
         )
 
-    def _recommendation(self, candidate_id: str) -> CandidateRecommendation:
+    def _recommendation(
+        self,
+        candidate_id: str,
+        *,
+        require_current: bool = True,
+    ) -> CandidateRecommendation:
         try:
             recommendation = self._recommendations[candidate_id]
         except KeyError as exc:
             raise CandidateNotFoundError(
                 f"candidate is not in the current recommendation set: {candidate_id}"
             ) from exc
-        if recommendation.candidate.expires_at <= self._now():
+        if require_current and recommendation.candidate.expires_at <= self._now():
             raise CandidateNotFoundError(f"candidate expired: {candidate_id}")
         return recommendation
 
