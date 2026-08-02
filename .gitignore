@@ -6,6 +6,7 @@
 /data.zip
 *.csv
 *.png
+/graphify-out/
 
 # Keep the canonical data directory documented, but ignore its contents by default
 /data/*
