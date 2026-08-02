@@ -8,9 +8,34 @@
           {{ status_badge(vm.federation.state, vm.federation.state_label, True) }}
         </header>
 
+        {% if vm.federation.connected_label|default('') %}
+        <div class="federation-notice">
+          <strong>This device has a revalidated trusted federation binding.</strong>
+          <span>The internal authority identifier remains private.</span>
+        </div>
+        {% endif %}
+
+        {% if vm.federation.repair_reason|default('') %}
+        <div class="federation-warning" role="alert">
+          <strong>Saved membership needs attention</strong>
+          <span>The identity and local binding were kept. No new authority was created.</span>
+        </div>
+        {% endif %}
+
+        {% if vm.federation.can_reconnect|default(false) %}
+        <form method="post" action="{{ vm.actions.federation_url }}" class="local-federation-action">
+          <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
+          <input type="hidden" name="command_id" value="{{ vm.command_id|default('') }}">
+          <input type="hidden" name="intent" value="reconnect">
+          <div><strong>Reconnect trusted membership</strong><span>Revalidate the saved identity and membership without minting new enrollment or invitation authority.</span></div>
+          <button class="federation-button federation-button--primary" type="submit">Reconnect</button>
+        </form>
+        {% endif %}
+
         {% if vm.federation.candidates %}
         <form method="post" action="{{ vm.actions.federation_url }}" class="federation-candidate-form">
-          {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+          <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
+          <input type="hidden" name="command_id" value="{{ vm.command_id|default('') }}">
           <fieldset>
             <legend>Discovered federations</legend>
             <div class="federation-candidate-grid">
@@ -29,24 +54,35 @@
               {% endfor %}
             </div>
           </fieldset>
+          <label>
+            <span>Enter the verification code for a first join</span>
+            <input type="text" name="verification_code" maxlength="128" autocomplete="off" spellcheck="false">
+          </label>
           <div class="onboarding-inline-actions">
             <button class="federation-button federation-button--primary" type="submit" name="intent" value="join">Verify and join</button>
-            <button class="federation-button federation-button--secondary" type="submit" name="intent" value="refresh">Scan again</button>
+            <button class="federation-button federation-button--secondary" type="submit" name="intent" value="refresh" formnovalidate>Scan again</button>
           </div>
         </form>
-        {% else %}
+        {% elif not vm.federation.connected_label|default('') %}
           {{ empty_state('No federation found yet', 'Create a federation on this device or scan the trusted network again.', vm.federation.empty_action, 'information') }}
         {% endif %}
 
+        {% if vm.federation.can_create_local|default(true) %}
         <form method="post" action="{{ vm.actions.federation_url }}" class="local-federation-action">
-          {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+          <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
+          <input type="hidden" name="command_id" value="{{ vm.command_id|default('') }}">
           <input type="hidden" name="intent" value="create-local">
-          <div><strong>Start locally instead</strong><span>Create a federation on this device when no suitable federation is available.</span></div>
+          <div><strong>Start locally instead</strong><span>Create a federation on this device only after discovery completed with no candidate.</span></div>
           <button class="federation-button federation-button--secondary" type="submit">Create local federation</button>
         </form>
+        {% endif %}
 
         <div class="onboarding-actions">
           <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
-          <button class="federation-button federation-button--primary" type="button" data-next-step>Continue to inspection</button>
+          {% if vm.federation.connected_label|default('') %}
+          <a class="federation-button federation-button--primary" href="{{ vm.actions.overview_url }}">Open Federation overview</a>
+          {% else %}
+          <button class="federation-button federation-button--primary" type="button" disabled aria-disabled="true">Inspection remains blocked</button>
+          {% endif %}
         </div>
       </section>
