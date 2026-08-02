@@ -165,7 +165,7 @@ class AuthenticatedNetworkPathAdapter:
                 samples.append(sample)
         except (BenchmarkCancelled, TimeoutError):
             raise
-        except Exception:
+        except Exception:  # noqa: BLE001 - seam failures become safe evidence
             return BenchmarkObservation(
                 state=BenchmarkState.FAILED,
                 recommendation=BenchmarkRecommendation.NOT_RECOMMENDED,
