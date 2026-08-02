@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ document_title }} · MSH Docs</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/docs.css') }}">
+    <script defer src="{{ url_for('static', filename='js/docs-navigation.js') }}"></script>
+  </head>
+  <body class="docs-body">
+    {% macro render_tree(node, depth=0) -%}
+      <ul class="docs-tree" data-depth="{{ depth }}">
+        {% for directory in node.dirs %}
+          {% set expanded = current_path and (current_path == directory.path or current_path.startswith(directory.path ~ '/')) %}
+          <li class="docs-tree__directory">
+            <details {% if expanded %}open{% endif %}>
+              <summary>
+                <span class="docs-tree__folder" aria-hidden="true"></span>
+                <span>{{ directory.name }}</span>
+              </summary>
+              {{ render_tree(directory, depth + 1) }}
+            </details>
+          </li>
+        {% endfor %}
+        {% for file in node.files %}
+          <li class="docs-tree__file {% if file.path == current_path %}is-active{% endif %}">
+            <a href="{{ file.url }}" {% if file.path == current_path %}aria-current="page"{% endif %}>
+              <span class="docs-tree__dot" aria-hidden="true"></span>
+              <span>{{ file.name }}</span>
+            </a>
+          </li>
+        {% endfor %}
+      </ul>
+    {%- endmacro %}
+
+    <button
+      class="docs-nav-toggle"
+      type="button"
+      data-docs-nav-toggle
+      aria-controls="docs-sidebar"
+      aria-expanded="false"
+    >
+      <span class="docs-nav-toggle__icon" aria-hidden="true"><i></i><i></i><i></i></span>
+      <span>Documents</span>
+    </button>
+
+    <div class="docs-shell">
+      <aside class="docs-sidebar" id="docs-sidebar" data-docs-sidebar>
+        <header class="docs-sidebar__header">
+          <a class="docs-brand" href="{{ url_for('docs_web.index') }}">
+            <span class="docs-brand__mark" aria-hidden="true">MSH</span>
+            <span>
+              <strong>Documentation</strong>
+              <small>{{ document_count }} Markdown files</small>
+            </span>
+          </a>
+          <a class="docs-back" href="/">Back to MSH</a>
+        </header>
+
+        <nav class="docs-sidebar__navigation" aria-label="Documentation files">
+          {% if tree.dirs or tree.files %}
+            {{ render_tree(tree) }}
+          {% else %}
+            <p class="docs-sidebar__empty">No Markdown files were found.</p>
+          {% endif %}
+        </nav>
+      </aside>
+
+      <main class="docs-main">
+        <div class="docs-main__inner">
+          <nav class="docs-breadcrumbs" aria-label="Breadcrumb">
+            {% for crumb in breadcrumbs %}
+              {% if not loop.first %}<span aria-hidden="true">/</span>{% endif %}
+              {% if crumb.url %}
+                <a href="{{ crumb.url }}">{{ crumb.label }}</a>
+              {% else %}
+                <span {% if loop.last %}aria-current="page"{% endif %}>{{ crumb.label }}</span>
+              {% endif %}
+            {% endfor %}
+          </nav>
+
+          {% if document %}
+            <div class="docs-document-layout">
+              <article class="docs-article">
+                {{ document_html | safe }}
+              </article>
+              {% if document_toc %}
+                <aside class="docs-toc" aria-label="On this page">
+                  <strong>On this page</strong>
+                  {{ document_toc | safe }}
+                </aside>
+              {% endif %}
+            </div>
+          {% else %}
+            <section class="docs-welcome">
+              <p class="docs-eyebrow">Repository documentation</p>
+              <h1>MSH Documentation</h1>
+              {% if docs_root_exists %}
+                <p>
+                  Browse the Markdown files from the repository's <code>docs/</code>
+                  folder. The navigation follows the real directory structure and
+                  updates after the application is restarted or the page is refreshed.
+                </p>
+                <div class="docs-welcome__facts">
+                  <div><strong>{{ document_count }}</strong><span>documents available</span></div>
+                  <div><strong>Read only</strong><span>the browser cannot edit repository files</span></div>
+                  <div><strong>Local</strong><span>served by the existing MSH Flask app</span></div>
+                </div>
+                <p class="docs-welcome__hint">Choose a document from the navigation panel to begin.</p>
+              {% else %}
+                <div class="docs-warning">
+                  <strong>The documentation folder could not be found.</strong>
+                  <p>Start MSH from the repository checkout or configure <code>MSH_DOCS_ROOT</code>.</p>
+                </div>
+              {% endif %}
+            </section>
+          {% endif %}
+        </div>
+      </main>
+    </div>
+  </body>
+</html>
