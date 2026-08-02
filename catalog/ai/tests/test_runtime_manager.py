@@ -89,7 +89,7 @@ def test_model_change_keeps_one_scheduler_and_provider_capacity() -> None:
     second_started = threading.Event()
     calls: list[str] = []
     outcomes: list[str] = []
-    errors: list[Exception] = []
+    errors: list[RuntimeError | AssertionError] = []
 
     def fake_chat(**kwargs) -> str:
         model = str(kwargs["model"])
@@ -111,7 +111,7 @@ def test_model_change_keeps_one_scheduler_and_provider_capacity() -> None:
     def execute(runtime, model: str) -> None:
         try:
             outcomes.append(runtime.execute(_request(model)).content)
-        except Exception as error:  # pragma: no cover - asserted below
+        except (RuntimeError, AssertionError) as error:
             errors.append(error)
 
     first_thread = threading.Thread(target=execute, args=(first, "model-a"))
