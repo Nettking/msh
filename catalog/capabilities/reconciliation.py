@@ -1080,9 +1080,9 @@ class TrustedProviderRuntimeReconciler:
         )
         desired_ai_ids = tuple(item.capability_id for item in ai_bindings)
         desired_compute_ids = tuple(item.capability_id for item in compute_bindings)
-        ai_replace_ids = tuple(sorted(set((*previous_ai_ids, *desired_ai_ids))))
+        ai_replace_ids = tuple(sorted({*previous_ai_ids, *desired_ai_ids}))
         compute_replace_ids = tuple(
-            sorted(set((*previous_compute_ids, *desired_compute_ids)))
+            sorted({*previous_compute_ids, *desired_compute_ids})
         )
         try:
             if self.ai_runtime_manager is not None:
