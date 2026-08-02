@@ -89,7 +89,7 @@ def test_model_change_keeps_one_scheduler_and_provider_capacity() -> None:
     second_started = threading.Event()
     calls: list[str] = []
     outcomes: list[str] = []
-    errors: list[BaseException] = []
+    errors: list[Exception] = []
 
     def fake_chat(**kwargs) -> str:
         model = str(kwargs["model"])
@@ -111,7 +111,7 @@ def test_model_change_keeps_one_scheduler_and_provider_capacity() -> None:
     def execute(runtime, model: str) -> None:
         try:
             outcomes.append(runtime.execute(_request(model)).content)
-        except BaseException as error:  # pragma: no cover - asserted below
+        except Exception as error:  # pragma: no cover - asserted below
             errors.append(error)
 
     first_thread = threading.Thread(target=execute, args=(first, "model-a"))
