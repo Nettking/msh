@@ -85,7 +85,7 @@ class AdapterOutcome:
                 raise ValueError("reason must be non-empty when supplied")
             object.__setattr__(self, "reason", reason)
         if not isinstance(self.authority_confirmed, bool):
-            raise ValueError("authority_confirmed must be boolean")
+            raise TypeError("authority_confirmed must be boolean")
 
 
 class CandidateSource(Protocol):
