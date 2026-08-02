@@ -1,8 +1,8 @@
 # Connected capabilities
 
-MSH can keep the web workbench on one device and use a capability contributed by another device. The first supported shared capability is an Ollama language-model provider.
+MSH can keep the web workbench on one device and use a capability contributed by another device. The first supported shared capability is an Ollama language-model provider. Phase F7 adds a logical runtime that can keep several trusted language-model providers registered in the same session and select per request by explicit model, modality, availability, exclusion, and capacity policy.
 
-The intended phone setup is:
+The common phone setup remains:
 
 ```text
 Android phone                         Laptop
@@ -60,20 +60,41 @@ In MSH:
 6. Select **Test provider connection**.
 7. Continue to the model step, select **Edge small**, then save.
 
-The connection test reads `/api/tags` from the provider and updates the model readiness shown in setup. AI Explainer then uses the saved provider URL immediately; changing provider does not require rebuilding MSH.
+The connection test reads `/api/tags` from the provider and updates the model readiness shown in setup. AI Explainer then uses the saved provider immediately; changing the configured connection does not require rebuilding MSH.
 
-## Current scope
+## Logical provider runtime
 
-The connection record identifies:
+The setup UI persists one configured local or connected Ollama endpoint. F7.7 wraps that endpoint as a logical `language-model` provider and may retain it together with additional trusted, session-bound providers registered by application integration.
 
-- the contributing machine;
-- the capability type (`language-model`);
-- the protocol (`Ollama HTTP API`);
-- the endpoint;
-- the selected model profile;
-- live reachability and installed-model status.
+For each request, the runtime:
 
-This is a deliberate first step toward multiple cooperating MSH devices. It supports one active language-model provider. Automatic discovery, load balancing, credentials, internet exposure, and a general multi-provider registry are not part of this version.
+- validates the request and provider protocol versions;
+- requires the same logical session;
+- translates model and modality needs into explicit capability requirements;
+- filters unavailable, incompatible, excluded, or over-capacity providers;
+- selects deterministically rather than using primary/replica semantics;
+- enforces a bounded pending queue and provider concurrency limit;
+- passes timeout and cancellation only to adapters that declare support;
+- permits fallback only for explicitly allowlisted transient, timeout, or overload failures;
+- returns structured provider attempts, selection reasoning, results, and errors.
+
+The configured Ollama connection keeps one logical provider identity, scheduler, and capacity counter across model changes. Switching requested model cannot create a parallel runtime that bypasses the provider concurrency limit.
+
+The AI page and JSON response may show a safe provider label, logical capability ID, supported models and modalities, capacity, queue depth, and the selection reason. They do not expose the configured base URL, IP address, port, credentials, or backend path.
+
+## Authority boundary
+
+A language-model provider is an inference capability only. Registration or selection does not grant storage read, storage write, leadership, database access, artifact access, session administration, or permission to execute shell commands.
+
+Repository context supplied to AI remains selected by the MSH application. Protected job inputs and artifacts require their own short-lived, job-scoped authorization. Cross-session provider registration and cross-session requests fail closed.
+
+Ollama must remain private. Do not publish port `11434` to the internet or treat provider status as proof that the endpoint is authenticated. Use a trusted LAN, VPN, or a separately approved authenticated transport.
+
+## Current limitations
+
+The setup interface still configures one Ollama connection at a time. Additional simultaneous providers require trusted application-side registration; automatic discovery and enrollment from the federated control plane are not yet part of this setup flow.
+
+The F7.7 AI queue is bounded but process-local rather than a durable distributed interactive request queue. Production cost, latency, locality, fairness, quotas, model warm pools, streaming responses, untrusted-provider sandboxing, internet deployment, marketplace behavior, and payment are outside the current implementation.
 
 ## Troubleshooting
 
