@@ -289,8 +289,8 @@ def test_remote_contract_roundtrip_contains_only_logical_route_fields() -> None:
     frame = RemoteAIInvocationRequest(
         invocation_id="rai-contract",
         session_id=SESSION_ID,
-        requester_node_id="node-requester",
-        provider_node_id="node-provider",
+        requester_node_id="node-ABCDEFGHIJKLMNOPQRSTUVWX",
+        provider_node_id="node-ZYXWVUTSRQPONMLKJIHGFEDC",
         capability_id="provider-contract",
         provider_generation=2,
         health_report_revision=7,
