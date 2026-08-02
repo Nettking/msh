@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any, Final
 
 REDACTED: Final = "[redacted]"
@@ -62,6 +63,13 @@ NONPUBLIC_LOCATION_PREFIXES: Final = (
     "s3:",
     "sqlite:",
 )
+EMBEDDED_LOCATION_MARKERS: Final = tuple(
+    prefix for prefix in NONPUBLIC_LOCATION_PREFIXES if prefix not in {"/", "\\"}
+)
+_IPV4_LOCATION = re.compile(
+    r"(?<![0-9])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?"
+)
+_WINDOWS_LOCATION = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]")
 
 
 def is_secret_text(value: object) -> bool:
@@ -107,11 +115,11 @@ def is_nonpublic_location_text(value: object) -> bool:
     if not isinstance(value, str):
         return False
     normalized = value.strip().casefold()
-    return normalized.startswith(NONPUBLIC_LOCATION_PREFIXES) or (
-        len(normalized) >= 3
-        and normalized[0].isalpha()
-        and normalized[1] == ":"
-        and normalized[2] in {"\\", "/"}
+    return (
+        normalized.startswith(NONPUBLIC_LOCATION_PREFIXES)
+        or any(marker in normalized for marker in EMBEDDED_LOCATION_MARKERS)
+        or _IPV4_LOCATION.search(normalized) is not None
+        or _WINDOWS_LOCATION.search(value) is not None
     )
 
 
