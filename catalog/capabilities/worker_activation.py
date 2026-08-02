@@ -41,7 +41,7 @@ from .provider_health import (
     ProviderHealthRecord,
     ProviderHealthState,
 )
-from .provider_reports import ProviderStatus, protocol_version_parts
+from .provider_reports import ProviderStatus
 
 COMPUTE_HANDLER_DESCRIPTOR_SCHEMA = "msh.compute-handler-descriptor.v1"
 COMPUTE_HANDLER_ACTIVATION_SCHEMA = "msh.compute-handler-activation.v1"

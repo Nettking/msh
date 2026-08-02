@@ -42,7 +42,7 @@ from catalog.capabilities.worker_activation import (
     TrustedComputeWorkerBinder,
 )
 from catalog.federation.coordinator import SessionCoordinator
-from catalog.federation.errors import FederationOperationError, FederationValidationError
+from catalog.federation.errors import FederationValidationError
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 from catalog.node.identity import IdentityStore, NodeCredentials
 
