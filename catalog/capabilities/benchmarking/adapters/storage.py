@@ -147,7 +147,11 @@ class StorageCandidateAdapter:
             : target.payload_bytes
         ]
         probe_id = stable_fingerprint(
-            {"device_id": context.device_id, "candidate_id": target.candidate_id, "payload": payload.hex()}
+            {
+                "device_id": context.device_id,
+                "candidate_id": target.candidate_id,
+                "payload": payload.hex(),
+            }
         )
         write_completed = False
         read_completed = False
@@ -172,14 +176,14 @@ class StorageCandidateAdapter:
             round_trip_match = read_completed and value == payload
         except (BenchmarkCancelled, TimeoutError) as exc:
             cancelled = exc
-        except Exception:
+        except Exception:  # noqa: BLE001 - callback failures must still clean up
             failure = True
         finally:
             try:
                 started = self._monotonic()
                 cleanup_completed = bool(target.cleanup_probe(probe_id, context))
                 cleanup_latency = elapsed_ms(started, self._monotonic())
-            except Exception:
+            except Exception:  # noqa: BLE001 - cleanup evidence fails closed
                 cleanup_completed = False
                 failure = True
 
