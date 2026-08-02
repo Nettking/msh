@@ -25,6 +25,7 @@ from .remote_contracts import (
     RemoteAIInvocationOutcome,
     RemoteAIInvocationRequest,
     RemoteAIInvocationResponse,
+    _node_id,
 )
 from .runtime import (
     AIProviderInvocationError,
@@ -91,7 +92,7 @@ class RemoteAIHealthAuthority:
             )
         self.health = health
         self.session_id = _logical_id(session_id, "session_id")
-        self.actor_node_id = _logical_id(actor_node_id, "actor_node_id")
+        self.actor_node_id = _node_id(actor_node_id, "actor_node_id")
         self._clock = clock
 
     def now(self) -> datetime:
