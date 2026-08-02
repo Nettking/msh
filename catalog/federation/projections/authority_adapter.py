@@ -164,8 +164,8 @@ class FederationAuthorityAdapter:
                 actor_node_id=self._actor_node_id,
                 cursor=cursor,
             )
-            for key in merged:
-                merged[key].extend(_sequence(_value(page, key, ())))
+            for key, values in merged.items():
+                values.extend(_sequence(_value(page, key, ())))
             pagination = _value(page, "pagination", {})
             if not bool(_value(pagination, "has_more", False)):
                 return merged
