@@ -111,6 +111,18 @@ from .lifecycle_coordinator import (
 )
 from .lifecycle_store import ResultMutation, RetryMutation, SQLiteJobLifecycleStore
 from .lifecycle_worker import CancellableCapabilityWorker, SQLiteLifecycleDispatchInbox
+from .provider_enrollment import (
+    PROVIDER_ENROLLMENT_AUDIT_SCHEMA,
+    PROVIDER_ENROLLMENT_PROTOCOL,
+    PROVIDER_ENROLLMENT_PROTOCOL_MAJOR,
+    PROVIDER_ENROLLMENT_PROTOCOL_VERSION,
+    PROVIDER_ENROLLMENT_SCHEMA,
+    FederatedProviderEnrollmentService,
+    ProviderEnrollmentAuditEvent,
+    ProviderEnrollmentRecord,
+    ProviderEnrollmentState,
+    SQLiteProviderEnrollmentStore,
+)
 from .provider_reports import (
     PROVIDER_REPORT_PROTOCOL,
     PROVIDER_REPORT_PROTOCOL_MAJOR,
@@ -177,6 +189,11 @@ __all__ = [
     "MAX_PENDING_HEARTBEATS",
     "MAX_PENDING_LIFECYCLE_REQUESTS",
     "OUTPUT_PLACEMENT_POLICY_SCHEMA",
+    "PROVIDER_ENROLLMENT_AUDIT_SCHEMA",
+    "PROVIDER_ENROLLMENT_PROTOCOL",
+    "PROVIDER_ENROLLMENT_PROTOCOL_MAJOR",
+    "PROVIDER_ENROLLMENT_PROTOCOL_VERSION",
+    "PROVIDER_ENROLLMENT_SCHEMA",
     "PROVIDER_REPORT_PROTOCOL",
     "PROVIDER_REPORT_PROTOCOL_MAJOR",
     "PROVIDER_REPORT_PROTOCOL_VERSION",
@@ -220,6 +237,7 @@ __all__ = [
     "DurableJobSnapshot",
     "ExecutionResult",
     "F6ArtifactTransferPlanner",
+    "FederatedProviderEnrollmentService",
     "JobAttempt",
     "JobAuditEvent",
     "JobContract",
@@ -233,6 +251,9 @@ __all__ = [
     "OutputPlacementPolicy",
     "OwnershipLease",
     "ProviderCandidate",
+    "ProviderEnrollmentAuditEvent",
+    "ProviderEnrollmentRecord",
+    "ProviderEnrollmentState",
     "ProviderResourceReport",
     "ProviderSelection",
     "ProviderSelectionPolicy",
@@ -252,6 +273,7 @@ __all__ = [
     "SQLiteJobLifecycleStore",
     "SQLiteJobStore",
     "SQLiteLifecycleDispatchInbox",
+    "SQLiteProviderEnrollmentStore",
     "TimeoutPolicy",
     "WorkerRegistration",
     "evaluate_provider_candidate",
