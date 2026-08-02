@@ -1,5 +1,6 @@
 name: Phase F8.4 trusted compute worker activation
 
+# Final gate for the public activation boundary and relay acceptance path.
 on:
   pull_request:
     paths:
