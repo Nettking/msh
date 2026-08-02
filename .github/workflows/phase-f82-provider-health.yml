@@ -5,6 +5,7 @@ on:
     paths:
       - "catalog/capabilities/provider_health.py"
       - "catalog/capabilities/tests/test_provider_health.py"
+      - "catalog/capabilities/tests/test_provider_health_restart.py"
       - "catalog/capabilities/provider_enrollment.py"
       - "catalog/capabilities/provider_reports.py"
       - "catalog/capabilities/provider_selection.py"
@@ -16,6 +17,7 @@ on:
     paths:
       - "catalog/capabilities/provider_health.py"
       - "catalog/capabilities/tests/test_provider_health.py"
+      - "catalog/capabilities/tests/test_provider_health_restart.py"
       - "catalog/capabilities/provider_enrollment.py"
       - "catalog/capabilities/provider_reports.py"
       - "catalog/capabilities/provider_selection.py"
@@ -56,6 +58,7 @@ jobs:
           python -m compileall
           catalog/capabilities/provider_health.py
           catalog/capabilities/tests/test_provider_health.py
+          catalog/capabilities/tests/test_provider_health_restart.py
       - name: F8.2 and affected federation regressions
         run: >-
           python -m pytest -o addopts= -q
@@ -68,6 +71,7 @@ jobs:
           python -m ruff check
           catalog/capabilities/provider_health.py
           catalog/capabilities/tests/test_provider_health.py
+          catalog/capabilities/tests/test_provider_health_restart.py
           --ignore I001,RUF022,B008,C408,PLC0206,UP035
       - name: Compose validation
         run: docker compose config --quiet
