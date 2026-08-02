@@ -161,10 +161,14 @@ def test_discovery_requires_active_session_membership_and_is_deterministic(
         capability_type="language-model",
     )
 
-    assert [item.capability_id for item in discovered] == [
+    assert {item.capability_id for item in discovered} == {
         "provider-a",
         "provider-z",
+    }
+    discovery_order = [
+        (item.type, item.node_id, item.capability_id) for item in discovered
     ]
+    assert discovery_order == sorted(discovery_order)
     with pytest.raises(AuthorizationError) as outsider_rejected:
         service.discover(
             session_id="session-f8",
