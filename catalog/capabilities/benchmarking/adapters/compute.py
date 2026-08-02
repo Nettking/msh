@@ -65,13 +65,13 @@ class RegisteredComputeHandlerAdapter:
 
     def dependency_inputs(self, handler_id: str) -> dict[str, Any]:
         binding = self._bindings()[handler_id]
-        descriptor = getattr(binding, "descriptor")
+        descriptor = binding.descriptor
         return {
             "descriptor_fingerprint": safe_identifier(
                 getattr(descriptor, "descriptor_fingerprint", None),
                 "descriptor_fingerprint",
             ),
-            "binding_revision": int(getattr(binding, "revision")),
+            "binding_revision": int(binding.revision),
         }
 
     def __call__(self, context: InspectionContext) -> InspectionFinding:
