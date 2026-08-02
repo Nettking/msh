@@ -35,7 +35,6 @@ from catalog.capabilities.provider_reports import (
     ProviderStatus,
 )
 from catalog.federation.coordinator import SessionCoordinator
-from catalog.federation.errors import FederationOperationError
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 from catalog.node.identity import IdentityStore, NodeCredentials
 
@@ -551,15 +550,3 @@ def test_existing_fallback_policy_applies_to_two_remote_providers(
         "remote-primary",
         "remote-fallback",
     ]
-
-
-def test_binder_rejects_noncurrent_provider() -> None:
-    class MissingHealth:
-        pass
-
-    with pytest.raises(FederationOperationError):
-        raise FederationOperationError(
-            "remote-provider-not-current",
-            "provider is not current",
-            "capability_id",
-        )
