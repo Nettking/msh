@@ -2,19 +2,21 @@
 
 Status: pre-release scope definition. This document defines the intended trusted-federation boundary; it does not declare that `v1.0.0` has been released.
 
+Reality-audit baseline: `ba954c91fa5f0cbd075b2210fbb1fcc717df8fa8` on `main`.
+
+Current implementation evidence is summarized in:
+
+- `docs/implementation/capability_first_reality_audit.md`.
+
 ## Release identity
 
-Product milestone: **MSH Federation v1.0 technical baseline** with capability-first onboarding completed before release publication.
+Product milestone: **MSH Federation v1.0 technical authority baseline plus integrated and accepted capability-first product flow**.
 
-Release intent: provide a stable trusted federation for MSH devices that can contribute storage, language-model, compute, recording, and other supported capabilities while preserving explicit authority, bounded recovery, and local-first compatibility.
+The authority baseline through F8.7 exists. The capability-first release layer is not yet integrated or accepted. CF1-CF6 currently provide isolated contracts, services, a UI shell, and safe projections rather than a supported end-to-end product.
 
-## Product model
+## Intended product model
 
-Every installation is one persistent MSH device.
-
-A device may contribute several supported capabilities simultaneously. The user is not required to select one permanent deployment role during first-run setup.
-
-The intended product flow is:
+Every installation is one persistent MSH device. A device may contribute several supported capabilities simultaneously. The intended first-run flow is:
 
 ```text
 load or create device identity
@@ -25,197 +27,182 @@ load or create device identity
   -> reconnect and reconcile automatically on later starts
 ```
 
-Benchmarks describe suitability and capacity. They do not grant membership, provider authority, storage assignment, job ownership, or artifact access.
+At the audited baseline, the supported setup remains role-first and persists `deployment_mode`. The intended flow becomes release scope only after integration and CF7 acceptance.
 
-## Supported capability boundary
+## Supported authority boundary
 
-### Identity and federation membership
+Federation v1 is for explicitly trusted devices and providers.
+
+The following existing authority properties remain in scope:
 
 - persistent node identities;
-- explicit enrollment and revocation;
-- authenticated federation membership and actor checks;
-- discovery of federation candidates without granting trust;
-- verified first-time join;
-- local federation creation when no candidate exists;
-- ordered durable events and replay;
-- reconnect without inventing authority from connectivity alone.
+- explicit enrollment, membership, invitation, revocation, ordered events, and replay;
+- authenticated relay and supported direct transport;
+- storage primary/replica assignment, terms, leases, fencing, completeness, failover, and recovery;
+- durable capability-specific job ownership, dispatch, retry, cancellation, stale-worker fencing, and artifact authorization;
+- trusted provider enrollment, expiring health, remote AI binding, registered compute activation, operator projections, and restart reconciliation;
+- recorder durability and supported compatibility outputs.
 
-The current implementation uses an internal session boundary. During the compatible capability-first migration, one user-facing federation maps to one existing internal session. `session_id` remains an internal protocol and isolation field until a separately planned protocol-major migration.
+Capability-first integration must compose these authorities rather than create replacements.
 
-### Federation transport
+## Capability-first scope and current status
 
-- outbound node connections;
-- authenticated relay transport;
-- direct encrypted peer transport when available;
-- relay fallback;
-- signed route/rendezvous information;
-- verified, bounded, resumable object transfer;
-- restart-safe transfer state where implemented.
+### Contracts and compatibility
+
+In scope and isolated implementation complete:
+
+- versioned discovery, federation binding, inspection, benchmark, contribution candidate, and intent contracts;
+- deterministic `federation_id` mapping to the existing internal session boundary;
+- read-only migration preview for supported legacy deployment modes;
+- no protocol or existing persistence field removal.
+
+Not yet release-complete:
+
+- actual onboarding-state persistence and migration writes;
+- compatibility-tested upgrade and rollback behavior.
 
 ### Device inspection and benchmarks
 
-- bounded local inspection of supported hardware, services, handlers, storage candidates, network paths, and data sources;
-- versioned benchmark definitions and results;
-- expiring and invalidatable benchmark evidence;
-- safe capacity recommendations;
-- no credentials, private endpoint disclosure, arbitrary remote code, or automatic authority from benchmark success.
+In scope and partly implemented:
+
+- generic trusted-local benchmark registry/runner;
+- fingerprints, expiry, invalidation, safe diagnostics, and durable results;
+- generic device inspection seams.
+
+Still required for v1 claims:
+
+- concrete AI benchmark integrated from the legacy setup probe;
+- concrete MTConnect/data-source inspection adapter;
+- registered-compute benchmark;
+- storage-candidate benchmark;
+- authenticated-network benchmark;
+- supported persistence/composition and cross-platform composed gates.
+
+Benchmark timeout currently bounds caller wait and does not establish sandboxing or hard termination of a non-cooperative trusted local probe.
+
+### Federation discovery and connection
+
+In scope and isolated implementation complete:
+
+- bounded configured/relay-resolver discovery;
+- safe candidate projection;
+- verified join through existing enrollment/invitation authority;
+- reconnect through existing membership authority;
+- safe local federation creation when discovery completes with no candidate;
+- several-candidate selection.
+
+Still required:
+
+- supported Flask/setup integration;
+- real independently persisted multi-device acceptance on Windows and Linux;
+- accurate public documentation of supported discovery transports.
 
 ### Contributions
 
-- one device may contribute several capabilities simultaneously;
-- contribution intent is separate from benchmark evidence and federation policy;
-- enabling one contribution grants no unrelated authority;
-- contributions can be disabled or suspended without deleting unrelated device membership;
-- health and capacity remain fresh, authenticated, and expiring.
+In scope and isolated implementation complete:
 
-### Federated storage
+- one device may express several contribution intents;
+- candidate generation from inspection and benchmark evidence;
+- local intent storage and policy evaluation;
+- enable, disable, suspend, and reconcile seams;
+- AI adapter without compute/storage authority;
+- compute adapter restricted to registered handlers;
+- candidate-only storage adapter that cannot assign authority;
+- disabling/suspending through fencing callbacks without membership deletion.
 
-- logical storage API rather than direct application access to physical databases;
-- filesystem and supported database providers;
-- storage benchmark results create candidates only;
-- one coordinator-authorized writable primary per storage group;
-- zero or more replicas;
-- terms, leases, fencing tokens, and rejection of stale primary writes;
-- immutable and idempotent replication boundaries;
-- acknowledgement policy;
-- authoritative manifests, hashes, watermarks, and missing ranges;
-- completeness-aware failover;
-- explicit degraded state when no complete qualified candidate exists;
-- recovery and returning-former-primary behavior without self-promotion.
+Still required:
 
-### Capability scheduling
+- binding to actual supported recorder, AI, compute, and storage authorities;
+- stale/replay/restart proof;
+- simultaneous multi-capability end-to-end acceptance.
 
-- versioned job and attempt contracts;
-- capability-specific requirements;
-- several AI or compute providers without primary/replica semantics;
-- deterministic eligibility and provider ranking;
-- coordinator-owned durable job ownership;
-- authenticated dispatch to explicitly registered local handlers;
-- duplicate suppression;
-- bounded retry, timeout, heartbeat-loss handling, cancellation, and reassignment;
-- stale-worker fencing;
-- at most one logical committed result;
-- least-privilege job-scoped artifact authorization and verified publication.
+### Product UI
 
-### Trusted provider federation
+In scope but not integrated:
 
-- authenticated contribution enrollment and policy decision;
-- fresh provider health and capacity reports;
-- simultaneous trusted providers of the same type;
-- remote language-model invocation through logical authenticated routes;
-- local compute-handler activation without transferring executable code;
-- operator-safe provider status and controls;
-- restart/reconnect reconciliation from durable authority and ordered events;
-- natural health expiry without deleting durable trust or membership.
+- six-step onboarding template/static shell;
+- Federation overview template shell;
+- framework-neutral safe projections for Overview, This device, Devices, Services, Benchmarks, Storage, Jobs, Activity, and Settings.
 
-### Recorder and data-source contribution
+No supported Flask route currently composes these components. The UI shell and projections must not be described as a reachable Federation product until integrated.
 
-- MTConnect and future supported data-source discovery;
-- stable source identity;
-- explicit source selection before recording begins;
-- crash-safe local recording and compatibility outputs;
-- recorder contribution may coexist with AI, compute, workbench, or other capabilities on the same device.
+## Mandatory authority separations
 
-### Compatibility
+Federation v1 must preserve all of the following:
 
-- the current Flask-first workbench remains the supported application surface;
-- existing recorder durability and JSONL compatibility outputs remain supported;
-- local-first workflows remain possible without connected remote providers;
-- configured local or connected Ollama use remains supported during migration;
-- old deployment-mode settings remain readable and migrate deterministically;
-- migration does not silently enable a new contribution;
-- federation capability registration does not grant storage authority;
-- private service endpoints remain private by default.
+- benchmark evidence gives no authority;
+- discovery or network presence gives no membership;
+- contribution intent is not federation approval;
+- provider health is not membership, storage leadership, or job ownership;
+- AI gives no compute or storage authority;
+- compute can invoke only explicitly registered handlers;
+- storage candidates receive no primary/replica authority without the existing control plane;
+- disabling or suspending a contribution fences future use without deleting unrelated membership;
+- `session_id` remains the internal protocol/isolation field;
+- `deployment_mode` remains during the compatibility period;
+- role-first setup remains until CF7 succeeds;
+- protocol and persistence migration require separate compatibility plans.
 
-## Trust model
+## Compatibility boundary
 
-Federation v1 is for **explicitly trusted devices and providers**.
-
-V1 assumes:
-
-- an authorized operator or explicit private policy controls first-time device acceptance;
-- nodes are operated on trusted private networks, VPNs, or separately approved authenticated transport;
-- contributed compute handlers are preinstalled and explicitly registered locally;
-- provider operators are known and trusted;
-- private database, Ollama, Flask, relay, worker, and storage ports are not exposed publicly by default.
-
-V1 does not treat discovery, connection, benchmark success, contribution intent, provider health, selection, successful execution, or artifact access as equivalent authorities.
-
-## Explicitly outside v1
-
-The following are not supported claims for v1:
-
-- anonymous or public provider participation;
-- authority granted solely because a device is visible on the network;
-- arbitrary remotely supplied code, package, module, image, shell command, or process-launch execution;
-- production sandboxing for unknown third-party workloads;
-- marketplace, payment, billing, reputation, dispute, or settlement systems;
-- internet-wide automatic endpoint exposure;
-- a full Kubernetes-style scheduler;
-- production cost, energy, fairness, quota, preemption, accelerator, and placement optimization;
-- durable distributed interactive AI queues and complete streaming/model lifecycle orchestration;
-- complete public-relay operations, restrictive-NAT certification, or every physical topology;
-- production SLO, incident-management, abuse, denial-of-service, soak, chaos, and upgrade certification;
-- multi-organization policy management or comprehensive role-based administration;
-- removal or protocol renaming of the internal session boundary without a versioned migration plan.
-
-## Public terminology
-
-Use these product concepts consistently:
-
-- Federation
-- Device
-- This device
-- Connected device
-- Contribution
-- Service
-- Benchmark
-- Recommended
-- Enabled
-- Disabled
-- Temporarily unavailable
-- Storage candidate
-- Primary
-- Replica
-- AI service
-- Compute service
-- Recorder
-- Access removed
-- Degraded
-
-Use only in advanced or administrative contexts:
-
-- internal session ID;
-- owner/member authority;
-- provider enrollment records;
-- terms, generations, revisions, leases, and fencing tokens;
-- descriptor fingerprints and reconciliation cursors.
+- The current Flask-first application remains the supported surface.
+- Existing setup settings remain readable.
+- Existing recorder and AI configurations remain preserved.
+- Migration never silently enables compute or storage.
+- Local-first operation remains possible.
+- Private service endpoints remain private by default.
+- Existing technical Federation regressions remain mandatory during capability-first integration.
 
 ## Required release evidence
 
-The release may be published only after:
+Release publication requires all of the following:
 
-- repository cleanup and documentation consolidation are complete;
-- capability-first onboarding is implemented and accepted;
-- one permanent Federation regression gate is green on Linux and Windows;
-- clean installation succeeds from a fresh checkout;
-- first-run setup succeeds without selecting a permanent role;
-- at least two independently persisted devices complete discovery/join/reconnect/restart acceptance;
-- safe local federation creation is demonstrated when no candidate exists;
-- migration from every supported old deployment mode is demonstrated;
-- one device contributes at least two capabilities simultaneously;
-- benchmark expiry, invalidation, rerun, skip, and failure behavior are demonstrated;
-- storage replication and controlled failover are demonstrated;
-- at least one AI and one compute contribution are enabled, used, disabled or revoked, and recovered safely;
-- recorder plus another contribution is demonstrated on one device;
-- documentation links and commands are validated;
-- generated output and unsupported experiments are absent from the production tree;
-- security and limitation statements match actual behavior;
-- release notes and changelog are complete;
-- the exact release commit is tagged and verified.
+- bounded integration of CF1-CF6 into the supported Flask/setup/runtime path;
+- concrete v1 benchmark adapters;
+- explicit compatible persistence for onboarding, benchmarks, and contribution intents;
+- one permanent composed Federation regression gate on Linux and Windows;
+- fresh real Windows installation and manual verification;
+- fresh real Linux installation and manual verification;
+- first-run setup without selecting a permanent role;
+- at least two independently persisted devices completing verified discovery/join/reconnect/restart;
+- safe local federation creation when no candidate exists;
+- migration from every supported old deployment mode;
+- one device contributing at least recorder plus AI;
+- separate AI, registered-compute, and storage-candidate participation;
+- benchmark expiry, invalidation, rerun, skip, cancellation, timeout, and failure;
+- safe enable/use/disable/suspend/recovery for supported contributions;
+- storage replication and controlled failover through existing authority;
+- revocation and controlled rejoin;
+- desktop and mobile browser acceptance;
+- backup/recovery and corrupted-state rehearsal;
+- documentation commands and links checked;
+- cleanup and canonical documentation complete;
+- release notes and changelog matching actual limitations;
+- exact verified release commit and tag.
+
+Component workflows, merge count, fixture rendering, and earlier authority-core acceptance are not substitutes for this evidence.
+
+## Explicitly outside v1
+
+- anonymous or public provider participation;
+- authority from network presence;
+- arbitrary remotely supplied code, package, image, command, or process execution;
+- production sandboxing for unknown workloads;
+- marketplace, billing, reputation, or dispute systems;
+- internet-wide automatic endpoint exposure;
+- full Kubernetes-style scheduling;
+- advanced cost, energy, fairness, quota, preemption, and placement optimization;
+- complete public-relay/restrictive-NAT certification;
+- production SLO, incident, abuse, soak, chaos, and broad upgrade certification;
+- multi-organization policy management;
+- removal or protocol renaming of the internal session boundary without a versioned migration plan.
 
 ## Versioning policy
 
-- `1.0.x`: compatible fixes, documentation corrections, regression strengthening, and security hardening without deliberate public contract expansion;
-- `1.x`: compatible product improvements, including capability-first onboarding, guided Federation UI, benchmarks, and integrated documentation where protocol authority semantics remain compatible;
-- `2.0`: intentionally broader federation, trust, or protocol model requiring a new compatibility and migration decision.
+- `1.0.x`: compatible fixes, documentation corrections, regression strengthening, and security hardening without deliberate public-contract expansion;
+- `1.x`: compatible product improvements after v1 publication where protocol authority semantics remain stable;
+- `2.0`: broader trust, protocol, or compatibility model requiring explicit migration planning.
+
+## Current release decision
+
+Federation v1 is not release-ready at the audited baseline. The next release-progress boundary is a read-only Federation overview integrated into the supported Flask application, followed by the remaining bounded integration and CF7 acceptance work.
