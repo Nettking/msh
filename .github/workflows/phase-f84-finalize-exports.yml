@@ -1,0 +1,86 @@
+name: Finalize F8.4 exports
+
+on:
+  push:
+    branches: [agent/phase-f84-compute-worker-activation]
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/phase-f84-compute-worker-activation
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Apply exact F8.4 export cleanup
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          worker = Path("catalog/capabilities/worker_activation.py")
+          text = worker.read_text(encoding="utf-8")
+          old = "from .provider_reports import ProviderStatus, protocol_version_parts"
+          assert text.count(old) == 1
+          worker.write_text(text.replace(old, "from .provider_reports import ProviderStatus"), encoding="utf-8")
+
+          test = Path("catalog/capabilities/tests/test_worker_activation.py")
+          text = test.read_text(encoding="utf-8")
+          old = "from catalog.federation.errors import FederationOperationError, FederationValidationError"
+          assert text.count(old) == 1
+          test.write_text(text.replace(old, "from catalog.federation.errors import FederationValidationError"), encoding="utf-8")
+
+          public = Path("catalog/capabilities/__init__.py")
+          text = public.read_text(encoding="utf-8")
+          import_block = '''from .worker_activation import (
+              COMPUTE_HANDLER_ACTIVATION_KIND,
+              COMPUTE_HANDLER_ACTIVATION_SCHEMA,
+              COMPUTE_HANDLER_DESCRIPTOR_SCHEMA,
+              MAX_LOCAL_COMPUTE_HANDLERS,
+              ActivatedComputeWorker,
+              ComputeHandlerActivationReference,
+              ComputeWorkerActivationAuthority,
+              ComputeWorkerActivationSnapshot,
+              LocalComputeHandlerBinding,
+              LocalComputeHandlerDescriptor,
+              LocalComputeHandlerInventory,
+              TrustedComputeWorkerBinder,
+          )
+          '''
+          marker = "from .job_store import ("
+          assert marker in text
+          assert "from .worker_activation import (" not in text
+          text = text.replace(marker, import_block + marker, 1)
+          export_block = '''    "COMPUTE_HANDLER_ACTIVATION_KIND",
+              "COMPUTE_HANDLER_ACTIVATION_SCHEMA",
+              "COMPUTE_HANDLER_DESCRIPTOR_SCHEMA",
+              "MAX_LOCAL_COMPUTE_HANDLERS",
+              "ActivatedComputeWorker",
+              "ComputeHandlerActivationReference",
+              "ComputeWorkerActivationAuthority",
+              "ComputeWorkerActivationSnapshot",
+              "LocalComputeHandlerBinding",
+              "LocalComputeHandlerDescriptor",
+              "LocalComputeHandlerInventory",
+              "TrustedComputeWorkerBinder",
+          '''
+          marker = '    "validate_provider_report_protocol",\n]'
+          assert marker in text
+          text = text.replace(marker, export_block + marker, 1)
+          public.write_text(text, encoding="utf-8")
+
+          Path(".github/workflows/phase-f84-finalize-exports.yml").unlink()
+          PY
+      - name: Commit exact cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/capabilities/worker_activation.py catalog/capabilities/tests/test_worker_activation.py catalog/capabilities/__init__.py .github/workflows/phase-f84-finalize-exports.yml
+          git commit -m "Finalize F8.4 public activation boundary"
+          git push origin HEAD:agent/phase-f84-compute-worker-activation
