@@ -11,6 +11,7 @@ from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_bac
 
 from .ai_routes import ai_web
 from .docs_routes import docs_web
+from .federation_routes import federation_web
 from .operator_strategy_routes import operator_strategy_web
 from .operator_support_routes import operator_support_web
 from .provider_federation_routes import provider_federation_web
@@ -75,9 +76,10 @@ def create_app() -> Flask:
     )
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
-    # Documentation is registered before the main web blueprint so its
-    # read-only pre-runtime hook runs before the global startup gate.
+    # Read-only surfaces are registered before the main web blueprint so their
+    # GET/HEAD hooks can run without changing the legacy startup gate.
     app.register_blueprint(docs_web)
+    app.register_blueprint(federation_web)
     app.register_blueprint(server_setup_web)
     app.register_blueprint(web)
     app.register_blueprint(source_web)
