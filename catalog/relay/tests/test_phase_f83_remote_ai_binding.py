@@ -1,3 +1,5 @@
+"""F8.3 relay acceptance, also guarding the F8.5 AI eligibility projection."""
+
 from __future__ import annotations
 
 import asyncio
