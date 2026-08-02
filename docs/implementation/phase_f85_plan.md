@@ -8,6 +8,8 @@ Baseline: `main` at `99bbe25d23bb160ad57c821ae275145dee9addb0` after F8.4 truste
 
 F8.5 exposes the existing trusted-provider authority chain to a local operator without creating a second source of truth. Discovery remains owned by the Phase 2 coordinator, durable decisions remain owned by F8.1 enrollment, live state remains owned by F8.2 health, remote AI eligibility remains owned by F8.3, and compute compatibility remains owned by F8.4.
 
+The operator surface is an authority-neutral projection and command adapter. It does not persist an independent provider, health, activation, job, artifact, or storage state.
+
 ## Delivery
 
 - a versioned, immutable provider operator snapshot containing only safe logical identity, announcement status, enrollment state/revision, health state/reason, expiry, generation, report revision, bounded resource counters, activation eligibility, inventory compatibility, allowed actions, and safe reason codes;
