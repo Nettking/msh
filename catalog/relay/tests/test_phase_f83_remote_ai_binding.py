@@ -122,10 +122,10 @@ async def join(
     await owner.request_replay(session_id)
 
 
-def runtime_request(request_id: str) -> AIRuntimeRequest:
+def runtime_request(session_id: str, request_id: str) -> AIRuntimeRequest:
     return AIRuntimeRequest(
         request_id=request_id,
-        session_id="session-f83-relay",
+        session_id=session_id,
         idempotency_key=f"idem-{request_id}",
         model="small",
         modality=AIModality.TEXT,
@@ -137,6 +137,7 @@ def runtime_request(request_id: str) -> AIRuntimeRequest:
 
 def health_report(
     *,
+    session_id: str,
     provider_node_id: str,
     revision: int,
     reported_at: datetime,
@@ -144,7 +145,7 @@ def health_report(
     return ProviderResourceReport(
         capability_id=CAPABILITY_ID,
         node_id=provider_node_id,
-        session_id="session-f83-relay",
+        session_id=session_id,
         capability_type="language-model",
         protocol="msh-language-model",
         protocol_version="1.0",
@@ -193,7 +194,6 @@ def test_f83_remote_provider_invokes_once_over_authenticated_relay(
             await enroll(relay, provider_node)
             session = await owner.create_session("F8.3 relay AI")
             session_id = str(session["session_id"])
-            assert session_id == "session-f83-relay"
             await join(owner, provider_node, session_id)
 
             relay.coordinator.announce_capability(
@@ -242,6 +242,7 @@ def test_f83_remote_provider_invokes_once_over_authenticated_relay(
             )
             health.publish(
                 health_report(
+                    session_id=session_id,
                     provider_node_id=provider_node.node_id,
                     revision=0,
                     reported_at=current[0],
@@ -287,7 +288,7 @@ def test_f83_remote_provider_invokes_once_over_authenticated_relay(
                 capability_id=CAPABILITY_ID,
                 provider_generation=1,
                 health_report_revision=0,
-                request=runtime_request("relay-one"),
+                request=runtime_request(session_id, "relay-one"),
                 sent_at=current[0],
                 expires_at=current[0] + timedelta(seconds=10),
             )
@@ -308,6 +309,7 @@ def test_f83_remote_provider_invokes_once_over_authenticated_relay(
             current[0] += timedelta(seconds=1)
             health.publish(
                 health_report(
+                    session_id=session_id,
                     provider_node_id=provider_node.node_id,
                     revision=0,
                     reported_at=current[0],
@@ -324,7 +326,7 @@ def test_f83_remote_provider_invokes_once_over_authenticated_relay(
                 capability_id=CAPABILITY_ID,
                 provider_generation=1,
                 health_report_revision=0,
-                request=runtime_request("relay-stale"),
+                request=runtime_request(session_id, "relay-stale"),
                 sent_at=current[0],
                 expires_at=current[0] + timedelta(seconds=10),
             )
