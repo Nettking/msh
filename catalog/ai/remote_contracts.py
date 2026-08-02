@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
@@ -31,10 +32,23 @@ REMOTE_AI_RESPONSE_SCHEMA = "msh.remote-ai-invocation-response.v1"
 MAX_REMOTE_AI_CONTROL_MESSAGE_BYTES = 5 * 1024 * 1024
 MAX_REMOTE_AI_INVOCATION_TTL_SECONDS = 3_600
 
+_NODE_ID_RE = re.compile(r"^node-[A-Za-z0-9_-]{16,200}$")
+
 
 class RemoteAIInvocationOutcome(str, Enum):
     SUCCEEDED = "succeeded"
     FAILED = "failed"
+
+
+def _node_id(value: Any, field: str) -> str:
+    value = _text(value, field, maximum=256)
+    if _NODE_ID_RE.fullmatch(value) is None:
+        raise FederationValidationError(
+            "invalid-node-id",
+            field,
+            "must be a derived MSH node identity",
+        )
+    return value
 
 
 def _positive(value: Any, field: str) -> int:
@@ -173,14 +187,10 @@ class RemoteAIInvocationRequest:
     remote_protocol_version: str = REMOTE_AI_PROTOCOL_VERSION
 
     def __post_init__(self) -> None:
-        for name in (
-            "invocation_id",
-            "session_id",
-            "requester_node_id",
-            "provider_node_id",
-            "capability_id",
-        ):
+        for name in ("invocation_id", "session_id", "capability_id"):
             object.__setattr__(self, name, _logical_id(getattr(self, name), name))
+        for name in ("requester_node_id", "provider_node_id"):
+            object.__setattr__(self, name, _node_id(getattr(self, name), name))
         object.__setattr__(
             self,
             "provider_generation",
@@ -315,12 +325,12 @@ class RemoteAIInvocationResponse:
         for name in (
             "invocation_id",
             "session_id",
-            "requester_node_id",
-            "provider_node_id",
             "capability_id",
             "request_id",
         ):
             object.__setattr__(self, name, _logical_id(getattr(self, name), name))
+        for name in ("requester_node_id", "provider_node_id"):
+            object.__setattr__(self, name, _node_id(getattr(self, name), name))
         object.__setattr__(
             self,
             "provider_generation",
