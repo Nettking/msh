@@ -1,4 +1,4 @@
-"""Read-only AI explainer and logical language-model runtime helpers."""
+"""Read-only AI explainer, local runtime, and trusted remote model helpers."""
 
 from .federated_runtime import TrustedFederatedLanguageModelRuntime
 from .ollama_provider import OllamaLanguageModelProvider, logical_provider_id
