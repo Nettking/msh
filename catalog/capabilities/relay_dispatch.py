@@ -60,7 +60,10 @@ class RelayDispatchEndpoint:
         if request_timeout <= 0:
             raise ValueError("request_timeout must be positive")
         self.relay_client = relay_client
-        self.workers = dict(workers or {})
+        self.workers: dict[str, CapabilityWorker] = {}
+        for provider_id, worker in dict(workers or {}).items():
+            self._validate_worker(provider_id, worker)
+            self.workers[provider_id] = worker
         self.request_timeout = float(request_timeout)
         self._pending: dict[str, _Pending] = {}
         self._reader_task: asyncio.Task[None] | None = None
@@ -70,22 +73,62 @@ class RelayDispatchEndpoint:
         )
         self._closed = False
 
-    def register_worker(self, provider_id: str, worker: CapabilityWorker) -> None:
+    def _validate_worker(self, provider_id: str, worker: CapabilityWorker) -> None:
         if not isinstance(provider_id, str) or not provider_id:
             raise ValueError("provider_id must be non-empty text")
-        if worker.registration.provider_id != provider_id:
+        registration = getattr(worker, "registration", None)
+        if registration is None or registration.provider_id != provider_id:
             raise FederationValidationError(
                 "worker-provider-mismatch",
                 "provider_id",
                 "registration differs from the endpoint worker key",
             )
-        if worker.registration.node_id != self.relay_client.node_id:
+        if registration.node_id != self.relay_client.node_id:
             raise FederationValidationError(
                 "worker-node-mismatch",
                 "node_id",
                 "worker registration differs from the local node identity",
             )
+
+    def register_worker(self, provider_id: str, worker: CapabilityWorker) -> None:
+        self._validate_worker(provider_id, worker)
         self.workers[provider_id] = worker
+
+    def replace_workers(
+        self,
+        workers: dict[str, CapabilityWorker],
+        *,
+        replace_provider_ids: tuple[str, ...],
+    ) -> dict[str, CapabilityWorker]:
+        """Atomically replace one explicit reconciler-owned worker subset."""
+
+        replacement_ids = tuple(sorted(set(replace_provider_ids)))
+        if any(not isinstance(item, str) or not item for item in replacement_ids):
+            raise ValueError("replace_provider_ids must contain non-empty text")
+        replacement_set = set(replacement_ids)
+        normalized = dict(workers)
+        for provider_id, worker in normalized.items():
+            if provider_id not in replacement_set:
+                raise FederationValidationError(
+                    "unowned-worker-replacement",
+                    "provider_id",
+                    "replacement worker must be included in the explicit owned set",
+                )
+            self._validate_worker(provider_id, worker)
+        previous = {
+            provider_id: self.workers[provider_id]
+            for provider_id in replacement_ids
+            if provider_id in self.workers
+        }
+        if (
+            set(previous) == set(normalized)
+            and all(previous[key] is normalized[key] for key in normalized)
+        ):
+            return previous
+        for provider_id in replacement_ids:
+            self.workers.pop(provider_id, None)
+        self.workers.update(normalized)
+        return previous
 
     def unregister_worker(
         self,
