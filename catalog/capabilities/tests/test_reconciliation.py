@@ -40,10 +40,7 @@ from catalog.capabilities.worker_activation import (
     TrustedComputeWorkerBinder,
 )
 from catalog.federation.coordinator import SessionCoordinator
-from catalog.federation.errors import (
-    AuthorizationError,
-    FederationOperationError,
-)
+from catalog.federation.errors import AuthorizationError, FederationOperationError
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 from catalog.node.identity import IdentityStore, NodeCredentials
 
@@ -328,7 +325,6 @@ def publish_compute(
 
 
 def prepare_authority(
-    tmp_path: Path,
     *,
     coordinator: SessionCoordinator,
     enrollments: FederatedProviderEnrollmentService,
@@ -457,7 +453,6 @@ def test_restart_reopens_all_authorities_and_rebuilds_exact_runtime(
         current,
     ) = environment(tmp_path)
     inventory, _descriptor = prepare_authority(
-        tmp_path,
         coordinator=coordinator,
         enrollments=enrollments,
         health=health,
@@ -513,19 +508,19 @@ def test_restart_reopens_all_authorities_and_rebuilds_exact_runtime(
     unchanged = restarted.reconcile()
 
     assert rebuilt.changed is True
-    assert rebuilt.reason_code == "runtime-rebuilt"
+    assert rebuilt.reason_code == "runtime-authority-rebuilt"
     assert restarted_manager.additional_provider_ids() == (AI_CAPABILITY,)
     assert tuple(restarted_endpoint.workers) == (COMPUTE_CAPABILITY,)
     assert unchanged.changed is False
     assert unchanged.reason_code == "reconciliation-unchanged"
     assert unchanged.checkpoint_revision == rebuilt.checkpoint_revision
 
-    serialized = str(
-        reopened_store.get(
-            session_id=SESSION_ID,
-            actor_node_id=local_actor.identity.node_id,
-        ).to_dict()
+    reopened_checkpoint = reopened_store.get(
+        session_id=SESSION_ID,
+        actor_node_id=local_actor.identity.node_id,
     )
+    assert reopened_checkpoint is not None
+    serialized = str(reopened_checkpoint.to_dict())
     for forbidden in (
         "properties",
         "attributes",
@@ -558,7 +553,6 @@ def test_report_revision_generation_and_expiry_replace_then_remove_bindings(
         current,
     ) = environment(tmp_path)
     inventory, descriptor = prepare_authority(
-        tmp_path,
         coordinator=coordinator,
         enrollments=enrollments,
         health=health,
@@ -645,7 +639,6 @@ def test_suspension_and_member_removal_clear_only_reconciler_owned_runtime(
         current,
     ) = environment(tmp_path)
     inventory, _descriptor = prepare_authority(
-        tmp_path,
         coordinator=coordinator,
         enrollments=enrollments,
         health=health,
@@ -712,7 +705,6 @@ def test_checkpoint_failure_rolls_back_runtime_and_replay_limit_fails_closed(
         current,
     ) = environment(tmp_path)
     inventory, _descriptor = prepare_authority(
-        tmp_path,
         coordinator=coordinator,
         enrollments=enrollments,
         health=health,
