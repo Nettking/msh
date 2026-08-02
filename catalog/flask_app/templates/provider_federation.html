@@ -1,0 +1,109 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro">
+  <h2>Provider federation</h2>
+  <p>Review trusted provider decisions, live health, and activation eligibility without exposing connection or implementation details.</p>
+</section>
+
+{% if operator_error %}
+<section class="section-block overview-decision overview-decision--error">
+  <div class="overview-decision__main">
+    <span class="metric-label">Federation status</span>
+    <h3>Provider controls are unavailable</h3>
+    <p class="overview-decision__summary">Reason: <code>{{ operator_error }}</code></p>
+    <div class="overview-decision__next">
+      <strong>What this means</strong>
+      <p>The local runtime has not bound an authorized provider operator surface, or the current node cannot read the configured session.</p>
+    </div>
+  </div>
+</section>
+{% elif operator_view %}
+<section class="section-block overview-decision {% if operator_view.is_owner %}overview-decision--ready{% else %}overview-decision--partial{% endif %}">
+  <div class="overview-decision__main">
+    <span class="metric-label">Session</span>
+    <h3>{{ operator_view.session_id }}</h3>
+    <p class="overview-decision__summary">
+      {% if operator_view.is_owner %}
+      This node is the session owner and may manage provider enrollment using revision-fenced commands.
+      {% else %}
+      This node is a session member. Provider state is read-only.
+      {% endif %}
+    </p>
+  </div>
+  <div class="overview-decision__facts">
+    <span class="status-badge {% if operator_view.is_owner %}status-ready{% else %}status-waiting{% endif %}">
+      {{ 'Owner controls' if operator_view.is_owner else 'Read only' }}
+    </span>
+    <ul>
+      <li>{{ operator_view.providers|length }} provider record(s).</li>
+      <li>Generated {{ operator_view.generated_at.isoformat() }}.</li>
+      <li>Actor identity is bound by the server.</li>
+    </ul>
+  </div>
+</section>
+
+<section class="section-block section-block--primary">
+  <header>
+    <h3>Providers</h3>
+    <p>Only safe logical identity, decision, health, capacity, and compatibility fields are shown.</p>
+  </header>
+
+  <div class="info-grid">
+    {% for provider in operator_view.providers %}
+    <article class="info-card">
+      <header>
+        <div>
+          <span class="metric-label">{{ provider.capability_type }}</span>
+          <h4>{{ provider.capability_id }}</h4>
+        </div>
+        <span class="status-badge {% if provider.activation_state.value == 'eligible' %}status-ready{% elif provider.activation_state.value == 'incompatible' %}status-error{% else %}status-waiting{% endif %}">
+          {{ provider.activation_state.value.replace('-', ' ')|title }}
+        </span>
+      </header>
+
+      <dl>
+        <div><dt>Node</dt><dd><code>{{ provider.node_id }}</code></dd></div>
+        <div><dt>Protocol</dt><dd>{{ provider.protocol }} {{ provider.protocol_version }}</dd></div>
+        <div><dt>Announcement</dt><dd>{{ provider.announcement_status }}</dd></div>
+        <div><dt>Enrollment</dt><dd>{{ provider.enrollment_state }}{% if provider.enrollment_revision %} · revision {{ provider.enrollment_revision }}{% endif %}</dd></div>
+        <div><dt>Enrollment reason</dt><dd><code>{{ provider.enrollment_reason_code }}</code></dd></div>
+        <div><dt>Health</dt><dd>{{ provider.health_state }} · <code>{{ provider.health_reason_code }}</code></dd></div>
+        <div><dt>Activation</dt><dd><code>{{ provider.activation_reason_code }}</code></dd></div>
+        {% if provider.provider_generation is not none %}<div><dt>Generation</dt><dd>{{ provider.provider_generation }}</dd></div>{% endif %}
+        {% if provider.report_revision is not none %}<div><dt>Report revision</dt><dd>{{ provider.report_revision }}</dd></div>{% endif %}
+        {% if provider.expires_at %}<div><dt>Health expires</dt><dd>{{ provider.expires_at.isoformat() }}</dd></div>{% endif %}
+        {% if provider.max_concurrent_jobs is not none %}
+        <div><dt>Capacity</dt><dd>{{ provider.active_jobs }}/{{ provider.max_concurrent_jobs }} active · queue {{ provider.queue_depth }} · utilization {{ provider.utilization_millis }}‰</dd></div>
+        {% endif %}
+        {% if provider.inventory_compatible is not none %}<div><dt>Local inventory</dt><dd>{{ 'Compatible' if provider.inventory_compatible else 'Not compatible' }}</dd></div>{% endif %}
+      </dl>
+
+      {% if provider.allowed_actions %}
+      <div class="overview-decision__actions">
+        {% for action in provider.allowed_actions %}
+        <form method="post" action="{{ url_for('provider_federation_web.provider_action_html', capability_id=provider.capability_id, action=action.value) }}">
+          <input type="hidden" name="_csrf_token" value="{{ provider_federation_csrf_token }}">
+          {% if action.value != 'request' %}<input type="hidden" name="expected_revision" value="{{ provider.enrollment_revision }}">{% endif %}
+          {% if action.value == 'suspend' %}<input type="hidden" name="reason_code" value="operator-suspended">{% endif %}
+          {% if action.value == 'revoke' %}<input type="hidden" name="reason_code" value="operator-revoked">{% endif %}
+          <button type="submit" class="{% if action.value == 'approve' %}button-primary{% endif %}">{{ action.value|title }}</button>
+        </form>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </article>
+    {% else %}
+    <article class="info-card">
+      <h4>No providers discovered</h4>
+      <p>The session currently has no announced or previously enrolled capability providers.</p>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="section-block">
+  <h3>Safety boundary</h3>
+  <p>This page never displays provider properties, health attributes, prompts, results, endpoints, addresses, credentials, backend paths, handler objects, package names, module paths, artifact grants, or storage authority.</p>
+</section>
+{% endif %}
+{% endblock %}
