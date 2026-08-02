@@ -1,0 +1,153 @@
+{
+  "schema": "msh.cf7.acceptance-manifest.v1",
+  "scope": "CF7-A capability-first acceptance harness and workflow foundation",
+  "acceptance_claim": "foundation-only",
+  "federation_v1_end_to_end_accepted": false,
+  "capability_first_onboarding_end_to_end_accepted": false,
+  "executable_now": [
+    {
+      "id": "cf1.contracts-and-legacy-migration-preview",
+      "status": "executable",
+      "evidence": "catalog/federation/tests/test_onboarding_contracts.py"
+    },
+    {
+      "id": "cf2a.isolated-inspection-benchmark-engine",
+      "status": "executable",
+      "evidence": "catalog/capabilities/tests selected by benchmarking, excluding adapters"
+    },
+    {
+      "id": "cf2b.isolated-concrete-benchmark-adapters",
+      "status": "executable",
+      "evidence": "catalog/capabilities/tests/test_benchmarking_adapters.py"
+    },
+    {
+      "id": "cf3.multiple-candidate-selection",
+      "status": "executable",
+      "evidence": "cf7_acceptance/test_foundation.py"
+    },
+    {
+      "id": "cf3.verified-join-and-trusted-reconnect",
+      "status": "executable",
+      "evidence": "cf7_acceptance/test_foundation.py"
+    },
+    {
+      "id": "federation.membership-revocation-fencing-controlled-rejoin",
+      "status": "executable",
+      "evidence": "cf7_acceptance/test_foundation.py"
+    },
+    {
+      "id": "state.identity-isolation-restart-corruption-partial-write",
+      "status": "executable",
+      "evidence": "cf7_acceptance/test_foundation.py"
+    },
+    {
+      "id": "cf4.isolated-contribution-service-contracts",
+      "status": "executable",
+      "evidence": "catalog/capabilities/contributions/tests"
+    },
+    {
+      "id": "cf5.static-ui-shell-contracts",
+      "status": "executable",
+      "evidence": "catalog/flask_app/tests/test_cf5_ui_shell.py"
+    },
+    {
+      "id": "cfi1.read-only-federation-overview-route",
+      "status": "executable",
+      "evidence": "catalog/flask_app/tests/test_federation_overview_route.py"
+    },
+    {
+      "id": "cf6.framework-neutral-projection-safety",
+      "status": "executable",
+      "evidence": "catalog/federation/tests/test_federation_projections.py"
+    },
+    {
+      "id": "federation-v1.focused-authority-regressions",
+      "status": "executable",
+      "evidence": "catalog/federation/tests/test_phase2_unit.py"
+    }
+  ],
+  "blocked_by_cfi": [
+    {
+      "id": "product.existing-federation-discovery-and-join",
+      "status": "blocked",
+      "blocked_by": "CFI-2 supported onboarding composition"
+    },
+    {
+      "id": "product.no-candidate-local-federation-creation",
+      "status": "blocked",
+      "blocked_by": "CFI-2 supported onboarding composition"
+    },
+    {
+      "id": "product.returning-device-startup-reconnect",
+      "status": "blocked",
+      "blocked_by": "CFI-2 startup integration"
+    },
+    {
+      "id": "product.legacy-mode-browser-migration",
+      "status": "blocked",
+      "blocked_by": "CFI-2 onboarding route and persisted product flow"
+    },
+    {
+      "id": "product.recorder-plus-ai-simultaneous-contribution",
+      "status": "blocked",
+      "blocked_by": "contribution authority binding"
+    },
+    {
+      "id": "product.separate-ai-compute-storage-contributors",
+      "status": "blocked",
+      "blocked_by": "contribution authority binding and supported product composition"
+    },
+    {
+      "id": "product.benchmark-run-skip-rerun-through-flask-onboarding",
+      "status": "blocked",
+      "blocked_by": "CFI-2 supported Flask/onboarding benchmark composition"
+    },
+    {
+      "id": "product.contribution-disable-and-reenable",
+      "status": "blocked",
+      "blocked_by": "contribution actions in the supported product flow"
+    },
+    {
+      "id": "product.federation-overview-mutations",
+      "status": "blocked",
+      "blocked_by": "CFI-1 is intentionally read-only and grants no mutation authority"
+    },
+    {
+      "id": "product.complete-capability-first-end-to-end-acceptance",
+      "status": "blocked",
+      "blocked_by": "remaining CFI integration and full CF7"
+    }
+  ],
+  "manual_physical_verification": [
+    {
+      "id": "physical.fresh-windows-checkout",
+      "status": "manual",
+      "reason": "CI validates a clean Windows runner, not owner hardware"
+    },
+    {
+      "id": "physical.fresh-linux-checkout",
+      "status": "manual",
+      "reason": "CI validates a clean Ubuntu runner, not owner hardware"
+    },
+    {
+      "id": "physical.multi-host-relay-and-network-path",
+      "status": "manual",
+      "reason": "requires independent hosts and the deployment network"
+    },
+    {
+      "id": "physical.mtconnect-recorder-source",
+      "status": "manual",
+      "reason": "requires a reachable physical or approved MTConnect source"
+    },
+    {
+      "id": "physical.ollama-model-and-accelerator",
+      "status": "manual",
+      "reason": "requires local model files and target accelerator hardware"
+    },
+    {
+      "id": "physical.mobile-and-desktop-browser-review",
+      "status": "manual",
+      "reason": "the route is automated, but responsive rendering and interaction still require real desktop and mobile browsers"
+    }
+  ]
+}
