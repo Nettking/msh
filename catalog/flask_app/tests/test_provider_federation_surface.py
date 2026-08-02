@@ -221,7 +221,8 @@ def test_html_page_renders_safe_provider_status() -> None:
     assert b"Provider federation" in response.data
     assert b"provider-one" in response.data
     assert b"Actor identity is bound by the server" in response.data
-    assert b"properties" not in response.data
+    assert b"<dt>Properties</dt>" not in response.data
+    assert b"handler_id" not in response.data
 
 
 def test_real_app_factory_registers_provider_federation_blueprint() -> None:

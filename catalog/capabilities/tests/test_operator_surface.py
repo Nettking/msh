@@ -264,8 +264,8 @@ def ready_environment(tmp_path: Path):
         descriptor,
         owner,
         provider,
-        reader,
-        outsider,
+        _reader,
+        _outsider,
         current,
     ) = values
     announce(
