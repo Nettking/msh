@@ -12,7 +12,14 @@ from catalog.capabilities.provider_reports import (
 )
 from catalog.federation.errors import FederationValidationError
 
-from .runtime import LanguageModelRuntime, _safe_provider_name
+from .remote_contracts import _node_id
+from .runtime import (
+    MAX_REGISTERED_AI_PROVIDERS,
+    LanguageModelRuntime,
+    _ProviderState,
+    _safe_provider_name,
+)
+from .runtime_contracts import _logical_id, _text
 
 
 class TrustedFederatedLanguageModelRuntime(LanguageModelRuntime):
@@ -22,6 +29,93 @@ class TrustedFederatedLanguageModelRuntime(LanguageModelRuntime):
     exposing ``resource_report(now)`` contribute their current F8.2 report,
     augmented conservatively with requests reserved by this runtime instance.
     """
+
+    def register(
+        self,
+        provider,
+        *,
+        status: ProviderStatus = ProviderStatus.READY,
+    ) -> None:
+        """Accept derived MSH node identities only for F8.2-backed providers."""
+
+        if not callable(getattr(provider, "resource_report", None)):
+            super().register(provider, status=status)
+            return
+        capability_id = _logical_id(
+            getattr(provider, "capability_id", None), "capability_id"
+        )
+        _node_id(getattr(provider, "node_id", None), "node_id")
+        provider_session = _logical_id(
+            getattr(provider, "session_id", None), "provider.session_id"
+        )
+        if provider_session != self.session_id:
+            raise FederationValidationError(
+                "cross-session-ai-provider",
+                "provider.session_id",
+                "provider must belong to the runtime session",
+            )
+        _safe_provider_name(getattr(provider, "display_name", None))
+        _text(
+            getattr(provider, "protocol", None),
+            "provider.protocol",
+            maximum=128,
+        )
+        _text(
+            getattr(provider, "protocol_version", None),
+            "provider.protocol_version",
+            maximum=32,
+        )
+        models = tuple(
+            _text(item, f"provider.models[{index}]", maximum=256)
+            for index, item in enumerate(getattr(provider, "models", ()))
+        )
+        modalities = tuple(
+            _logical_id(item, f"provider.modalities[{index}]")
+            for index, item in enumerate(getattr(provider, "modalities", ()))
+        )
+        if not models or not modalities:
+            raise FederationValidationError(
+                "incomplete-ai-provider",
+                "provider",
+                "must advertise at least one model and modality",
+            )
+        max_concurrent = getattr(provider, "max_concurrent_jobs", None)
+        if (
+            isinstance(max_concurrent, bool)
+            or not isinstance(max_concurrent, int)
+            or max_concurrent <= 0
+        ):
+            raise FederationValidationError(
+                "invalid-provider-capacity",
+                "max_concurrent_jobs",
+                "must be a positive integer",
+            )
+        try:
+            provider_status = ProviderStatus(status)
+        except (TypeError, ValueError) as exc:
+            raise FederationValidationError(
+                "invalid-provider-status",
+                "status",
+                "unknown provider status",
+            ) from exc
+        with self._condition:
+            if capability_id in self._providers:
+                raise FederationValidationError(
+                    "duplicate-ai-provider",
+                    "capability_id",
+                    "provider is already registered",
+                )
+            if len(self._providers) >= MAX_REGISTERED_AI_PROVIDERS:
+                raise FederationValidationError(
+                    "too-many-ai-providers",
+                    "providers",
+                    f"must not exceed {MAX_REGISTERED_AI_PROVIDERS}",
+                )
+            self._providers[capability_id] = _ProviderState(
+                provider=provider,
+                status=provider_status,
+            )
+            self._condition.notify_all()
 
     def _reports(self, now: datetime) -> tuple[ProviderResourceReport, ...]:
         reports: list[ProviderResourceReport] = []
