@@ -11,13 +11,19 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+from uuid import uuid4
 
 from .grounding import append_grounding_warning
-from .ollama_client import DEFAULT_MODEL, OllamaError, chat
+from .ollama_client import DEFAULT_BASE_URL, DEFAULT_MODEL
+from .ollama_provider import OllamaLanguageModelProvider
 from .prompts import SYSTEM_PROMPT, build_extractive_prompt, build_prompt
 from .rag import format_context, retrieve
 from .repo_index import load_or_build_chunks, repo_root_from
+from .runtime import AIRuntimePolicy, LanguageModelRuntime
+from .runtime_contracts import AIModality, AIRuntimeError, AIRuntimeRequest
 from .symbols import build_symbols
+
+CLI_AI_SESSION_ID = "local-ai-cli"
 
 
 def parse_args() -> argparse.Namespace:
@@ -45,6 +51,20 @@ def _bounded_context(context: str, max_chars: int) -> str:
     return context[:max_chars].rstrip() + "\n\n[context truncated by --max-context-chars]"
 
 
+def _runtime(model: str) -> LanguageModelRuntime:
+    provider = OllamaLanguageModelProvider(
+        session_id=CLI_AI_SESSION_ID,
+        display_name="Default Ollama",
+        base_url=DEFAULT_BASE_URL,
+        models=(model,),
+    )
+    return LanguageModelRuntime(
+        session_id=CLI_AI_SESSION_ID,
+        providers=(provider,),
+        policy=AIRuntimePolicy(max_fallbacks=0),
+    )
+
+
 def main() -> int:
     args = parse_args()
     root = repo_root_from(args.root)
@@ -69,13 +89,24 @@ def main() -> int:
 
     prompt_builder = build_extractive_prompt if args.extractive else build_prompt
     prompt = prompt_builder(args.question, context, sources=source_labels)
+    request_token = uuid4().hex
+    logical_request = AIRuntimeRequest(
+        request_id=f"request-{request_token}",
+        session_id=CLI_AI_SESSION_ID,
+        idempotency_key=f"request-{request_token}",
+        model=args.model,
+        modality=AIModality.TEXT,
+        prompt=prompt,
+        system_prompt=SYSTEM_PROMPT.strip(),
+        timeout_seconds=120,
+    )
     try:
-        answer = chat(prompt=prompt, system_prompt=SYSTEM_PROMPT, model=args.model)
-    except OllamaError as exc:
-        print(exc)
+        result = _runtime(args.model).execute(logical_request)
+    except AIRuntimeError as exc:
+        print(f"{exc.code}: {exc.message}")
         return 2
 
-    print(append_grounding_warning(answer, selected))
+    print(append_grounding_warning(result.content, selected))
     return 0
 
 
