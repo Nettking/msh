@@ -1,0 +1,55 @@
+name: CF4 contribution service
+
+on:
+  pull_request:
+    paths:
+      - "catalog/capabilities/contributions/**"
+      - ".github/workflows/cf4-contribution-service.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cf4-contribution-service-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contribution-service:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile CF4 contribution service
+        run: python -m compileall -q catalog/capabilities/contributions
+      - name: CF4 focused tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/capabilities/contributions/tests
+      - name: Authority and reconciliation regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/capabilities/tests/test_reconciliation.py
+          catalog/capabilities/tests/test_worker_activation.py
+          catalog/capabilities/tests/test_provider_enrollment.py
+          catalog/capabilities/tests/test_provider_health_restart.py
+          catalog/ai/tests/test_runtime_manager_reconciliation.py
+          catalog/flask_app/tests/test_recorder_control_service.py
+      - name: Ruff CF4 contribution service
+        run: python -m ruff check catalog/capabilities/contributions
+      - name: Diff hygiene
+        run: git diff --check origin/${{ github.base_ref }}...HEAD
