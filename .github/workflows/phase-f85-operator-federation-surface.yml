@@ -66,6 +66,7 @@ jobs:
           catalog/relay/tests/test_phase_f84_compute_worker_activation.py
           catalog/flask_app/tests/test_docs_viewer.py
           catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_windows_start_script.py
           catalog/flask_app/test_navigation_smoke.py
           catalog/federation/tests/test_phase0.py
           catalog/federation/tests/test_phase1.py
@@ -80,6 +81,7 @@ jobs:
           catalog/flask_app/provider_federation_routes.py
           catalog/flask_app/tests/test_docs_viewer.py
           catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_windows_start_script.py
           --ignore I001,RUF022,B008,C408,PLC0206,UP035
       - name: Compose validation
         run: docker compose config --quiet
