@@ -49,6 +49,20 @@ from .dispatch import (
     SQLiteDispatchInbox,
     WorkerRegistration,
 )
+from .worker_activation import (
+    COMPUTE_HANDLER_ACTIVATION_KIND,
+    COMPUTE_HANDLER_ACTIVATION_SCHEMA,
+    COMPUTE_HANDLER_DESCRIPTOR_SCHEMA,
+    MAX_LOCAL_COMPUTE_HANDLERS,
+    ActivatedComputeWorker,
+    ComputeHandlerActivationReference,
+    ComputeWorkerActivationAuthority,
+    ComputeWorkerActivationSnapshot,
+    LocalComputeHandlerBinding,
+    LocalComputeHandlerDescriptor,
+    LocalComputeHandlerInventory,
+    TrustedComputeWorkerBinder,
+)
 from .job_store import (
     JOB_STORE_SCHEMA_VERSION,
     MAX_OWNERSHIP_LEASE_SECONDS,
@@ -311,5 +325,17 @@ __all__ = [
     "validate_job_transition",
     "validate_jobs_protocol",
     "validate_logical_artifact_endpoint",
+    "COMPUTE_HANDLER_ACTIVATION_KIND",
+    "COMPUTE_HANDLER_ACTIVATION_SCHEMA",
+    "COMPUTE_HANDLER_DESCRIPTOR_SCHEMA",
+    "MAX_LOCAL_COMPUTE_HANDLERS",
+    "ActivatedComputeWorker",
+    "ComputeHandlerActivationReference",
+    "ComputeWorkerActivationAuthority",
+    "ComputeWorkerActivationSnapshot",
+    "LocalComputeHandlerBinding",
+    "LocalComputeHandlerDescriptor",
+    "LocalComputeHandlerInventory",
+    "TrustedComputeWorkerBinder",
     "validate_provider_report_protocol",
 ]
