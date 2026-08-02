@@ -59,6 +59,7 @@ jobs:
           catalog/flask_app
           catalog/relay/tests/test_phase_f83_remote_ai_binding.py
           catalog/relay/tests/test_phase_f84_compute_worker_activation.py
+          catalog/relay/tests/test_phase_f86_reconciliation.py
       - name: F8.6 and affected regressions
         run: >-
           python -m pytest -o addopts= -q
@@ -68,6 +69,7 @@ jobs:
           catalog/relay/tests/test_phase_f75_retry_cancellation.py
           catalog/relay/tests/test_phase_f83_remote_ai_binding.py
           catalog/relay/tests/test_phase_f84_compute_worker_activation.py
+          catalog/relay/tests/test_phase_f86_reconciliation.py
           catalog/flask_app/tests/test_provider_federation_surface.py
           catalog/flask_app/tests/test_ai_runtime_integration.py
           catalog/flask_app/tests/test_connected_ai_provider.py
@@ -82,6 +84,7 @@ jobs:
           catalog/capabilities/tests/test_reconciliation.py
           catalog/ai/remote_provider.py
           catalog/ai/runtime_manager.py
+          catalog/relay/tests/test_phase_f86_reconciliation.py
           --ignore I001,RUF022,B008,C408,PLC0206,UP035
       - name: Compose validation
         run: docker compose config --quiet
