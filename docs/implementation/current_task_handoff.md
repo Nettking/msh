@@ -1,134 +1,175 @@
 # Current task handoff
 
-Last updated: 2026-08-02 Europe/Oslo
+Last updated: 2026-08-02, Europe/Oslo.
 
 ## Repository state
 
 - Repository: `Nettking/msh`
 - Default branch: `main`
-- Current planning branch: `agent/capability-first-onboarding-plan`
-- Technical federation baseline: complete through F8.7
-- Latest merged product change: `41934cd3b3907c4847fb788a3fd9f9647e165969` — integrated repository documentation browser
-- Published release tag: not yet created
+- Audited `main` SHA: `ba954c91fa5f0cbd075b2210fbb1fcc717df8fa8`
+- Audit branch: `agent/capability-first-reality-audit`
+- Technical Federation authority baseline: complete through F8.7
+- Capability-first isolated foundation: CF1-CF6 components merged
+- Capability-first Flask/setup/runtime integration: not started
+- Capability-first CF7 acceptance: not started
+- Published release tag: not created
 
-## Completed baseline
+## Authoritative current documents
 
-The validated federation implementation includes:
-
-- authenticated persistent node identity, membership/session compatibility, ordered events, replay, and revocation;
-- storage primary/replica authority, replication, fencing, completeness-aware failover, and recovery;
-- direct encrypted transport, relay fallback, rendezvous, and resumable verified transfer;
-- multi-provider AI and compute scheduling, durable job ownership, dispatch, retry, cancellation, stale-worker fencing, and artifact authorization;
-- trusted-provider enrollment, expiring health, remote AI binding, compute activation, operator-safe projection, and restart reconciliation;
-- Linux and Windows federation acceptance.
-
-## Stabilization and documentation work completed
-
-- V1-A audit, scope, closeout, roadmap, and handoff foundation;
-- V1-B cleanup manifest;
-- Graphify generated-output deletion and ignore rule;
-- integrated `/docs` reader in the normal Flask application;
-- manual `/docs` acceptance on the owner's laptop: passed;
-- the standalone Markdown prototype is now superseded and remains only until a separate deletion change.
-
-## Product-direction decision
-
-The repository owner has explicitly replaced role-first setup as the planned product direction.
-
-New product model:
-
-- every installation is one persistent MSH device;
-- a device may contribute several capabilities simultaneously;
-- setup discovers or creates a federation before asking for contributions;
-- MSH inspects the device and runs suitable bounded benchmarks;
-- the user enables any combination of recommended contributions;
-- returning trusted devices reconnect automatically;
-- storage primary/replica, job owner, membership administration, leases, fencing, and artifact grants remain internal authority states rather than device identities.
-
-The internal `session_id` boundary remains for compatibility. The UI uses Federation as the product concept.
-
-## Authoritative active plan
-
+- `docs/implementation/capability_first_reality_audit.md`
 - `docs/implementation/capability_first_federation_plan.md`
+- `docs/implementation/federation_v1_closeout_plan.md`
+- `docs/releases/federation_v1_scope.md`
+- `docs/roadmap/post_v1_product_roadmap.md`
 
-The plan defines:
+## What is actually complete
 
-- discovery, verification, join, reconnect, and local federation creation;
-- device inspection;
-- versioned AI, compute, storage, network, and data-source benchmarks;
-- contribution candidates and contribution intents;
-- legacy deployment-mode migration;
-- Federation information architecture;
-- CF0-CF8 implementation sequence;
-- explicit parallel-agent file ownership and merge ordering;
-- Linux/Windows, migration, security, restart, and end-to-end acceptance.
+### Existing Federation authority core
 
-## Plans adjusted
+The existing validated technical baseline includes:
 
-The following documents are aligned with the new direction:
+- persistent identity, enrollment, membership/session compatibility, ordered events, replay, and revocation;
+- storage primary/replica authority, replication, fencing, completeness-aware failover, and recovery;
+- direct encrypted transport, relay fallback, rendezvous, and verified resumable transfer;
+- durable AI/compute scheduling, dispatch, retry, cancellation, stale-worker fencing, and artifact authorization;
+- trusted-provider enrollment, expiring health, remote AI binding, registered compute activation, operator projection, and restart reconciliation.
 
-- `docs/roadmap/post_v1_product_roadmap.md`;
-- `docs/implementation/federation_v1_closeout_plan.md`;
-- `docs/releases/federation_v1_scope.md`;
-- this handoff.
+### Capability-first isolated foundation
 
-The previous roadmap assumptions about a user choosing one role, manually creating/resuming a technical session, and treating provider approval as the primary setup journey are superseded.
+CF1:
 
-## Parallel-agent strategy
+- versioned onboarding/discovery/inspection/benchmark/candidate/intent contracts;
+- deterministic federation/internal-session compatibility mapping;
+- read-only legacy migration preview;
+- focused Ubuntu and Windows component workflow.
 
-Parallel work begins only after CF1 contracts merge.
+CF2:
 
-Wave 1 can use three agents concurrently on disjoint paths:
+- generic inspection and trusted-local benchmark kernel;
+- durable SQLite results and run reservations;
+- expiry, invalidation, cancellation signaling, concurrency limits, fingerprints, and safe diagnostics;
+- focused tests;
+- no dedicated merged CF2 cross-platform workflow found;
+- concrete AI, MTConnect, compute, storage, and network benchmark adapters remain missing.
 
-1. benchmark/inspection engine;
-2. federation discovery and verified-join adapter;
-3. new onboarding/Federation UI templates, CSS, and JavaScript only.
+CF3:
 
-Wave 2 can use two agents concurrently:
+- bounded configured/relay discovery;
+- several-candidate selection;
+- verified join through existing enrollment/invitation authority;
+- reconnect through existing membership authority;
+- safe local federation creation;
+- focused Ubuntu and Windows component workflow.
 
-1. contribution recommendation/activation service;
-2. safe Federation projections.
+CF4:
 
-One later integration agent exclusively owns shared files such as:
+- candidate generation, intent persistence, policy, enable/disable/ask-later/suspend/reconcile;
+- recorder callback adapter;
+- AI runtime-registration adapter without compute/storage authority;
+- registered-handler-only compute adapter;
+- candidate-only storage adapter;
+- focused Ubuntu and Windows component workflow with selected authority regressions.
 
-- `catalog/flask_app/app.py`;
-- `catalog/flask_app/routes.py`;
-- `catalog/flask_app/server_setup_routes.py`;
-- `catalog/flask_app/services/server_setup_service.py`;
-- `catalog/flask_app/templates/base.html`;
-- `catalog/flask_app/templates/startup.html`;
-- `setup_msh.py`;
-- `.env.example`.
+CF5:
 
-An independent acceptance agent owns final migration fixtures, CI additions, and end-to-end validation.
+- six-step onboarding and Federation overview templates;
+- responsive CSS, JavaScript, fixture view models, and standalone Jinja tests;
+- focused Ubuntu and Windows component workflow;
+- UI shell only: no Flask routes or authoritative server-side flow.
 
-## Current exact action
+CF6:
 
-Proceed with **CF1 only**:
+- framework-neutral safe projections for all planned Federation sections;
+- read-only adapters over existing state and authority surfaces;
+- degraded/repair states and public-data safety checks;
+- focused Ubuntu and Windows component workflow;
+- not instantiated by the Flask application.
 
-1. add pure versioned onboarding contracts;
-2. add `federation_id` to internal-session compatibility mapping;
-3. add a read-only migration preview from every existing deployment mode;
-4. prove that migration never silently enables a new contribution;
-5. add malformed-state, serialization, compatibility, and migration tests;
-6. do not change the current setup UI;
-7. merge CF1 before creating the parallel Wave 1 branches.
+## What is not integrated
 
-## Do not do yet
+At the audited `main` SHA:
 
-- do not remove `session_id` from protocols or persistence;
-- do not replace the current setup UI before CF1-CF4 services exist;
-- do not let benchmark success grant authority;
-- do not enable storage or compute contributions automatically during migration;
-- do not let multiple agents edit shared Flask/setup files concurrently;
-- do not delete the old role-first path until CF7 acceptance passes;
-- do not mix unrelated cleanup into CF1.
+- `catalog/flask_app/app.py` does not register a capability-first or Federation overview blueprint;
+- the current setup service still reads/writes `ServerSetupSettings.deployment_mode`;
+- `DEPLOYMENT_MODES` and `ROLE_CAPABILITIES` still control setup and runtime behavior;
+- no supported route renders the CF5 onboarding or Federation overview templates;
+- no production composition instantiates the CF2 runner, CF3 discovery service, CF4 contribution service, or CF6 projection service;
+- no authoritative onboarding progress or migration write exists;
+- no capability-first end-to-end scenario has been accepted.
+
+Do not describe CF1-CF6 as integrated, end-to-end accepted, or manually verified on real Windows/Linux installations.
+
+## Required boundaries
+
+- Benchmark evidence never grants authority.
+- Discovery or network presence never grants membership.
+- AI never grants compute or storage authority.
+- Compute exposes only registered local handlers.
+- Storage candidates never gain primary/replica authority without the existing control plane.
+- Disable/suspend fences future use without deleting unrelated membership.
+- `session_id` remains the internal protocol and isolation boundary.
+- `deployment_mode` remains through the compatibility period.
+- Role-first setup remains until CF7 passes.
+- No protocol or persistence migration occurs without a separate compatibility plan.
+
+## Revised integration approach
+
+Do not implement one large CFI pull request. Split integration into bounded authority/failure domains:
+
+1. read-only Federation overview route and composition;
+2. identity, legacy preview, discovery, verified join/local creation, and reconnect;
+3. concrete benchmark adapters and lifecycle endpoints;
+4. contribution actions bound to actual recorder, AI, registered-compute, and storage authorities;
+5. compatibility-controlled startup transition retaining role-first fallback;
+6. independent CF7 acceptance;
+7. CF8 cleanup only after acceptance.
+
+## Current exact next implementation unit
+
+Implement **CFI-1: read-only Federation overview integration** only.
+
+Expected boundary:
+
+- add a narrow Federation blueprint/route;
+- instantiate CF6 projections from existing authorized read-only services;
+- render the existing CF5 Federation overview shell;
+- register the blueprint in the Flask app;
+- prove safe no-context and degraded states;
+- run route/template and affected app regressions on Ubuntu and Windows.
+
+Explicit exclusions:
+
+- no onboarding writes;
+- no benchmark execution;
+- no contribution mutations;
+- no setup migration;
+- no navigation replacement;
+- no role-gate removal;
+- no protocol changes;
+- no persistence changes.
+
+## Acceptance still required before Federation v1
+
+- real fresh Windows and Linux installation;
+- no-state identity creation;
+- real independently persisted devices completing discovery/join/reconnect/restart;
+- safe local federation creation;
+- migration from every supported legacy deployment mode;
+- recorder plus AI on one device;
+- AI, registered compute, and storage candidates on separate devices;
+- concrete benchmark lifecycle;
+- contribution fencing and recovery;
+- revocation and controlled rejoin;
+- storage assignment/failover through existing authority;
+- desktop/mobile UI;
+- backup/recovery and malformed-state handling;
+- permanent composed Linux/Windows release gate;
+- documentation command/link checks;
+- manual Windows and Linux verification records.
 
 ## Resume safety
 
 - Safe to resume: yes.
-- Technical baseline: complete through F8.7.
-- `/docs`: implemented, CI validated, and manually accepted.
-- Capability-first direction: approved and planned.
-- Runtime implementation of capability-first onboarding: not started.
-- Next unit: CF1 contracts and migration preview only.
+- Start from updated `main`, not from an earlier CF branch.
+- Preserve the exact authority and compatibility boundaries above.
+- Treat the reality audit as the source of truth when older PR descriptions or phase wording imply more completion than the repository demonstrates.
