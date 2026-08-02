@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{{ title }} · Stacks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,400;8..60,600;8..60,700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">
+  <span></span><span></span><span></span>
+</button>
+
+<div class="shell">
+
+  <!-- ============================ SIDEBAR ============================ -->
+  <nav class="sidebar" id="sidebar" aria-label="Document navigation">
+    <div class="sidebar-brand">
+      <span class="brand-mark">§</span>
+      <span class="brand-text">Stacks</span>
+    </div>
+
+    <div class="sidebar-tree">
+      {% macro render_tree(node, depth) %}
+        <ul class="tree" data-depth="{{ depth }}">
+          {% for dir in node.dirs %}
+            {% set is_ancestor = current_path.startswith(dir.path + '/') %}
+            <li class="tree-dir">
+              <details {% if is_ancestor %}open{% endif %}>
+                <summary>
+                  <span class="tab-icon" aria-hidden="true"></span>
+                  <span class="dir-name">{{ dir.name }}</span>
+                </summary>
+                {{ render_tree(dir, depth + 1) }}
+              </details>
+            </li>
+          {% endfor %}
+
+          {% for file in node.files %}
+            <li class="tree-file {{ 'active' if file.path == current_path else '' }}">
+              <a href="{{ url_for('view', filepath=file.path) }}">
+                <span class="file-icon" aria-hidden="true"></span>
+                <span class="file-name">{{ file.name }}</span>
+              </a>
+            </li>
+          {% endfor %}
+        </ul>
+      {% endmacro %}
+
+      {{ render_tree(tree, 0) }}
+    </div>
+  </nav>
+
+  <!-- ============================ CONTENT ============================ -->
+  <main class="content">
+    {% if breadcrumbs %}
+    <div class="breadcrumbs">
+      <a href="{{ url_for('home') }}" class="crumb-home">Stacks</a>
+      {% for crumb in breadcrumbs %}
+        <span class="crumb-sep">/</span>
+        {% if crumb.is_file %}
+          <span class="crumb current">{{ crumb.label }}</span>
+        {% else %}
+          <span class="crumb">{{ crumb.label }}</span>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <article class="doc">
+      {% if content %}
+        {{ content | safe }}
+      {% else %}
+        <div class="empty-state">
+          <p class="empty-mark">—</p>
+          <h1>Nothing on the shelves yet</h1>
+          <p>Drop some <code>.md</code> files into the <code>docs/</code> folder
+             (subfolders welcome) and they'll show up in the navigation on the left.</p>
+        </div>
+      {% endif %}
+    </article>
+  </main>
+
+</div>
+
+<script>
+  // Small screens: sidebar starts collapsed, toggled by the tab button.
+  const toggle = document.getElementById('navToggle');
+  const sidebar = document.getElementById('sidebar');
+  toggle.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    toggle.classList.toggle('active');
+  });
+  // Close the mobile nav after picking a document.
+  sidebar.querySelectorAll('a').forEach(link => {
+    link.addEventListener('click', () => {
+      sidebar.classList.remove('open');
+      toggle.classList.remove('active');
+    });
+  });
+</script>
+</body>
+</html>
