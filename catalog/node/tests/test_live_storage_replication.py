@@ -32,7 +32,9 @@ from catalog.node.storage_agent import STORAGE_NODE_CONFIG_SCHEMA, StorageNodeCo
 from catalog.relay.service import RelayServer
 
 NOW = datetime(2026, 7, 31, 1, 0, tzinfo=timezone.utc)
-TIMEOUT = 5.0
+# Keep the end-to-end relay/storage test bounded while allowing for Windows CI
+# scheduling jitter during the complete cross-platform regression matrix.
+TIMEOUT = 15.0
 
 
 def _write_config(

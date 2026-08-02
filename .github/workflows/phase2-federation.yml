@@ -12,7 +12,11 @@ on:
       - "constraints-phase2.txt"
       - ".github/workflows/phase2-federation.yml"
       - ".github/workflows/phase-f6-closeout.yml"
+      - ".github/workflows/phase-f7-closeout.yml"
       - "docs/implementation/phase_f6_closeout.md"
+      - "docs/implementation/phase_f7_closeout.md"
+      - "docs/connected_capabilities.md"
+      - "docs/architecture.md"
   push:
     branches: [main]
     paths:
@@ -25,7 +29,11 @@ on:
       - "constraints-phase2.txt"
       - ".github/workflows/phase2-federation.yml"
       - ".github/workflows/phase-f6-closeout.yml"
+      - ".github/workflows/phase-f7-closeout.yml"
       - "docs/implementation/phase_f6_closeout.md"
+      - "docs/implementation/phase_f7_closeout.md"
+      - "docs/connected_capabilities.md"
+      - "docs/architecture.md"
 
 permissions:
   contents: read

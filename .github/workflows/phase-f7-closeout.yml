@@ -1,0 +1,106 @@
+name: Phase F7 capability scheduling closeout
+
+on:
+  pull_request:
+    paths:
+      - "catalog/capabilities/**"
+      - "catalog/ai/**"
+      - "catalog/flask_app/ai_routes.py"
+      - "catalog/flask_app/templates/ai_explainer.html"
+      - "catalog/flask_app/tests/test_ai_explainer_chat.py"
+      - "catalog/flask_app/tests/test_ai_runtime_integration.py"
+      - "catalog/flask_app/tests/test_connected_ai_provider.py"
+      - "catalog/flask_app/tests/test_model_provider_compose.py"
+      - "catalog/relay/tests/test_phase_f74_capability_dispatch.py"
+      - "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
+      - "docs/connected_capabilities.md"
+      - "docs/architecture.md"
+      - "docs/implementation/phase_f7_closeout.md"
+      - ".github/workflows/phase-f7-closeout.yml"
+      - ".github/workflows/phase-f6-closeout.yml"
+      - ".github/workflows/phase2-federation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/capabilities/**"
+      - "catalog/ai/**"
+      - "catalog/flask_app/ai_routes.py"
+      - "catalog/flask_app/templates/ai_explainer.html"
+      - "catalog/flask_app/tests/test_ai_explainer_chat.py"
+      - "catalog/flask_app/tests/test_ai_runtime_integration.py"
+      - "catalog/flask_app/tests/test_connected_ai_provider.py"
+      - "catalog/flask_app/tests/test_model_provider_compose.py"
+      - "catalog/relay/tests/test_phase_f74_capability_dispatch.py"
+      - "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
+      - "docs/connected_capabilities.md"
+      - "docs/architecture.md"
+      - "docs/implementation/phase_f7_closeout.md"
+      - ".github/workflows/phase-f7-closeout.yml"
+      - ".github/workflows/phase-f6-closeout.yml"
+      - ".github/workflows/phase2-federation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f7-closeout-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  capability-closeout:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile complete F7 boundary
+        run: >-
+          python -m compileall
+          catalog/capabilities
+          catalog/ai
+          catalog/flask_app/ai_routes.py
+          catalog/flask_app/tests/test_ai_explainer_chat.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/flask_app/tests/test_model_provider_compose.py
+          catalog/relay/tests/test_phase_f74_capability_dispatch.py
+          catalog/relay/tests/test_phase_f75_retry_cancellation.py
+      - name: Complete F7 and Phase 6 acceptance matrix
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/capabilities/tests
+          catalog/ai/tests
+          catalog/flask_app/tests/test_ai_explainer_chat.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/flask_app/tests/test_model_provider_compose.py
+          catalog/relay/tests/test_phase_f74_capability_dispatch.py
+          catalog/relay/tests/test_phase_f75_retry_cancellation.py
+          catalog/federation/tests/test_phase0.py
+          catalog/federation/tests/test_phase1.py
+      - name: Ruff complete F7 boundary
+        run: >-
+          python -m ruff check
+          catalog/capabilities
+          catalog/ai
+          catalog/flask_app/ai_routes.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          --ignore I001,RUF022,B008,C408,PLC0206,UP035
+      - name: Compose validation
+        run: docker compose config --quiet
+      - name: Diff hygiene
+        run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
