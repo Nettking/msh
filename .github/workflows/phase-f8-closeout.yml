@@ -1,0 +1,118 @@
+name: Phase F8 trusted provider closeout
+
+on:
+  pull_request:
+    paths:
+      - "catalog/capabilities/**"
+      - "catalog/ai/**"
+      - "catalog/relay/tests/test_phase_f74_capability_dispatch.py"
+      - "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
+      - "catalog/relay/tests/test_phase_f83_remote_ai_binding.py"
+      - "catalog/relay/tests/test_phase_f84_compute_worker_activation.py"
+      - "catalog/relay/tests/test_phase_f86_reconciliation.py"
+      - "catalog/relay/tests/test_phase_f87_trusted_provider_closeout.py"
+      - "catalog/flask_app/provider_federation_routes.py"
+      - "catalog/flask_app/tests/test_provider_federation_surface.py"
+      - "catalog/flask_app/tests/test_ai_runtime_integration.py"
+      - "catalog/flask_app/tests/test_connected_ai_provider.py"
+      - "docs/implementation/phase_f8_plan.md"
+      - "docs/implementation/phase_f87_plan.md"
+      - "docs/implementation/phase_f8_closeout.md"
+      - ".github/workflows/phase-f8-closeout.yml"
+      - ".github/workflows/phase-f7-closeout.yml"
+      - ".github/workflows/phase2-federation.yml"
+  push:
+    branches: [main]
+    paths:
+      - "catalog/capabilities/**"
+      - "catalog/ai/**"
+      - "catalog/relay/tests/test_phase_f74_capability_dispatch.py"
+      - "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
+      - "catalog/relay/tests/test_phase_f83_remote_ai_binding.py"
+      - "catalog/relay/tests/test_phase_f84_compute_worker_activation.py"
+      - "catalog/relay/tests/test_phase_f86_reconciliation.py"
+      - "catalog/relay/tests/test_phase_f87_trusted_provider_closeout.py"
+      - "catalog/flask_app/provider_federation_routes.py"
+      - "catalog/flask_app/tests/test_provider_federation_surface.py"
+      - "catalog/flask_app/tests/test_ai_runtime_integration.py"
+      - "catalog/flask_app/tests/test_connected_ai_provider.py"
+      - "docs/implementation/phase_f8_plan.md"
+      - "docs/implementation/phase_f87_plan.md"
+      - "docs/implementation/phase_f8_closeout.md"
+      - ".github/workflows/phase-f8-closeout.yml"
+      - ".github/workflows/phase-f7-closeout.yml"
+      - ".github/workflows/phase2-federation.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: f8-closeout-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  trusted-provider-closeout:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile complete F8 boundary
+        run: >-
+          python -m compileall
+          catalog/capabilities
+          catalog/ai
+          catalog/flask_app/provider_federation_routes.py
+          catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/relay/tests/test_phase_f74_capability_dispatch.py
+          catalog/relay/tests/test_phase_f75_retry_cancellation.py
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+          catalog/relay/tests/test_phase_f84_compute_worker_activation.py
+          catalog/relay/tests/test_phase_f86_reconciliation.py
+          catalog/relay/tests/test_phase_f87_trusted_provider_closeout.py
+      - name: Complete F8 and affected F7 acceptance matrix
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/capabilities/tests
+          catalog/ai/tests
+          catalog/relay/tests/test_phase_f74_capability_dispatch.py
+          catalog/relay/tests/test_phase_f75_retry_cancellation.py
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+          catalog/relay/tests/test_phase_f84_compute_worker_activation.py
+          catalog/relay/tests/test_phase_f86_reconciliation.py
+          catalog/relay/tests/test_phase_f87_trusted_provider_closeout.py
+          catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/federation/tests/test_phase0.py
+          catalog/federation/tests/test_phase1.py
+          catalog/federation/tests/test_phase2_unit.py
+      - name: Ruff complete F8 boundary
+        run: >-
+          python -m ruff check
+          catalog/capabilities
+          catalog/ai
+          catalog/flask_app/provider_federation_routes.py
+          catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/relay/tests/test_phase_f87_trusted_provider_closeout.py
+          --ignore I001,RUF022,B008,C408,PLC0206,UP035
+      - name: Compose validation
+        run: docker compose config --quiet
+      - name: Diff hygiene
+        run: git diff --check origin/${{ github.base_ref || 'main' }}...HEAD
