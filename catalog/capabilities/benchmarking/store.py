@@ -7,6 +7,7 @@ import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from threading import RLock
+from typing import Self
 
 from catalog.federation.onboarding_models import BenchmarkResult
 
@@ -65,7 +66,7 @@ class SQLiteBenchmarkResultStore:
         with self._lock:
             self._connection.close()
 
-    def __enter__(self) -> "SQLiteBenchmarkResultStore":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(self, *_: object) -> None:
