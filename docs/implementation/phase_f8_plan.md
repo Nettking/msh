@@ -1,30 +1,32 @@
 # Phase F8 plan: productized trusted-provider federation
 
-Status: F8.1 through F8.3 are complete on `main`; only F8.4 is authorized for implementation in the current pull request.
+Status: F8.1 through F8.6 are complete on `main`. F8.7 end-to-end acceptance and closeout is the only authorized work in the current pull request.
 
-Baseline: `main` at `991f54d785b68f5f052acdaad74cf2a1fd5afec4` after F8.3 trusted remote AI binding.
+Baseline: `main` at `10cd7dc38c33ebe1d855885b08aa7841c185649c` after F8.6 reconnect and restart reconciliation.
 
 ## Purpose
 
-F7 completed deterministic capability scheduling, durable job ownership, authenticated dispatch, bounded recovery, capability-specific artifact authorization, and the logical multi-provider AI runtime. F8 turns those safe internal boundaries into a productized federation path for explicitly trusted providers.
+F7 completed deterministic capability scheduling, durable job ownership, authenticated dispatch, bounded retry and cancellation, capability-specific artifact authorization, and the logical multi-provider AI runtime. F8 turns those internal boundaries into a productized path for explicitly trusted session providers.
 
-The Phase 2 coordinator owns durable session membership and capability announcements. F8.1 added explicit durable provider approval. F8.2 connected that approval to expiring live resource state. F8.3 bound approved and currently healthy remote language-model providers to the existing F7.7 runtime. F8.4 binds approved and currently healthy compute providers to explicit locally installed handler inventories while preserving the existing F7.4 dispatch, F7.3 ownership, and F7.5 lifecycle authority boundaries.
+The Phase 2 coordinator remains authoritative for node identity, membership, announcements, revocation, connectivity, and ordered events. F8 adds explicit durable approval, authenticated expiring resource state, safe AI and compute runtime binding, an operator projection, and restart reconciliation without granting storage authority or accepting arbitrary remote code.
 
 ## Fixed F8 boundaries
 
-- The coordinator remains authoritative for enrolled nodes, session membership, capability announcements, revocation, connectivity, and ordered session events.
-- An announced capability is discoverable metadata only. It is not automatically approved, schedulable, callable, or authorized to access data.
-- Provider approval is explicit, durable, revision-fenced, session-bound, and auditable.
-- Approval grants no storage leadership, storage read/write access, artifact access, job ownership, shell execution, endpoint publication, or permission to install code.
+- A capability announcement is discoverable metadata only. It is never automatic approval, live health, scheduling, invocation, compute activation, artifact access, or storage authority.
+- Provider approval is explicit, durable, revision-fenced, session-bound, capability-bound, node-bound, type-bound, protocol-bound, and auditable.
+- Approval grants no storage leadership, storage read/write access, artifact access, job ownership, shell execution, endpoint publication, code installation, or process-launch authority.
 - F7 provider selection still requires a fresh `ProviderResourceReport`; enrollment state is not a substitute for live resource state.
-- Private endpoints, credentials, physical addresses, backend paths, and secret material must not enter announcements, enrollment records, health records, invocation frames, status surfaces, events, or logs.
-- Existing local Flask, recorder, JSONL, storage, relay, direct transport, Ollama setup, and F7 runtime behavior remain compatible.
-- Unknown protocol major versions, cross-session identities, stale generations, stale revisions, unauthenticated actors, and mismatched relay routes fail closed.
-- F8 never transfers arbitrary executable code, module paths, package specifications, shell commands, environment variables, or process-launch instructions between nodes.
+- F7 remains authoritative for provider ranking, job ownership, leases, dispatch, cancellation, retry, stale-worker fencing, and result commit.
+- F7.6 remains authoritative for least-privilege job-scoped artifact grants and verified result publication.
+- Storage remains governed by its separate primary/replica, term, lease, fencing, acknowledgement, completeness, replication, and failover rules.
+- Private endpoints, credentials, physical addresses, backend paths, prompts, results, handler implementations, and secret material must not enter announcements, enrollment records, health records, reconciliation checkpoints, operator surfaces, audit events, or logs.
+- Existing local Flask, recorder, JSONL, Storage API, relay, direct transport, private Ollama setup, and F7 runtime behavior remain compatible.
+- Unknown protocol majors, cross-session identities, stale generations, stale revisions, stale leases, removed membership, revoked nodes, unauthenticated actors, and mismatched relay routes fail closed.
+- F8 never transfers arbitrary executable code, module paths, package specifications, container images, shell commands, environment variables, or process-launch instructions between nodes.
 
 ## F8.1: authorized discovery and durable provider enrollment — complete
 
-Delivered on `main` by PR #153:
+Delivered by PR #153 at `9f63ce3417e573762b8ba0be64682aa5e428aa8c`:
 
 - actor-authorized coordinator discovery within one session;
 - versioned pending, approved, suspended, and revoked enrollment records;
@@ -33,101 +35,100 @@ Delivered on `main` by PR #153:
 - deterministic support for several approved providers of the same capability type;
 - fail-closed eligibility when announcements are removed, changed, disabled, revoked, cross-session, identity-conflicting, or protocol-incompatible.
 
-F8.1 does not create live resource state or runtime authority.
+F8.1 creates no live resource or runtime authority.
 
-## F8.2: authenticated health and resource-report synchronization — complete
+## F8.2: authenticated health and resource synchronization — complete
 
-Delivered on `main` by PR #154:
+Delivered by PR #154 at `5f239c8f7f4325d9ae3ace2f5fbe17152e9293d8`:
 
-- a versioned provider-health synchronization contract over the existing F7 `ProviderResourceReport`;
-- authenticated self-publication by the provider node inside an active session;
-- exact enrollment, session, capability, node, type, protocol, generation, and revision binding;
-- transactional latest-report persistence, idempotent command replay, safe audit evidence, restart recovery, and natural expiry;
-- deterministic retrieval of fresh F7 reports after rechecking current enrollment and coordinator announcement state;
-- safe health observations for current, expired, superseded, enrollment-ineligible, announcement-ineligible, and absent state;
-- multiple simultaneously healthy providers of the same capability type.
+- authenticated provider self-publication of short-lived F7 resource reports;
+- exact enrollment, session, capability, node, type, protocol, generation, and report-revision binding;
+- transactional latest-report persistence, safe audit evidence, idempotency, restart recovery, and natural expiry;
+- current-report retrieval only after rechecking enrollment and coordinator announcement state;
+- safe current, expired, superseded, enrollment-ineligible, announcement-ineligible, and absent observations;
+- simultaneous same-type providers without primary/replica semantics.
 
-F8.2 does not create transport handshakes, remote adapters, model invocation, or compute handlers.
+F8.2 creates no ownership, transport, invocation, handler, artifact, or storage authority.
 
-## F8.3: trusted remote language-model adapter binding — complete
+## F8.3: trusted remote language-model binding — complete
 
-Delivered on `main` by PR #155:
+Delivered by PR #155 at `991f54d785b68f5f052acdaad74cf2a1fd5afec4`:
 
-- versioned bounded remote AI request and response contracts containing only logical identities, request content, outcomes, and safe error fields;
-- authenticated relay request/reply with exact bidirectional actor, session, target, provider, capability, generation, and request binding;
-- provider-side and requester-side revalidation against current F8.1 enrollment and F8.2 health;
-- provider-generation fencing, bounded pending requests, duplicate suppression, timeout and cancellation seams, and safe error translation;
-- a remote `LanguageModelProvider` adapter without endpoint or credential fields;
-- dynamic F8.2 report sourcing through the existing F7.7 selection and fallback rules;
+- versioned bounded logical invocation request and response frames;
+- authenticated relay request/reply with exact bidirectional route identity;
+- provider-side and requester-side enrollment, health, generation, report, and membership revalidation;
+- bounded pending calls, duplicate suppression, timeout/cancellation seams, and safe error translation;
+- remote `LanguageModelProvider` adapters without endpoint or credential fields;
+- current F8.2 report use through the unchanged F7.7 selection and fallback algorithm;
 - coexistence of local and multiple remote language-model providers.
 
-F8.3 does not activate compute workers or transfer executable code.
+F8.3 activates no compute worker and transfers no executable code.
 
-## F8.4: trusted compute-worker inventory and activation
+## F8.4: trusted compute inventory and activation — complete
 
-Deliver:
+Delivered by PR #156 at `99bbe25d23bb160ad57c821ae275145dee9addb0`:
 
-- a versioned local compute-handler descriptor containing a logical handler ID, capability type, protocol, protocol version, safe offered attributes, and an immutable descriptor fingerprint;
-- a bounded in-process handler inventory that accepts only explicitly supplied local `CapabilityHandler` objects and rejects duplicate or conflicting descriptors;
-- no reflection, dynamic imports, module paths, package names, source text, bytecode, binaries, shell commands, process launchers, environment variables, or executable payloads in inventory descriptors or federated records;
-- a compute activation authority that revalidates current F8.1 enrollment, current F8.2 health, active node membership, announcement identity, provider generation, report revision, capability type, protocol, protocol major, and local node identity;
-- exact binding between one current F8.2 compute-provider report and one locally installed descriptor selected by a logical `handler_id` advertised in safe report attributes;
-- descriptor/report compatibility checks so the local descriptor's offered attributes satisfy every advertised health attribute except F8-reserved activation metadata;
-- a generation-fenced activated worker wrapper around the existing F7.4 `CapabilityWorker` and `SQLiteDispatchInbox`;
-- revalidation immediately before each dispatch reaches the local handler, so expiry, suspension, revocation, announcement change, membership removal, node revocation, generation change, report revision change, handler removal, or descriptor replacement prevents new execution;
-- deterministic activation of multiple approved and healthy compute providers on one node when each maps to a distinct locally installed handler descriptor;
-- explicit endpoint registration and removal helpers that add only activated workers to the existing `RelayDispatchEndpoint` without altering its authenticated request/reply protocol;
-- preservation of F7.3 ownership leases, F7.4 dispatch identity and duplicate suppression, F7.5 retry/cancellation/result fencing, and F7.6 artifact authorization;
-- focused Linux and Windows CI plus complete affected F8.1, F8.2, F7.3-F7.6, relay, and Phase 2 regressions.
+- versioned logical handler descriptors with immutable fingerprints;
+- bounded in-process inventories containing only explicitly supplied local handler objects;
+- exact enrollment, health, generation, report, descriptor, binding, node, type, protocol, and local-identity validation;
+- activated wrappers around the existing F7.4 worker and durable duplicate-suppression inbox;
+- revalidation immediately before every local handler call;
+- deterministic activation of multiple current providers and exact endpoint replacement/removal helpers;
+- preservation of F7 ownership, dispatch, retry, cancellation, result, artifact, and storage boundaries.
 
-F8.4 does not:
+F8.4 performs no reflection, dynamic import, download, install, compilation, process launch, shell execution, package/image resolution, or remote handler selection.
 
-- download, install, compile, import, transmit, or execute code supplied by another node;
-- accept a module path, executable path, shell command, container image, package coordinate, URL, private address, credential, token, environment variable, or backend path as a handler identity;
-- infer handler availability from announcements or durable approval without a current F8.2 report and a matching local inventory entry;
-- let a remote actor choose an arbitrary local handler or mutate the local inventory;
-- create ownership, bypass lease fencing, broaden artifact grants, grant storage authority, or change F7 provider selection;
-- add process isolation, container sandboxing, public untrusted execution, marketplace behavior, operator UI, or reconnect reconciliation;
-- start F8.5 or later work.
+## F8.5: operator status and control surface — complete
 
-Exit criteria:
+Delivered by PR #157 at `fe9e5fdc89cf28d55afeaf924f8a83bb1f92cf1d`:
 
-- an unapproved, suspended, revoked, removed, expired, superseded, cross-session, protocol-incompatible, announcement-incompatible, or generation-mismatched compute provider cannot activate or execute;
-- only the provider's authenticated local node can bind its health record to a local handler inventory;
-- activation requires a current F8.2 report whose safe `handler_id` names exactly one preinstalled local descriptor;
-- descriptor identity, capability type, protocol, protocol major, and offered attributes match the current health record;
-- descriptors and health records contain no executable code, module or executable paths, package or image references, shell commands, endpoints, credentials, tokens, environment variables, backend paths, or authority scopes;
-- replacing or removing a descriptor invalidates the prior activation before the next local handler call;
-- a higher provider generation or report revision fences an older activation before local execution;
-- health expiry, enrollment suspension/revocation, membership removal, node revocation, or announcement removal/change prevents subsequent dispatch without deleting durable approval;
-- two separately approved and healthy compute providers can activate distinct local handlers and remain independently addressable by provider ID;
-- an identical duplicate dispatch still executes at most once through the existing durable F7.4 inbox, while conflicting reuse fails closed;
-- F7 ownership, dispatch, lifecycle, cancellation, retry, result, artifact, and storage authority boundaries remain unchanged;
-- complete focused tests, compilation, Ruff, Compose validation, and diff hygiene pass on Linux and Windows.
+- versioned safe provider snapshots combining discovery, enrollment, health, generation, expiry, activation, compatibility, and reason codes;
+- member-authorized read-only session views;
+- owner-only request, approve, suspend, revoke, and reconcile operations delegated to F8.1 with expected-revision and idempotency fencing;
+- server-bound actor/session context and CSRF-protected local HTML and JSON routes;
+- controlled unavailable behavior without exposing announcement properties, health attributes, model lists, handler identities, prompts, results, endpoints, credentials, private locations, artifact grants, or storage authority.
 
-## Proposed later F8 sequence
+F8.5 is a projection and adapter, not an authority source.
 
-These steps are planning boundaries only. They are not authorized by the F8.4 pull request.
+## F8.6: reconnect and restart reconciliation — complete
 
-### F8.5: operator status and control surface
+Delivered by PR #158 at `10cd7dc38c33ebe1d855885b08aa7841c185649c`:
 
-Expose safe discovery, approval, suspension, revocation, health, expiry, generation, activation, inventory compatibility, and reason codes without exposing secrets, private locations, or handler implementation details.
+- restart-safe per-session/per-actor checkpoints containing only ordered event cursors and immutable logical fencing evidence;
+- bounded contiguous coordinator event replay and repeated active-membership validation;
+- deterministic reconstruction of current F8.3 AI adapters and F8.4 compute workers;
+- exact generation, report, enrollment, handler binding, binding revision, and descriptor fingerprint fencing;
+- atomic replacement of only reconciler-owned runtime entries while unrelated local entries remain untouched;
+- idempotent unchanged-state reconciliation and rollback on partial reconstruction or checkpoint failure;
+- persisted coordinator, enrollment, health, reconciliation, dispatch, and runtime reopen tests.
 
-### F8.6: reconnect and restart reconciliation
+F8.6 never revives expired health, reopens revoked approval, infers capacity from announcements, or creates invocation, dispatch, artifact, or storage authority.
 
-Rebuild approved runtime candidates and compute activations after coordinator, provider, or client restart; replay ordered session changes; and fence stale provider generations and descriptor revisions.
+## F8.7: end-to-end acceptance and closeout — current
 
-### F8.7: end-to-end acceptance and closeout
+F8.7 must:
 
-Validate multiple trusted AI and compute providers across persisted nodes, interruption, revocation, restart, cancellation, artifact authorization, and F7 compatibility before closing F8.
+- exercise two trusted AI providers and two trusted compute providers in one persisted session;
+- prove deterministic selection from current F8.2 reports and successful authenticated F8.3/F8.4 execution;
+- prove duplicate suppression, suspension, revocation, generation/report advancement, expiry, interruption, restart reconciliation, and preservation of durable approval;
+- consolidate the existing F7 ownership, cancellation, retry, stale-worker, result, artifact, and storage compatibility gates;
+- verify the safe F8.5 projection and secret/private-location exclusion;
+- record the exact delivered sequence, authority boundaries, compatibility impact, deferred operational work, and branch-cleanup policy;
+- pass the complete F8, affected F7, relay, Flask, Phase 2, compilation, Ruff, Compose, and diff-hygiene matrix on Linux and Windows.
+
+F8 is closed as a software implementation milestone only after the exact final F8.7 PR head is green and the closeout decision is merged.
 
 ## Explicitly outside F8
 
-- public anonymous participation;
-- marketplace, payment, billing, or reputation;
+- internet-facing relay and rendezvous operations;
+- physical unrelated-network and restrictive-NAT deployment acceptance;
+- public or anonymous provider participation;
+- marketplace, payment, billing, reputation, or dispute handling;
 - arbitrary third-party code execution;
-- full Kubernetes-style scheduling;
-- production sandboxing and supply-chain acceptance for untrusted providers;
-- public relay operations and physical restrictive-NAT deployment acceptance;
-- advanced cost, energy, fairness, preemption, and heterogeneous-accelerator scheduling;
-- production load, abuse, chaos, SLO, and incident-management acceptance.
+- production sandboxing, provenance, signing, and supply-chain policy for untrusted providers;
+- full Kubernetes-style scheduling or replacement of established schedulers;
+- production cost, latency, locality, energy, fairness, quotas, priorities, preemption, and heterogeneous-accelerator scheduling;
+- production load, abuse, denial-of-service, soak, chaos, upgrade, observability, alerting, SLO, and incident-management acceptance;
+- automatic public endpoint management or exposure of PostgreSQL, Ollama, Flask, relay, worker, or storage services.
+
+No implementation branch is deleted by F8.7. Cleanup requires separate explicit repository-owner approval after merge and exact `main` verification.
