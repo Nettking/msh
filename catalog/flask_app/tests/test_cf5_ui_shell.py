@@ -5,7 +5,14 @@ import json
 from pathlib import Path
 
 import pytest
-from jinja2 import ChoiceLoader, DictLoader, Environment, FileSystemLoader, StrictUndefined, select_autoescape
+from jinja2 import (
+    ChoiceLoader,
+    DictLoader,
+    Environment,
+    FileSystemLoader,
+    StrictUndefined,
+    select_autoescape,
+)
 
 HERE = Path(__file__).resolve().parent
 FLASK_APP = HERE.parent
