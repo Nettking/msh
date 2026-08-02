@@ -56,6 +56,26 @@
       "evidence": "catalog/flask_app/tests/test_federation_overview_route.py"
     },
     {
+      "id": "cfi2.existing-federation-discovery-and-verified-join",
+      "status": "executable",
+      "evidence": "catalog/flask_app/tests/test_capability_onboarding_route.py"
+    },
+    {
+      "id": "cfi2.no-candidate-local-federation-creation",
+      "status": "executable",
+      "evidence": "catalog/flask_app/tests/test_capability_onboarding_route.py"
+    },
+    {
+      "id": "cfi2.returning-device-startup-reconnect",
+      "status": "executable",
+      "evidence": "catalog/flask_app/tests/test_capability_onboarding_route.py"
+    },
+    {
+      "id": "cfi2.legacy-mode-browser-preview",
+      "status": "executable",
+      "evidence": "catalog/flask_app/tests/test_capability_onboarding_route.py"
+    },
+    {
       "id": "cf6.framework-neutral-projection-safety",
       "status": "executable",
       "evidence": "catalog/federation/tests/test_federation_projections.py"
@@ -68,24 +88,9 @@
   ],
   "blocked_by_cfi": [
     {
-      "id": "product.existing-federation-discovery-and-join",
+      "id": "product.legacy-mode-persisted-migration",
       "status": "blocked",
-      "blocked_by": "CFI-2 supported onboarding composition"
-    },
-    {
-      "id": "product.no-candidate-local-federation-creation",
-      "status": "blocked",
-      "blocked_by": "CFI-2 supported onboarding composition"
-    },
-    {
-      "id": "product.returning-device-startup-reconnect",
-      "status": "blocked",
-      "blocked_by": "CFI-2 startup integration"
-    },
-    {
-      "id": "product.legacy-mode-browser-migration",
-      "status": "blocked",
-      "blocked_by": "CFI-2 onboarding route and persisted product flow"
+      "blocked_by": "compatibility-controlled setup transition remains a separate integration change"
     },
     {
       "id": "product.recorder-plus-ai-simultaneous-contribution",
@@ -100,7 +105,7 @@
     {
       "id": "product.benchmark-run-skip-rerun-through-flask-onboarding",
       "status": "blocked",
-      "blocked_by": "CFI-2 supported Flask/onboarding benchmark composition"
+      "blocked_by": "separate authoritative benchmark product-flow integration"
     },
     {
       "id": "product.contribution-disable-and-reenable",
@@ -110,12 +115,12 @@
     {
       "id": "product.federation-overview-mutations",
       "status": "blocked",
-      "blocked_by": "CFI-1 is intentionally read-only and grants no mutation authority"
+      "blocked_by": "CFI-1 remains intentionally read-only and CFI-2 adds onboarding-only mutations"
     },
     {
       "id": "product.complete-capability-first-end-to-end-acceptance",
       "status": "blocked",
-      "blocked_by": "remaining CFI integration and full CF7"
+      "blocked_by": "remaining benchmark, contribution, setup transition, and full CF7 acceptance"
     }
   ],
   "manual_physical_verification": [
@@ -147,7 +152,7 @@
     {
       "id": "physical.mobile-and-desktop-browser-review",
       "status": "manual",
-      "reason": "the route is automated, but responsive rendering and interaction still require real desktop and mobile browsers"
+      "reason": "the routes are automated, but responsive rendering and interaction still require real desktop and mobile browsers"
     }
   ]
 }
