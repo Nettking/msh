@@ -138,19 +138,20 @@ class ContributionService:
         candidate = recommendation.candidate
         current = self._store.get(candidate_id)
         desired = (
-            ContributionDesiredState.ENABLED
+            ContributionDesiredState.ASK_LATER
             if current is None
             else current.desired_state
+        )
+        policy_state = (
+            ContributionPolicyState.NOT_EVALUATED
+            if current is None
+            else current.policy_state
         )
         outcome = self._adapter(candidate).suspend(candidate, reason=reason)
         return self._store.transition(
             candidate=candidate,
             desired_state=desired,
-            policy_state=(
-                ContributionPolicyState.ALLOWED
-                if current is None
-                else current.policy_state
-            ),
+            policy_state=policy_state,
             activation_state=ContributionActivationState.SUSPENDED,
             reason=outcome.reason or reason,
             decided_at=self._now(),
