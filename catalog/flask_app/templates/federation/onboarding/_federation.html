@@ -23,7 +23,7 @@
         {% endif %}
 
         {% if vm.federation.can_reconnect|default(false) %}
-        <form method="post" action="{{ vm.actions.federation_url }}" class="local-federation-action">
+        <form method="post" action="{{ vm.actions.federation_url|default('/onboarding/federation') }}" class="local-federation-action">
           <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
           <input type="hidden" name="command_id" value="{{ vm.command_id|default('') }}">
           <input type="hidden" name="intent" value="reconnect">
@@ -38,7 +38,7 @@
             <strong id="pairing-code-heading">Connect another MSH device</strong>
             <span>Generate a signed one-use code. It expires after five minutes.</span>
           </div>
-          <form method="post" action="{{ vm.actions.pairing_code_url }}">
+          <form method="post" action="{{ vm.actions.pairing_code_url|default('/onboarding/federation/pairing-code') }}">
             <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
             <button class="federation-button federation-button--secondary" type="submit">Create pairing code</button>
           </form>
@@ -54,7 +54,7 @@
         {% endif %}
 
         {% if vm.federation.can_redeem_pairing_code|default(true) %}
-        <form method="post" action="{{ vm.actions.pair_url }}" class="federation-candidate-form">
+        <form method="post" action="{{ vm.actions.pair_url|default('/onboarding/federation/pair') }}" class="federation-candidate-form">
           <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
           <label>
             <span>Pairing code from the other MSH device</span>
@@ -68,7 +68,7 @@
         <details class="federation-technical-details">
           <summary>Other discovery options</summary>
           {% if vm.federation.candidates %}
-          <form method="post" action="{{ vm.actions.federation_url }}" class="federation-candidate-form">
+          <form method="post" action="{{ vm.actions.federation_url|default('/onboarding/federation') }}" class="federation-candidate-form">
             <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
             <input type="hidden" name="command_id" value="{{ vm.command_id|default('') }}">
             <fieldset>
@@ -101,7 +101,7 @@
           {% endif %}
 
           {% if vm.federation.can_create_local|default(true) %}
-          <form method="post" action="{{ vm.actions.federation_url }}" class="local-federation-action">
+          <form method="post" action="{{ vm.actions.federation_url|default('/onboarding/federation') }}" class="local-federation-action">
             <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
             <input type="hidden" name="command_id" value="{{ vm.command_id|default('') }}">
             <input type="hidden" name="intent" value="create-local">
