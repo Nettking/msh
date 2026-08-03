@@ -5,11 +5,16 @@
             <h3 id="contributions-heading">Choose what this device contributes</h3>
             <p>Enable any suitable combination. Each choice is independent and can be changed later.</p>
           </div>
-          <span class="federation-selection-count" data-selection-count aria-live="polite"></span>
+          <div>
+            {{ status_badge(vm.contribution_summary.state, vm.contribution_summary.label, True) }}
+            <span class="federation-selection-count" data-selection-count aria-live="polite"></span>
+          </div>
         </header>
 
+        {% if vm.contributions %}
         <form method="post" action="{{ vm.actions.contributions_url }}" data-contribution-form>
           {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+          {% if vm.command_id %}<input type="hidden" name="command_id" value="{{ vm.command_id }}">{% endif %}
           <div class="contribution-grid">
             {% for contribution in vm.contributions %}{{ contribution_card(contribution, True) }}{% endfor %}
           </div>
@@ -18,4 +23,21 @@
             <button class="federation-button federation-button--primary" type="submit">Save contribution choices</button>
           </div>
         </form>
+        {% else %}
+        <div class="federation-empty-state" role="status">
+          <h4>{{ vm.contribution_summary.label }}</h4>
+          <p>MSH did not find a supported contribution candidate, or this step is waiting for an earlier onboarding action.</p>
+        </div>
+        <div class="onboarding-actions">
+          <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
+        </div>
+        {% endif %}
+
+        {% if vm.contribution_summary.can_reconcile %}
+        <form method="post" action="{{ vm.actions.reconcile_contributions_url }}" class="onboarding-actions">
+          {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+          {% if vm.command_id %}<input type="hidden" name="command_id" value="{{ vm.command_id }}">{% endif %}
+          <button class="federation-button federation-button--ghost" type="submit">Reconcile saved choices</button>
+        </form>
+        {% endif %}
       </section>
