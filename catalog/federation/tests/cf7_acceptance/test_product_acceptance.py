@@ -403,13 +403,13 @@ def test_fresh_product_flow_finishes_restarts_and_reruns_expired_evidence(
     assert returning.status_code == 302
     assert returning.location.endswith("/federation")
 
+    restarted_ids = _candidate_ids(restarted)
     current[0] = NOW + timedelta(minutes=16)
     with restarted.app.app_context():
         reconciled = {
             intent.candidate_id: intent
             for intent in restarted.contributions.reconcile()
         }
-    restarted_ids = _candidate_ids(restarted)
     assert reconciled[restarted_ids["language-model"]].activation_state is (
         ContributionActivationState.SUSPENDED
     )
