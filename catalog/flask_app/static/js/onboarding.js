@@ -40,6 +40,7 @@
   function initializeShell(shell) {
     var stepButtons = Array.from(shell.querySelectorAll("[data-step-target]"));
     var panels = Array.from(shell.querySelectorAll("[data-step-panel]"));
+    var allSteps = stepButtons.map(function (button) { return button.dataset.stepTarget; });
     var availableSteps = stepButtons
       .filter(function (button) { return !button.disabled; })
       .map(function (button) { return button.dataset.stepTarget; });
@@ -89,9 +90,9 @@
       var label = shell.querySelector("#onboarding-progress-label");
       var button = stepButtons.find(function (item) { return item.dataset.stepTarget === step; });
       if (!label || !button) return;
-      var position = stepIndex(step) + 1;
+      var position = allSteps.indexOf(step) + 1;
       var title = button.querySelector("strong");
-      label.textContent = "Step " + position + " of " + availableSteps.length + " · " + (title ? title.textContent : step);
+      label.textContent = "Step " + position + " of " + allSteps.length + " · " + (title ? title.textContent : step);
     }
 
     function showStep(step, options) {
