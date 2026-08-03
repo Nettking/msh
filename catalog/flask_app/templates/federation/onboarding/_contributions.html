@@ -13,8 +13,8 @@
           </div>
         </header>
 
-        {% if contribution_summary.state not in ['complete', 'pending'] %}
-        <p class="federation-notice">Contributions remain blocked until the required inspection and benchmark review are complete.</p>
+        {% if contribution_summary.state != 'complete' %}
+        <p class="federation-notice">Contributions remain blocked until benchmark review and an explicit supported choice are complete.</p>
         {% endif %}
 
         {% if vm.contributions %}
