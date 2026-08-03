@@ -8,6 +8,7 @@ from typing import Any
 
 from flask import Flask, current_app
 
+from .capability_recovery_adapters import fresh_capability_inspection_adapters
 from .federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
     PairingRelayRuntime,
@@ -95,10 +96,14 @@ class LazyPairingOnboardingService(PairingAwareCapabilityOnboardingService):
 
 
 def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
-    """Install a config-aware lazy service before any CFI getter is resolved."""
+    """Install config-aware onboarding and fresh capability composition."""
 
     service = LazyPairingOnboardingService()
     app.config["CAPABILITY_ONBOARDING_SERVICE"] = service
+    if app.config.get("CAPABILITY_ONBOARDING_INSPECTION_ADAPTERS") is None:
+        app.config["CAPABILITY_ONBOARDING_INSPECTION_ADAPTERS"] = (
+            fresh_capability_inspection_adapters
+        )
     app.extensions["federation_pairing_service"] = service
     return service
 
