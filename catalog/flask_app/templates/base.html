@@ -3,7 +3,10 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    {% set document_recorder_only = server_setup_settings and server_setup_settings.configured and server_setup_settings.user_setup_complete and server_setup_settings.deployment_mode == 'recorder-only' %}
+    {% set document_capabilities = capability_startup_flags|default({}) %}
+    {% set document_capability_complete = document_capabilities.completed|default(false) %}
+    {% set legacy_document_recorder_only = server_setup_settings and server_setup_settings.configured and server_setup_settings.user_setup_complete and server_setup_settings.deployment_mode == 'recorder-only' %}
+    {% set document_recorder_only = (document_capability_complete and document_capabilities.recorder|default(false) and not document_capabilities.workbench|default(false)) or (not document_capability_complete and legacy_document_recorder_only) %}
     <title>{{ 'MSH Recorder' if document_recorder_only else 'MSH Webapp' }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/global-refresh.css') }}">
@@ -23,13 +26,21 @@
   <body class="{% if setup_focus %}setup-focus{% endif %}">
     {% set setup_is_configured = server_setup_settings and server_setup_settings.configured and server_setup_settings.user_setup_complete %}
     {% set setup_runtime_pending = setup_is_configured and startup_state is defined and startup_state.requires_choice and server_setup_settings.deployment_mode in ['full-server', 'web-workbench'] %}
-    {% set recorder_role = setup_is_configured and server_setup_settings.deployment_mode in ['full-server', 'recorder-only'] %}
-    {% set recorder_only = setup_is_configured and server_setup_settings.deployment_mode == 'recorder-only' %}
-    {% set ai_role = setup_is_configured and server_setup_settings.deployment_mode != 'recorder-only' %}
-    {% set workbench_role = setup_is_configured and server_setup_settings.deployment_mode != 'recorder-only' %}
+    {% set capability_flags = capability_startup_flags|default({}) %}
+    {% set capability_complete = capability_flags.completed|default(false) %}
+    {% set legacy_recorder_role = setup_is_configured and server_setup_settings.deployment_mode in ['full-server', 'recorder-only'] %}
+    {% set legacy_recorder_only = setup_is_configured and server_setup_settings.deployment_mode == 'recorder-only' %}
+    {% set legacy_ai_role = setup_is_configured and server_setup_settings.deployment_mode != 'recorder-only' %}
+    {% set legacy_workbench_role = setup_is_configured and server_setup_settings.deployment_mode != 'recorder-only' %}
+    {% set recorder_role = capability_flags.recorder|default(false) if capability_complete else legacy_recorder_role %}
+    {% set workbench_role = capability_flags.workbench|default(false) if capability_complete else legacy_workbench_role %}
+    {% set ai_role = capability_flags.language_model|default(false) if capability_complete else legacy_ai_role %}
+    {% set recorder_only = (recorder_role and not workbench_role) if capability_complete else legacy_recorder_only %}
     {% set knowledge_endpoints = ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export', 'operator_support_web.first_part', 'operator_support_web.quality_outcomes', 'operator_support_web.machine_notes', 'operator_support_web.learning', 'operator_support_web.recommender_artifacts', 'web.strategies', 'web.save_strategies'] %}
     {% set active_group = 'monitor' %}
-    {% if endpoint.startswith('operator_strategy_web.') or endpoint in knowledge_endpoints %}
+    {% if endpoint.startswith('federation_web.') or endpoint.startswith('capability_') %}
+      {% set active_group = 'federation' %}
+    {% elif endpoint.startswith('operator_strategy_web.') or endpoint in knowledge_endpoints %}
       {% set active_group = 'knowledge' %}
     {% elif endpoint == 'web.guide' or endpoint == 'web.startup' or endpoint.startswith('source_web.') or endpoint == 'web.status' or endpoint.startswith('ai_web.') %}
       {% set active_group = 'system' %}
@@ -37,17 +48,27 @@
     {% macro primary_links(group) -%}
       {% if recorder_only %}
       <a class="{% if endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}" {% if endpoint == 'web.status' %}aria-current="page"{% endif %}>Status</a>
-      <a class="{% if endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup', edit='1') }}" {% if endpoint == 'web.startup' %}aria-current="page"{% endif %}>Setup</a>
+      <a class="{% if group == 'federation' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.overview', '/federation') }}" {% if group == 'federation' %}aria-current="page"{% endif %}>Federation</a>
+      <a class="{% if endpoint.startswith('capability_') %}is-active{% endif %}" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}" {% if endpoint.startswith('capability_') %}aria-current="page"{% endif %}>Device</a>
       {% else %}
+      {% if workbench_role or not capability_complete %}
       <a class="{% if group == 'monitor' %}is-active{% endif %}" href="{{ url_for('web.overview') }}" {% if group == 'monitor' %}aria-current="page"{% endif %}>Monitor</a>
       <a class="{% if group == 'knowledge' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.index', '/operator-strategies') }}" {% if group == 'knowledge' %}aria-current="page"{% endif %}>Knowledge</a>
+      {% endif %}
+      {% if capability_complete %}
+      <a class="{% if group == 'federation' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.overview', '/federation') }}" {% if group == 'federation' %}aria-current="page"{% endif %}>Federation</a>
+      {% endif %}
       <a class="{% if group == 'system' %}is-active{% endif %}" href="{{ url_for('web.guide') }}" {% if group == 'system' %}aria-current="page"{% endif %}>System</a>
       {% endif %}
     {%- endmacro %}
     {% macro section_links(group, current_endpoint) -%}
       {% if recorder_only %}
         <a class="{% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Recorder status</a>
-        <a class="{% if current_endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup', edit='1') }}">Setup</a>
+        <a class="{% if current_endpoint.startswith('federation_web.') %}is-active{% endif %}" href="{{ endpoint_url('federation_web.overview', '/federation') }}">Federation overview</a>
+        <a class="{% if current_endpoint.startswith('capability_') %}is-active{% endif %}" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}">Device setup</a>
+      {% elif group == 'federation' %}
+        <a class="{% if current_endpoint.startswith('federation_web.') %}is-active{% endif %}" href="{{ endpoint_url('federation_web.overview', '/federation') }}">Overview</a>
+        <a class="{% if current_endpoint.startswith('capability_') %}is-active{% endif %}" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}">Device onboarding</a>
       {% elif group == 'knowledge' %}
         <a class="{% if current_endpoint == 'operator_strategy_web.index' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.index', '/operator-strategies') }}">Overview</a>
         <a class="{% if current_endpoint == 'operator_strategy_web.capture' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.capture', '/operator-strategies/capture') }}">Capture</a>
@@ -57,9 +78,9 @@
         <a class="{% if current_endpoint == 'operator_support_web.osl_export' %}is-active{% endif %}" href="{{ endpoint_url('operator_support_web.osl_export', '/osl-export') }}">SysML Export</a>
       {% elif group == 'system' %}
         <a class="{% if current_endpoint == 'web.guide' %}is-active{% endif %}" href="{{ url_for('web.guide') }}">Guide</a>
-        <a class="{% if current_endpoint == 'web.startup' and request.args.get('step') != 'ai' %}is-active{% endif %}" href="{{ url_for('web.startup') }}">Setup</a>
+        <a class="{% if current_endpoint.startswith('capability_') %}is-active{% endif %}" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}">Device setup</a>
         {% if ai_role %}
-        <a class="{% if current_endpoint == 'web.startup' and request.args.get('step') == 'ai' %}is-active{% endif %}" href="{{ url_for('web.startup', edit='1', step='ai') }}">Connections</a>
+        <a href="{{ url_for('web.startup', legacy='1', edit='1', step='ai') }}">Connections</a>
         {% endif %}
         {% if recorder_role %}
         <a href="{{ url_for('web.status') }}#recorder-status">Recording</a>
@@ -70,6 +91,11 @@
         <a class="{% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
         {% if ai_role %}
         <a class="{% if current_endpoint.startswith('ai_web.') %}is-active{% endif %}" href="{{ endpoint_url('ai_web.ai_page', '/ai') }}">AI Explainer</a>
+        {% endif %}
+        {% if capability_complete %}
+        <a href="{{ url_for('web.startup', legacy='1', edit='1') }}">Compatibility setup</a>
+        {% else %}
+        <a class="{% if current_endpoint == 'web.startup' %}is-active{% endif %}" href="{{ url_for('web.startup', legacy='1') }}">Setup</a>
         {% endif %}
       {% else %}
         <a class="{% if current_endpoint == 'web.overview' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Overview</a>
@@ -101,7 +127,7 @@
           </button>
         </form>
         {% else %}
-        <a class="setup-shell-header__exit" href="{{ url_for('web.startup', edit='1', step='recorder') }}">Configure recording</a>
+        <a class="setup-shell-header__exit" href="{{ url_for('web.startup', legacy='1', edit='1', step='recorder') }}">Configure recording</a>
         {% endif %}
       {% endif %}
       {% if endpoint == 'web.get_started' %}
