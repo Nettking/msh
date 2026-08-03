@@ -1,0 +1,97 @@
+name: CFI-3 device inspection composition
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cfi3-device-inspection-composition.yml"
+      - "catalog/flask_app/app.py"
+      - "catalog/flask_app/capability_inspection_routes.py"
+      - "catalog/flask_app/services/capability_inspection_service.py"
+      - "catalog/flask_app/templates/federation/onboarding/_inspect.html"
+      - "catalog/flask_app/tests/test_capability_inspection_route.py"
+      - "catalog/capabilities/benchmarking/**"
+      - "catalog/federation/onboarding_models.py"
+      - "catalog/flask_app/services/mtconnect_discovery_service.py"
+      - "catalog/flask_app/services/server_setup_service.py"
+  push:
+    branches:
+      - main
+      - "agent/cfi3-*"
+    paths:
+      - ".github/workflows/cfi3-device-inspection-composition.yml"
+      - "catalog/flask_app/app.py"
+      - "catalog/flask_app/capability_inspection_routes.py"
+      - "catalog/flask_app/services/capability_inspection_service.py"
+      - "catalog/flask_app/templates/federation/onboarding/_inspect.html"
+      - "catalog/flask_app/tests/test_capability_inspection_route.py"
+      - "catalog/capabilities/benchmarking/**"
+      - "catalog/federation/onboarding_models.py"
+      - "catalog/flask_app/services/mtconnect_discovery_service.py"
+      - "catalog/flask_app/services/server_setup_service.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cfi3-inspection-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  inspection:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile CFI-3 composition
+        run: >-
+          python -m compileall -q
+          catalog/flask_app/capability_inspection_routes.py
+          catalog/flask_app/services/capability_inspection_service.py
+          catalog/flask_app/tests/test_capability_inspection_route.py
+      - name: Run CFI-3 and affected regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_capability_inspection_route.py
+          catalog/flask_app/tests/test_capability_onboarding_route.py
+          catalog/capabilities/tests/test_benchmarking_inspection.py
+          catalog/capabilities/tests/test_benchmarking_adapters.py
+          catalog/federation/tests/test_onboarding_contracts.py
+          catalog/federation/tests/test_onboarding_discovery_service.py
+          catalog/flask_app/tests/test_cf5_ui_shell.py
+          catalog/flask_app/tests/test_federation_overview_route.py
+          catalog/federation/tests/test_federation_projections.py
+          catalog/flask_app/tests/test_post_setup_handoff.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/flask_app/tests/test_mtconnect_discovery_service.py
+      - name: Validate Compose configuration
+        run: docker compose config
+      - name: Ruff CFI-3 composition
+        run: >-
+          python -m ruff check
+          catalog/flask_app/app.py
+          catalog/flask_app/capability_inspection_routes.py
+          catalog/flask_app/services/capability_inspection_service.py
+          catalog/flask_app/tests/test_capability_inspection_route.py
+      - name: Diff hygiene
+        shell: bash
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git diff --check "origin/${{ github.base_ref }}...HEAD"
+          else
+            git diff --check HEAD^ HEAD
+          fi
