@@ -63,7 +63,7 @@ def _reject_unexpected_fields(
         raise AuthorizationError(
             "onboarding-context-override-forbidden",
             "benchmark execution context is derived from trusted server state",
-            sorted(unexpected)[0],
+            min(unexpected),
         )
 
 
