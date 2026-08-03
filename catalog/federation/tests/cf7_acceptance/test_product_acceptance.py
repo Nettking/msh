@@ -363,7 +363,7 @@ def test_fresh_product_flow_finishes_restarts_and_reruns_expired_evidence(
         data={"_csrf_token": csrf, "command_id": command_id},
     )
     assert finished.status_code == 303
-    assert finished.location.endswith("/federation")
+    assert finished.location == "/onboarding?step=finish"
     state = stack.transition.load()
     assert state is not None and state.completed
     assert state.source_kind == "capability-first"
