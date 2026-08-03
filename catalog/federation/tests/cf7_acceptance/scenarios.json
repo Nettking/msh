@@ -147,7 +147,7 @@
     {
       "id": "product.recorder-plus-ai-simultaneous-contribution",
       "status": "blocked",
-      "blocked_by": "automated bounded composition is executable, but real configured recorder and Ollama acceptance requires validated physical evidence"
+      "blocked_by": "CFI-4 and CFI-5 automated bounded composition is executable, but real configured recorder and Ollama acceptance requires validated physical evidence"
     },
     {
       "id": "product.separate-ai-compute-storage-contributors",
