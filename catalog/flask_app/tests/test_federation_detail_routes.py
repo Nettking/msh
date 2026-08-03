@@ -23,6 +23,18 @@ def _app():
     return app
 
 
+def test_federation_detail_route_is_registered_read_only() -> None:
+    app = _app()
+    rule = next(
+        rule
+        for rule in app.url_map.iter_rules()
+        if rule.endpoint == "federation_web.detail"
+    )
+
+    assert str(rule) == "/federation/<page_name>"
+    assert rule.methods == {"GET", "HEAD", "OPTIONS"}
+
+
 @pytest.mark.parametrize(("path", "title"), FEDERATION_PAGES.items())
 def test_all_federation_detail_pages_render_read_only(
     path: str,
@@ -32,13 +44,11 @@ def test_all_federation_detail_pages_render_read_only(
 
     response = client.get(path)
     head = client.head(path)
-    rejected_write = client.post(path)
     page = response.get_data(as_text=True)
 
     assert response.status_code == 200
     assert head.status_code == 200
     assert head.data == b""
-    assert rejected_write.status_code == 405
     assert f"<h2>{title}</h2>" in page
     assert f'href="{path}"' in page
     assert 'aria-current="page"' in page
