@@ -16,8 +16,8 @@ from flask import current_app
 
 from catalog.capabilities.benchmarking import (
     BenchmarkRegistry,
-    BenchmarkRunRequest,
     BenchmarkRunner,
+    BenchmarkRunRequest,
     BenchmarkValidityReason,
     CancellationToken,
     SQLiteBenchmarkResultStore,
@@ -445,8 +445,12 @@ class CapabilityBenchmarkService:
                         dependency_inputs = dependency_supplier(target_service_id)
                     except (KeyError, TypeError, ValueError):
                         continue
-                    except Exception:
-                        continue
+                    except Exception as exc:
+                        raise FederationValidationError(
+                            "benchmark-dependency-inputs-unavailable",
+                            "benchmark_id",
+                            "benchmark dependency inputs could not be derived safely",
+                        ) from exc
                     if not isinstance(dependency_inputs, Mapping):
                         continue
                     missing = set(definition.invalidation_inputs) - set(
@@ -809,7 +813,7 @@ class CapabilityBenchmarkService:
             action_label = "Running"
 
         digest = hashlib.sha256(
-            f"{item.benchmark_id}\0{item.target_service_id}".encode("utf-8")
+            f"{item.benchmark_id}\0{item.target_service_id}".encode()
         ).hexdigest()[:12]
         return {
             "id": f"{item.benchmark_id}-{digest}",
