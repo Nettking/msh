@@ -1,0 +1,61 @@
+name: Fix CF7-E final lint
+
+on:
+  push:
+    branches:
+      - agent/cf7e-functional-onboarding-pairing
+    paths:
+      - ".github/workflows/cf7e-fix-final-lint.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/cf7e-functional-onboarding-pairing
+          fetch-depth: 0
+
+      - name: Apply exact lint fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          pairing = Path("catalog/flask_app/services/federation_pairing_service.py")
+          text = pairing.read_text(encoding="utf-8")
+          old = "from dataclasses import dataclass, field\n"
+          new = "from collections.abc import Callable\nfrom dataclasses import dataclass, field\n"
+          assert text.count(old) == 1
+          text = text.replace(old, new)
+          old = "from typing import Any, Callable, Final\n"
+          new = "from typing import Any, Final\n"
+          assert text.count(old) == 1
+          pairing.write_text(text.replace(old, new), encoding="utf-8")
+
+          normalizer = Path("catalog/flask_app/services/onboarding_view_normalizer.py")
+          text = normalizer.read_text(encoding="utf-8")
+          old = "from copy import deepcopy\nfrom typing import Any, Mapping\n"
+          new = "from collections.abc import Mapping\nfrom copy import deepcopy\nfrom typing import Any\n"
+          assert text.count(old) == 1
+          normalizer.write_text(text.replace(old, new), encoding="utf-8")
+
+          tests = Path("catalog/flask_app/tests/test_federation_pairing_service.py")
+          text = tests.read_text(encoding="utf-8")
+          old = "    codec, code = _code(tmp_path)\n    expired = PairingCodeCodec("
+          new = "    _codec, code = _code(tmp_path)\n    expired = PairingCodeCodec("
+          assert text.count(old) == 1
+          tests.write_text(text.replace(old, new), encoding="utf-8")
+
+          Path(".github/workflows/cf7e-fix-final-lint.yml").unlink()
+          PY
+
+      - name: Commit lint cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix CF7-E lint findings"
+          git push origin HEAD:agent/cf7e-functional-onboarding-pairing
