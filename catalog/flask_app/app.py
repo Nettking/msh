@@ -28,6 +28,7 @@ from .services.capability_startup_transition_service import (
     get_capability_startup_transition_service,
 )
 from .services.catalog_service import ArtifactCatalog
+from .services.onboarding_view_normalizer import normalize_onboarding_view_model
 from .services.recorder_control_service import get_recorder_control_service
 from .services.server_setup_service import (
     AI_MODEL_CHOICES,
@@ -100,6 +101,9 @@ def create_app() -> Flask:
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_CONTRIBUTION_TTL_SECONDS",
         int(os.getenv("MSH_CONTRIBUTION_TTL_SECONDS", "900")),
+    )
+    app.jinja_env.globals["normalize_onboarding_view_model"] = (
+        normalize_onboarding_view_model
     )
 
     catalog = ArtifactCatalog()
