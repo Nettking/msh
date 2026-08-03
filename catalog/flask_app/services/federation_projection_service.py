@@ -9,18 +9,26 @@ from typing import Any
 from flask import current_app
 
 from catalog.capabilities.operator_surface import ProviderOperatorSurface
+from catalog.federation.errors import FederationOperationError
 from catalog.federation.onboarding_compat import federation_id_from_session_id
 from catalog.federation.projections import (
     BenchmarkResultsAdapter,
+    BenchmarkSnapshot,
     FederationAuthorityAdapter,
     FederationProjectionService,
     JobAuthorityAdapter,
+    JobAuthoritySnapshot,
     OnboardingContractsAdapter,
     ProjectionAdapters,
     ProviderOperatorAdapter,
+    ProviderSnapshot,
     StorageAuthorityAdapter,
+    StorageAuthoritySnapshot,
 )
 
+from .capability_benchmark_service import get_capability_benchmark_service
+from .capability_contribution_service import get_capability_contribution_service
+from .capability_inspection_service import get_capability_inspection_service
 from .capability_onboarding_service import (
     AuthorizedOnboardingContext,
     get_capability_onboarding_service,
@@ -34,6 +42,12 @@ _BENCHMARK_STORE_CONFIG_KEY = "FEDERATION_AUTHORIZED_BENCHMARK_STORE"
 _STORAGE_STORE_CONFIG_KEY = "FEDERATION_STORAGE_AUTHORITY_STORE"
 _JOB_SUPPLIER_CONFIG_KEY = "FEDERATION_AUTHORIZED_JOB_SNAPSHOT_SUPPLIER"
 
+_EXPECTED_EMPTY_CONTRIBUTION_CODES = {
+    "contribution-federation-required",
+    "contribution-inspection-required",
+    "contribution-inspection-expired",
+}
+
 
 class _AuthorizedProviderView:
     """Reuse one already-authorized operator view without re-reading authority."""
@@ -43,6 +57,16 @@ class _AuthorizedProviderView:
 
     def view(self) -> object:
         return self._view
+
+
+class _StaticSnapshotAdapter:
+    """Expose one already-safe immutable snapshot through the adapter protocol."""
+
+    def __init__(self, snapshot: object) -> None:
+        self._snapshot = snapshot
+
+    def snapshot(self) -> object:
+        return self._snapshot
 
 
 def _private_binding_text(value: object) -> str | None:
@@ -71,19 +95,101 @@ def _onboarding_context() -> AuthorizedOnboardingContext | None:
         return None
 
 
+def _warn_projection(name: str, exc: Exception) -> None:
+    current_app.logger.warning(
+        "%s projection unavailable (%s)",
+        name,
+        type(exc).__name__,
+    )
+
+
+def _inspection_state() -> tuple[object | None, bool]:
+    if _INSPECTION_CONFIG_KEY in current_app.config:
+        return current_app.config.get(_INSPECTION_CONFIG_KEY), False
+    try:
+        return get_capability_inspection_service().load(), False
+    except Exception as exc:  # noqa: BLE001 - preserve binding and degrade safely
+        _warn_projection("Federation inspection", exc)
+        return None, True
+
+
+def _benchmark_adapter(*, inspection_failed: bool) -> object:
+    if inspection_failed:
+        return _StaticSnapshotAdapter(
+            BenchmarkSnapshot(False, "inspection-projection-failed")
+        )
+    if _BENCHMARK_STORE_CONFIG_KEY in current_app.config:
+        store = current_app.config.get(_BENCHMARK_STORE_CONFIG_KEY)
+        if store is None:
+            return _StaticSnapshotAdapter(BenchmarkSnapshot(True, "not-configured"))
+        return BenchmarkResultsAdapter(store)
+    try:
+        return BenchmarkResultsAdapter(get_capability_benchmark_service())
+    except Exception as exc:  # noqa: BLE001 - keep the Federation binding visible
+        _warn_projection("Federation benchmark", exc)
+        return _StaticSnapshotAdapter(
+            BenchmarkSnapshot(False, "benchmark-projection-failed")
+        )
+
+
+def _contribution_state() -> tuple[tuple[object, ...], tuple[object, ...], bool]:
+    if (
+        _CANDIDATES_CONFIG_KEY in current_app.config
+        or _INTENTS_CONFIG_KEY in current_app.config
+    ):
+        return (
+            _configured_items(_CANDIDATES_CONFIG_KEY),
+            _configured_items(_INTENTS_CONFIG_KEY),
+            False,
+        )
+    try:
+        service = get_capability_contribution_service()
+        candidates = service.recommend(require_benchmark_review=False)
+        intents = service.intents()
+        return tuple(candidates), tuple(intents), False
+    except FederationOperationError as exc:
+        if getattr(exc, "code", None) in _EXPECTED_EMPTY_CONTRIBUTION_CODES:
+            return (), (), False
+        _warn_projection("Federation contribution", exc)
+        return (), (), True
+    except Exception as exc:  # noqa: BLE001 - contribution reads fail closed
+        _warn_projection("Federation contribution", exc)
+        return (), (), True
+
+
+def _storage_adapter(internal_session_id: str) -> object:
+    store = current_app.config.get(_STORAGE_STORE_CONFIG_KEY)
+    if store is None:
+        return _StaticSnapshotAdapter(
+            StorageAuthoritySnapshot(True, "not-configured")
+        )
+    return StorageAuthorityAdapter(
+        store,
+        internal_session_id=internal_session_id,
+    )
+
+
+def _job_adapter() -> object:
+    supplier: Any = current_app.config.get(_JOB_SUPPLIER_CONFIG_KEY)
+    if not callable(supplier):
+        return _StaticSnapshotAdapter(JobAuthoritySnapshot(True, "not-configured"))
+    return JobAuthorityAdapter(supplier)
+
+
 def get_federation_projection_service() -> FederationProjectionService:
-    """Build the overview projection from server-bound authorities.
+    """Build product projections from server-bound read-only authorities.
 
     The existing provider operator surface remains the preferred authorization
-    boundary. CFI-2 adds a fallback only when a durable device identity and
-    trusted federation binding can be revalidated against the same existing
-    ``SessionCoordinator`` authority. Request parameters are never accepted as
-    actor or session context.
+    boundary. Otherwise the durable capability-first identity and trusted
+    binding are revalidated against the existing ``SessionCoordinator``. The
+    inspection, benchmark and contribution projections read the same CFI-3,
+    CFI-4 and CFI-5 services used by onboarding. Browser parameters are never
+    accepted as actor, session, endpoint or authority context.
     """
 
     surface = current_app.config.get(_OPERATOR_SURFACE_CONFIG_KEY)
     binding: object | None = None
-    provider_adapter: ProviderOperatorAdapter | None = None
+    provider_adapter: object | None = None
     coordinator: object | None = None
     internal_session_id: str | None = None
     actor_node_id: str | None = None
@@ -121,31 +227,38 @@ def get_federation_projection_service() -> FederationProjectionService:
             actor_node_id = context.credentials.identity.node_id
             coordinator = context.coordinator
 
-        benchmark_store = current_app.config.get(_BENCHMARK_STORE_CONFIG_KEY)
-        storage_store = current_app.config.get(_STORAGE_STORE_CONFIG_KEY)
-        job_supplier: Any = current_app.config.get(_JOB_SUPPLIER_CONFIG_KEY)
-        if not callable(job_supplier):
-            job_supplier = None
+        inspection, inspection_failed = _inspection_state()
+        candidates, intents, contribution_failed = _contribution_state()
+        if provider_adapter is None:
+            provider_adapter = _StaticSnapshotAdapter(
+                ProviderSnapshot(
+                    not contribution_failed,
+                    (
+                        "current"
+                        if not contribution_failed
+                        else "contribution-projection-failed"
+                    ),
+                )
+            )
 
         adapters = ProjectionAdapters(
             onboarding=OnboardingContractsAdapter(
                 binding=binding,
-                inspection=current_app.config.get(_INSPECTION_CONFIG_KEY),
-                candidates=_configured_items(_CANDIDATES_CONFIG_KEY),
-                intents=_configured_items(_INTENTS_CONFIG_KEY),
+                inspection=inspection,
+                candidates=candidates,
+                intents=intents,
             ),
             providers=provider_adapter,
-            benchmarks=BenchmarkResultsAdapter(benchmark_store),
+            benchmarks=_benchmark_adapter(
+                inspection_failed=inspection_failed
+            ),
             federation=FederationAuthorityAdapter(
                 coordinator,
                 actor_node_id=actor_node_id,
                 internal_session_id=internal_session_id,
             ),
-            storage=StorageAuthorityAdapter(
-                storage_store,
-                internal_session_id=internal_session_id,
-            ),
-            jobs=JobAuthorityAdapter(job_supplier),
+            storage=_storage_adapter(internal_session_id),
+            jobs=_job_adapter(),
         )
         return FederationProjectionService(adapters)
     except Exception:  # noqa: BLE001 - authorization/projection must fail closed
