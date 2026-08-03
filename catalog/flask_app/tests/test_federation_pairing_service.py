@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from catalog.capabilities.benchmarking import OLLAMA_BENCHMARK_ID
 from catalog.federation.errors import (
     AuthenticationError,
     FederationValidationError,
@@ -172,6 +173,32 @@ def test_pairing_code_route_accepts_the_onboarding_csrf_token(
     assert response.status_code == 200
     assert calls == ["ws://192.168.10.10:8765"]
     assert "Pairing code created" in response.get_data(as_text=True)
+
+
+def test_fresh_install_registers_ollama_check_before_legacy_setup(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    app = create_app()
+    app.config["CAPABILITY_ONBOARDING_SETUP_LOADER"] = lambda: {
+        "configured": False,
+        "user_setup_complete": False,
+        "ai_enabled": True,
+        "ai_model": "llama3.2:3b",
+        "ollama_base_url": "http://ollama:11434",
+    }
+
+    with app.app_context():
+        factory = app.config["CAPABILITY_ONBOARDING_INSPECTION_ADAPTERS"]
+        adapters = factory()
+
+    benchmark_ids = {
+        adapter.definition.benchmark_id
+        for adapter in adapters
+        if hasattr(adapter, "definition")
+    }
+    assert OLLAMA_BENCHMARK_ID in benchmark_ids
 
 
 def test_fresh_reset_preserves_only_recorder_jsonl(tmp_path: Path) -> None:
