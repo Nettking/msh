@@ -44,8 +44,13 @@ def normalize_onboarding_view_model(
         isinstance(inspection, Mapping)
         and inspection.get("state") == "current"
     )
+    existing_summary = view_model.get("benchmark_summary")
+    benchmark_degraded = (
+        isinstance(existing_summary, Mapping)
+        and existing_summary.get("state") == "degraded"
+    )
 
-    if inspection_current and not benchmark_items:
+    if inspection_current and not benchmark_items and not benchmark_degraded:
         summary = view_model.get("benchmark_summary")
         if not isinstance(summary, dict):
             summary = {}
