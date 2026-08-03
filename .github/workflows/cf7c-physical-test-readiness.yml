@@ -1,0 +1,101 @@
+name: CF7-C physical test readiness
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cf7c-physical-test-readiness.yml"
+      - ".gitignore"
+      - "ops/cf7_physical_readiness.py"
+      - "ops/cf7_physical_topology.template.json"
+      - "ops/cf7_prepare_windows.ps1"
+      - "ops/cf7_prepare_linux.sh"
+      - "catalog/federation/tests/cf7_acceptance/test_physical_readiness.py"
+      - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
+      - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
+      - "docs/implementation/cf7c_physical_test_readiness.md"
+  push:
+    branches:
+      - agent/cf7c-physical-test-readiness
+    paths:
+      - ".github/workflows/cf7c-physical-test-readiness.yml"
+      - ".gitignore"
+      - "ops/cf7_physical_readiness.py"
+      - "ops/cf7_physical_topology.template.json"
+      - "ops/cf7_prepare_windows.ps1"
+      - "ops/cf7_prepare_linux.sh"
+      - "catalog/federation/tests/cf7_acceptance/test_physical_readiness.py"
+      - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
+      - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
+      - "docs/implementation/cf7c_physical_test_readiness.md"
+
+permissions:
+  contents: read
+
+jobs:
+  readiness:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+
+      - name: Compile readiness tooling
+        run: >-
+          python -m compileall -q
+          ops/cf7_physical_readiness.py
+          catalog/federation/tests/cf7_acceptance/test_physical_readiness.py
+
+      - name: Validate topology template
+        run: >-
+          python -m ops.cf7_physical_readiness
+          topology ops/cf7_physical_topology.template.json
+
+      - name: Run readiness and evidence tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/cf7_acceptance/test_physical_readiness.py
+          catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+
+      - name: Validate Linux wrapper syntax
+        if: runner.os == 'Linux'
+        shell: bash
+        run: bash -n ops/cf7_prepare_linux.sh
+
+      - name: Validate Windows wrapper syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path "ops/cf7_prepare_windows.ps1"),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | ForEach-Object { Write-Error $_.Message }
+            exit 1
+          }
+
+      - name: Ruff readiness tooling
+        run: >-
+          ruff check
+          ops/cf7_physical_readiness.py
+          catalog/federation/tests/cf7_acceptance/test_physical_readiness.py
+
+      - name: Diff hygiene
+        run: git diff --check
