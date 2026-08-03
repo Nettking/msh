@@ -10,12 +10,14 @@ on:
       - "catalog/flask_app/templates/base.html"
       - "catalog/flask_app/templates/federation/onboarding/_finish.html"
       - "catalog/flask_app/tests/test_capability_startup_transition_route.py"
+      - "catalog/flask_app/tests/test_streamlined_onboarding_flow.py"
       - "catalog/federation/onboarding_compat.py"
       - "catalog/federation/onboarding_models.py"
   push:
     branches:
       - main
       - "agent/cfi6-*"
+      - "agent/cf7d-*"
     paths:
       - ".github/workflows/cfi6-compatibility-startup-transition.yml"
       - "catalog/flask_app/app.py"
@@ -24,6 +26,7 @@ on:
       - "catalog/flask_app/templates/base.html"
       - "catalog/flask_app/templates/federation/onboarding/_finish.html"
       - "catalog/flask_app/tests/test_capability_startup_transition_route.py"
+      - "catalog/flask_app/tests/test_streamlined_onboarding_flow.py"
       - "catalog/federation/onboarding_compat.py"
       - "catalog/federation/onboarding_models.py"
 
@@ -62,10 +65,12 @@ jobs:
           catalog/flask_app/capability_startup_transition_routes.py
           catalog/flask_app/services/capability_startup_transition_service.py
           catalog/flask_app/tests/test_capability_startup_transition_route.py
+          catalog/flask_app/tests/test_streamlined_onboarding_flow.py
       - name: Run CFI-6 and affected regressions
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_capability_startup_transition_route.py
+          catalog/flask_app/tests/test_streamlined_onboarding_flow.py
           catalog/flask_app/tests/test_capability_contribution_route.py
           catalog/flask_app/tests/test_capability_benchmark_route.py
           catalog/flask_app/tests/test_capability_inspection_route.py
@@ -86,6 +91,7 @@ jobs:
           catalog/flask_app/capability_startup_transition_routes.py
           catalog/flask_app/services/capability_startup_transition_service.py
           catalog/flask_app/tests/test_capability_startup_transition_route.py
+          catalog/flask_app/tests/test_streamlined_onboarding_flow.py
       - name: Diff hygiene
         shell: bash
         run: |
