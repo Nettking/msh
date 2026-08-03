@@ -1,0 +1,60 @@
+name: Apply CF7-C readiness fix
+
+on:
+  push:
+    branches:
+      - agent/cf7c-physical-test-readiness
+    paths:
+      - ".github/workflows/cf7c-apply-readiness-fix.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/cf7c-physical-test-readiness
+          fetch-depth: 0
+
+      - name: Apply exact bounded fixes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          runner = Path("ops/cf7_physical_readiness.py")
+          text = runner.read_text(encoding="utf-8")
+          old = 'r"private[_-]?key)\\b\\s*[:=]\\s*[^\\s,;]+"'
+          new = 'r"private[_-]?key)\\b\\s*[:=]\\s*(?:bearer\\s+)?[^\\s,;]+"'
+          assert text.count(old) == 1
+          runner.write_text(text.replace(old, new), encoding="utf-8")
+
+          tests = Path(
+              "catalog/federation/tests/cf7_acceptance/"
+              "test_physical_readiness.py"
+          )
+          text = tests.read_text(encoding="utf-8")
+          old = (
+              'lambda: {"service": "ollama", "reachable": True, '
+              '"private_endpoint_persisted": False},'
+          )
+          new = (
+              'lambda: {"service": "ollama", "reachable": True, '
+              '"target_model_present": True, '
+              '"private_endpoint_persisted": False},'
+          )
+          assert text.count(old) == 1
+          tests.write_text(text.replace(old, new), encoding="utf-8")
+
+          Path(".github/workflows/cf7c-apply-readiness-fix.yml").unlink()
+          PY
+
+      - name: Commit bounded fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Fix CF7-C readiness redaction fixtures"
+          git push origin HEAD:agent/cf7c-physical-test-readiness
