@@ -1,130 +1,142 @@
-# CF7-A capability-first acceptance harness
+# CF7 capability-first acceptance harness
 
-Status: foundation implemented and extended through CFI-4; full CF7 product acceptance is **not** claimed.
+Status: automated foundation and product-composition coverage are implemented through CF7-B. **Physical product acceptance and complete Federation v1 end-to-end acceptance are not claimed.**
 
 ## Purpose
 
-CF7-A provides deterministic, cross-platform test infrastructure for the capability-first work that is executable in the current repository.
+The CF7 acceptance system has two permanent layers:
 
-The permanent gate now includes:
+- **CF7-A foundation gate** — verifies contracts, isolated services, Flask integrations, projections, authority regressions, persistence, restart behavior, redaction, and cross-platform compatibility through CFI-6.
+- **CF7-B product and physical gate** — verifies integrated product flows with bounded deterministic external-service fixtures and validates the format of operator-produced physical evidence.
 
-- CF1 onboarding contracts and legacy migration preview;
-- CF2-A benchmark/inspection kernel tests;
-- CF2-B isolated concrete benchmark adapter tests;
-- CF3 isolated discovery, join, reconnect, and authority tests;
-- CF4 isolated contribution service tests;
-- CF5 static onboarding and Federation shell tests;
-- CFI-1 read-only `/federation` route integration;
-- CFI-2 Flask identity, discovery, verified join, local creation, reconnect, and migration-preview integration;
-- CFI-3 Flask device-inspection composition, persistence, expiry, privacy, and no-authority tests;
-- CFI-4 Flask benchmark run, skip, rerun, cancellation, validity, persistence, privacy, and no-authority tests;
-- CF6 projection safety;
-- focused Federation v1 authority regressions.
+The machine-readable source of truth is:
 
-These remain bounded claims. Contribution actions, setup transition, physical browser and hardware behavior, and complete end-to-end acceptance remain outside CF7-A.
+```text
+catalog/federation/tests/cf7_acceptance/scenarios.json
+```
 
-The machine-readable source of truth is `catalog/federation/tests/cf7_acceptance/scenarios.json`.
+The detailed physical runbook is:
 
-## Harness boundaries
+```text
+docs/implementation/cf7b_product_physical_acceptance.md
+```
 
-The harness provides:
+## Authority and truth boundaries
 
-- independent state roots for three MSH devices;
-- stable `IdentityStore` creation and reopen helpers;
-- durable `SessionCoordinator` restart and reconnect helpers;
-- shell-free child-process lifecycle helpers;
-- OS-assigned held TCP ports rather than fixed ports;
-- configured discovery fixtures with two federation candidates;
-- verified join, persisted reconnect, membership removal, fencing, and controlled rejoin fixtures;
-- bounded malformed and partial-write injection against existing identity state;
-- assertions for membership, route authority, fencing, identity stability, and private-data leakage;
-- an explicit scenario manifest with `executable`, `blocked`, and `manual` status only.
+The acceptance harness does not define replacement production behavior.
 
-The helpers and Flask integrations never create a second authority model. Membership changes go through `SessionCoordinator`; join and reconnect go through `SessionOnboardingAuthority`; identity persistence goes through `IdentityStore`; CFI-3 inspection delegates to the existing CF2 `DeviceInspector`; CFI-4 benchmark execution delegates to the existing CF2 registry, runner, result store, validity evaluator, and exact adapter instances composed by CFI-3.
+- Membership changes continue through `SessionCoordinator`.
+- Join and reconnect continue through `SessionOnboardingAuthority`.
+- Stable identity continues through `IdentityStore`.
+- Inspection and benchmarks continue through the existing CF2 services and exact registered adapters.
+- Contribution intent and activation continue through the CF4/CFI-5 service and existing recorder, AI, compute, and storage authority seams.
+- Startup transition continues through CFI-6.
+- Storage remains candidate-only until existing assignment authority acts.
+- Passing benchmark evidence remains evidence rather than authority.
 
-## Scenario-to-test mapping
+CI uses bounded local fixtures for physical services. A green workflow cannot prove real MTConnect, Ollama/GPU, multi-host transport, target storage, or real-browser behavior.
 
-| CF7 area | Current status | Automated evidence | Limitation |
-| --- | --- | --- | --- |
-| Independent device state | Executable | `test_device_state_directories_and_identities_are_isolated` | Test directories, not separate physical hosts |
-| Cross-platform files, processes, ports | Executable | `test_cross_platform_port_and_process_restart_helpers` | Local loopback and child processes only |
-| Several federation candidates | Executable | CF7 foundation and CFI-2 route tests | Configured discovery source, not general LAN discovery |
-| Verified join | Executable | CF3 and CFI-2 route tests | Existing enrollment and invitation authority |
-| No-candidate local creation | Executable | `test_no_candidate_local_creation_uses_existing_coordinator_authority` | One local coordinator authority |
-| Returning trusted startup reconnect | Executable | `test_returning_startup_reconnect_mints_no_new_authority` | Revalidates saved membership; physical relay reconnect remains manual |
-| Legacy mode browser preview | Executable | `test_legacy_migration_preview_never_renders_private_values` | Read-only preview; no migration write |
-| Membership removal and fencing | Executable | CF7 foundation and CFI-2 route tests | Existing session authority only |
-| Controlled rejoin | Executable | CF7 foundation | Existing invitation authority only |
-| Corrupt and partial identity state | Executable | CF7 foundation | Existing identity format |
-| Corrupt CFI-2 onboarding state | Executable | CFI-2 route test | Fail-closed render; no automatic recovery |
-| CF2-A inspection and benchmark engine | Executable | focused capability tests | Isolated engine |
-| CF2-B concrete adapters | Executable | `test_benchmarking_adapters.py` | Existing bounded trusted seams only |
-| CF4 contribution service | Executable | contribution package tests | Isolated service and adapters |
-| CF5 UI shell | Executable | `test_cf5_ui_shell.py` | Automated template/static checks |
-| CFI-1 Federation overview | Executable | `test_federation_overview_route.py` | Read-only |
-| CFI-2 onboarding composition | Executable | `test_capability_onboarding_route.py` | Identity and Federation steps only |
-| CFI-3 device inspection | Executable | `test_capability_inspection_route.py` | Reads coarse local state and existing adapter seams |
-| CFI-4 benchmark composition | Executable | `test_capability_benchmark_route.py` | Evidence only; no contribution activation or new authority |
-| CF6 projections | Executable | `test_federation_projections.py` | Read-only safe projections |
-| Federation v1 authority regression | Executable | `test_phase2_unit.py` | Focused gate, not physical deployment |
-| Persisted legacy migration | Blocked | Manifest entry | Requires compatibility-controlled setup transition |
-| Recorder plus AI contribution | Blocked | Manifest entry | Requires contribution authority binding |
-| Separate AI, compute, and storage contributors | Blocked | Manifest entry | Requires supported contribution composition |
-| Contribution disable/re-enable | Blocked | Manifest entry | CFI-4 stops before contribution actions |
-| Federation overview mutations | Blocked | Manifest entry | Overview remains read-only |
-| Fresh physical Windows/Linux checkout | Manual | Manifest entries | CI runners are not owner hardware |
-| Desktop and mobile browser verification | Manual | Manifest entry | Route tests do not prove physical rendering |
-| Multi-host relay, MTConnect, Ollama/accelerator | Manual | Manifest entries | Requires physical services and devices |
+## CF7-A coverage
 
-## CFI-3 bounded claim
+`.github/workflows/cf7-acceptance-harness.yml` runs on Ubuntu and Windows and covers:
 
-The CFI-3 route suite proves that:
+- CF1 onboarding contracts and legacy migration mapping;
+- CF2 inspection, benchmark engine, concrete adapters, expiry, invalidation, cancellation, and redaction;
+- CF3 discovery, selection, verified join, reconnect, revocation, fencing, and controlled rejoin;
+- CF4 contribution contracts;
+- CF5 onboarding and Federation UI shell;
+- CFI-1 read-only Federation overview;
+- CFI-2 identity and Federation composition;
+- CFI-3 device inspection composition;
+- CFI-4 benchmark composition;
+- CFI-5 contribution enable, disable, suspend, and reconcile composition;
+- CFI-6 persisted migration, startup routing, runtime intent, navigation, and explicit compatibility fallback;
+- CF6 safe projections;
+- focused Federation v1 authority regressions;
+- compilation, manifest validation, Ruff, and diff hygiene.
 
-- inspection requires the server-bound device identity and revalidated membership;
-- the existing CF2 inspector is called through the supported Flask onboarding flow;
-- the snapshot survives restart with monotonic revisions;
-- expired evidence is not treated as current;
-- corrupt persisted evidence fails closed;
-- request-supplied actor, device, session, endpoint, and credential context is rejected;
-- private values do not reach the template;
-- saved MTConnect discovery is read without starting a scan;
-- configured Ollama inspection uses inventory only and does not invoke a model;
-- no benchmark probe, contribution action, membership mutation, storage assignment, or job authority is produced by inspection.
+## CF7-B automated product coverage
 
-## CFI-4 bounded claim
+`catalog/federation/tests/cf7_acceptance/test_product_acceptance.py` composes the supported Flask application and real CFI-2 through CFI-6 services.
 
-The CFI-4 route suite proves that:
+The automated product scenarios prove, within deterministic local fixtures:
 
-- the exact CFI-3 registry and adapter instances are reused rather than rediscovered;
-- trusted Federation context and a current device-bound inspection are required;
-- run IDs, dependency fingerprints, prerequisites, timeouts, and identity/Federation context are server-owned;
-- explicit run and rerun create immutable durable CF1 benchmark results;
-- optional skip creates only local onboarding progress and invokes no probe;
-- cooperative cancellation produces bounded cancelled evidence;
-- TTL expiry, benchmark-version changes, and dependency changes require rerun;
-- corrupt persisted evidence fails closed without rendering raw bytes;
-- Ollama inference occurs only after an explicit benchmark POST;
-- MTConnect does not start scanning or recording, compute handlers are not invoked, storage remains candidate-only, and network targets remain authenticated explicit seams;
-- passing evidence grants no contribution, provider, membership, storage, job, lease, term, grant, or fencing authority.
+- fresh identity and local Federation creation from empty state;
+- inspection, explicit benchmark, contribution review, and capability-first finish;
+- simultaneous recorder and language-model contribution;
+- contribution disable and re-enable without membership change;
+- stable identity, trusted reconnect, startup routing, and contribution reconciliation after restart;
+- expired inspection/benchmark evidence suspending an enabled contribution until explicit inspection and benchmark rerun;
+- three independent device state roots joined to one Federation;
+- separate AI, registered-compute, and storage-candidate paths;
+- storage remaining pending until existing assignment authority reports an assignment;
+- no private recorder endpoint reaching the Federation overview;
+- no contribution action creating membership or unrelated authority.
 
-Passing these tests does not prove physical hardware performance, production network reachability, representative benchmark suitability, contribution activation, or complete product acceptance.
+These are automated product-composition claims, not physical deployment claims.
 
-## Permanent gate
+## Physical evidence contract
 
-`.github/workflows/cf7-acceptance-harness.yml` runs on `ubuntu-latest` and `windows-latest`. It executes:
+CF7-B adds:
 
-- the CF7-A foundation scenarios;
-- CF1 contracts;
-- CF2-A and CF2-B tests;
-- CF3 discovery and authority tests;
-- CF4 contribution service tests;
-- CF5 UI-shell tests;
-- CFI-1 read-only Federation route tests;
-- CFI-2 onboarding route and persistence tests;
-- CFI-3 inspection route, persistence, expiry, safety, and no-authority tests;
-- CFI-4 benchmark route, persistence, skip, rerun, cancel, validity, safety, and no-authority tests;
-- CF6 projections;
-- focused Federation authority regressions;
-- compilation, manifest assertions, Ruff, and diff hygiene.
+```text
+catalog/federation/tests/cf7_acceptance/physical_evidence.py
+catalog/federation/tests/cf7_acceptance/physical_evidence.template.json
+catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+```
 
-Passing this workflow means that the currently executable foundation and bounded Flask integrations are green on both runner families. It must not be used as evidence that contribution mutations are supported, that physical desktop/mobile or hardware behavior is accepted, or that complete capability-first or Federation v1 end-to-end acceptance has passed.
+The validator requires a complete redacted document bound to one exact Git commit. It rejects incomplete environments or scenarios, commit mismatch, malformed or oversized data, unsafe paths, URLs, IP addresses, credentials, enrollment material, private keys, local setup filenames, and private database locations.
+
+The checked-in template is intentionally pending and must fail full validation. CI verifies that this fail-closed behavior remains true.
+
+Required physical evidence includes:
+
+- fresh physical Windows and Linux checkouts;
+- independent multi-host Federation transport;
+- a real or approved MTConnect source;
+- target Ollama model and accelerator;
+- desktop and mobile browser review;
+- recorder plus AI on one device;
+- separate AI, compute, and storage devices;
+- benchmark expiry and rerun;
+- contribution disable and re-enable;
+- restart and reconciliation;
+- revocation, fencing, and controlled rejoin.
+
+## Permanent CF7-B gate
+
+`.github/workflows/cf7b-product-physical-acceptance.yml` runs on Ubuntu and Windows and includes:
+
+- manifest truth-boundary assertions;
+- integrated CF7-B product scenarios;
+- physical evidence validator tests;
+- CF7 foundation scenarios;
+- CFI-2 through CFI-6 route suites;
+- Federation overview tests;
+- navigation, mobile, responsive, setup-handoff, provider, recorder, and AI runtime regressions;
+- contribution, projection, onboarding, and discovery contracts;
+- Phase 0, Phase 1, and focused Phase 2 authority regressions;
+- Docker Compose validation;
+- Ruff and diff hygiene.
+
+## Acceptance decision
+
+The manifest currently and intentionally keeps:
+
+```json
+{
+  "acceptance_claim": "foundation-only",
+  "federation_v1_end_to_end_accepted": false,
+  "capability_first_onboarding_end_to_end_accepted": false,
+  "physical_evidence_accepted": false
+}
+```
+
+Those flags may change only in a separate review after:
+
+1. CF7-A, CF7-B, and broad Federation matrices are green for the exact commit;
+2. all physical scenarios pass on real equipment;
+3. one complete redacted physical evidence document validates against that commit;
+4. no unresolved authority, privacy, data-loss, cross-platform, or browser defect remains.
+
+CF8 role-first retirement must not begin solely because automated CI is green. It begins only after the evidence-backed CF7 acceptance decision is reviewed and accepted.
