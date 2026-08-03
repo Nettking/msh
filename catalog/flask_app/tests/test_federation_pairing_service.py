@@ -14,7 +14,9 @@ from catalog.federation.onboarding_models import (
     FederationConnectionState,
     FederationSessionBinding,
 )
+from catalog.flask_app import federation_pairing_routes
 from catalog.flask_app.app import create_app
+from catalog.flask_app.capability_onboarding_routes import _CSRF_SESSION_KEY
 from catalog.flask_app.services.federation_pairing_service import (
     PAIRING_CODE_PREFIX,
     PairingCodeCodec,
@@ -130,3 +132,42 @@ def test_pairing_routes_and_ui_are_registered(tmp_path: Path, monkeypatch) -> No
         or "Pairing code from the other MSH device" in body
     )
     assert "A public device ID alone never grants membership" in body
+
+
+def test_pairing_code_route_accepts_the_onboarding_csrf_token(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    app = create_app()
+    app.config.update(
+        TESTING=True,
+        CAPABILITY_ONBOARDING_PAIRING_RELAY_URL="ws://192.168.10.10:8765",
+    )
+    calls: list[str] = []
+
+    class PairingServiceStub:
+        def create_pairing_code(self, *, relay_url: str) -> str:
+            calls.append(relay_url)
+            return "MSH1-test-code"
+
+    monkeypatch.setattr(
+        federation_pairing_routes,
+        "_pairing_service",
+        lambda: PairingServiceStub(),
+    )
+    client = app.test_client()
+    page = client.get("/onboarding?step=federation")
+    assert page.status_code == 200
+    with client.session_transaction() as browser:
+        token = browser[_CSRF_SESSION_KEY]
+
+    response = client.post(
+        "/onboarding/federation/pairing-code",
+        data={"_csrf_token": token},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert calls == ["ws://192.168.10.10:8765"]
+    assert "Pairing code created" in response.get_data(as_text=True)
