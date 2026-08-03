@@ -81,6 +81,11 @@
       "evidence": "catalog/flask_app/tests/test_capability_inspection_route.py"
     },
     {
+      "id": "cfi4.benchmark-run-skip-rerun-cancel-through-onboarding",
+      "status": "executable",
+      "evidence": "catalog/flask_app/tests/test_capability_benchmark_route.py"
+    },
+    {
       "id": "cf6.framework-neutral-projection-safety",
       "status": "executable",
       "evidence": "catalog/federation/tests/test_federation_projections.py"
@@ -108,14 +113,9 @@
       "blocked_by": "contribution authority binding and supported product composition"
     },
     {
-      "id": "product.benchmark-run-skip-rerun-through-flask-onboarding",
-      "status": "blocked",
-      "blocked_by": "CFI-3 intentionally stops after read-only inspection and before benchmark run, skip, and rerun integration"
-    },
-    {
       "id": "product.contribution-disable-and-reenable",
       "status": "blocked",
-      "blocked_by": "contribution actions in the supported product flow"
+      "blocked_by": "CFI-4 intentionally stops after benchmark evidence and before contribution actions"
     },
     {
       "id": "product.federation-overview-mutations",
@@ -125,7 +125,7 @@
     {
       "id": "product.complete-capability-first-end-to-end-acceptance",
       "status": "blocked",
-      "blocked_by": "remaining benchmark, contribution, setup transition, and full CF7 acceptance"
+      "blocked_by": "remaining contribution, setup transition, and full CF7 acceptance"
     }
   ],
   "manual_physical_verification": [
