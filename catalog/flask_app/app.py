@@ -10,6 +10,7 @@ from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
 from .ai_routes import ai_web
+from .capability_benchmark_routes import capability_benchmark_web
 from .capability_inspection_routes import capability_inspection_web
 from .capability_onboarding_routes import capability_onboarding_web
 from .docs_routes import docs_web
@@ -48,6 +49,13 @@ def create_app() -> Flask:
         os.getenv(
             "MSH_FEDERATION_ONBOARDING_DATABASE",
             "data/federation/onboarding/onboarding.sqlite3",
+        ),
+    )
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_BENCHMARK_DATABASE",
+        os.getenv(
+            "MSH_FEDERATION_BENCHMARK_DATABASE",
+            app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
         ),
     )
     app.config.setdefault(
@@ -111,10 +119,11 @@ def create_app() -> Flask:
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
     # Read-only and capability-onboarding surfaces are registered before the
-    # legacy setup/runtime gates. CFI-3 adds inspection evidence only and leaves
-    # benchmark, contribution, and role-first authority behavior unchanged.
+    # legacy setup/runtime gates. CFI-4 adds benchmark evidence only and leaves
+    # contribution, provider, storage, job, and role-first authority unchanged.
     app.register_blueprint(docs_web)
     app.register_blueprint(federation_web)
+    app.register_blueprint(capability_benchmark_web)
     app.register_blueprint(capability_inspection_web)
     app.register_blueprint(capability_onboarding_web)
     app.register_blueprint(server_setup_web)
