@@ -266,7 +266,7 @@ def test_inspection_persists_safe_snapshot_without_running_benchmark_or_authorit
     assert "16-31-gib" in page
     assert "10.0.0.9" not in page
     assert "/private" not in page
-    assert "Benchmarks remain blocked" in page
+    assert "contributions remain blocked" in page.lower()
 
 
 def test_inspection_revision_is_monotonic_and_survives_restart(
@@ -518,7 +518,7 @@ def test_default_ollama_composition_uses_read_only_inventory_only(
     assert "qwen2.5:7b" not in page
 
 
-def test_benchmark_and_contribution_routes_remain_blocked_after_cfi3(
+def test_benchmark_requires_inspection_and_contribution_remains_blocked_after_cfi4(
     tmp_path: Path,
 ) -> None:
     clock = lambda: NOW
