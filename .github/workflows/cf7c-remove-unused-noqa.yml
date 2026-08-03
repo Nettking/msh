@@ -1,0 +1,46 @@
+name: Remove unused CF7-C noqa
+
+on:
+  push:
+    branches:
+      - agent/cf7c-physical-test-readiness
+    paths:
+      - ".github/workflows/cf7c-remove-unused-noqa.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/cf7c-physical-test-readiness
+          fetch-depth: 0
+
+      - name: Remove exact unused directives
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path("ops/cf7_physical_readiness.py")
+          text = path.read_text(encoding="utf-8")
+          replacements = {
+              "with urllib.request.urlopen(  # noqa: S310 - explicit operator endpoint": "with urllib.request.urlopen(",
+              "with urllib.request.urlopen(  # noqa: S310 - operator endpoint": "with urllib.request.urlopen(",
+          }
+          for old, new in replacements.items():
+              assert text.count(old) == 1, old
+              text = text.replace(old, new)
+          path.write_text(text, encoding="utf-8")
+          Path(".github/workflows/cf7c-remove-unused-noqa.yml").unlink()
+          PY
+
+      - name: Commit lint cleanup
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Remove unused CF7-C lint directives"
+          git push origin HEAD:agent/cf7c-physical-test-readiness
