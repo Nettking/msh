@@ -19,6 +19,7 @@ on:
       - "catalog/flask_app/static/js/onboarding.js"
       - "catalog/flask_app/tests/test_capability_onboarding_route.py"
       - "catalog/flask_app/tests/test_federation_pairing_service.py"
+      - "catalog/flask_app/tests/test_federation_pairing_relay.py"
       - "catalog/flask_app/tests/test_functional_onboarding_progress.py"
       - "catalog/federation/onboarding_models.py"
       - "catalog/federation/onboarding_compat.py"
@@ -45,6 +46,7 @@ on:
       - "catalog/flask_app/static/js/onboarding.js"
       - "catalog/flask_app/tests/test_capability_onboarding_route.py"
       - "catalog/flask_app/tests/test_federation_pairing_service.py"
+      - "catalog/flask_app/tests/test_federation_pairing_relay.py"
       - "catalog/flask_app/tests/test_functional_onboarding_progress.py"
       - "catalog/federation/onboarding_models.py"
       - "catalog/federation/onboarding_compat.py"
@@ -90,12 +92,14 @@ jobs:
           catalog/flask_app/services/federation_projection_service.py
           catalog/flask_app/tests/test_capability_onboarding_route.py
           catalog/flask_app/tests/test_federation_pairing_service.py
+          catalog/flask_app/tests/test_federation_pairing_relay.py
           catalog/flask_app/tests/test_functional_onboarding_progress.py
       - name: Run CFI-2 and affected regressions
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_capability_onboarding_route.py
           catalog/flask_app/tests/test_federation_pairing_service.py
+          catalog/flask_app/tests/test_federation_pairing_relay.py
           catalog/flask_app/tests/test_functional_onboarding_progress.py
           catalog/federation/tests/test_onboarding_contracts.py
           catalog/federation/tests/test_onboarding_discovery_service.py
@@ -119,6 +123,7 @@ jobs:
           catalog/flask_app/services/federation_projection_service.py
           catalog/flask_app/tests/test_capability_onboarding_route.py
           catalog/flask_app/tests/test_federation_pairing_service.py
+          catalog/flask_app/tests/test_federation_pairing_relay.py
           catalog/flask_app/tests/test_functional_onboarding_progress.py
       - name: Diff hygiene
         shell: bash
