@@ -32,6 +32,7 @@ from .capability_onboarding_routes import (
     _validate_server_bound_request,
 )
 from .services.capability_inspection_service import (
+    CapabilityInspectionService,
     get_capability_inspection_service,
 )
 from .services.capability_onboarding_service import (
@@ -67,6 +68,24 @@ def _inspection_message(exc: BaseException) -> str:
         code,
         "Device inspection could not be completed safely.",
     )
+
+
+def _initialize_snapshot_schema(service: CapabilityInspectionService) -> None:
+    """Create the additive table before the store acquires its write lock.
+
+    The existing CFI-2 database may still use SQLite's default journal mode.
+    Journal-mode negotiation is therefore performed outside `BEGIN IMMEDIATE`;
+    the store's transactional save then sees an already initialized WAL schema.
+    """
+
+    store = service.store
+    store.database.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+    connection = store._connect()
+    try:
+        store._create_table(connection)
+        connection.commit()
+    finally:
+        connection.close()
 
 
 def _render_onboarding_with_inspection() -> Response:
@@ -190,7 +209,10 @@ def inspect_device() -> Response:
     payload = _payload()
     try:
         _validate_server_bound_request(payload, require_command=False)
-        snapshot = get_capability_inspection_service().run()
+        service = get_capability_inspection_service()
+        if service.onboarding_service.authorized_context() is not None:
+            _initialize_snapshot_schema(service)
+        snapshot = service.run()
     except AuthorizationError as exc:
         return _safe_error_response(exc.code, 403)
     except FederationOperationError as exc:
