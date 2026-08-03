@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from flask import redirect
 import pytest
+from flask import redirect
 
 from catalog.flask_app.app import create_app
 
