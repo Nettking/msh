@@ -21,7 +21,7 @@
 
   {{ section_nav(vm.sections, vm.active_section) }}
 
-  {% if vm.degraded.visible %}
+  {% if vm.degraded.visible and vm['items'] %}
   <section class="federation-degraded" role="alert">
     <div>
       <span class="federation-eyebrow">Needs attention</span>
@@ -30,7 +30,7 @@
     </div>
     <a class="federation-button federation-button--primary" href="{{ vm.degraded.action.url }}">{{ vm.degraded.action.label }}</a>
   </section>
-  {% elif vm.notice %}
+  {% elif vm.notice and vm['items'] %}
   <section class="federation-panel" role="status">
     <span class="federation-eyebrow">Status</span>
     <h3>{{ vm.notice.title }}</h3>
@@ -38,7 +38,7 @@
   </section>
   {% endif %}
 
-  {% if vm.recommended_action %}
+  {% if vm.recommended_action and vm['items'] %}
   <section class="recommended-action">
     <div>
       <span class="federation-eyebrow">Recommended next action</span>
@@ -97,11 +97,18 @@
       </li>
       {% endfor %}
     </ul>
+    {% elif vm.degraded.visible %}
+      {{ empty_state(
+        vm.degraded.title,
+        vm.degraded.message,
+        vm.degraded.action,
+        'warning'
+      ) }}
     {% else %}
       {{ empty_state(
         vm.notice.title if vm.notice else 'Nothing to show yet',
         vm.notice.message if vm.notice else 'This read-only page has no current items.',
-        vm.recommended_action,
+        vm.notice.action if vm.notice and vm.notice.action else vm.recommended_action,
         'information'
       ) }}
     {% endif %}
