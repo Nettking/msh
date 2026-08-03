@@ -8,9 +8,13 @@
           {{ status_badge(vm.inspection.state, vm.inspection.state_label, True) }}
         </header>
 
+        {% if vm.inspection.observations %}
         <dl class="inspection-facts">
           {% for fact in vm.inspection.observations %}<div><dt>{{ fact.label }}</dt><dd>{{ fact.value }}</dd></div>{% endfor %}
         </dl>
+        {% else %}
+        <p>No inspection evidence has been recorded for this device yet.</p>
+        {% endif %}
 
         <div class="inspection-columns">
           <section>
@@ -23,18 +27,32 @@
           </section>
         </div>
 
+        {% if vm.inspection.recommended_checks %}
+        <section aria-labelledby="inspection-checks-heading">
+          <h4 id="inspection-checks-heading">Recommended bounded checks</h4>
+          <ul class="federation-list">
+            {% for check in vm.inspection.recommended_checks %}<li><strong>{{ check.label }}</strong><span>{{ check.summary }}</span></li>{% endfor %}
+          </ul>
+          <p>These are recommendations only. CFI-3 does not run a benchmark or activate a contribution.</p>
+        </section>
+        {% endif %}
+
         {% if vm.inspection.warnings %}
         <div class="federation-warning" role="alert"><strong>Review before continuing</strong><ul>{% for warning in vm.inspection.warnings %}<li>{{ warning }}</li>{% endfor %}</ul></div>
         {% endif %}
 
+        {% if vm.inspection.can_run %}
         <form method="post" action="{{ vm.actions.inspect_url }}" class="onboarding-inline-actions">
           {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
-          <button class="federation-button federation-button--secondary" type="submit">Run inspection again</button>
+          <button class="federation-button federation-button--secondary" type="submit">{% if vm.inspection.revision %}Run inspection again{% else %}Inspect this device{% endif %}</button>
           <span>Inspection revision {{ vm.inspection.revision }}</span>
         </form>
+        {% else %}
+        <p>Connect this device to a trusted federation before inspection.</p>
+        {% endif %}
 
         <div class="onboarding-actions">
           <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
-          <button class="federation-button federation-button--primary" type="button" data-next-step>Continue to benchmarks</button>
+          <button class="federation-button federation-button--primary" type="button" disabled aria-disabled="true">Benchmarks remain blocked</button>
         </div>
       </section>
