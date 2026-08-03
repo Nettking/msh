@@ -18,6 +18,7 @@ from flask import (
 
 from catalog.federation.errors import FederationOperationError
 
+from .capability_onboarding_routes import _CSRF_SESSION_KEY
 from .services.capability_onboarding_service import get_capability_onboarding_service
 from .services.federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
@@ -37,7 +38,9 @@ def _pairing_service() -> PairingAwareCapabilityOnboardingService:
 
 
 def _require_csrf() -> None:
-    expected = session.get("_csrf_token")
+    """Validate against the same server-issued token as the onboarding forms."""
+
+    expected = session.get(_CSRF_SESSION_KEY)
     supplied = request.form.get("_csrf_token")
     if (
         not isinstance(expected, str)
@@ -76,15 +79,15 @@ def create_pairing_code():
     try:
         _require_csrf()
         code = _pairing_service().create_pairing_code(relay_url=_relay_url())
-        flash(
-            "Pairing code created. Copy it to the other MSH device within five minutes.",
-            "success",
-        )
         if not code:
             raise FederationOperationError(
                 "pairing-code-unavailable",
                 "the pairing code could not be created",
             )
+        flash(
+            "Pairing code created. Copy it to the other MSH device within five minutes.",
+            "success",
+        )
     except FederationOperationError as exc:
         flash(exc.message, "error")
     except Exception as exc:  # noqa: BLE001 - do not expose tokens or endpoints
