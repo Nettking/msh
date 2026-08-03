@@ -96,6 +96,21 @@
       "evidence": "catalog/flask_app/tests/test_capability_contribution_route.py"
     },
     {
+      "id": "product.legacy-mode-persisted-migration",
+      "status": "executable",
+      "evidence": "catalog/flask_app/tests/test_capability_startup_transition_route.py"
+    },
+    {
+      "id": "cfi6.capability-first-startup-routing-and-explicit-fallback",
+      "status": "executable",
+      "evidence": "catalog/flask_app/tests/test_capability_startup_transition_route.py"
+    },
+    {
+      "id": "cfi6.capability-derived-runtime-and-navigation",
+      "status": "executable",
+      "evidence": "catalog/flask_app/tests/test_capability_startup_transition_route.py"
+    },
+    {
       "id": "cf6.framework-neutral-projection-safety",
       "status": "executable",
       "evidence": "catalog/federation/tests/test_federation_projections.py"
@@ -108,14 +123,9 @@
   ],
   "blocked_by_cfi": [
     {
-      "id": "product.legacy-mode-persisted-migration",
-      "status": "blocked",
-      "blocked_by": "compatibility-controlled setup transition remains a separate integration change"
-    },
-    {
       "id": "product.recorder-plus-ai-simultaneous-contribution",
       "status": "blocked",
-      "blocked_by": "CFI-4 benchmark automation and CFI-5 authority-adapter composition are implemented, but configured recorder and Ollama product acceptance still requires physical verification"
+      "blocked_by": "CFI-4 benchmark automation, CFI-5 authority-adapter composition, and CFI-6 startup transition are implemented, but configured recorder and Ollama product acceptance still requires physical verification"
     },
     {
       "id": "product.separate-ai-compute-storage-contributors",
@@ -130,7 +140,7 @@
     {
       "id": "product.complete-capability-first-end-to-end-acceptance",
       "status": "blocked",
-      "blocked_by": "remaining setup transition, physical product verification, and full CF7 acceptance"
+      "blocked_by": "physical product verification and the remaining full CF7 acceptance run"
     }
   ],
   "manual_physical_verification": [
