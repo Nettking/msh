@@ -313,7 +313,7 @@ def test_scenario_manifest_separates_executable_blocked_and_manual_status() -> N
         for scenario in manifest["blocked_by_cfi"]
     )
     assert any(
-        scenario["blocked_by"].startswith("CFI-3")
+        scenario["blocked_by"].startswith("CFI-4")
         for scenario in manifest["blocked_by_cfi"]
     )
     assert "accepted" not in {
