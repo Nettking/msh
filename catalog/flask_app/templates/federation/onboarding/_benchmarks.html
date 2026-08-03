@@ -8,6 +8,8 @@
           {{ status_badge(vm.benchmark_summary.state, vm.benchmark_summary.label, True) }}
         </header>
 
+        <p class="federation-notice">Contributions remain blocked until benchmark review and an explicit supported choice are complete.</p>
+
         {% if vm.benchmarks %}
         <div class="benchmark-list">
           {% for benchmark in vm.benchmarks %}
