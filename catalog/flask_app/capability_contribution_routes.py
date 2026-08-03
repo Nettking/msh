@@ -41,9 +41,6 @@ from .services.capability_benchmark_service import (
 from .services.capability_contribution_service import (
     get_capability_contribution_service,
 )
-from .services.capability_onboarding_service import (
-    get_capability_onboarding_service,
-)
 
 capability_contribution_web = Blueprint(
     "capability_contribution_web",
@@ -101,10 +98,7 @@ def _contribution_message(exc: BaseException) -> str:
 
 
 def _prerequisite_response(exc: FederationOperationError) -> Response | None:
-    if (
-        exc.code in _PREREQUISITE_CODES
-        and get_capability_onboarding_service().identity_or_none() is not None
-    ):
+    if exc.code in _PREREQUISITE_CODES:
         return _secure_response(
             f"This step remains blocked. {_contribution_message(exc)}",
             409,
@@ -304,8 +298,11 @@ def save_contributions() -> Response:
     payload = _payload()
     try:
         choices = _choice_payload(payload)
+        _validate_server_bound_request(payload, require_command=False)
+        service = get_capability_contribution_service()
+        service.recommend(require_benchmark_review=True)
         _validate_server_bound_request(payload, require_command=True)
-        results = get_capability_contribution_service().apply_choices(choices)
+        results = service.apply_choices(choices)
     except AuthorizationError as exc:
         return _safe_error_response(exc.code, 403)
     except FederationOperationError as exc:
