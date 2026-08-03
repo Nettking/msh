@@ -260,6 +260,14 @@ class BenchmarkSkipStore:
             return
         try:
             with self._connect() as connection:
+                table = connection.execute(
+                    """
+                    SELECT name FROM sqlite_master
+                    WHERE type='table' AND name='benchmark_skip_decision'
+                    """
+                ).fetchone()
+                if table is None:
+                    return
                 connection.execute(
                     """
                     DELETE FROM benchmark_skip_decision
@@ -533,12 +541,12 @@ class CapabilityBenchmarkService:
         benchmark_id: str,
         target_service_id: str,
     ) -> BenchmarkResult:
+        device_id, snapshot = self._authorized_snapshot(require_current=True)
         benchmark_id = _bounded_identifier(benchmark_id, "benchmark_id")
         target_service_id = _bounded_identifier(
             target_service_id,
             "target_service_id",
         )
-        device_id, snapshot = self._authorized_snapshot(require_current=True)
         plan = self.plan(snapshot)
         item = self._resolve_item(
             plan,
@@ -600,12 +608,12 @@ class CapabilityBenchmarkService:
         benchmark_id: str,
         target_service_id: str,
     ) -> None:
+        device_id, snapshot = self._authorized_snapshot(require_current=True)
         benchmark_id = _bounded_identifier(benchmark_id, "benchmark_id")
         target_service_id = _bounded_identifier(
             target_service_id,
             "target_service_id",
         )
-        device_id, snapshot = self._authorized_snapshot(require_current=True)
         self._resolve_item(
             self.plan(snapshot),
             benchmark_id=benchmark_id,
@@ -907,7 +915,7 @@ class CapabilityBenchmarkService:
                 if complete
                 else f"{pending} check{'s' if pending != 1 else ''} need review"
             ),
-            "can_skip": bool(cards),
+            "can_skip": any(item.runnable for item in plan),
         }
         return summary, cards, complete
 
