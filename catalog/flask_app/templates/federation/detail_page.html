@@ -1,0 +1,127 @@
+{% extends 'base.html' %}
+{% from 'federation/_status_badge.html' import status_badge %}
+{% from 'federation/_section_nav.html' import section_nav %}
+{% from 'federation/_empty_state.html' import empty_state %}
+{% block body %}
+{% set vm = federation_page %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/federation.css') }}">
+
+<section class="federation-shell">
+  <header class="federation-hero">
+    <div>
+      <span class="federation-eyebrow">Federation</span>
+      <h2>{{ vm.title }}</h2>
+      <p>{{ vm.intro }}</p>
+    </div>
+    <div class="federation-hero__state">
+      {{ status_badge(vm.state, vm.state_label, True) }}
+      <span>{{ vm.updated_label }}</span>
+    </div>
+  </header>
+
+  {{ section_nav(vm.sections, vm.active_section) }}
+
+  {% if vm.degraded.visible %}
+  <section class="federation-degraded" role="alert">
+    <div>
+      <span class="federation-eyebrow">Needs attention</span>
+      <h3>{{ vm.degraded.title }}</h3>
+      <p>{{ vm.degraded.message }}</p>
+    </div>
+    <a class="federation-button federation-button--primary" href="{{ vm.degraded.action.url }}">{{ vm.degraded.action.label }}</a>
+  </section>
+  {% elif vm.notice %}
+  <section class="federation-panel" role="status">
+    <span class="federation-eyebrow">Status</span>
+    <h3>{{ vm.notice.title }}</h3>
+    <p>{{ vm.notice.message }}</p>
+  </section>
+  {% endif %}
+
+  {% if vm.recommended_action %}
+  <section class="recommended-action">
+    <div>
+      <span class="federation-eyebrow">Recommended next action</span>
+      <h3>{{ vm.recommended_action.title }}</h3>
+      <p>{{ vm.recommended_action.message }}</p>
+    </div>
+    <a class="federation-button federation-button--primary" href="{{ vm.recommended_action.url }}">{{ vm.recommended_action.label }}</a>
+  </section>
+  {% endif %}
+
+  {% if vm.active_section == 'this-device' %}
+  <section class="federation-panel">
+    <header class="federation-panel__header">
+      <div>
+        <span class="federation-eyebrow">Device details</span>
+        <h3>This MSH device</h3>
+        <p>Safe inspection details from this device only.</p>
+      </div>
+    </header>
+    <dl class="federation-detail-list">
+      <div><dt>Device ID</dt><dd>{{ vm.device_id }}</dd></div>
+      <div><dt>Operating system</dt><dd>{{ vm.operating_system }}</dd></div>
+      <div><dt>Architecture</dt><dd>{{ vm.architecture }}</dd></div>
+      <div><dt>Inspection revision</dt><dd>{{ vm.inspection_revision or 'Not available' }}</dd></div>
+      <div><dt>Inspection expires</dt><dd>{{ vm.inspection_expires_at }}</dd></div>
+    </dl>
+  </section>
+  {% endif %}
+
+  <section class="federation-panel">
+    <header class="federation-panel__header">
+      <div>
+        <span class="federation-eyebrow">{{ vm.title }}</span>
+        <h3>{{ vm['items']|length }} visible {{ 'item' if vm['items']|length == 1 else 'items' }}</h3>
+        <p>Only safe read-only projection data is shown here.</p>
+      </div>
+      <a class="federation-text-link" href="/federation">Back to overview</a>
+    </header>
+
+    {% if vm['items'] %}
+    <ul class="federation-entity-list">
+      {% for item in vm['items'] %}
+      <li>
+        <div>
+          <strong>{{ item.label }}</strong>
+          <span>{{ item.detail }}</span>
+          {% if item.details %}
+          <dl class="federation-detail-list">
+            {% for detail in item.details %}
+            <div><dt>{{ detail.label }}</dt><dd>{{ detail.value }}</dd></div>
+            {% endfor %}
+          </dl>
+          {% endif %}
+        </div>
+        {{ status_badge(item.state, item.state_label) }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+      {{ empty_state(
+        vm.notice.title if vm.notice else 'Nothing to show yet',
+        vm.notice.message if vm.notice else 'This read-only page has no current items.',
+        vm.recommended_action,
+        'information'
+      ) }}
+    {% endif %}
+  </section>
+
+  {% if vm.technical_details %}
+  <details class="federation-technical-details">
+    <summary>Show technical details</summary>
+    <dl>
+      {% for detail in vm.technical_details %}
+      <div><dt>{{ detail.label }}</dt><dd><code>{{ detail.value }}</code></dd></div>
+      {% endfor %}
+    </dl>
+    <p>Private addresses, credentials, and local provider configuration are intentionally not displayed.</p>
+  </details>
+  {% endif %}
+
+  <footer class="federation-footer-help">
+    <span>Return to the Federation summary.</span>
+    <a href="/federation">Open overview</a>
+  </footer>
+</section>
+{% endblock %}
