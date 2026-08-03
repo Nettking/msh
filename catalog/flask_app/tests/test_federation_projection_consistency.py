@@ -6,6 +6,7 @@ from types import SimpleNamespace
 from flask import Flask
 
 from catalog.federation.projections import (
+    BenchmarkResultsAdapter,
     BenchmarkSnapshot,
     DeviceRecord,
     FederationAuthoritySnapshot,
@@ -210,6 +211,11 @@ def test_production_composition_reads_live_cfi_services(
             recommend=lambda *, require_benchmark_review: (candidate,),
             intents=lambda: (intent,),
         ),
+    )
+    monkeypatch.setattr(
+        composition,
+        "BenchmarkResultsAdapter",
+        lambda store: BenchmarkResultsAdapter(store, now=lambda: NOW),
     )
 
     app = Flask(__name__)
