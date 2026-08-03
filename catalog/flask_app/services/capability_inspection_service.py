@@ -68,7 +68,6 @@ class InspectionSnapshotStore:
 
     @staticmethod
     def _create_table(connection: sqlite3.Connection) -> None:
-        connection.execute("PRAGMA journal_mode=WAL")
         connection.execute(
             """
             CREATE TABLE IF NOT EXISTS device_inspection_snapshot (
@@ -80,6 +79,25 @@ class InspectionSnapshotStore:
             )
             """
         )
+
+    def initialize(self) -> None:
+        """Create the additive schema before acquiring a write transaction."""
+
+        self.database.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        try:
+            connection = self._connect()
+            try:
+                connection.execute("PRAGMA journal_mode=WAL")
+                self._create_table(connection)
+                connection.commit()
+            finally:
+                connection.close()
+        except sqlite3.Error as exc:
+            raise FederationValidationError(
+                "inspection-state-initialize-failed",
+                "database",
+                "inspection evidence storage could not be initialized safely",
+            ) from exc
 
     @staticmethod
     def _decode(encoded: str) -> DeviceInspectionSnapshot:
@@ -158,7 +176,7 @@ class InspectionSnapshotStore:
                 "must be a DeviceInspectionSnapshot",
             )
         encoded = self._encode(snapshot)
-        self.database.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        self.initialize()
         try:
             connection = self._connect()
             try:
@@ -626,9 +644,7 @@ class CapabilityInspectionService:
             if snapshot is not None and self.state(snapshot) == "current" and not error_reason:
                 completed.append("inspect")
 
-        if requested_step == "inspect" and connected:
-            view_model["current_step"] = "inspect"
-        elif requested_step is None and connected:
+        if connected and requested_step in {None, "inspect"}:
             view_model["current_step"] = "inspect"
 
         revision = snapshot.revision if snapshot is not None else 0
