@@ -8,6 +8,7 @@ from urllib.parse import urlsplit
 
 from flask import (
     Blueprint,
+    Response,
     current_app,
     flash,
     redirect,
@@ -72,6 +73,19 @@ def _relay_url() -> str:
     formatted_host = f"[{host}]" if ":" in host else host
     port = int(os.getenv("MSH_RELAY_PORT", "8765"))
     return f"ws://{formatted_host}:{port}"
+
+
+@federation_pairing_web.before_app_request
+def _dispatch_before_legacy_setup_gate() -> Response | None:
+    """Execute pairing endpoints before the retained role-first setup gate."""
+
+    if request.blueprint != federation_pairing_web.name:
+        return None
+    endpoint = request.endpoint or ""
+    view = current_app.view_functions.get(endpoint)
+    if view is None:
+        return None
+    return current_app.ensure_sync(view)(**(request.view_args or {}))
 
 
 @federation_pairing_web.post("/onboarding/federation/pairing-code")
