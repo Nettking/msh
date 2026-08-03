@@ -95,6 +95,15 @@ def _uint(value: object, field: str) -> int:
 
 
 def _utc(value: object, field: str) -> datetime:
+    if isinstance(value, str):
+        try:
+            value = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError as exc:
+            raise FederationValidationError(
+                "invalid-startup-transition-time",
+                field,
+                "must be an ISO-8601 UTC timestamp",
+            ) from exc
     if not isinstance(value, datetime) or value.tzinfo is None:
         raise FederationValidationError(
             "invalid-startup-transition-time",
