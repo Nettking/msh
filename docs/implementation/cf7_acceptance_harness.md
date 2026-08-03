@@ -1,12 +1,10 @@
 # CF7-A capability-first acceptance harness
 
-Status: foundation implemented and extended through CFI-2; full CF7 product
-acceptance is **not** claimed.
+Status: foundation implemented and extended through CFI-3; full CF7 product acceptance is **not** claimed.
 
 ## Purpose
 
-CF7-A provides deterministic, cross-platform test infrastructure for the
-capability-first work that is executable in the current repository.
+CF7-A provides deterministic, cross-platform test infrastructure for the capability-first work that is executable in the current repository.
 
 The permanent gate now includes:
 
@@ -17,17 +15,14 @@ The permanent gate now includes:
 - CF4 isolated contribution service tests;
 - CF5 static onboarding and Federation shell tests;
 - CFI-1 read-only `/federation` route integration;
-- CFI-2 Flask identity, discovery, verified join, local creation, reconnect, and
-  migration-preview integration;
+- CFI-2 Flask identity, discovery, verified join, local creation, reconnect, and migration-preview integration;
+- CFI-3 Flask device-inspection composition, persistence, expiry, privacy, and no-authority tests;
 - CF6 projection safety;
 - focused Federation v1 authority regressions.
 
-These remain bounded claims. Physical browser behavior, benchmark product
-actions, contribution actions, setup transition, and complete end-to-end
-acceptance remain outside CF7-A.
+These remain bounded claims. Physical browser behavior, benchmark product actions, contribution actions, setup transition, and complete end-to-end acceptance remain outside CF7-A.
 
-The machine-readable source of truth is
-`catalog/federation/tests/cf7_acceptance/scenarios.json`.
+The machine-readable source of truth is `catalog/federation/tests/cf7_acceptance/scenarios.json`.
 
 ## Harness boundaries
 
@@ -39,17 +34,12 @@ The harness provides:
 - shell-free child-process lifecycle helpers;
 - OS-assigned held TCP ports rather than fixed ports;
 - configured discovery fixtures with two federation candidates;
-- verified join, persisted reconnect, membership removal, fencing, and
-  controlled rejoin fixtures;
+- verified join, persisted reconnect, membership removal, fencing, and controlled rejoin fixtures;
 - bounded malformed and partial-write injection against existing identity state;
-- assertions for membership, route authority, fencing, identity stability, and
-  private-data leakage;
-- an explicit scenario manifest with `executable`, `blocked`, and `manual`
-  status only.
+- assertions for membership, route authority, fencing, identity stability, and private-data leakage;
+- an explicit scenario manifest with `executable`, `blocked`, and `manual` status only.
 
-The helpers and Flask integration never create a second authority model.
-Membership changes go through `SessionCoordinator`; join and reconnect go through
-`SessionOnboardingAuthority`; identity persistence goes through `IdentityStore`.
+The helpers and Flask integrations never create a second authority model. Membership changes go through `SessionCoordinator`; join and reconnect go through `SessionOnboardingAuthority`; identity persistence goes through `IdentityStore`; CFI-3 inspection delegates to the existing CF2 `DeviceInspector` and persists only the frozen CF1 snapshot.
 
 ## Scenario-to-test mapping
 
@@ -67,11 +57,12 @@ Membership changes go through `SessionCoordinator`; join and reconnect go throug
 | Corrupt and partial identity state | Executable | CF7 foundation | Existing identity format |
 | Corrupt CFI-2 onboarding state | Executable | CFI-2 route test | Fail-closed render; no automatic recovery |
 | CF2-A inspection and benchmark engine | Executable | focused capability tests | Isolated engine |
-| CF2-B concrete adapters | Executable | `test_benchmarking_adapters.py` | Evidence only, not product execution |
+| CF2-B concrete adapters | Executable | `test_benchmarking_adapters.py` | Evidence only, not benchmark product execution |
 | CF4 contribution service | Executable | contribution package tests | Isolated service and adapters |
 | CF5 UI shell | Executable | `test_cf5_ui_shell.py` | Automated template/static checks |
 | CFI-1 Federation overview | Executable | `test_federation_overview_route.py` | Read-only |
 | CFI-2 onboarding composition | Executable | `test_capability_onboarding_route.py` | Identity and federation steps only |
+| CFI-3 device inspection | Executable | `test_capability_inspection_route.py` | Reads coarse local state and existing adapter seams; no benchmark execution |
 | CF6 projections | Executable | `test_federation_projections.py` | Read-only safe projections |
 | Federation v1 authority regression | Executable | `test_phase2_unit.py` | Focused gate, not physical deployment |
 | Persisted legacy migration | Blocked | Manifest entry | Requires compatibility-controlled setup transition |
@@ -82,12 +73,28 @@ Membership changes go through `SessionCoordinator`; join and reconnect go throug
 | Federation overview mutations | Blocked | Manifest entry | Overview remains read-only |
 | Fresh physical Windows/Linux checkout | Manual | Manifest entries | CI runners are not owner hardware |
 | Desktop and mobile browser verification | Manual | Manifest entry | Route tests do not prove physical rendering |
-| Multi-host relay, MTConnect, Ollama/GPU | Manual | Manifest entries | Requires physical services and devices |
+| Multi-host relay, MTConnect, Ollama/accelerator | Manual | Manifest entries | Requires physical services and devices |
+
+## CFI-3 bounded claim
+
+The CFI-3 route suite proves that:
+
+- inspection requires the server-bound device identity and revalidated membership;
+- the existing CF2 inspector is called through the supported Flask onboarding flow;
+- the snapshot survives restart with monotonic revisions;
+- expired evidence is not treated as current;
+- corrupt persisted evidence fails closed;
+- request-supplied actor, device, session, endpoint, and credential context is rejected;
+- private values do not reach the template;
+- saved MTConnect discovery is read without starting a scan;
+- configured Ollama inspection uses inventory only and does not invoke a model;
+- no benchmark probe, contribution action, membership mutation, storage assignment, or job authority is produced.
+
+Passing these tests does not prove physical hardware discovery, accelerator behavior, production network reachability, benchmark suitability, or contribution activation.
 
 ## Permanent gate
 
-`.github/workflows/cf7-acceptance-harness.yml` runs on `ubuntu-latest` and
-`windows-latest`. It executes:
+`.github/workflows/cf7-acceptance-harness.yml` runs on `ubuntu-latest` and `windows-latest`. It executes:
 
 - the CF7-A foundation scenarios;
 - CF1 contracts;
@@ -97,12 +104,9 @@ Membership changes go through `SessionCoordinator`; join and reconnect go throug
 - CF5 UI-shell tests;
 - CFI-1 read-only Federation route tests;
 - CFI-2 onboarding route and persistence tests;
+- CFI-3 inspection route, persistence, expiry, safety, and no-authority tests;
 - CF6 projections;
 - focused Federation authority regressions;
 - compilation, manifest assertions, Ruff, and diff hygiene.
 
-Passing this workflow means that the currently executable foundation and bounded
-Flask integrations are green on both runner families. It must not be used as
-evidence that benchmark or contribution mutations are supported, that physical
-desktop/mobile behavior is accepted, or that complete capability-first or
-Federation v1 end-to-end acceptance has passed.
+Passing this workflow means that the currently executable foundation and bounded Flask integrations are green on both runner families. It must not be used as evidence that benchmark or contribution mutations are supported, that physical desktop/mobile behavior is accepted, or that complete capability-first or Federation v1 end-to-end acceptance has passed.
