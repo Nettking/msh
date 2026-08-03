@@ -24,6 +24,7 @@ from catalog.flask_app.services.federation_pairing_service import (
     RemotePairingStore,
 )
 from catalog.node.identity import IdentityStore
+from reset_msh import reset_repository_state
 
 NOW = datetime(2026, 8, 3, 18, 0, tzinfo=timezone.utc)
 SESSION_ID = "session-pairing-one"
@@ -171,3 +172,38 @@ def test_pairing_code_route_accepts_the_onboarding_csrf_token(
     assert response.status_code == 200
     assert calls == ["ws://192.168.10.10:8765"]
     assert "Pairing code created" in response.get_data(as_text=True)
+
+
+def test_fresh_reset_preserves_only_recorder_jsonl(tmp_path: Path) -> None:
+    (tmp_path / "docker-compose.yml").write_text("services: {}\n", encoding="utf-8")
+    preserved = (
+        tmp_path
+        / "data"
+        / "sources"
+        / "mtconnect_recorder"
+        / "jsonl"
+        / "machine-one"
+        / "batch.jsonl"
+    )
+    preserved.parent.mkdir(parents=True)
+    preserved.write_text('{"sequence":1}\n', encoding="utf-8")
+    unwanted_nearby = preserved.with_suffix(".txt")
+    unwanted_nearby.write_text("remove", encoding="utf-8")
+    federation_state = tmp_path / "data" / "federation" / "onboarding.sqlite3"
+    federation_state.parent.mkdir(parents=True)
+    federation_state.write_bytes(b"state")
+    recorder_state = tmp_path / "data" / "source_state" / "recorder.json"
+    recorder_state.parent.mkdir(parents=True)
+    recorder_state.write_text("{}", encoding="utf-8")
+    result = tmp_path / "results" / "derived.jsonl"
+    result.parent.mkdir(parents=True)
+    result.write_text("derived\n", encoding="utf-8")
+
+    summary = reset_repository_state(tmp_path, stop_compose=False)
+
+    assert preserved.read_text(encoding="utf-8") == '{"sequence":1}\n'
+    assert not unwanted_nearby.exists()
+    assert not federation_state.exists()
+    assert not recorder_state.exists()
+    assert not result.exists()
+    assert summary.preserved_jsonl_files == 1
