@@ -1,0 +1,88 @@
+name: Apply streamlined onboarding flow
+
+on:
+  push:
+    branches:
+      - agent/cf7d-streamlined-onboarding-flow
+    paths:
+      - ".github/workflows/cf7d-apply-streamlined-onboarding.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/cf7d-streamlined-onboarding-flow
+          fetch-depth: 0
+
+      - name: Apply exact onboarding UX changes
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          replacements = {
+              Path("catalog/flask_app/capability_startup_transition_routes.py"): [
+                  (
+                      '    return redirect(url_for("federation_web.overview"), code=303)\n',
+                      '    return redirect(\n'
+                      '        url_for(\n'
+                      '            "capability_startup_transition_web.onboarding",\n'
+                      '            step="finish",\n'
+                      '        ),\n'
+                      '        code=303,\n'
+                      '    )\n',
+                  ),
+              ],
+              Path("catalog/flask_app/services/capability_startup_transition_service.py"): [
+                  (
+                      '                            "title": "Review the connected federation",\n'
+                      '                            "message": "Open the safe read-only Federation overview.",\n'
+                      '                            "label": "Open Federation overview",\n'
+                      '                            "url": "/federation",\n',
+                      '                            "title": "Setup complete",\n'
+                      '                            "message": "Continue to MSH when you are ready.",\n'
+                      '                            "label": "Continue to MSH",\n'
+                      '                            "url": "/",\n',
+                  ),
+              ],
+              Path("catalog/flask_app/templates/federation/onboarding/_finish.html"): [
+                  (
+                      '          <a class="federation-button federation-button--secondary" href="{{ vm.actions.overview_url }}" data-finish-link>Open Federation overview</a>\n',
+                      '',
+                  ),
+              ],
+              Path("catalog/flask_app/templates/base.html"): [
+                  (
+                      "  {% set setup_focus = endpoint in ['web.startup', 'web.get_started'] %}\n",
+                      "  {% set setup_focus = endpoint in ['web.startup', 'web.get_started'] or endpoint.startswith('capability_') %}\n",
+                  ),
+              ],
+              Path("catalog/flask_app/tests/test_capability_startup_transition_route.py"): [
+                  (
+                      '    assert accepted.location == "/federation"\n',
+                      '    assert accepted.location == "/onboarding?step=finish"\n',
+                  ),
+              ],
+          }
+
+          for path, pairs in replacements.items():
+              text = path.read_text(encoding="utf-8")
+              for old, new in pairs:
+                  assert text.count(old) == 1, (path, old)
+                  text = text.replace(old, new)
+              path.write_text(text, encoding="utf-8")
+
+          Path(".github/workflows/cf7d-apply-streamlined-onboarding.yml").unlink()
+          PY
+
+      - name: Commit bounded UX fix
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Keep capability onboarding in one focused flow"
+          git push origin HEAD:agent/cf7d-streamlined-onboarding-flow
