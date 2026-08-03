@@ -8,6 +8,7 @@
           {{ status_badge(vm.benchmark_summary.state, vm.benchmark_summary.label, True) }}
         </header>
 
+        {% if vm.benchmarks %}
         <div class="benchmark-list">
           {% for benchmark in vm.benchmarks %}
           <article class="benchmark-card benchmark-card--{{ benchmark.state }}" data-benchmark-card="{{ benchmark.id }}">
@@ -46,9 +47,16 @@
           <div><strong>Continue without optional checks</strong><span>Skipped benchmarks remain visible and never enable a contribution automatically.</span></div>
           <button class="federation-button federation-button--ghost" type="submit" {% if not vm.benchmark_summary.get('can_skip', True) %}disabled{% endif %}>Skip optional benchmarks</button>
         </form>
+        {% else %}
+        <div class="federation-empty-state" role="status">
+          <h4>{{ vm.benchmark_summary.label }}</h4>
+          <p>Inspection did not find a configured Ollama model, MTConnect source, registered compute handler, or storage candidate that MSH can check.</p>
+          <a class="federation-button federation-button--secondary" href="{{ vm.benchmark_summary.get('setup_url', '/startup') }}">Configure this device</a>
+        </div>
+        {% endif %}
 
         <div class="onboarding-actions">
           <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
-          <button class="federation-button federation-button--primary" type="button" data-next-step>Review contributions</button>
+          <button class="federation-button federation-button--primary" type="button" data-next-step {% if vm.benchmark_summary.state != 'complete' %}disabled aria-disabled="true"{% endif %}>Review contributions</button>
         </div>
       </section>
