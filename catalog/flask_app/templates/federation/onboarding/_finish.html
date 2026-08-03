@@ -41,6 +41,5 @@
           {% if vm.migration.can_migrate|default(false) or vm.migration.source_kind|default('') == 'degraded' %}
           <a class="federation-button federation-button--ghost" href="{{ vm.actions.legacy_setup_url }}">Open legacy fallback</a>
           {% endif %}
-          <a class="federation-button federation-button--secondary" href="{{ vm.actions.overview_url }}" data-finish-link>Open Federation overview</a>
         </div>
       </section>

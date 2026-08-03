@@ -787,10 +787,10 @@ class CapabilityStartupTransitionService:
                         "state_label": "Ready",
                         "transition_action": None,
                         "next_action": {
-                            "title": "Review the connected federation",
-                            "message": "Open the safe read-only Federation overview.",
-                            "label": "Open Federation overview",
-                            "url": "/federation",
+                            "title": "Setup complete",
+                            "message": "Continue to MSH when you are ready.",
+                            "label": "Continue to MSH",
+                            "url": "/",
                         },
                     }
                 )

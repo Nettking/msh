@@ -22,7 +22,7 @@
     {% endif %}
   </head>
   {% set endpoint = request.endpoint or '' %}
-  {% set setup_focus = endpoint in ['web.startup', 'web.get_started'] %}
+  {% set setup_focus = endpoint in ['web.startup', 'web.get_started'] or endpoint.startswith('capability_') %}
   <body class="{% if setup_focus %}setup-focus{% endif %}">
     {% set setup_is_configured = server_setup_settings and server_setup_settings.configured and server_setup_settings.user_setup_complete %}
     {% set setup_runtime_pending = setup_is_configured and startup_state is defined and startup_state.requires_choice and server_setup_settings.deployment_mode in ['full-server', 'web-workbench'] %}

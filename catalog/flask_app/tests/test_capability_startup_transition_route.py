@@ -517,7 +517,7 @@ def test_transition_posts_require_csrf_command_and_server_owned_context(
         data={"_csrf_token": csrf, "command_id": command},
     )
     assert accepted.status_code == 303
-    assert accepted.location == "/federation"
+    assert accepted.location == "/onboarding?step=finish"
     assert transition.migration_calls == [
         f"flask-startup-migration-{command}"
     ]
