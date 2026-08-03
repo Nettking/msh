@@ -12,6 +12,7 @@ on:
       - "catalog/flask_app/static/css/federation.css"
       - "catalog/flask_app/tests/test_federation_overview_route.py"
       - "catalog/flask_app/tests/test_federation_detail_routes.py"
+      - "catalog/flask_app/tests/test_federation_projection_consistency.py"
       - "catalog/federation/projections/**"
   push:
     branches:
@@ -28,6 +29,7 @@ on:
       - "catalog/flask_app/static/css/federation.css"
       - "catalog/flask_app/tests/test_federation_overview_route.py"
       - "catalog/flask_app/tests/test_federation_detail_routes.py"
+      - "catalog/flask_app/tests/test_federation_projection_consistency.py"
       - "catalog/federation/projections/**"
 
 permissions:
@@ -65,11 +67,13 @@ jobs:
           catalog/flask_app/services/federation_projection_service.py
           catalog/flask_app/tests/test_federation_overview_route.py
           catalog/flask_app/tests/test_federation_detail_routes.py
+          catalog/flask_app/tests/test_federation_projection_consistency.py
       - name: Run focused and affected tests
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_federation_overview_route.py
           catalog/flask_app/tests/test_federation_detail_routes.py
+          catalog/flask_app/tests/test_federation_projection_consistency.py
           catalog/flask_app/tests/test_cf5_ui_shell.py
           catalog/federation/tests/test_federation_projections.py
           catalog/flask_app/tests/test_provider_federation_surface.py
@@ -82,6 +86,7 @@ jobs:
           catalog/flask_app/services/federation_projection_service.py
           catalog/flask_app/tests/test_federation_overview_route.py
           catalog/flask_app/tests/test_federation_detail_routes.py
+          catalog/flask_app/tests/test_federation_projection_consistency.py
       - name: Diff hygiene
         shell: bash
         run: |
