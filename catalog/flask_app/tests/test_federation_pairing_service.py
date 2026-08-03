@@ -171,7 +171,9 @@ def test_pairing_code_route_accepts_the_onboarding_csrf_token(
     )
 
     assert response.status_code == 200
-    assert calls == ["ws://192.168.10.10:8765"]
+    with client.session_transaction() as browser:
+        flashes = tuple(browser.get("_flashes", ()))
+    assert calls == ["ws://192.168.10.10:8765"], flashes
     assert "Pairing code created" in response.get_data(as_text=True)
 
 
