@@ -61,11 +61,12 @@ def _page_response(page: FederationPage) -> Response:
         if page is FederationPage.OVERVIEW
         else "federation/detail_page.html"
     )
+    projection = _safe_projection(page)
     response = make_response(
         render_template(
             template,
-            federation_overview=_safe_projection(page),
-            federation_page=_safe_projection(page),
+            federation_overview=projection,
+            federation_page=projection,
         )
     )
     response.headers["Cache-Control"] = "no-store"
