@@ -13,20 +13,24 @@ on:
       - "catalog/capabilities/contributions/**"
       - "catalog/federation/projections/**"
       - "catalog/flask_app/app.py"
+      - "catalog/flask_app/capability_startup_transition_routes.py"
       - "catalog/flask_app/capability_contribution_routes.py"
       - "catalog/flask_app/capability_benchmark_routes.py"
       - "catalog/flask_app/capability_inspection_routes.py"
       - "catalog/flask_app/capability_onboarding_routes.py"
       - "catalog/flask_app/federation_routes.py"
+      - "catalog/flask_app/services/capability_startup_transition_service.py"
       - "catalog/flask_app/services/capability_contribution_components.py"
       - "catalog/flask_app/services/capability_contribution_service.py"
       - "catalog/flask_app/services/capability_benchmark_service.py"
       - "catalog/flask_app/services/capability_inspection_service.py"
       - "catalog/flask_app/services/capability_onboarding_service.py"
       - "catalog/flask_app/services/federation_projection_service.py"
+      - "catalog/flask_app/templates/base.html"
       - "catalog/flask_app/templates/onboarding.html"
       - "catalog/flask_app/templates/federation_overview.html"
       - "catalog/flask_app/templates/federation/onboarding/**"
+      - "catalog/flask_app/tests/test_capability_startup_transition_route.py"
       - "catalog/flask_app/tests/test_capability_contribution_route.py"
       - "catalog/flask_app/tests/test_capability_benchmark_route.py"
       - "catalog/flask_app/tests/test_capability_inspection_route.py"
@@ -40,6 +44,7 @@ on:
       - "agent/cfi3-*"
       - "agent/cfi4-*"
       - "agent/cfi5-*"
+      - "agent/cfi6-*"
     paths:
       - ".github/workflows/cf7-acceptance-harness.yml"
       - "catalog/federation/tests/cf7_acceptance/**"
@@ -51,20 +56,24 @@ on:
       - "catalog/capabilities/contributions/**"
       - "catalog/federation/projections/**"
       - "catalog/flask_app/app.py"
+      - "catalog/flask_app/capability_startup_transition_routes.py"
       - "catalog/flask_app/capability_contribution_routes.py"
       - "catalog/flask_app/capability_benchmark_routes.py"
       - "catalog/flask_app/capability_inspection_routes.py"
       - "catalog/flask_app/capability_onboarding_routes.py"
       - "catalog/flask_app/federation_routes.py"
+      - "catalog/flask_app/services/capability_startup_transition_service.py"
       - "catalog/flask_app/services/capability_contribution_components.py"
       - "catalog/flask_app/services/capability_contribution_service.py"
       - "catalog/flask_app/services/capability_benchmark_service.py"
       - "catalog/flask_app/services/capability_inspection_service.py"
       - "catalog/flask_app/services/capability_onboarding_service.py"
       - "catalog/flask_app/services/federation_projection_service.py"
+      - "catalog/flask_app/templates/base.html"
       - "catalog/flask_app/templates/onboarding.html"
       - "catalog/flask_app/templates/federation_overview.html"
       - "catalog/flask_app/templates/federation/onboarding/**"
+      - "catalog/flask_app/tests/test_capability_startup_transition_route.py"
       - "catalog/flask_app/tests/test_capability_contribution_route.py"
       - "catalog/flask_app/tests/test_capability_benchmark_route.py"
       - "catalog/flask_app/tests/test_capability_inspection_route.py"
@@ -85,7 +94,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 50
+    timeout-minutes: 55
     steps:
       - uses: actions/checkout@v4
         with:
@@ -99,7 +108,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -c constraints-phase2.txt
           python -m pip install pytest ruff
-      - name: Compile CF7-A through CFI-5 harness files
+      - name: Compile CF7-A through CFI-6 harness files
         run: >-
           python -m compileall -q
           catalog/federation/tests/cf7_acceptance
@@ -116,6 +125,9 @@ jobs:
           catalog/flask_app/services/capability_contribution_components.py
           catalog/flask_app/services/capability_contribution_service.py
           catalog/flask_app/tests/test_capability_contribution_route.py
+          catalog/flask_app/capability_startup_transition_routes.py
+          catalog/flask_app/services/capability_startup_transition_service.py
+          catalog/flask_app/tests/test_capability_startup_transition_route.py
       - name: Parse scenario manifest
         run: >-
           python -c "import json, pathlib;
@@ -135,7 +147,11 @@ jobs:
           assert 'cfi4.benchmark-run-skip-rerun-cancel-through-onboarding' in executable;
           assert 'cfi5.contribution-enable-disable-suspend-reconcile-through-onboarding' in executable;
           assert 'product.contribution-disable-and-reenable' in executable;
+          assert 'product.legacy-mode-persisted-migration' in executable;
+          assert 'cfi6.capability-first-startup-routing-and-explicit-fallback' in executable;
+          assert 'cfi6.capability-derived-runtime-and-navigation' in executable;
           assert 'cf2b.isolated-concrete-benchmark-adapters' in executable;
+          assert 'product.legacy-mode-persisted-migration' not in blocked;
           assert 'product.recorder-plus-ai-simultaneous-contribution' in blocked;
           assert 'product.complete-capability-first-end-to-end-acceptance' in blocked;
           assert 'physical.mobile-and-desktop-browser-review' in manual"
@@ -163,11 +179,13 @@ jobs:
         run: python -m pytest -o addopts= -q catalog/flask_app/tests/test_capability_benchmark_route.py
       - name: Run CFI-5 contribution composition regressions
         run: python -m pytest -o addopts= -q catalog/flask_app/tests/test_capability_contribution_route.py
+      - name: Run CFI-6 startup transition regressions
+        run: python -m pytest -o addopts= -q catalog/flask_app/tests/test_capability_startup_transition_route.py
       - name: Run CF6 projection regressions
         run: python -m pytest -o addopts= -q catalog/federation/tests/test_federation_projections.py
       - name: Run focused Federation authority regressions
         run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase2_unit.py
-      - name: Ruff CF7-A through CFI-5 files
+      - name: Ruff CF7-A through CFI-6 files
         run: >-
           python -m ruff check
           catalog/federation/tests/cf7_acceptance
@@ -184,6 +202,9 @@ jobs:
           catalog/flask_app/services/capability_contribution_components.py
           catalog/flask_app/services/capability_contribution_service.py
           catalog/flask_app/tests/test_capability_contribution_route.py
+          catalog/flask_app/capability_startup_transition_routes.py
+          catalog/flask_app/services/capability_startup_transition_service.py
+          catalog/flask_app/tests/test_capability_startup_transition_route.py
       - name: Diff hygiene
         shell: bash
         run: |
