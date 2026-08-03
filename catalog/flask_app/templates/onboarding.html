@@ -5,7 +5,8 @@
 {% from 'federation/_contribution_card.html' import contribution_card %}
 {% block body %}
 {% set raw_vm = onboarding if onboarding is defined else view_model %}
-{% set vm = normalize_onboarding_view_model(raw_vm, request.args.get('step')) %}
+{% set requested_step = request.args.get('step') if request is defined else none %}
+{% set vm = normalize_onboarding_view_model(raw_vm, requested_step) %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/federation.css') }}">
 
 <section
