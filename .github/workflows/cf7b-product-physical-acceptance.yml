@@ -1,0 +1,151 @@
+name: CF7-B product and physical acceptance
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cf7b-product-physical-acceptance.yml"
+      - "catalog/federation/tests/cf7_acceptance/**"
+      - "docs/implementation/cf7b_product_physical_acceptance.md"
+      - "docs/implementation/cf7_acceptance_harness.md"
+      - "catalog/flask_app/**"
+      - "catalog/capabilities/**"
+      - "catalog/federation/**"
+  push:
+    branches:
+      - main
+      - "agent/cf7b-*"
+    paths:
+      - ".github/workflows/cf7b-product-physical-acceptance.yml"
+      - "catalog/federation/tests/cf7_acceptance/**"
+      - "docs/implementation/cf7b_product_physical_acceptance.md"
+      - "docs/implementation/cf7_acceptance_harness.md"
+      - "catalog/flask_app/**"
+      - "catalog/capabilities/**"
+      - "catalog/federation/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cf7b-acceptance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  acceptance:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile CF7-B acceptance files
+        run: >-
+          python -m compileall -q
+          catalog/federation/tests/cf7_acceptance
+          catalog/flask_app
+      - name: Validate acceptance manifest boundaries
+        run: >-
+          python -c "import json, pathlib;
+          path = pathlib.Path('catalog/federation/tests/cf7_acceptance/scenarios.json');
+          manifest = json.loads(path.read_text(encoding='utf-8'));
+          executable = {item['id'] for item in manifest['executable_now']};
+          blocked = {item['id'] for item in manifest['blocked_by_cfi']};
+          manual = {item['id'] for item in manifest['manual_physical_verification']};
+          assert manifest['acceptance_claim'] == 'foundation-only';
+          assert manifest['automated_product_acceptance_executable'] is True;
+          assert manifest['physical_evidence_accepted'] is False;
+          assert manifest['federation_v1_end_to_end_accepted'] is False;
+          assert manifest['capability_first_onboarding_end_to_end_accepted'] is False;
+          assert 'cf7b.fresh-local-product-flow-through-finish' in executable;
+          assert 'cf7b.simulated-recorder-ai-disable-reenable-restart-expiry-rerun' in executable;
+          assert 'cf7b.simulated-three-device-ai-compute-storage-separation' in executable;
+          assert 'cf7b.physical-evidence-contract-redaction-and-commit-binding' in executable;
+          assert 'product.complete-capability-first-end-to-end-acceptance' in blocked;
+          required_manual = {
+            'physical.fresh-windows-checkout',
+            'physical.fresh-linux-checkout',
+            'physical.multi-host-relay-and-network-path',
+            'physical.mtconnect-recorder-source',
+            'physical.ollama-model-and-accelerator',
+            'physical.mobile-and-desktop-browser-review',
+            'physical.recorder-plus-ai-simultaneous-contribution',
+            'physical.separate-ai-compute-storage-contributors',
+            'physical.benchmark-expiry-and-rerun',
+            'physical.contribution-disable-and-reenable',
+            'physical.restart-and-reconciliation',
+            'physical.revocation-and-controlled-rejoin',
+          };
+          assert required_manual <= manual"
+      - name: Run CF7-B integrated product scenarios
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/cf7_acceptance/test_product_acceptance.py
+      - name: Run physical evidence contract tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+      - name: Run CF7 foundation scenarios
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/cf7_acceptance/test_foundation.py
+      - name: Run integrated CFI-2 through CFI-6 routes
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_capability_onboarding_route.py
+          catalog/flask_app/tests/test_capability_inspection_route.py
+          catalog/flask_app/tests/test_capability_benchmark_route.py
+          catalog/flask_app/tests/test_capability_contribution_route.py
+          catalog/flask_app/tests/test_capability_startup_transition_route.py
+          catalog/flask_app/tests/test_federation_overview_route.py
+      - name: Run product UI and compatibility regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/test_navigation_smoke.py
+          catalog/flask_app/tests/test_mobile_layout_contract.py
+          catalog/flask_app/tests/test_responsive_routes.py
+          catalog/flask_app/tests/test_post_setup_handoff.py
+          catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_recorder_control_service.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+      - name: Run contribution and projection contracts
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/capabilities/contributions/tests
+          catalog/federation/tests/test_federation_projections.py
+          catalog/federation/tests/test_onboarding_contracts.py
+          catalog/federation/tests/test_onboarding_discovery_service.py
+      - name: Run focused Federation authority regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/test_phase0.py
+          catalog/federation/tests/test_phase1.py
+          catalog/federation/tests/test_phase2_unit.py
+      - name: Validate Compose configuration
+        run: docker compose config
+      - name: Ruff CF7-B acceptance files
+        run: >-
+          python -m ruff check
+          catalog/federation/tests/cf7_acceptance/physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_product_acceptance.py
+      - name: Diff hygiene
+        shell: bash
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git diff --check "origin/${{ github.base_ref }}...HEAD"
+          else
+            git diff --check HEAD^ HEAD
+          fi
