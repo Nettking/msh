@@ -299,6 +299,11 @@ def save_contributions() -> Response:
     try:
         choices = _choice_payload(payload)
         _validate_server_bound_request(payload, require_command=False)
+        if not choices:
+            return _secure_response(
+                "This step remains blocked. Select at least one current contribution candidate.",
+                409,
+            )
         service = get_capability_contribution_service()
         service.recommend(require_benchmark_review=True)
         _validate_server_bound_request(payload, require_command=True)
