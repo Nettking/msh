@@ -5,7 +5,10 @@ from pathlib import Path
 
 import pytest
 
-from catalog.federation.errors import AuthenticationError
+from catalog.federation.errors import (
+    AuthenticationError,
+    FederationValidationError,
+)
 from catalog.federation.onboarding_compat import federation_id_from_session_id
 from catalog.federation.onboarding_models import (
     FederationConnectionState,
@@ -65,7 +68,7 @@ def test_pairing_code_rejects_tampering(tmp_path: Path) -> None:
     codec, code = _code(tmp_path)
     replacement = "A" if code[-1] != "A" else "B"
 
-    with pytest.raises((AuthenticationError, Exception)):
+    with pytest.raises((AuthenticationError, FederationValidationError)):
         codec.decode(code[:-1] + replacement)
 
 
@@ -122,5 +125,8 @@ def test_pairing_routes_and_ui_are_registered(tmp_path: Path, monkeypatch) -> No
     page = app.test_client().get("/onboarding?step=federation")
     body = page.get_data(as_text=True)
     assert page.status_code == 200
-    assert "Create pairing code" in body or "Pairing code from the other MSH device" in body
+    assert (
+        "Create pairing code" in body
+        or "Pairing code from the other MSH device" in body
+    )
     assert "A public device ID alone never grants membership" in body
