@@ -14,6 +14,9 @@ from .capability_benchmark_routes import capability_benchmark_web
 from .capability_contribution_routes import capability_contribution_web
 from .capability_inspection_routes import capability_inspection_web
 from .capability_onboarding_routes import capability_onboarding_web
+from .capability_startup_transition_routes import (
+    capability_startup_transition_web,
+)
 from .docs_routes import docs_web
 from .federation_routes import federation_web
 from .operator_strategy_routes import operator_strategy_web
@@ -21,6 +24,9 @@ from .operator_support_routes import operator_support_web
 from .provider_federation_routes import provider_federation_web
 from .routes import web
 from .server_setup_routes import server_setup_web
+from .services.capability_startup_transition_service import (
+    get_capability_startup_transition_service,
+)
 from .services.catalog_service import ArtifactCatalog
 from .services.recorder_control_service import get_recorder_control_service
 from .services.server_setup_service import (
@@ -30,7 +36,6 @@ from .services.server_setup_service import (
     ServerSetupError,
     load_settings,
     ollama_status,
-    runtime_should_start,
 )
 from .source_routes import source_web
 
@@ -50,6 +55,13 @@ def create_app() -> Flask:
         os.getenv(
             "MSH_FEDERATION_ONBOARDING_DATABASE",
             "data/federation/onboarding/onboarding.sqlite3",
+        ),
+    )
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_TRANSITION_DATABASE",
+        os.getenv(
+            "MSH_FEDERATION_TRANSITION_DATABASE",
+            app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
         ),
     )
     app.config.setdefault(
@@ -132,11 +144,12 @@ def create_app() -> Flask:
     )
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
-    # Read-only and capability-onboarding surfaces are registered before the
-    # legacy setup/runtime gates. CFI-5 adds explicit contribution intent and
-    # delegates activation only to existing registered authority adapters.
+    # CFI-6 owns capability-first startup and migration before CFI-5 and the
+    # retained role-first compatibility gates. It persists intent only and
+    # delegates every operational authority to the already registered services.
     app.register_blueprint(docs_web)
     app.register_blueprint(federation_web)
+    app.register_blueprint(capability_startup_transition_web)
     app.register_blueprint(capability_contribution_web)
     app.register_blueprint(capability_benchmark_web)
     app.register_blueprint(capability_inspection_web)
@@ -158,30 +171,44 @@ if __name__ == "__main__":
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
 
     setup = None
+    runtime_enabled = False
     try:
         setup = load_settings()
     except ServerSetupError as exc:
         print(
-            f"[orchestrator] browser setup needs attention before runtime starts: {exc}",
+            f"[orchestrator] setup needs attention before runtime starts: {exc}",
+            flush=True,
+        )
+    try:
+        with app.app_context():
+            runtime_enabled = (
+                get_capability_startup_transition_service().runtime_should_start(
+                    setup
+                )
+            )
+    except Exception as exc:  # noqa: BLE001 - corrupt state must fail closed
+        print(
+            "[orchestrator] capability-first startup state needs repair: "
+            f"{type(exc).__name__}",
             flush=True,
         )
 
     if (
         os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1"
         and setup is not None
-        and runtime_should_start(setup)
+        and runtime_enabled
     ):
         runtime_manager = get_runtime_manager()
         if runtime_manager.requires_startup_choice():
             print(
-                "[orchestrator] startup mode selection required at /startup "
-                "before runtime processing begins",
+                "[orchestrator] runtime progress choice remains available through "
+                "the controlled legacy fallback",
                 flush=True,
             )
         else:
             print(
-                "[orchestrator] webapp-first startup: Flask available immediately, "
-                "runtime starts in background",
+                "[orchestrator] capability-first startup: Flask available "
+                "immediately, runtime starts in background",
                 flush=True,
             )
             start_runtime_background()
@@ -191,14 +218,14 @@ if __name__ == "__main__":
         or not getattr(setup, "user_setup_complete", False)
     ):
         print(
-            "[orchestrator] first-time browser setup required at /startup; "
+            "[orchestrator] capability-first onboarding required at /onboarding; "
             "runtime will remain idle",
             flush=True,
         )
     else:
         print(
-            "[orchestrator] orchestration disabled by environment or browser setup; "
-            "runtime manager will remain idle",
+            "[orchestrator] runtime disabled by capability intent, environment, "
+            "or repair state",
             flush=True,
         )
 
