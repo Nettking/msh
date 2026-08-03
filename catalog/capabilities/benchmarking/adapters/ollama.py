@@ -253,7 +253,9 @@ class OllamaBenchmarkAdapter:
             except Exception:  # noqa: BLE001 - probe failures become safe evidence
                 warnings.append("A trusted local Ollama target could not be inspected")
         prerequisites = (OLLAMA_PREREQUISITE,) if available else ()
-        recommended = (self.definition.benchmark_id,) if available else ()
+        # Keep a configured target visible even while it is unavailable. The
+        # resulting blocked check remains evidence only and grants no authority.
+        recommended = (self.definition.benchmark_id,)
         return InspectionFinding(
             resource_observations={
                 "ollama": {
