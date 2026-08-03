@@ -27,10 +27,6 @@ from catalog.federation.onboarding_models import (
     ContributionDesiredState,
     FederationConnectionState,
     OnboardingModel,
-    _optional_safe_text,
-    _safe_text,
-    _uint,
-    _utc,
 )
 
 from .capability_contribution_service import (
@@ -61,6 +57,51 @@ _SOURCE_KINDS = frozenset({"legacy-migration", "capability-first"})
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _safe_text(value: object, field: str) -> str:
+    if not isinstance(value, str):
+        raise FederationValidationError(
+            "invalid-startup-transition-text",
+            field,
+            "must be text",
+        )
+    normalized = value.strip()
+    if not normalized or len(normalized) > 512 or any(
+        ord(character) < 32 for character in normalized
+    ):
+        raise FederationValidationError(
+            "invalid-startup-transition-text",
+            field,
+            "must be bounded printable text",
+        )
+    return normalized
+
+
+def _optional_text(value: object, field: str) -> str | None:
+    if value is None:
+        return None
+    return _safe_text(value, field)
+
+
+def _uint(value: object, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise FederationValidationError(
+            "invalid-startup-transition-number",
+            field,
+            "must be a non-negative integer",
+        )
+    return value
+
+
+def _utc(value: object, field: str) -> datetime:
+    if not isinstance(value, datetime) or value.tzinfo is None:
+        raise FederationValidationError(
+            "invalid-startup-transition-time",
+            field,
+            "must be timezone-aware",
+        )
+    return value.astimezone(timezone.utc)
 
 
 def _intents(value: object) -> dict[str, str]:
@@ -104,7 +145,11 @@ class CapabilityStartupState(OnboardingModel):
 
     def __post_init__(self) -> None:
         for name in ("device_id", "federation_id", "internal_session_id"):
-            object.__setattr__(self, name, _safe_text(getattr(self, name), name))
+            object.__setattr__(
+                self,
+                name,
+                _safe_text(getattr(self, name), name),
+            )
         try:
             state = FederationConnectionState(self.federation_state)
         except (TypeError, ValueError) as exc:
@@ -125,7 +170,11 @@ class CapabilityStartupState(OnboardingModel):
             "inspection_revision",
             _uint(self.inspection_revision, "inspection_revision"),
         )
-        object.__setattr__(self, "contribution_intents", _intents(self.contribution_intents))
+        object.__setattr__(
+            self,
+            "contribution_intents",
+            _intents(self.contribution_intents),
+        )
         if not isinstance(self.completed, bool):
             raise FederationValidationError(
                 "invalid-startup-transition-completion",
@@ -143,12 +192,12 @@ class CapabilityStartupState(OnboardingModel):
         object.__setattr__(
             self,
             "source_schema",
-            _optional_safe_text(self.source_schema, "source_schema"),
+            _optional_text(self.source_schema, "source_schema"),
         )
         object.__setattr__(
             self,
             "source_mode",
-            _optional_safe_text(self.source_mode, "source_mode"),
+            _optional_text(self.source_mode, "source_mode"),
         )
         source_revision = _uint(self.source_revision, "source_revision")
         if source_revision == 0:
@@ -158,7 +207,11 @@ class CapabilityStartupState(OnboardingModel):
                 "must be greater than zero",
             )
         object.__setattr__(self, "source_revision", source_revision)
-        object.__setattr__(self, "updated_at", _utc(self.updated_at, "updated_at"))
+        object.__setattr__(
+            self,
+            "updated_at",
+            _utc(self.updated_at, "updated_at"),
+        )
         if self.source_kind == "legacy-migration" and (
             self.source_schema is None or self.source_mode is None
         ):
@@ -244,6 +297,7 @@ class CapabilityStartupStateStore:
             )
             """
         )
+        connection.commit()
 
     def load(self) -> CapabilityStartupState | None:
         if not self.database.exists():
@@ -273,6 +327,13 @@ class CapabilityStartupStateStore:
                 ) from exc
         return None if row is None else self._decode(row["state_json"])
 
+    @staticmethod
+    def _rollback(connection: sqlite3.Connection) -> None:
+        try:
+            connection.rollback()
+        except sqlite3.Error:
+            pass
+
     def save(self, state: CapabilityStartupState) -> CapabilityStartupState:
         if not isinstance(state, CapabilityStartupState):
             raise FederationValidationError(
@@ -295,55 +356,57 @@ class CapabilityStartupStateStore:
             )
         self.database.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         with self._lock:
+            connection: sqlite3.Connection | None = None
             try:
                 connection = self._connect()
-                try:
-                    connection.execute("BEGIN IMMEDIATE")
-                    self._initialize(connection)
-                    row = connection.execute(
-                        """
-                        SELECT state_json FROM capability_startup_state
-                        WHERE singleton=1
-                        """
-                    ).fetchone()
-                    if row is not None:
-                        current = self._decode(row["state_json"])
-                        if (
-                            current.device_id != state.device_id
-                            or current.federation_id != state.federation_id
-                            or current.internal_session_id != state.internal_session_id
-                        ):
-                            raise FederationValidationError(
-                                "startup-transition-replacement-forbidden",
-                                "state",
-                                "device and federation binding cannot be replaced",
-                            )
-                    stamp = state.updated_at.isoformat().replace("+00:00", "Z")
-                    connection.execute(
-                        """
-                        INSERT INTO capability_startup_state(
-                            singleton,state_json,updated_at
-                        ) VALUES(1,?,?)
-                        ON CONFLICT(singleton) DO UPDATE SET
-                            state_json=excluded.state_json,
-                            updated_at=excluded.updated_at
-                        """,
-                        (encoded, stamp),
-                    )
-                    connection.commit()
-                except BaseException:
-                    connection.rollback()
-                    raise
-                finally:
-                    connection.close()
+                self._initialize(connection)
+                connection.execute("BEGIN IMMEDIATE")
+                row = connection.execute(
+                    """
+                    SELECT state_json FROM capability_startup_state
+                    WHERE singleton=1
+                    """
+                ).fetchone()
+                if row is not None:
+                    current = self._decode(row["state_json"])
+                    if (
+                        current.device_id != state.device_id
+                        or current.federation_id != state.federation_id
+                        or current.internal_session_id != state.internal_session_id
+                    ):
+                        raise FederationValidationError(
+                            "startup-transition-replacement-forbidden",
+                            "state",
+                            "device and federation binding cannot be replaced",
+                        )
+                stamp = state.updated_at.isoformat().replace("+00:00", "Z")
+                connection.execute(
+                    """
+                    INSERT INTO capability_startup_state(
+                        singleton,state_json,updated_at
+                    ) VALUES(1,?,?)
+                    ON CONFLICT(singleton) DO UPDATE SET
+                        state_json=excluded.state_json,
+                        updated_at=excluded.updated_at
+                    """,
+                    (encoded, stamp),
+                )
+                connection.commit()
             except (FederationValidationError, ProtocolCompatibilityError):
+                if connection is not None:
+                    self._rollback(connection)
                 raise
             except sqlite3.Error as exc:
+                if connection is not None:
+                    self._rollback(connection)
                 raise FederationValidationError(
                     "startup-transition-write-failed",
                     "database",
                     "transition state could not be persisted safely",
                 ) from exc
+            finally:
+                if connection is not None:
+                    connection.close()
         try:
             self.database.chmod(0o600)
         except OSError as exc:
@@ -402,9 +465,8 @@ class CapabilityStartupTransitionService:
         return snapshot.revision
 
     def _connected_context(self, *, request_id: str | None = None):
-        credentials = self.onboarding_service.identity_or_none()
-        if credentials is None:
-            credentials = self.onboarding_service.create_identity()
+        if self.onboarding_service.identity_or_none() is None:
+            self.onboarding_service.create_identity()
         context = self.onboarding_service.authorized_context()
         if context is not None:
             return context
@@ -513,7 +575,12 @@ class CapabilityStartupTransitionService:
         }
         intents["workbench"] = ContributionDesiredState.ENABLED.value
         intents["runtime"] = ContributionDesiredState.ENABLED.value
-        for capability_type in ("recorder", "language-model", "compute", "storage"):
+        for capability_type in (
+            "recorder",
+            "language-model",
+            "compute",
+            "storage",
+        ):
             if capability_type in by_type:
                 intents[capability_type] = self._combine_desired(
                     by_type[capability_type]
