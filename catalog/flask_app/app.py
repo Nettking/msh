@@ -10,6 +10,7 @@ from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
 from .ai_routes import ai_web
+from .capability_inspection_routes import capability_inspection_web
 from .capability_onboarding_routes import capability_onboarding_web
 from .docs_routes import docs_web
 from .federation_routes import federation_web
@@ -61,6 +62,11 @@ def create_app() -> Flask:
         os.getenv("MSH_DEVICE_NAME", "This MSH device"),
     )
     app.config.setdefault("CAPABILITY_ONBOARDING_DISCOVERY_SOURCES", ())
+    app.config.setdefault("CAPABILITY_ONBOARDING_INSPECTION_ADAPTERS", None)
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS",
+        int(os.getenv("MSH_INSPECTION_TTL_SECONDS", "900")),
+    )
 
     catalog = ArtifactCatalog()
     app.config["ARTIFACT_CATALOG"] = catalog
@@ -105,10 +111,11 @@ def create_app() -> Flask:
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
     # Read-only and capability-onboarding surfaces are registered before the
-    # legacy setup/runtime gates. CFI-2 reuses existing authorities and leaves
-    # the role-first fallback unchanged.
+    # legacy setup/runtime gates. CFI-3 adds inspection evidence only and leaves
+    # benchmark, contribution, and role-first authority behavior unchanged.
     app.register_blueprint(docs_web)
     app.register_blueprint(federation_web)
+    app.register_blueprint(capability_inspection_web)
     app.register_blueprint(capability_onboarding_web)
     app.register_blueprint(server_setup_web)
     app.register_blueprint(web)
@@ -148,28 +155,5 @@ if __name__ == "__main__":
                 flush=True,
             )
         else:
-            print(
-                "[orchestrator] webapp-first startup: Flask available immediately, "
-                "runtime starts in background",
-                flush=True,
-            )
             start_runtime_background()
-    elif (
-        setup is None
-        or not getattr(setup, "configured", False)
-        or not getattr(setup, "user_setup_complete", False)
-    ):
-        print(
-            "[orchestrator] first-time browser setup required at /startup; "
-            "runtime will remain idle",
-            flush=True,
-        )
-    else:
-        print(
-            "[orchestrator] orchestration disabled by environment or browser setup; "
-            "runtime manager will remain idle",
-            flush=True,
-        )
-
-    print(f"[orchestrator] starting Flask app on http://{host}:{port}", flush=True)
-    app.run(host=host, port=port, debug=debug, threaded=True)
+    app.run(host=host, port=port, debug=debug, use_reloader=debug)
