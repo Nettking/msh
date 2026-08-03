@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import json
 import sqlite3
 from dataclasses import replace
 from datetime import datetime, timezone
@@ -9,7 +8,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from catalog.federation.errors import FederationOperationError, FederationValidationError
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.federation.onboarding_models import (
     ContributionDesiredState,
     FederationConnectionState,
@@ -55,7 +57,10 @@ class FakeOnboarding:
         saved_binding: bool = False,
         connect_error: Exception | None = None,
     ) -> None:
-        identity = SimpleNamespace(node_id=DEVICE_ID, display_name="Transition device")
+        identity = SimpleNamespace(
+            node_id=DEVICE_ID,
+            display_name="Transition device",
+        )
         self.credentials = SimpleNamespace(identity=identity)
         self.binding = SimpleNamespace(
             federation_id=FEDERATION_ID,
@@ -63,7 +68,10 @@ class FakeOnboarding:
             state=FederationConnectionState.CONNECTED,
         )
         self.context = (
-            SimpleNamespace(credentials=self.credentials, binding=self.binding)
+            SimpleNamespace(
+                credentials=self.credentials,
+                binding=self.binding,
+            )
             if connected
             else None
         )
@@ -119,18 +127,30 @@ class FakeContribution:
     def recommend(self, *, require_benchmark_review: bool = True):
         assert require_benchmark_review is True
         return tuple(
-            SimpleNamespace(candidate_id=candidate_id, capability_type=kind)
+            SimpleNamespace(
+                candidate_id=candidate_id,
+                capability_type=kind,
+            )
             for candidate_id, (kind, _desired) in self.choices.items()
         )
 
-    def view_model(self, _snapshot, *, connected: bool, benchmark_complete: bool):
+    def view_model(
+        self,
+        _snapshot,
+        *,
+        connected: bool,
+        benchmark_complete: bool,
+    ):
         assert connected and benchmark_complete
         state = "complete" if self.complete else "pending"
         return {"state": state}, [], self.complete
 
     def intents(self):
         return tuple(
-            SimpleNamespace(candidate_id=candidate_id, desired_state=desired)
+            SimpleNamespace(
+                candidate_id=candidate_id,
+                desired_state=desired,
+            )
             for candidate_id, (_kind, desired) in self.choices.items()
         )
 
@@ -216,8 +236,14 @@ def _service(
 @pytest.mark.parametrize(
     ("mode", "enabled"),
     [
-        ("full-server", {"workbench", "runtime", "recorder", "language-model"}),
-        ("web-workbench", {"workbench", "runtime", "language-model"}),
+        (
+            "full-server",
+            {"workbench", "runtime", "recorder", "language-model"},
+        ),
+        (
+            "web-workbench",
+            {"workbench", "runtime", "language-model"},
+        ),
         ("web-ui-only", {"workbench", "language-model"}),
         ("recorder-only", {"recorder"}),
         ("language-model-provider", {"language-model"}),
@@ -234,7 +260,9 @@ def test_all_legacy_modes_migrate_without_compute_storage_or_private_values(
     second = service.migrate_legacy(request_id="ignored-command")
 
     actual = {
-        key for key, value in first.contribution_intents.items() if value == "enabled"
+        key
+        for key, value in first.contribution_intents.items()
+        if value == "enabled"
     }
     assert actual == enabled
     assert first.contribution_intents["compute"] == "disabled"
@@ -279,7 +307,9 @@ def test_migration_fences_ambiguous_discovery_and_broken_saved_binding(
     assert broken.connect_calls == []
 
 
-def test_migration_creates_local_federation_only_when_none_exists(tmp_path: Path) -> None:
+def test_migration_creates_local_federation_only_when_none_exists(
+    tmp_path: Path,
+) -> None:
     onboarding = FakeOnboarding(connected=False)
     service = _service(
         tmp_path,
@@ -293,7 +323,9 @@ def test_migration_creates_local_federation_only_when_none_exists(tmp_path: Path
     assert onboarding.connect_calls == ["local-create"]
 
 
-def test_store_rejects_binding_replacement_and_corrupt_state(tmp_path: Path) -> None:
+def test_store_rejects_binding_replacement_and_corrupt_state(
+    tmp_path: Path,
+) -> None:
     store = CapabilityStartupStateStore(tmp_path / "state.sqlite3")
     saved = store.save(_state())
     assert store.load() == saved
@@ -345,7 +377,9 @@ def test_capability_finish_persists_intent_and_compatibility_settings(
     assert saved_settings[0].ai_enabled is True
 
 
-def test_runtime_flags_and_finish_action_come_from_capability_state(tmp_path: Path) -> None:
+def test_runtime_flags_and_finish_action_come_from_capability_state(
+    tmp_path: Path,
+) -> None:
     service = _service(tmp_path, settings=_settings("full-server"))
     service.store.save(
         _state(
@@ -372,7 +406,10 @@ def test_runtime_flags_and_finish_action_come_from_capability_state(tmp_path: Pa
         "actions": {},
         "storage_key": "msh.onboarding.device.cfi5",
     }
-    fresh.apply_to_onboarding_view_model(view_model, requested_step="finish")
+    fresh.apply_to_onboarding_view_model(
+        view_model,
+        requested_step="finish",
+    )
     assert view_model["finish"]["transition_action"]["kind"] == "finish"
     assert view_model["storage_key"].endswith(".cfi6")
 
@@ -403,7 +440,11 @@ def _route_app(monkeypatch, tmp_path: Path, transition):
     )
     monkeypatch.setattr(app_module, "get_runtime_manager", lambda: manager)
     monkeypatch.setattr(routes_module, "get_runtime_manager", lambda: manager)
-    monkeypatch.setattr(server_setup_routes, "get_runtime_manager", lambda: manager)
+    monkeypatch.setattr(
+        server_setup_routes,
+        "get_runtime_manager",
+        lambda: manager,
+    )
     monkeypatch.setattr(app_module, "load_settings", lambda: settings)
     monkeypatch.setattr(routes_module, "load_settings", lambda: settings)
     monkeypatch.setattr(server_setup_routes, "load_settings", lambda: settings)
@@ -432,7 +473,10 @@ def test_cfi6_registration_and_startup_routing(monkeypatch, tmp_path) -> None:
     assert response.location == "/onboarding?step=finish"
 
 
-def test_returning_device_and_explicit_legacy_fallback(monkeypatch, tmp_path) -> None:
+def test_returning_device_and_explicit_legacy_fallback(
+    monkeypatch,
+    tmp_path,
+) -> None:
     completed = FakeTransitionRouteService(_flags(completed=True))
     app = _route_app(monkeypatch, tmp_path / "completed", completed)
     client = app.test_client()
@@ -474,4 +518,6 @@ def test_transition_posts_require_csrf_command_and_server_owned_context(
     )
     assert accepted.status_code == 303
     assert accepted.location == "/federation"
-    assert transition.migration_calls == [f"flask-startup-migration-{command}"]
+    assert transition.migration_calls == [
+        f"flask-startup-migration-{command}"
+    ]
