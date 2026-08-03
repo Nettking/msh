@@ -37,11 +37,21 @@ from .capability_onboarding_routes import (
 from .services.capability_benchmark_service import (
     get_capability_benchmark_service,
 )
+from .services.capability_onboarding_service import (
+    get_capability_onboarding_service,
+)
 
 capability_benchmark_web = Blueprint("capability_benchmark_web", __name__)
 
 _RUN_FIELDS = frozenset({"_csrf_token", "benchmark_id", "target_service_id"})
 _SKIP_FIELDS = frozenset({"_csrf_token"})
+_PREREQUISITE_CODES = frozenset(
+    {
+        "benchmark-federation-required",
+        "benchmark-inspection-required",
+        "benchmark-inspection-expired",
+    }
+)
 
 
 def _reject_unexpected_fields(
@@ -92,6 +102,18 @@ def _benchmark_message(exc: BaseException) -> str:
         code,
         "The bounded benchmark action could not be completed safely.",
     )
+
+
+def _prerequisite_response(exc: FederationOperationError) -> Response | None:
+    if (
+        exc.code in _PREREQUISITE_CODES
+        and get_capability_onboarding_service().identity_or_none() is not None
+    ):
+        return _secure_response(
+            f"This step remains blocked. {_benchmark_message(exc)}",
+            409,
+        )
+    return None
 
 
 def _render_onboarding_with_benchmarks() -> Response:
@@ -176,10 +198,14 @@ def run_benchmark() -> Response:
         )
     except AuthorizationError as exc:
         return _safe_error_response(exc.code, 403)
+    except FederationOperationError as exc:
+        blocked = _prerequisite_response(exc)
+        if blocked is not None:
+            return blocked
+        flash(_benchmark_message(exc), "error")
     except (
         AuthenticationError,
         BenchmarkingError,
-        FederationOperationError,
         FederationValidationError,
         ProtocolCompatibilityError,
         NodeIdentityStateError,
@@ -214,10 +240,14 @@ def skip_benchmarks() -> Response:
         count = get_capability_benchmark_service().skip_all()
     except AuthorizationError as exc:
         return _safe_error_response(exc.code, 403)
+    except FederationOperationError as exc:
+        blocked = _prerequisite_response(exc)
+        if blocked is not None:
+            return blocked
+        flash(_benchmark_message(exc), "error")
     except (
         AuthenticationError,
         BenchmarkingError,
-        FederationOperationError,
         FederationValidationError,
         ProtocolCompatibilityError,
         NodeIdentityStateError,
