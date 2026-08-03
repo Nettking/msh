@@ -61,6 +61,14 @@ The overview also applies consistent empty and connection semantics:
 - a connected device without inspection receives one direct **Open inspection**
   recommendation.
 
+## Validation
+
+The implementation commit `988c66d4d48078fdabb0a4c491dbb68810a5ac21`
+passed the dedicated CFI-1 gate on Ubuntu and Windows, the CF6 projection gate,
+the CFI-6 onboarding gate and the complete CF7-B acceptance gate on Ubuntu and
+Windows. The current branch head adds documentation only on top of that tested
+implementation.
+
 ## Boundaries
 
 These changes do not alter Federation authority, membership, discovery,
