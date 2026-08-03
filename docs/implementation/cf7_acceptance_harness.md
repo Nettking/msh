@@ -1,6 +1,6 @@
 # CF7-A capability-first acceptance harness
 
-Status: foundation implemented and extended through CFI-3; full CF7 product acceptance is **not** claimed.
+Status: foundation implemented and extended through CFI-4; full CF7 product acceptance is **not** claimed.
 
 ## Purpose
 
@@ -17,10 +17,11 @@ The permanent gate now includes:
 - CFI-1 read-only `/federation` route integration;
 - CFI-2 Flask identity, discovery, verified join, local creation, reconnect, and migration-preview integration;
 - CFI-3 Flask device-inspection composition, persistence, expiry, privacy, and no-authority tests;
+- CFI-4 Flask benchmark run, skip, rerun, cancellation, validity, persistence, privacy, and no-authority tests;
 - CF6 projection safety;
 - focused Federation v1 authority regressions.
 
-These remain bounded claims. Physical browser behavior, benchmark product actions, contribution actions, setup transition, and complete end-to-end acceptance remain outside CF7-A.
+These remain bounded claims. Contribution actions, setup transition, physical browser and hardware behavior, and complete end-to-end acceptance remain outside CF7-A.
 
 The machine-readable source of truth is `catalog/federation/tests/cf7_acceptance/scenarios.json`.
 
@@ -39,7 +40,7 @@ The harness provides:
 - assertions for membership, route authority, fencing, identity stability, and private-data leakage;
 - an explicit scenario manifest with `executable`, `blocked`, and `manual` status only.
 
-The helpers and Flask integrations never create a second authority model. Membership changes go through `SessionCoordinator`; join and reconnect go through `SessionOnboardingAuthority`; identity persistence goes through `IdentityStore`; CFI-3 inspection delegates to the existing CF2 `DeviceInspector` and persists only the frozen CF1 snapshot.
+The helpers and Flask integrations never create a second authority model. Membership changes go through `SessionCoordinator`; join and reconnect go through `SessionOnboardingAuthority`; identity persistence goes through `IdentityStore`; CFI-3 inspection delegates to the existing CF2 `DeviceInspector`; CFI-4 benchmark execution delegates to the existing CF2 registry, runner, result store, validity evaluator, and exact adapter instances composed by CFI-3.
 
 ## Scenario-to-test mapping
 
@@ -57,19 +58,19 @@ The helpers and Flask integrations never create a second authority model. Member
 | Corrupt and partial identity state | Executable | CF7 foundation | Existing identity format |
 | Corrupt CFI-2 onboarding state | Executable | CFI-2 route test | Fail-closed render; no automatic recovery |
 | CF2-A inspection and benchmark engine | Executable | focused capability tests | Isolated engine |
-| CF2-B concrete adapters | Executable | `test_benchmarking_adapters.py` | Evidence only, not benchmark product execution |
+| CF2-B concrete adapters | Executable | `test_benchmarking_adapters.py` | Existing bounded trusted seams only |
 | CF4 contribution service | Executable | contribution package tests | Isolated service and adapters |
 | CF5 UI shell | Executable | `test_cf5_ui_shell.py` | Automated template/static checks |
 | CFI-1 Federation overview | Executable | `test_federation_overview_route.py` | Read-only |
-| CFI-2 onboarding composition | Executable | `test_capability_onboarding_route.py` | Identity and federation steps only |
-| CFI-3 device inspection | Executable | `test_capability_inspection_route.py` | Reads coarse local state and existing adapter seams; no benchmark execution |
+| CFI-2 onboarding composition | Executable | `test_capability_onboarding_route.py` | Identity and Federation steps only |
+| CFI-3 device inspection | Executable | `test_capability_inspection_route.py` | Reads coarse local state and existing adapter seams |
+| CFI-4 benchmark composition | Executable | `test_capability_benchmark_route.py` | Evidence only; no contribution activation or new authority |
 | CF6 projections | Executable | `test_federation_projections.py` | Read-only safe projections |
 | Federation v1 authority regression | Executable | `test_phase2_unit.py` | Focused gate, not physical deployment |
 | Persisted legacy migration | Blocked | Manifest entry | Requires compatibility-controlled setup transition |
-| Benchmark run/skip/rerun through onboarding | Blocked | Manifest entry | Requires separate benchmark product integration |
 | Recorder plus AI contribution | Blocked | Manifest entry | Requires contribution authority binding |
 | Separate AI, compute, and storage contributors | Blocked | Manifest entry | Requires supported contribution composition |
-| Contribution disable/re-enable | Blocked | Manifest entry | Requires supported contribution actions |
+| Contribution disable/re-enable | Blocked | Manifest entry | CFI-4 stops before contribution actions |
 | Federation overview mutations | Blocked | Manifest entry | Overview remains read-only |
 | Fresh physical Windows/Linux checkout | Manual | Manifest entries | CI runners are not owner hardware |
 | Desktop and mobile browser verification | Manual | Manifest entry | Route tests do not prove physical rendering |
@@ -88,9 +89,25 @@ The CFI-3 route suite proves that:
 - private values do not reach the template;
 - saved MTConnect discovery is read without starting a scan;
 - configured Ollama inspection uses inventory only and does not invoke a model;
-- no benchmark probe, contribution action, membership mutation, storage assignment, or job authority is produced.
+- no benchmark probe, contribution action, membership mutation, storage assignment, or job authority is produced by inspection.
 
-Passing these tests does not prove physical hardware discovery, accelerator behavior, production network reachability, benchmark suitability, or contribution activation.
+## CFI-4 bounded claim
+
+The CFI-4 route suite proves that:
+
+- the exact CFI-3 registry and adapter instances are reused rather than rediscovered;
+- trusted Federation context and a current device-bound inspection are required;
+- run IDs, dependency fingerprints, prerequisites, timeouts, and identity/Federation context are server-owned;
+- explicit run and rerun create immutable durable CF1 benchmark results;
+- optional skip creates only local onboarding progress and invokes no probe;
+- cooperative cancellation produces bounded cancelled evidence;
+- TTL expiry, benchmark-version changes, and dependency changes require rerun;
+- corrupt persisted evidence fails closed without rendering raw bytes;
+- Ollama inference occurs only after an explicit benchmark POST;
+- MTConnect does not start scanning or recording, compute handlers are not invoked, storage remains candidate-only, and network targets remain authenticated explicit seams;
+- passing evidence grants no contribution, provider, membership, storage, job, lease, term, grant, or fencing authority.
+
+Passing these tests does not prove physical hardware performance, production network reachability, representative benchmark suitability, contribution activation, or complete product acceptance.
 
 ## Permanent gate
 
@@ -105,8 +122,9 @@ Passing these tests does not prove physical hardware discovery, accelerator beha
 - CFI-1 read-only Federation route tests;
 - CFI-2 onboarding route and persistence tests;
 - CFI-3 inspection route, persistence, expiry, safety, and no-authority tests;
+- CFI-4 benchmark route, persistence, skip, rerun, cancel, validity, safety, and no-authority tests;
 - CF6 projections;
 - focused Federation authority regressions;
 - compilation, manifest assertions, Ruff, and diff hygiene.
 
-Passing this workflow means that the currently executable foundation and bounded Flask integrations are green on both runner families. It must not be used as evidence that benchmark or contribution mutations are supported, that physical desktop/mobile behavior is accepted, or that complete capability-first or Federation v1 end-to-end acceptance has passed.
+Passing this workflow means that the currently executable foundation and bounded Flask integrations are green on both runner families. It must not be used as evidence that contribution mutations are supported, that physical desktop/mobile or hardware behavior is accepted, or that complete capability-first or Federation v1 end-to-end acceptance has passed.
