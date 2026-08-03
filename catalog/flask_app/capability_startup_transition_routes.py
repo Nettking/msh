@@ -36,6 +36,9 @@ from .capability_onboarding_routes import (
     _secure_response,
     _validate_server_bound_request,
 )
+from .services.capability_contribution_service import (
+    get_capability_contribution_service,
+)
 from .services.capability_startup_transition_service import (
     get_capability_startup_transition_service,
 )
@@ -47,6 +50,9 @@ capability_startup_transition_web = Blueprint(
 
 _RETURNED_SESSION_KEY = "capability_startup_transition_opened"
 _LEGACY_FALLBACK_SESSION_KEY = "capability_startup_legacy_fallback"
+_CONTRIBUTION_RECONCILE_EXTENSION_KEY = (
+    "capability_contribution_startup_reconciled"
+)
 _BASE_FIELDS = frozenset({"_csrf_token", "command_id"})
 _SAFE_PREFIXES = ("/onboarding", "/federation", "/docs", "/static")
 _LEGACY_CONTROL_PREFIXES = (
@@ -56,8 +62,8 @@ _LEGACY_CONTROL_PREFIXES = (
 _LEGACY_CONTROL_PATHS = frozenset(
     {
         "/rescan",
-        "/startup",
         "/startup/choose",
+        "/status",
         "/status/recorder.json",
     }
 )
@@ -190,7 +196,23 @@ def _degraded_view_model(view_model: dict[str, object]) -> dict[str, object]:
     return view_model
 
 
+def _reconcile_contributions_once() -> None:
+    if current_app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY):
+        return
+    current_app.extensions[_CONTRIBUTION_RECONCILE_EXTENSION_KEY] = True
+    try:
+        service = get_capability_contribution_service()
+        if service.has_persisted_intents():
+            service.reconcile()
+    except Exception as exc:  # noqa: BLE001 - startup must remain available
+        current_app.logger.info(
+            "Capability contribution startup reconcile unavailable (%s)",
+            type(exc).__name__,
+        )
+
+
 def _build_view_model() -> dict[str, object]:
+    _reconcile_contributions_once()
     view_model, _benchmark_complete = (
         _build_onboarding_with_contributions_view_model()
     )
@@ -220,10 +242,6 @@ def _render_onboarding() -> Response:
     )
 
 
-def _legacy_fallback_allowed() -> bool:
-    return bool(session.get(_LEGACY_FALLBACK_SESSION_KEY))
-
-
 def _is_legacy_control_path() -> bool:
     return request.path in _LEGACY_CONTROL_PATHS or request.path.startswith(
         _LEGACY_CONTROL_PREFIXES
@@ -247,10 +265,14 @@ def _startup_transition_gate_and_dispatch() -> Response | None:
     if request.path.startswith(_SAFE_PREFIXES):
         return None
 
+    # Compatibility controls remain callable and keep their existing local
+    # authorization checks. CFI-6 changes the default browser entry point, not
+    # the authority or semantics of these bounded endpoints.
+    if _is_legacy_control_path():
+        return None
+
     if request.path == "/startup" and request.args.get("legacy") == "1":
         session[_LEGACY_FALLBACK_SESSION_KEY] = True
-        return None
-    if _legacy_fallback_allowed() and _is_legacy_control_path():
         return None
 
     try:
@@ -286,14 +308,20 @@ def _startup_transition_gate_and_dispatch() -> Response | None:
             return redirect(url_for("federation_web.overview"))
         return None
 
-    if flags["needs_migration"]:
-        return redirect(
-            url_for(
-                "capability_startup_transition_web.onboarding",
-                step="finish",
+    if request.path == "/":
+        if flags["needs_migration"]:
+            return redirect(
+                url_for(
+                    "capability_startup_transition_web.onboarding",
+                    step="finish",
+                )
             )
-        )
-    return redirect(url_for("capability_startup_transition_web.onboarding"))
+        return redirect(url_for("capability_startup_transition_web.onboarding"))
+
+    # Existing deep links retain their own compatibility gates. Their redirects
+    # eventually reach /startup, where CFI-6 selects onboarding unless the
+    # operator explicitly requested the legacy fallback.
+    return None
 
 
 @capability_startup_transition_web.get("/onboarding", strict_slashes=False)
