@@ -246,7 +246,7 @@ def test_preflight_delegates_only_to_selected_physical_role(
     monkeypatch.setattr(
         readiness,
         "probe_ollama",
-        lambda: {"service": "ollama", "reachable": True, "private_endpoint_persisted": False},
+        lambda: {"service": "ollama", "reachable": True, "target_model_present": True, "private_endpoint_persisted": False},
     )
     monkeypatch.setattr(
         readiness,

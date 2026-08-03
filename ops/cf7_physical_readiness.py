@@ -64,7 +64,7 @@ _IPV4_RE = re.compile(
 _WINDOWS_PATH_RE = re.compile(r"(?i)\b[a-z]:[\\/][^\r\n\t]+")
 _TOKEN_RE = re.compile(
     r"(?i)\b(?:authorization|bearer|token|password|secret|"
-    r"private[_-]?key)\b\s*[:=]\s*[^\s,;]+"
+    r"private[_-]?key)\b\s*[:=]\s*(?:bearer\s+)?[^\s,;]+"
 )
 
 
