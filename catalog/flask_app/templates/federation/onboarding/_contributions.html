@@ -13,8 +13,8 @@
           </div>
         </header>
 
-        {% if contribution_summary.state != 'complete' or not vm.contributions %}
-        <p class="federation-notice">Contributions remain blocked until the required onboarding evidence and an explicit supported choice are available.</p>
+        {% if contribution_summary.state not in ['complete', 'pending'] %}
+        <p class="federation-notice">Complete the required inspection and benchmark review before enabling a contribution.</p>
         {% endif %}
 
         {% if vm.contributions %}
@@ -32,10 +32,18 @@
         {% else %}
         <div class="federation-empty-state" role="status">
           <h4>{{ contribution_summary.label }}</h4>
-          <p>MSH did not find a supported contribution candidate, or this step is waiting for an earlier onboarding action.</p>
+          {% if contribution_summary.state == 'complete' %}
+          <p>This device has no configured service to contribute. It can still use MSH as a workbench and join the federation.</p>
+          {% else %}
+          <p>Configure an Ollama model, MTConnect source, registered compute handler, or storage candidate before enabling a contribution.</p>
+          <a class="federation-button federation-button--secondary" href="/startup">Configure this device</a>
+          {% endif %}
         </div>
         <div class="onboarding-actions">
           <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
+          {% if contribution_summary.state == 'complete' %}
+          <a class="federation-button federation-button--primary" href="/onboarding?step=finish">Continue to Finish</a>
+          {% endif %}
         </div>
         {% endif %}
 
