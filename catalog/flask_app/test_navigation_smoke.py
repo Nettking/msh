@@ -4,6 +4,7 @@ from dataclasses import replace
 from pathlib import Path
 
 from catalog.flask_app import app as app_module
+from catalog.flask_app import capability_startup_transition_routes as transition_routes
 from catalog.flask_app import routes as routes_module
 from catalog.flask_app.app import create_app
 from catalog.flask_app.services.server_setup_service import default_settings
@@ -78,6 +79,44 @@ class FakeSetupDiscovery:
         return "192.168.200.0/24"
 
 
+class FakeStartupTransition:
+    def __init__(self, settings) -> None:
+        self.settings = settings
+
+    def capability_flags(self) -> dict[str, object]:
+        complete = bool(
+            self.settings.configured and self.settings.user_setup_complete
+        )
+        mode = self.settings.deployment_mode
+        recorder = complete and mode in {"full-server", "recorder-only"}
+        workbench = complete and mode not in {
+            "recorder-only",
+            "language-model-provider",
+        }
+        runtime = complete and mode in {"full-server", "web-workbench"}
+        language_model = complete and (
+            mode in {
+                "full-server",
+                "web-workbench",
+                "web-ui-only",
+                "language-model-provider",
+            }
+            and self.settings.ai_enabled
+        )
+        return {
+            "workbench": workbench,
+            "runtime": runtime,
+            "recorder": recorder,
+            "language_model": language_model,
+            "compute": False,
+            "storage": False,
+            "completed": complete,
+            "needs_migration": False,
+            "source": "capability-first" if complete else "unconfigured",
+            "state": object() if complete else None,
+        }
+
+
 def _patch_runtime(monkeypatch, *, requires_choice: bool = False) -> None:
     manager = FakeRuntimeManager(requires_choice=requires_choice)
     monkeypatch.setattr(app_module, "get_runtime_manager", lambda: manager)
@@ -92,7 +131,22 @@ def _patch_setup(monkeypatch, settings=None) -> None:
 
     monkeypatch.setattr(app_module, "load_settings", load_configured_settings)
     monkeypatch.setattr(routes_module, "load_settings", load_configured_settings)
-    monkeypatch.setattr("catalog.flask_app.server_setup_routes.load_settings", load_configured_settings)
+    monkeypatch.setattr(
+        "catalog.flask_app.server_setup_routes.load_settings",
+        load_configured_settings,
+    )
+    transition = FakeStartupTransition(configured_settings)
+    monkeypatch.setattr(
+        transition_routes,
+        "get_capability_startup_transition_service",
+        lambda: transition,
+    )
+
+
+def _open_returning_device(client) -> None:
+    landing = client.get("/")
+    assert landing.status_code == 302
+    assert landing.location == "/federation"
 
 
 def test_main_navigation_pages_load(monkeypatch, tmp_path):
@@ -103,13 +157,17 @@ def test_main_navigation_pages_load(monkeypatch, tmp_path):
     app = create_app()
     app.config.update(TESTING=True)
     client = app.test_client()
+    _open_returning_device(client)
 
     pages = [
         ("/", "Overview"),
         ("/guide", "How to use MSH"),
         ("/get-started", "What do you want to do first?"),
-        ("/startup", "MSH is ready"),
-        ("/startup?edit=1&step=ai", "Language-model capability"),
+        ("/startup?legacy=1", "MSH is ready"),
+        (
+            "/startup?legacy=1&edit=1&step=ai",
+            "Language-model capability",
+        ),
         ("/sources/", "Sources"),
         ("/status", "Diagnostics"),
         ("/operator-strategies", "Knowledge workspace"),
@@ -146,7 +204,10 @@ def test_get_started_is_a_focused_task_handoff(monkeypatch, tmp_path):
     assert "Full workbench" in html
 
 
-def test_main_pages_include_mobile_navigation_but_setup_does_not(monkeypatch, tmp_path):
+def test_main_pages_include_mobile_navigation_but_setup_does_not(
+    monkeypatch,
+    tmp_path,
+):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup(monkeypatch)
@@ -154,9 +215,10 @@ def test_main_pages_include_mobile_navigation_but_setup_does_not(monkeypatch, tm
     app = create_app()
     app.config.update(TESTING=True)
     client = app.test_client()
+    _open_returning_device(client)
 
     overview = client.get("/").get_data(as_text=True)
-    setup = client.get("/startup?edit=1").get_data(as_text=True)
+    setup = client.get("/startup?legacy=1&edit=1").get_data(as_text=True)
 
     assert 'data-mobile-navigation' in overview
     assert 'aria-label="Mobile primary sections"' in overview
@@ -172,6 +234,7 @@ def test_knowledge_navigation_opens_a_choice_page(monkeypatch, tmp_path):
     app = create_app()
     app.config.update(TESTING=True)
     client = app.test_client()
+    _open_returning_device(client)
 
     overview_html = client.get("/").get_data(as_text=True)
     knowledge_response = client.get("/operator-strategies")
@@ -226,11 +289,12 @@ def test_recorder_setup_contains_inline_discovery_and_role_scoped_saved_view(
     app.config.update(TESTING=True)
     client = app.test_client()
 
-    edit_html = client.get("/startup?edit=1&step=recorder").get_data(
-        as_text=True
-    )
-    saved_response = client.get("/startup")
+    edit_html = client.get(
+        "/startup?legacy=1&edit=1&step=recorder"
+    ).get_data(as_text=True)
+    saved_response = client.get("/startup?legacy=1")
     status_html = client.get("/status").get_data(as_text=True)
+    first_workbench_response = client.get("/")
     workbench_response = client.get("/")
     guide_response = client.get("/guide")
 
@@ -258,6 +322,8 @@ def test_recorder_setup_contains_inline_discovery_and_role_scoped_saved_view(
     assert "Open source inventory" not in status_html
     assert "Open control" not in status_html
     assert "Stop recording" not in edit_html
+    assert first_workbench_response.status_code == 302
+    assert first_workbench_response.location == "/federation"
     assert workbench_response.status_code == 302
     assert workbench_response.location == "/status"
     assert guide_response.status_code == 200
@@ -286,7 +352,9 @@ def test_malformed_saved_discovery_results_do_not_break_setup(
     app = create_app()
     app.config.update(TESTING=True)
 
-    response = app.test_client().get("/startup?edit=1&step=recorder")
+    response = app.test_client().get(
+        "/startup?legacy=1&edit=1&step=recorder"
+    )
 
     assert response.status_code == 200
 
@@ -303,7 +371,7 @@ def test_web_workbench_hides_recorder_only_saved_options(
     app.config.update(TESTING=True)
     client = app.test_client()
 
-    saved_html = client.get("/startup").get_data(as_text=True)
+    saved_html = client.get("/startup?legacy=1").get_data(as_text=True)
     status_html = client.get("/status").get_data(as_text=True)
 
     assert "<h4>Language-model provider</h4>" in saved_html
@@ -328,9 +396,12 @@ def test_web_ui_only_does_not_require_a_runtime_start_choice(
     app.config.update(TESTING=True)
     client = app.test_client()
 
+    first_overview_response = client.get("/")
     overview_response = client.get("/")
-    saved_html = client.get("/startup").get_data(as_text=True)
+    saved_html = client.get("/startup?legacy=1").get_data(as_text=True)
 
+    assert first_overview_response.status_code == 302
+    assert first_overview_response.location == "/federation"
     assert overview_response.status_code == 200
     assert "Resume session" not in saved_html
     assert "Open overview" in saved_html
