@@ -24,4 +24,6 @@ At least one of the latter two machines must be a physical Linux host.
 7. Redact the evidence before final validation.
 
 The wrapper result proves readiness only. It does not mark any physical scenario
-passed and it cannot unblock CF8.
+passed and it cannot unblock CF8. The commit used by all three machines must be
+the same final reviewed candidate; do not combine evidence from different
+branch heads.
