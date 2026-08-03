@@ -17,11 +17,12 @@ import re
 import ssl
 import tempfile
 import threading
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Any, Callable, Final
+from typing import Any, Final
 from urllib.parse import urlsplit
 
 from catalog.federation.errors import (

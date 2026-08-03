@@ -73,7 +73,7 @@ def test_pairing_code_rejects_tampering(tmp_path: Path) -> None:
 
 
 def test_pairing_code_expires(tmp_path: Path) -> None:
-    codec, code = _code(tmp_path)
+    _codec, code = _code(tmp_path)
     expired = PairingCodeCodec(clock=lambda: NOW + timedelta(minutes=6))
 
     with pytest.raises(AuthenticationError) as error:
