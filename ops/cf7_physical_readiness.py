@@ -247,7 +247,7 @@ def _http_json(url: str) -> object:
         method="GET",
         headers={"Accept": "application/json"},
     )
-    with urllib.request.urlopen(  # noqa: S310 - explicit operator endpoint
+    with urllib.request.urlopen(
         request,
         timeout=DEFAULT_TIMEOUT_SECONDS,
     ) as response:
@@ -318,7 +318,7 @@ def probe_mtconnect() -> dict[str, object]:
                 method="GET",
                 headers={"Accept": "application/xml,text/xml,*/*"},
             )
-            with urllib.request.urlopen(  # noqa: S310 - operator endpoint
+            with urllib.request.urlopen(
                 request,
                 timeout=DEFAULT_TIMEOUT_SECONDS,
             ) as response:
