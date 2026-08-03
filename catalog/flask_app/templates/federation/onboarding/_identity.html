@@ -20,6 +20,13 @@
         {% if vm.device.notice %}<p class="federation-notice">{{ vm.device.notice }}</p>{% endif %}
         <div class="onboarding-actions">
           <span></span>
+          {% if vm.device.can_create|default(false) %}
+          <form method="post" action="{{ vm.actions.identity_url|default('/onboarding/identity') }}">
+            <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
+            <button class="federation-button federation-button--primary" type="submit">Create stable identity</button>
+          </form>
+          {% else %}
           <button class="federation-button federation-button--primary" type="button" data-next-step>Continue to federation</button>
+          {% endif %}
         </div>
       </section>

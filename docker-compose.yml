@@ -11,9 +11,14 @@ services:
       - MSH_FLASK_SECRET=${MSH_FLASK_SECRET:-msh-dev}
       - MSH_AI_MODEL=${MSH_AI_MODEL:-llama3.2:3b}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
+      - MSH_DEVICE_NAME=${MSH_DEVICE_NAME:-This MSH device}
+      - MSH_FEDERATION_NODE_STATE_DIR=${MSH_FEDERATION_NODE_STATE_DIR:-/app/data/federation/device}
+      - MSH_FEDERATION_ONBOARDING_DATABASE=${MSH_FEDERATION_ONBOARDING_DATABASE:-/app/data/federation/onboarding/onboarding.sqlite3}
+      - MSH_FEDERATION_COORDINATOR_DATABASE=${MSH_FEDERATION_COORDINATOR_DATABASE:-/var/lib/msh-relay/control.sqlite3}
     volumes:
       - ./results:/app/results
       - ./data:/app/data
+      - relay_state:/var/lib/msh-relay
     restart: unless-stopped
 
   ollama:

@@ -10,6 +10,7 @@ from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
 from .ai_routes import ai_web
+from .capability_onboarding_routes import capability_onboarding_web
 from .docs_routes import docs_web
 from .federation_routes import federation_web
 from .operator_strategy_routes import operator_strategy_web
@@ -34,6 +35,33 @@ from .source_routes import source_web
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["SECRET_KEY"] = os.getenv("MSH_FLASK_SECRET", "msh-dev")
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_IDENTITY_DIRECTORY",
+        os.getenv(
+            "MSH_FEDERATION_NODE_STATE_DIR",
+            "data/federation/device",
+        ),
+    )
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_STATE_DATABASE",
+        os.getenv(
+            "MSH_FEDERATION_ONBOARDING_DATABASE",
+            "data/federation/onboarding/onboarding.sqlite3",
+        ),
+    )
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_COORDINATOR_DATABASE",
+        os.getenv(
+            "MSH_FEDERATION_COORDINATOR_DATABASE",
+            "data/federation/relay/control.sqlite3",
+        ),
+    )
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_DEVICE_NAME",
+        os.getenv("MSH_DEVICE_NAME", "This MSH device"),
+    )
+    app.config.setdefault("CAPABILITY_ONBOARDING_DISCOVERY_SOURCES", ())
+
     catalog = ArtifactCatalog()
     app.config["ARTIFACT_CATALOG"] = catalog
 
@@ -76,10 +104,12 @@ def create_app() -> Flask:
     )
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
-    # Read-only surfaces are registered before the main web blueprint so their
-    # GET/HEAD hooks can run without changing the legacy startup gate.
+    # Read-only and capability-onboarding surfaces are registered before the
+    # legacy setup/runtime gates. CFI-2 reuses existing authorities and leaves
+    # the role-first fallback unchanged.
     app.register_blueprint(docs_web)
     app.register_blueprint(federation_web)
+    app.register_blueprint(capability_onboarding_web)
     app.register_blueprint(server_setup_web)
     app.register_blueprint(web)
     app.register_blueprint(source_web)

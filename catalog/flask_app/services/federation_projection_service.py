@@ -21,6 +21,11 @@ from catalog.federation.projections import (
     StorageAuthorityAdapter,
 )
 
+from .capability_onboarding_service import (
+    AuthorizedOnboardingContext,
+    get_capability_onboarding_service,
+)
+
 _OPERATOR_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
 _INSPECTION_CONFIG_KEY = "FEDERATION_DEVICE_INSPECTION"
 _CANDIDATES_CONFIG_KEY = "FEDERATION_CONTRIBUTION_CANDIDATES"
@@ -59,38 +64,62 @@ def _empty_service() -> FederationProjectionService:
     return FederationProjectionService(ProjectionAdapters())
 
 
-def get_federation_projection_service() -> FederationProjectionService:
-    """Build the overview projection from server-bound, read-only authorities.
+def _onboarding_context() -> AuthorizedOnboardingContext | None:
+    try:
+        return get_capability_onboarding_service().authorized_context()
+    except Exception:  # noqa: BLE001 - projection authorization fails closed
+        return None
 
-    The existing provider operator surface is the authorization boundary. Its
-    view is resolved before any session-scoped authority is consulted. Request
-    parameters are never accepted as actor or session context.
+
+def get_federation_projection_service() -> FederationProjectionService:
+    """Build the overview projection from server-bound authorities.
+
+    The existing provider operator surface remains the preferred authorization
+    boundary. CFI-2 adds a fallback only when a durable device identity and
+    trusted federation binding can be revalidated against the same existing
+    ``SessionCoordinator`` authority. Request parameters are never accepted as
+    actor or session context.
     """
 
     surface = current_app.config.get(_OPERATOR_SURFACE_CONFIG_KEY)
-    if not isinstance(surface, ProviderOperatorSurface):
-        return _empty_service()
+    binding: object | None = None
+    provider_adapter: ProviderOperatorAdapter | None = None
+    coordinator: object | None = None
+    internal_session_id: str | None = None
+    actor_node_id: str | None = None
 
     try:
-        authorized_view = surface.view()
-        internal_session_id = _private_binding_text(
-            getattr(authorized_view, "session_id", None)
-        )
-        actor_node_id = _private_binding_text(
-            getattr(authorized_view, "actor_node_id", None)
-        )
-        if internal_session_id is None or actor_node_id is None:
-            return _empty_service()
-
-        federation_id = federation_id_from_session_id(internal_session_id)
-        binding = SimpleNamespace(
-            federation_id=federation_id,
-            device_id=actor_node_id,
-            state="connected",
-            trusted=True,
-        )
-        enrollment = getattr(surface, "enrollment", None)
-        coordinator = getattr(enrollment, "coordinator", None)
+        if isinstance(surface, ProviderOperatorSurface):
+            authorized_view = surface.view()
+            internal_session_id = _private_binding_text(
+                getattr(authorized_view, "session_id", None)
+            )
+            actor_node_id = _private_binding_text(
+                getattr(authorized_view, "actor_node_id", None)
+            )
+            if internal_session_id is None or actor_node_id is None:
+                return _empty_service()
+            binding = SimpleNamespace(
+                federation_id=federation_id_from_session_id(
+                    internal_session_id
+                ),
+                device_id=actor_node_id,
+                state="connected",
+                trusted=True,
+            )
+            enrollment = getattr(surface, "enrollment", None)
+            coordinator = getattr(enrollment, "coordinator", None)
+            provider_adapter = ProviderOperatorAdapter(
+                _AuthorizedProviderView(authorized_view)
+            )
+        else:
+            context = _onboarding_context()
+            if context is None:
+                return _empty_service()
+            binding = context.binding
+            internal_session_id = context.binding.internal_session_id
+            actor_node_id = context.credentials.identity.node_id
+            coordinator = context.coordinator
 
         benchmark_store = current_app.config.get(_BENCHMARK_STORE_CONFIG_KEY)
         storage_store = current_app.config.get(_STORAGE_STORE_CONFIG_KEY)
@@ -105,9 +134,7 @@ def get_federation_projection_service() -> FederationProjectionService:
                 candidates=_configured_items(_CANDIDATES_CONFIG_KEY),
                 intents=_configured_items(_INTENTS_CONFIG_KEY),
             ),
-            providers=ProviderOperatorAdapter(
-                _AuthorizedProviderView(authorized_view)
-            ),
+            providers=provider_adapter,
             benchmarks=BenchmarkResultsAdapter(benchmark_store),
             federation=FederationAuthorityAdapter(
                 coordinator,

@@ -1,0 +1,103 @@
+name: CFI-2 capability onboarding composition
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cfi2-onboarding-composition.yml"
+      - "docker-compose.yml"
+      - "catalog/flask_app/app.py"
+      - "catalog/flask_app/capability_onboarding_routes.py"
+      - "catalog/flask_app/services/capability_onboarding_service.py"
+      - "catalog/flask_app/services/federation_projection_service.py"
+      - "catalog/flask_app/templates/onboarding.html"
+      - "catalog/flask_app/templates/federation/onboarding/**"
+      - "catalog/flask_app/static/css/federation.css"
+      - "catalog/flask_app/static/js/onboarding.js"
+      - "catalog/flask_app/tests/test_capability_onboarding_route.py"
+      - "catalog/federation/onboarding_models.py"
+      - "catalog/federation/onboarding_compat.py"
+      - "catalog/federation/onboarding_discovery/**"
+  push:
+    branches:
+      - main
+      - "agent/cfi2-*"
+    paths:
+      - ".github/workflows/cfi2-onboarding-composition.yml"
+      - "docker-compose.yml"
+      - "catalog/flask_app/app.py"
+      - "catalog/flask_app/capability_onboarding_routes.py"
+      - "catalog/flask_app/services/capability_onboarding_service.py"
+      - "catalog/flask_app/services/federation_projection_service.py"
+      - "catalog/flask_app/templates/onboarding.html"
+      - "catalog/flask_app/templates/federation/onboarding/**"
+      - "catalog/flask_app/static/css/federation.css"
+      - "catalog/flask_app/static/js/onboarding.js"
+      - "catalog/flask_app/tests/test_capability_onboarding_route.py"
+      - "catalog/federation/onboarding_models.py"
+      - "catalog/federation/onboarding_compat.py"
+      - "catalog/federation/onboarding_discovery/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cfi2-onboarding-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  onboarding:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile CFI-2 composition
+        run: >-
+          python -m compileall -q
+          catalog/flask_app/capability_onboarding_routes.py
+          catalog/flask_app/services/capability_onboarding_service.py
+          catalog/flask_app/services/federation_projection_service.py
+          catalog/flask_app/tests/test_capability_onboarding_route.py
+      - name: Run CFI-2 and affected regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_capability_onboarding_route.py
+          catalog/federation/tests/test_onboarding_contracts.py
+          catalog/federation/tests/test_onboarding_discovery_service.py
+          catalog/flask_app/tests/test_cf5_ui_shell.py
+          catalog/flask_app/tests/test_federation_overview_route.py
+          catalog/federation/tests/test_federation_projections.py
+          catalog/flask_app/tests/test_post_setup_handoff.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+      - name: Validate Compose configuration
+        run: docker compose config
+      - name: Ruff CFI-2 composition
+        run: >-
+          python -m ruff check
+          catalog/flask_app/app.py
+          catalog/flask_app/capability_onboarding_routes.py
+          catalog/flask_app/services/capability_onboarding_service.py
+          catalog/flask_app/services/federation_projection_service.py
+          catalog/flask_app/tests/test_capability_onboarding_route.py
+      - name: Diff hygiene
+        shell: bash
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git diff --check "origin/${{ github.base_ref }}...HEAD"
+          else
+            git diff --check HEAD^ HEAD
+          fi

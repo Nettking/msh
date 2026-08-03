@@ -13,14 +13,20 @@ on:
       - "catalog/capabilities/contributions/**"
       - "catalog/federation/projections/**"
       - "catalog/flask_app/app.py"
+      - "catalog/flask_app/capability_onboarding_routes.py"
       - "catalog/flask_app/federation_routes.py"
+      - "catalog/flask_app/services/capability_onboarding_service.py"
       - "catalog/flask_app/services/federation_projection_service.py"
+      - "catalog/flask_app/templates/onboarding.html"
       - "catalog/flask_app/templates/federation_overview.html"
+      - "catalog/flask_app/templates/federation/onboarding/**"
+      - "catalog/flask_app/tests/test_capability_onboarding_route.py"
       - "catalog/flask_app/tests/test_federation_overview_route.py"
   push:
     branches:
       - main
       - "agent/cf7a-*"
+      - "agent/cfi2-*"
     paths:
       - ".github/workflows/cf7-acceptance-harness.yml"
       - "catalog/federation/tests/cf7_acceptance/**"
@@ -32,9 +38,14 @@ on:
       - "catalog/capabilities/contributions/**"
       - "catalog/federation/projections/**"
       - "catalog/flask_app/app.py"
+      - "catalog/flask_app/capability_onboarding_routes.py"
       - "catalog/flask_app/federation_routes.py"
+      - "catalog/flask_app/services/capability_onboarding_service.py"
       - "catalog/flask_app/services/federation_projection_service.py"
+      - "catalog/flask_app/templates/onboarding.html"
       - "catalog/flask_app/templates/federation_overview.html"
+      - "catalog/flask_app/templates/federation/onboarding/**"
+      - "catalog/flask_app/tests/test_capability_onboarding_route.py"
       - "catalog/flask_app/tests/test_federation_overview_route.py"
 
 permissions:
@@ -51,7 +62,7 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
         with:
@@ -65,10 +76,13 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -c constraints-phase2.txt
           python -m pip install pytest ruff
-      - name: Compile CF7-A harness
+      - name: Compile CF7-A and CFI-2 harness files
         run: >-
           python -m compileall -q
           catalog/federation/tests/cf7_acceptance
+          catalog/flask_app/capability_onboarding_routes.py
+          catalog/flask_app/services/capability_onboarding_service.py
+          catalog/flask_app/tests/test_capability_onboarding_route.py
       - name: Parse scenario manifest
         run: >-
           python -c "import json, pathlib;
@@ -81,8 +95,12 @@ jobs:
           assert manifest['federation_v1_end_to_end_accepted'] is False;
           assert manifest['capability_first_onboarding_end_to_end_accepted'] is False;
           assert 'cfi1.read-only-federation-overview-route' in executable;
+          assert 'cfi2.existing-federation-discovery-and-verified-join' in executable;
+          assert 'cfi2.no-candidate-local-federation-creation' in executable;
+          assert 'cfi2.returning-device-startup-reconnect' in executable;
           assert 'cf2b.isolated-concrete-benchmark-adapters' in executable;
           assert 'product.benchmark-run-skip-rerun-through-flask-onboarding' in blocked;
+          assert 'product.complete-capability-first-end-to-end-acceptance' in blocked;
           assert 'physical.mobile-and-desktop-browser-review' in manual"
       - name: Run CF7-A harness scenarios
         run: >-
@@ -117,6 +135,10 @@ jobs:
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_federation_overview_route.py
+      - name: Run CFI-2 onboarding composition regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_capability_onboarding_route.py
       - name: Run CF6 projection regressions
         run: >-
           python -m pytest -o addopts= -q
@@ -125,10 +147,13 @@ jobs:
         run: >-
           python -m pytest -o addopts= -q
           catalog/federation/tests/test_phase2_unit.py
-      - name: Ruff CF7-A harness
+      - name: Ruff CF7-A and CFI-2 files
         run: >-
           python -m ruff check
           catalog/federation/tests/cf7_acceptance
+          catalog/flask_app/capability_onboarding_routes.py
+          catalog/flask_app/services/capability_onboarding_service.py
+          catalog/flask_app/tests/test_capability_onboarding_route.py
       - name: Diff hygiene
         shell: bash
         run: |
