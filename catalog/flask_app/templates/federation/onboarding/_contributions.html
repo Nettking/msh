@@ -1,3 +1,4 @@
+      {% set contribution_summary = vm.contribution_summary|default({'state': 'blocked', 'label': 'Contributions remain blocked', 'can_reconcile': false}) %}
       <section class="onboarding-panel" data-step-panel="contributions" aria-labelledby="contributions-heading">
         <header class="onboarding-panel__header">
           <div>
@@ -6,10 +7,14 @@
             <p>Enable any suitable combination. Each choice is independent and can be changed later.</p>
           </div>
           <div>
-            {{ status_badge(vm.contribution_summary.state, vm.contribution_summary.label, True) }}
+            {{ status_badge(contribution_summary.state, contribution_summary.label, True) }}
             <span class="federation-selection-count" data-selection-count aria-live="polite"></span>
           </div>
         </header>
+
+        {% if contribution_summary.state != 'complete' or not vm.contributions %}
+        <p class="federation-notice">Contributions remain blocked until the required onboarding evidence and an explicit supported choice are available.</p>
+        {% endif %}
 
         {% if vm.contributions %}
         <form method="post" action="{{ vm.actions.contributions_url }}" data-contribution-form>
@@ -25,7 +30,7 @@
         </form>
         {% else %}
         <div class="federation-empty-state" role="status">
-          <h4>{{ vm.contribution_summary.label }}</h4>
+          <h4>{{ contribution_summary.label }}</h4>
           <p>MSH did not find a supported contribution candidate, or this step is waiting for an earlier onboarding action.</p>
         </div>
         <div class="onboarding-actions">
@@ -33,7 +38,7 @@
         </div>
         {% endif %}
 
-        {% if vm.contribution_summary.can_reconcile %}
+        {% if contribution_summary.can_reconcile %}
         <form method="post" action="{{ vm.actions.reconcile_contributions_url }}" class="onboarding-actions">
           {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
           {% if vm.command_id %}<input type="hidden" name="command_id" value="{{ vm.command_id }}">{% endif %}
