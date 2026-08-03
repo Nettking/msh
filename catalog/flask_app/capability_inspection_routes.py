@@ -20,6 +20,7 @@ from catalog.federation.errors import (
     FederationValidationError,
     ProtocolCompatibilityError,
 )
+from catalog.federation.onboarding_models import DeviceInspectionSnapshot
 from catalog.node.identity import NodeIdentityStateError
 
 from .capability_onboarding_routes import (
@@ -69,7 +70,15 @@ def _inspection_message(exc: BaseException) -> str:
     )
 
 
-def _render_onboarding_with_inspection() -> Response:
+def _build_onboarding_with_inspection_view_model() -> tuple[
+    dict[str, object],
+    DeviceInspectionSnapshot | None,
+    bool,
+    str | None,
+    str | None,
+]:
+    """Build the CFI-2/CFI-3 view state for later bounded integrations."""
+
     onboarding_service = get_capability_onboarding_service()
     inspection_service = get_capability_inspection_service()
     credentials = None
@@ -162,6 +171,19 @@ def _render_onboarding_with_inspection() -> Response:
         requested_step=requested_step,
         error_reason=inspection_reason,
     )
+    return (
+        view_model,
+        inspection_snapshot,
+        connected_binding is not None,
+        requested_step,
+        inspection_reason,
+    )
+
+
+def _render_onboarding_with_inspection() -> Response:
+    view_model, _snapshot, _connected, _step, _reason = (
+        _build_onboarding_with_inspection_view_model()
+    )
     return _secure_response(
         render_template("onboarding.html", onboarding=view_model)
     )
@@ -230,4 +252,7 @@ def inspect_device() -> Response:
     )
 
 
-__all__ = ["capability_inspection_web"]
+__all__ = [
+    "_build_onboarding_with_inspection_view_model",
+    "capability_inspection_web",
+]
