@@ -18,6 +18,7 @@ from .capability_startup_transition_routes import (
     capability_startup_transition_web,
 )
 from .docs_routes import docs_web
+from .federation_pairing_routes import federation_pairing_web
 from .federation_routes import federation_web
 from .operator_strategy_routes import operator_strategy_web
 from .operator_support_routes import operator_support_web
@@ -28,6 +29,7 @@ from .services.capability_startup_transition_service import (
     get_capability_startup_transition_service,
 )
 from .services.catalog_service import ArtifactCatalog
+from .services.federation_pairing_install import install_federation_pairing
 from .services.onboarding_view_normalizer import normalize_onboarding_view_model
 from .services.recorder_control_service import get_recorder_control_service
 from .services.server_setup_service import (
@@ -95,6 +97,16 @@ def create_app() -> Flask:
     app.config.setdefault("CAPABILITY_ONBOARDING_CONTRIBUTION_SOURCES", None)
     app.config.setdefault("CAPABILITY_ONBOARDING_CONTRIBUTION_ADAPTERS", None)
     app.config.setdefault(
+        "CAPABILITY_ONBOARDING_PAIRING_RELAY_URL",
+        os.getenv("MSH_PAIRING_RELAY_URL", ""),
+    )
+    remote_pairing_path = os.getenv("MSH_FEDERATION_REMOTE_PAIRING_PATH", "")
+    if remote_pairing_path:
+        app.config.setdefault(
+            "CAPABILITY_ONBOARDING_REMOTE_PAIRING_PATH",
+            remote_pairing_path,
+        )
+    app.config.setdefault(
         "CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS",
         int(os.getenv("MSH_INSPECTION_TTL_SECONDS", "900")),
     )
@@ -105,6 +117,7 @@ def create_app() -> Flask:
     app.jinja_env.globals["normalize_onboarding_view_model"] = (
         normalize_onboarding_view_model
     )
+    install_federation_pairing(app)
 
     catalog = ArtifactCatalog()
     app.config["ARTIFACT_CATALOG"] = catalog
@@ -153,6 +166,7 @@ def create_app() -> Flask:
     # delegates every operational authority to the already registered services.
     app.register_blueprint(docs_web)
     app.register_blueprint(federation_web)
+    app.register_blueprint(federation_pairing_web)
     app.register_blueprint(capability_startup_transition_web)
     app.register_blueprint(capability_contribution_web)
     app.register_blueprint(capability_benchmark_web)
