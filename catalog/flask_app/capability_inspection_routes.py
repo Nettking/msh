@@ -193,9 +193,21 @@ def inspect_device() -> Response:
         snapshot = get_capability_inspection_service().run()
     except AuthorizationError as exc:
         return _safe_error_response(exc.code, 403)
+    except FederationOperationError as exc:
+        if (
+            exc.code == "inspection-federation-required"
+            and get_capability_onboarding_service().identity_or_none() is not None
+        ):
+            return _secure_response(
+                (
+                    "This step remains blocked until this device has a trusted "
+                    "federation connection."
+                ),
+                409,
+            )
+        flash(_inspection_message(exc), "error")
     except (
         AuthenticationError,
-        FederationOperationError,
         FederationValidationError,
         ProtocolCompatibilityError,
         NodeIdentityStateError,
