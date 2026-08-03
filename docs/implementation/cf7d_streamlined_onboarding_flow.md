@@ -69,6 +69,15 @@ the CFI-6 onboarding gate and the complete CF7-B acceptance gate on Ubuntu and
 Windows. The current branch head adds documentation only on top of that tested
 implementation.
 
+## Browser retest
+
+Pull the latest `agent/cf7d-streamlined-onboarding-flow`, rebuild the existing
+Compose deployment and hard-refresh `/federation`. A connected installation
+without inspection should show **Connected**, **1 connected now**, **0 results / Not
+run**, and one **Open inspection** action. The generic degraded warning should
+not appear merely because optional service, storage or job authorities are
+empty.
+
 ## Boundaries
 
 These changes do not alter Federation authority, membership, discovery,
