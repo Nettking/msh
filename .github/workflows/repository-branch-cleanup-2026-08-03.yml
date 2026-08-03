@@ -1,0 +1,108 @@
+name: One-time repository branch cleanup 2026-08-03
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - ".github/workflows/repository-branch-cleanup-2026-08-03.yml"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  delete-retired-branches:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'agent/repository-branch-cleanup-2026-08-03' &&
+      github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify main and delete authorized refs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const expectedMain = 'f580c71f7269643a077cc7e7db8ba9bf6050bb6a';
+            const cleanupBranch = 'agent/repository-branch-cleanup-2026-08-03';
+            const retainedBranches = new Set([
+              'main',
+              'agent/plan-method-osl-msh-alignment',
+              cleanupBranch,
+            ]);
+            const branches = [
+              'agent/capability-first-onboarding-plan',
+              'agent/capability-first-reality-audit',
+              'agent/cf1-onboarding-contracts',
+              'agent/cf2-benchmark-engine',
+              'agent/cf2-concrete-benchmark-adapters',
+              'agent/cf3-federation-discovery',
+              'agent/cf4-contribution-service',
+              'agent/cf5-ui-shell',
+              'agent/cf6-federation-projections',
+              'agent/cf7a-acceptance-harness',
+              'agent/cfi1-read-only-federation-overview',
+              'agent/cfi2-onboarding-federation-composition',
+              'agent/integrated-docs-viewer',
+              'agent/phase-f81-provider-enrollment',
+              'agent/phase-f82-provider-health-sync',
+              'agent/phase-f83-remote-ai-binding',
+              'agent/phase-f84-compute-worker-activation',
+              'agent/phase-f85-operator-federation-surface',
+              'agent/phase-f86-reconnect-reconciliation',
+              'agent/phase-f87-f8-closeout',
+              'agent/plan-method-osl-msh-alignment-2',
+            ];
+
+            const { owner, repo } = context.repo;
+            const main = await github.rest.git.getRef({ owner, repo, ref: 'heads/main' });
+            if (main.data.object.sha !== expectedMain) {
+              core.setFailed(`main moved: expected ${expectedMain}, got ${main.data.object.sha}`);
+              return;
+            }
+
+            for (const branch of branches) {
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+                await github.rest.git.deleteRef({ owner, repo, ref: `heads/${branch}` });
+                core.info(`deleted ${branch}`);
+              } catch (error) {
+                if (error.status === 404) {
+                  core.info(`already absent ${branch}`);
+                  continue;
+                }
+                throw error;
+              }
+            }
+
+            const refs = await github.paginate(github.rest.git.listMatchingRefs, {
+              owner,
+              repo,
+              ref: 'heads/',
+              per_page: 100,
+            });
+            const remaining = refs.map((ref) => ref.ref.replace('refs/heads/', '')).sort();
+            const unexpected = remaining.filter((branch) => !retainedBranches.has(branch));
+            if (unexpected.length) {
+              core.setFailed(`unexpected branches remain: ${unexpected.join(', ')}`);
+              return;
+            }
+            for (const branch of retainedBranches) {
+              if (!remaining.includes(branch)) {
+                core.setFailed(`expected retained branch is missing: ${branch}`);
+                return;
+              }
+            }
+
+            const mainAfter = await github.rest.git.getRef({ owner, repo, ref: 'heads/main' });
+            if (mainAfter.data.object.sha !== expectedMain) {
+              core.setFailed(`main changed during cleanup: ${mainAfter.data.object.sha}`);
+              return;
+            }
+
+            await github.rest.git.deleteRef({
+              owner,
+              repo,
+              ref: `heads/${cleanupBranch}`,
+            });
+            core.info('deleted temporary cleanup runner branch');
