@@ -1,0 +1,72 @@
+name: Apply CF7-G compatibility fixes
+
+on:
+  push:
+    branches:
+      - agent/cf7g-fast-federation-onboarding
+
+permissions:
+  contents: write
+
+jobs:
+  apply-and-validate:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: agent/cf7g-fast-federation-onboarding
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+      - name: Apply compatibility fixes
+        run: python tools/apply_cf7g_compatibility_fixes.py
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile changed files
+        run: |
+          python -m compileall -q \
+            catalog/flask_app/capability_startup_transition_routes.py \
+            catalog/flask_app/services/capability_startup_transition_service.py \
+            catalog/flask_app/tests/test_capability_startup_transition_route.py
+      - name: Run CFI-6 and affected regressions
+        run: |
+          python -m pytest -o addopts= -q \
+            catalog/flask_app/tests/test_capability_startup_transition_route.py \
+            catalog/flask_app/tests/test_streamlined_onboarding_flow.py \
+            catalog/flask_app/tests/test_fast_federation_onboarding.py \
+            catalog/flask_app/tests/test_functional_onboarding_progress.py \
+            catalog/flask_app/tests/test_capability_contribution_route.py \
+            catalog/flask_app/tests/test_capability_benchmark_route.py \
+            catalog/flask_app/tests/test_capability_inspection_route.py \
+            catalog/flask_app/tests/test_capability_onboarding_route.py \
+            catalog/flask_app/tests/test_federation_pairing_service.py \
+            catalog/flask_app/tests/test_post_setup_handoff.py \
+            catalog/flask_app/tests/test_cf5_ui_shell.py \
+            catalog/flask_app/tests/test_federation_overview_route.py \
+            catalog/federation/tests/test_onboarding_contracts.py \
+            catalog/federation/tests/test_onboarding_discovery_service.py \
+            catalog/capabilities/contributions/tests \
+            catalog/federation/tests/test_federation_projections.py
+      - name: Ruff changed Python
+        run: |
+          ruff check \
+            catalog/flask_app/capability_startup_transition_routes.py \
+            catalog/flask_app/services/capability_startup_transition_service.py \
+            catalog/flask_app/tests/test_capability_startup_transition_route.py \
+            catalog/flask_app/tests/test_fast_federation_onboarding.py \
+            catalog/flask_app/tests/test_functional_onboarding_progress.py
+      - name: Commit validated fixes
+        run: |
+          rm tools/apply_cf7g_compatibility_fixes.py
+          rm .github/workflows/cf7g-compatibility-fix.yml
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add -A
+          git commit -m "Keep fast Federation onboarding compatible"
+          git push origin HEAD:agent/cf7g-fast-federation-onboarding
