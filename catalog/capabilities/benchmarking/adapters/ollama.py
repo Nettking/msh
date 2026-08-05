@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import socket
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -77,8 +78,24 @@ def _bounded_json_request(
     try:
         with request.urlopen(probe_request, timeout=timeout_seconds) as response:
             raw = response.read(max_response_bytes + 1)
-    except (error.HTTPError, error.URLError, OSError, TimeoutError) as exc:
-        raise OllamaProbeError("local Ollama probe failed") from exc
+    except error.HTTPError as exc:
+        status = int(getattr(exc, "code", 0) or 0)
+        message = (
+            f"Ollama rejected the bounded request (HTTP {status})"
+            if 400 <= status <= 599
+            else "Ollama rejected the bounded request"
+        )
+        raise OllamaProbeError(message) from exc
+    except (TimeoutError, socket.timeout) as exc:
+        raise OllamaProbeError("Ollama did not respond within the benchmark limit") from exc
+    except error.URLError as exc:
+        if isinstance(getattr(exc, "reason", None), (TimeoutError, socket.timeout)):
+            raise OllamaProbeError(
+                "Ollama did not respond within the benchmark limit"
+            ) from exc
+        raise OllamaProbeError("Ollama service could not be reached") from exc
+    except OSError as exc:
+        raise OllamaProbeError("Ollama service could not be reached") from exc
     if len(raw) > max_response_bytes:
         raise OllamaProbeError("Ollama probe response exceeded its size bound")
     try:
@@ -100,7 +117,7 @@ class OllamaProbeTarget:
     model: str
     service_version: str = "unknown"
     inspection_timeout_seconds: float = 1.0
-    request_timeout_seconds: float = 10.0
+    request_timeout_seconds: float = 120.0
     max_response_bytes: int = MAX_PROBE_RESPONSE_BYTES
 
     def __post_init__(self) -> None:
@@ -137,7 +154,7 @@ class OllamaProbeTarget:
             bounded_seconds(
                 self.request_timeout_seconds,
                 "request_timeout_seconds",
-                maximum=15.0,
+                maximum=120.0,
             ),
         )
         object.__setattr__(
@@ -173,8 +190,8 @@ class OllamaBenchmarkAdapter:
         benchmark_id=OLLAMA_BENCHMARK_ID,
         capability_type="language-model",
         capability_protocol="msh-language-model",
-        implementation_version="1.0.0",
-        max_duration_seconds=15,
+        implementation_version="1.1.0",
+        max_duration_seconds=120,
         max_parallelism=1,
         prerequisites=(OLLAMA_PREREQUISITE,),
         metric_names=(
@@ -303,6 +320,12 @@ class OllamaBenchmarkAdapter:
                 timeout,
                 target.max_response_bytes,
             )
+        except OllamaProbeError as exc:
+            return BenchmarkObservation(
+                state=BenchmarkState.FAILED,
+                recommendation=BenchmarkRecommendation.NOT_RECOMMENDED,
+                diagnostics=(str(exc),),
+            )
         except Exception:  # noqa: BLE001 - inference failures become safe evidence
             return BenchmarkObservation(
                 state=BenchmarkState.FAILED,
@@ -328,11 +351,12 @@ class OllamaBenchmarkAdapter:
         if isinstance(eval_duration, int) and eval_duration > 0 and generated_tokens > 0:
             tokens_per_second = round(generated_tokens / (eval_duration / 1_000_000_000), 3)
         latency = elapsed_ms(started, finished)
-        recommendation = (
-            BenchmarkRecommendation.RECOMMENDED
-            if latency <= 5000
-            else BenchmarkRecommendation.USABLE
-        )
+        if latency <= 5_000:
+            recommendation = BenchmarkRecommendation.RECOMMENDED
+        elif latency <= 30_000:
+            recommendation = BenchmarkRecommendation.USABLE
+        else:
+            recommendation = BenchmarkRecommendation.NOT_RECOMMENDED
         return BenchmarkObservation(
             metrics={
                 "model_available": True,
