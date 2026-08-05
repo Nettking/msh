@@ -1,9 +1,9 @@
 name: Apply CF7-G acceptance update
 
 on:
-  push:
+  pull_request:
     branches:
-      - agent/cf7g-fast-federation-onboarding
+      - agent/cf7f-onboarding-recovery
 
 permissions:
   contents: write
