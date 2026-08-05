@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import socket
 import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
@@ -86,10 +85,10 @@ def _bounded_json_request(
             else "Ollama rejected the bounded request"
         )
         raise OllamaProbeError(message) from exc
-    except (TimeoutError, socket.timeout) as exc:
+    except TimeoutError as exc:
         raise OllamaProbeError("Ollama did not respond within the benchmark limit") from exc
     except error.URLError as exc:
-        if isinstance(getattr(exc, "reason", None), (TimeoutError, socket.timeout)):
+        if isinstance(getattr(exc, "reason", None), TimeoutError):
             raise OllamaProbeError(
                 "Ollama did not respond within the benchmark limit"
             ) from exc
