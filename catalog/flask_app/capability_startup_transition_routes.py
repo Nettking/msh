@@ -130,6 +130,9 @@ def _transition_message(exc: BaseException) -> str:
         "startup-transition-reconnect-required": (
             "Repair the saved federation membership before migrating."
         ),
+        "startup-transition-inspection-required": (
+            "Inspect this device before finishing setup."
+        ),
         "startup-transition-benchmarks-required": (
             "Review the current benchmark evidence before finishing setup."
         ),
@@ -376,10 +379,7 @@ def _run_transition(*, migration: bool) -> Response:
     session.pop(_LEGACY_FALLBACK_SESSION_KEY, None)
     flash(message, "success")
     return redirect(
-        url_for(
-            "capability_startup_transition_web.onboarding",
-            step="finish",
-        ),
+        url_for("federation_web.overview"),
         code=303,
     )
 

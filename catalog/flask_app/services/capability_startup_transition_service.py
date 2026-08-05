@@ -542,6 +542,32 @@ class CapabilityStartupTransitionService:
             return ContributionDesiredState.DISABLED.value
         return ContributionDesiredState.ASK_LATER.value
 
+    @staticmethod
+    def _fast_start_intents() -> dict[str, str]:
+        """Start the workbench without granting optional contribution authority."""
+
+        intents = {
+            key: ContributionDesiredState.ASK_LATER.value
+            for key in CONTRIBUTION_KEYS
+        }
+        intents["workbench"] = ContributionDesiredState.ENABLED.value
+        intents["runtime"] = ContributionDesiredState.ENABLED.value
+        return intents
+
+    def _current_inspection_revision(self, device_id: str) -> int:
+        snapshot = self.inspection_service.load()
+        if (
+            snapshot is None
+            or snapshot.device_id != device_id
+            or self.inspection_service.state(snapshot) != "current"
+        ):
+            raise FederationOperationError(
+                "startup-transition-inspection-required",
+                "run a current device inspection before finishing onboarding",
+                "inspection",
+            )
+        return snapshot.revision
+
     def _current_intents(self) -> dict[str, str]:
         snapshot, complete = self.contribution_service._authorized_snapshot(
             require_benchmark_review=True
@@ -647,7 +673,10 @@ class CapabilityStartupTransitionService:
         if current is not None:
             return current
         context = self._connected_context()
-        intents = self._current_intents()
+        inspection_revision = self._current_inspection_revision(
+            context.credentials.identity.node_id
+        )
+        intents = self._fast_start_intents()
         self._write_compatibility_settings(intents)
         return self.store.save(
             CapabilityStartupState(
@@ -655,9 +684,7 @@ class CapabilityStartupTransitionService:
                 federation_id=context.binding.federation_id,
                 internal_session_id=context.binding.internal_session_id,
                 federation_state=context.binding.state,
-                inspection_revision=self._inspection_revision(
-                    context.credentials.identity.node_id
-                ),
+                inspection_revision=inspection_revision,
                 contribution_intents=intents,
                 completed=True,
                 source_kind="capability-first",
@@ -772,6 +799,20 @@ class CapabilityStartupTransitionService:
             and bool(step.get("available"))
             for step in steps
         )
+        inspection = view_model.get("inspection")
+        fast_finish_available = (
+            isinstance(inspection, Mapping)
+            and inspection.get("state") == "current"
+        )
+        if fast_finish_available and isinstance(steps, list):
+            for step in steps:
+                if isinstance(step, dict) and step.get("key") == "finish":
+                    step.update(
+                        {
+                            "available": True,
+                            "summary": "Ready after inspection",
+                        }
+                    )
         if state is not None and state.completed:
             view_model["overall_state"] = "connected"
             view_model["overall_state_label"] = "Capability-first setup complete"
@@ -834,14 +875,21 @@ class CapabilityStartupTransitionService:
                         )
             if requested_step in {None, "finish"}:
                 view_model["current_step"] = "finish"
-        elif isinstance(finish, dict) and finish_available:
+        elif isinstance(finish, dict) and (
+            finish_available or fast_finish_available
+        ):
             finish.update(
                 {
+                    "title": "Open the Federation workbench",
+                    "message": (
+                        "Benchmarks and service contributions are optional. "
+                        "Finish now and review them later from the Federation page."
+                    ),
                     "state": "pending",
-                    "state_label": "Ready to finish",
+                    "state_label": "Ready after inspection",
                     "transition_action": {
                         "kind": "finish",
-                        "label": "Finish capability-first setup",
+                        "label": "Finish setup and open Federation",
                         "url": "/onboarding/finish",
                     },
                 }

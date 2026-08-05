@@ -1,9 +1,9 @@
       <section class="onboarding-panel" data-step-panel="inspect" aria-labelledby="inspect-heading">
         <header class="onboarding-panel__header">
           <div>
-            <span class="onboarding-panel__step">Step 3 of 6</span>
+            <span class="onboarding-panel__step">Step 3 of 3</span>
             <h3 id="inspect-heading">Inspect this device</h3>
-            <p>Review supported local services and data sources before running any bounded checks.</p>
+            <p>Review supported local services and data sources. Benchmarks and contribution choices can be completed later.</p>
           </div>
           {{ status_badge(vm.inspection.state, vm.inspection.state_label, True) }}
         </header>
@@ -30,16 +30,16 @@
         {% set recommended_checks = vm.inspection.get('recommended_checks', ()) %}
         {% if recommended_checks %}
         <section aria-labelledby="inspection-checks-heading">
-          <h4 id="inspection-checks-heading">Recommended bounded checks</h4>
+          <h4 id="inspection-checks-heading">Optional checks available later</h4>
           <ul class="federation-list">
             {% for check in recommended_checks %}<li><strong>{{ check.label }}</strong><span>{{ check.summary }}</span></li>{% endfor %}
           </ul>
-          <p>These are recommendations only. CFI-3 does not run a benchmark or activate a contribution.</p>
+          <p>These recommendations do not block setup and do not activate a contribution.</p>
         </section>
         {% endif %}
 
         {% if vm.inspection.warnings %}
-        <div class="federation-warning" role="alert"><strong>Review before continuing</strong><ul>{% for warning in vm.inspection.warnings %}<li>{{ warning }}</li>{% endfor %}</ul></div>
+        <div class="federation-warning" role="alert"><strong>Inspection notes</strong><ul>{% for warning in vm.inspection.warnings %}<li>{{ warning }}</li>{% endfor %}</ul></div>
         {% endif %}
 
         {% if vm.inspection.get('can_run', True) %}
@@ -54,6 +54,14 @@
 
         <div class="onboarding-actions">
           <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
-          <button class="federation-button federation-button--primary" type="button" disabled aria-disabled="true">Benchmarks remain blocked</button>
+          {% if vm.inspection.state == 'current' %}
+          <form method="post" action="{{ vm.actions.finish_url }}">
+            {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+            {% if vm.command_id %}<input type="hidden" name="command_id" value="{{ vm.command_id }}">{% endif %}
+            <button class="federation-button federation-button--primary" type="submit">Finish setup and open Federation</button>
+          </form>
+          {% else %}
+          <button class="federation-button federation-button--primary" type="button" disabled aria-disabled="true">Inspect before finishing</button>
+          {% endif %}
         </div>
       </section>
