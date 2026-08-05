@@ -1,146 +1,247 @@
-# Capability-first federation onboarding plan
+# Capability-first Federation implementation and acceptance plan
 
-Status: approved product-direction plan. Implementation has not started.
+Status: **active authoritative plan**.
 
-Baseline: `main` after the integrated `/docs` reader was accepted on the repository owner's laptop.
+Last updated: **2026-08-05 Europe/Oslo**.
 
-## Objective
+Current merged baseline: `main` at `d9d6c895962ccc11de68f04a8ff4414df1681e4b` after PR #185.
 
-Replace the current role-first setup experience with a capability-first onboarding flow where every MSH installation is one persistent device that may contribute several independent services.
+This document replaces the original pre-implementation sequencing in earlier
+versions of this file. Capability-first onboarding is implemented on `main`.
+The remaining work is runtime-parity validation, documentation reconciliation,
+complete physical CF7 acceptance, and only then a separately reviewed CF8
+retirement of role-first setup.
 
-The user should not need to decide whether a machine is a recorder, workbench, language-model provider, compute worker, or storage node before MSH has inspected it. MSH should discover or create a federation, inspect the device, run suitable benchmarks, recommend contributions, and let the user activate the contributions they want.
+## How to use this document
 
-The product flow becomes:
+This file is the canonical source for:
+
+- durable product and authority decisions;
+- current capability-first product behavior;
+- implementation status;
+- remaining implementation and acceptance sequence;
+- stop conditions for future agents.
+
+The following sources have narrower responsibilities:
+
+- `catalog/federation/tests/cf7_acceptance/scenarios.json` is the machine-readable
+  source of truth for acceptance claims;
+- `docs/implementation/cf7b_product_physical_acceptance.md` is the detailed
+  physical acceptance runbook;
+- `docs/implementation/cf7c_physical_test_readiness.md` is the operator
+  preparation guide;
+- phase-specific CFI and CF7 documents are historical delivery records unless
+  they explicitly say that they describe the current merged baseline.
+
+When a historical delivery note conflicts with this file or with
+`scenarios.json`, this file defines the intended product behavior and the
+manifest defines what has actually been accepted.
+
+## Current repository reality
+
+The capability-first implementation is no longer a future design.
+
+PR #185 merged the complete capability-first Federation onboarding baseline to
+`main`, including:
+
+- stable device identity and Federation connection composition;
+- signed pairing and trusted reconnect;
+- device inspection;
+- benchmark planning and execution;
+- contribution recommendation and intent handling;
+- compatibility-controlled startup;
+- the Federation read-only product surface;
+- recovery and fresh-reset behavior;
+- permanent Ubuntu and Windows gates;
+- automated CF7 product-composition coverage;
+- physical-test readiness tooling;
+- the streamlined three-step first-run experience.
+
+The current mandatory first-run flow is:
 
 ```text
-Start MSH
-  -> load or create the stable device identity
-  -> discover an existing federation
-       -> one trusted candidate: offer a one-action verified join
-       -> several candidates: let the user choose
-       -> none: create a local federation
-  -> inspect local services, hardware, data sources, and connectivity
-  -> recommend and run bounded benchmarks
-  -> show contribution candidates
-  -> let the user enable one or more contributions
-  -> publish authenticated health and capacity through existing authority paths
-  -> open the Federation overview
+Identity
+  -> Federation
+  -> Inspect
+  -> finish setup
+  -> open Federation
 ```
 
-## Product decision
+A current device inspection is sufficient to finish setup.
 
-An MSH device does not have one mutually exclusive product role.
+Benchmarks and optional contribution decisions are available as follow-up work.
+They do not block access to the normal MSH workbench.
 
-A device may simultaneously provide any supported combination of:
+Fast completion:
 
-- the Flask workbench;
-- MTConnect or other data-source recording;
-- a language-model service;
-- registered compute handlers;
-- storage capacity;
-- relay or transport assistance where explicitly configured;
-- future supported capabilities.
+- enables the workbench and runtime;
+- grants no recorder, language-model, compute, or storage contribution
+  authority;
+- records those optional capabilities as `ask-later`;
+- preserves contribution choices when the operator has already completed a
+  fully reviewed contribution flow;
+- retains the compatible role-first settings carrier until CF8.
 
-Internal authority roles remain necessary. Storage primary/replica assignment, job ownership, membership administration, provider suspension, leases, terms, fencing, and artifact grants continue to be controlled by their existing authoritative components. They are not presented as the permanent identity of the device.
+Physical pairing and Federation connection have been verified by the operator.
+That verification is useful evidence, but it is not complete CF7 physical
+acceptance.
 
-## Compatibility decision
-
-The existing `session_id` boundary is not removed in this migration.
-
-For the first compatible implementation:
-
-- the user-facing concept is `federation_id`;
-- one federation maps to one existing internal session boundary;
-- existing protocol messages, persistence, membership checks, replay, job ownership, storage authority, provider binding, and artifact authorization continue to use the internal session ID;
-- UI and public documentation stop asking users to create or resume a technical session;
-- a later protocol-major migration may rename or generalize the internal field only after a separate compatibility plan.
-
-This provides the simpler product model without rewriting the validated federation core.
-
-## Trust decision
-
-Discovery may be automatic. Trust must remain authenticated.
-
-The default flow is:
-
-1. discover a federation candidate;
-2. display a friendly name and short verification code;
-3. require one local confirmation the first time a device joins;
-4. persist the device identity and membership;
-5. reconnect automatically on later starts.
-
-A controlled private deployment may enable a policy that automatically accepts new authenticated devices, but that is an explicit federation policy. Network presence alone never grants membership, provider authority, storage access, job execution, or artifact access.
-
-## Benchmark decision
-
-A benchmark is evidence of suitability and capacity. It is not authority.
-
-Every benchmark result must be:
-
-- bound to the stable device identity;
-- bound to a benchmark definition and version;
-- timestamped and expiring;
-- bound to relevant software, model, handler, hardware, and configuration fingerprints;
-- bounded in duration and resource use;
-- safe to rerun;
-- free of credentials and private endpoint disclosure;
-- invalidated when a relevant dependency changes;
-- separate from contribution activation and federation approval policy.
-
-A successful benchmark can create a contribution candidate. Only the user's contribution intent and the federation's policy may activate it.
-
-## Existing implementation that can be reused
-
-The migration should compose existing functionality rather than duplicate it:
-
-- stable Ed25519 node identities and durable enrollment state;
-- session membership, invitation, revocation, ordered events, and replay;
-- authenticated relay and direct transport;
-- F7 provider resource reports, eligibility, ranking, jobs, dispatch, retry, cancellation, and artifact authorization;
-- F8 provider enrollment, health, remote AI binding, compute activation, operator projection, and restart reconciliation;
-- local and connected Ollama connection testing;
-- the existing setup AI response-time probe as the seed for a general AI benchmark;
-- MTConnect network discovery and stable machine identity extraction;
-- recorder durability and status services;
-- storage health, replication, completeness, failover, and recovery;
-- the integrated Flask application and `/docs` browser.
-
-## Current constraints that must be migrated
-
-The current setup is centered on `ServerSetupSettings.deployment_mode`, `DEPLOYMENT_MODES`, and `ROLE_CAPABILITIES`. UI, runtime gates, navigation, recorder startup, AI visibility, setup tests, `.env` defaults, and command setup all depend on those values.
-
-The migration must therefore be additive first. Removing the old deployment-mode field before compatibility adapters and state migration exist would break existing installations.
-
-## Target persisted model
-
-Introduce a versioned onboarding document separate from the current setup file.
-
-Suggested schema:
+The acceptance manifest still correctly records:
 
 ```json
 {
-  "schema": "msh.onboarding.v1",
-  "device_id": "node-...",
-  "federation": {
-    "federation_id": "federation-...",
-    "internal_session_id": "session-...",
-    "state": "connected"
-  },
-  "inspection_revision": 3,
-  "contribution_intents": {
-    "recorder": "enabled",
-    "language-model": "enabled",
-    "compute": "disabled",
-    "storage": "recommended"
-  },
-  "completed": true,
-  "updated_at": "..."
+  "federation_v1_end_to_end_accepted": false,
+  "capability_first_onboarding_end_to_end_accepted": false,
+  "physical_evidence_accepted": false
 }
 ```
 
-The old `server_settings.json` remains readable during migration. A deterministic adapter maps existing deployment modes to initial contribution intents:
+## Product objective
 
-| Existing mode | Initial contribution intents |
+Every MSH installation is one persistent device.
+
+A device may contribute several independent capabilities simultaneously. The
+user must not be forced to choose one permanent technical role before MSH has
+identified the device and connected it to a Federation.
+
+The supported product model is:
+
+```text
+Start MSH
+  -> create or load stable device identity
+  -> discover, join, reconnect to, or create a Federation
+  -> inspect local supported capabilities
+  -> open the normal MSH workbench
+  -> optionally run or rerun bounded benchmarks
+  -> optionally enable, disable, suspend, or reconcile contributions
+  -> publish authenticated health and capacity through existing authority paths
+```
+
+## Fixed product decisions
+
+### A device is not one role
+
+One device may provide any supported combination of:
+
+- the Flask workbench;
+- runtime/orchestration;
+- MTConnect or another supported recorder/data-source capability;
+- a language-model service;
+- explicitly registered compute handlers;
+- storage capacity as a candidate;
+- explicitly configured relay or transport assistance;
+- future versioned capabilities.
+
+Internal authority roles remain necessary. Storage primary/replica assignment,
+job ownership, membership administration, provider suspension, leases, terms,
+fencing, and artifact grants remain controlled by their existing authoritative
+components. They are not the permanent product identity of a device.
+
+### Federation is the user-facing concept
+
+The existing `session_id` boundary is retained.
+
+For this compatible implementation:
+
+- the UI uses `federation_id`;
+- one user-facing Federation maps to one existing internal session boundary;
+- protocol messages, persistence, replay, membership checks, provider binding,
+  storage authority, jobs, and artifact authorization continue to use the
+  internal session ID;
+- public onboarding must not ask ordinary users to create or resume a technical
+  session;
+- renaming or removing the internal session boundary requires a separate
+  protocol-major compatibility plan.
+
+### Discovery is not trust
+
+Discovery may be automatic. Membership may not be.
+
+First-time connection must use an authenticated path such as:
+
+- an existing trusted binding;
+- an explicitly configured trusted candidate;
+- a signed, expiring pairing code containing one-use enrollment and invitation
+  material;
+- another reviewed adapter to the existing membership authority.
+
+A public device ID or network presence identifies a candidate only. It never
+grants:
+
+- membership;
+- provider authority;
+- storage access or assignment;
+- compute execution;
+- job ownership;
+- artifact access.
+
+### Benchmark evidence is not authority
+
+A benchmark result describes suitability and capacity.
+
+It may support a contribution candidate, but it may not by itself:
+
+- create or change Federation membership;
+- activate a contribution;
+- enroll a provider;
+- assign storage primary or replica authority;
+- dispatch compute;
+- create job ownership;
+- grant a lease, term, fencing token, or artifact permission.
+
+### Optional contributions remain independent
+
+Enabling one contribution must not grant another.
+
+In particular:
+
+- AI grants no compute or storage authority;
+- compute exposes only explicitly registered local handlers;
+- storage remains candidate-only until the existing storage control plane
+  assigns authority;
+- recorder activation requires an explicitly selected supported source;
+- disable and suspend operations fence future use without deleting unrelated
+  device membership or unrelated contributions.
+
+## Current persisted model
+
+Capability-first startup uses a versioned local `msh.onboarding.v1` document.
+
+It records only the compatible startup state needed to reopen MSH safely:
+
+- stable device ID;
+- public Federation ID;
+- existing internal session ID;
+- connected Federation state;
+- current inspection revision;
+- generic contribution intents;
+- completion state;
+- migration source metadata;
+- UTC update time.
+
+It must not store:
+
+- credentials;
+- invitation or enrollment secrets;
+- private endpoints;
+- recorder source URLs;
+- Ollama URLs;
+- handler paths;
+- executable payloads;
+- storage assignments;
+- job authority;
+- grants, leases, terms, or fencing tokens.
+
+The persisted device and Federation binding are immutable. Corrupt, oversized,
+unsupported, contradictory, or partially written state fails closed.
+
+## Compatibility boundary
+
+The old `server_settings.json` remains a compatibility carrier until CF8.
+
+Legacy deployment modes are mapped deterministically:
+
+| Existing mode | Compatible initial behavior |
 | --- | --- |
 | `full-server` | workbench, runtime, recorder, configured AI |
 | `web-workbench` | workbench, runtime, configured AI |
@@ -148,558 +249,521 @@ The old `server_settings.json` remains readable during migration. A deterministi
 | `recorder-only` | recorder and recorder status |
 | `language-model-provider` | language-model contribution |
 
-Migration must preserve configured Ollama information, selected model, recorder sources, polling settings, and existing data. It must not silently enable a new storage or compute contribution.
+Migration must preserve existing configured behavior and data.
 
-## Core contracts
+Migration must never silently enable:
 
-### Federation discovery result
+- a new recorder source;
+- compute;
+- storage;
+- an unconfigured language model;
+- any other contribution not represented by the old configuration.
 
-Required safe fields:
+The explicit role-first fallback remains available through the bounded
+compatibility path until CF8 is accepted.
 
-- discovery ID;
-- friendly federation label;
-- stable federation fingerprint;
-- transport kind;
-- verification code;
-- whether a prior trusted relationship exists;
-- expiry;
-- safe reason when joining is unavailable.
+## Current first-run behavior
 
-Discovery output must not contain reusable enrollment secrets, credentials, private service URLs, database locations, or provider-local configuration.
+### Step 1 — Identity
 
-### Device inspection snapshot
+MSH creates or reopens the stable Ed25519 device identity.
 
-Required fields:
+Identity creation grants no Federation membership or contribution authority.
 
-- device ID;
-- inspection revision;
+### Step 2 — Federation
+
+The device may:
+
+- reconnect to its saved trusted Federation;
+- discover and select an existing candidate;
+- join through verified trust;
+- redeem a signed, short-lived pairing code;
+- create a local Federation when no candidate exists.
+
+Ambiguous candidates require operator selection. A broken saved binding must be
+repaired; it must not be silently replaced.
+
+### Step 3 — Inspect
+
+MSH performs one bounded local inspection and persists a device-bound snapshot.
+
+Inspection may include:
+
 - operating-system family and architecture;
-- bounded CPU, memory, GPU/accelerator, disk, and network observations;
-- detected local supported services;
-- detected registered handlers;
-- detected data sources;
-- recommended benchmark IDs;
-- safe warnings;
-- creation and expiry times.
+- coarse CPU, memory, accelerator, disk, and network observations;
+- configured local supported services;
+- explicitly registered handlers;
+- saved bounded MTConnect discovery evidence;
+- recommended benchmark definitions;
+- safe warnings and expiry.
 
-Raw hardware details that are unnecessary for eligibility should stay local.
+Inspection does not:
 
-### Benchmark definition
+- scan arbitrary networks unless a separately reviewed adapter explicitly does
+  so;
+- start recording;
+- invoke AI inference;
+- execute a compute handler;
+- assign storage;
+- activate a contribution.
 
-Required fields:
+### Finish after inspection
 
-- benchmark ID and schema version;
-- capability type and protocol;
-- implementation version;
-- resource and duration limits;
-- required local prerequisites;
-- result metrics and pass/recommendation rules;
-- invalidation inputs;
-- privacy classification.
+A current inspection permits setup completion.
 
-### Benchmark result
+When no fully reviewed optional contribution choices exist, the completed state
+is:
 
-Required fields:
+- `workbench`: enabled;
+- `runtime`: enabled;
+- `recorder`: ask-later;
+- `language-model`: ask-later;
+- `compute`: ask-later;
+- `storage`: ask-later.
 
-- run ID;
-- device ID;
-- benchmark ID/version;
-- target logical service ID;
-- start/end times;
-- result state;
-- bounded metrics;
-- recommendation;
-- expiry;
-- dependency fingerprint;
-- safe diagnostics.
+The compatibility settings are written so the existing runtime can start
+without granting optional authority.
 
-### Contribution candidate
+Successful fresh completion opens the Federation landing page.
 
-Required fields:
+## Optional follow-up behavior
 
-- candidate ID;
-- device ID;
-- capability type and protocol;
-- safe display label;
-- supporting inspection and benchmark revisions;
-- recommended capacity envelope;
-- prerequisites still missing;
-- activation policy state;
-- no endpoint, credential, handler path, or executable payload.
+### Benchmarks
 
-### Contribution intent
+The operator may run, skip, cancel, rerun, and review registered bounded checks
+after inspection.
 
-Required fields:
+Every benchmark result must be:
 
-- candidate ID;
-- desired state: disabled, enabled, or ask-later;
-- local user decision revision;
-- federation policy result;
-- activation state;
-- safe reason when activation is blocked.
+- bound to the stable device identity;
+- bound to a benchmark definition and implementation version;
+- bound to one safe logical target;
+- timestamped and expiring;
+- invalidated by declared dependency changes;
+- bounded in time, payload, response size, resource use, and parallelism;
+- restart-safe where reservations or durable results are involved;
+- free of credentials and private endpoint disclosure;
+- separate from contribution activation.
 
-## Benchmark families
+Historical results remain visible but cannot satisfy current-evidence
+requirements after expiry or invalidation.
 
-### Language-model benchmark
+### Contribution review
 
-Build from the existing Ollama connection and response-time probe, then add:
+Candidates are derived from current inspection and relevant benchmark evidence.
 
-- model availability;
-- cold and warm response latency;
-- bounded generation throughput;
-- declared context and modality compatibility where safely testable;
-- one-request and bounded-concurrency behavior;
-- timeout and malformed-response handling;
-- recommendation for interactive, batch, or unsuitable use.
+The operator may:
 
-The benchmark uses the private local provider adapter. It never publishes the Ollama URL.
+- leave a contribution as ask-later;
+- enable it when prerequisites and policy allow;
+- disable it;
+- suspend it;
+- reconcile persisted intent after restart or evidence changes.
 
-### Compute benchmark
+A completed contribution review is preserved when setup finishes. Incomplete
+or absent optional review does not block the workbench and does not activate
+anything.
 
-Measure only explicitly supported local handlers:
+## Returning-device behavior
 
-- handler availability and descriptor fingerprint;
-- bounded synthetic work;
-- latency and safe concurrency;
-- memory/resource failure behavior;
-- cancellation support;
-- recommendation per handler/capability protocol.
+A completed returning device should:
 
-It must not import, download, install, or execute code supplied by another node.
+- reopen its stable identity;
+- revalidate the saved Federation membership;
+- reconnect without minting new authority;
+- reconcile existing explicit contribution intent;
+- suspend use when required evidence has expired or become invalid;
+- open the Federation overview on the normal startup path;
+- show a guided repair state when identity, membership, or persisted startup
+  state cannot be trusted.
 
-### Storage benchmark
+## Federation product surface
 
-Evaluate a local storage provider candidate using the existing storage contract:
-
-- durable write/read round trip;
-- immutable/idempotent behavior;
-- restart persistence where the provider supports it;
-- bounded throughput and latency;
-- available capacity reported in coarse safe bands;
-- synchronization prerequisites;
-- suitability as a candidate only.
-
-The benchmark never self-assigns primary or replica authority.
-
-### Network benchmark
-
-Measure the authenticated federation path:
-
-- relay reachability;
-- direct-path availability where configured;
-- bounded latency and throughput samples;
-- connection stability;
-- suitability warnings for interactive AI, compute dispatch, storage replication, and object transfer.
-
-Private addresses and route descriptors remain in restricted diagnostics.
-
-### Data-source inspection
-
-MTConnect and future source discovery produce contribution candidates rather than a machine role:
-
-- stable source identities;
-- reachability;
-- protocol compatibility;
-- recording prerequisites;
-- explicit source selection before recording starts.
-
-## Target UI
-
-The main navigation should expose:
+The current product surface includes:
 
 ```text
-Home
-Monitor
-Knowledge
 Federation
-System
-Docs
+  Overview
+  This device
+  Devices
+  Services
+  Benchmarks
+  Storage
+  Jobs
+  Activity
+  Settings
 ```
 
-The Federation section should contain:
+The surface is read-only unless a specific mutation is implemented through an
+existing authority seam.
 
-```text
-Overview
-This device
-Devices
-Services
-Benchmarks
-Storage
-Jobs
-Activity
-Settings
-```
+Public projections must not render:
 
-### First-run onboarding
+- private endpoints;
+- credentials;
+- pairing or enrollment material;
+- internal session bindings;
+- local paths;
+- handler paths or payloads;
+- provider-local configuration;
+- grants, leases, terms, or fencing tokens;
+- private job inputs or artifacts.
 
-The old first step, "What should this computer do?", is replaced by:
+Missing optional services are empty states, not false system failures.
+Configured projection failures produce bounded degraded states.
 
-1. **Identity** — create or load this device;
-2. **Federation** — discover, verify, join, or create locally;
-3. **Inspect** — identify supported local services and data sources;
-4. **Benchmarks** — run recommended checks, with skip and rerun behavior;
-5. **Contributions** — enable any combination of suitable services;
-6. **Finish** — show the connected state and next recommended action.
+## Implemented component status
 
-### Returning-device startup
+### CF0 — product direction and contract decisions
 
-A returning trusted device should:
+State: complete, with this document now reflecting the current implementation.
 
-- load its stable identity;
-- reconnect to its saved federation automatically;
-- reconcile membership and active contributions;
-- rerun only expired or invalidated health/benchmark checks;
-- open the Federation overview;
-- show a guided repair action if reconnection fails.
+### CF1 — onboarding contracts and compatibility mapping
 
-A runtime progress choice may remain where the workbench genuinely needs it, but it must not be described as creating or resuming the federation.
+State: implemented and merged.
 
-## Implementation sequence
+Includes versioned discovery, Federation binding, inspection, benchmark,
+candidate, and intent models plus deterministic legacy migration preview.
 
-### CF0 — plan and contract freeze
+### CF2 — inspection and benchmark framework
 
-Deliverables:
+State: implemented and merged.
 
-- this plan;
-- roadmap, release-scope, closeout, and handoff amendments;
-- fixed terminology and compatibility decisions;
-- parallel file-ownership plan.
+Includes the registry, runner, durable results, cancellation, expiry,
+invalidation, safe diagnostics, and concrete adapters.
 
-Exit criteria:
+Current follow-up: PR #186 addresses Docker/native Ollama runtime parity and
+cold-model benchmark timing. It remains subject to physical Docker and native
+`beast` retesting before merge.
 
-- no runtime behavior changes;
-- no protocol field removed or renamed;
-- the first implementation contracts are unambiguous.
+### CF3 — discovery, verified join, pairing, and reconnect
 
-### CF1 — additive onboarding contracts and compatibility adapter
+State: implemented and merged.
 
-Deliver:
+Pairing uses signed, expiring, bounded material and existing coordinator/session
+authority. Public identity alone grants nothing.
 
-- pure versioned models for discovery, inspection, benchmark results, candidates, and intents;
-- canonical serialization and validation;
-- `federation_id` to internal-session mapping contract;
-- legacy deployment-mode to contribution-intent adapter;
-- read-only migration preview;
-- tests for every existing setup mode and malformed state.
+### CF4 — contribution recommendation and activation
 
-Do not change the browser wizard in CF1.
+State: implemented and merged.
 
-Exit criteria:
+Recorder, AI, registered-compute, and storage-candidate paths delegate to
+existing authority seams.
 
-- old setup files remain readable;
-- no contribution is newly activated by migration;
-- existing v1 tests remain green;
-- unsupported protocol majors fail closed.
+### CF5 — onboarding UI
 
-### CF2 — device inspection and benchmark framework
+State: implemented and merged.
 
-Deliver:
+The original six-stage architecture remains available as functional services,
+but the required first-run product journey is now the streamlined
+Identity/Federation/Inspect flow. Benchmarks and contributions are optional
+follow-up activities.
 
-- benchmark registry and runner;
-- bounded execution, cancellation, expiry, fingerprints, and safe diagnostics;
-- device inspection service;
-- initial AI benchmark migrated from the setup probe;
-- MTConnect discovery adapter producing candidates;
-- extension seams for compute, storage, and network benchmarks.
+### CF6 — Federation projections and pages
 
-Exit criteria:
+State: implemented and merged.
 
-- benchmark execution is local and bounded;
-- results are durable and restart-safe;
-- benchmark success grants no authority;
-- tests cover expiry, invalidation, timeout, duplicate run IDs, and redaction.
+All nine Federation projection pages are registered through bounded GET/HEAD
+routes with safe empty, connected, and degraded semantics.
 
-### CF3 — federation discovery and verified join
+### CFI-1 through CFI-6 — supported Flask composition
 
-Deliver:
+State: implemented and merged.
 
-- bounded local discovery interface;
-- discovery adapters for already-supported relay/configuration paths;
-- one-action verified join using existing enrollment/invitation authority;
-- automatic reconnect for already trusted devices;
-- local federation creation when no candidate exists;
-- several-candidate selection;
-- safe failure reasons.
+The supported Flask application composes identity, Federation, inspection,
+benchmarks, contributions, compatibility migration, startup routing, runtime
+intent, and navigation.
 
-Exit criteria:
+### CF7-A and CF7-B — automated acceptance foundation
 
-- discovery alone grants nothing;
-- first trust requires verification unless explicit policy allows authenticated auto-accept;
-- reconnect does not mint new authority;
-- internal session behavior remains compatible.
+State: implemented and merged.
 
-### CF4 — contribution recommendation and activation service
+CI covers component contracts and bounded product-composition scenarios on
+Ubuntu and Windows.
 
-Deliver:
+Automated acceptance does not prove real hardware, real services, real
+multi-host networking, or real browser behavior.
 
-- candidate generation from inspections and benchmark results;
-- local contribution-intent persistence;
-- policy evaluation;
-- adapters to existing recorder, AI provider, compute-handler, and storage-provider authorities;
-- enable, disable, suspend, and reconcile behavior;
-- simultaneous multi-capability contribution from one device.
+### CF7 physical readiness and product corrections
 
-Exit criteria:
+State: repository preparation and several physical-browser corrections are
+implemented and merged through PR #185.
 
-- enabling AI grants no storage or compute authority;
-- enabling compute exposes only registered handlers;
-- storage remains candidate-only until control-plane assignment;
-- disabling a contribution fences future use without deleting unrelated device membership.
-
-### CF5 — capability-first onboarding UI
-
-Deliver:
-
-- the new six-step onboarding flow;
-- no deployment-role choice;
-- progress that survives refresh/restart;
-- benchmark progress and rerun controls;
-- contribution selection;
-- migration display for existing installations;
-- accessible desktop and mobile layouts;
-- direct links to `/docs`.
-
-The old wizard remains behind a compatibility fallback until CF7 acceptance.
-
-Exit criteria:
-
-- a fresh user can complete setup without understanding session, provider enrollment, primary/replica, or handler terminology;
-- a returning installation retains all previous configured behavior;
-- skipped benchmarks do not silently enable contributions.
-
-### CF6 — Federation product UI
-
-Deliver:
-
-- Federation in desktop and mobile navigation;
-- Overview, This device, Devices, Services, Benchmarks, Storage, Jobs, Activity, and Settings shells;
-- live projections from existing safe operator services;
-- user-language status and one recommended next action;
-- advanced technical details on demand;
-- graceful empty/degraded states.
-
-Exit criteria:
-
-- the current provider operator surface is reachable through the product UI;
-- missing runtime context produces a useful onboarding or repair action rather than a raw 503 page;
-- no private endpoint or credential is rendered.
-
-### CF7 — migration and end-to-end acceptance
-
-Required acceptance:
-
-- fresh Windows and Linux checkout;
-- no existing state;
-- existing federation discovered and joined;
-- no federation found and local federation created;
-- returning trusted device reconnect;
-- migration from each old deployment mode;
-- one device contributing recorder plus AI simultaneously;
-- separate devices contributing AI, compute, and storage candidates;
-- benchmark expiry and rerun;
-- contribution disable/re-enable;
-- restart/reconciliation;
-- revocation and rejoin behavior;
-- mobile and desktop UI;
-- complete v1 regression gates.
+Complete evidence-backed physical acceptance remains open.
 
 ### CF8 — retire role-first setup
 
-Only after CF7 passes:
+State: blocked.
+
+CF8 may not begin solely because CI is green or pairing worked once.
+
+## Acceptance truth boundary
+
+Acceptance is intentionally layered.
+
+### Layer 1 — component and contract evidence
+
+Proves isolated contracts, persistence, redaction, authority boundaries,
+restart behavior, and platform compatibility.
+
+State: implemented and green on the merged baseline.
+
+### Layer 2 — automated product-composition evidence
+
+Proves supported Flask composition with bounded deterministic fixtures and
+independent state roots.
+
+State: implemented and green on the merged baseline.
+
+### Layer 3 — physical smoke evidence
+
+Proves selected real paths, such as physical browser interaction, pairing, or a
+configured service, on operator hardware.
+
+State: partial. Pairing and Federation connection have been physically
+verified, and physical testing exposed the runtime-parity work in PR #186.
+
+Partial smoke evidence must not be reported as complete CF7 acceptance.
+
+### Layer 4 — complete commit-bound CF7 physical acceptance
+
+Requires every mandatory physical scenario to pass on one exact frozen commit,
+with a complete redacted evidence document accepted by the strict validator.
+
+State: not accepted.
+
+### Layer 5 — CF8 retirement approval
+
+Requires a separate review of the complete CF7 evidence and an explicit
+decision to retire role-first setup.
+
+State: blocked.
+
+## Required physical acceptance
+
+The frozen candidate must pass all required observations, including:
+
+- fresh physical Windows checkout;
+- fresh physical Linux checkout;
+- independent multi-host Federation transport;
+- real or approved MTConnect source;
+- target Ollama model and accelerator;
+- real desktop browser;
+- real mobile browser;
+- recorder plus AI on one physical device;
+- separate physical AI, registered-compute, and storage-candidate devices;
+- benchmark expiry or dependency invalidation and explicit rerun;
+- contribution disable and re-enable;
+- restart and reconciliation;
+- revocation, route fencing, and controlled verified rejoin;
+- storage remaining candidate-only until existing assignment authority acts;
+- no private data or unrelated authority leakage.
+
+All environments and scenarios must use the same exact commit.
+
+## Current exact implementation sequence
+
+### 1. Complete benchmark runtime parity
+
+Use draft PR #186 as the focused unit.
+
+Required before merge:
+
+- retest the Ollama benchmark in the supported Docker deployment;
+- retest it in the native `beast` runtime;
+- confirm the configured endpoint resolves correctly in both contexts;
+- confirm the selected model remains visible when AI contribution intent is
+  `ask-later`;
+- confirm the bounded cold-start window completes or fails with safe actionable
+  diagnostics;
+- confirm no benchmark result grants AI, compute, or storage authority;
+- keep all existing Ubuntu and Windows gates green.
+
+Do not broaden PR #186 into general onboarding, provider, or storage changes.
+
+### 2. Reconcile current documentation
+
+After runtime-parity behavior is settled:
+
+- mark phase-specific branch delivery notes as historical where appropriate;
+- point them to this plan for current behavior;
+- update `current_task_handoff.md`;
+- update `federation_v1_closeout_plan.md`;
+- update the post-v1 roadmap and release scope where they still describe
+  benchmarks and contribution selection as mandatory before first completion;
+- add a durable note for the recovery and fast-onboarding decisions merged in
+  PR #185;
+- remove obsolete “implement CF1 next” instructions.
+
+This plan update is the first part of that reconciliation.
+
+### 3. Update the physical acceptance campaign
+
+Update issue #180 and the physical handoff so they refer to:
+
+- the merged PR #185 baseline;
+- the final merged runtime-parity commit;
+- one newly frozen exact acceptance candidate;
+- the current three-step onboarding behavior;
+- the full unchanged CF7 physical scenario set.
+
+Do not combine evidence from old stacked branch heads with the new candidate.
+
+### 4. Freeze one acceptance candidate
+
+Freeze one exact lowercase 40-character commit after:
+
+- PR #186 is merged or deliberately rejected;
+- all documentation required to operate the test is current;
+- CF7-A, CF7-B, runtime-parity, Federation, Flask, recorder, provider, storage,
+  and broad regression gates are green;
+- there are no known unresolved authority, privacy, data-loss, or platform
+  defects.
+
+### 5. Execute complete physical CF7 acceptance
+
+Use the current readiness tooling and strict evidence contract.
+
+Every required scenario must genuinely pass. Pending, skipped, simulated, or
+CI-only evidence is insufficient.
+
+### 6. Review the acceptance decision
+
+Only a separate evidence-backed review may change the manifest flags to `true`.
+
+The review must verify:
+
+- exact commit binding;
+- complete scenario coverage;
+- redaction;
+- cross-platform evidence;
+- real service and real multi-host evidence;
+- no unresolved defect;
+- no overclaim beyond the tested topology.
+
+### 7. Plan CF8 separately
+
+Only after the acceptance review succeeds, create a new CF8 implementation plan
+and branch.
+
+CF8 must not be folded into the acceptance PR.
+
+## CF8 retirement scope
+
+When unblocked, CF8 may:
 
 - stop writing `deployment_mode` for new installations;
 - retain a bounded legacy reader for supported upgrades;
-- remove role-specific UI gates replaced by contribution checks;
+- replace remaining role-derived runtime and navigation checks with
+  capability-intent checks;
 - update command setup and `.env` compatibility;
-- remove obsolete role tests only after equivalent capability tests exist;
-- delete the old setup path in a separately reviewed cleanup change.
+- migrate or remove obsolete role-specific tests only after equivalent
+  capability coverage exists;
+- remove the old setup path in a separately reviewed cleanup change;
+- update user documentation so no active guide instructs a new user to choose a
+  permanent device role.
 
-## Parallel multi-agent execution plan
+CF8 must not:
 
-Parallel work is allowed only after CF1 contracts are merged and frozen.
+- remove `session_id`;
+- alter protocol authority;
+- invent a second persistence or membership source;
+- silently activate optional contributions;
+- remove recovery or compatibility behavior without migration evidence.
 
-### Wave 0 — one contract agent
+## Validation required for every remaining implementation PR
 
-**Agent CF1 — contracts and migration preview**
-
-Owns:
-
-- `catalog/federation/onboarding_models.py`;
-- `catalog/federation/onboarding_compat.py`;
-- focused new tests under `catalog/federation/tests/`;
-- contract sections of this plan if corrections are required.
-
-Must not edit Flask templates, setup routes, benchmark implementation, transport, provider runtime, or existing authority stores.
-
-CF1 must merge before the parallel branches are created.
-
-### Wave 1 — three parallel agents
-
-All Wave 1 branches start from the exact CF1 merge commit.
-
-#### Agent CF2-A — inspection and benchmark engine
-
-Owns only:
-
-- `catalog/capabilities/benchmarking/**`;
-- `catalog/capabilities/tests/test_benchmarking_*.py`;
-- benchmark fixtures under a new dedicated test-data directory.
-
-May import frozen CF1 contracts. Must not edit setup, Flask navigation, federation discovery, existing AI runtime selection, or provider enrollment.
-
-#### Agent CF3-A — federation discovery and onboarding authority adapter
-
-Owns only:
-
-- `catalog/federation/onboarding_discovery/**`;
-- `catalog/federation/tests/test_onboarding_discovery_*.py`;
-- narrow adapters to existing coordinator APIs in new files.
-
-Must not change relay protocol schemas, existing session persistence, setup UI, benchmark code, or provider health logic.
-
-#### Agent CF5-A — UI shell and static behavior
-
-Owns only new UI files:
-
-- `catalog/flask_app/templates/onboarding.html`;
-- `catalog/flask_app/templates/federation_overview.html`;
-- new partials under `catalog/flask_app/templates/federation/`;
-- `catalog/flask_app/static/css/federation.css`;
-- `catalog/flask_app/static/js/onboarding.js`;
-- template/static-focused tests in new files.
-
-Uses documented view-model fixtures and must not edit `app.py`, `routes.py`, `server_setup_routes.py`, `server_setup_service.py`, `base.html`, or `startup.html` during Wave 1.
-
-### Wave 2 — two parallel agents
-
-Starts after CF2-A and CF3-A are merged.
-
-#### Agent CF4-A — contribution service
-
-Owns:
-
-- new contribution service modules under `catalog/capabilities/contributions/**`;
-- adapters in new files for recorder, AI, compute, and storage candidates;
-- focused contribution tests.
-
-Must not edit shared Flask/setup files.
-
-#### Agent CF6-A — safe Federation projections
-
-Owns:
-
-- new framework-neutral projection services;
-- new tests for overview/device/service/benchmark states;
-- adapters to the existing provider operator surface in new files.
-
-Must not edit shared Flask/setup files.
-
-### Wave 3 — one integration agent
-
-**Agent CFI — Flask/setup integration and migration** is the only agent allowed to modify shared integration files:
-
-- `catalog/flask_app/app.py`;
-- `catalog/flask_app/routes.py`;
-- `catalog/flask_app/server_setup_routes.py`;
-- `catalog/flask_app/services/server_setup_service.py`;
-- `catalog/flask_app/templates/base.html`;
-- `catalog/flask_app/templates/startup.html`;
-- `setup_msh.py`;
-- `.env.example`;
-- existing setup/navigation tests that must be migrated.
-
-The integration agent composes already-merged contracts, services, templates, and projections. It must not redesign their contracts during integration. Contract changes require a separate CF1 amendment reviewed before continuing.
-
-### Wave 4 — independent acceptance agent
-
-**Agent CFA — regression and acceptance** owns:
-
-- new end-to-end acceptance tests;
-- CI workflow additions;
-- migration fixtures for every old setup mode;
-- documentation-command validation;
-- no production behavior except minimal test seams approved in review.
-
-This agent validates the integrated result independently and reports gaps instead of silently broadening scope.
-
-## File-conflict rules for concurrent agents
-
-1. Every agent uses a separate branch created from the documented baseline commit.
-2. Two active agents must not own the same production file.
-3. Shared files are reserved for the integration wave.
-4. Existing protocol, authority, and persistence modules are read-only unless the plan explicitly assigns a narrow adapter file.
-5. New contracts are merged before dependent parallel work starts.
-6. Each PR states its owned paths and proves that no other path changed.
-7. Each PR includes focused tests and runs the applicable existing regression subset.
-8. Agents do not merge another agent's branch into their own branch; they rebase or recreate from updated `main` after prerequisite merges.
-9. Cross-agent interface changes require a small contract PR, not ad hoc changes in both branches.
-10. The integration agent merges only green, independently reviewable units.
-
-## Suggested branch and PR sequence
-
-```text
-agent/cf1-onboarding-contracts
-  -> merge
-
-parallel from the CF1 merge:
-  agent/cf2-benchmark-engine
-  agent/cf3-federation-discovery
-  agent/cf5-ui-shell
-  -> merge independently when green
-
-parallel from updated main:
-  agent/cf4-contribution-service
-  agent/cf6-federation-projections
-  -> merge independently when green
-
-agent/cfi-capability-onboarding-integration
-  -> compose shared setup and Flask files
-  -> merge after full matrix
-
-agent/cfa-capability-onboarding-acceptance
-  -> independent acceptance and release-plan update
-```
-
-At least three agents can work concurrently in Wave 1 without overlapping production files. Two can work concurrently in Wave 2. The shared setup migration is intentionally serialized because splitting edits to the same Flask and setup files would create avoidable conflicts and inconsistent gating.
-
-## Required validation throughout
-
-Every implementation PR must include:
+Every focused PR must include, as applicable:
 
 - Python compilation for changed packages;
 - Ruff for changed Python files;
 - focused deterministic tests;
-- protocol-major and malformed-input rejection where contracts are involved;
-- redaction checks;
-- restart/idempotency checks where state is durable;
-- Windows and Linux coverage when platform behavior differs;
-- `docker compose config --quiet` where packaging or setup is affected;
+- malformed-input and unsupported-version rejection;
+- private-data redaction checks;
+- restart and idempotency checks for durable state;
+- Linux and Windows coverage when platform behavior differs;
+- Docker Compose validation when setup or packaging changes;
 - `git diff --check`;
-- no weakening of existing Federation v1 regression gates.
+- no weakening of Federation authority gates;
+- a PR description that distinguishes automated evidence from physical
+  evidence.
 
-The integration and acceptance waves must run the full permanent federation matrix, Flask/setup tests, recorder tests, AI runtime tests, provider federation tests, storage tests, direct/relay transport tests, and documentation-link checks.
+Documentation-only reconciliation PRs must at minimum verify:
+
+- referenced paths exist;
+- commands match current entry points;
+- links are valid;
+- current-state claims match `main`;
+- no historical document is presented as the current next task.
+
+## File-ownership policy for future agents
+
+The original Wave 0–4 ownership plan successfully reduced conflicts and is now
+historical.
+
+For remaining work:
+
+1. create every branch from current `main`;
+2. keep each PR focused on one explicit defect, acceptance unit, or
+   documentation reconciliation;
+3. do not stack new work on superseded pre-PR-185 branches;
+4. declare owned paths in the PR body;
+5. do not let two agents edit the same shared Flask/setup file concurrently;
+6. do not redesign frozen contracts inside an integration fix;
+7. use a separate contract amendment when a shared interface must change;
+8. keep acceptance-only work from introducing new production authority;
+9. open draft PRs until the relevant automated and physical conditions are met;
+10. never merge or mark acceptance complete solely because one automated matrix
+    is green.
 
 ## Stop conditions
 
 Stop and report rather than broaden scope when:
 
-- discovery would require unauthenticated trust;
-- a benchmark would require arbitrary downloaded or remotely supplied code;
-- a benchmark result is being used as authority by itself;
-- migration would silently enable storage, compute, recorder, or AI contributions not previously configured;
-- a user-facing simplification would remove membership, revocation, fencing, lease, or artifact checks;
-- two active agents need to edit the same shared integration file;
-- removing `session_id` becomes necessary for a compatible unit;
-- a unit requires a protocol-major change not covered by this plan;
-- acceptance cannot distinguish a real multi-device path from a loopback-only simulation.
+- discovery or pairing would require unauthenticated trust;
+- a public device ID or network presence is being treated as membership;
+- a benchmark would run arbitrary downloaded or remotely supplied code;
+- benchmark evidence is being used as authority;
+- optional fast completion would activate recorder, AI, compute, or storage;
+- migration would silently enable a contribution not present in the old setup;
+- AI activation would imply compute or storage authority;
+- compute would expose an unregistered handler;
+- storage would self-assign primary or replica authority;
+- disabling a contribution would remove membership or unrelated capability
+  state;
+- a user-facing simplification would bypass membership, revocation, fencing,
+  lease, job, storage, or artifact checks;
+- the same physical acceptance campaign would use different commits;
+- evidence cannot distinguish a real path from fixtures, loopback, CI,
+  containers, or WSL where physical hardware is required;
+- private endpoints, credentials, identities, local paths, or database locations
+  cannot be safely redacted;
+- an unresolved authority, privacy, data-loss, cross-platform, browser,
+  MTConnect, Ollama, restart, revocation, or multi-host defect remains;
+- CF8 is proposed before the acceptance manifest is changed through a separate
+  evidence-backed review.
 
-## Exact next implementation unit
+## Superseded instructions
 
-Proceed with **CF1 only**:
+The following instructions from older revisions of this plan are obsolete:
 
-1. add pure onboarding contracts;
-2. add the `federation_id` compatibility mapping;
-3. add the legacy deployment-mode migration preview;
-4. add exhaustive contract and migration tests;
-5. do not change the current setup UI;
-6. merge CF1 before creating the parallel CF2, CF3, and CF5 branches.
+- “implementation has not started”;
+- “proceed with CF1 only”;
+- “merge CF1 before creating Wave 1 branches”;
+- treating the six-stage onboarding architecture as six mandatory first-run
+  screens;
+- requiring benchmark or contribution review before the user can open MSH;
+- describing PRs #175 through #179 as the current unmerged implementation
+  stack.
+
+Those statements describe historical sequencing, not the current repository.
+
+## Current next action
+
+Complete the focused physical Docker/native retest of PR #186.
+
+After that result is known, merge or revise PR #186, reconcile the remaining
+current-state documentation, freeze one exact acceptance candidate, and execute
+the complete CF7 physical acceptance campaign.
+
+Do not begin CF8.
