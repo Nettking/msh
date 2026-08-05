@@ -27,7 +27,7 @@ Analyzed repository baselines:
 | 08 | [Validation, testing, and CI](08_validation_testing_and_ci.md) | complete | `e36a9b8d5291d58f495062e1344c872724113744` |
 | 09 | [Migration and compatibility](09_migration_and_compatibility.md) | complete | `cbba254bcdede391a87eb80e5bd6966055cd2848` |
 | 10 | [Phased implementation roadmap](10_phased_implementation_roadmap.md) | complete | `ab52961d21208d2b231b9c22c1480d096c125e96` |
-| index | `README.md` | complete; initial index commit recorded in the final status update | pending this commit |
+| index | `README.md` | complete; initial index | `34b7b609d63cb3cc67cbbb421c4d4faa2269bb97` |
 
 Each document is useful on its own and was committed immediately after its
 document-level consistency check. Later commits do not squash or rewrite the
@@ -131,6 +131,32 @@ SQLite, SysML, migration, federation, capability or operational binding.
 
 ## Final verification status
 
-Repository/document checks, docs-only history verification, clean-worktree
-verification and remote push are pending. This section will be updated and
-committed separately after the checks run.
+Verification completed on branch
+`agent/osl-language-and-paper-workflow-plan` after the initial index commit:
+
+- **Document set:** passed; all 12 expected Markdown files (00-10 plus this
+  index) exist and no unexpected file is present in the plan directory.
+- **Internal Markdown links:** passed; zero unresolved local link targets.
+- **Planned JSON examples:** passed; all three fenced JSON examples parse.
+- **Whitespace/diff hygiene:** `git diff --check origin/main...HEAD` passed.
+- **Source/marker audit:** all documents record the relevant exact source
+  baseline and use the classification markers according to their scope; the
+  scope/index records all three full repository SHAs.
+- **Incremental history:** passed; 12 pre-status commits exist after updated
+  `main` and each introduced exactly one bounded planning document.
+- **Docs-only audit:** passed; the 12 changed files before this status update are
+  all under `docs/implementation/osl_integration/`. No production code,
+  workflow or external paper repository was changed.
+- **Focused existing baseline:** passed; 8 tests across
+  `test_operator_strategy_service.py`, `test_osl_sysml_export.py` and
+  `test_operator_strategy_lifecycle.py` passed on the Windows host in an
+  isolated Python 3.12/pytest runtime.
+- **Markdown linter:** no Markdown-specific linter is configured in the analyzed
+  repository; link, JSON, encoding-sentinel and Git whitespace checks were used
+  instead.
+- **Temporary test data:** removed after the test run.
+
+The Git commit containing this section is the separate final status update.
+Remote push and final clean-worktree verification occur after that commit and
+are reported in the task handoff, avoiding a self-referential third README
+status commit.
