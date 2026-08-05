@@ -628,6 +628,31 @@ class CapabilityStartupTransitionService:
                 )
         return intents
 
+    def _completion_intents(self) -> dict[str, str]:
+        """Preserve fully reviewed choices, otherwise finish with safe defaults."""
+
+        has_persisted_intents = getattr(
+            type(self.contribution_service),
+            "has_persisted_intents",
+            None,
+        )
+        if (
+            not callable(has_persisted_intents)
+            or not has_persisted_intents(self.contribution_service)
+        ):
+            return self._fast_start_intents()
+        try:
+            return self._current_intents()
+        except FederationOperationError as exc:
+            if exc.code in {
+                "contribution-benchmarks-required",
+                "contribution-inspection-expired",
+                "startup-transition-benchmarks-required",
+                "startup-transition-contributions-required",
+            }:
+                return self._fast_start_intents()
+            raise
+
     @staticmethod
     def _compatibility_mode(intents: Mapping[str, str]) -> str:
         recorder = intents["recorder"] == ContributionDesiredState.ENABLED.value
@@ -682,7 +707,7 @@ class CapabilityStartupTransitionService:
         inspection_revision = self._current_inspection_revision(
             context.credentials.identity.node_id
         )
-        intents = self._fast_start_intents()
+        intents = self._completion_intents()
         self._write_compatibility_settings(intents)
         return self.store.save(
             CapabilityStartupState(
