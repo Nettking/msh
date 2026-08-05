@@ -62,3 +62,5 @@ jobs:
           git add -A
           git commit -m "Make Federation onboarding finish after inspection"
           git push origin HEAD:agent/cf7g-fast-federation-onboarding
+
+# This temporary workflow deletes itself after a validated patch commit.
