@@ -116,4 +116,5 @@ def test_fast_setup_templates_expose_finish_and_optional_follow_up() -> None:
 
     assert "Step 3 of 3" in inspect_template
     assert "Finish setup and open Federation" in inspect_template
+    assert "Recommended bounded checks" in inspect_template
     assert "Review optional capabilities" in overview_template
