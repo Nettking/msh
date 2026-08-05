@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -106,16 +107,12 @@ def test_fast_setup_still_requires_current_inspection(tmp_path) -> None:
 
 
 def test_fast_setup_templates_expose_finish_and_optional_follow_up() -> None:
-    inspect_template = (
-        __import__("pathlib").Path(
-            "catalog/flask_app/templates/federation/onboarding/_inspect.html"
-        ).read_text(encoding="utf-8")
-    )
-    overview_template = (
-        __import__("pathlib").Path(
-            "catalog/flask_app/templates/federation_overview.html"
-        ).read_text(encoding="utf-8")
-    )
+    inspect_template = Path(
+        "catalog/flask_app/templates/federation/onboarding/_inspect.html"
+    ).read_text(encoding="utf-8")
+    overview_template = Path(
+        "catalog/flask_app/templates/federation_overview.html"
+    ).read_text(encoding="utf-8")
 
     assert "Step 3 of 3" in inspect_template
     assert "Finish setup and open Federation" in inspect_template
