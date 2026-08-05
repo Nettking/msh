@@ -26,6 +26,21 @@ jobs:
           cache: pip
       - name: Apply patch
         run: python tools/apply_cf7g_fast_onboarding.py
+      - name: Make optional link safe without Flask context
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path("catalog/flask_app/templates/federation_overview.html")
+          text = path.read_text(encoding="utf-8")
+          old = "  {% if capability_startup_flags.completed|default(false) %}\n"
+          new = (
+              "  {% set startup_flags = capability_startup_flags|default({}) %}\n"
+              "  {% if startup_flags.completed|default(false) %}\n"
+          )
+          if old not in text:
+              raise SystemExit("Optional capability link condition was not found")
+          path.write_text(text.replace(old, new, 1), encoding="utf-8")
+          PY
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
