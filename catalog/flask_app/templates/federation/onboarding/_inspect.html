@@ -30,7 +30,7 @@
         {% set recommended_checks = vm.inspection.get('recommended_checks', ()) %}
         {% if recommended_checks %}
         <section aria-labelledby="inspection-checks-heading">
-          <h4 id="inspection-checks-heading">Optional checks available later</h4>
+          <h4 id="inspection-checks-heading">Recommended bounded checks</h4>
           <ul class="federation-list">
             {% for check in recommended_checks %}<li><strong>{{ check.label }}</strong><span>{{ check.summary }}</span></li>{% endfor %}
           </ul>

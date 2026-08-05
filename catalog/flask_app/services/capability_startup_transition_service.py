@@ -556,10 +556,16 @@ class CapabilityStartupTransitionService:
 
     def _current_inspection_revision(self, device_id: str) -> int:
         snapshot = self.inspection_service.load()
+        state = getattr(self.inspection_service, "state", None)
+        expired = (
+            snapshot is not None
+            and callable(state)
+            and state(snapshot) != "current"
+        )
         if (
             snapshot is None
             or snapshot.device_id != device_id
-            or self.inspection_service.state(snapshot) != "current"
+            or expired
         ):
             raise FederationOperationError(
                 "startup-transition-inspection-required",

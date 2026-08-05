@@ -368,13 +368,13 @@ def test_capability_finish_persists_intent_and_compatibility_settings(
     assert state.contribution_intents == {
         "workbench": "enabled",
         "runtime": "enabled",
-        "recorder": "disabled",
-        "language-model": "enabled",
-        "compute": "disabled",
-        "storage": "disabled",
+        "recorder": "ask-later",
+        "language-model": "ask-later",
+        "compute": "ask-later",
+        "storage": "ask-later",
     }
     assert saved_settings[0].deployment_mode == "web-workbench"
-    assert saved_settings[0].ai_enabled is True
+    assert saved_settings[0].ai_enabled is False
 
 
 def test_runtime_flags_and_finish_action_come_from_capability_state(

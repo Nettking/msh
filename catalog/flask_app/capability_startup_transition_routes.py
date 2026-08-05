@@ -378,10 +378,14 @@ def _run_transition(*, migration: bool) -> Response:
     session[_RETURNED_SESSION_KEY] = True
     session.pop(_LEGACY_FALLBACK_SESSION_KEY, None)
     flash(message, "success")
-    return redirect(
-        url_for("federation_web.overview"),
-        code=303,
-    )
+    if migration:
+        destination = url_for(
+            "capability_startup_transition_web.onboarding",
+            step="finish",
+        )
+    else:
+        destination = url_for("federation_web.overview")
+    return redirect(destination, code=303)
 
 
 @capability_startup_transition_web.post("/onboarding/migrate")
