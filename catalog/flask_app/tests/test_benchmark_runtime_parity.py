@@ -7,8 +7,8 @@ import pytest
 
 from catalog.capabilities.benchmarking import (
     BenchmarkRegistry,
-    BenchmarkRunRequest,
     BenchmarkRunner,
+    BenchmarkRunRequest,
     SQLiteBenchmarkResultStore,
 )
 from catalog.capabilities.benchmarking.adapters import (
