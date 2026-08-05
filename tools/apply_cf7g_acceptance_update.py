@@ -37,11 +37,14 @@ replace_once(
         """Preserve fully reviewed choices, otherwise finish with safe defaults."""
 
         has_persisted_intents = getattr(
-            self.contribution_service,
+            type(self.contribution_service),
             "has_persisted_intents",
             None,
         )
-        if not callable(has_persisted_intents) or not has_persisted_intents():
+        if (
+            not callable(has_persisted_intents)
+            or not has_persisted_intents(self.contribution_service)
+        ):
             return self._fast_start_intents()
         try:
             return self._current_intents()
