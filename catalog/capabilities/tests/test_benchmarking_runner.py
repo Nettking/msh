@@ -116,7 +116,10 @@ def test_timeout_and_cancellation_are_bounded_and_persisted(tmp_path) -> None:
     started = time.monotonic()
     timed_out = runner.run(_request(run_id="run-timeout", timeout_seconds=0.05))
     elapsed = time.monotonic() - started
-    assert elapsed < 0.5
+    # Hosted Windows runners can pause worker threads during process scheduling
+    # and virus scanning. The operation must still return well inside the
+    # definition's two-second upper bound.
+    assert elapsed < 1.0
     assert timed_out.state == BenchmarkState.FAILED
     assert timed_out.recommendation == BenchmarkRecommendation.NOT_RECOMMENDED
     assert timed_out.diagnostics == ("benchmark timed out",)

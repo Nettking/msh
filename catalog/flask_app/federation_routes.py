@@ -1,10 +1,11 @@
-"""Read-only Federation overview integration for the supported Flask app."""
+"""Read-only Federation product integration for the supported Flask app."""
 
 from __future__ import annotations
 
 from flask import (
     Blueprint,
     Response,
+    abort,
     current_app,
     make_response,
     redirect,
@@ -14,6 +15,7 @@ from flask import (
 )
 
 from catalog.federation.projections import (
+    FederationPage,
     FederationProjectionService,
     ProjectionAdapters,
     assert_public_projection,
@@ -25,27 +27,46 @@ from .services.federation_projection_service import (
 
 federation_web = Blueprint("federation_web", __name__)
 
+_PAGE_BY_PATH = {
+    "device": FederationPage.THIS_DEVICE,
+    "devices": FederationPage.DEVICES,
+    "services": FederationPage.SERVICES,
+    "benchmarks": FederationPage.BENCHMARKS,
+    "storage": FederationPage.STORAGE,
+    "jobs": FederationPage.JOBS,
+    "activity": FederationPage.ACTIVITY,
+    "settings": FederationPage.SETTINGS,
+}
 
-def _safe_overview() -> dict[str, object]:
+
+def _safe_projection(page: FederationPage) -> dict[str, object]:
     try:
         service = get_federation_projection_service()
         return assert_public_projection(
-            service.overview(include_technical=False).to_dict()
+            service.project(page, include_technical=False).to_dict()
         )
     except Exception as exc:  # noqa: BLE001 - never expose projection failures
         current_app.logger.warning(
-            "Federation overview projection unavailable (%s)",
+            "Federation %s projection unavailable (%s)",
+            page.value,
             type(exc).__name__,
         )
         fallback = FederationProjectionService(ProjectionAdapters())
-        return assert_public_projection(fallback.overview().to_dict())
+        return assert_public_projection(fallback.project(page).to_dict())
 
 
-def _overview_response() -> Response:
+def _page_response(page: FederationPage) -> Response:
+    template = (
+        "federation_overview.html"
+        if page is FederationPage.OVERVIEW
+        else "federation/detail_page.html"
+    )
+    projection = _safe_projection(page)
     response = make_response(
         render_template(
-            "federation_overview.html",
-            federation_overview=_safe_overview(),
+            template,
+            federation_overview=projection,
+            federation_page=projection,
         )
     )
     response.headers["Cache-Control"] = "no-store"
@@ -75,7 +96,19 @@ def _serve_read_only_federation_before_runtime_gate() -> Response | None:
 def overview() -> Response:
     if request.query_string:
         return redirect(url_for("federation_web.overview"))
-    return _overview_response()
+    return _page_response(FederationPage.OVERVIEW)
+
+
+@federation_web.get("/federation/<page_name>", strict_slashes=False)
+def detail(page_name: str) -> Response:
+    page = _PAGE_BY_PATH.get(page_name)
+    if page is None:
+        abort(404)
+    if request.query_string:
+        return redirect(
+            url_for("federation_web.detail", page_name=page_name)
+        )
+    return _page_response(page)
 
 
 __all__ = ["federation_web"]

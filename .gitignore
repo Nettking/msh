@@ -18,6 +18,12 @@
 !/results/README.md
 !/results/.gitkeep
 
+# CF7 physical acceptance is local and may contain redacted operational evidence.
+# Never commit raw endpoints, screenshots, logs, topology choices or evidence files.
+/evidence/
+/cf7-physical.local.json
+/cf7-topology.local.json
+
 # Python / environment
 /.env
 __pycache__/

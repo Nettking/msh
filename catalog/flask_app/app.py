@@ -10,15 +10,27 @@ from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
 from .ai_routes import ai_web
+from .capability_benchmark_routes import capability_benchmark_web
+from .capability_contribution_routes import capability_contribution_web
+from .capability_inspection_routes import capability_inspection_web
 from .capability_onboarding_routes import capability_onboarding_web
+from .capability_startup_transition_routes import (
+    capability_startup_transition_web,
+)
 from .docs_routes import docs_web
+from .federation_pairing_routes import federation_pairing_web
 from .federation_routes import federation_web
 from .operator_strategy_routes import operator_strategy_web
 from .operator_support_routes import operator_support_web
 from .provider_federation_routes import provider_federation_web
 from .routes import web
 from .server_setup_routes import server_setup_web
+from .services.capability_startup_transition_service import (
+    get_capability_startup_transition_service,
+)
 from .services.catalog_service import ArtifactCatalog
+from .services.federation_pairing_install import install_federation_pairing
+from .services.onboarding_view_normalizer import normalize_onboarding_view_model
 from .services.recorder_control_service import get_recorder_control_service
 from .services.server_setup_service import (
     AI_MODEL_CHOICES,
@@ -27,7 +39,6 @@ from .services.server_setup_service import (
     ServerSetupError,
     load_settings,
     ollama_status,
-    runtime_should_start,
 )
 from .source_routes import source_web
 
@@ -50,6 +61,27 @@ def create_app() -> Flask:
         ),
     )
     app.config.setdefault(
+        "CAPABILITY_ONBOARDING_TRANSITION_DATABASE",
+        os.getenv(
+            "MSH_FEDERATION_TRANSITION_DATABASE",
+            app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
+        ),
+    )
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_BENCHMARK_DATABASE",
+        os.getenv(
+            "MSH_FEDERATION_BENCHMARK_DATABASE",
+            app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
+        ),
+    )
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_CONTRIBUTION_DATABASE",
+        os.getenv(
+            "MSH_FEDERATION_CONTRIBUTION_DATABASE",
+            app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
+        ),
+    )
+    app.config.setdefault(
         "CAPABILITY_ONBOARDING_COORDINATOR_DATABASE",
         os.getenv(
             "MSH_FEDERATION_COORDINATOR_DATABASE",
@@ -61,6 +93,31 @@ def create_app() -> Flask:
         os.getenv("MSH_DEVICE_NAME", "This MSH device"),
     )
     app.config.setdefault("CAPABILITY_ONBOARDING_DISCOVERY_SOURCES", ())
+    app.config.setdefault("CAPABILITY_ONBOARDING_INSPECTION_ADAPTERS", None)
+    app.config.setdefault("CAPABILITY_ONBOARDING_CONTRIBUTION_SOURCES", None)
+    app.config.setdefault("CAPABILITY_ONBOARDING_CONTRIBUTION_ADAPTERS", None)
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_PAIRING_RELAY_URL",
+        os.getenv("MSH_PAIRING_RELAY_URL", ""),
+    )
+    remote_pairing_path = os.getenv("MSH_FEDERATION_REMOTE_PAIRING_PATH", "")
+    if remote_pairing_path:
+        app.config.setdefault(
+            "CAPABILITY_ONBOARDING_REMOTE_PAIRING_PATH",
+            remote_pairing_path,
+        )
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS",
+        int(os.getenv("MSH_INSPECTION_TTL_SECONDS", "900")),
+    )
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_CONTRIBUTION_TTL_SECONDS",
+        int(os.getenv("MSH_CONTRIBUTION_TTL_SECONDS", "900")),
+    )
+    app.jinja_env.globals["normalize_onboarding_view_model"] = (
+        normalize_onboarding_view_model
+    )
+    install_federation_pairing(app)
 
     catalog = ArtifactCatalog()
     app.config["ARTIFACT_CATALOG"] = catalog
@@ -104,11 +161,16 @@ def create_app() -> Flask:
     )
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
-    # Read-only and capability-onboarding surfaces are registered before the
-    # legacy setup/runtime gates. CFI-2 reuses existing authorities and leaves
-    # the role-first fallback unchanged.
+    # CFI-6 owns capability-first startup and migration before CFI-5 and the
+    # retained role-first compatibility gates. It persists intent only and
+    # delegates every operational authority to the already registered services.
     app.register_blueprint(docs_web)
     app.register_blueprint(federation_web)
+    app.register_blueprint(federation_pairing_web)
+    app.register_blueprint(capability_startup_transition_web)
+    app.register_blueprint(capability_contribution_web)
+    app.register_blueprint(capability_benchmark_web)
+    app.register_blueprint(capability_inspection_web)
     app.register_blueprint(capability_onboarding_web)
     app.register_blueprint(server_setup_web)
     app.register_blueprint(web)
@@ -127,30 +189,44 @@ if __name__ == "__main__":
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
 
     setup = None
+    runtime_enabled = False
     try:
         setup = load_settings()
     except ServerSetupError as exc:
         print(
-            f"[orchestrator] browser setup needs attention before runtime starts: {exc}",
+            f"[orchestrator] setup needs attention before runtime starts: {exc}",
+            flush=True,
+        )
+    try:
+        with app.app_context():
+            runtime_enabled = (
+                get_capability_startup_transition_service().runtime_should_start(
+                    setup
+                )
+            )
+    except Exception as exc:  # noqa: BLE001 - corrupt state must fail closed
+        print(
+            "[orchestrator] capability-first startup state needs repair: "
+            f"{type(exc).__name__}",
             flush=True,
         )
 
     if (
         os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1"
         and setup is not None
-        and runtime_should_start(setup)
+        and runtime_enabled
     ):
         runtime_manager = get_runtime_manager()
         if runtime_manager.requires_startup_choice():
             print(
-                "[orchestrator] startup mode selection required at /startup "
-                "before runtime processing begins",
+                "[orchestrator] runtime progress choice remains available through "
+                "the controlled legacy fallback",
                 flush=True,
             )
         else:
             print(
-                "[orchestrator] webapp-first startup: Flask available immediately, "
-                "runtime starts in background",
+                "[orchestrator] capability-first startup: Flask available "
+                "immediately, runtime starts in background",
                 flush=True,
             )
             start_runtime_background()
@@ -160,14 +236,14 @@ if __name__ == "__main__":
         or not getattr(setup, "user_setup_complete", False)
     ):
         print(
-            "[orchestrator] first-time browser setup required at /startup; "
+            "[orchestrator] capability-first onboarding required at /onboarding; "
             "runtime will remain idle",
             flush=True,
         )
     else:
         print(
-            "[orchestrator] orchestration disabled by environment or browser setup; "
-            "runtime manager will remain idle",
+            "[orchestrator] runtime disabled by capability intent, environment, "
+            "or repair state",
             flush=True,
         )
 

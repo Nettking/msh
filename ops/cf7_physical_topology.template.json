@@ -1,0 +1,38 @@
+{
+  "schema": "msh.cf7.physical-topology.v1",
+  "candidate_commit": "REPLACE_WITH_FROZEN_40_CHARACTER_SHA",
+  "machines": {
+    "local-ai": {
+      "os_family": "windows",
+      "roles": [
+        "language-model",
+        "desktop-browser"
+      ],
+      "private_configuration": "Set MSH_CF7_OLLAMA_URL and MSH_CF7_OLLAMA_MODEL locally. Do not write endpoint values here."
+    },
+    "cnc-recorder": {
+      "os_family": "linux",
+      "roles": [
+        "recorder",
+        "mtconnect"
+      ],
+      "private_configuration": "Set MSH_CF7_MTCONNECT_ENDPOINTS locally as a JSON alias-to-endpoint object for both CNC machines."
+    },
+    "school-control": {
+      "os_family": "windows",
+      "roles": [
+        "control",
+        "registered-compute",
+        "storage-candidate",
+        "mobile-browser"
+      ],
+      "private_configuration": "Set MSH_CF7_PEERS locally as a JSON alias-to-host:port object for the other two machines."
+    }
+  },
+  "rules": [
+    "Change os_family values to match the real machines before testing.",
+    "The final topology must include at least one physical Windows host and one physical Linux host.",
+    "Never store raw IP addresses, URLs, credentials, private hostnames or local absolute paths in this file.",
+    "All three machines must use the same frozen candidate commit."
+  ]
+}

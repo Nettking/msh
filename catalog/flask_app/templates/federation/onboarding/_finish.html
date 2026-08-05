@@ -1,3 +1,5 @@
+      {% set transition_action = vm.finish.transition_action|default(None) %}
+      {% set next_action = vm.finish.next_action|default(None) %}
       <section class="onboarding-panel" data-step-panel="finish" aria-labelledby="finish-heading">
         <header class="onboarding-panel__header">
           <div>
@@ -14,15 +16,30 @@
           {% endfor %}
         </div>
 
-        {% if vm.finish.next_action %}
+        {% if transition_action %}
+        <form method="post" action="{{ transition_action.url }}" class="recommended-action">
+          {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+          {% if vm.command_id|default('') %}<input type="hidden" name="command_id" value="{{ vm.command_id }}">{% endif %}
+          <div>
+            <span class="federation-eyebrow">Compatibility-controlled transition</span>
+            <h4>{{ transition_action.label }}</h4>
+            <p>MSH will persist capability-first startup state without changing Federation authority or deleting the supported legacy fallback.</p>
+          </div>
+          <button class="federation-button federation-button--primary" type="submit" data-finish-link>{{ transition_action.label }}</button>
+        </form>
+        {% endif %}
+
+        {% if next_action %}
         <section class="recommended-action">
-          <div><span class="federation-eyebrow">Recommended next action</span><h4>{{ vm.finish.next_action.title }}</h4><p>{{ vm.finish.next_action.message }}</p></div>
-          <a class="federation-button federation-button--primary" href="{{ vm.finish.next_action.url }}" data-finish-link>{{ vm.finish.next_action.label }}</a>
+          <div><span class="federation-eyebrow">Recommended next action</span><h4>{{ next_action.title }}</h4><p>{{ next_action.message }}</p></div>
+          <a class="federation-button federation-button--primary" href="{{ next_action.url }}" data-finish-link>{{ next_action.label }}</a>
         </section>
         {% endif %}
 
         <div class="onboarding-actions">
           <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
-          <a class="federation-button federation-button--secondary" href="{{ vm.actions.overview_url }}" data-finish-link>Open Federation overview</a>
+          {% if vm.migration.can_migrate|default(false) or vm.migration.source_kind|default('') == 'degraded' %}
+          <a class="federation-button federation-button--ghost" href="{{ vm.actions.legacy_setup_url }}">Open legacy fallback</a>
+          {% endif %}
         </div>
       </section>

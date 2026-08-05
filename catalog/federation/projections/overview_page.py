@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
-from .models import FederationPage, FederationViewModel, SummaryCard
+from .models import (
+    FederationPage,
+    FederationViewModel,
+    RecommendedAction,
+    SummaryCard,
+)
 from .service_core import (
     _ACTIVE_PROVIDER_STATES,
     _FAILED_JOB_STATES,
@@ -17,14 +22,39 @@ from .service_core import (
 
 
 class OverviewProjectionMixin:
+    @staticmethod
+    def _device_connected(snapshot: object, device: object) -> bool:
+        onboarding = snapshot.onboarding
+        if (
+            device.node_id == onboarding.device_id
+            and onboarding.connection_state == "connected"
+            and onboarding.trusted
+        ):
+            return True
+        return device.state in _ONLINE_DEVICE_STATES
+
     def overview(self, *, include_technical: bool = False) -> FederationViewModel:
         snapshot = self._snapshot()
         state, state_label = self._state(snapshot)
         notice = self._notice(snapshot)
         next_action = self._selected_action(snapshot, notice)
+        if (
+            next_action is None
+            and snapshot.onboarding.available
+            and snapshot.onboarding.connection_state == "connected"
+            and snapshot.onboarding.trusted
+            and snapshot.onboarding.inspection_revision is None
+        ):
+            next_action = RecommendedAction(
+                "Inspect this device",
+                "Run the safe local inspection before reviewing benchmarks or contributions.",
+                "Open inspection",
+                "/onboarding?step=inspect",
+            )
+
         devices = snapshot.federation.devices
-        online_devices = sum(
-            device.state in _ONLINE_DEVICE_STATES for device in devices
+        connected_devices = sum(
+            self._device_connected(snapshot, device) for device in devices
         )
         active_services = sum(
             provider.activation_state in _ACTIVE_PROVIDER_STATES
@@ -35,6 +65,7 @@ class OverviewProjectionMixin:
                 contribution.activation_state == "active"
                 for contribution in snapshot.onboarding.contributions
             )
+        benchmark_count = len(snapshot.benchmarks.results)
         current_benchmarks = sum(
             result.current for result in snapshot.benchmarks.results
         )
@@ -45,13 +76,53 @@ class OverviewProjectionMixin:
             job.status in _FAILED_JOB_STATES for job in snapshot.jobs.jobs
         )
 
+        if benchmark_count == 0:
+            benchmark_card = SummaryCard(
+                "Benchmark freshness",
+                "0 results",
+                "Run inspection and review the recommended checks.",
+                "empty",
+                "Not run",
+            )
+        else:
+            benchmark_card = SummaryCard(
+                "Benchmark freshness",
+                f"{current_benchmarks} of {benchmark_count}",
+                (
+                    "All evidence is current"
+                    if current_benchmarks == benchmark_count
+                    else (
+                        f"{benchmark_count - current_benchmarks} "
+                        "result(s) need review"
+                    )
+                ),
+                (
+                    "passed"
+                    if current_benchmarks == benchmark_count
+                    else "expired"
+                ),
+                (
+                    "Current"
+                    if current_benchmarks == benchmark_count
+                    else "Review"
+                ),
+            )
+
         cards = (
             SummaryCard(
                 "Trusted devices",
                 str(len(devices)),
-                f"{online_devices} online now",
-                "connected" if devices and online_devices == len(devices) else "degraded",
-                "Healthy" if devices and online_devices == len(devices) else "Review",
+                f"{connected_devices} connected now",
+                (
+                    "connected"
+                    if devices and connected_devices == len(devices)
+                    else "degraded"
+                ),
+                (
+                    "Healthy"
+                    if devices and connected_devices == len(devices)
+                    else "Review"
+                ),
             ),
             SummaryCard(
                 "Active services",
@@ -60,28 +131,7 @@ class OverviewProjectionMixin:
                 "active" if active_services else "empty",
                 "Available" if active_services else "None active",
             ),
-            SummaryCard(
-                "Benchmark freshness",
-                f"{current_benchmarks} of {len(snapshot.benchmarks.results)}",
-                (
-                    "All evidence is current"
-                    if current_benchmarks == len(snapshot.benchmarks.results)
-                    else (
-                        f"{len(snapshot.benchmarks.results) - current_benchmarks} "
-                        "result(s) need review"
-                    )
-                ),
-                (
-                    "passed"
-                    if current_benchmarks == len(snapshot.benchmarks.results)
-                    else "expired"
-                ),
-                (
-                    "Current"
-                    if current_benchmarks == len(snapshot.benchmarks.results)
-                    else "Review"
-                ),
-            ),
+            benchmark_card,
             SummaryCard(
                 "Jobs",
                 f"{running_jobs} running",
@@ -128,19 +178,15 @@ class OverviewProjectionMixin:
             if active_types
             else "."
         )
+        device_connected = (
+            snapshot.onboarding.connection_state == "connected"
+            and snapshot.onboarding.trusted
+        )
         device = {
             "label": device_label,
             "summary": device_summary,
-            "state": (
-                "connected"
-                if snapshot.onboarding.connection_state == "connected"
-                else "unavailable"
-            ),
-            "state_label": (
-                "Online"
-                if snapshot.onboarding.connection_state == "connected"
-                else "Reconnect"
-            ),
+            "state": "connected" if device_connected else "unavailable",
+            "state_label": "Connected" if device_connected else "Reconnect",
             "detail_url": "/federation/device",
             "details": [
                 {"label": "Device ID", "value": device_id},
@@ -200,7 +246,7 @@ class OverviewProjectionMixin:
             "items": benchmark_items,
             "empty_action": {
                 "label": "Run benchmarks",
-                "url": "/federation/benchmarks",
+                "url": "/onboarding?step=benchmarks",
             },
         }
 
@@ -210,17 +256,13 @@ class OverviewProjectionMixin:
         ]
         device_items = []
         for item in devices[:5]:
-            state_value = (
-                "connected" if item.state in _ONLINE_DEVICE_STATES else "unavailable"
-            )
+            is_connected = self._device_connected(snapshot, item)
             device_items.append(
                 {
                     "label": item.label,
                     "detail": _count(item.capability_count, "service"),
-                    "state": state_value,
-                    "state_label": (
-                        "Online" if state_value == "connected" else "Offline"
-                    ),
+                    "state": "connected" if is_connected else "unavailable",
+                    "state_label": "Connected" if is_connected else "Offline",
                 }
             )
         activity_items = [

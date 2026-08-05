@@ -26,6 +26,8 @@ class AICandidateSpec:
 
 
 class AICandidateSource:
+    """Expose configured AI intent without pretending an unavailable model works."""
+
     def __init__(self, services: Mapping[str, AICandidateSpec]) -> None:
         self._services = dict(services)
 
@@ -34,21 +36,25 @@ class AICandidateSource:
         inspection: DeviceInspectionSnapshot,
     ) -> tuple[LocalContributionDescriptor, ...]:
         detected = set(inspection.detected_services)
-        return tuple(
-            LocalContributionDescriptor(
-                logical_service_id=spec.service_id,
-                capability_type="language-model",
-                capability_protocol=spec.protocol,
-                display_label=spec.display_label,
-                capacity_envelope={
-                    **spec.capacity_envelope,
-                    "provider_id": spec.service_id,
-                },
-                missing_prerequisites=spec.missing_prerequisites,
+        descriptors: list[LocalContributionDescriptor] = []
+        for service_id, spec in sorted(self._services.items()):
+            missing = list(spec.missing_prerequisites)
+            if service_id not in detected:
+                missing.append("configured-service-not-detected")
+            descriptors.append(
+                LocalContributionDescriptor(
+                    logical_service_id=spec.service_id,
+                    capability_type="language-model",
+                    capability_protocol=spec.protocol,
+                    display_label=spec.display_label,
+                    capacity_envelope={
+                        **spec.capacity_envelope,
+                        "provider_id": spec.service_id,
+                    },
+                    missing_prerequisites=tuple(dict.fromkeys(missing)),
+                )
             )
-            for service_id, spec in sorted(self._services.items())
-            if service_id in detected
-        )
+        return tuple(descriptors)
 
 
 class AIContributionAdapter:

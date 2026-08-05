@@ -2,8 +2,8 @@
         <header class="onboarding-panel__header">
           <div>
             <span class="onboarding-panel__step">Step 2 of 6</span>
-            <h3 id="federation-heading">Connect to a federation</h3>
-            <p>Choose a trusted federation that MSH discovered, or create one on this device.</p>
+            <h3 id="federation-heading">Connect the MSH devices</h3>
+            <p>Create a signed pairing code on one device and paste it into the other. A public device ID alone never grants membership.</p>
           </div>
           {{ status_badge(vm.federation.state, vm.federation.state_label, True) }}
         </header>
@@ -11,78 +11,112 @@
         {% if vm.federation.connected_label|default('') %}
         <div class="federation-notice">
           <strong>This device has a revalidated trusted federation binding.</strong>
-          <span>The internal authority identifier remains private.</span>
+          <span>{{ 'Connected through the shared relay.' if vm.federation.pairing_mode|default('local') == 'remote' else 'This device currently owns or uses the local federation authority.' }}</span>
         </div>
         {% endif %}
 
         {% if vm.federation.repair_reason|default('') %}
         <div class="federation-warning" role="alert">
           <strong>Saved membership needs attention</strong>
-          <span>The identity and local binding were kept. No new authority was created.</span>
+          <span>The identity and saved binding were kept. No new authority was created. Reconnect or paste a new pairing code.</span>
         </div>
         {% endif %}
 
         {% if vm.federation.can_reconnect|default(false) %}
-        <form method="post" action="{{ vm.actions.federation_url }}" class="local-federation-action">
+        <form method="post" action="{{ vm.actions.federation_url|default('/onboarding/federation') }}" class="local-federation-action">
           <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
           <input type="hidden" name="command_id" value="{{ vm.command_id|default('') }}">
           <input type="hidden" name="intent" value="reconnect">
-          <div><strong>Reconnect trusted membership</strong><span>Revalidate the saved identity and membership without minting new enrollment or invitation authority.</span></div>
+          <div><strong>Reconnect trusted membership</strong><span>Revalidate the saved identity and membership without creating new authority.</span></div>
           <button class="federation-button federation-button--primary" type="submit">Reconnect</button>
         </form>
         {% endif %}
 
-        {% if vm.federation.candidates %}
-        <form method="post" action="{{ vm.actions.federation_url }}" class="federation-candidate-form">
-          <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
-          <input type="hidden" name="command_id" value="{{ vm.command_id|default('') }}">
-          <fieldset>
-            <legend>Discovered federations</legend>
-            <div class="federation-candidate-grid">
-              {% for candidate in vm.federation.candidates %}
-              <label class="federation-candidate{% if candidate.selected %} is-selected{% endif %}">
-                <input type="radio" name="discovery_id" value="{{ candidate.discovery_id }}" {% if candidate.selected %}checked{% endif %} {% if not candidate.available %}disabled{% endif %}>
-                <span class="federation-candidate__main">
-                  <strong>{{ candidate.label }}</strong>
-                  <small>{{ candidate.transport_label }}</small>
-                </span>
-                {{ status_badge(candidate.state, candidate.state_label) }}
-                <span class="federation-candidate__verification"><span>Verification code</span><code>{{ candidate.verification_code }}</code></span>
-                <span class="federation-candidate__fingerprint">{{ candidate.fingerprint }}</span>
-                {% if candidate.reason %}<span class="federation-candidate__reason">{{ candidate.reason }}</span>{% endif %}
-              </label>
-              {% endfor %}
-            </div>
-          </fieldset>
-          <label>
-            <span>Enter the verification code for a first join</span>
-            <input type="text" name="verification_code" maxlength="128" autocomplete="off" spellcheck="false">
-          </label>
-          <div class="onboarding-inline-actions">
-            <button class="federation-button federation-button--primary" type="submit" name="intent" value="join">Verify and join</button>
-            <button class="federation-button federation-button--secondary" type="submit" name="intent" value="refresh" formnovalidate>Scan again</button>
+        {% if vm.federation.can_generate_pairing_code|default(false) %}
+        <section class="local-federation-action" aria-labelledby="pairing-code-heading">
+          <div>
+            <strong id="pairing-code-heading">Connect another MSH device</strong>
+            <span>Generate a signed one-use code. It expires after five minutes.</span>
           </div>
-        </form>
-        {% elif not vm.federation.connected_label|default('') %}
-          {{ empty_state('No federation found yet', 'Create a federation on this device or scan the trusted network again.', vm.federation.empty_action, 'information') }}
+          <form method="post" action="{{ vm.actions.pairing_code_url|default('/onboarding/federation/pairing-code') }}">
+            <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
+            <button class="federation-button federation-button--secondary" type="submit">Create pairing code</button>
+          </form>
+        </section>
         {% endif %}
 
-        {% if vm.federation.can_create_local|default(true) %}
-        <form method="post" action="{{ vm.actions.federation_url }}" class="local-federation-action">
+        {% if vm.federation.pairing_code|default('') %}
+        <label class="federation-pairing-code">
+          <span>Copy this code to the other device</span>
+          <textarea readonly rows="6" spellcheck="false" data-pairing-code>{{ vm.federation.pairing_code }}</textarea>
+          <small>The code contains private one-use enrollment material. Do not post it publicly.</small>
+        </label>
+        {% endif %}
+
+        {% if vm.federation.can_redeem_pairing_code|default(true) %}
+        <form method="post" action="{{ vm.actions.pair_url|default('/onboarding/federation/pair') }}" class="federation-candidate-form">
           <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
-          <input type="hidden" name="command_id" value="{{ vm.command_id|default('') }}">
-          <input type="hidden" name="intent" value="create-local">
-          <div><strong>Start locally instead</strong><span>Create a federation on this device only after discovery completed with no candidate.</span></div>
-          <button class="federation-button federation-button--secondary" type="submit">Create local federation</button>
+          <label>
+            <span>Pairing code from the other MSH device</span>
+            <textarea name="pairing_code" rows="5" maxlength="32768" autocomplete="off" spellcheck="false" required></textarea>
+          </label>
+          <p>Pairing switches this device to the shared Federation only after the signed code and relay membership are verified.</p>
+          <button class="federation-button federation-button--primary" type="submit">Connect this device</button>
         </form>
         {% endif %}
+
+        <details class="federation-technical-details">
+          <summary>Other discovery options</summary>
+          {% if vm.federation.candidates %}
+          <form method="post" action="{{ vm.actions.federation_url|default('/onboarding/federation') }}" class="federation-candidate-form">
+            <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
+            <input type="hidden" name="command_id" value="{{ vm.command_id|default('') }}">
+            <fieldset>
+              <legend>Discovered federations</legend>
+              <div class="federation-candidate-grid">
+                {% for candidate in vm.federation.candidates %}
+                <label class="federation-candidate{% if candidate.selected %} is-selected{% endif %}">
+                  <input type="radio" name="discovery_id" value="{{ candidate.discovery_id }}" {% if candidate.selected %}checked{% endif %} {% if not candidate.available %}disabled{% endif %}>
+                  <span class="federation-candidate__main">
+                    <strong>{{ candidate.label }}</strong>
+                    <small>{{ candidate.transport_label }}</small>
+                  </span>
+                  {{ status_badge(candidate.state, candidate.state_label) }}
+                  <span class="federation-candidate__verification"><span>Verification code</span><code>{{ candidate.verification_code }}</code></span>
+                  <span class="federation-candidate__fingerprint">{{ candidate.fingerprint }}</span>
+                  {% if candidate.reason %}<span class="federation-candidate__reason">{{ candidate.reason }}</span>{% endif %}
+                </label>
+                {% endfor %}
+              </div>
+            </fieldset>
+            <label>
+              <span>Verification code</span>
+              <input type="text" name="verification_code" maxlength="128" autocomplete="off" spellcheck="false">
+            </label>
+            <div class="onboarding-inline-actions">
+              <button class="federation-button federation-button--primary" type="submit" name="intent" value="join">Verify and join</button>
+              <button class="federation-button federation-button--secondary" type="submit" name="intent" value="refresh" formnovalidate>Scan again</button>
+            </div>
+          </form>
+          {% endif %}
+
+          {% if vm.federation.can_create_local|default(true) %}
+          <form method="post" action="{{ vm.actions.federation_url|default('/onboarding/federation') }}" class="local-federation-action">
+            <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
+            <input type="hidden" name="command_id" value="{{ vm.command_id|default('') }}">
+            <input type="hidden" name="intent" value="create-local">
+            <div><strong>Create a new Federation here</strong><span>Use this on the first device, then generate a pairing code for the others.</span></div>
+            <button class="federation-button federation-button--secondary" type="submit">Create local Federation</button>
+          </form>
+          {% endif %}
+        </details>
 
         <div class="onboarding-actions">
           <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
           {% if vm.federation.connected_label|default('') %}
-          <a class="federation-button federation-button--primary" href="{{ vm.actions.overview_url }}">Open Federation overview</a>
+          <a class="federation-button federation-button--primary" href="/onboarding?step=inspect">Continue to inspection</a>
           {% else %}
-          <button class="federation-button federation-button--primary" type="button" disabled aria-disabled="true">Inspection remains blocked</button>
+          <button class="federation-button federation-button--primary" type="button" disabled aria-disabled="true">Connect a Federation first</button>
           {% endif %}
         </div>
       </section>

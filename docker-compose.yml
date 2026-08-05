@@ -12,6 +12,8 @@ services:
       - MSH_AI_MODEL=${MSH_AI_MODEL:-llama3.2:3b}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
       - MSH_DEVICE_NAME=${MSH_DEVICE_NAME:-This MSH device}
+      - MSH_RELAY_PORT=${MSH_RELAY_PORT:-8765}
+      - MSH_PAIRING_RELAY_URL=${MSH_PAIRING_RELAY_URL:-}
       - MSH_FEDERATION_NODE_STATE_DIR=${MSH_FEDERATION_NODE_STATE_DIR:-/app/data/federation/device}
       - MSH_FEDERATION_ONBOARDING_DATABASE=${MSH_FEDERATION_ONBOARDING_DATABASE:-/app/data/federation/onboarding/onboarding.sqlite3}
       - MSH_FEDERATION_COORDINATOR_DATABASE=${MSH_FEDERATION_COORDINATOR_DATABASE:-/var/lib/msh-relay/control.sqlite3}
@@ -98,10 +100,9 @@ services:
     restart: unless-stopped
 
   relay:
-    # Development-only plaintext relay. Prefer the explicit relay-dev profile.
-    # The relay profile remains as a compatibility alias for the Phase 2 runbook.
-    # Host publication is loopback-only; use TLS outside local development.
-    profiles: ["relay-dev", "relay"]
+    # Authenticated development relay for copy-and-paste pairing on a trusted
+    # private LAN or VPN. The pairing code is signed, expires quickly and uses
+    # one-use enrollment/invitation tokens. Configure WSS for untrusted networks.
     build:
       context: .
       dockerfile: Dockerfile.cli
@@ -119,7 +120,7 @@ services:
       - "8765"
       - --unsafe-development-plaintext
     ports:
-      - "127.0.0.1:${MSH_RELAY_PORT:-8765}:8765"
+      - "${MSH_RELAY_BIND:-0.0.0.0}:${MSH_RELAY_PORT:-8765}:8765"
     volumes:
       - relay_state:/var/lib/msh-relay
     restart: unless-stopped

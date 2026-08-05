@@ -8,11 +8,18 @@
           {{ status_badge(vm.benchmark_summary.state, vm.benchmark_summary.label, True) }}
         </header>
 
+        <p class="federation-notice">Contributions remain blocked until benchmark review and an explicit supported choice are complete.</p>
+
+        {% if vm.benchmarks %}
         <div class="benchmark-list">
           {% for benchmark in vm.benchmarks %}
           <article class="benchmark-card benchmark-card--{{ benchmark.state }}" data-benchmark-card="{{ benchmark.id }}">
             <header>
-              <div><span>{{ benchmark.capability_label }}</span><h4>{{ benchmark.label }}</h4></div>
+              <div>
+                <span>{{ benchmark.capability_label }}</span>
+                <h4>{{ benchmark.label }}</h4>
+                {% if benchmark.get('target_label') %}<small>Target: {{ benchmark.target_label }}</small>{% endif %}
+              </div>
               {{ status_badge(benchmark.state, benchmark.state_label, True) }}
             </header>
             <p>{{ benchmark.summary }}</p>
@@ -20,10 +27,19 @@
             {% if benchmark.diagnostic %}<p class="benchmark-card__diagnostic">{{ benchmark.diagnostic }}</p>{% endif %}
             <form method="post" action="{{ benchmark.action_url }}" data-benchmark-form>
               {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
-              <input type="hidden" name="benchmark_id" value="{{ benchmark.id }}">
+              <input type="hidden" name="benchmark_id" value="{{ benchmark.get('benchmark_id', benchmark.id) }}">
+              {% if benchmark.get('target_service_id') %}<input type="hidden" name="target_service_id" value="{{ benchmark.target_service_id }}">{% endif %}
               <button class="federation-button federation-button--secondary" type="submit" {% if not benchmark.can_run %}disabled{% endif %}>{{ benchmark.action_label }}</button>
               {% if benchmark.expires_label %}<small>{{ benchmark.expires_label }}</small>{% endif %}
             </form>
+            {% if benchmark.get('can_cancel') %}
+            <form method="post" action="{{ benchmark.cancel_url }}" class="benchmark-cancel-form">
+              {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
+              <input type="hidden" name="benchmark_id" value="{{ benchmark.benchmark_id }}">
+              <input type="hidden" name="target_service_id" value="{{ benchmark.target_service_id }}">
+              <button class="federation-button federation-button--ghost" type="submit">Cancel check</button>
+            </form>
+            {% endif %}
           </article>
           {% endfor %}
         </div>
@@ -31,11 +47,18 @@
         <form method="post" action="{{ vm.actions.skip_benchmarks_url }}" class="benchmark-skip">
           {% if vm.csrf_token %}<input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">{% endif %}
           <div><strong>Continue without optional checks</strong><span>Skipped benchmarks remain visible and never enable a contribution automatically.</span></div>
-          <button class="federation-button federation-button--ghost" type="submit">Skip optional benchmarks</button>
+          <button class="federation-button federation-button--ghost" type="submit" {% if not vm.benchmark_summary.get('can_skip', True) %}disabled{% endif %}>Skip optional benchmarks</button>
         </form>
+        {% else %}
+        <div class="federation-empty-state" role="status">
+          <h4>{{ vm.benchmark_summary.label }}</h4>
+          <p>Inspection did not find a configured Ollama model, MTConnect source, registered compute handler, or storage candidate that MSH can check.</p>
+          <a class="federation-button federation-button--secondary" href="{{ vm.benchmark_summary.get('setup_url', '/startup') }}">Configure this device</a>
+        </div>
+        {% endif %}
 
         <div class="onboarding-actions">
           <button class="federation-button federation-button--ghost" type="button" data-prev-step>Back</button>
-          <button class="federation-button federation-button--primary" type="button" data-next-step>Review contributions</button>
+          <button class="federation-button federation-button--primary" type="button" data-next-step {% if vm.benchmark_summary.state != 'complete' %}disabled aria-disabled="true"{% endif %}>Review contributions</button>
         </div>
       </section>

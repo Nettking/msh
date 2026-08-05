@@ -36,6 +36,18 @@
   </section>
   {% endif %}
 
+  {% set startup_flags = capability_startup_flags|default({}) %}
+  {% if startup_flags.completed|default(false) %}
+  <section class="recommended-action">
+    <div>
+      <span class="federation-eyebrow">Optional device setup</span>
+      <h3>Benchmark and contribution review</h3>
+      <p>Run checks and choose which services this device may contribute whenever it is convenient. These choices do not block Federation access.</p>
+    </div>
+    <a class="federation-button federation-button--secondary" href="{{ url_for('capability_startup_transition_web.onboarding', step='benchmarks') }}">Review optional capabilities</a>
+  </section>
+  {% endif %}
+
   <div class="federation-summary-grid">
     {% for card in vm.summary_cards %}
     <article class="federation-summary-card">

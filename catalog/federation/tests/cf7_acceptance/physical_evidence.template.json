@@ -1,0 +1,94 @@
+{
+  "schema": "msh.cf7.physical-evidence.v1",
+  "commit_sha": "0000000000000000000000000000000000000000",
+  "executed_at": "1970-01-01T00:00:00Z",
+  "operator": "REPLACE WITH OPERATOR NAME",
+  "environments": {
+    "windows": {
+      "os_family": "windows",
+      "fresh_checkout": false,
+      "repository_clean": false,
+      "result": "pending",
+      "command_log": "evidence/windows/commands.txt"
+    },
+    "linux": {
+      "os_family": "linux",
+      "fresh_checkout": false,
+      "repository_clean": false,
+      "result": "pending",
+      "command_log": "evidence/linux/commands.txt"
+    }
+  },
+  "scenarios": {
+    "physical.fresh-windows-checkout": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Run the clean Windows checkout procedure."
+    },
+    "physical.fresh-linux-checkout": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Run the clean Linux checkout procedure."
+    },
+    "physical.multi-host-relay-and-network-path": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Use independent hosts and the approved deployment network."
+    },
+    "physical.mtconnect-recorder-source": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Use a reachable physical or approved MTConnect source."
+    },
+    "physical.ollama-model-and-accelerator": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Use the target Ollama model files and accelerator hardware."
+    },
+    "physical.mobile-and-desktop-browser-review": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Review the onboarding and Federation product in real browsers."
+    },
+    "physical.recorder-plus-ai-simultaneous-contribution": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Enable recorder and language-model contribution on one device."
+    },
+    "physical.separate-ai-compute-storage-contributors": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Use independent devices for AI, registered compute, and storage candidate paths."
+    },
+    "physical.benchmark-expiry-and-rerun": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Observe expiry or invalidation and complete a bounded rerun."
+    },
+    "physical.contribution-disable-and-reenable": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Disable and re-enable a contribution without changing membership."
+    },
+    "physical.restart-and-reconciliation": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Restart the device and verify contribution reconciliation."
+    },
+    "physical.revocation-and-controlled-rejoin": {
+      "status": "pending",
+      "evidence_refs": [],
+      "notes": "Revoke membership, verify fencing, and complete controlled rejoin."
+    }
+  },
+  "privacy_review": {
+    "no_credentials": false,
+    "no_private_endpoints": false,
+    "no_private_database_paths": false,
+    "no_reusable_enrollment_material": false,
+    "operator_reviewed": false
+  },
+  "notes": [
+    "This template is intentionally incomplete and must fail full validation until every physical scenario has passed."
+  ]
+}

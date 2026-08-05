@@ -114,10 +114,16 @@ def test_cross_platform_port_and_process_restart_helpers(tmp_path: Path) -> None
         assert first_pid == process.process.pid
 
         process = process.restart()
-        wait_until(
-            lambda: marker.exists()
-            and int(marker.read_text(encoding="utf-8")) != first_pid
-        )
+
+        def marker_contains_new_pid() -> bool:
+            if not marker.exists():
+                return False
+            try:
+                return int(marker.read_text(encoding="utf-8")) != first_pid
+            except ValueError:
+                return False
+
+        wait_until(marker_contains_new_pid)
         second_pid = int(marker.read_text(encoding="utf-8"))
         assert second_pid == process.process.pid
         assert second_pid != first_pid
@@ -313,7 +319,7 @@ def test_scenario_manifest_separates_executable_blocked_and_manual_status() -> N
         for scenario in manifest["blocked_by_cfi"]
     )
     assert any(
-        scenario["blocked_by"].startswith("CFI-2")
+        scenario["blocked_by"].startswith("CFI-4")
         for scenario in manifest["blocked_by_cfi"]
     )
     assert "accepted" not in {
