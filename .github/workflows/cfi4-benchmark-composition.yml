@@ -9,7 +9,9 @@ on:
       - "catalog/flask_app/capability_inspection_routes.py"
       - "catalog/flask_app/services/capability_benchmark_service.py"
       - "catalog/flask_app/services/capability_inspection_service.py"
+      - "catalog/flask_app/services/capability_recovery_adapters.py"
       - "catalog/flask_app/templates/federation/onboarding/_benchmarks.html"
+      - "catalog/flask_app/tests/test_benchmark_runtime_parity.py"
       - "catalog/flask_app/tests/test_capability_benchmark_route.py"
       - "catalog/flask_app/tests/test_capability_inspection_route.py"
       - "catalog/capabilities/benchmarking/**"
@@ -18,6 +20,7 @@ on:
     branches:
       - main
       - "agent/cfi4-*"
+      - "agent/benchmark-*"
     paths:
       - ".github/workflows/cfi4-benchmark-composition.yml"
       - "catalog/flask_app/app.py"
@@ -25,7 +28,9 @@ on:
       - "catalog/flask_app/capability_inspection_routes.py"
       - "catalog/flask_app/services/capability_benchmark_service.py"
       - "catalog/flask_app/services/capability_inspection_service.py"
+      - "catalog/flask_app/services/capability_recovery_adapters.py"
       - "catalog/flask_app/templates/federation/onboarding/_benchmarks.html"
+      - "catalog/flask_app/tests/test_benchmark_runtime_parity.py"
       - "catalog/flask_app/tests/test_capability_benchmark_route.py"
       - "catalog/flask_app/tests/test_capability_inspection_route.py"
       - "catalog/capabilities/benchmarking/**"
@@ -66,11 +71,14 @@ jobs:
           catalog/flask_app/capability_inspection_routes.py
           catalog/flask_app/services/capability_benchmark_service.py
           catalog/flask_app/services/capability_inspection_service.py
+          catalog/flask_app/services/capability_recovery_adapters.py
+          catalog/flask_app/tests/test_benchmark_runtime_parity.py
           catalog/flask_app/tests/test_capability_benchmark_route.py
           catalog/flask_app/tests/test_capability_inspection_route.py
       - name: Run CFI-4 and affected regressions
         run: >-
           python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_benchmark_runtime_parity.py
           catalog/flask_app/tests/test_capability_benchmark_route.py
           catalog/flask_app/tests/test_capability_inspection_route.py
           catalog/flask_app/tests/test_capability_onboarding_route.py
@@ -96,6 +104,8 @@ jobs:
           catalog/flask_app/capability_inspection_routes.py
           catalog/flask_app/services/capability_benchmark_service.py
           catalog/flask_app/services/capability_inspection_service.py
+          catalog/flask_app/services/capability_recovery_adapters.py
+          catalog/flask_app/tests/test_benchmark_runtime_parity.py
           catalog/flask_app/tests/test_capability_benchmark_route.py
           catalog/flask_app/tests/test_capability_inspection_route.py
       - name: Diff hygiene
