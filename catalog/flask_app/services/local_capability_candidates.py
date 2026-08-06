@@ -1,15 +1,18 @@
 """Safe built-in compute and storage candidates for capability-first onboarding.
 
-The built-ins make ordinary Docker installations useful without inventing authority:
+The built-ins make ordinary Docker installations useful without deriving authority
+from benchmark evidence:
 
 * compute exposes one explicitly registered, read-only local handler descriptor;
   selecting it remains pending until an existing worker/control-plane authority
   activates that handler;
 * storage exposes the host-mounted MSH data area through a bounded temporary
-  write/read/cleanup probe; selecting it remains candidate-only until assigned by
-  the existing storage control plane.
+  write/read/cleanup probe. When the authenticated device created the federation
+  and no storage topology exists yet, an explicit Enable choice may register and
+  assign this provider through the existing durable storage control plane.
 
-No benchmark or contribution choice grants dispatch or storage authority here.
+A joined device never self-approves storage, and an existing storage topology is
+never replaced by this bootstrap path.
 """
 
 from __future__ import annotations
@@ -18,6 +21,7 @@ import hashlib
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Any
 
 from flask import current_app
 
@@ -38,15 +42,26 @@ from catalog.capabilities.worker_activation import (
     LocalComputeHandlerDescriptor,
     LocalComputeHandlerInventory,
 )
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.federation.onboarding_models import (
     ContributionActivationState,
     ContributionCandidate,
     ContributionDesiredState,
 )
+from catalog.federation.phase_d_control import PhaseDControlPlane
+from catalog.federation.storage_control_plane import StorageProviderRegistration
+from catalog.federation.storage_protocol import (
+    STORAGE_PROTOCOL,
+    STORAGE_PROTOCOL_VERSION,
+)
 
 _EXTENSION_KEY = "capability_local_candidate_bundle"
 _COMPUTE_HANDLER_ID = "msh-system-summary"
 _STORAGE_PROVIDER_ID = "msh-local-data-storage"
+_STORAGE_GROUP_ID = "msh-local-storage"
 _STORAGE_FINGERPRINT = "sha256:" + hashlib.sha256(
     b"msh-local-data-storage-candidate-v1"
 ).hexdigest()
@@ -165,6 +180,198 @@ class _LocalStorageProbe:
             path.unlink(missing_ok=True)
 
 
+class CreatorBootstrapStorageContributionAdapter:
+    """Bootstrap only the creator's first local storage assignment.
+
+    The adapter consumes an already authenticated onboarding context. It never
+    treats a benchmark as authority, never approves a joining node, and never
+    replaces an existing provider or storage-group assignment.
+    """
+
+    candidate_only = True
+
+    def __init__(self, onboarding_service: object, probe: _LocalStorageProbe) -> None:
+        self._onboarding_service = onboarding_service
+        self._probe = probe
+
+    def supports(self, candidate: ContributionCandidate) -> bool:
+        return (
+            candidate.capability_type == "storage"
+            and candidate.capacity_envelope.get("authority") == "candidate-only"
+            and candidate.capacity_envelope.get("provider_id")
+            == _STORAGE_PROVIDER_ID
+        )
+
+    def enable(self, candidate: ContributionCandidate) -> AdapterOutcome:
+        provider_id = self._provider_id(candidate)
+        context, session = self._context_and_session()
+        node_id = context.credentials.identity.node_id
+        if session.created_by_node_id != node_id:
+            return AdapterOutcome(
+                ContributionActivationState.PENDING,
+                "Waiting for the federation creator to assign this storage provider.",
+            )
+
+        control = PhaseDControlPlane(context.coordinator.store.database)
+        snapshot = control.snapshot(session.session_id)
+        foreign_groups = set(snapshot.groups).difference({_STORAGE_GROUP_ID})
+        foreign_providers = set(snapshot.providers).difference({provider_id})
+        if foreign_groups or foreign_providers:
+            return AdapterOutcome(
+                ContributionActivationState.PENDING,
+                "Existing storage topology requires an explicit coordinator assignment.",
+            )
+
+        if _STORAGE_GROUP_ID not in snapshot.groups:
+            control.create_group(
+                session.session_id,
+                node_id,
+                _STORAGE_GROUP_ID,
+            )
+            snapshot = control.snapshot(session.session_id)
+
+        existing = snapshot.providers.get(provider_id)
+        registration = StorageProviderRegistration(
+            session_id=session.session_id,
+            provider_id=provider_id,
+            node_id=node_id,
+            protocol=STORAGE_PROTOCOL,
+            protocol_version=STORAGE_PROTOCOL_VERSION,
+            authorized=True,
+            status="ready",
+        )
+        if existing is None:
+            control.register_provider(session.session_id, node_id, registration)
+            snapshot = control.snapshot(session.session_id)
+        elif existing != registration:
+            raise FederationValidationError(
+                "storage-bootstrap-provider-conflict",
+                "provider_id",
+                "existing storage provider registration does not match this device",
+            )
+
+        assignment = snapshot.groups[_STORAGE_GROUP_ID]
+        if (
+            assignment.primary_provider_id is None
+            and not assignment.replica_provider_ids
+        ):
+            control.change_assignment(
+                session.session_id,
+                node_id,
+                _STORAGE_GROUP_ID,
+                provider_id,
+            )
+            assignment = control.snapshot(session.session_id).groups[
+                _STORAGE_GROUP_ID
+            ]
+
+        if assignment.primary_provider_id != provider_id:
+            return AdapterOutcome(
+                ContributionActivationState.PENDING,
+                "Existing storage assignment requires an explicit coordinator decision.",
+            )
+        return AdapterOutcome(
+            ContributionActivationState.ACTIVE,
+            "Authorized by the federation creator and assigned as the initial storage primary.",
+            authority_confirmed=True,
+        )
+
+    def disable(self, candidate: ContributionCandidate) -> AdapterOutcome:
+        provider_id = self._provider_id(candidate)
+        self._probe.fence(provider_id)
+        try:
+            context, session = self._context_and_session()
+        except FederationOperationError:
+            return AdapterOutcome(
+                ContributionActivationState.INACTIVE,
+                "Local storage use is fenced.",
+            )
+
+        node_id = context.credentials.identity.node_id
+        if session.created_by_node_id == node_id:
+            control = PhaseDControlPlane(context.coordinator.store.database)
+            snapshot = control.snapshot(session.session_id)
+            assignment = snapshot.groups.get(_STORAGE_GROUP_ID)
+            if assignment is not None and (
+                assignment.primary_provider_id == provider_id
+                or provider_id in assignment.replica_provider_ids
+            ):
+                primary = (
+                    None
+                    if assignment.primary_provider_id == provider_id
+                    else assignment.primary_provider_id
+                )
+                replicas = tuple(
+                    item
+                    for item in assignment.replica_provider_ids
+                    if item != provider_id
+                )
+                control.change_assignment(
+                    session.session_id,
+                    node_id,
+                    _STORAGE_GROUP_ID,
+                    primary,
+                    replicas,
+                )
+        return AdapterOutcome(
+            ContributionActivationState.INACTIVE,
+            "Local storage contribution disabled and future use fenced.",
+        )
+
+    def suspend(
+        self,
+        candidate: ContributionCandidate,
+        *,
+        reason: str,
+    ) -> AdapterOutcome:
+        disabled = self.disable(candidate)
+        return AdapterOutcome(
+            ContributionActivationState.SUSPENDED,
+            reason or disabled.reason,
+        )
+
+    def reconcile(
+        self,
+        candidate: ContributionCandidate,
+        *,
+        desired_state: ContributionDesiredState,
+    ) -> AdapterOutcome:
+        if desired_state is ContributionDesiredState.DISABLED:
+            return self.disable(candidate)
+        return self.enable(candidate)
+
+    def _context_and_session(self) -> tuple[Any, Any]:
+        loader = getattr(self._onboarding_service, "authorized_context", None)
+        context = loader() if callable(loader) else None
+        if context is None:
+            raise FederationOperationError(
+                "contribution-federation-required",
+                "a trusted federation connection is required",
+                "binding",
+            )
+        session_id = context.binding.internal_session_id
+        context.coordinator.store.require_membership(
+            session_id=session_id,
+            node_id=context.credentials.identity.node_id,
+        )
+        session = context.coordinator.store.get_session(session_id)
+        if session is None:
+            raise FederationOperationError(
+                "onboarding-session-unavailable",
+                "the trusted federation session is unavailable",
+                "internal_session_id",
+            )
+        return context, session
+
+    def _provider_id(self, candidate: ContributionCandidate) -> str:
+        if not self.supports(candidate):
+            raise ValueError("storage adapter received an unsupported candidate")
+        value = candidate.capacity_envelope.get("provider_id")
+        if not isinstance(value, str) or not value:
+            raise ValueError("storage candidate is missing provider_id")
+        return value
+
+
 @dataclass(frozen=True)
 class LocalCandidateBundle:
     inventory: LocalComputeHandlerInventory
@@ -209,7 +416,7 @@ def _build_bundle() -> LocalCandidateBundle:
     )
     storage_spec = StorageCandidateSpec(
         provider_id=_STORAGE_PROVIDER_ID,
-        protocol="msh-storage-candidate",
+        protocol=STORAGE_PROTOCOL,
         display_label="Local MSH data storage",
         capacity_envelope={
             "kind": "host-mounted-local-data",
@@ -243,8 +450,21 @@ def local_inspection_adapters() -> tuple[object, ...]:
     )
 
 
-def local_contribution_components() -> tuple[tuple[object, ...], tuple[object, ...]]:
+def local_contribution_components(
+    onboarding_service: object | None = None,
+) -> tuple[tuple[object, ...], tuple[object, ...]]:
     bundle = get_local_candidate_bundle()
+    storage_adapter: object
+    if onboarding_service is None:
+        storage_adapter = StorageContributionAdapter(
+            is_assigned=lambda _provider_id: False,
+            fence_candidate=bundle.storage_probe.fence,
+        )
+    else:
+        storage_adapter = CreatorBootstrapStorageContributionAdapter(
+            onboarding_service,
+            bundle.storage_probe,
+        )
     return (
         (
             ComputeCandidateSource(bundle.inventory),
@@ -252,15 +472,13 @@ def local_contribution_components() -> tuple[tuple[object, ...], tuple[object, .
         ),
         (
             bundle.compute_adapter,
-            StorageContributionAdapter(
-                is_assigned=lambda _provider_id: False,
-                fence_candidate=bundle.storage_probe.fence,
-            ),
+            storage_adapter,
         ),
     )
 
 
 __all__ = [
+    "CreatorBootstrapStorageContributionAdapter",
     "LocalCandidateBundle",
     "PendingComputeContributionAdapter",
     "get_local_candidate_bundle",
