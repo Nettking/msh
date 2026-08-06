@@ -65,11 +65,27 @@ function Get-RelayCandidates {
             --format "{{.ID}}" 2>$null
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
     foreach ($containerId in $relayContainers) {
-        $mount = (& docker inspect --format `
-            "{{range .Mounts}}{{if eq .Destination \"/var/lib/msh-relay\"}}{{.Name}}{{end}}{{end}}" `
-            $containerId 2>$null) -join ""
-        if (-not [string]::IsNullOrWhiteSpace($mount)) {
-            $values += $mount
+        $raw = (& docker inspect $containerId 2>$null) -join "`n"
+        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+            continue
+        }
+        try {
+            $inspection = @($raw | ConvertFrom-Json)
+            if ($inspection.Count -eq 0) {
+                continue
+            }
+            $mount = @($inspection[0].Mounts) |
+                Where-Object {
+                    [string]$_.Destination -eq "/var/lib/msh-relay" -and
+                    [string]$_.Type -eq "volume"
+                } |
+                Select-Object -First 1
+            if ($null -ne $mount -and -not [string]::IsNullOrWhiteSpace([string]$mount.Name)) {
+                $values += [string]$mount.Name
+            }
+        }
+        catch {
+            continue
         }
     }
 
