@@ -9,8 +9,10 @@ class _Transition:
     def __init__(self, *, completed: bool, runtime: bool = True) -> None:
         self.completed = completed
         self.runtime = runtime
+        self.received_setups: list[object | None] = []
 
-    def capability_flags(self, _setup) -> dict[str, bool]:
+    def capability_flags(self, setup=None) -> dict[str, bool]:
+        self.received_setups.append(setup)
         return {
             "completed": self.completed,
             "runtime": self.runtime,
@@ -56,6 +58,28 @@ def test_completed_capability_setup_continues_existing_runtime(
     assert state == "started"
     assert runtime.choices == ["continue_existing"]
     assert background_starts == []
+    assert runtime.requires_startup_choice() is False
+
+
+def test_completed_capability_setup_does_not_require_legacy_settings(
+    monkeypatch,
+) -> None:
+    app = Flask(__name__)
+    transition = _Transition(completed=True)
+    runtime = _Runtime(pending=True)
+
+    monkeypatch.setattr(
+        app_module,
+        "get_capability_startup_transition_service",
+        lambda: transition,
+    )
+    monkeypatch.setattr(app_module, "get_runtime_manager", lambda: runtime)
+
+    state = app_module._start_runtime_from_capability_state(app, None)
+
+    assert state == "started"
+    assert transition.received_setups == [None]
+    assert runtime.choices == ["continue_existing"]
     assert runtime.requires_startup_choice() is False
 
 
