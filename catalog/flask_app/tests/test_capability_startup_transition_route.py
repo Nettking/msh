@@ -473,15 +473,19 @@ def test_cfi6_registration_and_startup_routing(monkeypatch, tmp_path) -> None:
     assert response.location == "/onboarding?step=finish"
 
 
-def test_returning_device_and_explicit_legacy_fallback(
+def test_completed_setup_preserves_workbench_and_explicit_legacy_fallback(
     monkeypatch,
     tmp_path,
 ) -> None:
     completed = FakeTransitionRouteService(_flags(completed=True))
     app = _route_app(monkeypatch, tmp_path / "completed", completed)
     client = app.test_client()
-    assert client.get("/").location == "/federation"
-    assert client.get("/").status_code == 200
+
+    workbench = client.get("/")
+    assert workbench.status_code == 200
+    assert workbench.location is None
+    assert client.get("/data-upload/").status_code == 200
+    assert client.get("/startup").location == "/"
 
     legacy = FakeTransitionRouteService(_flags(needs_migration=True))
     app = _route_app(monkeypatch, tmp_path / "fallback", legacy)
