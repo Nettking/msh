@@ -416,7 +416,7 @@ def _build_bundle() -> LocalCandidateBundle:
     )
     storage_spec = StorageCandidateSpec(
         provider_id=_STORAGE_PROVIDER_ID,
-        protocol=STORAGE_PROTOCOL,
+        protocol="msh-storage-candidate",
         display_label="Local MSH data storage",
         capacity_envelope={
             "kind": "host-mounted-local-data",
