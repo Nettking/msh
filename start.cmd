@@ -80,7 +80,11 @@ if not defined MSH_WEB_PORT_RESOLVED (
 
 set "MSH_BASE_URL=http://localhost:%MSH_WEB_PORT_RESOLVED%"
 set "MSH_ONBOARDING_URL=%MSH_BASE_URL%/onboarding"
-if "%MSH_FRESH_INSTALL%"=="1" set "MSH_ONBOARDING_URL=%MSH_BASE_URL%/onboarding?fresh=1&reset=%RANDOM%%RANDOM%"
+set "MSH_OPEN_URL=%MSH_BASE_URL%"
+if "%MSH_FRESH_INSTALL%"=="1" (
+    set "MSH_ONBOARDING_URL=%MSH_BASE_URL%/onboarding?fresh=1&reset=%RANDOM%%RANDOM%"
+    set "MSH_OPEN_URL=%MSH_ONBOARDING_URL%"
+)
 
 if "%MSH_FRESH_INSTALL%"=="1" (
     echo Verifying fresh state inside the started Flask container...
@@ -95,11 +99,11 @@ if "%MSH_FRESH_INSTALL%"=="1" (
     )
 )
 
-echo Waiting for capability-first onboarding...
+echo Waiting for the MSH webapp...
 powershell -NoProfile -Command "$deadline = (Get-Date).AddSeconds(90); do { try { $response = Invoke-WebRequest -UseBasicParsing -Uri '%MSH_BASE_URL%/onboarding' -TimeoutSec 2; if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) { exit 0 } } catch {}; Start-Sleep -Seconds 1 } while ((Get-Date) -lt $deadline); exit 1"
 if errorlevel 1 (
     echo.
-    echo The containers started, but MSH onboarding did not become ready.
+    echo The containers started, but MSH did not become ready.
     echo Recent Flask log:
     docker compose logs --tail 60 flask
     echo.
@@ -121,7 +125,7 @@ echo Setup, Federation identity, pairing state, recording state, checkpoints,
 echo downloaded Ollama models, and recorded data are preserved between normal starts.
 echo.
 
-start "" "%MSH_ONBOARDING_URL%"
+start "" "%MSH_OPEN_URL%"
 exit /b 0
 
 :reset_device_state
