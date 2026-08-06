@@ -40,7 +40,7 @@ Purpose: make MSH quick to start and understandable without requiring users to c
 
 The authoritative implementation plan is:
 
-- `docs/implementation/capability_first_federation_plan.md`
+- `docs/implementation/federation/active/capability_first_federation_plan.md`
 
 ### Product model
 
