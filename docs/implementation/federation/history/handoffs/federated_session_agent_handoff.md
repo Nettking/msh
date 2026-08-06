@@ -1,8 +1,16 @@
 # Federated Session Network: Agent Implementation Handoff
 
-Status: implementation guide for `docs/federated_session_network.md`.
+> **Status: historical and non-authoritative.** This handoff records the original
+> phased Federation implementation sequence. That sequence is complete and must
+> not be resumed. Use the [current task handoff](../../../current_task_handoff.md)
+> and the [active Federation plans](../../active/) for current work.
 
-This document is intentionally prescriptive. It exists to reduce repository exploration, architecture re-design, and token use when an implementation agent begins work.
+Historical scope: implementation guide for `docs/federated_session_network.md`.
+
+This document is intentionally prescriptive because it was written to reduce
+repository exploration, architecture re-design, and token use when the original
+implementation began. Imperative language below is retained as historical
+delivery evidence, not as a current instruction.
 
 ## Read first
 
@@ -246,13 +254,13 @@ git diff --check
 
 Networking phases also require integration tests that create at least two independently persisted node states and reconnect them after interruption.
 
-## Recommended first Codex task
+## Historical recommended first Codex task
 
-Use the following as the first implementation request:
+The following prompt is retained for audit history. Do not execute it as current work.
 
 ```text
 Read docs/federated_session_network.md,
-docs/implementation/federated_session_agent_handoff.md, and
+docs/implementation/federation/history/handoffs/federated_session_agent_handoff.md, and
 docs/implementation/federated_session_test_matrix.md.
 
 Implement PR A only: Phase 0 domain contracts and deterministic policy.

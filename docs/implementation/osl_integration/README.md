@@ -1,13 +1,31 @@
 # OSL integration plan
 
-Status: **planning complete; production implementation not started**.  
+Status: **active planning package; production implementation not started**.  
+Reviewed: **2026-08-06 Europe/Oslo**.  
 Authoritative sequence: [10_phased_implementation_roadmap.md](10_phased_implementation_roadmap.md).  
 Current next delivery: **D0-A — profile, authority, and compatibility decisions only**.
 
 ## How to use this directory
 
-This directory contains one execution plan and a set of supporting analyses.
-Agents must not treat every document as an independent backlog.
+This directory contains one active execution plan and source-pinned supporting
+analysis. It is not a collection of independent backlogs.
+
+Use the material in this order:
+
+1. [10 — implementation execution plan](10_phased_implementation_roadmap.md)
+   decides status, implementation order, acceptance gates, and stop conditions.
+2. This README is the single entry point for the planning package and its
+   current status.
+3. Documents `00`-`09` are detailed source, architecture, contract, workflow,
+   UI, validation, migration, and file-planning references.
+4. `docs/planned-work/method-osl-msh-alignment.md` defines the W3 end-to-end
+   acceptance scenario. It is not a separate implementation plan, the current
+   entry point, or permission to implement W3 in one PR.
+
+When a supporting document conflicts with the execution plan, stop and update
+the plan. Do not choose the more permissive interpretation.
+
+## Document map
 
 | Document | Role |
 | --- | --- |
@@ -23,12 +41,7 @@ Agents must not treat every document as an independent backlog.
 | [08 — validation, testing, and CI](08_validation_testing_and_ci.md) | required evidence and permanent gates |
 | [09 — migration and compatibility](09_migration_and_compatibility.md) | compatibility, migration, rollback, and cutover analysis |
 
-The separate file
-`docs/planned-work/method-osl-msh-alignment.md` defines the W3 vertical-slice
-acceptance scenario. It does not authorize a one-PR implementation and does not
-override the execution plan.
-
-## Baselines
+## Planning baselines
 
 The detailed source analysis was pinned to:
 
@@ -41,13 +54,30 @@ The execution plan was reconciled against MSH `main` at
 
 The paper pins remain deliberate research inputs until explicitly revised. The
 old MSH pin is an analyzed snapshot, not permission to implement against stale
-routes, services, files, tests, or security assumptions. Every delivery starts
-from current `main` and re-audits its integration points.
+routes, services, files, tests, or security assumptions. Every delivery must
+start from current `main` and re-audit all affected integration points.
+
+The supporting documents preserve detailed candidate lifecycle analysis that is
+still valuable, including:
+
+- low-friction source capture and immutable preservation;
+- stable excerpts and candidate extraction with provenance;
+- committed immutable OSL revisions distinct from autosaved client drafts;
+- deterministic profile validation without treating validation as truth or
+  approval;
+- authenticated human review of an exact unchanged revision;
+- separate approval and publication commands;
+- correction, rejection, deprecation, supersession, migration, and audit
+  history;
+- AI limited to attributed suggestions and explanations.
+
+These are planned requirements and designs, not claims of implemented MSH
+behavior.
 
 ## Fixed decisions and boundaries
 
 - OSL is a versioned, non-executing bounded context under `catalog/osl/`.
-- JSON and SysML v2 are representations/adapters, not the language itself.
+- JSON and SysML v2 are representations or adapters, not the language itself.
 - Raw source, excerpts, candidates, immutable revisions, validation, human
   review, approval, publication, and feedback remain separate.
 - Decision and OperatorAction remain distinct.
@@ -82,6 +112,9 @@ Not completed:
   SysML v2 adapter;
 - proof that existing operator-note or legacy SysML behavior conforms to OSL.
 
+Do not infer from these planning files that save, completion, review, approval,
+publication, migration, or SysML/OSL conformance has been implemented.
+
 ## Current next action
 
 Implement **D0-A only** from the execution plan:
@@ -93,13 +126,14 @@ Implement **D0-A only** from the execution plan:
 5. obtain research/domain and security/product review;
 6. merge the documentation decisions before starting D1-A.
 
-D0-A must contain no production code. The first code delivery after acceptance
-is D1-A: pure immutable identifiers, source, evidence, and strategy-fragment
-contracts with focused tests and no Flask, SQLite, AI, SysML, migration,
-Federation, capability, provider, storage, or runtime imports.
+D0-A must contain no production code. The first code delivery after D0-A is
+accepted and merged is D1-A: pure immutable identifiers, source, evidence, and
+strategy-fragment contracts with focused tests and no Flask, SQLite, AI, SysML,
+migration, Federation, capability, provider, storage, or runtime imports.
 
-## Historical planning record
+## Historical record
 
-The original branch produced documents 00-10 incrementally. Their commit
-history remains available in Git and is not repeated here because commit-ledger
-metadata is not an implementation status source.
+Documents `00`-`10` were produced incrementally from pinned research and
+repository sources. Git history preserves that planning record. Historical
+commit order and old status notes do not define current implementation status;
+the execution plan does.
