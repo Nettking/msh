@@ -114,10 +114,10 @@ def default_components(
 ) -> tuple[tuple[object, ...], tuple[object, ...]]:
     """Compose existing authorities plus bounded built-in candidates.
 
-    The built-in compute and storage choices are deliberately non-authoritative:
-    compute remains pending until an existing worker authority activates its
-    registered handler, and storage remains candidate-only until assigned by the
-    storage control plane.
+    Built-in compute remains pending until a worker authority activates its
+    registered handler. Built-in storage may bootstrap only when this device is
+    the authenticated federation creator and no storage topology exists; joined
+    devices and established topologies remain control-plane owned.
 
     A configured Ollama target remains visible as an AI Explainer candidate even
     when retained legacy setup had AI disabled. Capability-first onboarding must
@@ -237,7 +237,9 @@ def default_components(
             )
         )
     else:
-        local_sources, local_adapters = local_contribution_components()
+        local_sources, local_adapters = local_contribution_components(
+            onboarding_service
+        )
         sources.append(local_sources[0])
         adapters.append(local_adapters[0])
 
@@ -281,7 +283,9 @@ def default_components(
             )
         )
     else:
-        local_sources, local_adapters = local_contribution_components()
+        local_sources, local_adapters = local_contribution_components(
+            onboarding_service
+        )
         sources.append(local_sources[1])
         adapters.append(local_adapters[1])
 
