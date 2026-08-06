@@ -206,7 +206,8 @@ class CreatorBootstrapStorageContributionAdapter:
         provider_id = self._provider_id(candidate)
         context, session = self._context_and_session()
         node_id = context.credentials.identity.node_id
-        if session.created_by_node_id != node_id:
+        creator_node_id = getattr(session, "created_by_node_id", None)
+        if creator_node_id != node_id:
             return AdapterOutcome(
                 ContributionActivationState.PENDING,
                 "Waiting for the federation creator to assign this storage provider.",
@@ -288,7 +289,7 @@ class CreatorBootstrapStorageContributionAdapter:
             )
 
         node_id = context.credentials.identity.node_id
-        if session.created_by_node_id == node_id:
+        if getattr(session, "created_by_node_id", None) == node_id:
             control = PhaseDControlPlane(context.coordinator.store.database)
             snapshot = control.snapshot(session.session_id)
             assignment = snapshot.groups.get(_STORAGE_GROUP_ID)
