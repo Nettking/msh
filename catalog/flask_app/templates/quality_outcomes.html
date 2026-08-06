@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block body %}
-<section class="page-intro"><h2>Outcomes</h2><p>Connect actions to results.</p></section>
+<section class="page-intro"><h2>Outcomes</h2><p>Connect actions to results.</p><p><strong>{{ storage_scope|default('Federation shared') }}</strong> · Outcomes are available to every trusted device in this Federation.</p></section>
 <section class="section-block"><h3>Record outcome</h3><form method="post" action="{{ url_for('operator_support_web.save_quality_outcome') }}"><input name="result" placeholder="result" required><button type="submit">Save</button></form></section>
 <section class="section-block"><h3>Recent outcomes</h3>{% if outcomes %}<ul>{% for item in outcomes %}<li>{{ item.recorded_at }} — {{ item.result }}</li>{% endfor %}</ul>{% else %}<p>No outcomes recorded yet.</p>{% endif %}</section>
 {% endblock %}
