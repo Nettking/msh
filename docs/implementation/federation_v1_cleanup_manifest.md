@@ -176,7 +176,7 @@ Manual and deep scripts are not automatically unused. The current script catalog
 | `catalog/data_visualizer/**` | Automatic playback export | Part of playback-ready contract. | None. | Data-visualizer and playback tests. | KEEP. |
 | `catalog/data_pr_day/**` | Supported manual analysis | Explicitly operator-triggered and documented. | None during v1 closeout. | Script catalog/control tests. | KEEP. |
 | `catalog/find_stops/**` | Supported manual analysis | Explicitly operator-triggered and documented. | None during v1 closeout. | Script catalog/control tests. | KEEP. |
-| `catalog/data_analysis/**` | Supported deep/exploratory analysis | Explicitly documented as manual research-oriented analysis. | Consider separate optional package only after v1. | Script catalog/control tests. | KEEP FOR V1. |
+| `catalog/data_analysis/**` | Supported deep/explatory analysis | Explicitly documented as manual research-oriented analysis. | Consider separate optional package only after v1. | Script catalog/control tests. | KEEP FOR V1. |
 | `catalog/ml_analysis/**` | Supported deep/exploratory analysis | Explicitly documented as manual ML baseline. | Consider separate optional package only after v1. | Script catalog/control tests. | KEEP FOR V1. |
 | `catalog/corrolation_machine_pairs/README.md` | Legacy script documentation | Canonical catalog classifies the script as Legacy. | Preserve any unique interpretation notes in history only if useful. | Search control usage and tests. | VERIFY BEFORE DELETE. |
 | `catalog/corrolation_machine_pairs/corrolation_machine_pairs.py` | Legacy script | Canonical catalog classifies it as legacy exploration. | None unless unique research behavior is still required. | Script-discovery/control tests; confirm no user workflow depends on it. | VERIFY BEFORE DELETE. |
@@ -209,7 +209,7 @@ The default rule is: completed `*_plan.md`, progress tracker, or agent handoff i
 
 | Path | Classification | Evidence | Replacement or migration | Required tests | Decision |
 | --- | --- | --- | --- | --- | --- |
-| `docs/implementation/federated_session_agent_handoff.md` | Superseded agent handoff | Historical continuation instructions, replaced by completed implementation and current handoff. | Preserve only unique durable decisions in history/contracts. | Link/reference check. | CONSOLIDATE, then DELETE CANDIDATE. |
+| `docs/implementation/federation/history/handoffs/federated_session_agent_handoff.md` | Historical agent handoff | Original phased continuation instructions retained with an explicit non-authoritative warning. | Current work is defined by the current task handoff and active Federation plans. | Link/reference check. | ARCHIVED. |
 | `docs/implementation/phase_e_progress.md` | Superseded progress tracker | Phase E is complete and later phases are merged. | Final closeout/history summary. | Link/reference check. | CONSOLIDATE, then DELETE CANDIDATE. |
 | `docs/implementation/phase_e7_recovery_plan.md` | Completed implementation plan | Recovery implementation completed and validated. | Recovery design/closeout evidence. | Link/reference check. | CONSOLIDATE, then DELETE CANDIDATE. |
 | `docs/implementation/federated_session_phase3_plan.md` | Completed implementation plan | Later federation phases and closeouts supersede it. | Contracts/closeouts/history. | Link/reference check. | CONSOLIDATE, then DELETE CANDIDATE. |
