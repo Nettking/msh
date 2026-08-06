@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import os
 from collections.abc import Callable, Mapping
 from typing import Any
@@ -45,6 +46,38 @@ def _payload(settings: object | None) -> dict[str, Any]:
         return {}
     value = settings.to_dict() if callable(getattr(settings, "to_dict", None)) else settings
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _ai_runtime_node_id(federation_node_id: object) -> str:
+    """Map one authenticated opaque Federation ID to a safe local runtime ID.
+
+    Federation node IDs are Ed25519-derived base64url identifiers and may contain
+    uppercase characters. The AI runtime deliberately accepts only lowercase
+    logical identifiers. Hashing the complete public node ID preserves a stable,
+    collision-resistant binding without weakening either contract or exposing a
+    private endpoint.
+    """
+
+    if not isinstance(federation_node_id, str):
+        raise FederationValidationError(
+            "invalid-ai-federation-node",
+            "node_id",
+            "authenticated Federation node identity is required",
+        )
+    value = federation_node_id.strip()
+    if (
+        not value
+        or value != federation_node_id
+        or len(value.encode("utf-8")) > 512
+        or any(ord(character) < 32 for character in value)
+    ):
+        raise FederationValidationError(
+            "invalid-ai-federation-node",
+            "node_id",
+            "authenticated Federation node identity is invalid",
+        )
+    digest = hashlib.sha256(value.encode("utf-8")).hexdigest()
+    return f"node-federation-{digest[:32]}"
 
 
 def default_policy(
@@ -154,13 +187,14 @@ def default_components(
                     "provider_id",
                     "AI contribution lacks its logical provider identity",
                 )
+            federation_node_id = context.credentials.identity.node_id
             return OllamaLanguageModelProvider(
                 session_id=manager.session_id,
                 display_name=candidate.display_label,
                 base_url=base_url,
                 models=(model,),
                 capability_id=provider_id,
-                node_id=context.credentials.identity.node_id,
+                node_id=_ai_runtime_node_id(federation_node_id),
             )
 
         adapters.append(
