@@ -74,6 +74,7 @@ class ExistingSetupResumeService:
         reconnect_interval_seconds: float = 2.0,
         monotonic: Callable[[], float] = time.monotonic,
         sleep: Callable[[float], None] = time.sleep,
+        progress: Callable[[str], None] | None = None,
     ) -> None:
         if reconnect_timeout_seconds <= 0 or reconnect_interval_seconds <= 0:
             raise ValueError("reconnect timing must be positive")
@@ -85,6 +86,10 @@ class ExistingSetupResumeService:
         self.reconnect_interval_seconds = float(reconnect_interval_seconds)
         self._monotonic = monotonic
         self._sleep = sleep
+        self._progress = progress or (lambda _message: None)
+
+    def _say(self, message: str) -> None:
+        self._progress(message)
 
     @staticmethod
     def _code(exc: BaseException, fallback: str) -> str:
@@ -94,6 +99,7 @@ class ExistingSetupResumeService:
     def _saved_context(self) -> object:
         identity_loader = getattr(self.onboarding_service, "identity_or_none", None)
         binding_loader = getattr(self.onboarding_service, "binding_or_none", None)
+        reconnect = getattr(self.onboarding_service, "reconnect", None)
         context_loader = getattr(self.onboarding_service, "authorized_context", None)
         if not all(callable(value) for value in (identity_loader, binding_loader, context_loader)):
             raise ExistingSetupResumeError("resume-service-unavailable")
@@ -105,12 +111,21 @@ class ExistingSetupResumeService:
                 "no saved identity and Federation binding are available"
             )
 
+        self._say("[1/4] Reconnecting the saved Federation membership...")
         deadline = self._monotonic() + self.reconnect_timeout_seconds
         last_code = "federation-reconnect-unavailable"
+        attempt = 0
         while True:
+            attempt += 1
             try:
+                if callable(reconnect):
+                    reconnect()
                 context = context_loader()
                 if context is not None:
+                    self._say(
+                        f"      Federation membership verified after {attempt} attempt"
+                        f"{'s' if attempt != 1 else ''}."
+                    )
                     return context
                 last_code = "federation-context-unavailable"
             except (
@@ -124,6 +139,9 @@ class ExistingSetupResumeService:
                 last_code = self._code(exc, "federation-reconnect-unavailable")
                 if last_code in _TERMINAL_RECONNECT_CODES:
                     raise ExistingSetupResumeError(last_code) from exc
+                self._say(
+                    f"      Reconnect attempt {attempt} did not complete: {last_code}."
+                )
             if self._monotonic() >= deadline:
                 raise ExistingSetupResumeError(last_code)
             self._sleep(self.reconnect_interval_seconds)
@@ -141,6 +159,7 @@ class ExistingSetupResumeService:
         inspection_runner = getattr(self.inspection_service, "run", None)
         if not callable(inspection_runner):
             raise ExistingSetupResumeError("inspection-service-unavailable")
+        self._say("[2/4] Inspecting this device and saving fresh local evidence...")
         try:
             snapshot = inspection_runner()
         except (
@@ -158,12 +177,14 @@ class ExistingSetupResumeService:
         revision = getattr(snapshot, "revision", None)
         if isinstance(revision, bool) or not isinstance(revision, int) or revision <= 0:
             raise ExistingSetupResumeError("invalid-inspection-refresh")
+        self._say(f"      Inspection revision {revision} saved.")
 
         planner = getattr(self.benchmark_service, "plan", None)
         runner = getattr(self.benchmark_service, "run", None)
         if not callable(planner) or not callable(runner):
             raise ExistingSetupResumeError("benchmark-service-unavailable")
 
+        self._say("[3/4] Planning and running the current benchmark targets...")
         try:
             plan = tuple(planner(snapshot))
         except (
@@ -179,6 +200,7 @@ class ExistingSetupResumeService:
         runs: list[tuple[str, str, str]] = []
         unavailable: list[tuple[str, str]] = []
         warnings: list[str] = []
+        self._say(f"      Benchmark plan contains {len(plan)} target(s).")
         for item in plan:
             benchmark_id = str(getattr(item, "benchmark_id", "") or "")
             target_service_id = str(
@@ -186,23 +208,24 @@ class ExistingSetupResumeService:
             )
             if not benchmark_id or not target_service_id:
                 warnings.append("invalid-benchmark-plan-item")
+                self._say("      Skipped an invalid benchmark plan item.")
                 continue
             if not bool(getattr(item, "runnable", False)):
                 unavailable.append((benchmark_id, target_service_id))
+                self._say(
+                    f"      Unavailable: {benchmark_id} / {target_service_id}."
+                )
                 continue
+            self._say(f"      Running: {benchmark_id} / {target_service_id}...")
             try:
                 result = runner(
                     benchmark_id=benchmark_id,
                     target_service_id=target_service_id,
                 )
                 state = getattr(getattr(result, "state", None), "value", None)
-                runs.append(
-                    (
-                        benchmark_id,
-                        target_service_id,
-                        str(state or getattr(result, "state", "unknown")),
-                    )
-                )
+                state_text = str(state or getattr(result, "state", "unknown"))
+                runs.append((benchmark_id, target_service_id, state_text))
+                self._say(f"      Completed: {state_text}.")
             except (
                 AuthenticationError,
                 AuthorizationError,
@@ -211,10 +234,13 @@ class ExistingSetupResumeService:
                 OSError,
                 TimeoutError,
             ) as exc:
-                warnings.append(self._code(exc, "benchmark-refresh-failed"))
+                code = self._code(exc, "benchmark-refresh-failed")
+                warnings.append(code)
+                self._say(f"      Warning: {benchmark_id} failed with {code}.")
 
         reconciled = 0
         contribution = self.contribution_service
+        self._say("[4/4] Reconciling previously saved contribution intent...")
         if contribution is not None:
             has_intents = getattr(contribution, "has_persisted_intents", None)
             reconcile = getattr(contribution, "reconcile", None)
@@ -229,9 +255,10 @@ class ExistingSetupResumeService:
                 OSError,
                 TimeoutError,
             ) as exc:
-                warnings.append(
-                    self._code(exc, "contribution-reconciliation-failed")
-                )
+                code = self._code(exc, "contribution-reconciliation-failed")
+                warnings.append(code)
+                self._say(f"      Warning: contribution reconciliation failed with {code}.")
+        self._say(f"      Reconciled {reconciled} contribution intent(s).")
 
         return ResumeReport(
             device_id=device_id,
@@ -285,6 +312,7 @@ def main() -> int:
             inspection_service=get_capability_inspection_service(),
             benchmark_service=get_capability_benchmark_service(),
             contribution_service=get_capability_contribution_service(),
+            progress=lambda message: print(message, flush=True),
         )
         try:
             report = service.resume()
