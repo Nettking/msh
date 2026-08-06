@@ -106,7 +106,7 @@ The intended product behavior is preserved in `docs/roadmap/post_v1_product_road
 | `new-stuff/md_viewer/templates/view.html` | Prototype template | Standalone Markdown rendering view. | Future Flask-first docs templates. | Same as above. | DELETE CANDIDATE with prototype. |
 | `new-stuff/md_viewer/docs/README.md` | Sample content | Sample docs, not canonical MSH documentation. | None; use repository `docs/` in V1.1. | Link check. | DELETE CANDIDATE with prototype. |
 | `new-stuff/md_viewer/docs/getting-started/installation.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
-| `new-stuff/md_viewer/docs/getting-started/quickstart.md` | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
+| `new-stuff/md_viewer/docs/getting-started/quickstart.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
 | `new-stuff/md_viewer/docs/reference/config.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
 | `new-stuff/md_viewer/docs/reference/api/index.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
 | `new-stuff/md_viewer/docs/guides/advanced-usage.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
@@ -118,7 +118,7 @@ Do **not** delete all of `new-stuff/` in the first cleanup batch. Use separate c
 1. Markdown viewer prototype after confirming roadmap preservation.
 2. Generated outputs and image-analysis scripts after optional export decision.
 3. Desktop/goal-agent experiments after deciding whether to preserve them in another repository.
-4. `step2.py` only after unique walkthrough expectations are compared with normal Flask tests.
+4. `step2.py` only after unique walkthrough expectations are compared with normal Flask tests first.
 
 ---
 
@@ -285,7 +285,7 @@ The repository currently has many phase-specific workflows. They may overlap, bu
 - any additional tracked `.github/workflows/federated-session-phase*.yml` or `.github/workflows/phase-f*.yml` discovered by `git ls-files`.
 
 | Classification | Evidence | Replacement or migration | Required tests | Decision |
-| --- | --- | --- | --- | --- |
+| --- | --- | --- | --- | --- | --- |
 | Phase-specific validation gates | Existing closeout evidence depends on them; exact uniqueness has not yet been mapped. | Create a permanent `federation-v1.yml` or small maintained workflow set only after extracting a command/OS/service matrix. | Inventory every job/step; map test files, Linux/Windows, PostgreSQL/relay services, Ruff, compile, Compose, and diff hygiene; run replacement at least twice green. | KEEP until replacement proves equivalent. Then delete superseded workflows in a separate change. |
 
 Workflow consolidation must not silently reduce coverage merely to reduce file count.
