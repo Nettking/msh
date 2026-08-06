@@ -117,7 +117,10 @@ if errorlevel 1 (
 echo Removing only device, setup, and Federation state...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ErrorActionPreference = 'Stop';" ^
-  "$compose = ConvertFrom-Json (docker compose config --format json);" ^
+  "$composeLines = @(docker compose config --format json);" ^
+  "if ($LASTEXITCODE -ne 0) { throw 'Docker Compose configuration could not be read.' };" ^
+  "$composeJson = [string]::Join([Environment]::NewLine, $composeLines);" ^
+  "$compose = ConvertFrom-Json $composeJson;" ^
   "$project = [string]$compose.name;" ^
   "if ([string]::IsNullOrWhiteSpace($project)) { throw 'Docker Compose project name was unavailable.' };" ^
   "$relayVolumes = @(docker volume ls --filter ('label=com.docker.compose.project=' + $project) --filter 'label=com.docker.compose.volume=relay_state' -q);" ^
