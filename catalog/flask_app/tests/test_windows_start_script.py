@@ -11,6 +11,10 @@ def _start_script() -> str:
     return (_repository_root() / "start.cmd").read_text(encoding="utf-8")
 
 
+def _update_script() -> str:
+    return (_repository_root() / "update.cmd").read_text(encoding="utf-8")
+
+
 def test_start_cmd_runs_current_core_services_detached() -> None:
     script = _start_script()
 
@@ -41,7 +45,7 @@ def test_start_cmd_runs_current_core_services_detached() -> None:
 def test_start_cmd_verifies_the_exact_ollama_model_before_opening_browser() -> None:
     script = _start_script()
 
-    assert ':ensure_ollama_model' in script
+    assert ":ensure_ollama_model" in script
     assert "os.environ.get('MSH_AI_MODEL') or 'llama3.2:3b'" in script
     assert 'ollama show "%MSH_AI_MODEL_RESOLVED%"' in script
     assert (
@@ -63,6 +67,46 @@ def test_start_cmd_verifies_the_exact_ollama_model_before_opening_browser() -> N
         "MSH will continue, but the language-model benchmark may be unavailable"
         not in script
     )
+
+
+def test_start_cmd_resume_mode_refreshes_only_existing_authorized_state() -> None:
+    script = _start_script()
+
+    assert 'if /I "%~1"=="--resume"' in script
+    assert 'set "MSH_RESUME_EXISTING=1"' in script
+    assert (
+        "docker compose exec -T flask python -m "
+        "catalog.flask_app.services.existing_setup_resume"
+        in script
+    )
+    assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/federation"' in script
+    assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/federation/benchmarks"' in script
+    assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/onboarding?repair=1"' in script
+    assert "No identity or Federation was replaced" in script
+    assert "start.cmd --resume" in script
+
+    resume_call = script.index(
+        "catalog.flask_app.services.existing_setup_resume"
+    )
+    assert script.index("Waiting for the MSH webapp") < resume_call
+    assert resume_call < script.index('start "" "%MSH_OPEN_URL%"')
+
+
+def test_update_cmd_fast_forwards_then_resumes_without_resetting_state() -> None:
+    script = _update_script()
+
+    assert "git pull --ff-only" in script
+    assert "call start.cmd --resume" in script
+    assert script.index("git pull --ff-only") < script.index(
+        "call start.cmd --resume"
+    )
+    assert "git reset --hard" not in script
+    assert "git clean" not in script
+    assert "start.cmd --fresh" not in script
+    assert "docker compose down" not in script
+    assert "docker compose down -v" not in script
+    assert "Remove-Item" not in script
+    assert "rmdir" not in script
 
 
 def test_start_cmd_fresh_mode_resets_and_verifies_authoritative_state() -> None:
