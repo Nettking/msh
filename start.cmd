@@ -56,6 +56,19 @@ echo.
 docker compose ps relay ollama flask recorder
 echo.
 
+echo Ensuring the configured Ollama benchmark model is installed...
+docker compose --profile model-install run --rm ollama-pull
+if errorlevel 1 (
+    echo.
+    echo WARNING: The configured Ollama model could not be installed or verified.
+    echo MSH will continue, but the language-model benchmark may be unavailable.
+    echo Retry later with: docker compose --profile model-install run --rm ollama-pull
+    echo.
+) else (
+    echo Ollama benchmark model is ready.
+    echo.
+)
+
 set "MSH_WEB_PORT_RESOLVED="
 for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$lines = @(docker compose port flask 5000); if ($LASTEXITCODE -ne 0 -or $lines.Count -eq 0) { exit 1 }; $binding = [string]$lines[0]; if ($binding -match ':(\d+)$') { $Matches[1] } else { exit 1 }"`) do set "MSH_WEB_PORT_RESOLVED=%%P"
 if not defined MSH_WEB_PORT_RESOLVED (
@@ -160,6 +173,7 @@ echo Usage:
 echo   start.cmd           Start MSH and preserve all existing state.
 echo   start.cmd --fresh   Reset device/Federation setup, verify it, then start MSH.
 echo.
+echo Both modes verify or install the configured Ollama benchmark model.
 echo The --fresh option requires typing RESET and preserves recordings,
 echo source configuration, recorder checkpoints, results, and Ollama models.
 exit /b 0
