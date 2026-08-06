@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - "start.cmd"
+      - "update.cmd"
       - "catalog/capabilities/**"
       - "catalog/flask_app/**"
       - "catalog/common/data_loading.py"
@@ -18,6 +19,7 @@ on:
     branches: [main]
     paths:
       - "start.cmd"
+      - "update.cmd"
       - "catalog/capabilities/**"
       - "catalog/flask_app/**"
       - "catalog/common/data_loading.py"
@@ -85,6 +87,7 @@ jobs:
           catalog/flask_app/tests/test_data_upload.py
           catalog/flask_app/tests/test_upload_analysis_jobs.py
           catalog/flask_app/tests/test_federation_auto_reconnect.py
+          catalog/flask_app/tests/test_existing_setup_resume.py
           catalog/flask_app/tests/test_windows_start_script.py
           catalog/flask_app/test_navigation_smoke.py
           catalog/federation/tests/test_onboarding_projection_policy.py
@@ -105,6 +108,7 @@ jobs:
           catalog/flask_app/services/capability_contribution_components.py
           catalog/flask_app/services/data_upload_service.py
           catalog/flask_app/services/device_state_reset.py
+          catalog/flask_app/services/existing_setup_resume.py
           catalog/flask_app/services/federation_pairing_install.py
           catalog/flask_app/services/local_capability_candidates.py
           catalog/flask_app/services/resilient_pairing_runtime.py
@@ -113,6 +117,7 @@ jobs:
           catalog/flask_app/tests/test_provider_federation_surface.py
           catalog/flask_app/tests/test_device_state_reset.py
           catalog/flask_app/tests/test_federation_auto_reconnect.py
+          catalog/flask_app/tests/test_existing_setup_resume.py
           catalog/flask_app/tests/test_local_capability_candidates.py
           catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
           catalog/flask_app/tests/test_capability_runtime_startup.py
