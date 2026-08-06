@@ -7,6 +7,7 @@ import pytest
 from catalog.flask_app.services.device_state_reset import (
     planned_reset_targets,
     reset_device_state,
+    verify_fresh_application_state,
 )
 
 
@@ -21,7 +22,7 @@ def _write_sqlite_state(path: Path) -> None:
     _write(Path(f"{path}-shm"))
 
 
-def test_reset_follows_configured_paths_and_preserves_operational_data(
+def test_reset_follows_configured_and_legacy_paths_and_preserves_operational_data(
     tmp_path: Path,
 ) -> None:
     app_root = tmp_path / "app"
@@ -49,12 +50,20 @@ def test_reset_follows_configured_paths_and_preserves_operational_data(
     _write(remote_pairing)
     _write(settings)
 
+    # Retained deliveries used additional files beneath these dedicated roots.
+    legacy_federation = data_root / "federation" / "legacy" / "binding.json"
+    legacy_setup = data_root / "server_setup" / "legacy_setup.json"
+    legacy_relay = relay_root / "legacy-authority.sqlite3"
+    for path in (legacy_federation, legacy_setup, legacy_relay):
+        _write(path)
+
     preserved = (
         data_root / "sources" / "machine" / "jsonl" / "telemetry.jsonl",
         data_root / "source_config" / "sources.json",
         data_root / "source_state" / "recorder_checkpoint.json",
         data_root / "operator_strategy_records" / "note.json",
         app_root / "results" / "workflows" / "result.json",
+        app_root / ".env",
         tmp_path / "ollama-model-volume" / "model.bin",
     )
     for path in preserved:
@@ -90,9 +99,19 @@ def test_reset_follows_configured_paths_and_preserves_operational_data(
         assert not Path(f"{database}-shm").exists()
     assert not remote_pairing.exists()
     assert not settings.exists()
+    assert not (data_root / "federation").exists()
+    assert not (data_root / "server_setup").exists()
+    assert relay_root.exists()
+    assert list(relay_root.iterdir()) == []
 
     for path in preserved:
         assert path.read_text(encoding="utf-8") == "preserve"
+
+    assert verify_fresh_application_state(
+        environ=environ,
+        app_root=app_root,
+        relay_root=relay_root,
+    ) == ()
 
 
 def test_reset_rejects_configured_paths_outside_bounded_mounts(
