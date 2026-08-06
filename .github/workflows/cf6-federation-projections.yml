@@ -6,6 +6,7 @@ on:
       - ".github/workflows/cf6-federation-projections.yml"
       - "catalog/federation/projections/**"
       - "catalog/federation/tests/test_federation_projections.py"
+      - "catalog/federation/tests/test_benchmark_latest_projection.py"
   push:
     branches:
       - main
@@ -14,6 +15,7 @@ on:
       - ".github/workflows/cf6-federation-projections.yml"
       - "catalog/federation/projections/**"
       - "catalog/federation/tests/test_federation_projections.py"
+      - "catalog/federation/tests/test_benchmark_latest_projection.py"
 
 permissions:
   contents: read
@@ -48,15 +50,18 @@ jobs:
           python -m compileall -q
           catalog/federation/projections
           catalog/federation/tests/test_federation_projections.py
+          catalog/federation/tests/test_benchmark_latest_projection.py
       - name: Run CF6 projection tests
         run: >-
           python -m pytest -o addopts= -q
           catalog/federation/tests/test_federation_projections.py
+          catalog/federation/tests/test_benchmark_latest_projection.py
       - name: Ruff CF6 projections
         run: >-
           python -m ruff check
           catalog/federation/projections
           catalog/federation/tests/test_federation_projections.py
+          catalog/federation/tests/test_benchmark_latest_projection.py
       - name: Diff hygiene
         shell: bash
         run: |
