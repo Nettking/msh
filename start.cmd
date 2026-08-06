@@ -5,10 +5,16 @@ title MSH
 cd /d "%~dp0"
 
 set "MSH_FRESH_INSTALL=0"
+set "MSH_RESUME_EXISTING=0"
 if "%~1"=="" goto :arguments_ready
 if /I "%~1"=="--fresh" (
     if not "%~2"=="" goto :usage_error
     set "MSH_FRESH_INSTALL=1"
+    goto :arguments_ready
+)
+if /I "%~1"=="--resume" (
+    if not "%~2"=="" goto :usage_error
+    set "MSH_RESUME_EXISTING=1"
     goto :arguments_ready
 )
 if /I "%~1"=="--help" goto :show_help
@@ -109,6 +115,36 @@ if errorlevel 1 (
     exit /b 1
 )
 
+if not "%MSH_RESUME_EXISTING%"=="1" goto :resume_complete
+echo.
+echo Reconnecting and refreshing the existing MSH setup...
+docker compose exec -T flask python -m catalog.flask_app.services.existing_setup_resume
+if errorlevel 4 goto :resume_partial
+if errorlevel 3 goto :resume_failed
+if errorlevel 2 goto :resume_missing
+set "MSH_OPEN_URL=%MSH_BASE_URL%/federation"
+echo Existing identity, Federation membership, inspection, benchmarks, and contribution intent are ready.
+goto :resume_complete
+
+:resume_partial
+set "MSH_OPEN_URL=%MSH_BASE_URL%/federation/benchmarks"
+echo Existing setup reconnected and refreshed with benchmark or reconciliation warnings.
+echo The benchmark page will open for review.
+goto :resume_complete
+
+:resume_failed
+set "MSH_OPEN_URL=%MSH_BASE_URL%/onboarding?repair=1"
+echo Existing setup could not be resumed safely.
+echo The guided repair page will open. No identity or Federation was replaced.
+goto :resume_complete
+
+:resume_missing
+set "MSH_OPEN_URL=%MSH_ONBOARDING_URL%"
+echo No saved device identity and Federation membership were found.
+echo First-time onboarding is required on this machine.
+
+:resume_complete
+echo.
 echo MSH is running:        %MSH_BASE_URL%
 echo Onboarding:            %MSH_ONBOARDING_URL%
 echo Federation:            %MSH_BASE_URL%/federation
@@ -209,11 +245,14 @@ exit /b 0
 
 :show_help
 echo Usage:
-echo   start.cmd           Start MSH and preserve all existing state.
-echo   start.cmd --fresh   Reset device/Federation setup, verify it, then start MSH.
+echo   start.cmd            Start MSH and preserve all existing state.
+echo   start.cmd --resume   Start, reconnect, inspect, benchmark, and reconcile saved setup.
+echo   start.cmd --fresh    Reset device/Federation setup, verify it, then start MSH.
 echo.
-echo Both modes install and verify the exact configured Ollama benchmark model.
-echo Startup retries a missing model three times and does not open onboarding until it is present.
+echo Normal and resume modes preserve identity, Federation membership, recordings,
+echo source configuration, recorder checkpoints, results, and downloaded models.
+echo Resume mode never creates or replaces identity or Federation authority.
+echo All modes install and verify the exact configured Ollama benchmark model.
 echo The --fresh option requires typing RESET and preserves recordings,
 echo source configuration, recorder checkpoints, results, and Ollama models.
 exit /b 0
