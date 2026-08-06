@@ -1,0 +1,76 @@
+name: One-time merged OSL branch cleanup 2026-08-06
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize]
+    paths:
+      - ".github/workflows/remove-merged-osl-branch-20260806.yml"
+
+permissions:
+  contents: write
+  pull-requests: read
+
+jobs:
+  delete-merged-branch:
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'cleanup/remove-merged-osl-branch-20260806' &&
+      github.base_ref == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Verify main and delete authorized refs
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const expectedMain = 'c78bc94ecd3a6ca9b6fb9825db583055f61f4950';
+            const cleanupBranch = 'cleanup/remove-merged-osl-branch-20260806';
+            const targetBranch = 'agent/clean-osl-implementation-plan';
+            const { owner, repo } = context.repo;
+
+            const main = await github.rest.git.getRef({ owner, repo, ref: 'heads/main' });
+            if (main.data.object.sha !== expectedMain) {
+              core.setFailed(`main moved: expected ${expectedMain}, got ${main.data.object.sha}`);
+              return;
+            }
+
+            for (const branch of [targetBranch]) {
+              try {
+                await github.rest.git.getRef({ owner, repo, ref: `heads/${branch}` });
+                await github.rest.git.deleteRef({ owner, repo, ref: `heads/${branch}` });
+                core.info(`deleted ${branch}`);
+              } catch (error) {
+                if (error.status === 404) {
+                  core.info(`already absent ${branch}`);
+                } else {
+                  throw error;
+                }
+              }
+            }
+
+            const refs = await github.paginate(github.rest.git.listMatchingRefs, {
+              owner,
+              repo,
+              ref: 'heads/',
+              per_page: 100,
+            });
+            const remaining = refs.map((ref) => ref.ref.replace('refs/heads/', '')).sort();
+            const expected = new Set(['main', cleanupBranch]);
+            const unexpected = remaining.filter((branch) => !expected.has(branch));
+            if (unexpected.length) {
+              core.setFailed(`unexpected branches remain: ${unexpected.join(', ')}`);
+              return;
+            }
+
+            const mainAfter = await github.rest.git.getRef({ owner, repo, ref: 'heads/main' });
+            if (mainAfter.data.object.sha !== expectedMain) {
+              core.setFailed(`main changed during cleanup: ${mainAfter.data.object.sha}`);
+              return;
+            }
+
+            await github.rest.git.deleteRef({
+              owner,
+              repo,
+              ref: `heads/${cleanupBranch}`,
+            });
+            core.info('deleted temporary cleanup runner branch');
