@@ -23,6 +23,12 @@ goto :usage_error
 
 :arguments_ready
 if not defined MSH_WEB_BIND set "MSH_WEB_BIND=127.0.0.1"
+if not defined COMPOSE_PROJECT_NAME set "COMPOSE_PROJECT_NAME=msh"
+set "MSH_WEB_PORT_EXPLICIT=1"
+if not defined MSH_WEB_PORT (
+    set "MSH_WEB_PORT=5000"
+    set "MSH_WEB_PORT_EXPLICIT=0"
+)
 
 where docker >nul 2>&1
 if errorlevel 1 (
@@ -45,10 +51,18 @@ if "%MSH_FRESH_INSTALL%"=="1" (
     if errorlevel 1 exit /b 1
 )
 
+call :resolve_web_port
+if errorlevel 1 (
+    echo.
+    echo MSH could not reserve a safe local web port.
+    pause
+    exit /b 1
+)
+
 echo Starting the current MSH core services...
 echo   - Federation relay
 echo   - Ollama service
-echo   - Flask workbench
+echo   - Flask workbench on %MSH_WEB_BIND%:%MSH_WEB_PORT%
 echo   - Managed recorder
 docker compose up -d --build relay ollama flask recorder
 if errorlevel 1 (
@@ -158,6 +172,30 @@ echo downloaded Ollama models, and recorded data are preserved between normal st
 echo.
 
 start "" "%MSH_OPEN_URL%"
+exit /b 0
+
+:resolve_web_port
+set "MSH_WEB_PORT_RESOLVED_PRESTART="
+set "MSH_WEB_PORT_FILE=%TEMP%\msh-web-port-%RANDOM%-%RANDOM%.txt"
+if "%MSH_WEB_PORT_EXPLICIT%"=="1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% > "%MSH_WEB_PORT_FILE%"
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% -AllowFallback > "%MSH_WEB_PORT_FILE%"
+)
+set "MSH_WEB_PORT_EXIT=%ERRORLEVEL%"
+if not "%MSH_WEB_PORT_EXIT%"=="0" (
+    if exist "%MSH_WEB_PORT_FILE%" del /q "%MSH_WEB_PORT_FILE%" >nul 2>&1
+    exit /b %MSH_WEB_PORT_EXIT%
+)
+if exist "%MSH_WEB_PORT_FILE%" set /p "MSH_WEB_PORT_RESOLVED_PRESTART="<"%MSH_WEB_PORT_FILE%"
+if exist "%MSH_WEB_PORT_FILE%" del /q "%MSH_WEB_PORT_FILE%" >nul 2>&1
+if not defined MSH_WEB_PORT_RESOLVED_PRESTART (
+    echo The Windows port resolver did not return a usable port.
+    exit /b 1
+)
+set "MSH_WEB_PORT=%MSH_WEB_PORT_RESOLVED_PRESTART%"
+echo MSH web port reserved: %MSH_WEB_BIND%:%MSH_WEB_PORT%
+echo.
 exit /b 0
 
 :ensure_ollama_model
