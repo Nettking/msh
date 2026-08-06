@@ -1,11 +1,16 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 from flask import Flask
 
+from catalog.ai.runtime_manager import ConfiguredLanguageModelRuntimeManager
 from catalog.capabilities.contributions import AICandidateSource, AIContributionAdapter
-from catalog.federation.onboarding_models import DeviceInspectionSnapshot
+from catalog.federation.onboarding_models import (
+    ContributionActivationState,
+    DeviceInspectionSnapshot,
+)
 from catalog.flask_app.services.capability_contribution_components import (
     default_components,
 )
@@ -30,15 +35,8 @@ def _inspection() -> DeviceInspectionSnapshot:
     )
 
 
-def test_legacy_ai_disabled_does_not_hide_configured_ai_explainer(
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("MSH_AI_MODEL", "llama3.2:3b")
-    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama:11434")
-
-    app = Flask(__name__)
-    app.config["CAPABILITY_ONBOARDING_AI_RUNTIME_MANAGER"] = object()
-    legacy_setup = {
+def _legacy_setup() -> dict[str, object]:
+    return {
         "configured": True,
         "user_setup_complete": True,
         "deployment_mode": "web-workbench",
@@ -48,10 +46,20 @@ def test_legacy_ai_disabled_does_not_hide_configured_ai_explainer(
         "ollama_base_url": "http://ollama:11434",
     }
 
+
+def test_legacy_ai_disabled_does_not_hide_configured_ai_explainer(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("MSH_AI_MODEL", "llama3.2:3b")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama:11434")
+
+    app = Flask(__name__)
+    app.config["CAPABILITY_ONBOARDING_AI_RUNTIME_MANAGER"] = object()
+
     with app.app_context():
         sources, adapters = default_components(
             onboarding_service=object(),  # type: ignore[arg-type]
-            setup_loader=lambda: legacy_setup,
+            setup_loader=_legacy_setup,
         )
         ai_sources = tuple(
             source for source in sources if isinstance(source, AICandidateSource)
@@ -70,3 +78,43 @@ def test_legacy_ai_disabled_does_not_hide_configured_ai_explainer(
     assert descriptor.capability_type == "language-model"
     assert descriptor.display_label == "AI Explainer — This computer"
     assert descriptor.missing_prerequisites == ()
+
+
+def test_ai_explainer_enable_maps_opaque_federation_identity_to_runtime_id(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("MSH_AI_MODEL", "llama3.2:3b")
+    monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama:11434")
+
+    opaque_node_id = "node-AbC_DEf-0123456789abcdefghijklmnopqrstuvwxyz"
+    context = SimpleNamespace(
+        credentials=SimpleNamespace(
+            identity=SimpleNamespace(node_id=opaque_node_id)
+        )
+    )
+    onboarding = SimpleNamespace(authorized_context=lambda: context)
+    manager = ConfiguredLanguageModelRuntimeManager(session_id="local-ai")
+    candidate = SimpleNamespace(
+        capability_type="language-model",
+        capacity_envelope={"provider_id": "ollama-configured"},
+        display_label="AI Explainer — This computer",
+    )
+
+    app = Flask(__name__)
+    app.config["CAPABILITY_ONBOARDING_AI_RUNTIME_MANAGER"] = manager
+    with app.app_context():
+        _sources, adapters = default_components(
+            onboarding_service=onboarding,  # type: ignore[arg-type]
+            setup_loader=_legacy_setup,
+        )
+        ai_adapter = next(
+            adapter for adapter in adapters if isinstance(adapter, AIContributionAdapter)
+        )
+        outcome = ai_adapter.enable(candidate)  # type: ignore[arg-type]
+
+    assert outcome.activation_state is ContributionActivationState.ACTIVE
+    assert manager.additional_provider_ids() == ("ollama-configured",)
+    provider = manager.additional_providers()[0]
+    assert provider.node_id.startswith("node-federation-")
+    assert provider.node_id != opaque_node_id
+    assert provider.node_id == provider.node_id.casefold()
