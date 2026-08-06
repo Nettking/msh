@@ -114,22 +114,30 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Removing only device, setup, and Federation state...
-powershell -NoProfile -ExecutionPolicy Bypass -Command ^
-  "$ErrorActionPreference = 'Stop';" ^
-  "$composeLines = @(docker compose config --format json);" ^
-  "if ($LASTEXITCODE -ne 0) { throw 'Docker Compose configuration could not be read.' };" ^
-  "$composeJson = [string]::Join([Environment]::NewLine, $composeLines);" ^
-  "$compose = ConvertFrom-Json $composeJson;" ^
-  "$project = [string]$compose.name;" ^
-  "if ([string]::IsNullOrWhiteSpace($project)) { throw 'Docker Compose project name was unavailable.' };" ^
-  "$relayVolumes = @(docker volume ls --filter ('label=com.docker.compose.project=' + $project) --filter 'label=com.docker.compose.volume=relay_state' -q);" ^
-  "foreach ($volume in $relayVolumes) { $null = docker volume rm $volume; if ($LASTEXITCODE -ne 0) { throw ('Could not remove relay state volume: ' + $volume) } };" ^
-  "Remove-Item -LiteralPath 'data\federation' -Recurse -Force -ErrorAction SilentlyContinue;" ^
-  "Remove-Item -LiteralPath 'data\server_setup\server_settings.json' -Force -ErrorAction SilentlyContinue"
+echo Clearing only the local Federation relay authority volume...
+docker compose run --rm --no-deps --build --entrypoint python relay -c "from pathlib import Path; import shutil; root = Path('/var/lib/msh-relay'); [(shutil.rmtree(path) if path.is_dir() and not path.is_symlink() else path.unlink()) for path in tuple(root.iterdir())]"
 if errorlevel 1 (
     echo.
-    echo Fresh device reset did not complete. Review the error above before retrying.
+    echo The Federation relay state could not be cleared.
+    echo Recorded data and Ollama models were not removed.
+    pause
+    exit /b 1
+)
+
+echo Removing host-side device, onboarding, and setup state...
+if exist "data\federation" rmdir /s /q "data\federation"
+if exist "data\federation" (
+    echo.
+    echo Could not remove data\federation. Check file permissions or open programs.
+    pause
+    exit /b 1
+)
+
+if exist "data\server_setup\server_settings.json" del /f /q "data\server_setup\server_settings.json"
+if exist "data\server_setup\server_settings.json" (
+    echo.
+    echo Could not remove data\server_setup\server_settings.json.
+    echo Check file permissions or open programs.
     pause
     exit /b 1
 )
