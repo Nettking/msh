@@ -81,7 +81,8 @@ class StorageContributionAdapter:
             )
         return AdapterOutcome(
             ContributionActivationState.PENDING,
-            "Waiting for storage control-plane assignment.",
+            "Waiting for federation storage assignment. Your preference is saved, "
+            "but this device has not been granted storage authority.",
         )
 
     def disable(self, candidate: ContributionCandidate) -> AdapterOutcome:
@@ -114,7 +115,8 @@ class StorageContributionAdapter:
             )
         return AdapterOutcome(
             ContributionActivationState.PENDING,
-            "Waiting for storage control-plane assignment.",
+            "Waiting for federation storage assignment. Your preference is saved, "
+            "but this device has not been granted storage authority.",
         )
 
     def _provider_id(self, candidate: ContributionCandidate) -> str:
