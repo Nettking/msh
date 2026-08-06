@@ -55,6 +55,7 @@
       var url = new URL(window.location.href);
       if (url.searchParams.get("fresh") !== "1") return false;
       url.searchParams.delete("fresh");
+      url.searchParams.delete("reset");
       window.history.replaceState({}, "", url.pathname + url.search + url.hash);
       return true;
     } catch (_error) {
