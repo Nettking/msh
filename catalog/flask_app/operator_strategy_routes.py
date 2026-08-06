@@ -2,15 +2,18 @@ from __future__ import annotations
 
 from flask import Blueprint, flash, redirect, render_template, request, url_for
 
-from .services.operator_strategy_service import DEFAULT_TIMEZONE, OperatorStrategyError, OperatorStrategyService
+from .services.federated_operator_strategy_service import (
+    FederatedOperatorStrategyService,
+)
+from .services.operator_strategy_service import DEFAULT_TIMEZONE, OperatorStrategyError
 from .services.source_inventory_service import SourceInventoryService
 
 
 operator_strategy_web = Blueprint("operator_strategy_web", __name__, url_prefix="/operator-strategies")
 
 
-def _service() -> OperatorStrategyService:
-    return OperatorStrategyService()
+def _service() -> FederatedOperatorStrategyService:
+    return FederatedOperatorStrategyService()
 
 
 def _source_inventory() -> dict[str, object]:
@@ -47,6 +50,7 @@ def index():
         status_counts=status_counts,
         total_records=len(records),
         load_error=load_error,
+        storage_scope=service.storage_scope,
     )
 
 
@@ -65,6 +69,7 @@ def capture():
         load_error=load_error,
         default_timezone=DEFAULT_TIMEZONE,
         records_path=service.records_path.as_posix(),
+        storage_scope=service.storage_scope,
         source_inventory=_source_inventory(),
     )
 
@@ -83,6 +88,7 @@ def review():
         records=records,
         load_error=load_error,
         records_path=service.records_path.as_posix(),
+        storage_scope=service.storage_scope,
     )
 
 
@@ -98,6 +104,7 @@ def structure(record_id: str):
         record=record,
         source_inventory=_source_inventory(),
         default_timezone=DEFAULT_TIMEZONE,
+        storage_scope=service.storage_scope,
     )
 
 
