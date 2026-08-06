@@ -1,125 +1,199 @@
 # Quick start
 
-This guide gets MSH running as a server-oriented Docker deployment. The same checkout can run the full workbench, the web UI only, the MTConnect recorder only, a headless language-model provider, or one-shot preparation/synchronization jobs.
+Status: **current user guide**  
+Reviewed: **2026-08-06**
+
+This guide describes the normal supported way to start MSH and complete capability-first onboarding.
+
+An MSH device is not assigned one permanent product role during first setup. The required first-run flow is:
+
+```text
+Identity
+  -> Federation
+  -> Inspect
+  -> finish setup
+  -> open Federation
+```
+
+A current device inspection is sufficient to finish setup. Benchmarks and contribution decisions are optional follow-up work and do not block the normal workbench.
 
 ## Prerequisites
 
-- Docker and Docker Compose for the recommended path.
-- Python 3 only to run the local setup helper.
-- Internet access on first AI setup so Docker can pull the Ollama image and selected model.
-- JSONL telemetry files in `data/` when you want real analysis results. A small example file is available under `example-data/` for development.
+- Git.
+- Docker Desktop on Windows, or Docker Engine with Docker Compose on Linux/macOS.
+- Internet access the first time the configured Ollama model must be downloaded.
+- JSONL telemetry under `data/` only when you want to analyze real machine data. Development examples are available under `example-data/`.
 
-## Select what this server should run
+## Windows: supported launcher
 
-Run the setup helper from the repository root:
-
-```bash
-python setup_msh.py
-```
-
-Choose one of the deployment modes:
-
-- **Full server** — Flask workbench plus MTConnect recorder.
-- **Web workbench** — Flask, orchestration, playback, source settings, and analysis UI.
-- **Web UI only** — Flask UI without background orchestration.
-- **Recorder station** — MTConnect recorder with setup, controls, and diagnostics UI.
-- **Language-model provider** — headless model capability for another connected MSH device.
-- **Prep only** — one-shot preparation/orchestration.
-- **Observer sync only** — one-shot Observer Phoenix synchronization.
-
-When a web-capable mode is selected, setup can use Ollama on the MSH computer or connect to Ollama contributed by another computer. The three standard model choices are:
-
-| Choice | Model | Device target |
-| --- | --- | --- |
-| Edge small | `smollm2:360m` | Small CPU, Raspberry Pi class, or very low memory testing. |
-| Laptop standard | `llama3.2:3b` | Normal laptop or small server. Default balance. |
-| Workstation strong | `qwen2.5:7b` | Gaming laptop, workstation, or GPU server. Stronger answers. |
-
-The helper writes `.env`, which is ignored by git and read automatically by Docker Compose. If you choose to pull the model during setup, it starts the `ollama` service and runs the one-shot `ollama-pull` installer.
-
-For an Android/phone MSH instance using a laptop model, see [Connected capabilities](connected_capabilities.md).
-
-## Small laptop provider
-
-To make a Docker-capable laptop contribute the default small model without installing Ollama separately:
-
-```bash
-git clone https://github.com/Nettking/msh.git
-cd msh
-docker compose --profile provider run --rm model-provider-install
-```
-
-This starts the provider and downloads `smollm2:360m` once into a persistent Docker volume. Connect the other MSH device to `http://<laptop-ip>:11434`.
-
-## Start with Docker
-
-On Windows, use the supported launcher:
+From a fresh checkout:
 
 ```cmd
+git clone https://github.com/Nettking/msh.git
+cd msh
 start.cmd
 ```
 
-The launcher starts the current capability-first core baseline in detached mode:
+The launcher builds and starts the current core services:
 
-- the Federation relay;
-- the bundled Ollama service;
-- the Flask workbench;
-- the managed recorder.
+- Federation relay;
+- Ollama;
+- Flask workbench;
+- managed recorder.
 
-It waits for `/onboarding` to become available and then opens that page. It does not download a model automatically; model installation remains an explicit setup action.
+It also checks that the configured Ollama model is installed and downloads it when necessary. Existing identity, Federation, recorder, model, and data state are preserved during normal starts.
 
-### Start as a fresh device
+The web interface is limited to the local MSH computer by default. Open:
 
-To remove the current MSH device identity and Federation setup before starting:
-
-```cmd
-start.cmd --fresh
+```text
+http://localhost:5000
 ```
 
-The launcher displays the exact reset boundary and requires typing `RESET` before changing anything. It stops the current Compose deployment and removes only:
-
-- `data/federation/`, including the local device identity and keys, onboarding state, saved binding, pairing state, benchmark/contribution evidence, and capability-transition state;
-- the Compose `relay_state` volume containing the local Federation coordinator authority database;
-- `data/server_setup/server_settings.json`, containing the saved server role and legacy device setup choices.
-
-The fresh-device option intentionally preserves:
-
-- recorded telemetry and imported data;
-- source configuration and recorder checkpoints;
-- analysis/workflow results;
-- `.env` deployment configuration;
-- Docker images;
-- downloaded Ollama and model-provider models.
-
-After the reset, the same command starts the normal core services and opens `/onboarding` with Identity and Federation empty. Running `start.cmd` without `--fresh` continues to preserve all existing state.
-
-On Linux, macOS, or for manual control, start the default Compose deployment:
-
-```bash
-docker compose up -d --build
-```
-
-Open capability-first onboarding:
+For a device without completed onboarding, open:
 
 ```text
 http://localhost:5000/onboarding
 ```
 
-After onboarding, the Federation overview is available at:
+The actual web port may differ when port `5000` is already occupied. `start.cmd` prints the resolved address before opening the browser.
 
-```text
-http://localhost:5000/federation
+### Reconnect and refresh an existing setup
+
+Use the explicit resume path when you want startup to reconnect the saved Federation, refresh inspection, run the benchmark plan, and reconcile saved contribution intent before opening the workbench:
+
+```cmd
+start.cmd --resume
 ```
 
-From another computer on the same trusted network, open:
+This does not replace the device identity or create a new Federation.
 
-```text
-http://<server-ip>:5000/onboarding
+### Start as a fresh device
+
+To remove this checkout's device identity and Federation setup before starting:
+
+```cmd
+start.cmd --fresh
 ```
 
-Opening MSH through the reachable LAN or VPN address also allows generated pairing codes to advertise the relay at `ws://<server-ip>:8765`. Opening through `localhost` is intentionally insufficient for pairing another physical device.
+The launcher displays the reset boundary and requires typing `RESET` before it changes anything.
 
-For server/firewall details, see [Server setup](server_setup.md).
+The reset removes:
+
+- the local device identity and keys;
+- Federation membership, pairing, onboarding, inspection, and benchmark state;
+- local Federation relay authority state;
+- saved legacy server-role and setup choices.
+
+It preserves:
+
+- recorded telemetry and imported data;
+- source configuration and recorder checkpoints;
+- analysis and workflow results;
+- Docker images;
+- downloaded Ollama models.
+
+After the reset, MSH verifies that authoritative setup state is empty and opens capability-first onboarding.
+
+## Linux or macOS
+
+Start the same default service set from the repository root:
+
+```bash
+docker compose up -d --build relay ollama recorder flask
+```
+
+Install the configured model the first time, or after changing `MSH_AI_MODEL`:
+
+```bash
+docker compose --profile model-install run --rm ollama-pull
+```
+
+Then open:
+
+```text
+http://localhost:5000/onboarding
+```
+
+Normal `docker compose` starts preserve device, Federation, recorder, model, and data state.
+
+## Complete first-run onboarding
+
+The mandatory setup is intentionally short:
+
+1. **Identity** — create or load the stable identity for this MSH device.
+2. **Federation** — reconnect, join, or create the user-facing Federation through an authenticated path.
+3. **Inspect** — inspect the device's supported local capabilities.
+4. **Finish setup** — enable the normal workbench without granting optional contribution authority.
+5. **Open Federation** — review connected devices and available capabilities.
+
+Finishing setup does not automatically grant recorder, language-model, compute, or storage contribution authority. Optional benchmarks and contribution choices remain available from the Federation pages.
+
+## First pages to open
+
+- <http://localhost:5000/onboarding> — complete or repair capability-first onboarding.
+- <http://localhost:5000/federation> — inspect the Federation, devices, capabilities, benchmarks, and contribution state.
+- <http://localhost:5000/status> — verify discovery, bootstrap, catch-up, failures, and readiness.
+- <http://localhost:5000/control> — select datasets, refresh data, and run workflows or scripts.
+- <http://localhost:5000/operator-strategies> — capture structured operator decisions.
+- <http://localhost:5000/sources/observer-phoenix> — configure and test Observer Phoenix access.
+- <http://localhost:5000/ai> — ask read-only system-understanding questions.
+- <http://localhost:5000/playback> — inspect playback-ready exports.
+- <http://localhost:5000/analyses> — browse discovered CSV and JSON artifacts.
+- <http://localhost:5000/docs> — browse repository documentation.
+
+## Access from another trusted device
+
+`start.cmd` binds the Flask workbench to `127.0.0.1` by default. To allow access from another computer on a trusted LAN or VPN, set the bind address before starting.
+
+From Windows Command Prompt:
+
+```cmd
+set MSH_WEB_BIND=0.0.0.0
+start.cmd
+```
+
+From PowerShell:
+
+```powershell
+$env:MSH_WEB_BIND = "0.0.0.0"
+.\start.cmd
+```
+
+For Docker Compose on Linux/macOS, place this in `.env` or export it before startup:
+
+```text
+MSH_WEB_BIND=0.0.0.0
+```
+
+Then open:
+
+```text
+http://<server-ip>:5000
+```
+
+Use the reachable LAN or VPN address when pairing another physical MSH device so the pairing material can advertise a reachable relay address. Do not expose Flask, the relay, or Ollama directly to the public internet.
+
+See [Server setup](server_setup.md) for network, deployment, recorder, and provider details.
+
+## Advanced deployment profiles
+
+`setup_msh.py` and Compose profiles remain available for advanced or compatibility deployments such as a headless model provider, a recorder-only station, or a one-shot preparation job. They are not the normal first-run product flow and do not define a permanent device identity or grant capability authority.
+
+See [Server setup](server_setup.md) before selecting a non-default deployment shape.
+
+## Optional one-shot jobs
+
+Run preparation explicitly:
+
+```bash
+docker compose --profile prep run --rm prep
+```
+
+Run Observer Phoenix synchronization explicitly:
+
+```bash
+docker compose --profile observer-sync run --rm observer-sync
+```
 
 ## Start without Docker
 
@@ -129,62 +203,13 @@ Use this for local development or troubleshooting only:
 python -m catalog.flask_app.app
 ```
 
-Flask reads these useful environment variables:
+Useful environment variables include:
 
-- `FLASK_RUN_HOST` — defaults to `0.0.0.0`.
+- `FLASK_RUN_HOST` — defaults to `0.0.0.0` for direct Flask startup.
 - `FLASK_RUN_PORT` — defaults to `5000`.
-- `FLASK_DEBUG` — set to `1` for Flask debug mode.
-- `MSH_FLASK_SECRET` — Flask secret key; generated by setup for Docker deployments.
+- `FLASK_DEBUG=1` — enables Flask debug mode.
+- `MSH_FLASK_SECRET` — Flask secret key.
 - `MSH_SKIP_ORCHESTRATION=1` — starts Flask without the background runtime.
-- `MSH_SCAN_DIRS` — comma-separated artifact scan roots; defaults are supplemented with `data` and `results` by the runtime.
+- `MSH_SCAN_DIRS` — comma-separated artifact scan roots.
 - `MSH_AI_MODEL` — selected Ollama model.
-- `OLLAMA_BASE_URL` — Ollama API URL. In Docker this is normally `http://ollama:11434`.
-
-## What web-workbench startup does
-
-The default web-workbench path is webapp-first:
-
-1. Flask starts and registers the operator routes.
-2. The runtime manager records app/runtime milestones in `results/workflows/runtime_state.json`.
-3. Source dates are discovered from JSONL telemetry in `data/`.
-4. A deterministic automatic workflow session is created or reused for the latest discovered day.
-5. Session-filtered data is prepared under `results/workflows/<session-id>/data/`.
-6. A compact derived metrics artifact is created at `data/_derived/basic_metrics.csv` inside the session.
-7. The automatic playback-ready script set runs in best-effort mode.
-8. Playback timeline exports are generated or reused under `exports/timeline/` inside the session.
-9. Historical catch-up proceeds one day at a time in the background, then the runtime polls for newly arriving source days.
-
-The automatic script set is intentionally bounded: `machines_active_per_day`, `analyze_missing_sequence_number`, `missing_per_day_by_machine`, `sampling_rate_analysis`, and `data_visualizer`.
-
-## First pages to open
-
-- <http://localhost:5000/onboarding> — create/load identity, connect or create the Federation, and inspect the device.
-- <http://localhost:5000/federation> — inspect the connected Federation and device capabilities.
-- <http://localhost:5000/status> — verify discovery, bootstrap, catch-up, failures, and readiness.
-- <http://localhost:5000/control> — select datasets, trigger refreshes, and run workflows or scripts.
-- <http://localhost:5000/operator-strategies> — record OSL-style operator strategy decisions during field work.
-- <http://localhost:5000/sources/observer-phoenix> — configure and test Observer Phoenix credentials.
-- <http://localhost:5000/ai> — ask read-only system-understanding questions using the selected local or connected model provider.
-- <http://localhost:5000/playback> — inspect playback-ready exports after filtered session data exists.
-- <http://localhost:5000/analyses> — browse discovered CSV/JSON artifacts.
-
-## Optional one-shot preparation
-
-Select `prep-only` during setup, or run explicitly:
-
-```bash
-docker compose --profile prep run --rm prep
-```
-
-## AI model retry
-
-If model installation fails or you change `MSH_AI_MODEL` in `.env`, retry with:
-
-```bash
-docker compose up -d ollama
-docker compose run --rm ollama-pull
-```
-
-## Windows helper
-
-`start.cmd` is the primary Windows launcher for the capability-first core services. `ops/start-system.ps1` remains a lower-level host-side wrapper around Docker Compose and can optionally launch a VPN monitor script if you pass a valid `-VpnReconnectScript`.
+- `OLLAMA_BASE_URL` — Ollama API URL.
