@@ -157,15 +157,21 @@ class JobAuthorityAdapter:
                 attempts = _sequence(_value(job, "attempts", ()))
                 latest = attempts[-1] if attempts else None
                 reason = _value(latest, "error_code") if latest is not None else None
+                capability = _value(job, "capability")
+                capability_type = _value(
+                    job,
+                    "capability_type",
+                    _value(
+                        capability,
+                        "capability_type",
+                        _value(job, "capability_id", "unknown-capability"),
+                    ),
+                )
                 jobs.append(
                     JobRecord(
                         job_id=_public_text(_value(job, "job_id"), "unknown-job"),
                         capability_type=_public_text(
-                            _value(
-                                job,
-                                "capability_type",
-                                _value(job, "capability_id", "unknown-capability"),
-                            ),
+                            capability_type,
                             "unknown-capability",
                         ),
                         status=_enum_value(_value(job, "status"), "unknown"),
