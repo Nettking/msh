@@ -7,6 +7,7 @@ from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
 from flask import Flask, current_app, url_for
+from werkzeug.datastructures import FileStorage
 
 from catalog.common.data_loading import iter_jsonl_files
 from catalog.flask_app.data_upload_routes import data_upload_web
@@ -68,7 +69,9 @@ def _test_app(service: DataUploadService) -> Flask:
     @app.context_processor
     def _navigation() -> dict[str, object]:
         def endpoint_url(endpoint: str, fallback: str) -> str:
-            return url_for(endpoint) if endpoint in current_app.view_functions else fallback
+            if endpoint in current_app.view_functions:
+                return url_for(endpoint)
+            return fallback
 
         return {"endpoint_url": endpoint_url}
 
@@ -94,7 +97,12 @@ def test_multiple_jsonl_files_import_then_request_existing_background_analysis(
         data={
             "_csrf_token": csrf,
             "files": [
-                (io.BytesIO(b'{"timestamp":"2026-08-05T10:00:00Z","machine":"A"}\n'), "first.jsonl"),
+                (
+                    io.BytesIO(
+                        b'{"timestamp":"2026-08-05T10:00:00Z","machine":"A"}\n'
+                    ),
+                    "first.jsonl",
+                ),
                 (
                     io.BytesIO(
                         b'{"timestamp":"2026-08-06T10:00:00Z","machine":"B"}\n'
@@ -144,8 +152,6 @@ def test_invalid_json_rolls_back_database_and_never_publishes_batch(
     tmp_path: Path,
 ) -> None:
     service = _service(tmp_path)
-    from werkzeug.datastructures import FileStorage
-
     batch = service.enqueue(
         (
             FileStorage(
@@ -180,3 +186,34 @@ def test_jsonl_discovery_hides_directory_until_publish_marker_is_removed(
 
     marker.unlink()
     assert list(iter_jsonl_files(tmp_path / "data")) == [file_path]
+
+
+def test_restart_marks_interrupted_batch_failed_and_removes_partial_directories(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path)
+    batch_id = "upload-interrupted"
+    with sqlite3.connect(service.database) as connection:
+        connection.execute(
+            """
+            INSERT INTO data_upload_batches(
+                batch_id,status,file_count,total_bytes,created_at
+            ) VALUES(?, 'publishing', 1, 10, '2026-08-06T10:00:00Z')
+            """,
+            (batch_id,),
+        )
+    staging = service.staging_root / batch_id
+    published = service.published_root / batch_id
+    staging.mkdir(parents=True)
+    published.mkdir(parents=True)
+    (staging / "data.uploading").write_bytes(b"partial")
+    (published / ".msh-importing").write_text(batch_id, encoding="utf-8")
+    (published / "data.jsonl").write_text('{"partial":true}\n', encoding="utf-8")
+
+    restarted = _service(tmp_path)
+    recovered = restarted.batch(batch_id)
+
+    assert recovered["status"] == "failed"
+    assert recovered["error_code"] == "import-interrupted"
+    assert not staging.exists()
+    assert not published.exists()
