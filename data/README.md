@@ -22,6 +22,20 @@ data/
     2026-01-10.jsonl
 ```
 
+3. **Browser upload batches**
+
+```text
+data/
+  imports/
+    uploads.sqlite3
+  uploads/
+    upload-<opaque-id>/
+      first.jsonl
+      second.jsonl
+```
+
+The Data upload page accepts several JSONL files in one batch. Every nonblank line is validated as a JSON object and stored transactionally in `data/imports/uploads.sqlite3`. The corresponding JSONL files are published under `data/uploads/` only after the full database import succeeds. A temporary `.msh-importing` marker hides incomplete publication directories from supported recursive discovery.
+
 ## Current support level
 
 The current runtime, date discovery, workflow-session filtering, and telemetry analytics cache paths are intended to discover JSONL recursively under `data/**/*.jsonl`.
