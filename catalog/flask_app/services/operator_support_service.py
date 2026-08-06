@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from .operator_strategy_service import OperatorStrategyService
+from .federated_operator_strategy_service import FederatedOperatorStrategyService
 from .operator_support_model import SupportCard, action_requires_confirmation
 
 
@@ -47,8 +47,11 @@ DEFAULT_ACTIONS: dict[str, dict[str, str]] = {
 
 
 class OperatorSupportService:
-    def __init__(self, note_service: OperatorStrategyService | None = None) -> None:
-        self.note_service = note_service or OperatorStrategyService()
+    def __init__(
+        self,
+        note_service: FederatedOperatorStrategyService | None = None,
+    ) -> None:
+        self.note_service = note_service or FederatedOperatorStrategyService()
 
     def support_cards(self) -> list[dict[str, Any]]:
         notes = self.note_service.recent_records(limit=100)
@@ -63,7 +66,7 @@ class OperatorSupportService:
     def _card_from_issue(self, issue_key: str, notes: list[dict[str, Any]]) -> SupportCard:
         action = DEFAULT_ACTIONS[issue_key]
         related = [note for note in notes if issue_key in _note_text(note)]
-        evidence = [f"{len(related)} related operator note(s) found."] if related else ["No local operator notes yet; using seed rule template."]
+        evidence = [f"{len(related)} related operator note(s) found."] if related else ["No Federation operator notes yet; using seed rule template."]
         return SupportCard(
             id=f"template-{issue_key.replace('_', '-')}",
             issue=issue_key.replace("_", " ").title(),
