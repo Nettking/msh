@@ -24,7 +24,7 @@ Use the planning material in this order:
 4. `docs/planned-work/method-osl-msh-alignment.md` defines the W3 end-to-end
    acceptance scenario. It is not a separate implementation plan or a one-PR
    instruction.
-5. `docs/implementation/capability_first_federation_plan.md` governs the
+5. `docs/implementation/federation/active/capability_first_federation_plan.md` governs the
    separate Federation product track. OSL work must not change Federation,
    provider, storage, benchmark, or capability authority unless a later,
    separately reviewed integration plan explicitly requires it.
