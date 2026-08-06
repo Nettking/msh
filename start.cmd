@@ -89,7 +89,7 @@ exit /b 0
 :reset_device_state
 echo.
 echo FRESH DEVICE INSTALL
- echo This permanently removes this checkout's:
+echo This permanently removes this checkout's:
 echo   - MSH device identity and keys
 echo   - Federation membership, pairing, onboarding, and benchmark state
 echo   - local Federation relay authority database
@@ -117,11 +117,11 @@ if errorlevel 1 (
 echo Removing only device, setup, and Federation state...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
   "$ErrorActionPreference = 'Stop';" ^
-  "$compose = docker compose config --format json ^| ConvertFrom-Json;" ^
+  "$compose = ConvertFrom-Json (docker compose config --format json);" ^
   "$project = [string]$compose.name;" ^
   "if ([string]::IsNullOrWhiteSpace($project)) { throw 'Docker Compose project name was unavailable.' };" ^
   "$relayVolumes = @(docker volume ls --filter ('label=com.docker.compose.project=' + $project) --filter 'label=com.docker.compose.volume=relay_state' -q);" ^
-  "foreach ($volume in $relayVolumes) { docker volume rm $volume ^| Out-Null; if ($LASTEXITCODE -ne 0) { throw ('Could not remove relay state volume: ' + $volume) } };" ^
+  "foreach ($volume in $relayVolumes) { $null = docker volume rm $volume; if ($LASTEXITCODE -ne 0) { throw ('Could not remove relay state volume: ' + $volume) } };" ^
   "Remove-Item -LiteralPath 'data\federation' -Recurse -Force -ErrorAction SilentlyContinue;" ^
   "Remove-Item -LiteralPath 'data\server_setup\server_settings.json' -Force -ErrorAction SilentlyContinue"
 if errorlevel 1 (
