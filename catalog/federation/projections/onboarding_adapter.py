@@ -86,6 +86,12 @@ class OnboardingContractsAdapter:
                 )
                 intent = intents.get(candidate_id)
                 capacity = _safe_mapping(_value(candidate, "capacity_envelope", {}))
+                candidate_policy = _value(candidate, "policy_state")
+                persisted_policy = (
+                    _value(intent, "policy_state", candidate_policy)
+                    if intent is not None
+                    else candidate_policy
+                )
                 contributions.append(
                     ContributionRecord(
                         candidate_id=candidate_id,
@@ -113,7 +119,7 @@ class OnboardingContractsAdapter:
                             )
                         ),
                         policy_state=_enum_value(
-                            _value(candidate, "policy_state"),
+                            persisted_policy,
                             "not-evaluated",
                         ),
                         desired_state=_enum_value(
