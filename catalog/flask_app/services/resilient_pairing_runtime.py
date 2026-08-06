@@ -1,0 +1,118 @@
+"""Recovery-aware relay pairing for devices with an existing identity.
+
+A pairing code is primarily an initial enrollment mechanism. A device may,
+however, have completed enrollment or membership before a browser/network
+failure prevented the remote binding from being persisted. Recovery therefore
+authenticates the existing identity and verifies existing membership rather than
+requiring new authority.
+"""
+
+from __future__ import annotations
+
+from typing import Any
+
+from catalog.federation.errors import AuthenticationError
+from catalog.federation.onboarding_models import (
+    FederationConnectionState,
+    FederationSessionBinding,
+)
+from catalog.node.client import RelayRemoteError
+
+from .federation_pairing_service import (
+    PairingOffer,
+    PairingRelayNodeClient,
+    PairingRelayRuntime,
+    _parse_stamp,
+    _stamp,
+)
+
+
+class ResilientPairingRelayRuntime(PairingRelayRuntime):
+    """Redeem a pairing offer without duplicating existing identity authority."""
+
+    @staticmethod
+    def _existing_session(
+        status: dict[str, Any],
+        session_id: str,
+    ) -> dict[str, Any] | None:
+        sessions = status.get("sessions")
+        if not isinstance(sessions, list):
+            return None
+        for value in sessions:
+            if isinstance(value, dict) and value.get("session_id") == session_id:
+                return value
+        return None
+
+    async def _redeem(self, offer: PairingOffer) -> FederationSessionBinding:
+        await self._disconnect_current()
+        client = PairingRelayNodeClient(
+            state_directory=self.state_directory,
+            relay_url=offer.relay_url,
+            display_name=self.display_name,
+            clock=self._clock,
+            request_timeout=min(self.timeout_seconds, 60.0),
+        )
+        try:
+            try:
+                await client.connect(enrollment_token=offer.enrollment_token)
+            except RelayRemoteError as exc:
+                if exc.code != "identity-already-enrolled":
+                    raise
+                # The relay has already accepted this exact public identity.
+                # Authenticate with the retained private key instead of trying
+                # to consume another enrollment token.
+                await client.connect()
+
+            try:
+                session = await client.join_session(offer.invitation_token)
+            except RelayRemoteError as exc:
+                if exc.code != "already-session-member":
+                    raise
+                # A previous attempt may have joined successfully before the
+                # local remote-binding file was saved. Recover only after the
+                # authenticated coordinator confirms the same session.
+                session = self._existing_session(
+                    await client.coordinator_status(),
+                    offer.internal_session_id,
+                )
+                if session is None:
+                    raise AuthenticationError(
+                        "pairing-membership-missing",
+                        "the authenticated device is not a member of the signed session",
+                        "binding",
+                    ) from exc
+        except BaseException:
+            if client.connected_event.is_set():
+                await client.disconnect(error_code="pairing-failed")
+            raise
+
+        session_id = str(session.get("session_id") or "")
+        if session_id != offer.internal_session_id:
+            await client.disconnect(error_code="pairing-session-mismatch")
+            raise AuthenticationError(
+                "pairing-session-mismatch",
+                "the relay joined a different session than the signed offer",
+                "pairing_code",
+            )
+        revision = session.get("revision")
+        if isinstance(revision, bool) or not isinstance(revision, int) or revision <= 0:
+            revision = 1
+        created_at = _parse_stamp(
+            session.get("created_at") or _stamp(self._clock()),
+            "created_at",
+        )
+        self._client = client
+        self._relay_url = offer.relay_url
+        return FederationSessionBinding(
+            federation_id=offer.federation_id,
+            internal_session_id=offer.internal_session_id,
+            device_id=client.node_id,
+            state=FederationConnectionState.CONNECTED,
+            revision=revision,
+            trusted=True,
+            created_at=created_at,
+            last_verified_at=self._clock(),
+        )
+
+
+__all__ = ["ResilientPairingRelayRuntime"]
