@@ -131,7 +131,7 @@ jobs:
           catalog/node/tests/test_phase_f61_transport.py
           catalog/node/tests/test_phase_f62_direct_peer.py
           catalog/node/tests/test_phase_f63_relay_loss_continuity.py
-          catalog/federation/tests/test_phase_f642_verified_chunk_transfer.py
+          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
           catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
           catalog/relay/tests/test_phase_f662_route_rendezvous.py
       - name: Phase 5 transport acceptance matrix
@@ -163,7 +163,7 @@ jobs:
           catalog/node/tests/test_phase_f61_transport.py
           catalog/node/tests/test_phase_f62_direct_peer.py
           catalog/node/tests/test_phase_f63_relay_loss_continuity.py
-          catalog/federation/tests/test_phase_f642_verified_chunk_transfer.py
+          catalog/node/tests/test_phase_f642_verified_chunk_transfer.py
           catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py
           catalog/relay/tests/test_phase_f662_route_rendezvous.py
           --ignore I001,RUF022,B008,C408,PLC0206
