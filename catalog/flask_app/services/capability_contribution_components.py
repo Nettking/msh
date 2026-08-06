@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Callable, Mapping
 from typing import Any
 
@@ -34,6 +35,7 @@ from catalog.federation.onboarding_models import (
 )
 
 from .capability_onboarding_service import CapabilityOnboardingService
+from .local_capability_candidates import local_contribution_components
 from .recorder_control_service import get_recorder_control_service
 from .server_setup_service import ai_provider_label
 
@@ -77,7 +79,13 @@ def default_components(
     onboarding_service: CapabilityOnboardingService,
     setup_loader: Callable[[], object | None],
 ) -> tuple[tuple[object, ...], tuple[object, ...]]:
-    """Compose only authorities that already exist and are explicitly configured."""
+    """Compose existing authorities plus bounded built-in candidates.
+
+    The built-in compute and storage choices are deliberately non-authoritative:
+    compute remains pending until an existing worker authority activates its
+    registered handler, and storage remains candidate-only until assigned by the
+    storage control plane.
+    """
 
     sources: list[object] = [RecorderCandidateSource()]
     adapters: list[object] = [
@@ -89,18 +97,21 @@ def default_components(
 
     settings = setup_loader()
     setup = _payload(settings)
-    if (
-        setup.get("configured")
-        and setup.get("user_setup_complete")
-        and setup.get("ai_enabled")
-        and str(setup.get("ai_model") or "").strip()
-        and str(setup.get("ollama_base_url") or "").strip()
-    ):
+    model = str(
+        os.environ.get("MSH_AI_MODEL") or setup.get("ai_model") or ""
+    ).strip()
+    base_url = str(
+        os.environ.get("OLLAMA_BASE_URL") or setup.get("ollama_base_url") or ""
+    ).strip()
+    setup_complete = bool(
+        setup.get("configured") and setup.get("user_setup_complete")
+    )
+    ai_requested = bool(setup.get("ai_enabled")) if setup_complete else True
+    if ai_requested and model and base_url:
         service_id = "ollama-configured"
-        model = str(setup["ai_model"]).strip()
         display_label = (
             ai_provider_label(settings)
-            if settings is not None
+            if settings is not None and setup_complete
             else "Configured Ollama service"
         )
         sources.append(
@@ -124,7 +135,6 @@ def default_components(
             from catalog.flask_app.ai_routes import AI_RUNTIME_MANAGER
 
             manager = AI_RUNTIME_MANAGER
-        base_url = str(setup["ollama_base_url"]).strip()
 
         def provider_factory(
             candidate: ContributionCandidate,
@@ -191,6 +201,10 @@ def default_components(
                 is_handler_active=is_handler_active,
             )
         )
+    else:
+        local_sources, local_adapters = local_contribution_components()
+        sources.append(local_sources[0])
+        adapters.append(local_adapters[0])
 
     storage_specs = current_app.config.get(
         "CAPABILITY_ONBOARDING_STORAGE_CANDIDATES"
@@ -231,6 +245,10 @@ def default_components(
                 fence_candidate=fence_candidate,
             )
         )
+    else:
+        local_sources, local_adapters = local_contribution_components()
+        sources.append(local_sources[1])
+        adapters.append(local_adapters[1])
 
     return tuple(sources), tuple(adapters)
 
