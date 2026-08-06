@@ -216,6 +216,32 @@ def create_app() -> Flask:
     return app
 
 
+def _start_runtime_from_capability_state(app: Flask, setup: object) -> str:
+    """Start runtime without reviving the retired legacy startup prompt.
+
+    A completed capability-first transition already made the safe startup choice:
+    preserve existing sessions and continue processing. Older installations that
+    have not completed that transition retain the explicit legacy choice.
+    """
+
+    with app.app_context():
+        flags = get_capability_startup_transition_service().capability_flags(setup)
+    if not bool(flags.get("runtime")):
+        return "disabled"
+
+    runtime_manager = get_runtime_manager()
+    if runtime_manager.requires_startup_choice():
+        if not bool(flags.get("completed")):
+            return "legacy-choice-required"
+        accepted, _message = runtime_manager.choose_startup_mode(
+            "continue_existing"
+        )
+        return "started" if accepted else "failed"
+
+    start_runtime_background()
+    return "started"
+
+
 if __name__ == "__main__":
     app = create_app()
     host = os.getenv("FLASK_RUN_HOST", "0.0.0.0")
@@ -223,7 +249,6 @@ if __name__ == "__main__":
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
 
     setup = None
-    runtime_enabled = False
     try:
         setup = load_settings()
     except ServerSetupError as exc:
@@ -231,39 +256,40 @@ if __name__ == "__main__":
             f"[orchestrator] setup needs attention before runtime starts: {exc}",
             flush=True,
         )
-    try:
-        with app.app_context():
-            runtime_enabled = (
-                get_capability_startup_transition_service().runtime_should_start(
-                    setup
-                )
-            )
-    except Exception as exc:  # noqa: BLE001 - corrupt state must fail closed
-        print(
-            "[orchestrator] capability-first startup state needs repair: "
-            f"{type(exc).__name__}",
-            flush=True,
-        )
 
+    runtime_start_state = "disabled"
     if (
         os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1"
         and setup is not None
-        and runtime_enabled
     ):
-        runtime_manager = get_runtime_manager()
-        if runtime_manager.requires_startup_choice():
+        try:
+            runtime_start_state = _start_runtime_from_capability_state(app, setup)
+        except Exception as exc:  # noqa: BLE001 - corrupt state must fail closed
+            runtime_start_state = "repair"
             print(
-                "[orchestrator] runtime progress choice remains available through "
-                "the controlled legacy fallback",
+                "[orchestrator] capability-first startup state needs repair: "
+                f"{type(exc).__name__}",
                 flush=True,
             )
-        else:
-            print(
-                "[orchestrator] capability-first startup: Flask available "
-                "immediately, runtime starts in background",
-                flush=True,
-            )
-            start_runtime_background()
+
+    if runtime_start_state == "started":
+        print(
+            "[orchestrator] capability-first startup: Flask available "
+            "immediately, runtime starts in background",
+            flush=True,
+        )
+    elif runtime_start_state == "legacy-choice-required":
+        print(
+            "[orchestrator] runtime progress choice remains available through "
+            "the controlled legacy fallback",
+            flush=True,
+        )
+    elif runtime_start_state == "failed":
+        print(
+            "[orchestrator] capability-first runtime continuation could not be "
+            "applied safely",
+            flush=True,
+        )
     elif (
         setup is None
         or not getattr(setup, "configured", False)
@@ -274,7 +300,7 @@ if __name__ == "__main__":
             "runtime will remain idle",
             flush=True,
         )
-    else:
+    elif runtime_start_state != "repair":
         print(
             "[orchestrator] runtime disabled by capability intent, environment, "
             "or repair state",
