@@ -80,6 +80,7 @@ jobs:
           catalog/flask_app/tests/test_device_state_reset.py
           catalog/flask_app/tests/test_local_capability_candidates.py
           catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
+          catalog/flask_app/tests/test_capability_startup_transition_route.py
           catalog/flask_app/tests/test_data_upload.py
           catalog/flask_app/tests/test_windows_start_script.py
           catalog/flask_app/test_navigation_smoke.py
@@ -94,6 +95,7 @@ jobs:
           catalog/ai/remote_provider.py
           catalog/common/data_loading.py
           catalog/flask_app/app.py
+          catalog/flask_app/capability_startup_transition_routes.py
           catalog/flask_app/data_upload_routes.py
           catalog/flask_app/docs_routes.py
           catalog/flask_app/provider_federation_routes.py
@@ -106,6 +108,7 @@ jobs:
           catalog/flask_app/tests/test_device_state_reset.py
           catalog/flask_app/tests/test_local_capability_candidates.py
           catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
+          catalog/flask_app/tests/test_capability_startup_transition_route.py
           catalog/flask_app/tests/test_data_upload.py
           catalog/flask_app/tests/test_windows_start_script.py
           catalog/federation/projections/onboarding_adapter.py
