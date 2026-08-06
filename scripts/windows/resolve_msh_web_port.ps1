@@ -7,8 +7,7 @@ param(
     [ValidateRange(1, 65535)]
     [int]$PreferredPort,
 
-    [Parameter(Mandatory = $true)]
-    [string]$CurrentProjectName,
+    [string]$CurrentProjectName = "msh",
 
     [switch]$AllowFallback
 )
