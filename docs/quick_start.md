@@ -32,8 +32,8 @@ When a web-capable mode is selected, setup can use Ollama on the MSH computer or
 | Choice | Model | Device target |
 | --- | --- | --- |
 | Edge small | `smollm2:360m` | Small CPU, Raspberry Pi class, or very low memory testing. |
-| Laptop standard | `llama3.2:3b` | Normal laptop or small server. |
-| Workstation strong | `qwen2.5:7b` | Gaming laptop, workstation, or GPU server. |
+| Laptop standard | `llama3.2:3b` | Normal laptop or small server. Default balance. |
+| Workstation strong | `qwen2.5:7b` | Gaming laptop, workstation, or GPU server. Stronger answers. |
 
 The helper writes `.env`, which is ignored by git and read automatically by Docker Compose. If you choose to pull the model during setup, it starts the `ollama` service and runs the one-shot `ollama-pull` installer.
 
@@ -67,6 +67,31 @@ The launcher starts the current capability-first core baseline in detached mode:
 - the managed recorder.
 
 It waits for `/onboarding` to become available and then opens that page. It does not download a model automatically; model installation remains an explicit setup action.
+
+### Start as a fresh device
+
+To remove the current MSH device identity and Federation setup before starting:
+
+```cmd
+start.cmd --fresh
+```
+
+The launcher displays the exact reset boundary and requires typing `RESET` before changing anything. It stops the current Compose deployment and removes only:
+
+- `data/federation/`, including the local device identity and keys, onboarding state, saved binding, pairing state, benchmark/contribution evidence, and capability-transition state;
+- the Compose `relay_state` volume containing the local Federation coordinator authority database;
+- `data/server_setup/server_settings.json`, containing the saved server role and legacy device setup choices.
+
+The fresh-device option intentionally preserves:
+
+- recorded telemetry and imported data;
+- source configuration and recorder checkpoints;
+- analysis/workflow results;
+- `.env` deployment configuration;
+- Docker images;
+- downloaded Ollama and model-provider models.
+
+After the reset, the same command starts the normal core services and opens `/onboarding` with Identity and Federation empty. Running `start.cmd` without `--fresh` continues to preserve all existing state.
 
 On Linux, macOS, or for manual control, start the default Compose deployment:
 
