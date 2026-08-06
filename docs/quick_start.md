@@ -53,21 +53,46 @@ This starts the provider and downloads `smollm2:360m` once into a persistent Doc
 
 ## Start with Docker
 
+On Windows, use the supported launcher:
+
+```cmd
+start.cmd
+```
+
+The launcher starts the current capability-first core baseline in detached mode:
+
+- the Federation relay;
+- the bundled Ollama service;
+- the Flask workbench;
+- the managed recorder.
+
+It waits for `/onboarding` to become available and then opens that page. It does not download a model automatically; model installation remains an explicit setup action.
+
+On Linux, macOS, or for manual control, start the default Compose deployment:
+
 ```bash
 docker compose up -d --build
 ```
 
-If the selected mode includes the web workbench, open:
+Open capability-first onboarding:
 
 ```text
-http://localhost:5000
+http://localhost:5000/onboarding
 ```
 
-From another computer on the same network, open:
+After onboarding, the Federation overview is available at:
 
 ```text
-http://<server-ip>:5000
+http://localhost:5000/federation
 ```
+
+From another computer on the same trusted network, open:
+
+```text
+http://<server-ip>:5000/onboarding
+```
+
+Opening MSH through the reachable LAN or VPN address also allows generated pairing codes to advertise the relay at `ws://<server-ip>:8765`. Opening through `localhost` is intentionally insufficient for pairing another physical device.
 
 For server/firewall details, see [Server setup](server_setup.md).
 
@@ -108,6 +133,8 @@ The automatic script set is intentionally bounded: `machines_active_per_day`, `a
 
 ## First pages to open
 
+- <http://localhost:5000/onboarding> — create/load identity, connect or create the Federation, and inspect the device.
+- <http://localhost:5000/federation> — inspect the connected Federation and device capabilities.
 - <http://localhost:5000/status> — verify discovery, bootstrap, catch-up, failures, and readiness.
 - <http://localhost:5000/control> — select datasets, trigger refreshes, and run workflows or scripts.
 - <http://localhost:5000/operator-strategies> — record OSL-style operator strategy decisions during field work.
@@ -135,4 +162,4 @@ docker compose run --rm ollama-pull
 
 ## Windows helper
 
-`ops/start-system.ps1` is a host-side wrapper around the Docker command. It can optionally launch a VPN monitor script if you pass a valid `-VpnReconnectScript`, but no VPN helper is required by default.
+`start.cmd` is the primary Windows launcher for the capability-first core services. `ops/start-system.ps1` remains a lower-level host-side wrapper around Docker Compose and can optionally launch a VPN monitor script if you pass a valid `-VpnReconnectScript`.
