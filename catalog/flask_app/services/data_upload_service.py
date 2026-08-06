@@ -81,7 +81,8 @@ class DataUploadService:
         self.max_file_bytes = max(1, int(max_file_bytes))
         self.max_total_bytes = max(1, int(max_total_bytes))
         self.max_line_bytes = max(1, int(max_line_bytes))
-        self._lock = threading.Lock()
+        self._analysis_lock = threading.Lock()
+        self._import_lock = threading.Lock()
         self.database.parent.mkdir(parents=True, exist_ok=True)
         self.staging_root.mkdir(parents=True, exist_ok=True)
         self.published_root.mkdir(parents=True, exist_ok=True)
@@ -96,6 +97,7 @@ class DataUploadService:
         return connection
 
     def _initialize(self) -> None:
+        interrupted: tuple[str, ...] = ()
         with self._connect() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.executescript(
@@ -138,6 +140,15 @@ class DataUploadService:
                     ON data_upload_records(batch_id, file_id, line_number);
                 """
             )
+            interrupted = tuple(
+                str(row["batch_id"])
+                for row in connection.execute(
+                    """
+                    SELECT batch_id FROM data_upload_batches
+                    WHERE status IN ('queued', 'importing', 'publishing')
+                    """
+                ).fetchall()
+            )
             connection.execute(
                 """
                 UPDATE data_upload_batches
@@ -146,6 +157,9 @@ class DataUploadService:
                 """,
                 (_utc_now(),),
             )
+        for batch_id in interrupted:
+            shutil.rmtree(self.staging_root / batch_id, ignore_errors=True)
+            shutil.rmtree(self.published_root / batch_id, ignore_errors=True)
 
     def enqueue(self, files: Iterable[FileStorage]) -> dict[str, Any]:
         selected = tuple(item for item in files if item and item.filename)
@@ -269,6 +283,10 @@ class DataUploadService:
         return candidate
 
     def _import_batch(self, batch_id: str) -> None:
+        with self._import_lock:
+            self._import_batch_serialized(batch_id)
+
+    def _import_batch_serialized(self, batch_id: str) -> None:
         staging_dir = self.staging_root / batch_id
         try:
             self._set_batch_state(batch_id, "importing", started_at=_utc_now())
@@ -346,56 +364,55 @@ class DataUploadService:
         source = staging_dir / str(file_row["staged_name"])
         count = 0
         try:
-            handle = source.open("r", encoding="utf-8")
+            with source.open("r", encoding="utf-8") as handle:
+                for line_number, raw_line in enumerate(handle, start=1):
+                    if len(raw_line.encode("utf-8")) > self.max_line_bytes:
+                        raise DataUploadError(
+                            "upload-line-too-large",
+                            f"{file_row['original_name']} contains a line that is too large.",
+                        )
+                    line = raw_line.strip()
+                    if not line:
+                        continue
+                    try:
+                        value = json.loads(line)
+                    except json.JSONDecodeError as exc:
+                        raise DataUploadError(
+                            "upload-invalid-json",
+                            f"{file_row['original_name']} contains invalid JSON at line {line_number}.",
+                        ) from exc
+                    if not isinstance(value, dict):
+                        raise DataUploadError(
+                            "upload-json-object-required",
+                            f"{file_row['original_name']} line {line_number} is not a JSON object.",
+                        )
+                    try:
+                        payload = json.dumps(
+                            value,
+                            ensure_ascii=False,
+                            sort_keys=True,
+                            separators=(",", ":"),
+                            allow_nan=False,
+                        )
+                    except (TypeError, ValueError) as exc:
+                        raise DataUploadError(
+                            "upload-invalid-json-value",
+                            f"{file_row['original_name']} line {line_number} contains an unsupported JSON value.",
+                        ) from exc
+                    connection.execute(
+                        """
+                        INSERT INTO data_upload_records(
+                            batch_id,file_id,line_number,payload_json
+                        ) VALUES(?,?,?,?)
+                        """,
+                        (batch_id, file_row["file_id"], line_number, payload),
+                    )
+                    count += 1
         except UnicodeDecodeError as exc:
             raise DataUploadError(
                 "upload-not-utf8",
                 f"{file_row['original_name']} must use UTF-8 encoding.",
             ) from exc
-        with handle:
-            for line_number, raw_line in enumerate(handle, start=1):
-                if len(raw_line.encode("utf-8")) > self.max_line_bytes:
-                    raise DataUploadError(
-                        "upload-line-too-large",
-                        f"{file_row['original_name']} contains a line that is too large.",
-                    )
-                line = raw_line.strip()
-                if not line:
-                    continue
-                try:
-                    value = json.loads(line)
-                except json.JSONDecodeError as exc:
-                    raise DataUploadError(
-                        "upload-invalid-json",
-                        f"{file_row['original_name']} contains invalid JSON at line {line_number}.",
-                    ) from exc
-                if not isinstance(value, dict):
-                    raise DataUploadError(
-                        "upload-json-object-required",
-                        f"{file_row['original_name']} line {line_number} is not a JSON object.",
-                    )
-                try:
-                    payload = json.dumps(
-                        value,
-                        ensure_ascii=False,
-                        sort_keys=True,
-                        separators=(",", ":"),
-                        allow_nan=False,
-                    )
-                except (TypeError, ValueError) as exc:
-                    raise DataUploadError(
-                        "upload-invalid-json-value",
-                        f"{file_row['original_name']} line {line_number} contains an unsupported JSON value.",
-                    ) from exc
-                connection.execute(
-                    """
-                    INSERT INTO data_upload_records(
-                        batch_id,file_id,line_number,payload_json
-                    ) VALUES(?,?,?,?)
-                    """,
-                    (batch_id, file_row["file_id"], line_number, payload),
-                )
-                count += 1
         return count
 
     def _publish_batch(self, batch_id: str, staging_dir: Path) -> Path:
@@ -464,7 +481,7 @@ class DataUploadService:
                 raise DataUploadError("upload-batch-not-found", "Upload batch not found.")
 
     def request_analysis(self, batch_id: str) -> dict[str, Any]:
-        with self._lock:
+        with self._analysis_lock:
             batch = self.batch(batch_id)
             if batch["status"] != "ready":
                 raise DataUploadError(
