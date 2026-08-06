@@ -48,7 +48,6 @@ capability_startup_transition_web = Blueprint(
     __name__,
 )
 
-_RETURNED_SESSION_KEY = "capability_startup_transition_opened"
 _LEGACY_FALLBACK_SESSION_KEY = "capability_startup_legacy_fallback"
 _CONTRIBUTION_RECONCILE_EXTENSION_KEY = (
     "capability_contribution_startup_reconciled"
@@ -253,7 +252,7 @@ def _is_legacy_control_path() -> bool:
 
 @capability_startup_transition_web.before_app_request
 def _startup_transition_gate_and_dispatch() -> Response | None:
-    """Make capability-first onboarding the default, retaining explicit fallback."""
+    """Require onboarding until complete without replacing workbench navigation."""
 
     endpoint = request.endpoint or ""
     if endpoint.startswith("static"):
@@ -269,8 +268,8 @@ def _startup_transition_gate_and_dispatch() -> Response | None:
         return None
 
     # Compatibility controls remain callable and keep their existing local
-    # authorization checks. CFI-6 changes the default browser entry point, not
-    # the authority or semantics of these bounded endpoints.
+    # authorization checks. CFI-6 changes setup authority, not the established
+    # workbench entry point or its deep links.
     if _is_legacy_control_path():
         return None
 
@@ -291,7 +290,7 @@ def _startup_transition_gate_and_dispatch() -> Response | None:
 
     if request.path == "/startup":
         if flags["completed"]:
-            return redirect(url_for("federation_web.overview"))
+            return redirect(url_for("web.overview"))
         if flags["needs_migration"]:
             return redirect(
                 url_for(
@@ -302,13 +301,6 @@ def _startup_transition_gate_and_dispatch() -> Response | None:
         return redirect(url_for("capability_startup_transition_web.onboarding"))
 
     if flags["completed"]:
-        if (
-            request.method in {"GET", "HEAD"}
-            and request.path == "/"
-            and not session.get(_RETURNED_SESSION_KEY)
-        ):
-            session[_RETURNED_SESSION_KEY] = True
-            return redirect(url_for("federation_web.overview"))
         return None
 
     if request.path == "/":
@@ -375,7 +367,6 @@ def _run_transition(*, migration: bool) -> Response:
             code=303,
         )
 
-    session[_RETURNED_SESSION_KEY] = True
     session.pop(_LEGACY_FALLBACK_SESSION_KEY, None)
     flash(message, "success")
     if migration:
@@ -384,7 +375,7 @@ def _run_transition(*, migration: bool) -> Response:
             step="finish",
         )
     else:
-        destination = url_for("federation_web.overview")
+        destination = url_for("web.overview")
     return redirect(destination, code=303)
 
 
