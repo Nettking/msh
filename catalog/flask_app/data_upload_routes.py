@@ -7,6 +7,7 @@ from typing import Any
 
 from flask import (
     Blueprint,
+    current_app,
     flash,
     jsonify,
     redirect,
@@ -17,6 +18,10 @@ from flask import (
 )
 
 from .services.data_upload_service import DataUploadError, get_data_upload_service
+from .services.upload_analysis_job_service import (
+    UploadAnalysisJobError,
+    get_upload_analysis_job_service,
+)
 
 
 data_upload_web = Blueprint(
@@ -100,14 +105,37 @@ def status(batch_id: str):
 
 @data_upload_web.post("/<batch_id>/analyze")
 def analyze(batch_id: str):
+    job_id: str | None = None
+    jobs = None
     try:
         _validate_csrf()
-        batch = get_data_upload_service().request_analysis(batch_id)
+        uploads = get_data_upload_service()
+        candidate = uploads.batch(batch_id)
+        jobs = get_upload_analysis_job_service()
+        job_id = jobs.submit_batch(candidate)
+        batch = uploads.request_analysis(batch_id)
+        jobs.start_tracking(job_id)
     except DataUploadError as exc:
+        if job_id is not None and jobs is not None:
+            jobs.fail(job_id, exc.code)
         flash(exc.message, "error")
         return redirect(url_for("data_upload_web.index", batch=batch_id))
+    except UploadAnalysisJobError as exc:
+        if job_id is not None and jobs is not None:
+            jobs.fail(job_id, exc.code)
+        flash(exc.message, "error")
+        return redirect(url_for("data_upload_web.index", batch=batch_id))
+    except Exception as exc:  # noqa: BLE001 - never expose job or authority internals
+        if job_id is not None and jobs is not None:
+            jobs.fail(job_id, "analysis-job-start-failed")
+        current_app.logger.warning(
+            "Upload analysis job could not be started safely (%s)",
+            type(exc).__name__,
+        )
+        flash("Background analysis could not be started safely.", "error")
+        return redirect(url_for("data_upload_web.index", batch=batch_id))
     flash(
-        "Background analysis requested. Open Diagnostics to follow runtime progress.",
+        "Background analysis started as a durable job. Open Jobs to follow it.",
         "success",
     )
     return redirect(url_for("data_upload_web.index", batch=batch["batch_id"]))
