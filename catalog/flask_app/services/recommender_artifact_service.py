@@ -4,15 +4,15 @@ from pathlib import Path
 from typing import Any
 import json
 
-from .operator_strategy_service import OperatorStrategyService
+from .federated_operator_strategy_service import FederatedOperatorStrategyService
 
 
 DEFAULT_RECOMMENDER_PATH = Path("data") / "osl" / "recommender_artifacts.json"
 
 
 class RecommenderArtifactService:
-    def __init__(self, note_service: OperatorStrategyService | None = None, output_path: Path | str = DEFAULT_RECOMMENDER_PATH) -> None:
-        self.note_service = note_service or OperatorStrategyService()
+    def __init__(self, note_service: FederatedOperatorStrategyService | None = None, output_path: Path | str = DEFAULT_RECOMMENDER_PATH) -> None:
+        self.note_service = note_service or FederatedOperatorStrategyService()
         self.output_path = Path(output_path)
 
     def generate(self) -> tuple[int, str]:
