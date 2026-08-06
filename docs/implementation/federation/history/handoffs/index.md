@@ -15,6 +15,6 @@
 
 - [Federated Session Network: Agent Implementation Handoff](federated_session_agent_handoff.md) — original phased implementation instructions retained for architectural and delivery history. The phased sequence is complete and must not be resumed.
 
-The [CF7-C machine handoff](../../../cf7c_test_handoff.md) remains outside this directory because complete physical CF7 acceptance is still open. It is current acceptance material, not a superseded handoff.
+The [CF7-C machine handoff](../../../cf7c_test_handoff.md) is not archived here because complete physical CF7 acceptance is still open. It remains current acceptance material.
 
 Current work is defined by the [current task handoff](../../../current_task_handoff.md) and the [active Federation plans](../../active/).
