@@ -85,6 +85,10 @@ def default_components(
     compute remains pending until an existing worker authority activates its
     registered handler, and storage remains candidate-only until assigned by the
     storage control plane.
+
+    A configured Ollama target remains visible as an AI Explainer candidate even
+    when retained legacy setup had AI disabled. Capability-first onboarding must
+    let the operator review that service explicitly; visibility never enables it.
     """
 
     sources: list[object] = [RecorderCandidateSource()]
@@ -103,17 +107,14 @@ def default_components(
     base_url = str(
         os.environ.get("OLLAMA_BASE_URL") or setup.get("ollama_base_url") or ""
     ).strip()
-    setup_complete = bool(
-        setup.get("configured") and setup.get("user_setup_complete")
-    )
-    ai_requested = bool(setup.get("ai_enabled")) if setup_complete else True
-    if ai_requested and model and base_url:
+    if model and base_url:
         service_id = "ollama-configured"
-        display_label = (
+        provider_label = (
             ai_provider_label(settings)
-            if settings is not None and setup_complete
-            else "Configured Ollama service"
+            if settings is not None and callable(getattr(settings, "to_dict", None))
+            else "This computer"
         )
+        display_label = f"AI Explainer — {provider_label}"
         sources.append(
             AICandidateSource(
                 {
