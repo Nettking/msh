@@ -56,17 +56,13 @@ echo.
 docker compose ps relay ollama flask recorder
 echo.
 
-echo Ensuring the configured Ollama benchmark model is installed...
-docker compose --profile model-install run --rm ollama-pull
+call :ensure_ollama_model
 if errorlevel 1 (
     echo.
-    echo WARNING: The configured Ollama model could not be installed or verified.
-    echo MSH will continue, but the language-model benchmark may be unavailable.
-    echo Retry later with: docker compose --profile model-install run --rm ollama-pull
-    echo.
-) else (
-    echo Ollama benchmark model is ready.
-    echo.
+    echo MSH services remain running, but onboarding will not be opened with a missing benchmark model.
+    echo Correct the network or Ollama error above, then run start.cmd again.
+    pause
+    exit /b 1
 )
 
 set "MSH_WEB_PORT_RESOLVED="
@@ -128,6 +124,45 @@ echo.
 start "" "%MSH_OPEN_URL%"
 exit /b 0
 
+:ensure_ollama_model
+set "MSH_AI_MODEL_RESOLVED="
+for /f "usebackq delims=" %%M in (`docker compose exec -T flask python -c "import os; print(os.environ.get('MSH_AI_MODEL') or 'llama3.2:3b')"`) do set "MSH_AI_MODEL_RESOLVED=%%M"
+if not defined MSH_AI_MODEL_RESOLVED set "MSH_AI_MODEL_RESOLVED=llama3.2:3b"
+
+echo Ensuring Ollama benchmark model is installed: %MSH_AI_MODEL_RESOLVED%
+docker compose exec -T ollama ollama show "%MSH_AI_MODEL_RESOLVED%" >nul 2>&1
+if not errorlevel 1 (
+    echo Ollama benchmark model is ready.
+    echo.
+    exit /b 0
+)
+
+set "MSH_MODEL_ATTEMPT=1"
+:pull_ollama_model
+echo Pulling %MSH_AI_MODEL_RESOLVED% ^(attempt %MSH_MODEL_ATTEMPT% of 3^) ...
+docker compose --profile model-install run --rm --entrypoint /bin/ollama ollama-pull pull "%MSH_AI_MODEL_RESOLVED%"
+set "MSH_MODEL_PULL_EXIT=%ERRORLEVEL%"
+
+docker compose exec -T ollama ollama show "%MSH_AI_MODEL_RESOLVED%" >nul 2>&1
+if not errorlevel 1 (
+    echo Ollama benchmark model is installed and verified.
+    echo.
+    exit /b 0
+)
+
+if %MSH_MODEL_ATTEMPT% GEQ 3 (
+    echo.
+    echo ERROR: Ollama does not contain the required model: %MSH_AI_MODEL_RESOLVED%
+    if not "%MSH_MODEL_PULL_EXIT%"=="0" echo The final pull command exited with code %MSH_MODEL_PULL_EXIT%.
+    echo Installed Ollama models:
+    docker compose exec -T ollama ollama list
+    exit /b 1
+)
+
+set /a MSH_MODEL_ATTEMPT+=1
+powershell -NoProfile -Command "Start-Sleep -Seconds 3"
+goto :pull_ollama_model
+
 :reset_device_state
 echo.
 echo FRESH DEVICE INSTALL
@@ -177,7 +212,8 @@ echo Usage:
 echo   start.cmd           Start MSH and preserve all existing state.
 echo   start.cmd --fresh   Reset device/Federation setup, verify it, then start MSH.
 echo.
-echo Both modes verify or install the configured Ollama benchmark model.
+echo Both modes install and verify the exact configured Ollama benchmark model.
+echo Startup retries a missing model three times and does not open onboarding until it is present.
 echo The --fresh option requires typing RESET and preserves recordings,
 echo source configuration, recorder checkpoints, results, and Ollama models.
 exit /b 0
