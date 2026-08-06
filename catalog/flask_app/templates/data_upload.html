@@ -1,0 +1,155 @@
+{% extends 'base.html' %}
+{% block body %}
+<section class="page-intro data-upload-intro">
+  <div>
+    <span class="eyebrow">Data</span>
+    <h2>Upload JSONL data</h2>
+    <p>Add several files at once. MSH validates every JSON object, stores the complete batch in SQLite, and only then makes it available to the analysis runtime.</p>
+  </div>
+  <a class="button-link" href="{{ url_for('web.status') }}">Open diagnostics</a>
+</section>
+
+<section class="section-block section-block--primary data-upload-panel">
+  <div class="data-upload-panel__heading">
+    <div>
+      <h3>Add files</h3>
+      <p>Only <code>.jsonl</code> files are accepted. Blank lines are ignored; every other line must contain one JSON object.</p>
+    </div>
+    <span class="status-badge status-ready">Up to {{ max_files }} files</span>
+  </div>
+
+  <form
+    class="data-upload-form"
+    method="post"
+    action="{{ url_for('data_upload_web.upload') }}"
+    enctype="multipart/form-data"
+    data-upload-form
+  >
+    <input type="hidden" name="_csrf_token" value="{{ data_upload_csrf_token }}">
+    <label class="data-upload-dropzone" data-upload-dropzone>
+      <input
+        class="data-upload-input"
+        type="file"
+        name="files"
+        accept=".jsonl,application/x-ndjson,application/jsonl"
+        multiple
+        required
+        data-upload-input
+      >
+      <span class="data-upload-dropzone__icon" aria-hidden="true">⇧</span>
+      <strong>Drop JSONL files here</strong>
+      <span>or click to choose several files</span>
+    </label>
+
+    <div class="data-upload-selection" data-upload-selection hidden>
+      <div class="data-upload-selection__summary">
+        <strong data-upload-count>0 files selected</strong>
+        <span data-upload-size>0 B</span>
+      </div>
+      <ul class="data-upload-file-list" data-upload-file-list></ul>
+    </div>
+
+    <div class="data-upload-actions">
+      <p class="inline-note">The combined upload limit is {{ (max_total_bytes / 1024 / 1024)|round|int }} MB.</p>
+      <button class="button-primary" type="submit" data-upload-submit disabled>Upload and import</button>
+    </div>
+  </form>
+</section>
+
+{% if selected_batch %}
+<section
+  class="section-block data-upload-current data-upload-current--{{ selected_batch.status }}"
+  data-upload-status
+  data-batch-id="{{ selected_batch.batch_id }}"
+  data-initial-status="{{ selected_batch.status }}"
+  data-status-url="{{ url_for('data_upload_web.status', batch_id=selected_batch.batch_id) }}"
+>
+  <div class="data-upload-current__heading">
+    <div>
+      <span class="eyebrow">Current batch</span>
+      <h3>{{ selected_batch.file_count }} file{% if selected_batch.file_count != 1 %}s{% endif %}</h3>
+      <p class="data-upload-batch-id">{{ selected_batch.batch_id }}</p>
+    </div>
+    <span class="status-badge status-{{ 'ready' if selected_batch.status == 'ready' else 'waiting' if selected_batch.status in ['queued', 'importing', 'publishing'] else 'error' }}" data-upload-status-label>
+      {{ selected_batch.status|replace('-', ' ')|title }}
+    </span>
+  </div>
+
+  <div class="data-upload-progress" aria-live="polite">
+    <div class="data-upload-progress__step {% if selected_batch.status != 'queued' %}is-complete{% endif %}">
+      <span>1</span><div><strong>Uploaded</strong><p>Files were copied safely from the browser.</p></div>
+    </div>
+    <div class="data-upload-progress__step {% if selected_batch.status in ['publishing', 'ready'] %}is-complete{% elif selected_batch.status == 'importing' %}is-current{% endif %}">
+      <span>2</span><div><strong>Stored in database</strong><p>Every JSON object is validated and inserted transactionally.</p></div>
+    </div>
+    <div class="data-upload-progress__step {% if selected_batch.status == 'ready' %}is-complete{% elif selected_batch.status == 'publishing' %}is-current{% endif %}">
+      <span>3</span><div><strong>Ready for analysis</strong><p>The complete batch is published to the supported JSONL input tree.</p></div>
+    </div>
+  </div>
+
+  <div class="metrics metrics-grid data-upload-metrics">
+    <article class="metric-card"><span class="metric-label">Files</span><strong class="metric-value">{{ selected_batch.file_count }}</strong></article>
+    <article class="metric-card"><span class="metric-label">Upload size</span><strong class="metric-value metric-value--long">{{ '%.1f'|format(selected_batch.total_bytes / 1024 / 1024) }} MB</strong></article>
+    <article class="metric-card"><span class="metric-label">Database records</span><strong class="metric-value" data-upload-record-count>{{ selected_batch.imported_records }}</strong></article>
+    <article class="metric-card"><span class="metric-label">Analysis</span><strong class="metric-value metric-value--long">{{ selected_batch.analysis_state|replace('-', ' ')|title }}</strong></article>
+  </div>
+
+  {% if selected_batch.status == 'failed' %}
+  <div class="notice notice--error">
+    <strong>Import failed safely</strong>
+    <p>No incomplete batch was exposed to analysis. Error code: <code>{{ selected_batch.error_code or 'upload-import-failed' }}</code>.</p>
+  </div>
+  {% elif selected_batch.status == 'ready' %}
+    {% if selected_batch.analysis_state == 'requested' %}
+    <div class="notice notice--success">
+      <strong>Background analysis requested</strong>
+      <p>The existing runtime is discovering the uploaded dates and processing them asynchronously.</p>
+      <a class="button-link" href="{{ url_for('web.status') }}">Follow analysis progress</a>
+    </div>
+    {% else %}
+    <div class="data-upload-analysis-ready">
+      <div>
+        <strong>All data is stored and ready</strong>
+        <p>Start the existing MSH background workflow when you are ready.</p>
+      </div>
+      <form method="post" action="{{ url_for('data_upload_web.analyze', batch_id=selected_batch.batch_id) }}">
+        <input type="hidden" name="_csrf_token" value="{{ data_upload_csrf_token }}">
+        <button class="button-primary" type="submit">Start background analysis</button>
+      </form>
+    </div>
+    {% endif %}
+  {% else %}
+  <p class="inline-note" data-upload-live-message>MSH is processing this batch in the background. This page updates automatically.</p>
+  {% endif %}
+
+  <details class="data-upload-files">
+    <summary>Files in this batch</summary>
+    <ul>
+      {% for file in selected_batch.files %}
+      <li><strong>{{ file.original_name }}</strong><span>{{ file.imported_records }} records · {{ file.status|title }}</span></li>
+      {% endfor %}
+    </ul>
+  </details>
+</section>
+{% endif %}
+
+<section class="section-block">
+  <div class="data-upload-panel__heading">
+    <div><h3>Recent uploads</h3><p>Completed and failed batches remain visible after restart.</p></div>
+  </div>
+  {% if upload_batches %}
+  <div class="data-upload-history">
+    {% for batch in upload_batches %}
+    <a class="data-upload-history__row" href="{{ url_for('data_upload_web.index', batch=batch.batch_id) }}">
+      <div><strong>{{ batch.file_count }} file{% if batch.file_count != 1 %}s{% endif %}</strong><span>{{ batch.created_at }}</span></div>
+      <div><strong>{{ batch.imported_records }} records</strong><span>{{ '%.1f'|format(batch.total_bytes / 1024 / 1024) }} MB</span></div>
+      <span class="status-badge status-{{ 'ready' if batch.status == 'ready' else 'waiting' if batch.status in ['queued', 'importing', 'publishing'] else 'error' }}">{{ batch.status|title }}</span>
+    </a>
+    {% endfor %}
+  </div>
+  {% else %}
+  <p class="empty-state">No JSONL uploads have been created yet.</p>
+  {% endif %}
+</section>
+<script defer src="{{ url_for('static', filename='js/data-upload.js') }}"></script>
+{% endblock %}
