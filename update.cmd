@@ -22,6 +22,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem Windows PowerShell may otherwise emit redirected output in an encoding that
+rem cmd.exe cannot parse with FOR /F. The runtime resolver also writes BOM-free
+rem UTF-8 explicitly when an output file is provided.
+chcp 65001 >nul
+
 echo.
 echo Starting MSH with the saved identity and Federation membership...
 call start.cmd --resume
