@@ -198,7 +198,7 @@ Phase-era documentation should not remain the default user path. Durable archite
 | --- | --- | --- | --- | --- | --- |
 | `docs/releases/federation_v1_scope.md` | Canonical release scope | Defines intended v1 product boundary. | None. | Link check. | KEEP. |
 | `docs/implementation/federation_v1_repository_audit.md` | Canonical stabilization audit | Defines cleanup policy and baseline. | Eventually move to release history after v1. | Link check. | KEEP. |
-| `docs/implementation/federation_v1_closeout_plan.md` | Canonical active plan | Defines V1-A through release closeout. | Archive after v1 release. | Link check. | KEEP. |
+| `docs/implementation/federation/active/federation_v1_closeout_plan.md` | Canonical active plan | Defines V1-A through release closeout. | Archive after v1 release. | Link check. | KEEP. |
 | `docs/implementation/federation_v1_cleanup_manifest.md` | Canonical cleanup manifest | This V1-B decision record. | Archive after cleanup/release. | Link check. | KEEP. |
 | `docs/roadmap/post_v1_product_roadmap.md` | Canonical future plan | Preserves V1.1 UI/docs and later federation expansion. | None until superseded by approved release plans. | Link check. | KEEP. |
 | `docs/implementation/current_task_handoff.md` | Canonical current status | Replaced stale phase-E handoff. | Continue updating during closeout. | Link check. | KEEP. |
