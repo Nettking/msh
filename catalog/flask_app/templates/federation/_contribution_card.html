@@ -30,6 +30,10 @@
   </div>
   {% endif %}
 
+  {% if contribution.reason %}
+  <p class="contribution-card__notice" role="status">{{ contribution.reason }}</p>
+  {% endif %}
+
   {% if interactive %}
   <fieldset class="contribution-choice"{% if contribution.policy_state == 'blocked' %} disabled{% endif %}>
     <legend>Contribution choice</legend>
