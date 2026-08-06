@@ -71,7 +71,7 @@ function Test-MshFlaskContainer {
     $hasMshDataMount = @($Inspection.Mounts) | Where-Object {
         [string]$_.Destination -eq "/app/data"
     }
-    return $hasMshEnvironment.Count -gt 0 -or $hasMshDataMount.Count -gt 0
+    return @($hasMshEnvironment).Count -gt 0 -or @($hasMshDataMount).Count -gt 0
 }
 
 function Remove-LegacyMshProject {
@@ -88,15 +88,13 @@ function Remove-LegacyMshProject {
         return
     }
 
-    Write-Warning (
+    Write-Warning ((
         "Port {0} is owned by an older MSH Compose project '{1}'. " +
         "Its containers will be replaced; named volumes and host data are preserved."
-    ) -f $PreferredPort, $project
+    ) -f $PreferredPort, $project)
 
     $projectContainers = @(
-        & docker ps -a \
-            --filter "label=com.docker.compose.project=$project" \
-            --format "{{.ID}}" 2>$null
+        & docker ps -a --filter "label=com.docker.compose.project=$project" --format "{{.ID}}" 2>$null
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
     foreach ($containerId in $projectContainers) {
