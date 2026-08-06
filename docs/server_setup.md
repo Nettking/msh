@@ -377,4 +377,4 @@ docker compose up -d --build relay ollama recorder flask
 - [Connected capabilities](connected_capabilities.md)
 - [Troubleshooting](troubleshooting.md)
 - [Federated session network](federated_session_network.md)
-- [Capability-first Federation plan](implementation/capability_first_federation_plan.md)
+- [Capability-first Federation plan](implementation/federation/active/capability_first_federation_plan.md)
