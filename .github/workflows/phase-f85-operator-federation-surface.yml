@@ -7,6 +7,8 @@ on:
       - "catalog/capabilities/**"
       - "catalog/flask_app/**"
       - "catalog/ai/**"
+      - "catalog/federation/projections/**"
+      - "catalog/federation/tests/test_onboarding_projection_policy.py"
       - "catalog/relay/tests/test_phase_f83_remote_ai_binding.py"
       - "catalog/relay/tests/test_phase_f84_compute_worker_activation.py"
       - "docs/implementation/phase_f85_plan.md"
@@ -18,6 +20,8 @@ on:
       - "catalog/capabilities/**"
       - "catalog/flask_app/**"
       - "catalog/ai/**"
+      - "catalog/federation/projections/**"
+      - "catalog/federation/tests/test_onboarding_projection_policy.py"
       - "catalog/relay/tests/test_phase_f83_remote_ai_binding.py"
       - "catalog/relay/tests/test_phase_f84_compute_worker_activation.py"
       - "docs/implementation/phase_f85_plan.md"
@@ -57,6 +61,8 @@ jobs:
           catalog/capabilities
           catalog/ai
           catalog/flask_app
+          catalog/federation/projections
+          catalog/federation/tests/test_onboarding_projection_policy.py
           catalog/relay/tests/test_phase_f83_remote_ai_binding.py
           catalog/relay/tests/test_phase_f84_compute_worker_activation.py
       - name: F8.5 and affected regressions
@@ -73,6 +79,7 @@ jobs:
           catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
           catalog/flask_app/tests/test_windows_start_script.py
           catalog/flask_app/test_navigation_smoke.py
+          catalog/federation/tests/test_onboarding_projection_policy.py
           catalog/federation/tests/test_phase0.py
           catalog/federation/tests/test_phase1.py
           catalog/federation/tests/test_phase2_unit.py
@@ -93,6 +100,8 @@ jobs:
           catalog/flask_app/tests/test_local_capability_candidates.py
           catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
           catalog/flask_app/tests/test_windows_start_script.py
+          catalog/federation/projections/onboarding_adapter.py
+          catalog/federation/tests/test_onboarding_projection_policy.py
           --ignore I001,RUF022,B008,C408,PLC0206,UP035
       - name: Compose validation
         run: docker compose config --quiet
