@@ -1,6 +1,10 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
+import subprocess
+
+import pytest
 
 
 def _repository_root() -> Path:
@@ -13,6 +17,15 @@ def _start_script() -> str:
 
 def _update_script() -> str:
     return (_repository_root() / "update.cmd").read_text(encoding="utf-8")
+
+
+def _port_resolver_script() -> str:
+    return (
+        _repository_root()
+        / "scripts"
+        / "windows"
+        / "resolve_msh_web_port.ps1"
+    ).read_text(encoding="utf-8")
 
 
 def test_start_cmd_runs_current_core_services_detached() -> None:
@@ -34,12 +47,61 @@ def test_start_cmd_runs_current_core_services_detached() -> None:
     assert "%MSH_BASE_URL%/docs" in script
     assert "docker compose ps relay ollama flask recorder" in script
     assert 'set "MSH_WEB_BIND=127.0.0.1"' in script
+    assert 'set "COMPOSE_PROJECT_NAME=msh"' in script
     assert "Invoke-WebRequest" in script
     assert script.index("Invoke-WebRequest") < script.index(
         'start "" "%MSH_OPEN_URL%"'
     )
     assert "docker compose up -d --build flask recorder" not in script
     assert "docker compose up --build" not in script
+
+
+def test_start_cmd_resolves_port_before_compose_start() -> None:
+    script = _start_script()
+    resolver = _port_resolver_script()
+
+    assert "call :resolve_web_port" in script
+    assert "resolve_msh_web_port.ps1" in script
+    assert 'set "MSH_WEB_PORT=5000"' in script
+    assert 'set "MSH_WEB_PORT_EXPLICIT=0"' in script
+    assert "-AllowFallback" in script
+    assert script.index("call :resolve_web_port") < script.index(
+        "docker compose up -d --build relay ollama flask recorder"
+    )
+
+    assert '[string]$CurrentProjectName = "msh"' in resolver
+    assert 'docker ps --filter "publish=$PreferredPort"' in resolver
+    assert "Test-MshFlaskContainer" in resolver
+    assert "Remove-LegacyMshProject" in resolver
+    assert "named volumes and host data are preserved" in resolver
+    assert "MSH will use http://localhost:$candidate" in resolver
+    assert "docker volume" not in resolver
+    assert "Stop-Process" not in resolver
+    assert "taskkill" not in resolver.casefold()
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell parser check")
+def test_windows_port_resolver_has_valid_powershell_syntax() -> None:
+    path = (
+        _repository_root()
+        / "scripts"
+        / "windows"
+        / "resolve_msh_web_port.ps1"
+    )
+    command = (
+        "$errors = $null; "
+        "[System.Management.Automation.Language.Parser]::ParseFile("
+        f"'{str(path).replace("'", "''")}', [ref]$null, [ref]$errors) | Out-Null; "
+        "if ($errors.Count -gt 0) { "
+        "$errors | ForEach-Object { Write-Error $_.Message }; exit 1 }"
+    )
+    completed = subprocess.run(
+        ["powershell", "-NoProfile", "-Command", command],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
 
 
 def test_start_cmd_verifies_the_exact_ollama_model_before_opening_browser() -> None:
