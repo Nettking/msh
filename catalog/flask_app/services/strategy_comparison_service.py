@@ -3,12 +3,15 @@ from __future__ import annotations
 from collections import defaultdict
 from typing import Any
 
-from .operator_strategy_service import OperatorStrategyService
+from .federated_operator_strategy_service import FederatedOperatorStrategyService
 
 
 class StrategyComparisonService:
-    def __init__(self, note_service: OperatorStrategyService | None = None) -> None:
-        self.note_service = note_service or OperatorStrategyService()
+    def __init__(
+        self,
+        note_service: FederatedOperatorStrategyService | None = None,
+    ) -> None:
+        self.note_service = note_service or FederatedOperatorStrategyService()
 
     def comparisons(self) -> list[dict[str, Any]]:
         notes = [
