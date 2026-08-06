@@ -76,13 +76,20 @@ def test_start_cmd_recovers_runtime_state_before_compose_start() -> None:
     assert 'set "MSH_DATA_DIR_DEFAULTED=1"' in script
     assert 'set "MSH_RESULTS_DIR_DEFAULTED=1"' in script
     assert "-AllowFallback" in script
+    assert '-OutputFile "%MSH_RUNTIME_FILE%"' in script
+    assert '> "%MSH_RUNTIME_FILE%"' not in script
     assert 'if /I "%%A"=="MSH_RELAY_VOLUME_NAME"' in script
     assert 'if /I "%%A"=="MSH_DATA_DIR"' in script
+    assert "Runtime-state resolver omitted MSH_WEB_PORT" in script
+    assert "Resolver output was:" in script
     assert script.index("call :resolve_runtime_state") < script.index(
         "docker compose build relay flask recorder"
     )
 
     assert '[string]$CurrentProjectName = "msh"' in resolver
+    assert '[string]$OutputFile = ""' in resolver
+    assert "System.Text.UTF8Encoding($false)" in resolver
+    assert "WriteAllLines" in resolver
     assert 'docker ps --filter "publish=$PreferredPort"' in resolver
     assert "Test-MshFlaskContainer" in resolver
     assert "Get-IdentityNodeId" in resolver
@@ -174,16 +181,24 @@ def test_start_cmd_resume_runs_before_long_running_flask_container() -> None:
         "catalog.flask_app.services.existing_setup_resume"
     )
     assert resume_command in script
-    assert "docker compose exec -T flask python -m catalog.flask_app.services.existing_setup_resume" not in script
+    assert "docker compose stop flask" in script
+    assert (
+        script.index("docker compose stop flask")
+        < script.index(resume_command)
+        < script.index("docker compose up -d flask")
+    )
+    assert (
+        "docker compose exec -T flask python -m "
+        "catalog.flask_app.services.existing_setup_resume"
+        not in script
+    )
     assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/federation"' in script
     assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/federation/benchmarks"' in script
     assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/onboarding?repair=1"' in script
     assert "No identity or Federation was replaced" in script
     assert "start.cmd --resume" in script
 
-    resume_call = script.index(resume_command)
     flask_start = script.index("docker compose up -d flask")
-    assert resume_call < flask_start
     assert flask_start < script.index("Waiting for the MSH webapp")
     assert script.index("Waiting for the MSH webapp") < script.index(
         'start "" "%MSH_OPEN_URL%"'
@@ -194,6 +209,7 @@ def test_update_cmd_fast_forwards_then_resumes_without_resetting_state() -> None
     script = _update_script()
 
     assert "git pull --ff-only" in script
+    assert "chcp 65001 >nul" in script
     assert "call start.cmd --resume" in script
     assert script.index("git pull --ff-only") < script.index(
         "call start.cmd --resume"
