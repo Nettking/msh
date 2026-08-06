@@ -10,6 +10,7 @@ from flask import Flask, current_app, url_for
 from werkzeug.datastructures import FileStorage
 
 from catalog.common.data_loading import iter_jsonl_files
+from catalog.flask_app import data_upload_routes as upload_routes
 from catalog.flask_app.data_upload_routes import data_upload_web
 from catalog.flask_app.services.data_upload_service import DataUploadService
 
@@ -22,6 +23,24 @@ class _Runtime:
     def request_refresh(self) -> bool:
         self.requests += 1
         return self.accepted
+
+
+class _Jobs:
+    def __init__(self) -> None:
+        self.submitted: list[str] = []
+        self.started: list[str] = []
+        self.failed: list[tuple[str, str]] = []
+
+    def submit_batch(self, batch: dict) -> str:
+        job_id = f"analysis-{batch['batch_id']}"
+        self.submitted.append(job_id)
+        return job_id
+
+    def start_tracking(self, job_id: str) -> None:
+        self.started.append(job_id)
+
+    def fail(self, job_id: str, error_code: str) -> None:
+        self.failed.append((job_id, error_code))
 
 
 def _service(tmp_path: Path, runtime: _Runtime | None = None) -> DataUploadService:
@@ -79,11 +98,18 @@ def _test_app(service: DataUploadService) -> Flask:
     return app
 
 
-def test_multiple_jsonl_files_import_then_request_existing_background_analysis(
+def test_multiple_jsonl_files_import_then_create_durable_background_job(
     tmp_path: Path,
+    monkeypatch,
 ) -> None:
     runtime = _Runtime()
     service = _service(tmp_path, runtime)
+    jobs = _Jobs()
+    monkeypatch.setattr(
+        upload_routes,
+        "get_upload_analysis_job_service",
+        lambda: jobs,
+    )
     app = _test_app(service)
     client = app.test_client()
 
@@ -146,6 +172,10 @@ def test_multiple_jsonl_files_import_then_request_existing_background_analysis(
     assert response.status_code == 302
     assert runtime.requests == 1
     assert service.batch(batch_id)["analysis_state"] == "requested"
+    expected_job_id = f"analysis-{batch_id}"
+    assert jobs.submitted == [expected_job_id]
+    assert jobs.started == [expected_job_id]
+    assert jobs.failed == []
 
 
 def test_invalid_json_rolls_back_database_and_never_publishes_batch(
