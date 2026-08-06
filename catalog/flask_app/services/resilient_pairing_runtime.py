@@ -11,7 +11,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from catalog.federation.errors import AuthenticationError
+from catalog.federation.errors import (
+    AuthenticationError,
+    FederationOperationError,
+)
+from catalog.federation.models import SessionEvent
 from catalog.federation.onboarding_models import (
     FederationConnectionState,
     FederationSessionBinding,
@@ -22,13 +26,14 @@ from .federation_pairing_service import (
     PairingOffer,
     PairingRelayNodeClient,
     PairingRelayRuntime,
+    RemotePairingState,
     _parse_stamp,
     _stamp,
 )
 
 
 class ResilientPairingRelayRuntime(PairingRelayRuntime):
-    """Redeem a pairing offer without duplicating existing identity authority."""
+    """Redeem and reuse one authenticated Federation relay connection."""
 
     @staticmethod
     def _existing_session(
@@ -42,6 +47,94 @@ class ResilientPairingRelayRuntime(PairingRelayRuntime):
             if isinstance(value, dict) and value.get("session_id") == session_id:
                 return value
         return None
+
+    def _connected_client(self) -> PairingRelayNodeClient:
+        client = self._client
+        if client is None or not client.connected_event.is_set():
+            raise FederationOperationError(
+                "pairing-relay-disconnected",
+                "the paired relay is not connected",
+            )
+        return client
+
+    async def _session_events(
+        self,
+        state: RemotePairingState,
+        *,
+        session_id: str,
+        after_revision: int,
+    ) -> tuple[SessionEvent, ...]:
+        if session_id != state.binding.internal_session_id:
+            raise AuthenticationError(
+                "pairing-membership-mismatch",
+                "shared knowledge must use the paired Federation session",
+                "session_id",
+            )
+        await self._ensure_connected(state)
+        client = self._connected_client()
+        await client.request_replay(session_id)
+        return client.state.applied_events(
+            session_id,
+            after_revision=after_revision,
+        )
+
+    def session_events(
+        self,
+        state: RemotePairingState,
+        *,
+        session_id: str,
+        after_revision: int = 0,
+    ) -> tuple[SessionEvent, ...]:
+        return self._submit(
+            self._session_events(
+                state,
+                session_id=session_id,
+                after_revision=after_revision,
+            )
+        )
+
+    async def _append_session_event(
+        self,
+        state: RemotePairingState,
+        *,
+        session_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+        request_id: str,
+    ) -> SessionEvent:
+        if session_id != state.binding.internal_session_id:
+            raise AuthenticationError(
+                "pairing-membership-mismatch",
+                "shared knowledge must use the paired Federation session",
+                "session_id",
+            )
+        await self._ensure_connected(state)
+        client = self._connected_client()
+        return await client.append_event(
+            session_id=session_id,
+            event_type=event_type,
+            payload=payload,
+            request_id=request_id,
+        )
+
+    def append_session_event(
+        self,
+        state: RemotePairingState,
+        *,
+        session_id: str,
+        event_type: str,
+        payload: dict[str, Any],
+        request_id: str,
+    ) -> SessionEvent:
+        return self._submit(
+            self._append_session_event(
+                state,
+                session_id=session_id,
+                event_type=event_type,
+                payload=payload,
+                request_id=request_id,
+            )
+        )
 
     async def _redeem(self, offer: PairingOffer) -> FederationSessionBinding:
         await self._disconnect_current()
