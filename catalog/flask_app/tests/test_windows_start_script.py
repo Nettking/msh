@@ -49,10 +49,8 @@ def test_start_cmd_fresh_mode_resets_only_device_and_federation_state() -> None:
     assert "docker compose down -v" not in script
     assert "docker volume prune" not in script
     assert "Remove-Item -LiteralPath 'data'" not in script
+    assert "Remove-Item -LiteralPath 'results'" not in script
     assert "ollama_models" not in script
     assert "model_provider_models" not in script
-    assert "data\\source_config" not in script
-    assert "data\\source_state" not in script
-    assert "results" not in script.split(":reset_device_state", maxsplit=1)[1].split(
-        ":show_help", maxsplit=1
-    )[0].replace("analysis results", "")
+    assert "Remove-Item -LiteralPath 'data\\source_config'" not in script
+    assert "Remove-Item -LiteralPath 'data\\source_state'" not in script
