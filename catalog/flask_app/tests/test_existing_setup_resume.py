@@ -15,6 +15,7 @@ from catalog.flask_app.services.existing_setup_resume import (
 class _Onboarding:
     def __init__(self, *, failures: list[BaseException] | None = None) -> None:
         self.failures = list(failures or [])
+        self.reconnect_calls = 0
         self.context_calls = 0
         self.identity = SimpleNamespace(identity=SimpleNamespace(node_id="node-existing"))
         self.binding = SimpleNamespace(federation_id="federation-existing")
@@ -27,6 +28,10 @@ class _Onboarding:
         return self.identity
 
     def binding_or_none(self) -> object:
+        return self.binding
+
+    def reconnect(self) -> object:
+        self.reconnect_calls += 1
         return self.binding
 
     def authorized_context(self) -> object:
@@ -95,6 +100,7 @@ def test_resume_retries_reconnect_then_refreshes_existing_setup() -> None:
     contribution = _Contribution()
     current = [0.0]
     sleeps: list[float] = []
+    progress: list[str] = []
 
     def sleep(seconds: float) -> None:
         sleeps.append(seconds)
@@ -109,8 +115,10 @@ def test_resume_retries_reconnect_then_refreshes_existing_setup() -> None:
         reconnect_interval_seconds=1,
         monotonic=lambda: current[0],
         sleep=sleep,
+        progress=progress.append,
     ).resume()
 
+    assert onboarding.reconnect_calls == 3
     assert onboarding.context_calls == 3
     assert sleeps == [1, 1]
     assert inspection.calls == 1
@@ -128,6 +136,10 @@ def test_resume_retries_reconnect_then_refreshes_existing_setup() -> None:
     )
     assert report.reconciled_contributions == 2
     assert report.partial is True
+    assert progress[0].startswith("[1/4] Reconnecting")
+    assert any(message.startswith("[2/4] Inspecting") for message in progress)
+    assert any(message.startswith("[3/4] Planning") for message in progress)
+    assert any(message.startswith("[4/4] Reconciling") for message in progress)
 
 
 def test_resume_never_creates_identity_or_federation_when_state_is_missing() -> None:
@@ -137,6 +149,9 @@ def test_resume_never_creates_identity_or_federation_when_state_is_missing() -> 
 
         def binding_or_none(self) -> None:
             return None
+
+        def reconnect(self) -> object:  # pragma: no cover - must not run
+            raise AssertionError("reconnect must not run without saved state")
 
         def authorized_context(self) -> object:  # pragma: no cover - must not run
             raise AssertionError("authorization must not run without saved state")
@@ -179,6 +194,7 @@ def test_terminal_membership_failure_does_not_retry_or_replace_authority() -> No
         service.resume()
 
     assert error.value.code == "revoked-node"
+    assert onboarding.reconnect_calls == 1
     assert onboarding.context_calls == 1
     assert sleeps == []
 
