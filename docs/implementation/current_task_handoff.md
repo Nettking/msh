@@ -1,134 +1,139 @@
 # Current task handoff
 
-Last updated: 2026-08-02 Europe/Oslo
+Last updated: 2026-08-06 Europe/Oslo
 
 ## Repository state
 
 - Repository: `Nettking/msh`
 - Default branch: `main`
-- Current planning branch: `agent/capability-first-onboarding-plan`
-- Technical federation baseline: complete through F8.7
-- Latest merged product change: `41934cd3b3907c4847fb788a3fd9f9647e165969` — integrated repository documentation browser
+- Reconciled main commit: `349da7cd0007bf3e0f97127ea6696fd325e3c583`
 - Published release tag: not yet created
+- Capability-first Federation implementation: merged baseline
+- Complete physical CF7 acceptance: not accepted
+- CF8 role-first retirement: blocked
+- OSL integration: planning complete; production implementation not started
 
-## Completed baseline
+This handoff identifies current plans and next actions. Historical phase notes and
+branch delivery records do not override the authoritative documents listed
+below.
 
-The validated federation implementation includes:
+## Track A: capability-first Federation
 
-- authenticated persistent node identity, membership/session compatibility, ordered events, replay, and revocation;
-- storage primary/replica authority, replication, fencing, completeness-aware failover, and recovery;
-- direct encrypted transport, relay fallback, rendezvous, and resumable verified transfer;
-- multi-provider AI and compute scheduling, durable job ownership, dispatch, retry, cancellation, stale-worker fencing, and artifact authorization;
-- trusted-provider enrollment, expiring health, remote AI binding, compute activation, operator-safe projection, and restart reconciliation;
-- Linux and Windows federation acceptance.
-
-## Stabilization and documentation work completed
-
-- V1-A audit, scope, closeout, roadmap, and handoff foundation;
-- V1-B cleanup manifest;
-- Graphify generated-output deletion and ignore rule;
-- integrated `/docs` reader in the normal Flask application;
-- manual `/docs` acceptance on the owner's laptop: passed;
-- the standalone Markdown prototype is now superseded and remains only until a separate deletion change.
-
-## Product-direction decision
-
-The repository owner has explicitly replaced role-first setup as the planned product direction.
-
-New product model:
-
-- every installation is one persistent MSH device;
-- a device may contribute several capabilities simultaneously;
-- setup discovers or creates a federation before asking for contributions;
-- MSH inspects the device and runs suitable bounded benchmarks;
-- the user enables any combination of recommended contributions;
-- returning trusted devices reconnect automatically;
-- storage primary/replica, job owner, membership administration, leases, fencing, and artifact grants remain internal authority states rather than device identities.
-
-The internal `session_id` boundary remains for compatibility. The UI uses Federation as the product concept.
-
-## Authoritative active plan
+Authoritative plan:
 
 - `docs/implementation/capability_first_federation_plan.md`
 
-The plan defines:
+Current product baseline includes:
 
-- discovery, verification, join, reconnect, and local federation creation;
-- device inspection;
-- versioned AI, compute, storage, network, and data-source benchmarks;
-- contribution candidates and contribution intents;
-- legacy deployment-mode migration;
-- Federation information architecture;
-- CF0-CF8 implementation sequence;
-- explicit parallel-agent file ownership and merge ordering;
-- Linux/Windows, migration, security, restart, and end-to-end acceptance.
+- stable device identity;
+- Federation discovery, verified join, pairing, reconnect, and local creation;
+- bounded device inspection and benchmarks;
+- independent contribution recommendation and intent handling;
+- the three-step first-run path `Identity -> Federation -> Inspect`;
+- optional benchmarks and contribution decisions after workbench access;
+- read-only Federation product pages and supported Flask composition;
+- permanent Ubuntu and Windows component/product gates;
+- recovery and fresh-reset behavior.
 
-## Plans adjusted
+PR #185 merged the capability-first product baseline. PR #186 subsequently
+merged Docker/native Ollama benchmark runtime-parity changes.
 
-The following documents are aligned with the new direction:
+### Federation work still open
 
-- `docs/roadmap/post_v1_product_roadmap.md`;
-- `docs/implementation/federation_v1_closeout_plan.md`;
-- `docs/releases/federation_v1_scope.md`;
-- this handoff.
+- Review and resolve the post-merge PR #186 concerns about persisted connected
+  provider settings being overridden by Compose defaults and native host
+  translation preserving explicit ports.
+- Reconcile any remaining documentation that treats PR #186 as an open draft or
+  benchmarks/contribution review as mandatory before first completion.
+- Freeze one exact acceptance candidate only after known code, authority,
+  privacy, platform, browser, MTConnect, Ollama, restart, revocation, and
+  multi-host issues are closed.
+- Execute the complete physical CF7 campaign on that one commit.
+- Change acceptance flags only through a separate evidence-backed review.
+- Plan CF8 separately after CF7 acceptance. Do not begin role-first retirement
+  earlier.
 
-The previous roadmap assumptions about a user choosing one role, manually creating/resuming a technical session, and treating provider approval as the primary setup journey are superseded.
+The old instructions to implement CF1, launch Wave 1, or replace the setup UI are
+historical and must not be used.
 
-## Parallel-agent strategy
+## Track B: OSL and Notebook-to-OSL integration
 
-Parallel work begins only after CF1 contracts merge.
+Authoritative execution plan:
 
-Wave 1 can use three agents concurrently on disjoint paths:
+- `docs/implementation/osl_integration/10_phased_implementation_roadmap.md`
 
-1. benchmark/inspection engine;
-2. federation discovery and verified-join adapter;
-3. new onboarding/Federation UI templates, CSS, and JavaScript only.
+Plan index and source/design references:
 
-Wave 2 can use two agents concurrently:
+- `docs/implementation/osl_integration/README.md`
 
-1. contribution recommendation/activation service;
-2. safe Federation projections.
+W3 end-to-end acceptance scenario:
 
-One later integration agent exclusively owns shared files such as:
+- `docs/planned-work/method-osl-msh-alignment.md`
 
-- `catalog/flask_app/app.py`;
-- `catalog/flask_app/routes.py`;
-- `catalog/flask_app/server_setup_routes.py`;
-- `catalog/flask_app/services/server_setup_service.py`;
-- `catalog/flask_app/templates/base.html`;
-- `catalog/flask_app/templates/startup.html`;
-- `setup_msh.py`;
-- `.env.example`.
+Current OSL reality:
 
-An independent acceptance agent owns final migration fixtures, CI additions, and end-to-end validation.
+- source, architecture, contract, workflow, file, UI, validation, migration, and
+  phased-delivery analysis exists;
+- the detailed MSH analysis was pinned to an older snapshot and every current
+  integration seam must be revalidated before implementation;
+- no accepted MSH OSL profile, authority policy, or compatibility policy exists;
+- no canonical `catalog/osl/` production package exists;
+- no canonical OSL persistence, lifecycle, API, UI, AI integration, migration,
+  or current SysML v2 adapter has been implemented;
+- W3 is an acceptance scenario across multiple deliveries, not a one-branch
+  implementation instruction.
 
-## Current exact action
+### Exact next OSL delivery
 
-Proceed with **CF1 only**:
+Proceed with **D0-A only**, as a documentation-only draft PR:
 
-1. add pure versioned onboarding contracts;
-2. add `federation_id` to internal-session compatibility mapping;
-3. add a read-only migration preview from every existing deployment mode;
-4. prove that migration never silently enables a new contribution;
-5. add malformed-state, serialization, compatibility, and migration tests;
-6. do not change the current setup UI;
-7. merge CF1 before creating the parallel Wave 1 branches.
+1. create `docs/osl_language_profile.md`;
+2. create `docs/osl_authority_boundary.md`;
+3. create `docs/osl_compatibility_policy.md`;
+4. update `docs/agent_notes/osl_sysml_alignment.md`;
+5. obtain research/domain and security/product review;
+6. merge the accepted decisions before D1-A begins.
 
-## Do not do yet
+Do not add production OSL modules in D0-A.
 
-- do not remove `session_id` from protocols or persistence;
-- do not replace the current setup UI before CF1-CF4 services exist;
-- do not let benchmark success grant authority;
-- do not enable storage or compute contributions automatically during migration;
-- do not let multiple agents edit shared Flask/setup files concurrently;
-- do not delete the old role-first path until CF7 acceptance passes;
-- do not mix unrelated cleanup into CF1.
+## Cross-track boundaries
+
+- Do not combine Federation acceptance/fixes and OSL implementation in one PR.
+- OSL content, validation, review, approval, or publication grants no Federation,
+  provider, compute, storage, job, artifact, lease, fencing, or machine
+  authority.
+- Federation device/node identity is not automatically a human OSL reviewer,
+  approver, or publisher identity.
+- OSL mutation routes remain blocked until server-verifiable human identity,
+  authorization, secure sessions, and CSRF are implemented and reviewed.
+- AI remains candidate-only in the OSL track and cannot sign, approve, publish,
+  or create canonical authority.
+- Existing operator records and legacy SysML exports remain compatibility inputs,
+  not proof of OSL conformance.
+- Do not let multiple agents edit the same shared Flask, setup, navigation,
+  security, persistence, or workflow file concurrently.
+
+## Agent operating discipline
+
+For both tracks:
+
+1. branch from updated `main`;
+2. scope the branch and PR to one named delivery, defect, acceptance unit, or
+   documentation reconciliation;
+3. declare owned paths;
+4. commit after coherent file/test boundaries so partial work is recoverable;
+5. open a draft PR and do not merge automatically;
+6. distinguish automated, simulated, physical, browser/toolchain, and human
+   evidence;
+7. preserve authority, privacy, migration, restart, and cross-platform gates;
+8. stop and report when a missing decision or dependency would require scope
+   expansion or a permissive assumption.
 
 ## Resume safety
 
-- Safe to resume: yes.
-- Technical baseline: complete through F8.7.
-- `/docs`: implemented, CI validated, and manually accepted.
-- Capability-first direction: approved and planned.
-- Runtime implementation of capability-first onboarding: not started.
-- Next unit: CF1 contracts and migration preview only.
+- Safe to resume Federation work: yes, through the authoritative capability-first
+  plan and complete CF7 acceptance boundary.
+- Safe to start CF8: no.
+- Safe to start OSL D0-A: yes, after the plan-cleanup PR is merged.
+- Safe to start OSL production code: no, until D0-A is reviewed and merged.
+- Safe to implement W3 as one PR: no.
