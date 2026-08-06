@@ -23,8 +23,10 @@ def test_start_cmd_runs_current_core_services_detached() -> None:
     assert "Ollama benchmark model is ready" in script
     assert "docker compose port flask 5000" in script
     assert 'set "MSH_BASE_URL=http://localhost:%MSH_WEB_PORT_RESOLVED%"' in script
+    assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%"' in script
+    assert 'set "MSH_OPEN_URL=%MSH_ONBOARDING_URL%"' in script
     assert "-Uri '%MSH_BASE_URL%/onboarding'" in script
-    assert 'start "" "%MSH_ONBOARDING_URL%"' in script
+    assert 'start "" "%MSH_OPEN_URL%"' in script
     assert "%MSH_BASE_URL%/federation" in script
     assert "%MSH_BASE_URL%/status" in script
     assert "%MSH_BASE_URL%/docs" in script
@@ -32,7 +34,7 @@ def test_start_cmd_runs_current_core_services_detached() -> None:
     assert 'set "MSH_WEB_BIND=127.0.0.1"' in script
     assert "Invoke-WebRequest" in script
     assert script.index("Invoke-WebRequest") < script.index(
-        'start "" "%MSH_ONBOARDING_URL%"'
+        'start "" "%MSH_OPEN_URL%"'
     )
     assert "docker compose up -d --build flask recorder" not in script
     assert "docker compose up --build" not in script
