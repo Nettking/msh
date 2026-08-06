@@ -194,6 +194,33 @@ def create_app() -> Flask:
     )
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
+
+    @app.before_request
+    def resolve_completed_capability_runtime_choice():
+        """Repair a stale legacy runtime choice before compatibility gates run."""
+
+        runtime_manager = get_runtime_manager()
+        if not runtime_manager.requires_startup_choice():
+            return None
+        try:
+            flags = get_capability_startup_transition_service().capability_flags()
+        except Exception as exc:  # noqa: BLE001 - legacy gate remains fail-closed
+            app.logger.info(
+                "Capability runtime request handoff unavailable (%s)",
+                type(exc).__name__,
+            )
+            return None
+        if not bool(flags.get("completed")) or not bool(flags.get("runtime")):
+            return None
+        accepted, _message = runtime_manager.choose_startup_mode(
+            "continue_existing"
+        )
+        if not accepted:
+            app.logger.warning(
+                "Completed capability runtime could not clear legacy startup choice"
+            )
+        return None
+
     # CFI-6 owns capability-first startup and migration before CFI-5 and the
     # retained role-first compatibility gates. It persists intent only and
     # delegates every operational authority to the already registered services.
@@ -216,7 +243,10 @@ def create_app() -> Flask:
     return app
 
 
-def _start_runtime_from_capability_state(app: Flask, setup: object) -> str:
+def _start_runtime_from_capability_state(
+    app: Flask,
+    setup: object | None = None,
+) -> str:
     """Start runtime without reviving the retired legacy startup prompt.
 
     A completed capability-first transition already made the safe startup choice:
@@ -258,10 +288,7 @@ if __name__ == "__main__":
         )
 
     runtime_start_state = "disabled"
-    if (
-        os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1"
-        and setup is not None
-    ):
+    if os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1":
         try:
             runtime_start_state = _start_runtime_from_capability_state(app, setup)
         except Exception as exc:  # noqa: BLE001 - corrupt state must fail closed
