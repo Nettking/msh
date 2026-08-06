@@ -37,20 +37,27 @@ def test_start_cmd_fresh_mode_resets_only_device_and_federation_state() -> None:
     assert 'if /I "%~1"=="--fresh"' in script
     assert "Type RESET to continue" in script
     assert "docker compose down --remove-orphans" in script
-    assert "com.docker.compose.volume=relay_state" in script
-    assert "Remove-Item -LiteralPath 'data\\federation'" in script
     assert (
-        "Remove-Item -LiteralPath "
-        "'data\\server_setup\\server_settings.json'" in script
+        "docker compose run --rm --no-deps --build --entrypoint python relay"
+        in script
+    )
+    assert "Path('/var/lib/msh-relay')" in script
+    assert 'rmdir /s /q "data\\federation"' in script
+    assert (
+        'del /f /q "data\\server_setup\\server_settings.json"' in script
     )
     assert "start.cmd --fresh" in script
+
+    # The reset must not depend on optional/newer Compose JSON output.
+    assert "docker compose config --format json" not in script
+    assert "ConvertFrom-Json" not in script
 
     # Fresh-device setup must not become a generic data or volume wipe.
     assert "docker compose down -v" not in script
     assert "docker volume prune" not in script
-    assert "Remove-Item -LiteralPath 'data'" not in script
-    assert "Remove-Item -LiteralPath 'results'" not in script
+    assert 'rmdir /s /q "data"' not in script
+    assert 'rmdir /s /q "results"' not in script
     assert "ollama_models" not in script
     assert "model_provider_models" not in script
-    assert "Remove-Item -LiteralPath 'data\\source_config'" not in script
-    assert "Remove-Item -LiteralPath 'data\\source_state'" not in script
+    assert 'rmdir /s /q "data\\source_config"' not in script
+    assert 'rmdir /s /q "data\\source_state"' not in script
