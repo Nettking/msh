@@ -1,9 +1,21 @@
 @echo off
-setlocal
+setlocal EnableExtensions
 title MSH
 
 cd /d "%~dp0"
 
+set "MSH_FRESH_INSTALL=0"
+if "%~1"=="" goto :arguments_ready
+if /I "%~1"=="--fresh" (
+    if not "%~2"=="" goto :usage_error
+    set "MSH_FRESH_INSTALL=1"
+    goto :arguments_ready
+)
+if /I "%~1"=="--help" goto :show_help
+if /I "%~1"=="/?" goto :show_help
+goto :usage_error
+
+:arguments_ready
 if not defined MSH_WEB_BIND set "MSH_WEB_BIND=127.0.0.1"
 
 where docker >nul 2>&1
@@ -20,6 +32,11 @@ if errorlevel 1 (
     echo Please start Docker Desktop and try again.
     pause
     exit /b 1
+)
+
+if "%MSH_FRESH_INSTALL%"=="1" (
+    call :reset_device_state
+    if errorlevel 1 exit /b 1
 )
 
 echo Starting the current MSH core services...
@@ -68,3 +85,66 @@ echo.
 
 start "" "http://localhost:5000/onboarding"
 exit /b 0
+
+:reset_device_state
+echo.
+echo FRESH DEVICE INSTALL
+ echo This permanently removes this checkout's:
+echo   - MSH device identity and keys
+echo   - Federation membership, pairing, onboarding, and benchmark state
+echo   - local Federation relay authority database
+echo   - saved server role and device setup choices
+echo.
+echo It preserves recorded telemetry, source configuration, recorder checkpoints,
+echo analysis results, Docker images, and downloaded Ollama models.
+echo.
+set "MSH_RESET_CONFIRM="
+set /p "MSH_RESET_CONFIRM=Type RESET to continue: "
+if /I not "%MSH_RESET_CONFIRM%"=="RESET" (
+    echo Fresh install cancelled. No state was removed.
+    exit /b 2
+)
+
+echo.
+echo Stopping MSH before resetting device and Federation state...
+docker compose down --remove-orphans
+if errorlevel 1 (
+    echo MSH containers could not be stopped safely. Nothing else was removed.
+    pause
+    exit /b 1
+)
+
+echo Removing only device, setup, and Federation state...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$ErrorActionPreference = 'Stop';" ^
+  "$compose = docker compose config --format json ^| ConvertFrom-Json;" ^
+  "$project = [string]$compose.name;" ^
+  "if ([string]::IsNullOrWhiteSpace($project)) { throw 'Docker Compose project name was unavailable.' };" ^
+  "$relayVolumes = @(docker volume ls --filter ('label=com.docker.compose.project=' + $project) --filter 'label=com.docker.compose.volume=relay_state' -q);" ^
+  "foreach ($volume in $relayVolumes) { docker volume rm $volume ^| Out-Null; if ($LASTEXITCODE -ne 0) { throw ('Could not remove relay state volume: ' + $volume) } };" ^
+  "Remove-Item -LiteralPath 'data\federation' -Recurse -Force -ErrorAction SilentlyContinue;" ^
+  "Remove-Item -LiteralPath 'data\server_setup\server_settings.json' -Force -ErrorAction SilentlyContinue"
+if errorlevel 1 (
+    echo.
+    echo Fresh device reset did not complete. Review the error above before retrying.
+    pause
+    exit /b 1
+)
+
+echo Fresh device reset completed. MSH will now start with Identity and Federation empty.
+echo.
+exit /b 0
+
+:show_help
+echo Usage:
+echo   start.cmd           Start MSH and preserve all existing state.
+echo   start.cmd --fresh   Reset device/Federation setup, then start MSH.
+echo.
+echo The --fresh option requires typing RESET and preserves recordings,
+echo source configuration, recorder checkpoints, results, and Ollama models.
+exit /b 0
+
+:usage_error
+echo Unknown option: %~1
+echo Run start.cmd --help for supported options.
+exit /b 2
