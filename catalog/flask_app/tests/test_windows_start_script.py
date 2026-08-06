@@ -17,12 +17,13 @@ def test_start_cmd_runs_current_core_services_detached() -> None:
     assert (
         "docker compose up -d --build relay ollama flask recorder" in script
     )
-    assert "-Uri 'http://localhost:5000/onboarding'" in script
+    assert "docker compose port flask 5000" in script
+    assert 'set "MSH_BASE_URL=http://localhost:%MSH_WEB_PORT_RESOLVED%"' in script
+    assert "-Uri '%MSH_BASE_URL%/onboarding'" in script
     assert 'start "" "%MSH_ONBOARDING_URL%"' in script
-    assert "http://localhost:5000/federation" in script
-    assert "http://localhost:5000/status" in script
-    assert "http://localhost:5000/docs" in script
-    assert "ws://localhost:8765" in script
+    assert "%MSH_BASE_URL%/federation" in script
+    assert "%MSH_BASE_URL%/status" in script
+    assert "%MSH_BASE_URL%/docs" in script
     assert "docker compose ps relay ollama flask recorder" in script
     assert 'set "MSH_WEB_BIND=127.0.0.1"' in script
     assert "Invoke-WebRequest" in script
@@ -33,7 +34,7 @@ def test_start_cmd_runs_current_core_services_detached() -> None:
     assert "docker compose up --build" not in script
 
 
-def test_start_cmd_fresh_mode_uses_configured_state_reset() -> None:
+def test_start_cmd_fresh_mode_resets_and_verifies_authoritative_state() -> None:
     script = _start_script()
 
     assert 'if /I "%~1"=="--fresh"' in script
@@ -43,15 +44,18 @@ def test_start_cmd_fresh_mode_uses_configured_state_reset() -> None:
         "python flask -m catalog.flask_app.services.device_state_reset" in script
     )
     assert (
-        'set "MSH_ONBOARDING_URL=http://localhost:5000/onboarding?fresh=1"'
+        "docker compose exec -T flask python -m "
+        "catalog.flask_app.services.device_state_reset --verify-fresh"
         in script
     )
+    assert "its authoritative setup state is not fresh" in script
+    assert "?fresh=1&reset=%RANDOM%%RANDOM%" in script
     assert "start.cmd --fresh" in script
 
-    # Fresh-device setup must not become a generic data or volume wipe.
+    # Fresh-device setup must not become a generic host-data or model wipe.
     assert "docker compose down -v" not in script
     assert "docker volume prune" not in script
-    assert 'rmdir /s /q "data\\federation"' not in script
+    assert 'rmdir /s /q "data"' not in script
     assert "Remove-Item -LiteralPath 'data'" not in script
     assert "Remove-Item -LiteralPath 'results'" not in script
     assert "ollama_models" not in script
@@ -74,4 +78,5 @@ def test_fresh_launch_clears_only_msh_onboarding_browser_progress() -> None:
     assert 'key.indexOf("msh.onboarding.") === 0' in script
     assert "window.localStorage.removeItem(key)" in script
     assert 'url.searchParams.delete("fresh")' in script
+    assert 'url.searchParams.delete("reset")' in script
     assert "window.localStorage.clear()" not in script
