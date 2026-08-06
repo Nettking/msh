@@ -6,6 +6,7 @@ cd /d "%~dp0"
 
 set "MSH_FRESH_INSTALL=0"
 set "MSH_RESUME_EXISTING=0"
+set "MSH_RESUME_EXIT=0"
 if "%~1"=="" goto :arguments_ready
 if /I "%~1"=="--fresh" (
     if not "%~2"=="" goto :usage_error
@@ -29,6 +30,16 @@ if not defined MSH_WEB_PORT (
     set "MSH_WEB_PORT=5000"
     set "MSH_WEB_PORT_EXPLICIT=0"
 )
+set "MSH_DATA_DIR_DEFAULTED=0"
+if not defined MSH_DATA_DIR (
+    for %%I in ("%~dp0data") do set "MSH_DATA_DIR=%%~fI"
+    set "MSH_DATA_DIR_DEFAULTED=1"
+)
+set "MSH_RESULTS_DIR_DEFAULTED=0"
+if not defined MSH_RESULTS_DIR (
+    for %%I in ("%~dp0results") do set "MSH_RESULTS_DIR=%%~fI"
+    set "MSH_RESULTS_DIR_DEFAULTED=1"
+)
 
 where docker >nul 2>&1
 if errorlevel 1 (
@@ -46,28 +57,60 @@ if errorlevel 1 (
     exit /b 1
 )
 
+call :resolve_runtime_state
+if errorlevel 1 (
+    echo.
+    echo MSH could not resolve its existing runtime state safely.
+    pause
+    exit /b 1
+)
+
 if "%MSH_FRESH_INSTALL%"=="1" (
     call :reset_device_state
     if errorlevel 1 exit /b 1
 )
 
-call :resolve_web_port
+echo Building the current MSH services...
+docker compose build relay flask recorder
 if errorlevel 1 (
     echo.
-    echo MSH could not reserve a safe local web port.
+    echo MSH images could not be built. Review the Docker error above.
     pause
     exit /b 1
 )
 
-echo Starting the current MSH core services...
+echo.
+echo Starting the MSH background services...
 echo   - Federation relay
 echo   - Ollama service
-echo   - Flask workbench on %MSH_WEB_BIND%:%MSH_WEB_PORT%
 echo   - Managed recorder
-docker compose up -d --build relay ollama flask recorder
+docker compose up -d relay ollama recorder
 if errorlevel 1 (
     echo.
-    echo MSH could not be started. Review the Docker error above.
+    echo MSH background services could not be started. Review the Docker error above.
+    pause
+    exit /b 1
+)
+
+call :ensure_ollama_model
+if errorlevel 1 (
+    echo.
+    echo MSH background services remain running, but the webapp will not be opened with a missing benchmark model.
+    echo Correct the network or Ollama error above, then run start.cmd again.
+    pause
+    exit /b 1
+)
+
+if "%MSH_RESUME_EXISTING%"=="1" (
+    call :run_existing_setup_resume
+    set "MSH_RESUME_EXIT=%ERRORLEVEL%"
+)
+
+echo Starting the Flask workbench on %MSH_WEB_BIND%:%MSH_WEB_PORT%...
+docker compose up -d flask
+if errorlevel 1 (
+    echo.
+    echo The MSH webapp could not be started. Review the Docker error above.
     pause
     exit /b 1
 )
@@ -75,15 +118,6 @@ if errorlevel 1 (
 echo.
 docker compose ps relay ollama flask recorder
 echo.
-
-call :ensure_ollama_model
-if errorlevel 1 (
-    echo.
-    echo MSH services remain running, but onboarding will not be opened with a missing benchmark model.
-    echo Correct the network or Ollama error above, then run start.cmd again.
-    pause
-    exit /b 1
-)
 
 set "MSH_WEB_PORT_RESOLVED="
 for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$lines = @(docker compose port flask 5000); if ($LASTEXITCODE -ne 0 -or $lines.Count -eq 0) { exit 1 }; $binding = [string]$lines[0]; if ($binding -match ':(\d+)$') { $Matches[1] } else { exit 1 }"`) do set "MSH_WEB_PORT_RESOLVED=%%P"
@@ -130,12 +164,12 @@ if errorlevel 1 (
 )
 
 if not "%MSH_RESUME_EXISTING%"=="1" goto :resume_complete
-echo.
-echo Reconnecting and refreshing the existing MSH setup...
-docker compose exec -T flask python -m catalog.flask_app.services.existing_setup_resume
-if errorlevel 4 goto :resume_partial
-if errorlevel 3 goto :resume_failed
-if errorlevel 2 goto :resume_missing
+if "%MSH_RESUME_EXIT%"=="0" goto :resume_success
+if "%MSH_RESUME_EXIT%"=="4" goto :resume_partial
+if "%MSH_RESUME_EXIT%"=="2" goto :resume_missing
+goto :resume_failed
+
+:resume_success
 set "MSH_OPEN_URL=%MSH_BASE_URL%/federation"
 echo Existing identity, Federation membership, inspection, benchmarks, and contribution intent are ready.
 goto :resume_complete
@@ -156,6 +190,7 @@ goto :resume_complete
 set "MSH_OPEN_URL=%MSH_ONBOARDING_URL%"
 echo No saved device identity and Federation membership were found.
 echo First-time onboarding is required on this machine.
+goto :resume_complete
 
 :resume_complete
 echo.
@@ -164,6 +199,8 @@ echo Onboarding:            %MSH_ONBOARDING_URL%
 echo Federation:            %MSH_BASE_URL%/federation
 echo Recorder status:       %MSH_BASE_URL%/status
 echo Documentation:         %MSH_BASE_URL%/docs
+echo Device data:           %MSH_DATA_DIR%
+echo Federation state:      %MSH_RELAY_VOLUME_NAME%
 echo.
 echo Web access is limited to this MSH machine by default.
 echo To pair another device, open MSH using this machine's LAN or VPN address.
@@ -174,33 +211,49 @@ echo.
 start "" "%MSH_OPEN_URL%"
 exit /b 0
 
-:resolve_web_port
-set "MSH_WEB_PORT_RESOLVED_PRESTART="
-set "MSH_WEB_PORT_FILE=%TEMP%\msh-web-port-%RANDOM%-%RANDOM%.txt"
+:resolve_runtime_state
+set "MSH_RUNTIME_FILE=%TEMP%\msh-runtime-%RANDOM%-%RANDOM%.txt"
 if "%MSH_WEB_PORT_EXPLICIT%"=="1" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% > "%MSH_WEB_PORT_FILE%"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% > "%MSH_RUNTIME_FILE%"
 ) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% -AllowFallback > "%MSH_WEB_PORT_FILE%"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% -AllowFallback > "%MSH_RUNTIME_FILE%"
 )
-set "MSH_WEB_PORT_EXIT=%ERRORLEVEL%"
-if not "%MSH_WEB_PORT_EXIT%"=="0" (
-    if exist "%MSH_WEB_PORT_FILE%" del /q "%MSH_WEB_PORT_FILE%" >nul 2>&1
-    exit /b %MSH_WEB_PORT_EXIT%
+set "MSH_RUNTIME_EXIT=%ERRORLEVEL%"
+if not "%MSH_RUNTIME_EXIT%"=="0" (
+    if exist "%MSH_RUNTIME_FILE%" del /q "%MSH_RUNTIME_FILE%" >nul 2>&1
+    exit /b %MSH_RUNTIME_EXIT%
 )
-if exist "%MSH_WEB_PORT_FILE%" set /p "MSH_WEB_PORT_RESOLVED_PRESTART="<"%MSH_WEB_PORT_FILE%"
-if exist "%MSH_WEB_PORT_FILE%" del /q "%MSH_WEB_PORT_FILE%" >nul 2>&1
-if not defined MSH_WEB_PORT_RESOLVED_PRESTART (
-    echo The Windows port resolver did not return a usable port.
-    exit /b 1
+for /f "usebackq tokens=1,* delims==" %%A in ("%MSH_RUNTIME_FILE%") do (
+    if /I "%%A"=="MSH_WEB_PORT" set "MSH_WEB_PORT=%%B"
+    if /I "%%A"=="MSH_RELAY_VOLUME_NAME" set "MSH_RELAY_VOLUME_NAME=%%B"
+    if /I "%%A"=="MSH_OLLAMA_VOLUME_NAME" set "MSH_OLLAMA_VOLUME_NAME=%%B"
+    if /I "%%A"=="MSH_MODEL_PROVIDER_VOLUME_NAME" set "MSH_MODEL_PROVIDER_VOLUME_NAME=%%B"
+    if /I "%%A"=="MSH_DATA_DIR" set "MSH_DATA_DIR=%%B"
+    if /I "%%A"=="MSH_RESULTS_DIR" set "MSH_RESULTS_DIR=%%B"
 )
-set "MSH_WEB_PORT=%MSH_WEB_PORT_RESOLVED_PRESTART%"
+if exist "%MSH_RUNTIME_FILE%" del /q "%MSH_RUNTIME_FILE%" >nul 2>&1
+if not defined MSH_WEB_PORT exit /b 1
+if not defined MSH_RELAY_VOLUME_NAME exit /b 1
+if not defined MSH_OLLAMA_VOLUME_NAME exit /b 1
+if not defined MSH_MODEL_PROVIDER_VOLUME_NAME exit /b 1
+if not defined MSH_DATA_DIR exit /b 1
+if not defined MSH_RESULTS_DIR exit /b 1
 echo MSH web port reserved: %MSH_WEB_BIND%:%MSH_WEB_PORT%
+echo MSH device data:       %MSH_DATA_DIR%
+echo MSH Federation state:  %MSH_RELAY_VOLUME_NAME%
 echo.
 exit /b 0
 
+:run_existing_setup_resume
+echo.
+echo Reconnecting the saved Federation before starting the webapp...
+echo The refresh will inspect this device, run its benchmark plan, and reconcile saved contribution intent.
+docker compose run --rm --no-deps --entrypoint python flask -m catalog.flask_app.services.existing_setup_resume
+exit /b %ERRORLEVEL%
+
 :ensure_ollama_model
 set "MSH_AI_MODEL_RESOLVED="
-for /f "usebackq delims=" %%M in (`docker compose exec -T flask python -c "import os; print(os.environ.get('MSH_AI_MODEL') or 'llama3.2:3b')"`) do set "MSH_AI_MODEL_RESOLVED=%%M"
+for /f "usebackq delims=" %%M in (`docker compose run --rm --no-deps --entrypoint python flask -c "import os; print(os.environ.get('MSH_AI_MODEL') or 'llama3.2:3b')"`) do set "MSH_AI_MODEL_RESOLVED=%%M"
 if not defined MSH_AI_MODEL_RESOLVED set "MSH_AI_MODEL_RESOLVED=llama3.2:3b"
 
 echo Ensuring Ollama benchmark model is installed: %MSH_AI_MODEL_RESOLVED%
@@ -284,7 +337,7 @@ exit /b 0
 :show_help
 echo Usage:
 echo   start.cmd            Start MSH and preserve all existing state.
-echo   start.cmd --resume   Start, reconnect, inspect, benchmark, and reconcile saved setup.
+echo   start.cmd --resume   Reconnect, inspect, benchmark, reconcile, then start MSH.
 echo   start.cmd --fresh    Reset device/Federation setup, verify it, then start MSH.
 echo.
 echo Normal and resume modes preserve identity, Federation membership, recordings,
