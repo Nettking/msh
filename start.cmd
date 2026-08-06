@@ -213,15 +213,22 @@ exit /b 0
 
 :resolve_runtime_state
 set "MSH_RUNTIME_FILE=%TEMP%\msh-runtime-%RANDOM%-%RANDOM%.txt"
+if exist "%MSH_RUNTIME_FILE%" del /q "%MSH_RUNTIME_FILE%" >nul 2>&1
 if "%MSH_WEB_PORT_EXPLICIT%"=="1" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% > "%MSH_RUNTIME_FILE%"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% -OutputFile "%MSH_RUNTIME_FILE%"
 ) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% -AllowFallback > "%MSH_RUNTIME_FILE%"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% -OutputFile "%MSH_RUNTIME_FILE%" -AllowFallback
 )
 set "MSH_RUNTIME_EXIT=%ERRORLEVEL%"
 if not "%MSH_RUNTIME_EXIT%"=="0" (
+    echo Runtime-state resolver exited with code %MSH_RUNTIME_EXIT%.
+    if exist "%MSH_RUNTIME_FILE%" type "%MSH_RUNTIME_FILE%"
     if exist "%MSH_RUNTIME_FILE%" del /q "%MSH_RUNTIME_FILE%" >nul 2>&1
     exit /b %MSH_RUNTIME_EXIT%
+)
+if not exist "%MSH_RUNTIME_FILE%" (
+    echo Runtime-state resolver did not create its output file.
+    exit /b 1
 )
 for /f "usebackq tokens=1,* delims==" %%A in ("%MSH_RUNTIME_FILE%") do (
     if /I "%%A"=="MSH_WEB_PORT" set "MSH_WEB_PORT=%%B"
@@ -231,23 +238,38 @@ for /f "usebackq tokens=1,* delims==" %%A in ("%MSH_RUNTIME_FILE%") do (
     if /I "%%A"=="MSH_DATA_DIR" set "MSH_DATA_DIR=%%B"
     if /I "%%A"=="MSH_RESULTS_DIR" set "MSH_RESULTS_DIR=%%B"
 )
+if not defined MSH_WEB_PORT echo Runtime-state resolver omitted MSH_WEB_PORT.
+if not defined MSH_RELAY_VOLUME_NAME echo Runtime-state resolver omitted MSH_RELAY_VOLUME_NAME.
+if not defined MSH_OLLAMA_VOLUME_NAME echo Runtime-state resolver omitted MSH_OLLAMA_VOLUME_NAME.
+if not defined MSH_MODEL_PROVIDER_VOLUME_NAME echo Runtime-state resolver omitted MSH_MODEL_PROVIDER_VOLUME_NAME.
+if not defined MSH_DATA_DIR echo Runtime-state resolver omitted MSH_DATA_DIR.
+if not defined MSH_RESULTS_DIR echo Runtime-state resolver omitted MSH_RESULTS_DIR.
+if not defined MSH_WEB_PORT goto :runtime_state_invalid
+if not defined MSH_RELAY_VOLUME_NAME goto :runtime_state_invalid
+if not defined MSH_OLLAMA_VOLUME_NAME goto :runtime_state_invalid
+if not defined MSH_MODEL_PROVIDER_VOLUME_NAME goto :runtime_state_invalid
+if not defined MSH_DATA_DIR goto :runtime_state_invalid
+if not defined MSH_RESULTS_DIR goto :runtime_state_invalid
 if exist "%MSH_RUNTIME_FILE%" del /q "%MSH_RUNTIME_FILE%" >nul 2>&1
-if not defined MSH_WEB_PORT exit /b 1
-if not defined MSH_RELAY_VOLUME_NAME exit /b 1
-if not defined MSH_OLLAMA_VOLUME_NAME exit /b 1
-if not defined MSH_MODEL_PROVIDER_VOLUME_NAME exit /b 1
-if not defined MSH_DATA_DIR exit /b 1
-if not defined MSH_RESULTS_DIR exit /b 1
 echo MSH web port reserved: %MSH_WEB_BIND%:%MSH_WEB_PORT%
 echo MSH device data:       %MSH_DATA_DIR%
 echo MSH Federation state:  %MSH_RELAY_VOLUME_NAME%
 echo.
 exit /b 0
 
+:runtime_state_invalid
+echo Resolver output was:
+type "%MSH_RUNTIME_FILE%"
+if exist "%MSH_RUNTIME_FILE%" del /q "%MSH_RUNTIME_FILE%" >nul 2>&1
+exit /b 1
+
 :run_existing_setup_resume
 echo.
 echo Reconnecting the saved Federation before starting the webapp...
 echo The refresh will inspect this device, run its benchmark plan, and reconcile saved contribution intent.
+rem Ensure only the isolated resume process uses this device identity. The
+rem long-running Flask service starts after the refresh has completed.
+docker compose stop flask >nul 2>&1
 docker compose run --rm --no-deps --entrypoint python flask -m catalog.flask_app.services.existing_setup_resume
 exit /b %ERRORLEVEL%
 
