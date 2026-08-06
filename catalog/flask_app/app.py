@@ -17,6 +17,7 @@ from .capability_onboarding_routes import capability_onboarding_web
 from .capability_startup_transition_routes import (
     capability_startup_transition_web,
 )
+from .data_upload_routes import data_upload_web
 from .docs_routes import docs_web
 from .federation_pairing_routes import federation_pairing_web
 from .federation_routes import federation_web
@@ -46,6 +47,38 @@ from .source_routes import source_web
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["SECRET_KEY"] = os.getenv("MSH_FLASK_SECRET", "msh-dev")
+    if app.config.get("MAX_CONTENT_LENGTH") is None:
+        app.config["MAX_CONTENT_LENGTH"] = int(
+            os.getenv("MSH_UPLOAD_MAX_REQUEST_BYTES", str(1100 * 1024 * 1024))
+        )
+    app.config.setdefault(
+        "DATA_UPLOAD_DATABASE",
+        os.getenv("MSH_DATA_UPLOAD_DATABASE", "data/imports/uploads.sqlite3"),
+    )
+    app.config.setdefault(
+        "DATA_UPLOAD_STAGING_DIRECTORY",
+        os.getenv("MSH_DATA_UPLOAD_STAGING_DIR", "data/imports/staging"),
+    )
+    app.config.setdefault(
+        "DATA_UPLOAD_PUBLISHED_DIRECTORY",
+        os.getenv("MSH_DATA_UPLOAD_PUBLISHED_DIR", "data/uploads"),
+    )
+    app.config.setdefault(
+        "DATA_UPLOAD_MAX_FILES",
+        int(os.getenv("MSH_DATA_UPLOAD_MAX_FILES", "50")),
+    )
+    app.config.setdefault(
+        "DATA_UPLOAD_MAX_FILE_BYTES",
+        int(os.getenv("MSH_DATA_UPLOAD_MAX_FILE_BYTES", str(512 * 1024 * 1024))),
+    )
+    app.config.setdefault(
+        "DATA_UPLOAD_MAX_TOTAL_BYTES",
+        int(os.getenv("MSH_DATA_UPLOAD_MAX_TOTAL_BYTES", str(1024 * 1024 * 1024))),
+    )
+    app.config.setdefault(
+        "DATA_UPLOAD_MAX_LINE_BYTES",
+        int(os.getenv("MSH_DATA_UPLOAD_MAX_LINE_BYTES", str(4 * 1024 * 1024))),
+    )
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_IDENTITY_DIRECTORY",
         os.getenv(
@@ -174,6 +207,7 @@ def create_app() -> Flask:
     app.register_blueprint(capability_onboarding_web)
     app.register_blueprint(server_setup_web)
     app.register_blueprint(web)
+    app.register_blueprint(data_upload_web)
     app.register_blueprint(source_web)
     app.register_blueprint(operator_strategy_web)
     app.register_blueprint(operator_support_web)
