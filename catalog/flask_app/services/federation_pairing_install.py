@@ -11,10 +11,26 @@ from flask import Flask, current_app
 from .capability_recovery_adapters import fresh_capability_inspection_adapters
 from .federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
-    PairingRelayRuntime,
     RemotePairingStore,
 )
+from .resilient_pairing_runtime import ResilientPairingRelayRuntime
 from .server_setup_service import load_settings
+
+_RECONNECT_EXTENSION_KEY = "federation_saved_membership_reconnect"
+_RETAINED_STARTUP_CHECK_KEY = "capability_onboarding_startup_checked"
+_CONNECTED_CHECK_SECONDS = 15.0
+_MAX_RETRY_SECONDS = 60.0
+_TERMINAL_RECONNECT_CODES = frozenset(
+    {
+        "malformed-remote-pairing-state",
+        "not-session-member",
+        "pairing-actor-mismatch",
+        "pairing-membership-mismatch",
+        "pairing-membership-missing",
+        "revoked-node",
+        "unknown-node",
+    }
+)
 
 
 def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
@@ -31,7 +47,7 @@ def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
         )
     )
     device_name = str(app.config["CAPABILITY_ONBOARDING_DEVICE_NAME"])
-    runtime = PairingRelayRuntime(
+    runtime = ResilientPairingRelayRuntime(
         state_directory=identity_directory,
         display_name=device_name,
     )
@@ -95,8 +111,115 @@ class LazyPairingOnboardingService(PairingAwareCapabilityOnboardingService):
         )
 
 
+class SavedFederationReconnectMonitor:
+    """Keep one saved remote Federation membership connected automatically."""
+
+    def __init__(
+        self,
+        app: Flask,
+        service: LazyPairingOnboardingService,
+    ) -> None:
+        self.app = app
+        self.service = service
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._state: dict[str, object] = {
+            "status": "not-started",
+            "attempts": 0,
+            "last_error_code": None,
+        }
+
+    def snapshot(self) -> dict[str, object]:
+        with self._lock:
+            return dict(self._state)
+
+    def _set_state(
+        self,
+        status: str,
+        *,
+        attempts: int,
+        error_code: str | None = None,
+    ) -> None:
+        with self._lock:
+            self._state = {
+                "status": status,
+                "attempts": attempts,
+                "last_error_code": error_code,
+            }
+
+    def start(self) -> None:
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                return
+            self._stop.clear()
+            self._thread = threading.Thread(
+                target=self._run,
+                name="msh-federation-auto-reconnect",
+                daemon=True,
+            )
+            self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def _run(self) -> None:
+        failures = 0
+        while not self._stop.is_set():
+            try:
+                with self.app.app_context():
+                    remote = self.service.remote_store.load()
+                    if remote is None:
+                        self._set_state(
+                            "no-saved-remote-membership",
+                            attempts=failures,
+                        )
+                        return
+                    context = self.service.authorized_context()
+                    if context is None:
+                        raise RuntimeError(
+                            "saved remote Federation context is unavailable"
+                        )
+            except Exception as exc:  # noqa: BLE001 - network retry boundary
+                failures += 1
+                code = str(getattr(exc, "code", type(exc).__name__))
+                if code in _TERMINAL_RECONNECT_CODES:
+                    self._set_state(
+                        "membership-needs-pairing",
+                        attempts=failures,
+                        error_code=code,
+                    )
+                    self.app.logger.warning(
+                        "Saved Federation membership requires pairing (%s)",
+                        code,
+                    )
+                    return
+                self._set_state(
+                    "retrying",
+                    attempts=failures,
+                    error_code=code,
+                )
+                delay = min(
+                    _MAX_RETRY_SECONDS,
+                    float(2 ** min(failures - 1, 6)),
+                )
+                if self._stop.wait(delay):
+                    return
+                continue
+
+            was_retrying = failures > 0
+            failures = 0
+            self._set_state("connected", attempts=0)
+            if was_retrying:
+                self.app.logger.info(
+                    "Saved Federation membership reconnected automatically"
+                )
+            if self._stop.wait(_CONNECTED_CHECK_SECONDS):
+                return
+
+
 def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
-    """Install config-aware onboarding and fresh capability composition."""
+    """Install config-aware onboarding and automatic saved reconnection."""
 
     service = LazyPairingOnboardingService()
     app.config["CAPABILITY_ONBOARDING_SERVICE"] = service
@@ -105,10 +228,22 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
             fresh_capability_inspection_adapters
         )
     app.extensions["federation_pairing_service"] = service
+    monitor = SavedFederationReconnectMonitor(app, service)
+    app.extensions[_RECONNECT_EXTENSION_KEY] = monitor
+
+    @app.before_request
+    def _start_saved_membership_reconnect() -> None:
+        # This hook is registered before the retained one-shot reconnect hook.
+        # The monitor owns retries, so prevent the old hook from marking a
+        # transient first failure as permanently checked.
+        app.extensions[_RETAINED_STARTUP_CHECK_KEY] = True
+        monitor.start()
+
     return service
 
 
 __all__ = [
     "LazyPairingOnboardingService",
+    "SavedFederationReconnectMonitor",
     "install_federation_pairing",
 ]
