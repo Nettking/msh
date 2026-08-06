@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/operator-strategies.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/source-tests.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ai-explainer.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/data-upload.css') }}">
     <script defer src="{{ url_for('static', filename='js/mobile-navigation.js') }}"></script>
     {% if not document_recorder_only %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
@@ -99,6 +100,7 @@
         {% endif %}
       {% else %}
         <a class="{% if current_endpoint == 'web.overview' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Overview</a>
+        <a class="{% if current_endpoint.startswith('data_upload_web.') %}is-active{% endif %}" href="{{ endpoint_url('data_upload_web.index', '/data-upload/') }}">Data upload</a>
         <a class="{% if current_endpoint == 'web.live' %}is-active{% endif %}" href="{{ url_for('web.live') }}">Live</a>
         <a class="{% if current_endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
         <a class="{% if current_endpoint == 'operator_support_web.assist' %}is-active{% endif %}" href="{{ endpoint_url('operator_support_web.assist', '/assist') }}">Assist</a>
