@@ -15,6 +15,7 @@ from catalog.capabilities.benchmarking import (
     OllamaProbeTarget,
 )
 
+from .local_capability_candidates import local_inspection_adapters
 from .mtconnect_discovery_service import get_mtconnect_discovery_service
 from .server_setup_service import ServerSetupError, load_settings
 
@@ -57,16 +58,17 @@ def _runtime_ollama_base_url(payload: Mapping[str, object]) -> str:
 
 
 def fresh_capability_inspection_adapters() -> tuple[object, ...]:
-    """Expose configured capability evidence in both Docker and native runs.
+    """Expose configured and safe built-in evidence in Docker and native runs.
 
     Benchmark visibility is intentionally independent of contribution activation.
-    A fresh capability-first installation leaves optional capabilities at
-    ``ask-later``; that must not hide the checks used to decide whether the
-    capability should later be enabled.
+    The built-in compute handler is descriptor-only during inspection, and local
+    storage uses only a bounded temporary round-trip probe. Neither grants runtime
+    authority.
     """
 
     adapters: list[object] = [
-        MtconnectSourceAdapter(get_mtconnect_discovery_service().last_scan)
+        MtconnectSourceAdapter(get_mtconnect_discovery_service().last_scan),
+        *local_inspection_adapters(),
     ]
     loader = current_app.config.get(
         "CAPABILITY_ONBOARDING_SETUP_LOADER",
