@@ -17,6 +17,10 @@ def test_start_cmd_runs_current_core_services_detached() -> None:
     assert (
         "docker compose up -d --build relay ollama flask recorder" in script
     )
+    assert (
+        "docker compose --profile model-install run --rm ollama-pull" in script
+    )
+    assert "Ollama benchmark model is ready" in script
     assert "docker compose port flask 5000" in script
     assert 'set "MSH_BASE_URL=http://localhost:%MSH_WEB_PORT_RESOLVED%"' in script
     assert "-Uri '%MSH_BASE_URL%/onboarding'" in script
