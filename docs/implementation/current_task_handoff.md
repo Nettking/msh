@@ -21,7 +21,7 @@ below.
 
 Authoritative plan:
 
-- `docs/implementation/capability_first_federation_plan.md`
+- `docs/implementation/federation/active/capability_first_federation_plan.md`
 
 Current product baseline includes:
 
