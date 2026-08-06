@@ -19,6 +19,10 @@ def _update_script() -> str:
     return (_repository_root() / "update.cmd").read_text(encoding="utf-8")
 
 
+def _compose_file() -> str:
+    return (_repository_root() / "docker-compose.yml").read_text(encoding="utf-8")
+
+
 def _port_resolver_script() -> str:
     return (
         _repository_root()
@@ -28,12 +32,12 @@ def _port_resolver_script() -> str:
     ).read_text(encoding="utf-8")
 
 
-def test_start_cmd_runs_current_core_services_detached() -> None:
+def test_start_cmd_builds_background_services_then_starts_web() -> None:
     script = _start_script()
 
-    assert (
-        "docker compose up -d --build relay ollama flask recorder" in script
-    )
+    assert "docker compose build relay flask recorder" in script
+    assert "docker compose up -d relay ollama recorder" in script
+    assert "docker compose up -d flask" in script
     assert "call :ensure_ollama_model" in script
     assert "Ollama benchmark model is ready" in script
     assert "docker compose port flask 5000" in script
@@ -49,35 +53,64 @@ def test_start_cmd_runs_current_core_services_detached() -> None:
     assert 'set "MSH_WEB_BIND=127.0.0.1"' in script
     assert 'set "COMPOSE_PROJECT_NAME=msh"' in script
     assert "Invoke-WebRequest" in script
+    assert script.index("docker compose up -d relay ollama recorder") < script.index(
+        "call :ensure_ollama_model"
+    )
+    assert script.index("call :ensure_ollama_model") < script.index(
+        "docker compose up -d flask"
+    )
     assert script.index("Invoke-WebRequest") < script.index(
         'start "" "%MSH_OPEN_URL%"'
     )
-    assert "docker compose up -d --build flask recorder" not in script
     assert "docker compose up --build" not in script
 
 
-def test_start_cmd_resolves_port_before_compose_start() -> None:
+def test_start_cmd_recovers_runtime_state_before_compose_start() -> None:
     script = _start_script()
     resolver = _port_resolver_script()
 
-    assert "call :resolve_web_port" in script
+    assert "call :resolve_runtime_state" in script
     assert "resolve_msh_web_port.ps1" in script
     assert 'set "MSH_WEB_PORT=5000"' in script
     assert 'set "MSH_WEB_PORT_EXPLICIT=0"' in script
+    assert 'set "MSH_DATA_DIR_DEFAULTED=1"' in script
+    assert 'set "MSH_RESULTS_DIR_DEFAULTED=1"' in script
     assert "-AllowFallback" in script
-    assert script.index("call :resolve_web_port") < script.index(
-        "docker compose up -d --build relay ollama flask recorder"
+    assert 'if /I "%%A"=="MSH_RELAY_VOLUME_NAME"' in script
+    assert 'if /I "%%A"=="MSH_DATA_DIR"' in script
+    assert script.index("call :resolve_runtime_state") < script.index(
+        "docker compose build relay flask recorder"
     )
 
     assert '[string]$CurrentProjectName = "msh"' in resolver
     assert 'docker ps --filter "publish=$PreferredPort"' in resolver
     assert "Test-MshFlaskContainer" in resolver
-    assert "Remove-LegacyMshProject" in resolver
-    assert "named volumes and host data are preserved" in resolver
+    assert "Get-IdentityNodeId" in resolver
+    assert "Get-RelayVolumeProbe" in resolver
+    assert "session_memberships" in resolver
+    assert "memberships -gt 0" in resolver
+    assert "Recovered Federation coordinator volume" in resolver
+    assert "MSH_RELAY_VOLUME_NAME=" in resolver
+    assert "MSH_DATA_DIR=" in resolver
+    assert "No Docker volume is deleted" in resolver
     assert "MSH will use http://localhost:$candidate" in resolver
-    assert "docker volume" not in resolver
+    assert "docker volume rm" not in resolver
+    assert "docker volume prune" not in resolver
     assert "Stop-Process" not in resolver
     assert "taskkill" not in resolver.casefold()
+
+
+def test_compose_uses_selected_state_and_host_data_locations() -> None:
+    compose = _compose_file()
+
+    assert "source: ${MSH_DATA_DIR:-./data}" in compose
+    assert "source: ${MSH_RESULTS_DIR:-./results}" in compose
+    assert "name: ${MSH_RELAY_VOLUME_NAME:-msh_relay_state}" in compose
+    assert "name: ${MSH_OLLAMA_VOLUME_NAME:-msh_ollama_models}" in compose
+    assert (
+        "name: ${MSH_MODEL_PROVIDER_VOLUME_NAME:-msh_model_provider_models}"
+        in compose
+    )
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell parser check")
@@ -119,40 +152,42 @@ def test_start_cmd_verifies_the_exact_ollama_model_before_opening_browser() -> N
     assert "attempt %MSH_MODEL_ATTEMPT% of 3" in script
     assert "if %MSH_MODEL_ATTEMPT% GEQ 3" in script
     assert "Ollama does not contain the required model" in script
-    assert "onboarding will not be opened with a missing benchmark model" in script
+    assert "webapp will not be opened with a missing benchmark model" in script
     assert script.index("call :ensure_ollama_model") < script.index(
         'start "" "%MSH_OPEN_URL%"'
     )
 
-    # The old behavior trusted one pull exit code and continued with an empty
-    # inventory. Startup must now verify the actual model before proceeding.
     assert (
         "MSH will continue, but the language-model benchmark may be unavailable"
         not in script
     )
 
 
-def test_start_cmd_resume_mode_refreshes_only_existing_authorized_state() -> None:
+def test_start_cmd_resume_runs_before_long_running_flask_container() -> None:
     script = _start_script()
 
     assert 'if /I "%~1"=="--resume"' in script
     assert 'set "MSH_RESUME_EXISTING=1"' in script
-    assert (
-        "docker compose exec -T flask python -m "
+    assert "call :run_existing_setup_resume" in script
+    resume_command = (
+        "docker compose run --rm --no-deps --entrypoint python flask -m "
         "catalog.flask_app.services.existing_setup_resume"
-        in script
     )
+    assert resume_command in script
+    assert "docker compose exec -T flask python -m catalog.flask_app.services.existing_setup_resume" not in script
     assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/federation"' in script
     assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/federation/benchmarks"' in script
     assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/onboarding?repair=1"' in script
     assert "No identity or Federation was replaced" in script
     assert "start.cmd --resume" in script
 
-    resume_call = script.index(
-        "catalog.flask_app.services.existing_setup_resume"
+    resume_call = script.index(resume_command)
+    flask_start = script.index("docker compose up -d flask")
+    assert resume_call < flask_start
+    assert flask_start < script.index("Waiting for the MSH webapp")
+    assert script.index("Waiting for the MSH webapp") < script.index(
+        'start "" "%MSH_OPEN_URL%"'
     )
-    assert script.index("Waiting for the MSH webapp") < resume_call
-    assert resume_call < script.index('start "" "%MSH_OPEN_URL%"')
 
 
 def test_update_cmd_fast_forwards_then_resumes_without_resetting_state() -> None:
@@ -190,14 +225,11 @@ def test_start_cmd_fresh_mode_resets_and_verifies_authoritative_state() -> None:
     assert "?fresh=1&reset=%RANDOM%%RANDOM%" in script
     assert "start.cmd --fresh" in script
 
-    # Fresh-device setup must not become a generic host-data or model wipe.
     assert "docker compose down -v" not in script
     assert "docker volume prune" not in script
     assert 'rmdir /s /q "data"' not in script
     assert "Remove-Item -LiteralPath 'data'" not in script
     assert "Remove-Item -LiteralPath 'results'" not in script
-    assert "ollama_models" not in script
-    assert "model_provider_models" not in script
     assert "Remove-Item -LiteralPath 'data\\source_config'" not in script
     assert "Remove-Item -LiteralPath 'data\\source_state'" not in script
 
