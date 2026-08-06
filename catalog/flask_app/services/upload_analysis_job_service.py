@@ -222,11 +222,11 @@ class UploadAnalysisJobService:
             )
         return job_id
 
-    def start_tracking(self, job_id: str) -> None:
+    def _activate(self, job_id: str) -> DurableJobSnapshot:
         with self._lock:
             snapshot = self.store.snapshot(job_id)
             if snapshot.job.terminal:
-                return
+                return snapshot
             link = self._link(job_id)
             now = self.clock()
             if snapshot.job.status is JobStatus.SUBMITTED:
@@ -249,31 +249,43 @@ class UploadAnalysisJobService:
                     lease_expires_at=now + timedelta(seconds=_LEASE_SECONDS),
                     now=now,
                 ).snapshot
+            ownership = snapshot.ownership
+            if ownership is None:
+                return snapshot
             if snapshot.job.attempts[-1].status is AttemptStatus.ASSIGNED:
                 snapshot = self.store.record_attempt_status(
                     job_id,
                     coordinator_id=link["coordinator_id"],
                     owner_provider_id=link["provider_id"],
-                    attempt_id=snapshot.ownership.attempt_id,
-                    lease_id=snapshot.ownership.lease_id,
+                    attempt_id=ownership.attempt_id,
+                    lease_id=ownership.lease_id,
                     command_id=f"accept-{link['batch_id']}",
                     expected_revision=snapshot.revision,
                     target_status=AttemptStatus.ACCEPTED,
                     now=now,
                 ).snapshot
-            if snapshot.job.attempts[-1].status is AttemptStatus.ACCEPTED:
-                self.store.record_attempt_status(
+                ownership = snapshot.ownership
+            if (
+                ownership is not None
+                and snapshot.job.attempts[-1].status is AttemptStatus.ACCEPTED
+            ):
+                snapshot = self.store.record_attempt_status(
                     job_id,
                     coordinator_id=link["coordinator_id"],
                     owner_provider_id=link["provider_id"],
-                    attempt_id=snapshot.ownership.attempt_id,
-                    lease_id=snapshot.ownership.lease_id,
+                    attempt_id=ownership.attempt_id,
+                    lease_id=ownership.lease_id,
                     command_id=f"run-{link['batch_id']}",
                     expected_revision=snapshot.revision,
                     target_status=AttemptStatus.RUNNING,
                     now=now,
-                )
+                ).snapshot
+            return snapshot
 
+    def start_tracking(self, job_id: str) -> None:
+        snapshot = self._activate(job_id)
+        if snapshot.job.terminal:
+            return
         threading.Thread(
             target=self._monitor,
             args=(job_id,),
@@ -283,12 +295,9 @@ class UploadAnalysisJobService:
 
     def fail(self, job_id: str, error_code: str) -> None:
         try:
-            snapshot = self.store.snapshot(job_id)
+            snapshot = self._activate(job_id)
             if snapshot.job.terminal:
                 return
-            if snapshot.ownership is None:
-                self.start_tracking(job_id)
-                snapshot = self.store.snapshot(job_id)
             self._complete(snapshot, success=False, error_code=error_code)
         except Exception:  # noqa: BLE001 - original safe route error remains primary
             return
@@ -357,9 +366,7 @@ class UploadAnalysisJobService:
                 self._complete(
                     snapshot,
                     success=not failed,
-                    error_code=(
-                        "analysis-step-failed" if failed else None
-                    ),
+                    error_code="analysis-step-failed" if failed else None,
                 )
                 return
 
@@ -368,6 +375,7 @@ class UploadAnalysisJobService:
                 ownership = snapshot.ownership
                 if ownership is None or snapshot.job.terminal:
                     return
+                renewal_now = self.clock()
                 self.store.renew(
                     job_id,
                     coordinator_id=link["coordinator_id"],
@@ -376,8 +384,8 @@ class UploadAnalysisJobService:
                     lease_id=ownership.lease_id,
                     command_id=f"renew-{link['batch_id']}-{snapshot.revision}",
                     expected_revision=snapshot.revision,
-                    lease_expires_at=self.clock() + timedelta(seconds=_LEASE_SECONDS),
-                    now=self.clock(),
+                    lease_expires_at=renewal_now + timedelta(seconds=_LEASE_SECONDS),
+                    now=renewal_now,
                 )
                 last_renewal = time.monotonic()
             time.sleep(self.poll_seconds)
