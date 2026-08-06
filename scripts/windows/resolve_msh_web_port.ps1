@@ -42,19 +42,20 @@ function Get-ContainerInspection {
         return $null
     }
     $decoded = @($raw | ConvertFrom-Json)
-    return if ($decoded.Count -gt 0) { $decoded[0] } else { $null }
+    if ($decoded.Count -gt 0) {
+        return $decoded[0]
+    }
+    return $null
 }
 
 function Get-ComposeProjectName {
     param([Parameter(Mandatory = $true)]$Inspection)
 
     $labels = $Inspection.Config.Labels
-    return if ($null -eq $labels) {
-        ""
+    if ($null -eq $labels) {
+        return ""
     }
-    else {
-        [string]$labels.'com.docker.compose.project'
-    }
+    return [string]$labels.'com.docker.compose.project'
 }
 
 function Get-Mount {
@@ -99,7 +100,10 @@ function Get-VolumeInspection {
         return $null
     }
     $decoded = @($raw | ConvertFrom-Json)
-    return if ($decoded.Count -gt 0) { $decoded[0] } else { $null }
+    if ($decoded.Count -gt 0) {
+        return $decoded[0]
+    }
+    return $null
 }
 
 function Find-ProjectVolume {
@@ -117,7 +121,10 @@ function Find-ProjectVolume {
             --filter "label=com.docker.compose.volume=$LogicalName" `
             --format "{{.Name}}" 2>$null
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    return if ($values.Count -gt 0) { [string]$values[0] } else { "" }
+    if ($values.Count -gt 0) {
+        return [string]$values[0]
+    }
+    return ""
 }
 
 function Get-IdentityNodeId {
@@ -130,7 +137,10 @@ function Get-IdentityNodeId {
     try {
         $identity = Get-Content -LiteralPath $identityPath -Raw | ConvertFrom-Json
         $nodeId = [string]$identity.node_id
-        return if ([string]::IsNullOrWhiteSpace($nodeId)) { "" } else { $nodeId }
+        if ([string]::IsNullOrWhiteSpace($nodeId)) {
+            return ""
+        }
+        return $nodeId
     }
     catch {
         Write-Warning "The saved public device identity could not be read during state recovery."
@@ -282,12 +292,18 @@ $relayWasExplicit = -not [string]::IsNullOrWhiteSpace($selectedRelayVolume)
 $probeImage = Find-ProbeImage
 
 if (-not $relayWasExplicit) {
-    $relayCandidates = @(
-        $ownerRelayVolume
+    $relayCandidates = @()
+    if (-not [string]::IsNullOrWhiteSpace($ownerRelayVolume)) {
+        $relayCandidates += $ownerRelayVolume
+    }
+    $relayCandidates += @(
         & docker volume ls `
             --filter "label=com.docker.compose.volume=relay_state" `
             --format "{{.Name}}" 2>$null
-    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) } | Select-Object -Unique
+    )
+    $relayCandidates = @($relayCandidates |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -Unique)
 
     $probes = @()
     if (-not [string]::IsNullOrWhiteSpace($probeImage)) {
@@ -309,7 +325,8 @@ if (-not $relayWasExplicit) {
     }
 
     if (-not [string]::IsNullOrWhiteSpace($nodeId)) {
-        $matching = @($probes | Where-Object { $_.memberships -gt 0 } |
+        $matching = @($probes |
+            Where-Object { $_.memberships -gt 0 } |
             Sort-Object memberships, sessions, nodes, size -Descending)
         if ($matching.Count -gt 0) {
             $selectedRelayVolume = [string]$matching[0].volume
