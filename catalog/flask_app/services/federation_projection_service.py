@@ -33,6 +33,7 @@ from .capability_onboarding_service import (
     AuthorizedOnboardingContext,
     get_capability_onboarding_service,
 )
+from .upload_analysis_job_service import get_upload_analysis_job_service
 
 _OPERATOR_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
 _INSPECTION_CONFIG_KEY = "FEDERATION_DEVICE_INSPECTION"
@@ -169,11 +170,20 @@ def _storage_adapter(internal_session_id: str) -> object:
     )
 
 
-def _job_adapter() -> object:
+def _job_adapter(internal_session_id: str) -> object:
     supplier: Any = current_app.config.get(_JOB_SUPPLIER_CONFIG_KEY)
-    if not callable(supplier):
-        return _StaticSnapshotAdapter(JobAuthoritySnapshot(True, "not-configured"))
-    return JobAuthorityAdapter(supplier)
+    if callable(supplier):
+        return JobAuthorityAdapter(supplier)
+    try:
+        service = get_upload_analysis_job_service()
+        return JobAuthorityAdapter(
+            lambda: service.snapshots(internal_session_id)
+        )
+    except Exception as exc:  # noqa: BLE001 - job projection must fail closed
+        _warn_projection("Federation jobs", exc)
+        return _StaticSnapshotAdapter(
+            JobAuthoritySnapshot(False, "job-projection-failed")
+        )
 
 
 def get_federation_projection_service() -> FederationProjectionService:
@@ -258,7 +268,7 @@ def get_federation_projection_service() -> FederationProjectionService:
                 internal_session_id=internal_session_id,
             ),
             storage=_storage_adapter(internal_session_id),
-            jobs=_job_adapter(),
+            jobs=_job_adapter(internal_session_id),
         )
         return FederationProjectionService(adapters)
     except Exception:  # noqa: BLE001 - authorization/projection must fail closed
