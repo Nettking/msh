@@ -6,6 +6,7 @@ on:
       - "start.cmd"
       - "catalog/capabilities/**"
       - "catalog/flask_app/**"
+      - "catalog/common/data_loading.py"
       - "catalog/ai/**"
       - "catalog/federation/projections/**"
       - "catalog/federation/tests/test_onboarding_projection_policy.py"
@@ -19,6 +20,7 @@ on:
       - "start.cmd"
       - "catalog/capabilities/**"
       - "catalog/flask_app/**"
+      - "catalog/common/data_loading.py"
       - "catalog/ai/**"
       - "catalog/federation/projections/**"
       - "catalog/federation/tests/test_onboarding_projection_policy.py"
@@ -61,6 +63,7 @@ jobs:
           catalog/capabilities
           catalog/ai
           catalog/flask_app
+          catalog/common/data_loading.py
           catalog/federation/projections
           catalog/federation/tests/test_onboarding_projection_policy.py
           catalog/relay/tests/test_phase_f83_remote_ai_binding.py
@@ -77,6 +80,7 @@ jobs:
           catalog/flask_app/tests/test_device_state_reset.py
           catalog/flask_app/tests/test_local_capability_candidates.py
           catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
+          catalog/flask_app/tests/test_data_upload.py
           catalog/flask_app/tests/test_windows_start_script.py
           catalog/flask_app/test_navigation_smoke.py
           catalog/federation/tests/test_onboarding_projection_policy.py
@@ -88,10 +92,13 @@ jobs:
           python -m ruff check
           catalog/capabilities
           catalog/ai/remote_provider.py
+          catalog/common/data_loading.py
           catalog/flask_app/app.py
+          catalog/flask_app/data_upload_routes.py
           catalog/flask_app/docs_routes.py
           catalog/flask_app/provider_federation_routes.py
           catalog/flask_app/services/capability_contribution_components.py
+          catalog/flask_app/services/data_upload_service.py
           catalog/flask_app/services/device_state_reset.py
           catalog/flask_app/services/local_capability_candidates.py
           catalog/flask_app/tests/test_docs_viewer.py
@@ -99,6 +106,7 @@ jobs:
           catalog/flask_app/tests/test_device_state_reset.py
           catalog/flask_app/tests/test_local_capability_candidates.py
           catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
+          catalog/flask_app/tests/test_data_upload.py
           catalog/flask_app/tests/test_windows_start_script.py
           catalog/federation/projections/onboarding_adapter.py
           catalog/federation/tests/test_onboarding_projection_policy.py
