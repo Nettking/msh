@@ -17,9 +17,7 @@ def test_start_cmd_runs_current_core_services_detached() -> None:
     assert (
         "docker compose up -d --build relay ollama flask recorder" in script
     )
-    assert (
-        "docker compose --profile model-install run --rm ollama-pull" in script
-    )
+    assert "call :ensure_ollama_model" in script
     assert "Ollama benchmark model is ready" in script
     assert "docker compose port flask 5000" in script
     assert 'set "MSH_BASE_URL=http://localhost:%MSH_WEB_PORT_RESOLVED%"' in script
@@ -38,6 +36,33 @@ def test_start_cmd_runs_current_core_services_detached() -> None:
     )
     assert "docker compose up -d --build flask recorder" not in script
     assert "docker compose up --build" not in script
+
+
+def test_start_cmd_verifies_the_exact_ollama_model_before_opening_browser() -> None:
+    script = _start_script()
+
+    assert ':ensure_ollama_model' in script
+    assert "os.environ.get('MSH_AI_MODEL') or 'llama3.2:3b'" in script
+    assert 'ollama show "%MSH_AI_MODEL_RESOLVED%"' in script
+    assert (
+        "docker compose --profile model-install run --rm --entrypoint "
+        "/bin/ollama ollama-pull pull \"%MSH_AI_MODEL_RESOLVED%\""
+        in script
+    )
+    assert "attempt %MSH_MODEL_ATTEMPT% of 3" in script
+    assert "if %MSH_MODEL_ATTEMPT% GEQ 3" in script
+    assert "Ollama does not contain the required model" in script
+    assert "onboarding will not be opened with a missing benchmark model" in script
+    assert script.index("call :ensure_ollama_model") < script.index(
+        'start "" "%MSH_OPEN_URL%"'
+    )
+
+    # The old behavior trusted one pull exit code and continued with an empty
+    # inventory. Startup must now verify the actual model before proceeding.
+    assert (
+        "MSH will continue, but the language-model benchmark may be unavailable"
+        not in script
+    )
 
 
 def test_start_cmd_fresh_mode_resets_and_verifies_authoritative_state() -> None:
