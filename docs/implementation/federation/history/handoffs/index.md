@@ -11,4 +11,8 @@
 | Reviewed | 2026-08-07 Europe/Oslo |
 | Retention | Retain only handoffs with unique decision, recovery, compatibility, or acceptance evidence |
 
-No handoff documents have been moved into this directory yet. Each move must identify the current replacement and update every repository reference.
+## Archived handoffs
+
+- [Federated Session Network: Agent Implementation Handoff](federated_session_agent_handoff.md) — original phased implementation instructions retained for architectural and delivery history. The phased sequence is complete and must not be resumed.
+
+Current work is defined by the [current task handoff](../../../current_task_handoff.md) and the [active Federation plans](../../active/).
