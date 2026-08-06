@@ -47,7 +47,13 @@ class BenchmarkStoreLike(Protocol):
 
 
 class BenchmarkResultsAdapter:
-    """Read CF2 durable evidence without turning benchmark success into authority."""
+    """Read the latest CF2 evidence without turning success into authority.
+
+    The durable benchmark store retains every run as audit history. Product
+    projections expose only the newest run for each device, benchmark and
+    target-service combination so expired historical evidence cannot become a
+    false rerun requirement.
+    """
 
     def __init__(
         self,
@@ -123,7 +129,19 @@ class BenchmarkResultsAdapter:
                 ),
                 reverse=True,
             )
-            return BenchmarkSnapshot(True, "current", tuple(results))
+            latest: list[BenchmarkRecord] = []
+            seen: set[tuple[str, str, str]] = set()
+            for result in results:
+                identity = (
+                    result.device_id,
+                    result.benchmark_id,
+                    result.target_service_id,
+                )
+                if identity in seen:
+                    continue
+                seen.add(identity)
+                latest.append(result)
+            return BenchmarkSnapshot(True, "current", tuple(latest))
         except Exception as exc:  # noqa: BLE001
             return BenchmarkSnapshot(
                 False,
