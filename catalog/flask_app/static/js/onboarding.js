@@ -37,6 +37,31 @@
     }
   }
 
+  function clearOnboardingStorage() {
+    try {
+      for (var index = window.localStorage.length - 1; index >= 0; index -= 1) {
+        var key = window.localStorage.key(index);
+        if (key && key.indexOf("msh.onboarding.") === 0) {
+          window.localStorage.removeItem(key);
+        }
+      }
+    } catch (_error) {
+      // Server-rendered empty state remains authoritative if storage is unavailable.
+    }
+  }
+
+  function consumeFreshLaunch() {
+    try {
+      var url = new URL(window.location.href);
+      if (url.searchParams.get("fresh") !== "1") return false;
+      url.searchParams.delete("fresh");
+      window.history.replaceState({}, "", url.pathname + url.search + url.hash);
+      return true;
+    } catch (_error) {
+      return false;
+    }
+  }
+
   function initializeShell(shell) {
     var stepButtons = Array.from(shell.querySelectorAll("[data-step-target]"));
     var panels = Array.from(shell.querySelectorAll("[data-step-panel]"));
@@ -192,5 +217,6 @@
     showStep(activeStep, { focus: false, scroll: false });
   }
 
+  if (consumeFreshLaunch()) clearOnboardingStorage();
   document.querySelectorAll("[data-onboarding-shell]").forEach(initializeShell);
 })();
