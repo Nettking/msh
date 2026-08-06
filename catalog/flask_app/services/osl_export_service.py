@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Any
 import re
 
-from .operator_strategy_service import OperatorStrategyService
+from .federated_operator_strategy_service import FederatedOperatorStrategyService
 
 
 DEFAULT_SYSML_EXPORT_PATH = Path("data") / "sysml" / "operator_strategies.sysml"
@@ -12,8 +12,8 @@ VALID_CONFIDENCE = {"Unknown", "Low", "Medium", "High"}
 
 
 class OslExportService:
-    def __init__(self, note_service: OperatorStrategyService | None = None, export_path: Path | str = DEFAULT_SYSML_EXPORT_PATH) -> None:
-        self.note_service = note_service or OperatorStrategyService()
+    def __init__(self, note_service: FederatedOperatorStrategyService | None = None, export_path: Path | str = DEFAULT_SYSML_EXPORT_PATH) -> None:
+        self.note_service = note_service or FederatedOperatorStrategyService()
         self.export_path = Path(export_path)
 
     def export_reusable(self) -> tuple[int, str]:
