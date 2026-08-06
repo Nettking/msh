@@ -13,6 +13,7 @@ Behavior:
 - blank lines are skipped
 - malformed JSON lines are skipped
 - non-dictionary JSON values are ignored
+- incomplete upload batches are hidden from discovery
 - file iteration order is sorted for deterministic processing
 """
 
@@ -24,6 +25,20 @@ from pathlib import Path
 from typing import Any
 
 from catalog.common.time_utils import parse_iso_timestamp
+
+_INCOMPLETE_IMPORT_MARKER = ".msh-importing"
+
+
+def _inside_incomplete_import(file_path: Path, root: Path) -> bool:
+    """Return True while an upload directory still carries its publish marker."""
+
+    current = file_path.parent
+    while True:
+        if (current / _INCOMPLETE_IMPORT_MARKER).is_file():
+            return True
+        if current == root or current.parent == current:
+            return False
+        current = current.parent
 
 
 def iter_jsonl_files(data_dir: Path | str, *, recursive: bool = True) -> Iterator[Path]:
@@ -45,14 +60,15 @@ def iter_jsonl_files(data_dir: Path | str, *, recursive: bool = True) -> Iterato
 
     Notes
     -----
-    Only files matching ``*.jsonl`` are yielded. Non-file matches are ignored.
+    Only files matching ``*.jsonl`` are yielded. Non-file matches and files in
+    upload directories carrying ``.msh-importing`` are ignored.
     """
     root = Path(data_dir)
     pattern = "*.jsonl"
     iterator = root.rglob(pattern) if recursive else root.glob(pattern)
 
     for file_path in sorted(iterator):
-        if file_path.is_file():
+        if file_path.is_file() and not _inside_incomplete_import(file_path, root):
             yield file_path
 
 
