@@ -9,6 +9,8 @@ param(
 
     [string]$CurrentProjectName = "msh",
 
+    [string]$OutputFile = "",
+
     [switch]$AllowFallback
 )
 
@@ -247,167 +249,197 @@ function Remove-LegacyMshProject {
     }
 }
 
-$selectedDataDirectory = [string]$env:MSH_DATA_DIR
-$selectedResultsDirectory = [string]$env:MSH_RESULTS_DIR
-$ownerProject = ""
-$ownerRelayVolume = ""
-$ownerDataDirectory = ""
-$ownerResultsDirectory = ""
+function Write-ResolvedState {
+    param([Parameter(Mandatory = $true)][string[]]$Lines)
 
-$publishedOwners = @(
-    & docker ps --filter "publish=$PreferredPort" --format "{{.ID}}" 2>$null
-) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    if ([string]::IsNullOrWhiteSpace($OutputFile)) {
+        $Lines | Write-Output
+        return
+    }
 
-foreach ($containerId in $publishedOwners) {
-    $inspection = Get-ContainerInspection -ContainerId $containerId
-    if ($null -eq $inspection -or -not (Test-MshFlaskContainer -Inspection $inspection)) {
-        continue
+    $absoluteOutput = [System.IO.Path]::GetFullPath($OutputFile)
+    $parent = [System.IO.Path]::GetDirectoryName($absoluteOutput)
+    if (-not [string]::IsNullOrWhiteSpace($parent)) {
+        [System.IO.Directory]::CreateDirectory($parent) | Out-Null
     }
-    $ownerProject = Get-ComposeProjectName -Inspection $inspection
-    $relayMount = Get-Mount -Inspection $inspection -Destination "/var/lib/msh-relay"
-    $dataMount = Get-Mount -Inspection $inspection -Destination "/app/data"
-    $resultsMount = Get-Mount -Inspection $inspection -Destination "/app/results"
-    if ($null -ne $relayMount -and [string]$relayMount.Type -eq "volume") {
-        $ownerRelayVolume = [string]$relayMount.Name
-    }
-    if ($null -ne $dataMount -and [string]$dataMount.Type -eq "bind") {
-        $ownerDataDirectory = [string]$dataMount.Source
-    }
-    if ($null -ne $resultsMount -and [string]$resultsMount.Type -eq "bind") {
-        $ownerResultsDirectory = [string]$resultsMount.Source
-    }
-    break
+    $encoding = New-Object System.Text.UTF8Encoding($false)
+    [System.IO.File]::WriteAllLines($absoluteOutput, $Lines, $encoding)
 }
 
-if ($env:MSH_DATA_DIR_DEFAULTED -eq "1" -and -not [string]::IsNullOrWhiteSpace($ownerDataDirectory)) {
-    $selectedDataDirectory = $ownerDataDirectory
-}
-if ($env:MSH_RESULTS_DIR_DEFAULTED -eq "1" -and -not [string]::IsNullOrWhiteSpace($ownerResultsDirectory)) {
-    $selectedResultsDirectory = $ownerResultsDirectory
-}
+try {
+    $selectedDataDirectory = [string]$env:MSH_DATA_DIR
+    $selectedResultsDirectory = [string]$env:MSH_RESULTS_DIR
+    $ownerProject = ""
+    $ownerRelayVolume = ""
+    $ownerDataDirectory = ""
+    $ownerResultsDirectory = ""
 
-$nodeId = Get-IdentityNodeId -DataDirectory $selectedDataDirectory
-$selectedRelayVolume = [string]$env:MSH_RELAY_VOLUME_NAME
-$relayWasExplicit = -not [string]::IsNullOrWhiteSpace($selectedRelayVolume)
-$probeImage = Find-ProbeImage
+    $publishedOwners = @(
+        & docker ps --filter "publish=$PreferredPort" --format "{{.ID}}" 2>$null
+    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
-if (-not $relayWasExplicit) {
-    $relayCandidates = @()
-    if (-not [string]::IsNullOrWhiteSpace($ownerRelayVolume)) {
-        $relayCandidates += $ownerRelayVolume
+    foreach ($containerId in $publishedOwners) {
+        $inspection = Get-ContainerInspection -ContainerId $containerId
+        if ($null -eq $inspection -or -not (Test-MshFlaskContainer -Inspection $inspection)) {
+            continue
+        }
+        $ownerProject = Get-ComposeProjectName -Inspection $inspection
+        $relayMount = Get-Mount -Inspection $inspection -Destination "/var/lib/msh-relay"
+        $dataMount = Get-Mount -Inspection $inspection -Destination "/app/data"
+        $resultsMount = Get-Mount -Inspection $inspection -Destination "/app/results"
+        if ($null -ne $relayMount -and [string]$relayMount.Type -eq "volume") {
+            $ownerRelayVolume = [string]$relayMount.Name
+        }
+        if ($null -ne $dataMount -and [string]$dataMount.Type -eq "bind") {
+            $ownerDataDirectory = [string]$dataMount.Source
+        }
+        if ($null -ne $resultsMount -and [string]$resultsMount.Type -eq "bind") {
+            $ownerResultsDirectory = [string]$resultsMount.Source
+        }
+        break
     }
-    $relayCandidates += @(
-        & docker volume ls `
-            --filter "label=com.docker.compose.volume=relay_state" `
-            --format "{{.Name}}" 2>$null
-    )
-    $relayCandidates = @($relayCandidates |
-        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
-        Select-Object -Unique)
 
-    $probes = @()
-    if (-not [string]::IsNullOrWhiteSpace($probeImage)) {
-        foreach ($volume in $relayCandidates) {
-            $probe = Get-RelayVolumeProbe `
-                -VolumeName $volume `
-                -ProbeImage $probeImage `
-                -NodeId $nodeId
-            if ($null -ne $probe) {
-                $probes += [pscustomobject]@{
-                    volume = [string]$volume
-                    memberships = [int]$probe.memberships
-                    sessions = [int]$probe.sessions
-                    nodes = [int]$probe.nodes
-                    size = [long]$probe.size
+    if ($env:MSH_DATA_DIR_DEFAULTED -eq "1" -and -not [string]::IsNullOrWhiteSpace($ownerDataDirectory)) {
+        $selectedDataDirectory = $ownerDataDirectory
+    }
+    if ($env:MSH_RESULTS_DIR_DEFAULTED -eq "1" -and -not [string]::IsNullOrWhiteSpace($ownerResultsDirectory)) {
+        $selectedResultsDirectory = $ownerResultsDirectory
+    }
+
+    $nodeId = Get-IdentityNodeId -DataDirectory $selectedDataDirectory
+    $selectedRelayVolume = [string]$env:MSH_RELAY_VOLUME_NAME
+    $relayWasExplicit = -not [string]::IsNullOrWhiteSpace($selectedRelayVolume)
+    $probeImage = Find-ProbeImage
+
+    if (-not $relayWasExplicit) {
+        $relayCandidates = @()
+        if (-not [string]::IsNullOrWhiteSpace($ownerRelayVolume)) {
+            $relayCandidates += $ownerRelayVolume
+        }
+        $relayCandidates += @(
+            & docker volume ls `
+                --filter "label=com.docker.compose.volume=relay_state" `
+                --format "{{.Name}}" 2>$null
+        )
+        $relayCandidates = @($relayCandidates |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Unique)
+
+        $probes = @()
+        if (-not [string]::IsNullOrWhiteSpace($probeImage)) {
+            foreach ($volume in $relayCandidates) {
+                $probe = Get-RelayVolumeProbe `
+                    -VolumeName $volume `
+                    -ProbeImage $probeImage `
+                    -NodeId $nodeId
+                if ($null -ne $probe) {
+                    $probes += [pscustomobject]@{
+                        volume = [string]$volume
+                        memberships = [int]$probe.memberships
+                        sessions = [int]$probe.sessions
+                        nodes = [int]$probe.nodes
+                        size = [long]$probe.size
+                    }
                 }
             }
         }
-    }
 
-    if (-not [string]::IsNullOrWhiteSpace($nodeId)) {
-        $matching = @($probes |
-            Where-Object { $_.memberships -gt 0 } |
-            Sort-Object memberships, sessions, nodes, size -Descending)
-        if ($matching.Count -gt 0) {
-            $selectedRelayVolume = [string]$matching[0].volume
-            if ($selectedRelayVolume -ne $ownerRelayVolume) {
-                Write-Warning (
-                    "Recovered Federation coordinator volume '$selectedRelayVolume' " +
-                    "because it contains the saved device's active membership."
-                )
+        if (-not [string]::IsNullOrWhiteSpace($nodeId)) {
+            $matching = @($probes |
+                Where-Object { $_.memberships -gt 0 } |
+                Sort-Object memberships, sessions, nodes, size -Descending)
+            if ($matching.Count -gt 0) {
+                $selectedRelayVolume = [string]$matching[0].volume
+                if ($selectedRelayVolume -ne $ownerRelayVolume) {
+                    Write-Warning (
+                        "Recovered Federation coordinator volume '$selectedRelayVolume' " +
+                        "because it contains the saved device's active membership."
+                    )
+                }
             }
         }
-    }
-    if ([string]::IsNullOrWhiteSpace($selectedRelayVolume) -and -not [string]::IsNullOrWhiteSpace($ownerRelayVolume)) {
-        $selectedRelayVolume = $ownerRelayVolume
-    }
-    if ([string]::IsNullOrWhiteSpace($selectedRelayVolume)) {
-        $selectedRelayVolume = "msh_relay_state"
-    }
-}
-
-$relayInspection = Get-VolumeInspection -VolumeName $selectedRelayVolume
-$stateProject = ""
-if ($null -ne $relayInspection -and $null -ne $relayInspection.Labels) {
-    $stateProject = [string]$relayInspection.Labels.'com.docker.compose.project'
-}
-if ([string]::IsNullOrWhiteSpace($stateProject)) {
-    $stateProject = $ownerProject
-}
-
-$selectedOllamaVolume = [string]$env:MSH_OLLAMA_VOLUME_NAME
-if ([string]::IsNullOrWhiteSpace($selectedOllamaVolume)) {
-    $selectedOllamaVolume = Find-ProjectVolume -ProjectName $stateProject -LogicalName "ollama_models"
-    if ([string]::IsNullOrWhiteSpace($selectedOllamaVolume)) {
-        $selectedOllamaVolume = "msh_ollama_models"
-    }
-}
-
-$selectedProviderVolume = [string]$env:MSH_MODEL_PROVIDER_VOLUME_NAME
-if ([string]::IsNullOrWhiteSpace($selectedProviderVolume)) {
-    $selectedProviderVolume = Find-ProjectVolume -ProjectName $stateProject -LogicalName "model_provider_models"
-    if ([string]::IsNullOrWhiteSpace($selectedProviderVolume)) {
-        $selectedProviderVolume = "msh_model_provider_models"
-    }
-}
-
-if (-not [string]::IsNullOrWhiteSpace($ownerProject) -and $ownerProject -ne $CurrentProjectName) {
-    Remove-LegacyMshProject -ProjectName $ownerProject
-}
-
-$selectedPort = $PreferredPort
-$portAvailable = Test-PortAvailable -Address $BindAddress -Port $PreferredPort
-$currentOwnerStillUsesPort = -not [string]::IsNullOrWhiteSpace($ownerProject) -and $ownerProject -eq $CurrentProjectName
-if (-not $portAvailable -and -not $currentOwnerStillUsesPort) {
-    if (-not $AllowFallback) {
-        Write-Error (
-            "MSH web port $PreferredPort is already in use by a non-MSH process. " +
-            "Close that process or choose another port with MSH_WEB_PORT."
-        )
-        exit 2
-    }
-    $maximumPort = [Math]::Min(65535, $PreferredPort + 99)
-    $selectedPort = 0
-    for ($candidate = $PreferredPort + 1; $candidate -le $maximumPort; $candidate++) {
-        if (Test-PortAvailable -Address $BindAddress -Port $candidate) {
-            $selectedPort = $candidate
-            Write-Warning (
-                "Port $PreferredPort is in use by another application. " +
-                "MSH will use http://localhost:$candidate for this start."
-            )
-            break
+        if ([string]::IsNullOrWhiteSpace($selectedRelayVolume) -and -not [string]::IsNullOrWhiteSpace($ownerRelayVolume)) {
+            $selectedRelayVolume = $ownerRelayVolume
+        }
+        if ([string]::IsNullOrWhiteSpace($selectedRelayVolume)) {
+            $selectedRelayVolume = "msh_relay_state"
         }
     }
-    if ($selectedPort -eq 0) {
-        Write-Error "No free MSH web port was found between $PreferredPort and $maximumPort."
-        exit 3
-    }
-}
 
-Write-Output "MSH_WEB_PORT=$selectedPort"
-Write-Output "MSH_RELAY_VOLUME_NAME=$selectedRelayVolume"
-Write-Output "MSH_OLLAMA_VOLUME_NAME=$selectedOllamaVolume"
-Write-Output "MSH_MODEL_PROVIDER_VOLUME_NAME=$selectedProviderVolume"
-Write-Output "MSH_DATA_DIR=$selectedDataDirectory"
-Write-Output "MSH_RESULTS_DIR=$selectedResultsDirectory"
-exit 0
+    $relayInspection = Get-VolumeInspection -VolumeName $selectedRelayVolume
+    $stateProject = ""
+    if ($null -ne $relayInspection -and $null -ne $relayInspection.Labels) {
+        $stateProject = [string]$relayInspection.Labels.'com.docker.compose.project'
+    }
+    if ([string]::IsNullOrWhiteSpace($stateProject)) {
+        $stateProject = $ownerProject
+    }
+
+    $selectedOllamaVolume = [string]$env:MSH_OLLAMA_VOLUME_NAME
+    if ([string]::IsNullOrWhiteSpace($selectedOllamaVolume)) {
+        $selectedOllamaVolume = Find-ProjectVolume -ProjectName $stateProject -LogicalName "ollama_models"
+        if ([string]::IsNullOrWhiteSpace($selectedOllamaVolume)) {
+            $selectedOllamaVolume = "msh_ollama_models"
+        }
+    }
+
+    $selectedProviderVolume = [string]$env:MSH_MODEL_PROVIDER_VOLUME_NAME
+    if ([string]::IsNullOrWhiteSpace($selectedProviderVolume)) {
+        $selectedProviderVolume = Find-ProjectVolume -ProjectName $stateProject -LogicalName "model_provider_models"
+        if ([string]::IsNullOrWhiteSpace($selectedProviderVolume)) {
+            $selectedProviderVolume = "msh_model_provider_models"
+        }
+    }
+
+    if (-not [string]::IsNullOrWhiteSpace($ownerProject) -and $ownerProject -ne $CurrentProjectName) {
+        Remove-LegacyMshProject -ProjectName $ownerProject
+    }
+
+    $selectedPort = $PreferredPort
+    $portAvailable = Test-PortAvailable -Address $BindAddress -Port $PreferredPort
+    $currentOwnerStillUsesPort = -not [string]::IsNullOrWhiteSpace($ownerProject) -and $ownerProject -eq $CurrentProjectName
+    if (-not $portAvailable -and -not $currentOwnerStillUsesPort) {
+        if (-not $AllowFallback) {
+            [Console]::Error.WriteLine(
+                "MSH web port $PreferredPort is already in use by a non-MSH process. " +
+                "Close that process or choose another port with MSH_WEB_PORT."
+            )
+            exit 2
+        }
+        $maximumPort = [Math]::Min(65535, $PreferredPort + 99)
+        $selectedPort = 0
+        for ($candidate = $PreferredPort + 1; $candidate -le $maximumPort; $candidate++) {
+            if (Test-PortAvailable -Address $BindAddress -Port $candidate) {
+                $selectedPort = $candidate
+                Write-Warning (
+                    "Port $PreferredPort is in use by another application. " +
+                    "MSH will use http://localhost:$candidate for this start."
+                )
+                break
+            }
+        }
+        if ($selectedPort -eq 0) {
+            [Console]::Error.WriteLine(
+                "No free MSH web port was found between $PreferredPort and $maximumPort."
+            )
+            exit 3
+        }
+    }
+
+    $resolved = @(
+        "MSH_WEB_PORT=$selectedPort",
+        "MSH_RELAY_VOLUME_NAME=$selectedRelayVolume",
+        "MSH_OLLAMA_VOLUME_NAME=$selectedOllamaVolume",
+        "MSH_MODEL_PROVIDER_VOLUME_NAME=$selectedProviderVolume",
+        "MSH_DATA_DIR=$selectedDataDirectory",
+        "MSH_RESULTS_DIR=$selectedResultsDirectory"
+    )
+    Write-ResolvedState -Lines $resolved
+    exit 0
+}
+catch {
+    [Console]::Error.WriteLine(
+        "MSH runtime-state resolver failed: " + $_.Exception.Message
+    )
+    exit 10
+}
