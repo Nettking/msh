@@ -5,6 +5,7 @@ on:
     paths:
       - "start.cmd"
       - "update.cmd"
+      - "scripts/windows/**"
       - "catalog/capabilities/**"
       - "catalog/flask_app/**"
       - "catalog/common/data_loading.py"
@@ -20,6 +21,7 @@ on:
     paths:
       - "start.cmd"
       - "update.cmd"
+      - "scripts/windows/**"
       - "catalog/capabilities/**"
       - "catalog/flask_app/**"
       - "catalog/common/data_loading.py"
