@@ -5,6 +5,7 @@ title MSH
 cd /d "%~dp0"
 
 set "MSH_FRESH_INSTALL=0"
+set "MSH_ONBOARDING_URL=http://localhost:5000/onboarding"
 if "%~1"=="" goto :arguments_ready
 if /I "%~1"=="--fresh" (
     if not "%~2"=="" goto :usage_error
@@ -37,6 +38,7 @@ if errorlevel 1 (
 if "%MSH_FRESH_INSTALL%"=="1" (
     call :reset_device_state
     if errorlevel 1 exit /b 1
+    set "MSH_ONBOARDING_URL=http://localhost:5000/onboarding?fresh=1"
 )
 
 echo Starting the current MSH core services...
@@ -71,7 +73,7 @@ if errorlevel 1 (
 )
 
 echo MSH is running:        http://localhost:5000
-echo Onboarding:            http://localhost:5000/onboarding
+echo Onboarding:            %MSH_ONBOARDING_URL%
 echo Federation:            http://localhost:5000/federation
 echo Recorder status:       http://localhost:5000/status
 echo Documentation:         http://localhost:5000/docs
@@ -83,7 +85,7 @@ echo Setup, Federation identity, pairing state, recording state, checkpoints,
 echo downloaded Ollama models, and recorded data are preserved between starts.
 echo.
 
-start "" "http://localhost:5000/onboarding"
+start "" "%MSH_ONBOARDING_URL%"
 exit /b 0
 
 :reset_device_state
@@ -94,6 +96,7 @@ echo   - MSH device identity and keys
 echo   - Federation membership, pairing, onboarding, and benchmark state
 echo   - local Federation relay authority database
 echo   - saved server role and device setup choices
+echo   - saved browser onboarding-step progress on the page opened afterward
 echo.
 echo It preserves recorded telemetry, source configuration, recorder checkpoints,
 echo analysis results, Docker images, and downloaded Ollama models.
@@ -114,30 +117,12 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Clearing only the local Federation relay authority volume...
-docker compose run --rm --no-deps --build --entrypoint python relay -c "from pathlib import Path; import shutil; root = Path('/var/lib/msh-relay'); [(shutil.rmtree(path) if path.is_dir() and not path.is_symlink() else path.unlink()) for path in tuple(root.iterdir())]"
+echo Resolving and clearing the exact state paths configured for Flask...
+docker compose run --rm --no-deps --build --entrypoint python flask -m catalog.flask_app.services.device_state_reset
 if errorlevel 1 (
     echo.
-    echo The Federation relay state could not be cleared.
-    echo Recorded data and Ollama models were not removed.
-    pause
-    exit /b 1
-)
-
-echo Removing host-side device, onboarding, and setup state...
-if exist "data\federation" rmdir /s /q "data\federation"
-if exist "data\federation" (
-    echo.
-    echo Could not remove data\federation. Check file permissions or open programs.
-    pause
-    exit /b 1
-)
-
-if exist "data\server_setup\server_settings.json" del /f /q "data\server_setup\server_settings.json"
-if exist "data\server_setup\server_settings.json" (
-    echo.
-    echo Could not remove data\server_setup\server_settings.json.
-    echo Check file permissions or open programs.
+    echo Fresh device reset did not complete. Review the specific path error above.
+    echo Recorded data, recorder checkpoints, results, and Ollama models were not targeted.
     pause
     exit /b 1
 )
