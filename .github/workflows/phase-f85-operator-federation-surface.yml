@@ -69,6 +69,7 @@ jobs:
           catalog/flask_app/tests/test_docs_viewer.py
           catalog/flask_app/tests/test_provider_federation_surface.py
           catalog/flask_app/tests/test_device_state_reset.py
+          catalog/flask_app/tests/test_local_capability_candidates.py
           catalog/flask_app/tests/test_windows_start_script.py
           catalog/flask_app/test_navigation_smoke.py
           catalog/federation/tests/test_phase0.py
@@ -83,9 +84,11 @@ jobs:
           catalog/flask_app/docs_routes.py
           catalog/flask_app/provider_federation_routes.py
           catalog/flask_app/services/device_state_reset.py
+          catalog/flask_app/services/local_capability_candidates.py
           catalog/flask_app/tests/test_docs_viewer.py
           catalog/flask_app/tests/test_provider_federation_surface.py
           catalog/flask_app/tests/test_device_state_reset.py
+          catalog/flask_app/tests/test_local_capability_candidates.py
           catalog/flask_app/tests/test_windows_start_script.py
           --ignore I001,RUF022,B008,C408,PLC0206,UP035
       - name: Compose validation
