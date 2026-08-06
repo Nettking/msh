@@ -7,6 +7,9 @@ param(
     [ValidateRange(1, 65535)]
     [int]$PreferredPort,
 
+    [Parameter(Mandatory = $true)]
+    [string]$CurrentProjectName,
+
     [switch]$AllowFallback
 )
 
@@ -49,6 +52,16 @@ function Get-ContainerInspection {
     return $decoded[0]
 }
 
+function Get-ComposeProjectName {
+    param([Parameter(Mandatory = $true)]$Inspection)
+
+    $labels = $Inspection.Config.Labels
+    if ($null -eq $labels) {
+        return ""
+    }
+    return [string]$labels.'com.docker.compose.project'
+}
+
 function Test-MshFlaskContainer {
     param([Parameter(Mandatory = $true)]$Inspection)
 
@@ -75,26 +88,22 @@ function Test-MshFlaskContainer {
 }
 
 function Remove-LegacyMshProject {
-    param([Parameter(Mandatory = $true)]$Inspection)
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$ProjectName
+    )
 
-    $labels = $Inspection.Config.Labels
-    $project = if ($null -ne $labels) {
-        [string]$labels.'com.docker.compose.project'
-    }
-    else {
-        ""
-    }
-    if ([string]::IsNullOrWhiteSpace($project)) {
+    if ([string]::IsNullOrWhiteSpace($ProjectName)) {
         return
     }
 
     Write-Warning ((
         "Port {0} is owned by an older MSH Compose project '{1}'. " +
         "Its containers will be replaced; named volumes and host data are preserved."
-    ) -f $PreferredPort, $project)
+    ) -f $PreferredPort, $ProjectName)
 
     $projectContainers = @(
-        & docker ps -a --filter "label=com.docker.compose.project=$project" --format "{{.ID}}" 2>$null
+        & docker ps -a --filter "label=com.docker.compose.project=$ProjectName" --format "{{.ID}}" 2>$null
     ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
 
     foreach ($containerId in $projectContainers) {
@@ -118,9 +127,17 @@ $publishedOwners = @(
 
 foreach ($containerId in $publishedOwners) {
     $inspection = Get-ContainerInspection -ContainerId $containerId
-    if ($null -ne $inspection -and (Test-MshFlaskContainer -Inspection $inspection)) {
-        Remove-LegacyMshProject -Inspection $inspection
+    if ($null -eq $inspection -or -not (Test-MshFlaskContainer -Inspection $inspection)) {
+        continue
     }
+    $ownerProject = Get-ComposeProjectName -Inspection $inspection
+    if ($ownerProject -eq $CurrentProjectName) {
+        # Docker Compose owns this exact binding already and will reuse or
+        # recreate the current service during `docker compose up`.
+        Write-Output $PreferredPort
+        exit 0
+    }
+    Remove-LegacyMshProject -ProjectName $ownerProject
 }
 
 if (Test-PortAvailable -Address $BindAddress -Port $PreferredPort) {
