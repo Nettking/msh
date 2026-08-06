@@ -1,83 +1,92 @@
-# Planned work: Notebook-to-OSL vertical slice in MSH
+# W3 acceptance scenario: Notebook-to-OSL in MSH
 
 Programme plan: `Nettking/phd-research/plans/method-osl-msh-alignment.md`  
 Workstream: W3  
-Status: planning may begin; semantic implementation depends on W1 and W2 contracts  
-Date opened: 2026-08-02
+Status: **acceptance scenario; implementation is governed by the OSL execution plan**  
+Date opened: 2026-08-02  
+Reconciled: 2026-08-06
+
+Authoritative MSH implementation sequence:
+`docs/implementation/osl_integration/10_phased_implementation_roadmap.md`.
+
+This file defines the end-to-end behavior W3 must eventually demonstrate. It is
+not a second implementation plan, does not authorize a single vertical-slice
+PR, and does not override delivery dependencies or security gates.
 
 ## Mission
 
-Implement one complete, intuitive, traceable path from a raw operator statement to a conformant current OSL/SysML export.
+Demonstrate one intuitive, traceable path from an unchanged operator source to a
+versioned OSL representation and, when the declared adapter is supported, a
+conformant SysML v2 projection.
 
-MSH must support both:
+MSH must consume rather than redefine:
 
 1. the Notebook-to-OSL method owned by `paper-repo`; and
-2. the OSL language owned by `systems-paper`.
+2. the OSL language/profile owned by `systems-paper` and the accepted MSH
+   compatibility profile.
 
-MSH must not silently redefine either one.
+## Problem demonstrated by the scenario
 
-## Confirmed problem
+The legacy MSH path is not sufficient evidence of OSL conformance:
 
-The current implementation has three central gaps:
+- `captured -> structured -> reusable` does not preserve explicit clarification,
+  validation, review, approval, or publication evidence;
+- the current operator record is flatter than the planned strategy-path and
+  typed-relation structure;
+- the legacy exporter and string-oriented tests target older OSL/SysML naming
+  and do not prove conformance to the selected profile;
+- mutable records and generated text cannot substitute for immutable source,
+  revisions, provenance, and exact human decisions.
 
-- the record lifecycle is shortened to `captured -> structured -> reusable` and lacks explicit clarification and validation evidence;
-- the internal record is flatter than the current OSL strategy-path and relation structure;
-- the exporter and its tests target an obsolete OSL package/keyword style.
+These findings justify the scenario. They do not authorize implementation to
+bypass the accepted profile, persistence, authority, security, or migration
+sequence.
 
-## Start condition
-
-The agent may immediately:
-
-- inspect current records, UI, exporter, tests, migrations, and documentation;
-- design adapters and a neutral model behind new files;
-- prepare migration and fixture plans;
-- identify exact incompatibilities.
-
-The agent must not finalize method statuses, required fields, or OSL mapping by guessing. Final semantic implementation must use the approved or clearly identified draft W1 and W2 contracts.
-
-## Required vertical slice
+## Required end-to-end observation
 
 ```text
-raw statement
-  -> method-conformant stored note
-  -> annotation/clarification/validation or explicit provisional state
-  -> neutral MSH strategy and strategy path
-  -> intuitive human-facing structuring UI
-  -> current OSL model
-  -> pinned SysML v2 conformance validation
-  -> trace manifest
+unchanged source artefact
+  -> exact source excerpt
+  -> attributed annotation and clarification
+  -> explicit provisional gaps or validation needs
+  -> candidate strategy content
+  -> immutable neutral OSL strategy-fragment revision
+  -> deterministic profile validation
+  -> exact-revision human review and model-readiness evidence
+  -> authorized product lifecycle decision where applicable
+  -> intuitive human-facing projection
+  -> canonical JSON bundle
+  -> optional declared SysML v2 projection
+  -> retained trace manifest and diagnostics
 ```
 
-## Internal model requirements
+## Semantic requirements
 
-Do not use generated SysML text as the primary data model. Introduce or adapt a neutral representation capable of storing:
+The accepted representation must be able to preserve, where present:
 
-- strategy identity and version;
+- strategy identity, profile, and revision;
 - one or more strategy paths;
-- situation;
-- observations and triggers;
-- contexts;
-- hypotheses;
-- goals;
-- decisions;
-- candidate actions;
-- selected actions;
+- situation, observations, triggers, and contexts;
+- hypotheses or interpretations and uncertainty;
+- goals and decisions;
+- candidate actions and selected actions as distinct concepts;
 - expected outcomes;
 - rationale;
-- evidence, evidence status, confidence, and source references;
+- evidence references and independent evidence dimensions;
+- confidence without treating confidence as verified truth;
 - risks and trade-offs;
-- open questions;
-- review needs;
-- validation needs and outcomes;
-- downstream artifact references;
-- explicit semantic relations;
-- source-note, annotation, validation, contract-version, and export provenance.
+- open questions, gaps, review needs, and validation needs;
+- downstream trace targets;
+- explicit typed relations;
+- source, annotation, validation, review, contract, tool, and export provenance.
 
-## UI requirements
+A Decision is not an OperatorAction. A represented selected action is not a
+recommendation, approval, authorization, or execution.
 
-The UI must remain understandable to a researcher or engineer who does not write SysML.
+## User-facing requirements
 
-Recommended user-facing grouping:
+The workflow must remain understandable to a researcher or engineer who does
+not write SysML. A suitable projection may group information as:
 
 ### What happened?
 
@@ -90,7 +99,7 @@ Recommended user-facing grouping:
 
 - hypothesis or interpretation;
 - uncertainty;
-- alternative interpretation;
+- alternatives;
 - open questions.
 
 ### What was being decided?
@@ -111,124 +120,144 @@ Recommended user-facing grouping:
 ### What still needs checking?
 
 - clarification;
-- operator/domain-expert validation;
+- domain review;
+- evidence review;
 - confidentiality;
 - model readiness;
 - downstream trace target.
 
-The distinction between actions considered and actions selected must be visible and intuitive.
-
-## Export requirements
-
-Replace the obsolete exporter with output based on the W2 contract. At minimum the final output must use:
-
-- `OSLCore`;
-- `OSLKeywords`;
-- `#osl_strategy`;
-- `#osl_path`;
-- current `#osl_*` element keywords;
-- explicit typed relations;
-- `#osl_considers` for candidate actions;
-- `#osl_selects` for selected actions;
-- evidence, confidence, review/validation needs, open questions, and traces where present.
-
-Do not claim that valid SysML means the operator strategy is correct, safe, or approved.
+The UI must preserve the distinction among source, candidate, draft, validation,
+review, approval, publication, and export. UI state is not canonical state.
 
 ## Provisional and reviewed boundaries
 
-MSH should support two clearly different outputs:
+### Provisional output
 
-### Provisional path
+- may be researcher-interpreted or incomplete;
+- records missing information and uncertainty explicitly;
+- retains open questions and review/validation needs;
+- is never labelled operator-validated without exact evidence;
+- grants no runtime or resource authority.
 
-- researcher-interpreted or incomplete;
-- missing information represented explicitly;
-- open questions or review needs retained;
-- never labelled operator-validated;
-- unavailable for automatic runtime authority.
+### Reviewed or model-ready evidence
 
-### Reviewed/model-ready path
+- binds the required method and review evidence to an exact unchanged revision;
+- records reviewer, scope, outcome, time, and provenance;
+- records the relevant structural validation result separately;
+- respects confidentiality and intended audience;
+- does not imply approval, publication, safety, operational validation, or
+  execution unless a separate exact product record states that decision.
 
-- required method-contract evidence exists;
-- validation outcome and provenance are recorded;
-- confidentiality permits the intended export;
-- eligible for the stronger reviewed OSL contract.
+Legacy `structured`, `reusable`, `validated`, or `model-ready` labels must not be
+silently promoted to canonical review, approval, publication, or authority.
 
-`reusable` may remain temporarily for migration/UI compatibility but must not silently mean validated, model-ready, export-authoritative, or runtime-approved.
+## Export requirements
+
+Canonical JSON is the first required representation.
+
+A later SysML v2 export, when supported, must:
+
+- name the exact OSL profile and exporter version;
+- use the declared current OSL packages and element/relation mapping;
+- preserve candidate versus selected action relations;
+- include supported evidence, confidence, gap, review/validation-need, and trace
+  information;
+- emit explicit diagnostics for unsupported semantics instead of guessing;
+- be deterministic and pass the pinned parser/toolchain checks;
+- leave canonical state and lifecycle unchanged.
+
+Parser acceptance alone does not prove semantic equivalence, domain
+correctness, safety, evidence acceptance, review, or approval.
 
 ## Migration requirements
 
-- Existing v3 records must remain readable.
-- Migration must preserve raw statements and identifiers.
-- Existing `structured` or `reusable` records must not be upgraded to validated/model-ready without evidence.
-- Unknown provenance must remain unknown.
-- Deletion or replacement must not erase research history silently.
-- The migration and new schema need focused Linux and Windows tests.
+- Existing operator records remain readable during the supported compatibility
+  window.
+- Migration preserves original bytes or exact source representation, IDs where
+  valid, and provenance.
+- Derived mappings are candidates with field-level source trace and findings.
+- Unknown provenance remains unknown.
+- Migration does not overwrite or delete research history.
+- Dry run, replay, restart, reconciliation, and rollback are explicit.
+- Focused migration behavior is tested on Ubuntu and Windows.
 
-## Conformance requirements
+## Runtime, AI, and authority boundaries
 
-String assertions alone are insufficient.
+- W3 is design-time knowledge transformation, not machine control.
+- A model-ready OSL fragment is not automatically a runtime recommendation.
+- AI may propose attributed annotations, structures, mappings, or explanations
+  only after the complete manual path exists.
+- AI cannot validate meaning, sign review, approve, publish, select an action
+  authoritatively, or grant runtime/resource authority.
+- OSL content cannot grant Federation membership, provider activation, compute,
+  storage, job, artifact, lease, fencing, or machine authority.
+- Federation, capability-first onboarding, benchmark semantics, provider
+  runtime, and storage authority remain outside W3.
 
-The test must:
+## Delivery mapping
 
-1. generate an OSL/SysML file from an MSH fixture;
-2. load the exact W2 OSL files in the declared order;
-3. load the generated file in the pinned environment;
-4. fail on unexpected parser/validation diagnostics;
-5. verify candidate and selected action relations;
-6. verify source and version provenance;
-7. retain the generated fixture or diagnostic output when useful.
+W3 becomes executable incrementally through the authoritative OSL deliveries:
 
-## Runtime and AI boundaries
+| W3 capability | Required delivery |
+| --- | --- |
+| accepted semantic/profile boundary | D0-A |
+| immutable source/evidence/strategy contracts | D1-A and D1-B |
+| canonical JSON and deterministic validation | D2-A and D2-B |
+| immutable storage, revisions, provenance, and audit | D3-A and D3-B |
+| lifecycle and safe read projections | D4-A |
+| manual capture, excerpt, annotation, clarification, candidate, and draft | D5-A and D5-B |
+| exact human review, approval, publication, and feedback | D6-A and D6-B |
+| authenticated read and mutation UI | D7-P, D7-A, and D7-B |
+| optional candidate-only AI | D8-A |
+| canonical bundle, SysML projection, and legacy migration | D9-A, D9-B, and D9-C |
+| cross-platform hardening, recovery, cutover, and retained evidence | D10-A |
 
-- A model-ready OSL path is not automatically a runtime recommendation.
-- Candidate support artifacts require a separate policy/review step.
-- AI may propose annotations or mappings, but cannot validate a fragment, select an action authoritatively, or grant runtime authority.
-- Federation, storage authority, benchmarking, provider onboarding, and unrelated Flask navigation are outside this workstream.
+No agent should be instructed to implement all of W3 in one branch or PR.
 
-## Acceptance criteria
+## Final acceptance criteria
 
-- One representative CNC statement can be captured, structured, and exported through the UI.
-- The stored record conforms to the W1 contract.
-- The generated model conforms to the W2 contract.
-- The model validates in the pinned Systems-paper environment with zero unexpected diagnostics.
-- Candidate and selected actions remain distinct.
-- Provisional incompleteness is explicit.
-- Reviewed/model-ready output requires method evidence.
-- Existing records migrate without claim inflation.
-- Every exported artifact records the source note, record/schema version, method contract, OSL contract, exporter version, and output identity.
-- Focused tests pass on Linux and Windows.
+W3 is accepted only when one representative CNC source can be exercised through
+the supported product path and the evidence demonstrates that:
 
-## Files this agent may change
+- the original source is unchanged and traceable;
+- excerpt and derived content have exact provenance;
+- provisional incompleteness remains explicit;
+- candidate and selected actions remain distinct;
+- the stored canonical revision conforms to the accepted MSH profile contract;
+- deterministic validation produces no unexpected findings for the supported
+  scenario;
+- human review/model-readiness evidence is exact and cannot be forged by the
+  client or AI;
+- any approval/publication record is distinct from structural validation and
+  grants no runtime authority;
+- the UI remains understandable without requiring SysML knowledge;
+- canonical JSON is deterministic;
+- the optional SysML output, when included, passes the pinned declared
+  conformance environment with no unexpected diagnostics;
+- migration does not inflate legacy claims;
+- the trace manifest records source, record/schema, method, profile, validator,
+  review, exporter, output, and exact MSH versions;
+- focused and permanent tests pass on Ubuntu and Windows;
+- retained evidence distinguishes fixtures, automated tests, real browser/tool
+  observations, and human review;
+- no private source, credentials, endpoints, identities, local paths, or
+  unrelated authority leak.
 
-- operator-knowledge schemas, services, adapters, and migrations;
-- focused capture/review/structure UI needed by the vertical slice;
-- OSL exporter and conformance adapter;
-- focused tests and fixtures;
-- documentation for this research workflow.
+## Handoff to the research programme
 
-Prefer new files and bounded adapters where possible.
+The final W3 evidence must report:
 
-## Files and areas this agent must not change
+- exact W1 method contract and W2/OSL profile versions;
+- exact source repository commits;
+- MSH schema, contract, validator, migration, and exporter versions;
+- exact MSH commit and supported deployment topology;
+- conformance environment and diagnostics;
+- retained example and trace manifest;
+- unsupported method, profile, UI, migration, and export features;
+- claim, privacy, AI, and runtime-authority boundaries;
+- whether the baseline is sufficiently stable to freeze for evaluation.
 
-- federation, capability-first onboarding, storage authority, provider runtime, or benchmark semantics;
-- scientific definitions in `paper-repo` or `systems-paper`;
-- unrelated Flask navigation/templates/setup unless strictly required by the vertical slice and explicitly justified;
-- tool-paper results;
-- runtime recommendation authority beyond clear gating and claim-safe labels.
+## Current action
 
-## Handoff to W0 and W4
-
-The completed PR must report:
-
-- exact W1 and W2 contract versions;
-- MSH schema and migration version;
-- exact MSH commit;
-- conformance environment and results;
-- retained example/trace manifest;
-- unsupported method and OSL features;
-- claim and runtime boundaries;
-- whether the baseline is ready to freeze for evaluation.
-
-## Agent prompt
-
-> Work on `Nettking/msh`, branch from updated `main`, and read `docs/planned-work/method-osl-msh-alignment.md`. Implement only W3, using the approved or clearly identified draft W1 Notebook-to-OSL contract and W2 OSL integration contract. Deliver one vertical slice from raw statement through an intuitive neutral strategy-path UI/model to current `#osl_*` SysML with typed relations and pinned conformance validation. Preserve provisional versus reviewed/model-ready status, provenance, safe migration, and runtime authority boundaries. Do not change federation or redefine the papers. Add focused Linux and Windows tests, open a draft PR, and do not merge.
+Do not start a W3 implementation branch. Complete D0-A from the authoritative
+OSL execution plan first.
