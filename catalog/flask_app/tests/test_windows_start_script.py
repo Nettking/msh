@@ -88,10 +88,11 @@ def test_windows_port_resolver_has_valid_powershell_syntax() -> None:
         / "windows"
         / "resolve_msh_web_port.ps1"
     )
+    escaped_path = str(path).replace("'", "''")
     command = (
         "$errors = $null; "
         "[System.Management.Automation.Language.Parser]::ParseFile("
-        f"'{str(path).replace("'", "''")}', [ref]$null, [ref]$errors) | Out-Null; "
+        f"'{escaped_path}', [ref]$null, [ref]$errors) | Out-Null; "
         "if ($errors.Count -gt 0) { "
         "$errors | ForEach-Object { Write-Error $_.Message }; exit 1 }"
     )
