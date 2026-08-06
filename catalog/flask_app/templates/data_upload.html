@@ -102,9 +102,12 @@
   {% elif selected_batch.status == 'ready' %}
     {% if selected_batch.analysis_state == 'requested' %}
     <div class="notice notice--success">
-      <strong>Background analysis requested</strong>
-      <p>The existing runtime is discovering the uploaded dates and processing them asynchronously.</p>
-      <a class="button-link" href="{{ url_for('web.status') }}">Follow analysis progress</a>
+      <strong>Background analysis job created</strong>
+      <p>The uploaded batch is tracked as a durable Federation job while the existing runtime processes it.</p>
+      <div class="data-upload-actions">
+        <a class="button-link" href="{{ url_for('federation_web.detail', page_name='jobs') }}">Open Jobs</a>
+        <a class="button-link" href="{{ url_for('web.status') }}">Open diagnostics</a>
+      </div>
     </div>
     {% else %}
     <div class="data-upload-analysis-ready">
