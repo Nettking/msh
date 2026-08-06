@@ -18,15 +18,23 @@ services:
       - MSH_FEDERATION_ONBOARDING_DATABASE=${MSH_FEDERATION_ONBOARDING_DATABASE:-/app/data/federation/onboarding/onboarding.sqlite3}
       - MSH_FEDERATION_COORDINATOR_DATABASE=${MSH_FEDERATION_COORDINATOR_DATABASE:-/var/lib/msh-relay/control.sqlite3}
     volumes:
-      - ./results:/app/results
-      - ./data:/app/data
-      - relay_state:/var/lib/msh-relay
+      - type: bind
+        source: ${MSH_RESULTS_DIR:-./results}
+        target: /app/results
+      - type: bind
+        source: ${MSH_DATA_DIR:-./data}
+        target: /app/data
+      - type: volume
+        source: relay_state
+        target: /var/lib/msh-relay
     restart: unless-stopped
 
   ollama:
     image: ollama/ollama:latest
     volumes:
-      - ollama_models:/root/.ollama
+      - type: volume
+        source: ollama_models
+        target: /root/.ollama
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "ollama", "list"]
@@ -54,7 +62,9 @@ services:
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
     volumes:
-      - model_provider_models:/root/.ollama
+      - type: volume
+        source: model_provider_models
+        target: /root/.ollama
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "ollama", "list"]
@@ -96,7 +106,9 @@ services:
       - MSH_RECORDER_CONFIG_REFRESH_INTERVAL=${MSH_RECORDER_CONFIG_REFRESH_INTERVAL:-1.0}
       - MSH_RECORDER_STATUS_INTERVAL=${MSH_RECORDER_STATUS_INTERVAL:-1.0}
     volumes:
-      - ./data:/app/data
+      - type: bind
+        source: ${MSH_DATA_DIR:-./data}
+        target: /app/data
     restart: unless-stopped
 
   relay:
@@ -122,7 +134,9 @@ services:
     ports:
       - "${MSH_RELAY_BIND:-0.0.0.0}:${MSH_RELAY_PORT:-8765}:8765"
     volumes:
-      - relay_state:/var/lib/msh-relay
+      - type: volume
+        source: relay_state
+        target: /var/lib/msh-relay
     restart: unless-stopped
 
   prep:
@@ -133,8 +147,12 @@ services:
     environment:
       - MSH_SCAN_DIRS=${MSH_SCAN_DIRS:-results,data}
     volumes:
-      - ./data:/app/data
-      - ./results:/app/results
+      - type: bind
+        source: ${MSH_DATA_DIR:-./data}
+        target: /app/data
+      - type: bind
+        source: ${MSH_RESULTS_DIR:-./results}
+        target: /app/results
 
   observer-sync:
     profiles: ["observer-sync"]
@@ -145,9 +163,14 @@ services:
     environment:
       - MSH_SCAN_DIRS=${MSH_SCAN_DIRS:-results,data}
     volumes:
-      - ./data:/app/data
+      - type: bind
+        source: ${MSH_DATA_DIR:-./data}
+        target: /app/data
 
 volumes:
   ollama_models:
+    name: ${MSH_OLLAMA_VOLUME_NAME:-msh_ollama_models}
   model_provider_models:
+    name: ${MSH_MODEL_PROVIDER_VOLUME_NAME:-msh_model_provider_models}
   relay_state:
+    name: ${MSH_RELAY_VOLUME_NAME:-msh_relay_state}
