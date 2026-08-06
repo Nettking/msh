@@ -29,13 +29,15 @@ Start here for the supported MSH product, operator workflow, deployment, and cur
 Use the following hierarchy when documents disagree:
 
 1. Current user and administration guides describe supported product behavior.
-2. [Current task handoff](implementation/current_task_handoff.md) identifies the active repository tracks and immediate next actions.
-3. A plan explicitly marked **active authoritative plan** governs its named track.
-4. Phase plans, completion reviews, closeouts, audits, test matrices, and agent handoffs are historical delivery evidence unless they explicitly state that they describe the current merged baseline.
+2. [Implementation documentation](implementation/) classifies current tracks, acceptance material, and historical evidence.
+3. [Current task handoff](implementation/current_task_handoff.md) identifies the active repository tracks and immediate next actions.
+4. A plan explicitly marked **active authoritative plan** governs its named track.
+5. Material under a `history/` directory is non-authoritative delivery evidence.
 
 Active track entry points:
 
-- [Capability-first Federation plan](implementation/capability_first_federation_plan.md) — current Federation product behavior, remaining acceptance work, and authority boundaries.
+- [Federation implementation index](implementation/federation/) — active plans, acceptance material, and historical Federation evidence.
+- [Capability-first Federation plan](implementation/federation/active/capability_first_federation_plan.md) — current Federation product behavior, remaining acceptance work, and authority boundaries.
 - [OSL integration plan index](implementation/osl_integration/README.md) — entry point for OSL planning and supporting analyses.
 - [OSL implementation execution plan](implementation/osl_integration/10_phased_implementation_roadmap.md) — authoritative OSL delivery order and acceptance gates.
 - [Post-v1 product roadmap](roadmap/post_v1_product_roadmap.md) — longer-term product direction.
@@ -43,4 +45,4 @@ Active track entry points:
 
 ## Documentation status
 
-The documentation tree still contains historical implementation material alongside current guides. Do not infer that a feature is current, accepted, or safe to implement merely because a document exists. Check its status statement and the hierarchy above before using it as an instruction.
+The documentation tree still contains historical implementation material outside the new Federation history directories. Do not infer that a feature is current, accepted, or safe to implement merely because a document exists. Check its directory index, status statement, and the hierarchy above before using it as an instruction.
