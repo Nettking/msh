@@ -106,7 +106,7 @@ The intended product behavior is preserved in `docs/roadmap/post_v1_product_road
 | `new-stuff/md_viewer/templates/view.html` | Prototype template | Standalone Markdown rendering view. | Future Flask-first docs templates. | Same as above. | DELETE CANDIDATE with prototype. |
 | `new-stuff/md_viewer/docs/README.md` | Sample content | Sample docs, not canonical MSH documentation. | None; use repository `docs/` in V1.1. | Link check. | DELETE CANDIDATE with prototype. |
 | `new-stuff/md_viewer/docs/getting-started/installation.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
-| `new-stuff/md_viewer/docs/getting-started/quickstart.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
+| `new-stuff/md_viewer/docs/getting-started/quickstart.md` | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
 | `new-stuff/md_viewer/docs/reference/config.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
 | `new-stuff/md_viewer/docs/reference/api/index.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
 | `new-stuff/md_viewer/docs/guides/advanced-usage.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
@@ -176,7 +176,7 @@ Manual and deep scripts are not automatically unused. The current script catalog
 | `catalog/data_visualizer/**` | Automatic playback export | Part of playback-ready contract. | None. | Data-visualizer and playback tests. | KEEP. |
 | `catalog/data_pr_day/**` | Supported manual analysis | Explicitly operator-triggered and documented. | None during v1 closeout. | Script catalog/control tests. | KEEP. |
 | `catalog/find_stops/**` | Supported manual analysis | Explicitly operator-triggered and documented. | None during v1 closeout. | Script catalog/control tests. | KEEP. |
-| `catalog/data_analysis/**` | Supported deep/explatory analysis | Explicitly documented as manual research-oriented analysis. | Consider separate optional package only after v1. | Script catalog/control tests. | KEEP FOR V1. |
+| `catalog/data_analysis/**` | Supported deep/exploratory analysis | Explicitly documented as manual research-oriented analysis. | Consider separate optional package only after v1. | Script catalog/control tests. | KEEP FOR V1. |
 | `catalog/ml_analysis/**` | Supported deep/exploratory analysis | Explicitly documented as manual ML baseline. | Consider separate optional package only after v1. | Script catalog/control tests. | KEEP FOR V1. |
 | `catalog/corrolation_machine_pairs/README.md` | Legacy script documentation | Canonical catalog classifies the script as Legacy. | Preserve any unique interpretation notes in history only if useful. | Search control usage and tests. | VERIFY BEFORE DELETE. |
 | `catalog/corrolation_machine_pairs/corrolation_machine_pairs.py` | Legacy script | Canonical catalog classifies it as legacy exploration. | None unless unique research behavior is still required. | Script-discovery/control tests; confirm no user workflow depends on it. | VERIFY BEFORE DELETE. |
