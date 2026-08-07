@@ -7,7 +7,7 @@ import pytest
 from flask import redirect
 
 from catalog.flask_app import capability_benchmark_routes as benchmark_routes
-from catalog.flask_app import federation_routes as federation_routes
+from catalog.flask_app import federation_routes
 from catalog.flask_app.app import create_app
 
 FEDERATION_PAGES = {
