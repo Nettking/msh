@@ -23,7 +23,7 @@ def _app(docs_root: Path) -> Flask:
     return app
 
 
-def test_docs_index_browses_the_real_directory_tree(tmp_path: Path) -> None:
+def test_docs_index_keeps_real_tree_behind_development_navigation(tmp_path: Path) -> None:
     (tmp_path / "index.md").write_text("# Documentation Home\n", encoding="utf-8")
     guide = tmp_path / "getting-started"
     guide.mkdir()
@@ -38,10 +38,11 @@ def test_docs_index_browses_the_real_directory_tree(tmp_path: Path) -> None:
 
     assert response.status_code == 200
     assert "MSH Documentation" in body
-    assert "2 Markdown files" in body
+    assert "Development &amp; all files" in body
     assert "Getting Started" in body
     assert "Install MSH on a Laptop" in body
     assert "/docs/getting-started/setup.md" in body
+    assert "2 Markdown files" not in body
 
 
 def test_docs_render_markdown_and_rewrite_local_links(tmp_path: Path) -> None:
