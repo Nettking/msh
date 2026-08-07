@@ -42,6 +42,7 @@ from .services.catalog_service import ArtifactCatalog
 from .services.federation_pairing_install import install_federation_pairing
 from .services.onboarding_view_normalizer import normalize_onboarding_view_model
 from .services.recorder_control_service import get_recorder_control_service
+from .services.run_once_capability_evidence import install_run_once_capability_evidence
 from .services.server_setup_service import (
     AI_MODEL_CHOICES,
     AI_PROVIDER_MODES,
@@ -196,10 +197,9 @@ def create_app() -> Flask:
             "CAPABILITY_ONBOARDING_REMOTE_PAIRING_PATH",
             remote_pairing_path,
         )
-    # Device inspection is explicit operator evidence, not a startup probe. Keep
-    # a finite safety horizon by default so ordinary restarts and idle time do
-    # not force a fresh inspection. Operators can still override this with
-    # MSH_INSPECTION_TTL_SECONDS or use the explicit Inspect again action.
+    # The frozen snapshot/result contracts retain an expiry timestamp, while the
+    # installed product uses explicit refresh plus dependency/version invalidation.
+    # A long default still keeps newly written compatibility metadata sensible.
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS",
         int(
@@ -217,6 +217,7 @@ def create_app() -> Flask:
         normalize_onboarding_view_model
     )
     install_federation_pairing(app)
+    install_run_once_capability_evidence(app)
 
     catalog = ArtifactCatalog()
     app.config["ARTIFACT_CATALOG"] = catalog
