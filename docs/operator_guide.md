@@ -1,6 +1,7 @@
 # Operator guide
 
-Status: **current user guide**  
+Status: **current user guide**
+
 Reviewed: **2026-08-07**
 
 This guide describes normal operation after MSH starts. It does not assign the device one permanent server role.
