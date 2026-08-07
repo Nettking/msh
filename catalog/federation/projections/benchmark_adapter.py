@@ -53,6 +53,12 @@ class BenchmarkResultsAdapter:
     projections expose only the newest run for each device, benchmark and
     target-service combination so expired historical evidence cannot become a
     false rerun requirement.
+
+    Installed product services may expose ``accepted_results(snapshot)`` plus
+    their inspection service. When present, that read-only product validity
+    policy is reused so Federation projections agree with onboarding about
+    whether persisted evidence is still structurally current. Plain stores keep
+    the strict timestamp fallback used by framework-neutral projection tests.
     """
 
     def __init__(
@@ -66,19 +72,49 @@ class BenchmarkResultsAdapter:
         self._now = now
         self._validity = validity
 
+    def _resolved_validity(self) -> Callable[[object], object] | None:
+        if self._validity is not None:
+            return self._validity
+        if self._store is None:
+            return None
+
+        accepted_supplier = getattr(self._store, "accepted_results", None)
+        inspection_service = getattr(self._store, "inspection_service", None)
+        snapshot_loader = getattr(inspection_service, "load", None)
+        if not callable(accepted_supplier) or not callable(snapshot_loader):
+            return None
+
+        snapshot = snapshot_loader()
+        if snapshot is None:
+            return lambda _result: (False, "inspection-required")
+
+        accepted_run_ids: set[str] = set()
+        for accepted in accepted_supplier(snapshot):
+            run_id = _value(accepted, "run_id")
+            if isinstance(run_id, str) and run_id:
+                accepted_run_ids.add(run_id)
+
+        def product_validity(result: object) -> tuple[bool, str]:
+            run_id = _value(result, "run_id")
+            current = isinstance(run_id, str) and run_id in accepted_run_ids
+            return current, "current" if current else "invalidated"
+
+        return product_validity
+
     def snapshot(self) -> BenchmarkSnapshot:
         if self._store is None:
             return BenchmarkSnapshot(False, "benchmark-store-unavailable")
         try:
             now = self._now().astimezone(timezone.utc)
+            validity = self._resolved_validity()
             results: list[BenchmarkRecord] = []
             for result in self._store.list_results():
                 expires_at = _timestamp(_value(result, "expires_at"))
-                if self._validity is None:
+                if validity is None:
                     current = expires_at is not None and expires_at > now
                     validity_reason = "current" if current else "expired"
                 else:
-                    evaluated = self._validity(result)
+                    evaluated = validity(result)
                     if isinstance(evaluated, tuple) and len(evaluated) == 2:
                         current = bool(evaluated[0])
                         raw_reason = evaluated[1]

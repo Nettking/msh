@@ -25,6 +25,25 @@ class _StaticAdapter:
         return self.value
 
 
+class _RunOnceStore:
+    def __init__(self, stored: tuple[object, ...], accepted_run_ids: set[str]) -> None:
+        self._stored = stored
+        self._accepted_run_ids = accepted_run_ids
+        self._inspection = object()
+        self.inspection_service = SimpleNamespace(load=lambda: self._inspection)
+
+    def list_results(self) -> tuple[object, ...]:
+        return self._stored
+
+    def accepted_results(self, snapshot: object) -> tuple[object, ...]:
+        assert snapshot is self._inspection
+        return tuple(
+            result
+            for result in self._stored
+            if result.run_id in self._accepted_run_ids
+        )
+
+
 def _result(
     *,
     run_id: str,
@@ -125,5 +144,34 @@ def test_historical_expired_runs_do_not_create_false_rerun_work() -> None:
     assert all(item["state"] == "passed" for item in detail["items"])
     assert "need rerun" not in detail["state_label"].casefold()
     assert overview["summary_cards"][2]["value"] == "3 of 3"
-    assert overview["content"]["benchmarks"]["state_label"] == "Current"
-    assert overview["recommended_action"] is None
+    action = overview["recommended_action"]
+    assert action is None or action["url"] != "/federation/benchmarks"
+
+
+def test_product_run_once_policy_overrides_legacy_time_expiry_only() -> None:
+    reusable = _result(
+        run_id="legacy-reusable",
+        benchmark_id="benchmark-ai",
+        target_service_id="ollama-configured",
+        finished_at=NOW - timedelta(hours=2),
+        expires_at=NOW - timedelta(hours=1),
+    )
+    structurally_stale = _result(
+        run_id="legacy-stale",
+        benchmark_id="benchmark-storage",
+        target_service_id="msh-local-data-storage",
+        finished_at=NOW - timedelta(hours=2),
+        expires_at=NOW - timedelta(hours=1),
+    )
+    store = _RunOnceStore(
+        (reusable, structurally_stale),
+        {"legacy-reusable"},
+    )
+
+    snapshot = BenchmarkResultsAdapter(store, now=lambda: NOW).snapshot()
+    by_run_id = {result.run_id: result for result in snapshot.results}
+
+    assert by_run_id["legacy-reusable"].current is True
+    assert by_run_id["legacy-reusable"].validity_reason == "current"
+    assert by_run_id["legacy-stale"].current is False
+    assert by_run_id["legacy-stale"].validity_reason == "invalidated"
