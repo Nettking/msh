@@ -39,7 +39,9 @@ class RegisteredComputeHandlerAdapter:
         invalidation_inputs=("descriptor_fingerprint", "binding_revision"),
         privacy_classification="public-summary",
     )
-    result_ttl_seconds = 900
+    # Evidence is explicitly refreshed by the operator. Keep a finite ten-year
+    # safety horizon so normal restarts and idle time do not force reruns.
+    result_ttl_seconds = 315_360_000
 
     def __init__(self, inventory: object) -> None:
         if not callable(getattr(inventory, "list_bindings", None)):
