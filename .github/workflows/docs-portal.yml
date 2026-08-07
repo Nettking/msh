@@ -1,0 +1,42 @@
+name: Documentation portal
+
+on:
+  pull_request:
+    paths:
+      - "catalog/flask_app/docs_routes.py"
+      - "catalog/flask_app/templates/docs_viewer.html"
+      - "catalog/flask_app/static/css/docs*.css"
+      - "catalog/flask_app/static/js/docs-navigation.js"
+      - "catalog/flask_app/tests/test_docs_portal.py"
+      - "docs/**"
+      - ".github/workflows/docs-portal.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  docs-portal:
+    name: docs-portal (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os:
+          - ubuntu-latest
+          - windows-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install focused test dependencies
+        run: python -m pip install Flask Markdown pytest
+
+      - name: Run documentation portal tests
+        run: python -m pytest catalog/flask_app/tests/test_docs_portal.py -q
