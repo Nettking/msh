@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from flask import Flask, redirect, request, url_for
+from flask import Flask, request
 
 from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
@@ -210,19 +210,15 @@ def create_app() -> Flask:
                 type(exc).__name__,
             )
             return None
-        if not bool(flags.get("completed")):
+        if not bool(flags.get("completed")) or not bool(flags.get("runtime")):
             return None
-        if bool(flags.get("runtime")):
-            accepted, _message = runtime_manager.choose_startup_mode(
-                "continue_existing"
+        accepted, _message = runtime_manager.choose_startup_mode(
+            "continue_existing"
+        )
+        if not accepted:
+            app.logger.warning(
+                "Completed capability runtime could not clear legacy startup choice"
             )
-            if not accepted:
-                app.logger.warning(
-                    "Completed capability runtime could not clear legacy startup choice"
-                )
-                return None
-        if request.path == "/":
-            return redirect(url_for("federation_web.overview"))
         return None
 
     # CFI-6 owns capability-first startup and migration before CFI-5 and the
