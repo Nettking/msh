@@ -14,7 +14,11 @@ from catalog.capabilities.benchmarking.adapters.network import (
 from catalog.capabilities.benchmarking.adapters.ollama import OllamaBenchmarkAdapter
 from catalog.capabilities.benchmarking.adapters.storage import StorageCandidateAdapter
 from catalog.federation.errors import AuthenticationError
-from catalog.flask_app.app import create_app
+from catalog.federation.onboarding_models import ContributionDesiredState
+from catalog.flask_app.app import (
+    _resume_persisted_contributions_safely,
+    create_app,
+)
 from catalog.flask_app.services.existing_setup_resume import (
     ExistingSetupRequired,
     ExistingSetupResumeError,
@@ -74,10 +78,12 @@ class _Inspection:
 
 
 class _Benchmark:
-    def __init__(self) -> None:
+    def __init__(self, *, complete: bool = True) -> None:
         self.list_calls = 0
         self.run_calls = 0
         self.plan_calls = 0
+        self.view_calls = 0
+        self.complete = complete
         self.results = (
             SimpleNamespace(
                 device_id="node-existing",
@@ -103,6 +109,12 @@ class _Benchmark:
         self.list_calls += 1
         return self.results
 
+    def view_model(self, snapshot: object, *, connected: bool):
+        self.view_calls += 1
+        assert connected is True
+        assert snapshot is not None
+        return {}, [], self.complete
+
     def plan(self, _snapshot: object) -> tuple[object, ...]:  # pragma: no cover
         self.plan_calls += 1
         raise AssertionError("resume must not plan benchmark execution")
@@ -115,13 +127,31 @@ class _Benchmark:
 class _Contribution:
     def __init__(self) -> None:
         self.reconcile_calls = 0
+        self.suspend_calls: list[str] = []
+        self.saved_intents = (
+            SimpleNamespace(
+                candidate_id="candidate-ai",
+                desired_state=ContributionDesiredState.ENABLED,
+            ),
+            SimpleNamespace(
+                candidate_id="candidate-disabled",
+                desired_state=ContributionDesiredState.DISABLED,
+            ),
+        )
 
     def has_persisted_intents(self) -> bool:
         return True
 
+    def intents(self) -> tuple[object, ...]:
+        return self.saved_intents
+
     def reconcile(self) -> tuple[object, ...]:
         self.reconcile_calls += 1
         return (object(), object())
+
+    def suspend(self, candidate_id: str) -> object:
+        self.suspend_calls.append(candidate_id)
+        return object()
 
 
 def test_production_evidence_defaults_survive_normal_restarts() -> None:
@@ -177,7 +207,8 @@ def test_resume_retries_reconnect_then_reuses_existing_evidence() -> None:
     assert benchmark.list_calls == 1
     assert benchmark.plan_calls == 0
     assert benchmark.run_calls == 0
-    assert contribution.reconcile_calls == 1
+    assert contribution.reconcile_calls == 0
+    assert contribution.suspend_calls == []
     assert report.device_id == "node-existing"
     assert report.federation_id == "federation-existing"
     assert report.inspection_revision == 7
@@ -186,12 +217,71 @@ def test_resume_retries_reconnect_then_reuses_existing_evidence() -> None:
         ("benchmark.compute", "msh-system-summary", "passed"),
     )
     assert report.unavailable_benchmarks == ()
-    assert report.reconciled_contributions == 2
+    assert report.reconciled_contributions == 0
     assert report.partial is False
     assert progress[0].startswith("[1/4] Reconnecting")
     assert any(message.startswith("[2/4] Loading") for message in progress)
     assert any(message.startswith("[3/4] Loading") for message in progress)
-    assert any(message.startswith("[4/4] Reconciling") for message in progress)
+    assert any(message.startswith("[4/4] Leaving") for message in progress)
+
+
+def test_safe_flask_reconcile_uses_current_saved_evidence(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inspection = _Inspection()
+    benchmark = _Benchmark(complete=True)
+    contribution = _Contribution()
+    monkeypatch.setattr(
+        "catalog.flask_app.app.get_capability_inspection_service",
+        lambda: inspection,
+    )
+    monkeypatch.setattr(
+        "catalog.flask_app.app.get_capability_benchmark_service",
+        lambda: benchmark,
+    )
+    monkeypatch.setattr(
+        "catalog.flask_app.app.get_capability_contribution_service",
+        lambda: contribution,
+    )
+
+    reconciled, suspended = _resume_persisted_contributions_safely()
+
+    assert (reconciled, suspended) == (2, 0)
+    assert inspection.load_calls == 1
+    assert inspection.run_calls == 0
+    assert benchmark.view_calls == 1
+    assert benchmark.run_calls == 0
+    assert contribution.reconcile_calls == 1
+    assert contribution.suspend_calls == []
+
+
+def test_safe_flask_reconcile_suspends_enabled_intent_when_benchmark_is_stale(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    inspection = _Inspection()
+    benchmark = _Benchmark(complete=False)
+    contribution = _Contribution()
+    monkeypatch.setattr(
+        "catalog.flask_app.app.get_capability_inspection_service",
+        lambda: inspection,
+    )
+    monkeypatch.setattr(
+        "catalog.flask_app.app.get_capability_benchmark_service",
+        lambda: benchmark,
+    )
+    monkeypatch.setattr(
+        "catalog.flask_app.app.get_capability_contribution_service",
+        lambda: contribution,
+    )
+
+    reconciled, suspended = _resume_persisted_contributions_safely()
+
+    assert (reconciled, suspended) == (0, 1)
+    assert inspection.run_calls == 0
+    assert benchmark.view_calls == 1
+    assert benchmark.run_calls == 0
+    assert contribution.reconcile_calls == 0
+    assert contribution.suspend_calls == ["candidate-ai"]
 
 
 def test_resume_never_creates_identity_or_federation_when_state_is_missing() -> None:
@@ -268,9 +358,10 @@ def test_expired_inspection_is_reported_but_never_rerun_automatically() -> None:
     assert inspection.run_calls == 0
     assert benchmark.list_calls == 1
     assert benchmark.run_calls == 0
+    assert contribution.reconcile_calls == 0
     assert report.inspection_revision == 7
     assert report.warnings == ("inspection-evidence-expired",)
-    assert report.reconciled_contributions == 2
+    assert report.reconciled_contributions == 0
     assert report.partial is True
 
 
