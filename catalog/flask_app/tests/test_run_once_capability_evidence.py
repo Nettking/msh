@@ -18,8 +18,8 @@ from catalog.federation.onboarding_models import (
     DeviceInspectionSnapshot,
 )
 from catalog.flask_app.app import create_app
-from catalog.flask_app.services.capability_benchmark_service import BenchmarkPlanItem
 from catalog.flask_app.services.capability_benchmark_service import (
+    BenchmarkPlanItem,
     get_capability_benchmark_service,
 )
 from catalog.flask_app.services.capability_contribution_service import (
