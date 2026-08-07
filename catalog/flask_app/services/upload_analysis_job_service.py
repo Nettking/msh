@@ -127,7 +127,7 @@ class UploadAnalysisJobService:
             session_id, coordinator_id = self.context_supplier()
         except UploadAnalysisJobError:
             raise
-        except Exception as exc:  # noqa: BLE001 - authorization remains server-owned
+        except Exception as exc:
             raise UploadAnalysisJobError(
                 "analysis-federation-required",
                 "Connect this device to its Federation before starting analysis.",
@@ -141,9 +141,7 @@ class UploadAnalysisJobService:
         provider_id = self._worker_id(coordinator_id)
         job_id = self._job_id(batch_id)
         request_id = f"request-{batch_id}"
-        identity = hashlib.sha256(
-            f"{session_id}\0{batch_id}".encode("utf-8")
-        ).hexdigest()
+        identity = hashlib.sha256(f"{session_id}\0{batch_id}".encode()).hexdigest()
         job = JobContract(
             job_id=job_id,
             session_id=session_id,
@@ -405,7 +403,7 @@ class UploadAnalysisJobService:
         for row in rows:
             try:
                 snapshots.append(self.store.snapshot(str(row["job_id"])))
-            except Exception:  # noqa: BLE001 - one damaged job must not leak or hide others
+            except Exception:  # noqa: S112 - one damaged job must not hide others
                 continue
         return tuple(snapshots)
 
@@ -421,7 +419,7 @@ class UploadAnalysisJobService:
                 if snapshot.job.terminal:
                     continue
                 self.fail(job_id, "analysis-interrupted")
-            except Exception:  # noqa: BLE001 - startup stays available and projection fails closed
+            except Exception:  # noqa: S112 - startup remains available and fails closed
                 continue
 
 
