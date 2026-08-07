@@ -425,27 +425,24 @@ class DataUploadService:
         final_dir.mkdir(parents=True, exist_ok=False)
         marker = final_dir / _IMPORT_MARKER
         marker.write_text(batch_id, encoding="utf-8")
-        try:
-            with self._connect() as connection:
-                files = connection.execute(
-                    """
-                    SELECT staged_name,published_name FROM data_upload_files
-                    WHERE batch_id=? ORDER BY published_name,file_id
-                    """,
-                    (batch_id,),
-                ).fetchall()
-            for item in files:
-                os.replace(
-                    staging_dir / str(item["staged_name"]),
-                    final_dir / str(item["published_name"]),
-                )
-            marker.unlink()
-            staging_dir.rmdir()
-            return final_dir
-        except BaseException:
-            # The marker deliberately remains so supported recursive discovery
-            # cannot consume a partially published batch.
-            raise
+        # The marker remains if publication fails, so recursive discovery cannot
+        # consume a partially published batch.
+        with self._connect() as connection:
+            files = connection.execute(
+                """
+                SELECT staged_name,published_name FROM data_upload_files
+                WHERE batch_id=? ORDER BY published_name,file_id
+                """,
+                (batch_id,),
+            ).fetchall()
+        for item in files:
+            os.replace(
+                staging_dir / str(item["staged_name"]),
+                final_dir / str(item["published_name"]),
+            )
+        marker.unlink()
+        staging_dir.rmdir()
+        return final_dir
 
     def _set_batch_state(
         self,
