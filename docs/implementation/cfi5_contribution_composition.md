@@ -11,7 +11,7 @@ The integration owns the existing Contributions step and adds these server-bound
 - `POST /onboarding/contributions/<candidate_id>/suspend`
 - `POST /onboarding/contributions/reconcile`
 
-Candidates are regenerated from the current device-bound inspection and existing immutable benchmark evidence. The browser may submit only candidate choices plus the current CSRF token and server-issued command ID. Device, actor, Federation, session, adapter, endpoint, credential, timeout, assignment, and authority context remain server-owned.
+Candidates are regenerated from the device-bound saved inspection and accepted immutable benchmark evidence. The browser may submit only candidate choices plus the current CSRF token and server-issued command ID. Device, actor, Federation, session, adapter, endpoint, credential, timeout, assignment, and authority context remain server-owned.
 
 ## Authority composition
 
@@ -28,18 +28,20 @@ Recorder enablement is policy-blocked when the compatible recorder role and conf
 
 Only CF1 `ContributionIntent` values and their revision history are persisted through the existing `SQLiteContributionIntentStore`.
 
-The long-running Flask application owns one automatic startup reconciliation. Before it can restore enabled intent, it loads the saved inspection and evaluates the saved benchmark review through the normal benchmark validity path. It never runs inspection or a benchmark as part of reconciliation.
+The long-running Flask application owns one automatic startup reconciliation. Before it can restore enabled intent, it loads the saved inspection and evaluates the saved benchmark review through the installed run-once validity path. It never runs inspection or a benchmark as part of reconciliation.
 
 The startup outcomes are deliberately asymmetric:
 
-- accepted saved evidence may restore an explicitly enabled contribution;
+- saved evidence whose benchmark identity, implementation version, and declared dependency inputs still match may restore an explicitly enabled contribution even when legacy temporal metadata is in the past;
 - disabled or ask-later choices remain fenced;
-- stale or expired capability evidence cannot reactivate enabled intent and instead sends enabled candidates through the existing suspension/fencing path where the candidate can still be resolved;
-- missing or malformed evidence fails closed and does not trigger an automatic benchmark or inspection run.
+- definition-stale, dependency-stale, mismatched, missing, or malformed capability evidence cannot reactivate enabled intent and instead leaves or sends enabled candidates through the existing suspension/fencing path where the candidate can still be resolved;
+- elapsed wall-clock time by itself is not an authority transition and does not trigger an automatic benchmark, inspection, or suspension.
+
+The run-once product composition does not rewrite old inspection/benchmark timestamps. It regenerates transient contribution candidates from accepted saved evidence and disables candidate-age fencing in this installed composition only. The frozen CF4 generator/service defaults retain strict expiry behavior for isolated contract tests.
 
 The isolated Windows `start.cmd --resume` process performs no contribution authority change. It reconnects the saved Federation and reads persisted evidence; reconciliation is deferred to the long-running Flask application so there is only one automatic authority path.
 
-The explicit `POST /onboarding/contributions/reconcile` operation also requires the same current benchmark-review prerequisite used for contribution choices. A stale benchmark review therefore remains server-side blocked even if a client attempts to call the endpoint directly.
+The explicit `POST /onboarding/contributions/reconcile` operation also requires the same accepted benchmark-review prerequisite used for contribution choices. A benchmark whose implementation or dependency inputs changed therefore remains server-side blocked even if a client attempts to call the endpoint directly.
 
 Reconciliation does not recreate membership, enroll providers, allocate storage, assign jobs, grant leases, or invoke compute handlers. Disable and suspend fence future use without removing the device from its Federation.
 
@@ -50,6 +52,13 @@ Reconciliation does not recreate membership, enroll providers, allocate storage,
 - Raw adapter exceptions are logged by type only and replaced with safe user messages.
 - Corrupt intent, inspection, benchmark, or authority composition fails closed.
 - Missing or ambiguous authority adapters cannot activate a candidate.
+- Time-only expiry is ignored only after device binding and structural benchmark validity are checked; it is never used to bypass dependency/version review.
+
+## Acceptance evidence
+
+`catalog/flask_app/tests/test_run_once_capability_evidence.py` verifies the installed policy boundary: old temporal expiry does not force evidence recollection, while benchmark dependency or implementation-version changes remain invalid and require explicit review. The CFI-5, CFI-4, CFI-3, and F8.5 Windows/Linux gates include that regression permanently.
+
+The existing CFI-5 route and core contribution suites continue to verify explicit intent, storage candidate-only behavior, authority delegation, disable/suspend fencing, and the strict core expiry semantics retained outside the installed run-once composition.
 
 ## Deliberate boundaries
 
