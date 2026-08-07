@@ -294,7 +294,7 @@ def _install_services_for_context(app: Flask) -> None:
             inspection_ttl_seconds=int(
                 app.config.get("CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS", 900)
             ),
-            clock=getattr(onboarding, "_clock"),
+            clock=onboarding._clock,
             system_observer=app.config.get("CAPABILITY_ONBOARDING_SYSTEM_OBSERVER"),
         )
         app.config["CAPABILITY_INSPECTION_SERVICE"] = inspection
@@ -310,7 +310,7 @@ def _install_services_for_context(app: Flask) -> None:
                 "CAPABILITY_ONBOARDING_BENCHMARK_DATABASE",
                 app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
             ),
-            clock=getattr(onboarding, "_clock"),
+            clock=onboarding._clock,
         )
         app.config["CAPABILITY_BENCHMARK_SERVICE"] = benchmarks
 
@@ -332,7 +332,7 @@ def _install_services_for_context(app: Flask) -> None:
                 "CAPABILITY_ONBOARDING_SETUP_LOADER",
                 load_settings,
             ),
-            clock=getattr(onboarding, "_clock"),
+            clock=onboarding._clock,
             candidate_ttl_seconds=int(
                 app.config.get("CAPABILITY_ONBOARDING_CONTRIBUTION_TTL_SECONDS", 900)
             ),
