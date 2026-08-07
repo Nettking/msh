@@ -30,8 +30,9 @@
   </div>
   {% endif %}
 
-  {% if contribution.reason %}
-  <p class="contribution-card__notice" role="status">{{ contribution.reason }}</p>
+  {% set reason = contribution.reason|default('') %}
+  {% if reason %}
+  <p class="contribution-card__notice" role="status">{{ reason }}</p>
   {% endif %}
 
   {% if interactive %}
