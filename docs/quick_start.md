@@ -15,9 +15,9 @@ Identity
   -> open Federation
 ```
 
-A current device inspection is sufficient to finish setup. Benchmarks and contribution decisions are optional follow-up work and do not block the normal workbench.
+Accepted device inspection evidence is sufficient to finish setup. Benchmarks and contribution decisions are optional follow-up work and do not block the normal workbench.
 
-Inspection and benchmark results are durable device evidence. Run them when establishing the device, or explicitly again after a relevant hardware, provider, model, service, or configuration change. Normal starts and updates reuse the saved evidence instead of rerunning probes.
+Inspection and benchmark results are durable device evidence. Run them when establishing the device, or explicitly again after a relevant hardware, provider, model, service, or configuration change. Normal starts and updates reuse the saved evidence instead of rerunning probes. Historical time-only expiry metadata does not by itself force another run in the installed product.
 
 ## Prerequisites
 
@@ -67,7 +67,7 @@ Use the explicit resume path when you want startup to reconnect the saved Federa
 start.cmd --resume
 ```
 
-Resume is evidence-preserving. It does **not** rerun device inspection or benchmarks, and it does not replace the device identity or create a new Federation. The long-running Flask app reconciles saved contribution intent once; current saved evidence may reactivate an explicitly enabled contribution, while stale evidence is not used to grant fresh activation.
+Resume is evidence-preserving. It does **not** rerun device inspection or benchmarks, and it does not replace the device identity or create a new Federation. The long-running Flask app reconciles saved contribution intent once; saved benchmark evidence may support an explicitly enabled contribution only while its benchmark identity, implementation version, and declared dependency inputs still match. A dependency/version change is not treated as fresh authority.
 
 `update.cmd` uses this resume path after a successful fast-forward update.
 
@@ -132,7 +132,7 @@ The mandatory setup is intentionally short:
 
 Finishing setup does not automatically grant recorder, language-model, compute, or storage contribution authority. Optional benchmarks and contribution choices remain available from the Federation pages.
 
-The supported production defaults keep inspection and standard benchmark evidence durable across ordinary restarts. Explicit **Inspect again** and **Run again** actions remain available when the device or a relevant dependency changes. The underlying evidence contracts still retain finite expiry and dependency/version invalidation; deployments may configure a shorter inspection lifetime with `MSH_INSPECTION_TTL_SECONDS` when required.
+The installed product uses run-once capability evidence. Explicit **Inspect again** and **Run again** actions remain available when the device or a relevant dependency changes, but elapsed time alone does not force either action. The frozen evidence records retain their original `expires_at` metadata without being rewritten. Benchmark identity, implementation-version, and declared dependency changes still invalidate saved benchmark evidence and require an explicit new run before it can support contribution reconciliation.
 
 ## First pages to open
 
@@ -219,4 +219,4 @@ Useful environment variables include:
 - `MSH_SCAN_DIRS` — comma-separated artifact scan roots.
 - `MSH_AI_MODEL` — selected Ollama model.
 - `OLLAMA_BASE_URL` — Ollama API URL.
-- `MSH_INSPECTION_TTL_SECONDS` — optional shorter inspection evidence lifetime; the supported default is a long finite safety horizon intended for explicit refresh.
+- `MSH_INSPECTION_TTL_SECONDS` — compatibility metadata horizon written into new inspection snapshots; installed-product refresh remains explicit rather than time-triggered.

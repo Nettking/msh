@@ -8,8 +8,10 @@ on:
       - "catalog/flask_app/capability_contribution_routes.py"
       - "catalog/flask_app/services/capability_contribution_components.py"
       - "catalog/flask_app/services/capability_contribution_service.py"
+      - "catalog/flask_app/services/run_once_capability_evidence.py"
       - "catalog/flask_app/templates/federation/onboarding/_contributions.html"
       - "catalog/flask_app/tests/test_capability_contribution_route.py"
+      - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
       - "catalog/capabilities/contributions/**"
       - "catalog/flask_app/capability_benchmark_routes.py"
       - "catalog/flask_app/services/capability_benchmark_service.py"
@@ -25,8 +27,10 @@ on:
       - "catalog/flask_app/capability_contribution_routes.py"
       - "catalog/flask_app/services/capability_contribution_components.py"
       - "catalog/flask_app/services/capability_contribution_service.py"
+      - "catalog/flask_app/services/run_once_capability_evidence.py"
       - "catalog/flask_app/templates/federation/onboarding/_contributions.html"
       - "catalog/flask_app/tests/test_capability_contribution_route.py"
+      - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
       - "catalog/capabilities/contributions/**"
       - "catalog/flask_app/capability_benchmark_routes.py"
       - "catalog/flask_app/services/capability_benchmark_service.py"
@@ -67,11 +71,14 @@ jobs:
           catalog/flask_app/capability_contribution_routes.py
           catalog/flask_app/services/capability_contribution_components.py
           catalog/flask_app/services/capability_contribution_service.py
+          catalog/flask_app/services/run_once_capability_evidence.py
           catalog/flask_app/tests/test_capability_contribution_route.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
       - name: Run CFI-5 and affected regressions
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_capability_contribution_route.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
           catalog/flask_app/tests/test_capability_benchmark_route.py
           catalog/flask_app/tests/test_capability_inspection_route.py
           catalog/flask_app/tests/test_capability_onboarding_route.py
@@ -97,7 +104,9 @@ jobs:
           catalog/flask_app/capability_contribution_routes.py
           catalog/flask_app/services/capability_contribution_components.py
           catalog/flask_app/services/capability_contribution_service.py
+          catalog/flask_app/services/run_once_capability_evidence.py
           catalog/flask_app/tests/test_capability_contribution_route.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
       - name: Diff hygiene
         shell: bash
         run: |

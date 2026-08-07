@@ -83,12 +83,12 @@ The steps have these boundaries:
 1. **Identity** creates or loads the stable identity of this MSH device.
 2. **Federation** reconnects, joins, or creates a Federation through an authenticated path.
 3. **Inspect** records and persists the device's supported local capabilities.
-4. **Finish setup** opens the normal workbench after a current inspection.
+4. **Finish setup** opens the normal workbench after accepted inspection evidence exists.
 5. **Federation** provides the read-only overview and entry points for optional follow-up work.
 
 Benchmarks and contribution decisions are optional after setup. Completing onboarding does not automatically grant recorder, language-model, compute, or storage contribution authority.
 
-Inspection and benchmark execution are explicit evidence-collection actions. Supported production defaults keep their results durable across ordinary starts and updates. Operators may explicitly run **Inspect again** or **Run again** after a relevant hardware, provider, model, service, or configuration change.
+Inspection and benchmark execution are explicit evidence-collection actions. The installed product reuses valid persisted evidence across ordinary starts and updates regardless of legacy time-only expiry metadata. Operators may explicitly run **Inspect again** or **Run again** after a relevant hardware, provider, model, service, or configuration change. Benchmark definition/version or declared dependency changes still require a new benchmark before that evidence can support contribution reconciliation.
 
 The older role-first settings carrier remains in the repository for compatibility until its separately reviewed retirement work is accepted. It is not the canonical user-facing onboarding model.
 
@@ -113,11 +113,11 @@ The resume operation is evidence-preserving:
 - it loads saved benchmark results rather than executing benchmark probes;
 - it does not change contribution authority in the one-shot resume process.
 
-The long-running Flask app owns the single automatic contribution reconciliation. Persisted intent is reconciled only when the saved inspection and benchmark review are accepted. If saved capability evidence is stale, enabled contribution intent is suspended through the existing fencing path rather than reactivated from stale evidence.
+The long-running Flask app owns the single automatic contribution reconciliation. Persisted intent is reconciled only when the saved inspection is device-bound and the saved benchmark review still matches current benchmark identity, implementation version, and declared dependency inputs. If those structural inputs changed, enabled contribution intent is suspended through the existing fencing path rather than reactivated from stale evidence. Elapsed wall-clock time by itself does not trigger inspection, benchmarking, or contribution suspension.
 
 `update.cmd` performs a fast-forward update and then invokes this resume path.
 
-The underlying inspection and benchmark contracts still use finite expiry plus benchmark dependency/version invalidation. The supported production defaults use a long finite safety horizon to make refresh operator-driven rather than restart-driven. A deployment that needs stricter inspection recency may set `MSH_INSPECTION_TTL_SECONDS` explicitly.
+The underlying frozen inspection and benchmark contracts still contain finite `expires_at` metadata, and the strict low-level evaluator remains available for contract and safety tests. The installed MSH product uses run-once composition: age alone is not an automatic refresh trigger, including for evidence written by older releases with a short TTL. Old evidence is not rewritten to appear newer. Explicit refresh remains available from the product surface.
 
 On Linux/macOS, ordinary `docker compose up -d` preserves the same mounted directories and named volumes. Inspection and benchmark reruns remain explicit actions from the product surface.
 

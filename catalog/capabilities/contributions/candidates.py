@@ -49,15 +49,19 @@ class ContributionCandidateGenerator:
         benchmark_definitions: Iterable[BenchmarkDefinition] = (),
         candidate_ttl_seconds: int = 900,
         now: Callable[[], datetime] = _utc_now,
+        enforce_evidence_expiry: bool = True,
     ) -> None:
         if isinstance(candidate_ttl_seconds, bool) or candidate_ttl_seconds <= 0:
             raise ValueError("candidate_ttl_seconds must be positive")
+        if not isinstance(enforce_evidence_expiry, bool):
+            raise TypeError("enforce_evidence_expiry must be boolean")
         self._sources = tuple(sources)
         self._definitions = {
             item.benchmark_id: item for item in benchmark_definitions
         }
         self._candidate_ttl_seconds = int(candidate_ttl_seconds)
         self._now = now
+        self._enforce_evidence_expiry = enforce_evidence_expiry
 
     def generate(
         self,
@@ -65,12 +69,16 @@ class ContributionCandidateGenerator:
         benchmark_results: Iterable[BenchmarkResult],
     ) -> tuple[CandidateRecommendation, ...]:
         now = self._now().astimezone(timezone.utc)
-        if inspection.expires_at <= now:
+        if self._enforce_evidence_expiry and inspection.expires_at <= now:
             return ()
         results = tuple(
             result
             for result in benchmark_results
-            if result.device_id == inspection.device_id and result.expires_at > now
+            if result.device_id == inspection.device_id
+            and (
+                not self._enforce_evidence_expiry
+                or result.expires_at > now
+            )
         )
         descriptors: dict[
             tuple[str, str, str], LocalContributionDescriptor
@@ -88,9 +96,11 @@ class ContributionCandidateGenerator:
                 descriptors[key] = descriptor
 
         recommendations: list[CandidateRecommendation] = []
-        expires_at = min(
-            inspection.expires_at,
-            now + timedelta(seconds=self._candidate_ttl_seconds),
+        generated_expires_at = now + timedelta(seconds=self._candidate_ttl_seconds)
+        expires_at = (
+            min(inspection.expires_at, generated_expires_at)
+            if self._enforce_evidence_expiry
+            else generated_expires_at
         )
         for descriptor in descriptors.values():
             evidence = self._evidence_for(descriptor, results)

@@ -10,10 +10,12 @@ on:
       - "catalog/flask_app/services/capability_benchmark_service.py"
       - "catalog/flask_app/services/capability_inspection_service.py"
       - "catalog/flask_app/services/capability_recovery_adapters.py"
+      - "catalog/flask_app/services/run_once_capability_evidence.py"
       - "catalog/flask_app/templates/federation/onboarding/_benchmarks.html"
       - "catalog/flask_app/tests/test_benchmark_runtime_parity.py"
       - "catalog/flask_app/tests/test_capability_benchmark_route.py"
       - "catalog/flask_app/tests/test_capability_inspection_route.py"
+      - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
       - "catalog/capabilities/benchmarking/**"
       - "catalog/federation/onboarding_models.py"
   push:
@@ -29,10 +31,12 @@ on:
       - "catalog/flask_app/services/capability_benchmark_service.py"
       - "catalog/flask_app/services/capability_inspection_service.py"
       - "catalog/flask_app/services/capability_recovery_adapters.py"
+      - "catalog/flask_app/services/run_once_capability_evidence.py"
       - "catalog/flask_app/templates/federation/onboarding/_benchmarks.html"
       - "catalog/flask_app/tests/test_benchmark_runtime_parity.py"
       - "catalog/flask_app/tests/test_capability_benchmark_route.py"
       - "catalog/flask_app/tests/test_capability_inspection_route.py"
+      - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
       - "catalog/capabilities/benchmarking/**"
       - "catalog/federation/onboarding_models.py"
 
@@ -72,15 +76,18 @@ jobs:
           catalog/flask_app/services/capability_benchmark_service.py
           catalog/flask_app/services/capability_inspection_service.py
           catalog/flask_app/services/capability_recovery_adapters.py
+          catalog/flask_app/services/run_once_capability_evidence.py
           catalog/flask_app/tests/test_benchmark_runtime_parity.py
           catalog/flask_app/tests/test_capability_benchmark_route.py
           catalog/flask_app/tests/test_capability_inspection_route.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
       - name: Run CFI-4 and affected regressions
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_benchmark_runtime_parity.py
           catalog/flask_app/tests/test_capability_benchmark_route.py
           catalog/flask_app/tests/test_capability_inspection_route.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
           catalog/flask_app/tests/test_capability_onboarding_route.py
           catalog/capabilities/tests/test_benchmarking_runner.py
           catalog/capabilities/tests/test_benchmarking_store_and_validity.py
@@ -105,9 +112,11 @@ jobs:
           catalog/flask_app/services/capability_benchmark_service.py
           catalog/flask_app/services/capability_inspection_service.py
           catalog/flask_app/services/capability_recovery_adapters.py
+          catalog/flask_app/services/run_once_capability_evidence.py
           catalog/flask_app/tests/test_benchmark_runtime_parity.py
           catalog/flask_app/tests/test_capability_benchmark_route.py
           catalog/flask_app/tests/test_capability_inspection_route.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
       - name: Diff hygiene
         shell: bash
         run: |

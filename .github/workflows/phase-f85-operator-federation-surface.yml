@@ -92,6 +92,7 @@ jobs:
           catalog/flask_app/tests/test_upload_analysis_jobs.py
           catalog/flask_app/tests/test_federation_auto_reconnect.py
           catalog/flask_app/tests/test_existing_setup_resume.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
           catalog/flask_app/tests/test_windows_start_script.py
           catalog/flask_app/tests/test_windows_update_script.py
           catalog/flask_app/tests/test_windows_volume_name_selection.py
@@ -118,12 +119,14 @@ jobs:
           catalog/flask_app/services/federation_pairing_install.py
           catalog/flask_app/services/local_capability_candidates.py
           catalog/flask_app/services/resilient_pairing_runtime.py
+          catalog/flask_app/services/run_once_capability_evidence.py
           catalog/flask_app/services/upload_analysis_job_service.py
           catalog/flask_app/tests/test_docs_viewer.py
           catalog/flask_app/tests/test_provider_federation_surface.py
           catalog/flask_app/tests/test_device_state_reset.py
           catalog/flask_app/tests/test_federation_auto_reconnect.py
           catalog/flask_app/tests/test_existing_setup_resume.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
           catalog/flask_app/tests/test_local_capability_candidates.py
           catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
           catalog/flask_app/tests/test_capability_runtime_startup.py

@@ -42,12 +42,16 @@ class ContributionService:
         policy: ContributionPolicyEvaluator,
         adapters: Sequence[ContributionActivationAdapter],
         now: Callable[[], datetime] = _utc_now,
+        enforce_candidate_expiry: bool = True,
     ) -> None:
+        if not isinstance(enforce_candidate_expiry, bool):
+            raise TypeError("enforce_candidate_expiry must be boolean")
         self._generator = generator
         self._store = store
         self._policy = policy
         self._adapters = tuple(adapters)
         self._now = now
+        self._enforce_candidate_expiry = enforce_candidate_expiry
         self._recommendations: dict[str, CandidateRecommendation] = {}
 
     def recommend(
@@ -167,7 +171,8 @@ class ContributionService:
             candidate = recommendation.candidate
             adapter = self._adapter(candidate)
             if (
-                candidate.expires_at <= self._now()
+                self._enforce_candidate_expiry
+                and candidate.expires_at <= self._now()
                 and current.desired_state is ContributionDesiredState.ENABLED
             ):
                 outcome = adapter.suspend(
@@ -262,7 +267,11 @@ class ContributionService:
             raise CandidateNotFoundError(
                 f"candidate is not in the current recommendation set: {candidate_id}"
             ) from exc
-        if require_current and recommendation.candidate.expires_at <= self._now():
+        if (
+            require_current
+            and self._enforce_candidate_expiry
+            and recommendation.candidate.expires_at <= self._now()
+        ):
             raise CandidateNotFoundError(f"candidate expired: {candidate_id}")
         return recommendation
 
