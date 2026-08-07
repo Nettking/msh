@@ -49,7 +49,7 @@ def test_default_local_compute_and_storage_are_benchmarkable_and_selectable(
             registry,
             probes=registration.inspection_probes,
             now=lambda: NOW,
-            system_observer=lambda: {},
+            system_observer=dict,
         )
         snapshot = inspector.inspect(device_id="device-local", revision=1)
 

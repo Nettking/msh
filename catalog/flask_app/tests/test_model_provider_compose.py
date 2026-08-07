@@ -10,7 +10,16 @@ def test_compose_defines_installable_language_model_provider() -> None:
     assert "model-provider:" in compose
     assert 'profiles: ["provider"]' in compose
     assert "${MSH_PROVIDER_BIND:-0.0.0.0}:${MSH_PROVIDER_PORT:-11434}:11434" in compose
-    assert "model_provider_models:/root/.ollama" in compose
+    assert (
+        "    volumes:\n"
+        "      - type: volume\n"
+        "        source: model_provider_models\n"
+        "        target: /root/.ollama"
+    ) in compose
+    assert (
+        "name: ${MSH_MODEL_PROVIDER_VOLUME_NAME:-msh_model_provider_models}"
+        in compose
+    )
     assert "no.msh.capability=language-model" in compose
     assert "model-provider-install:" in compose
     assert "OLLAMA_HOST=http://model-provider:11434" in compose

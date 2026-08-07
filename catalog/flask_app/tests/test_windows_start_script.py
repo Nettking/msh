@@ -182,11 +182,22 @@ def test_start_cmd_resume_runs_before_long_running_flask_container() -> None:
     )
     assert resume_command in script
     assert "docker compose stop flask" in script
-    assert (
-        script.index("docker compose stop flask")
-        < script.index(resume_command)
-        < script.index("docker compose up -d flask")
+
+    main_body = script.split("\n:resolve_runtime_state", maxsplit=1)[0]
+    resume_block = script.split(
+        "\n:run_existing_setup_resume",
+        maxsplit=1,
+    )[1].split(
+        "\n:ensure_ollama_model",
+        maxsplit=1,
+    )[0]
+    assert main_body.index("call :run_existing_setup_resume") < main_body.index(
+        "docker compose up -d flask"
     )
+    assert resume_block.index("docker compose stop flask") < resume_block.index(
+        resume_command
+    )
+
     assert (
         "docker compose exec -T flask python -m "
         "catalog.flask_app.services.existing_setup_resume"

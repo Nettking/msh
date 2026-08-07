@@ -49,6 +49,7 @@ capability_startup_transition_web = Blueprint(
 )
 
 _LEGACY_FALLBACK_SESSION_KEY = "capability_startup_legacy_fallback"
+_ROOT_HANDOFF_SESSION_KEY = "capability_startup_root_handoff_complete"
 _CONTRIBUTION_RECONCILE_EXTENSION_KEY = (
     "capability_contribution_startup_reconciled"
 )
@@ -301,6 +302,9 @@ def _startup_transition_gate_and_dispatch() -> Response | None:
         return redirect(url_for("capability_startup_transition_web.onboarding"))
 
     if flags["completed"]:
+        if request.path == "/" and not session.get(_ROOT_HANDOFF_SESSION_KEY):
+            session[_ROOT_HANDOFF_SESSION_KEY] = True
+            return redirect(url_for("federation_web.overview"))
         return None
 
     if request.path == "/":
@@ -375,7 +379,7 @@ def _run_transition(*, migration: bool) -> Response:
             step="finish",
         )
     else:
-        destination = url_for("web.overview")
+        destination = url_for("federation_web.overview")
     return redirect(destination, code=303)
 
 

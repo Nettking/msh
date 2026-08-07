@@ -1,153 +1,209 @@
-# Architecture
+# MSH architecture
 
-MSH is a Flask-first orchestration and analysis system for CNC telemetry. It keeps the web UI responsive while background runtime work prepares data, runs scripts, and exposes artifacts for inspection.
+Status: **current architecture reference**
 
-## Phase 1 local federation boundary
+Reviewed: **2026-08-07 Europe/Oslo**
 
-Federation's first implementation is local-only. Backend-neutral synchronous
-storage and capability-provider contracts sit in `catalog/federation`, with a
-process-local, thread-safe capability registry and a durable SQLite outbox. The
-registry is explicitly not durable and the outbox does not claim or deliver
-network work.
+MSH is a Flask-first CNC telemetry workbench with a trusted multi-device Federation layer. Local telemetry, operator workflows, and analysis remain usable without remote providers. Federation adds authenticated device identity, membership, capability contribution, storage authority, jobs, transport, and recovery without moving those authorities into the Flask request process.
 
-Recorder storage remains owned by `DurableRecorderStore`. Its adapter delegates
-the existing raw, detailed-observation, compatibility JSONL write sequence
-without changing paths or checkpoint behavior. Filesystem files and SQLite do
-**not** share an ACID transaction. A transactional SQLite prepared record first
-persists the immutable session, destination, schema, idempotency identity, and
-content hash. The recorder then writes its existing raw manifest and derived
-files before that prepared record becomes pending. After interruption, recorder
-recovery completes derived files and reconciliation activates only matching
-prepared records using their original persisted routing. Incomplete prepares
-are never advertised. Completed rows are retained rather than deleted,
-preserving acknowledgement and idempotency history.
+## Product model
 
-## Phase 2 opt-in relay-first session network
+One installation is one persistent MSH device.
 
-Phase 2 adds an independently runnable WebSocket relay and outbound-only node
-agent without changing the local Flask, recorder, workbench, JSONL, or
-AI-provider workflows. `catalog/relay/` owns the authenticated network
-boundary, `catalog/node/` owns persistent Ed25519 identity and durable replay
-state, and the transactional coordinator and authoritative session event log
-remain in `catalog/federation/`.
+A device may combine:
 
-The relay's SQLite control database durably owns enrollment, revocation,
-sessions, membership, invitation hashes, capability announcements,
-connectivity, audit records, request deduplication, and per-session ordered
-events. This event history is separate from the Phase 1 delivery outbox. Flask
-does not hold distributed coordinator authority, and node agents bind no
-inbound service port.
+- Flask workbench and documentation;
+- MTConnect recording and source access;
+- language-model service;
+- explicitly registered compute handlers;
+- storage capacity as a candidate or assigned provider;
+- authenticated relay or transport assistance;
+- future versioned capabilities.
 
-Transport envelopes use protocol major version 1 over bounded WebSocket
-frames. Authenticated membership checks and replay snapshots share SQLite
-transactions; event delivery is contiguous per connection, paged, and ordered
-only by coordinator revision. Command and event idempotency keys are retained
-as digests, while raw enrollment and invitation tokens are returned once and
-never stored. Public status is cursor-paged and excludes credential-shaped
-values, backend paths, and physical storage addresses.
+A device is not assigned one permanent product role. Internal authority roles such as storage primary, replica, job owner, administrator, member, provider, lease holder, or artifact grantee remain explicit backend states.
 
-The feature is disabled unless the relay profile or standalone relay process is
-started. See the
-[Phase 2 relay-first session runbook](implementation/federated_session_phase2_runbook.md)
-for secure defaults and a two-node exercise.
+## Required first-run composition
 
-## Dataflow
+```text
+Identity
+  -> Federation
+  -> Inspect
+  -> finish setup
+  -> open Federation
+```
+
+A current inspection is enough to complete setup. Benchmarks and contribution decisions are optional later actions.
+
+## Major boundaries
+
+```text
+Flask product surface
+  -> composition and public-safe projections
+  -> existing domain services and authorities
+  -> durable local or Federation state
+
+Device/node agent
+  -> persistent cryptographic identity
+  -> authenticated relay/control-plane connection
+  -> replay and reconnect state
+  -> logical capability routes
+
+Federation coordinator/control plane
+  -> membership and revocation
+  -> ordered events and revisions
+  -> provider and job authority
+  -> storage assignments, terms, leases, and fencing
+
+Capability providers
+  -> recorder
+  -> language model
+  -> registered compute handlers
+  -> storage providers
+```
+
+Flask presents product state and invokes reviewed service boundaries. It does not become the distributed coordinator, storage leader, provider authority, or job authority.
+
+## Identity, Federation, and membership
+
+`catalog/node/` owns persistent device identity and outbound Federation client behavior. `catalog/federation/` owns domain contracts and control-plane services. `catalog/relay/` provides the authenticated relay service.
+
+The current compatible product uses `federation_id` in the UI while retaining `session_id` as the internal protocol, isolation, persistence, replay, membership, job, provider, storage, and artifact boundary.
+
+Discovery identifies candidates. Trust and membership require an existing trusted binding, explicit authorized acceptance, or signed expiring pairing material. Public device IDs and network presence never grant authority.
+
+## Transport
+
+The supported transport model includes:
+
+- outbound authenticated node connections;
+- relay-first connectivity;
+- direct encrypted peer streams where available;
+- relay fallback;
+- signed route and rendezvous information;
+- bounded verified resumable object transfer;
+- reconnect and replay after interruption.
+
+Correctness cannot depend on direct peer connectivity. Private internal service ports must not be exposed publicly merely to simplify transport.
+
+## Device inspection and benchmarks
+
+Inspection discovers bounded supported local facts such as configured data sources, model availability, registered handlers, storage candidates, hardware, and network seams.
+
+Benchmarks are versioned evidence with explicit run, skip, cancel, expiry, invalidation, and rerun behavior. They describe suitability or capacity only. They cannot create membership, activate a provider, assign storage, dispatch a job, or grant artifact access.
+
+## Contribution lifecycle
+
+Contribution intent is distinct from inspection, benchmark evidence, Federation policy, provider health, activation, selection, and authority.
+
+Supported contribution behavior includes:
+
+- independent candidates for recorder, AI, registered compute, and storage;
+- enable, disable, suspend, and reconcile operations;
+- coexistence of several capabilities on one device;
+- authenticated expiring health and capacity;
+- no unrelated authority from enabling one capability;
+- no membership deletion when one contribution is disabled.
+
+## Storage authority
+
+Application components use logical storage contracts rather than connecting directly to arbitrary physical databases.
+
+Storage authority includes:
+
+- coordinator-assigned writable primary and zero or more replicas;
+- terms, leases, fencing tokens, and stale-write rejection;
+- immutable idempotent batches and object identities;
+- durable local outbox and acknowledgement policy;
+- authoritative manifests, hashes, watermarks, and missing ranges;
+- completeness-aware promotion;
+- explicit degraded state when no qualified complete candidate exists;
+- restart, catch-up, reinstatement, and returning-former-primary behavior without self-promotion.
+
+A benchmark creates a storage candidate only. It cannot assign primary or replica authority.
+
+## AI, compute, jobs, and artifacts
+
+Language-model and compute providers use capability-specific scheduling rather than storage primary/replica semantics.
+
+The current boundaries include:
+
+- authenticated provider enrollment and health;
+- logical provider selection;
+- remote AI invocation through authorized routes;
+- compute limited to explicitly registered local handlers;
+- versioned jobs and attempts;
+- durable job ownership;
+- duplicate suppression, timeout, retry, cancellation, and reassignment;
+- stale-worker fencing;
+- one logical committed result;
+- least-privilege job-scoped artifact authorization and verified publication.
+
+MSH does not transfer arbitrary executable code to compute providers.
+
+## Recorder and telemetry data flow
 
 ```mermaid
 flowchart LR
-    S[External source APIs] --> T[Source connectors]
-    T --> A[MSH-normalized JSONL data]
-    T --> U[Source sync state]
-    A --> B[Date discovery]
-    B --> C[Workflow session]
-    C --> D[Filtered data]
-    D --> E[Derived metrics]
-    E --> F[Analysis scripts]
-    D --> F
-    D --> G[Playback exports]
-    A --> I[Telemetry analytics cache]
-    I --> H[Flask views]
-    G --> H
-    F --> H
+    S[MTConnect and supported sources] --> R[Recorder or source connector]
+    R --> J[MSH-normalized JSONL]
+    R --> W[Source and recorder state]
+    J --> C[Telemetry cache and date discovery]
+    C --> F[Workflow session and filtering]
+    F --> A[Analysis and playback exports]
+    J --> L[Live and status projections]
+    A --> U[Flask workbench]
+    L --> U
+    R --> O[Authorized Federation storage outbox]
+    O --> P[Assigned logical storage route]
 ```
 
-The source connector layer is optional for historical/local JSONL workflows. It becomes important when data comes from external systems such as Observer Phoenix. Connectors must write MSH-compatible JSONL before shared workflow, cache, and playback code consumes the data.
+JSONL remains the local compatibility source. Recorder durability preserves raw and derived write ordering and checkpoints. Federation delivery is layered onto the existing local-first path; it must not make local recording depend on continuous remote availability.
 
-## Components
+## Flask application
 
-### Flask application
+`catalog/flask_app/` is the supported operator surface. It composes:
 
-`catalog/flask_app/` contains the primary UI. It registers routes for overview, control, status, playback, analyses, exploration, live telemetry, and startup choices. UI services cache short-lived snapshots so frequently refreshed pages do not repeatedly scan all sessions or artifacts.
+- capability-first onboarding;
+- Federation overview and detail projections;
+- local monitor, status, live, playback, source, and control views;
+- knowledge capture and compatibility export;
+- documentation browser;
+- AI explanation and connected-provider behavior;
+- compatibility setup where migration still requires it.
 
-### Orchestrator
+Federation pages use public-safe projections. They must not expose private endpoints, credentials, enrollment material, private keys, database paths, or unrestricted local configuration.
 
-`catalog/orchestrator/` owns runtime policy: webapp-first startup, latest-day bootstrap, best-effort script execution, historical catch-up, polling for new data, runtime state persistence, and startup mode decisions.
+## Local orchestration and analysis
 
-The orchestrator deliberately reuses `catalog/runner/` helpers instead of replacing all runner internals. This keeps behavior aligned between automatic runtime work and manual `/control` actions.
+`catalog/orchestrator/` manages local runtime policy and background preparation. `catalog/runner/` owns workflow sessions, filtering, script discovery, execution, and playback export. `catalog/common/` provides shared telemetry normalization, source state, cache, metrics, and timeline utilities.
 
-### Runner/session layer
+These local workflow responsibilities remain separate from Federation membership, provider, job, storage, and transport authority.
 
-`catalog/runner/` handles script discovery, hidden-folder filtering, workflow metadata, date filtering, isolated run workspaces, subprocess execution, and playback export preparation.
+## Persistence
 
-Scripts run in copied workspaces with session data linked or copied into `data/`. Environment variables such as `MSH_SESSION_ID`, `MSH_SESSION_DIR`, and `MSH_RUN_DIR` identify the active workflow session and run directory.
+Important durable state includes:
 
-### Source connectors
+- device identity and trusted Federation binding;
+- coordinator membership and ordered events;
+- onboarding, inspection, benchmark, and contribution intent state;
+- recorder configuration and checkpoints;
+- storage assignments, manifests, outboxes, terms, leases, and recovery records;
+- provider, job, attempt, artifact, and reconciliation state;
+- local telemetry and generated workflow results.
 
-`catalog/observer_phoenix/` is the first source connector package. It authenticates against Observer Phoenix, discovers machines and points, fetches trend measurements, and writes normalized JSONL under `data/sources/observer_phoenix/jsonl/`.
+Normal startup preserves state. A documented fresh reset must name exactly what is removed and what is retained.
 
-Source connectors should remain outside runner-visible script discovery. They prepare input data; they are not one-shot analysis scripts. Their persistent synchronization state belongs under `data/source_state/` and should not use a `.jsonl` extension.
+## Acceptance boundary
 
-### Common telemetry utilities
+Automated tests prove contracts and bounded product composition. They do not prove real MTConnect, Ollama/accelerator, multi-host network, target storage, or real-browser behavior.
 
-`catalog/common/` contains reusable loading, timestamp/machine normalization, basic metrics, state inference, event grouping, and timeline export utilities. New scripts should prefer these helpers so data assumptions remain consistent.
+Complete Federation v1 acceptance remains false until the required physical evidence validates against one exact candidate commit. See [Federation acceptance documentation](implementation/federation/acceptance/).
 
-`catalog/common/source_sync.py` contains small source-state helpers for external-source watermarks and metadata. It is intentionally generic and does not know any vendor API schema.
+## Related references
 
-`catalog/common/telemetry_cache.py` builds a disposable Parquet cache over raw JSONL and exposes DuckDB query helpers for production read paths such as live/latest telemetry, playback machine/day loading, exploration filtering, and machine/day summaries. JSONL remains the source of truth: rebuilding the cache still scans and loads the raw JSONL corpus before writing Parquet, so the current cache primarily accelerates repeated reads after a fresh cache exists rather than making ingestion incremental.
-
-### Script catalog
-
-Each `catalog/<script>/` directory contains a runnable analysis script and usually a script-specific README. The top-level [catalog/README.md](../catalog/README.md) is the canonical script catalog and workflow stage reference.
-
-## Runtime policies
-
-- **Startup handoff:** Flask starts before background data preparation completes.
-- **Bootstrap date policy:** process the latest discovered source day first.
-- **Execution policy:** best effort; continue after individual script failures and surface failure state.
-- **Catch-up policy:** process historical days incrementally instead of forcing a full rebuild on startup.
-- **Playback coverage:** automatic scripts are bounded to health checks plus timeline/playback generation; manual and deep/exploratory scripts are excluded from bootstrap/catch-up.
-- **Cache policy:** reuse session data, script outputs, playback exports, and the telemetry analytics cache when metadata signatures and expected files indicate they are still valid. The telemetry analytics cache is a cached read path for cache-covered fields; cache rebuilds are still full JSONL-to-Parquet rebuilds, and derived session-specific outputs continue using session artifacts.
-- **Source synchronization policy:** external sources should synchronize into MSH-normalized JSONL first, update source watermarks only after successful writes, and rely on the existing cache/session pipeline after synchronization.
-
-## Startup mode decisions
-
-When the runtime namespace already has state, the app can require a startup choice before background processing begins. Continuing preserves existing workflow/runtime artifacts. Starting clean resets the namespace-scoped runtime path. This decision is exposed at `/startup` rather than through the deprecated terminal menu.
-
-## Artifacts and scan roots
-
-The artifact catalog scans configured roots such as `results` and `data`. Artifacts can be generated by automatic scripts, manual scripts, playback export helpers, source synchronization steps, or external preparation. See the [Operator guide](operator_guide.md#core-concepts) for terminology.
-
-## Federated session network plan
-
-The default workbench architecture remains local. The opt-in Phase 2
-implementation now allows authenticated nodes on different physical networks
-to join a shared, versioned session through the relay-first control plane and
-advertise multiple capabilities. Later phases in the proposal define the
-user-contributed data plane, completeness-aware storage leadership, replicas,
-leases, terms, fencing tokens, direct peer transport, and distributed
-scheduling; none of those later-phase features are operational in Phase 2.
-
-See [Federated MSH Session Network](federated_session_network.md) for the full proposal, failure model, protocol boundaries, security requirements, and phased implementation plan.
-
-## Design limitations
-
-- The control panel is single-process and threaded; it is not a distributed job queue.
-- Recent control history is in memory and not durable across restarts.
-- Cache invalidation is intentionally lightweight and file/metadata based.
-- Telemetry analytics cache rebuilds are full rebuilds that load JSONL before writing Parquet; incremental updates are future work.
-- Telemetry cache status checks are cached briefly in request paths; forced status scans still recursively inspect source/cache files.
-- Telemetry cache queries currently open short-lived in-memory DuckDB connections; a persistent connection/cache manager is future work if refresh frequency requires it.
-- Live/latest telemetry cache reads currently use a window query over cached rows; a rolling latest-row cache or partition-pruned latest-query strategy is future work for multi-month datasets.
-- Source synchronization is currently a batch step, not a distributed ingestion service or message queue.
-- Manual and deep/exploratory analysis scripts may be slow and are excluded from bootstrap/catch-up.
-- Legacy and ingestion tools remain in the repository but are not runner-visible workflow steps.
+- [Federated network reference](federated_session_network.md)
+- [Capability-first Federation plan](implementation/federation/active/capability_first_federation_plan.md)
+- [Federation v1 scope](releases/federation_v1_scope.md)
+- [Data contract](data_contract.md)
+- [Workflow sessions](workflow_sessions.md)
+- [Operator guide](operator_guide.md)
