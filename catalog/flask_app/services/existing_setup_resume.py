@@ -1,9 +1,10 @@
-"""Refresh an existing MSH setup after a code update.
+"""Reconnect an existing MSH setup after a code update.
 
-This workflow deliberately reuses durable identity, Federation membership and
-operator choices. It never creates a device identity, creates a Federation, or
-replaces authority. After reconnecting, it refreshes local inspection and
-benchmark evidence and reconciles existing contribution intent.
+This workflow deliberately reuses durable identity, Federation membership,
+inspection evidence, benchmark evidence, and operator choices. It never creates
+a device identity, creates a Federation, replaces authority, runs inspection, or
+executes benchmarks. After reconnecting, it reads the saved evidence and
+reconciles existing contribution intent through the established authority paths.
 """
 
 from __future__ import annotations
@@ -38,7 +39,7 @@ class ExistingSetupRequired(RuntimeError):
 
 
 class ExistingSetupResumeError(RuntimeError):
-    """The existing setup could not be refreshed safely."""
+    """The existing setup could not be resumed safely."""
 
     def __init__(self, code: str) -> None:
         super().__init__(code)
@@ -50,6 +51,8 @@ class ResumeReport:
     device_id: str
     federation_id: str
     inspection_revision: int
+    # The historical field name is retained for compatibility. These entries
+    # describe saved benchmark evidence reused during resume; no run occurs.
     benchmark_runs: tuple[tuple[str, str, str], ...]
     unavailable_benchmarks: tuple[tuple[str, str], ...]
     warnings: tuple[str, ...]
@@ -61,7 +64,7 @@ class ResumeReport:
 
 
 class ExistingSetupResumeService:
-    """Reconnect and refresh only already-authorized local state."""
+    """Reconnect and reuse only already-authorized, already-persisted state."""
 
     def __init__(
         self,
@@ -101,7 +104,10 @@ class ExistingSetupResumeService:
         binding_loader = getattr(self.onboarding_service, "binding_or_none", None)
         reconnect = getattr(self.onboarding_service, "reconnect", None)
         context_loader = getattr(self.onboarding_service, "authorized_context", None)
-        if not all(callable(value) for value in (identity_loader, binding_loader, context_loader)):
+        if not all(
+            callable(value)
+            for value in (identity_loader, binding_loader, context_loader)
+        ):
             raise ExistingSetupResumeError("resume-service-unavailable")
 
         identity = identity_loader()
@@ -156,12 +162,13 @@ class ExistingSetupResumeService:
         if not device_id or not federation_id:
             raise ExistingSetupResumeError("invalid-authorized-context")
 
-        inspection_runner = getattr(self.inspection_service, "run", None)
-        if not callable(inspection_runner):
+        warnings: list[str] = []
+        inspection_loader = getattr(self.inspection_service, "load", None)
+        if not callable(inspection_loader):
             raise ExistingSetupResumeError("inspection-service-unavailable")
-        self._say("[2/4] Inspecting this device and saving fresh local evidence...")
+        self._say("[2/4] Loading the saved device inspection evidence...")
         try:
-            snapshot = inspection_runner()
+            snapshot = inspection_loader()
         except (
             AuthenticationError,
             AuthorizationError,
@@ -171,72 +178,75 @@ class ExistingSetupResumeService:
             TimeoutError,
         ) as exc:
             raise ExistingSetupResumeError(
-                self._code(exc, "inspection-refresh-failed")
+                self._code(exc, "inspection-evidence-load-failed")
             ) from exc
 
-        revision = getattr(snapshot, "revision", None)
-        if isinstance(revision, bool) or not isinstance(revision, int) or revision <= 0:
-            raise ExistingSetupResumeError("invalid-inspection-refresh")
-        self._say(f"      Inspection revision {revision} saved.")
+        revision = 0
+        if snapshot is None:
+            warnings.append("inspection-evidence-missing")
+            self._say(
+                "      No saved inspection evidence was found; inspection was not run automatically."
+            )
+        else:
+            snapshot_device_id = str(getattr(snapshot, "device_id", device_id) or "")
+            if snapshot_device_id != device_id:
+                raise ExistingSetupResumeError("inspection-device-mismatch")
+            revision_value = getattr(snapshot, "revision", None)
+            if (
+                isinstance(revision_value, bool)
+                or not isinstance(revision_value, int)
+                or revision_value <= 0
+            ):
+                raise ExistingSetupResumeError("invalid-inspection-evidence")
+            revision = revision_value
+            state_loader = getattr(self.inspection_service, "state", None)
+            inspection_state = (
+                str(state_loader(snapshot)) if callable(state_loader) else "current"
+            )
+            if inspection_state == "expired":
+                warnings.append("inspection-evidence-expired")
+                self._say(
+                    f"      Inspection revision {revision} is saved but expired; it was not rerun automatically."
+                )
+            else:
+                self._say(f"      Reusing inspection revision {revision}.")
 
-        planner = getattr(self.benchmark_service, "plan", None)
-        runner = getattr(self.benchmark_service, "run", None)
-        if not callable(planner) or not callable(runner):
+        result_loader = getattr(self.benchmark_service, "list_results", None)
+        if not callable(result_loader):
             raise ExistingSetupResumeError("benchmark-service-unavailable")
-
-        self._say("[3/4] Planning and running the current benchmark targets...")
+        self._say("[3/4] Loading saved benchmark evidence without executing checks...")
         try:
-            plan = tuple(planner(snapshot))
+            saved_results = tuple(result_loader())
         except (
+            AuthenticationError,
+            AuthorizationError,
             FederationOperationError,
             FederationValidationError,
             OSError,
             TimeoutError,
         ) as exc:
             raise ExistingSetupResumeError(
-                self._code(exc, "benchmark-plan-failed")
+                self._code(exc, "benchmark-evidence-load-failed")
             ) from exc
 
         runs: list[tuple[str, str, str]] = []
-        unavailable: list[tuple[str, str]] = []
-        warnings: list[str] = []
-        self._say(f"      Benchmark plan contains {len(plan)} target(s).")
-        for item in plan:
-            benchmark_id = str(getattr(item, "benchmark_id", "") or "")
+        for result in saved_results:
+            if str(getattr(result, "device_id", "") or "") != device_id:
+                continue
+            benchmark_id = str(getattr(result, "benchmark_id", "") or "")
             target_service_id = str(
-                getattr(item, "target_service_id", "") or ""
+                getattr(result, "target_service_id", "") or ""
             )
+            state = getattr(getattr(result, "state", None), "value", None)
+            state_text = str(state or getattr(result, "state", "unknown"))
             if not benchmark_id or not target_service_id:
-                warnings.append("invalid-benchmark-plan-item")
-                self._say("      Skipped an invalid benchmark plan item.")
+                warnings.append("invalid-benchmark-evidence")
                 continue
-            if not bool(getattr(item, "runnable", False)):
-                unavailable.append((benchmark_id, target_service_id))
-                self._say(
-                    f"      Unavailable: {benchmark_id} / {target_service_id}."
-                )
-                continue
-            self._say(f"      Running: {benchmark_id} / {target_service_id}...")
-            try:
-                result = runner(
-                    benchmark_id=benchmark_id,
-                    target_service_id=target_service_id,
-                )
-                state = getattr(getattr(result, "state", None), "value", None)
-                state_text = str(state or getattr(result, "state", "unknown"))
-                runs.append((benchmark_id, target_service_id, state_text))
-                self._say(f"      Completed: {state_text}.")
-            except (
-                AuthenticationError,
-                AuthorizationError,
-                FederationOperationError,
-                FederationValidationError,
-                OSError,
-                TimeoutError,
-            ) as exc:
-                code = self._code(exc, "benchmark-refresh-failed")
-                warnings.append(code)
-                self._say(f"      Warning: {benchmark_id} failed with {code}.")
+            runs.append((benchmark_id, target_service_id, state_text))
+        self._say(
+            f"      Reusing {len(runs)} saved benchmark result"
+            f"{'s' if len(runs) != 1 else ''}; no benchmark was executed."
+        )
 
         reconciled = 0
         contribution = self.contribution_service
@@ -257,7 +267,9 @@ class ExistingSetupResumeService:
             ) as exc:
                 code = self._code(exc, "contribution-reconciliation-failed")
                 warnings.append(code)
-                self._say(f"      Warning: contribution reconciliation failed with {code}.")
+                self._say(
+                    f"      Warning: contribution reconciliation failed with {code}."
+                )
         self._say(f"      Reconciled {reconciled} contribution intent(s).")
 
         return ResumeReport(
@@ -265,23 +277,18 @@ class ExistingSetupResumeService:
             federation_id=federation_id,
             inspection_revision=revision,
             benchmark_runs=tuple(runs),
-            unavailable_benchmarks=tuple(unavailable),
+            unavailable_benchmarks=(),
             warnings=tuple(dict.fromkeys(warnings)),
             reconciled_contributions=reconciled,
         )
 
 
 def _print_report(report: ResumeReport) -> None:
-    print("Existing MSH setup refreshed safely.", flush=True)
-    print(f"  Inspection revision: {report.inspection_revision}", flush=True)
-    print(f"  Benchmarks completed: {len(report.benchmark_runs)}", flush=True)
+    print("Existing MSH setup resumed safely.", flush=True)
+    print(f"  Saved inspection revision: {report.inspection_revision}", flush=True)
+    print(f"  Saved benchmark results reused: {len(report.benchmark_runs)}", flush=True)
     for benchmark_id, target, state in report.benchmark_runs:
         print(f"    - {benchmark_id} / {target}: {state}", flush=True)
-    if report.unavailable_benchmarks:
-        print(
-            f"  Benchmarks unavailable: {len(report.unavailable_benchmarks)}",
-            flush=True,
-        )
     print(
         f"  Contribution intents reconciled: {report.reconciled_contributions}",
         flush=True,
@@ -331,7 +338,7 @@ def main() -> int:
             return 3
         except Exception as exc:  # noqa: BLE001 - CLI boundary must not leak secrets
             print(
-                "Existing MSH setup refresh failed safely: "
+                "Existing MSH setup resume failed safely: "
                 f"{type(exc).__name__}",
                 flush=True,
             )
