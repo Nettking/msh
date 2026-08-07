@@ -1,6 +1,7 @@
 # Current task handoff
 
-Status: **current repository handoff**  
+Status: **current repository handoff**
+
 Reviewed: **2026-08-07 Europe/Oslo**
 
 ## Repository state
