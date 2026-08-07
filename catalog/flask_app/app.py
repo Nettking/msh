@@ -139,9 +139,13 @@ def create_app() -> Flask:
             "CAPABILITY_ONBOARDING_REMOTE_PAIRING_PATH",
             remote_pairing_path,
         )
+    # Device inspection is explicit operator evidence, not a startup probe. Keep
+    # a finite ten-year safety horizon by default so ordinary restarts and idle
+    # time do not force a fresh inspection. Operators can still override this
+    # with MSH_INSPECTION_TTL_SECONDS or use the explicit Inspect again action.
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS",
-        int(os.getenv("MSH_INSPECTION_TTL_SECONDS", "900")),
+        int(os.getenv("MSH_INSPECTION_TTL_SECONDS", "315360000")),
     )
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_CONTRIBUTION_TTL_SECONDS",
