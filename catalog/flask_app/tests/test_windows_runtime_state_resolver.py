@@ -27,7 +27,7 @@ def test_relay_probe_uses_encoded_python_across_native_boundary() -> None:
     assert "PSNativeCommandUseErrorActionPreference" in script
     assert "[Convert]::ToBase64String" in script
     assert "[System.Text.Encoding]::UTF8.GetBytes($probeCode)" in script
-    assert 'import base64;exec(base64.b64decode(\'$encoded\'))' in script
+    assert "import base64;exec(base64.b64decode('$encoded'))" in script
     assert '$arguments = @(' in script
     assert '& docker @arguments 2>$null' in script
     assert "-c $probeCode" not in script
@@ -49,19 +49,20 @@ def test_encoded_python_survives_windows_powershell_native_argument_forwarding(
 ) -> None:
     probe = tmp_path / "probe.ps1"
     probe.write_text(
-        """$ErrorActionPreference = \"Stop\"\n"
-        "$probeCode = @'\n"
-        "import json\n"
-        "import sys\n"
-        "print(json.dumps({\"line\": 7, \"node\": sys.argv[1]}, sort_keys=True))\n"
-        "'@\n"
-        "$encoded = [Convert]::ToBase64String(\n"
-        "    [System.Text.Encoding]::UTF8.GetBytes($probeCode)\n"
-        ")\n"
-        "$launcher = \"import base64;exec(base64.b64decode('$encoded'))\"\n"
-        "$output = (& python -c $launcher \"node with spaces\" 2>&1) -join \"`n\"\n"
-        "if ($LASTEXITCODE -ne 0) { Write-Error $output; exit $LASTEXITCODE }\n"
-        "Write-Output $output\n""",
+        """$ErrorActionPreference = "Stop"
+$probeCode = @'
+import json
+import sys
+print(json.dumps({"line": 7, "node": sys.argv[1]}, sort_keys=True))
+'@
+$encoded = [Convert]::ToBase64String(
+    [System.Text.Encoding]::UTF8.GetBytes($probeCode)
+)
+$launcher = "import base64;exec(base64.b64decode('$encoded'))"
+$output = (& python -c $launcher "node with spaces" 2>&1) -join "`n"
+if ($LASTEXITCODE -ne 0) { Write-Error $output; exit $LASTEXITCODE }
+Write-Output $output
+""",
         encoding="utf-8",
     )
 
