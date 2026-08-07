@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from flask import Flask, request
+from flask import Flask, current_app, request
 
 from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.federation.onboarding_models import ContributionDesiredState
@@ -28,7 +28,9 @@ from .provider_federation_routes import provider_federation_web
 from .routes import web
 from .server_setup_routes import server_setup_web
 from .services.capability_benchmark_service import get_capability_benchmark_service
-from .services.capability_contribution_service import get_capability_contribution_service
+from .services.capability_contribution_service import (
+    get_capability_contribution_service,
+)
 from .services.capability_inspection_service import get_capability_inspection_service
 from .services.capability_startup_transition_service import (
     get_capability_startup_transition_service,
@@ -86,7 +88,12 @@ def _resume_persisted_contributions_safely() -> tuple[int, int]:
             continue
         try:
             contribution.suspend(intent.candidate_id)
-        except Exception:  # noqa: BLE001 - best-effort fencing, never reactivate
+        except Exception as exc:  # noqa: BLE001 - fencing must remain best effort
+            current_app.logger.info(
+                "Contribution suspension unavailable during stale-evidence "
+                "recovery (%s)",
+                type(exc).__name__,
+            )
             continue
         suspended += 1
     return 0, suspended
