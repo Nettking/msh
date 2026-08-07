@@ -1,6 +1,7 @@
 # One-command setup
 
-Status: **current startup guide**  
+Status: **current startup guide**
+
 Reviewed: **2026-08-07**
 
 This page describes the supported default startup. It does not assign the device one permanent server role.
