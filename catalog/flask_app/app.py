@@ -6,6 +6,9 @@ import os
 
 from flask import Flask, current_app, request
 
+from catalog.capabilities.benchmarking.policy import (
+    DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS,
+)
 from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.federation.onboarding_models import ContributionDesiredState
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
@@ -50,7 +53,6 @@ from .services.server_setup_service import (
 from .source_routes import source_web
 
 _CONTRIBUTION_RECONCILE_EXTENSION_KEY = "capability_contribution_startup_reconciled"
-_DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS = 315_360_000
 
 
 def _resume_persisted_contributions_safely() -> tuple[int, int]:
@@ -195,15 +197,15 @@ def create_app() -> Flask:
             remote_pairing_path,
         )
     # Device inspection is explicit operator evidence, not a startup probe. Keep
-    # a finite ten-year safety horizon by default so ordinary restarts and idle
-    # time do not force a fresh inspection. Operators can still override this
-    # with MSH_INSPECTION_TTL_SECONDS or use the explicit Inspect again action.
+    # a finite safety horizon by default so ordinary restarts and idle time do
+    # not force a fresh inspection. Operators can still override this with
+    # MSH_INSPECTION_TTL_SECONDS or use the explicit Inspect again action.
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS",
         int(
             os.getenv(
                 "MSH_INSPECTION_TTL_SECONDS",
-                str(_DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS),
+                str(DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS),
             )
         ),
     )
