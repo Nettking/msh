@@ -375,7 +375,7 @@ def _run_transition(*, migration: bool) -> Response:
             step="finish",
         )
     else:
-        destination = url_for("web.overview")
+        destination = url_for("federation_web.overview")
     return redirect(destination, code=303)
 
 
