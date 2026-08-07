@@ -4,12 +4,24 @@ from types import SimpleNamespace
 
 import pytest
 
+from catalog.capabilities.benchmarking.adapters.compute import (
+    RegisteredComputeHandlerAdapter,
+)
+from catalog.capabilities.benchmarking.adapters.mtconnect import MtconnectSourceAdapter
+from catalog.capabilities.benchmarking.adapters.network import (
+    AuthenticatedNetworkPathAdapter,
+)
+from catalog.capabilities.benchmarking.adapters.ollama import OllamaBenchmarkAdapter
+from catalog.capabilities.benchmarking.adapters.storage import StorageCandidateAdapter
 from catalog.federation.errors import AuthenticationError
+from catalog.flask_app.app import create_app
 from catalog.flask_app.services.existing_setup_resume import (
     ExistingSetupRequired,
     ExistingSetupResumeError,
     ExistingSetupResumeService,
 )
+
+_DURABLE_EVIDENCE_TTL_SECONDS = 315_360_000
 
 
 class _Onboarding:
@@ -110,6 +122,26 @@ class _Contribution:
     def reconcile(self) -> tuple[object, ...]:
         self.reconcile_calls += 1
         return (object(), object())
+
+
+def test_production_evidence_defaults_survive_normal_restarts() -> None:
+    app = create_app()
+
+    assert (
+        app.config["CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS"]
+        == _DURABLE_EVIDENCE_TTL_SECONDS
+    )
+    assert OllamaBenchmarkAdapter.result_ttl_seconds == _DURABLE_EVIDENCE_TTL_SECONDS
+    assert MtconnectSourceAdapter.result_ttl_seconds == _DURABLE_EVIDENCE_TTL_SECONDS
+    assert (
+        RegisteredComputeHandlerAdapter.result_ttl_seconds
+        == _DURABLE_EVIDENCE_TTL_SECONDS
+    )
+    assert StorageCandidateAdapter.result_ttl_seconds == _DURABLE_EVIDENCE_TTL_SECONDS
+    assert (
+        AuthenticatedNetworkPathAdapter.result_ttl_seconds
+        == _DURABLE_EVIDENCE_TTL_SECONDS
+    )
 
 
 def test_resume_retries_reconnect_then_reuses_existing_evidence() -> None:
