@@ -12,6 +12,7 @@ from catalog.federation.onboarding_models import (
 )
 
 from ..inspection import InspectionContext, InspectionFinding
+from ..policy import DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS
 from ..runner import BenchmarkExecutionContext, BenchmarkObservation
 from .common import dependency_matches, safe_identifier
 
@@ -39,7 +40,7 @@ class RegisteredComputeHandlerAdapter:
         invalidation_inputs=("descriptor_fingerprint", "binding_revision"),
         privacy_classification="public-summary",
     )
-    result_ttl_seconds = 900
+    result_ttl_seconds = DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS
 
     def __init__(self, inventory: object) -> None:
         if not callable(getattr(inventory, "list_bindings", None)):

@@ -171,13 +171,13 @@ goto :resume_failed
 
 :resume_success
 set "MSH_OPEN_URL=%MSH_BASE_URL%/federation"
-echo Existing identity, Federation membership, inspection, benchmarks, and contribution intent are ready.
+echo Existing identity, Federation membership, saved capability evidence, and contribution intent are ready.
 goto :resume_complete
 
 :resume_partial
-set "MSH_OPEN_URL=%MSH_BASE_URL%/federation/benchmarks"
-echo Existing setup reconnected and refreshed with benchmark or reconciliation warnings.
-echo The benchmark page will open for review.
+set "MSH_OPEN_URL=%MSH_BASE_URL%/federation"
+echo Existing setup reconnected, but saved capability evidence needs explicit review.
+echo Federation will open without rerunning inspection or benchmarks.
 goto :resume_complete
 
 :resume_failed
@@ -266,9 +266,10 @@ exit /b 1
 :run_existing_setup_resume
 echo.
 echo Reconnecting the saved Federation before starting the webapp...
-echo The refresh will inspect this device, run its benchmark plan, and reconcile saved contribution intent.
+echo The resume will reuse saved inspection and benchmark evidence without rerunning either one.
+echo Saved contribution intent is left unchanged until the long-running Flask app validates the saved evidence.
 rem Ensure only the isolated resume process uses this device identity. The
-rem long-running Flask service starts after the refresh has completed.
+rem long-running Flask service starts after the read-only resume has completed.
 docker compose stop flask >nul 2>&1
 docker compose run --rm --no-deps --entrypoint python flask -m catalog.flask_app.services.existing_setup_resume
 exit /b %ERRORLEVEL%
@@ -359,12 +360,12 @@ exit /b 0
 :show_help
 echo Usage:
 echo   start.cmd            Start MSH and preserve all existing state.
-echo   start.cmd --resume   Reconnect, inspect, benchmark, reconcile, then start MSH.
+echo   start.cmd --resume   Reconnect, reuse saved capability evidence, then start MSH.
 echo   start.cmd --fresh    Reset device/Federation setup, verify it, then start MSH.
 echo.
 echo Normal and resume modes preserve identity, Federation membership, recordings,
 echo source configuration, recorder checkpoints, results, and downloaded models.
-echo Resume mode never creates or replaces identity or Federation authority.
+echo Resume mode never runs inspection or benchmarks and never replaces Federation authority.
 echo All modes install and verify the exact configured Ollama benchmark model.
 echo The --fresh option requires typing RESET and preserves recordings,
 echo source configuration, recorder checkpoints, results, and Ollama models.

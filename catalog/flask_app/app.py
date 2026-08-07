@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import os
 
-from flask import Flask, request
+from flask import Flask, current_app, request
 
+from catalog.capabilities.benchmarking.policy import (
+    DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS,
+)
 from catalog.common.artifact_refresh import register_artifact_catalog_refresh
+from catalog.federation.onboarding_models import ContributionDesiredState
 from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
 
 from .ai_routes import ai_web
@@ -26,6 +30,11 @@ from .operator_support_routes import operator_support_web
 from .provider_federation_routes import provider_federation_web
 from .routes import web
 from .server_setup_routes import server_setup_web
+from .services.capability_benchmark_service import get_capability_benchmark_service
+from .services.capability_contribution_service import (
+    get_capability_contribution_service,
+)
+from .services.capability_inspection_service import get_capability_inspection_service
 from .services.capability_startup_transition_service import (
     get_capability_startup_transition_service,
 )
@@ -42,6 +51,54 @@ from .services.server_setup_service import (
     ollama_status,
 )
 from .source_routes import source_web
+
+_CONTRIBUTION_RECONCILE_EXTENSION_KEY = "capability_contribution_startup_reconciled"
+
+
+def _resume_persisted_contributions_safely() -> tuple[int, int]:
+    """Reconcile saved intent only when saved capability evidence is accepted.
+
+    Returns ``(reconciled, suspended)``. Inspection and benchmarks are never run
+    here. If saved evidence is stale, enabled contributions are fenced through
+    the existing suspension path instead of being reactivated from stale input.
+    """
+
+    contribution = get_capability_contribution_service()
+    if not contribution.has_persisted_intents():
+        return 0, 0
+
+    inspection = get_capability_inspection_service()
+    snapshot = inspection.load()
+    if snapshot is None:
+        return 0, 0
+
+    evidence_current = inspection.state(snapshot) == "current"
+    if evidence_current:
+        benchmarks = get_capability_benchmark_service()
+        _summary, _cards, evidence_current = benchmarks.view_model(
+            snapshot,
+            connected=True,
+        )
+
+    if evidence_current:
+        return len(tuple(contribution.reconcile())), 0
+
+    suspended = 0
+    for intent in contribution.intents():
+        desired = getattr(intent, "desired_state", None)
+        if desired is not ContributionDesiredState.ENABLED:
+            continue
+        try:
+            contribution.suspend(intent.candidate_id)
+        except Exception as exc:  # noqa: BLE001 - fencing must remain best effort
+            current_app.logger.info(
+                "Contribution suspension unavailable during stale-evidence "
+                "recovery (%s)",
+                type(exc).__name__,
+            )
+            continue
+        suspended += 1
+    return 0, suspended
 
 
 def create_app() -> Flask:
@@ -139,9 +196,18 @@ def create_app() -> Flask:
             "CAPABILITY_ONBOARDING_REMOTE_PAIRING_PATH",
             remote_pairing_path,
         )
+    # Device inspection is explicit operator evidence, not a startup probe. Keep
+    # a finite safety horizon by default so ordinary restarts and idle time do
+    # not force a fresh inspection. Operators can still override this with
+    # MSH_INSPECTION_TTL_SECONDS or use the explicit Inspect again action.
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS",
-        int(os.getenv("MSH_INSPECTION_TTL_SECONDS", "900")),
+        int(
+            os.getenv(
+                "MSH_INSPECTION_TTL_SECONDS",
+                str(DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS),
+            )
+        ),
     )
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_CONTRIBUTION_TTL_SECONDS",
@@ -194,6 +260,39 @@ def create_app() -> Flask:
     )
     catalog.start_background_rescan_if_idle(reason="startup")
     get_runtime_manager().mark_app_started()
+
+    @app.before_request
+    def reconcile_persisted_contributions_from_current_evidence():
+        """Own the single automatic contribution reconciliation for this app."""
+
+        endpoint = request.endpoint or ""
+        if endpoint.startswith("static") or app.extensions.get(
+            _CONTRIBUTION_RECONCILE_EXTENSION_KEY
+        ):
+            return
+        # Set this before doing any work so the retained CFI-5/CFI-6 hooks see
+        # the reconciliation as owned here and cannot execute a second path.
+        app.extensions[_CONTRIBUTION_RECONCILE_EXTENSION_KEY] = True
+        try:
+            reconciled, suspended = _resume_persisted_contributions_safely()
+        except Exception as exc:  # noqa: BLE001 - startup must remain available
+            app.logger.info(
+                "Capability contribution startup reconcile unavailable (%s)",
+                type(exc).__name__,
+            )
+            return
+        if suspended:
+            app.logger.info(
+                "Suspended %d enabled contribution(s) because saved capability "
+                "evidence requires explicit refresh",
+                suspended,
+            )
+        elif reconciled:
+            app.logger.info(
+                "Reconciled %d persisted contribution choice(s) from saved "
+                "capability evidence",
+                reconciled,
+            )
 
     @app.before_request
     def resolve_completed_capability_runtime_choice():

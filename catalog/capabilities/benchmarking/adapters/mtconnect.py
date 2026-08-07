@@ -12,6 +12,7 @@ from catalog.federation.onboarding_models import (
 )
 
 from ..inspection import InspectionContext, InspectionFinding
+from ..policy import DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS
 from ..runner import BenchmarkExecutionContext, BenchmarkObservation
 from .common import dependency_matches, safe_identifier, stable_fingerprint
 
@@ -40,7 +41,7 @@ class MtconnectSourceAdapter:
         invalidation_inputs=("scan_fingerprint", "source_fingerprint"),
         privacy_classification="public-summary",
     )
-    result_ttl_seconds = 900
+    result_ttl_seconds = DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS
 
     def __init__(self, scan_supplier: Callable[[], Mapping[str, Any]]) -> None:
         if not callable(scan_supplier):
@@ -114,7 +115,9 @@ class MtconnectSourceAdapter:
         return InspectionFinding(
             resource_observations={
                 "mtconnect": {
-                    "scan_state": state if state in {"complete", "never", "unavailable", "running"} else "unknown",
+                    "scan_state": state
+                    if state in {"complete", "never", "unavailable", "running"}
+                    else "unknown",
                     "source_count": len(sources),
                     "machine_count": machine_count,
                 }
@@ -123,7 +126,9 @@ class MtconnectSourceAdapter:
             detected_data_sources=tuple(sorted(sources)),
             available_prerequisites=(MTCONNECT_PREREQUISITE,) if current else (),
             recommended_benchmark_ids=(self.definition.benchmark_id,) if current else (),
-            warnings=() if current else ("No current bounded MTConnect discovery evidence is available",),
+            warnings=()
+            if current
+            else ("No current bounded MTConnect discovery evidence is available",),
         )
 
     def benchmark(self, context: BenchmarkExecutionContext) -> BenchmarkObservation:
@@ -133,7 +138,9 @@ class MtconnectSourceAdapter:
             return BenchmarkObservation(
                 state=BenchmarkState.FAILED,
                 recommendation=BenchmarkRecommendation.UNSUPPORTED,
-                diagnostics=("MTConnect source is not present in the current discovery snapshot",),
+                diagnostics=(
+                    "MTConnect source is not present in the current discovery snapshot",
+                ),
             )
         if not dependency_matches(
             context.dependency_inputs,
@@ -142,7 +149,9 @@ class MtconnectSourceAdapter:
             return BenchmarkObservation(
                 state=BenchmarkState.FAILED,
                 recommendation=BenchmarkRecommendation.RERUN_REQUIRED,
-                diagnostics=("MTConnect discovery evidence changed before evaluation",),
+                diagnostics=(
+                    "MTConnect discovery evidence changed before evaluation",
+                ),
             )
         context.raise_if_cancelled()
         machines = source.get("machines", ())
@@ -168,7 +177,9 @@ class MtconnectSourceAdapter:
                 },
                 state=BenchmarkState.FAILED,
                 recommendation=BenchmarkRecommendation.NOT_RECOMMENDED,
-                diagnostics=("MTConnect source lacks current compatible probe evidence",),
+                diagnostics=(
+                    "MTConnect source lacks current compatible probe evidence",
+                ),
             )
         return BenchmarkObservation(
             metrics={

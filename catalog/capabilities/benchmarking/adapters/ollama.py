@@ -18,6 +18,7 @@ from catalog.federation.onboarding_models import (
 )
 
 from ..inspection import InspectionContext, InspectionFinding
+from ..policy import DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS
 from ..runner import BenchmarkExecutionContext, BenchmarkObservation
 from .common import (
     MAX_PROBE_PAYLOAD_BYTES,
@@ -120,8 +121,16 @@ class OllamaProbeTarget:
     max_response_bytes: int = MAX_PROBE_RESPONSE_BYTES
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "service_id", safe_identifier(self.service_id, "service_id"))
-        object.__setattr__(self, "display_label", safe_identifier(self.display_label, "display_label"))
+        object.__setattr__(
+            self,
+            "service_id",
+            safe_identifier(self.service_id, "service_id"),
+        )
+        object.__setattr__(
+            self,
+            "display_label",
+            safe_identifier(self.display_label, "display_label"),
+        )
         object.__setattr__(self, "model", safe_identifier(self.model, "model"))
         object.__setattr__(
             self,
@@ -204,7 +213,7 @@ class OllamaBenchmarkAdapter:
         invalidation_inputs=("service_fingerprint", "model_fingerprint"),
         privacy_classification="public-summary",
     )
-    result_ttl_seconds = 900
+    result_ttl_seconds = DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS
 
     def __init__(
         self,
@@ -265,7 +274,9 @@ class OllamaBenchmarkAdapter:
                 if target.model in names:
                     available = True
                 else:
-                    warnings.append("A configured Ollama model is not currently available")
+                    warnings.append(
+                        "A configured Ollama model is not currently available"
+                    )
             except Exception:  # noqa: BLE001 - probe failures become safe evidence
                 warnings.append("A trusted local Ollama target could not be inspected")
         prerequisites = (OLLAMA_PREREQUISITE,) if available else ()
@@ -293,7 +304,10 @@ class OllamaBenchmarkAdapter:
                 recommendation=BenchmarkRecommendation.UNSUPPORTED,
                 diagnostics=("Ollama target is not in the trusted local inventory",),
             )
-        if not dependency_matches(context.dependency_inputs, self.dependency_inputs(target.service_id)):
+        if not dependency_matches(
+            context.dependency_inputs,
+            self.dependency_inputs(target.service_id),
+        ):
             return BenchmarkObservation(
                 state=BenchmarkState.FAILED,
                 recommendation=BenchmarkRecommendation.RERUN_REQUIRED,
@@ -309,7 +323,10 @@ class OllamaBenchmarkAdapter:
             ],
             "options": {"num_predict": 8, "temperature": 0},
         }
-        timeout = min(target.request_timeout_seconds, max(0.001, context.remaining_seconds))
+        timeout = min(
+            target.request_timeout_seconds,
+            max(0.001, context.remaining_seconds),
+        )
         started = self._monotonic()
         try:
             response = self._requester(
@@ -348,7 +365,10 @@ class OllamaBenchmarkAdapter:
         eval_duration = response.get("eval_duration", 0)
         tokens_per_second = 0.0
         if isinstance(eval_duration, int) and eval_duration > 0 and generated_tokens > 0:
-            tokens_per_second = round(generated_tokens / (eval_duration / 1_000_000_000), 3)
+            tokens_per_second = round(
+                generated_tokens / (eval_duration / 1_000_000_000),
+                3,
+            )
         latency = elapsed_ms(started, finished)
         if latency <= 5_000:
             recommendation = BenchmarkRecommendation.RECOMMENDED

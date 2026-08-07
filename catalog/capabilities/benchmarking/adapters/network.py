@@ -13,6 +13,7 @@ from catalog.federation.onboarding_models import (
 )
 
 from ..inspection import InspectionContext, InspectionFinding
+from ..policy import DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS
 from ..runner import (
     BenchmarkCancelled,
     BenchmarkExecutionContext,
@@ -107,7 +108,7 @@ class AuthenticatedNetworkPathAdapter:
         invalidation_inputs=("path_fingerprint",),
         privacy_classification="public-summary",
     )
-    result_ttl_seconds = 300
+    result_ttl_seconds = DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS
 
     def __init__(self, targets: Sequence[AuthenticatedPathTarget]) -> None:
         if not targets or len(targets) > MAX_ADAPTER_TARGETS:
@@ -144,11 +145,16 @@ class AuthenticatedNetworkPathAdapter:
                 recommendation=BenchmarkRecommendation.UNSUPPORTED,
                 diagnostics=("Network path is not in the authenticated local inventory",),
             )
-        if not dependency_matches(context.dependency_inputs, self.dependency_inputs(target.path_id)):
+        if not dependency_matches(
+            context.dependency_inputs,
+            self.dependency_inputs(target.path_id),
+        ):
             return BenchmarkObservation(
                 state=BenchmarkState.FAILED,
                 recommendation=BenchmarkRecommendation.RERUN_REQUIRED,
-                diagnostics=("Authenticated network path changed before benchmark execution",),
+                diagnostics=(
+                    "Authenticated network path changed before benchmark execution",
+                ),
             )
         payload = b"msh-cf2b-authenticated-path"[: target.payload_bytes]
         if len(payload) < target.payload_bytes:
@@ -177,7 +183,8 @@ class AuthenticatedNetworkPathAdapter:
             "sample_count": target.sample_count,
             "successful_samples": len(samples),
             "median_latency_ms": round(
-                statistics.median(sample.latency_ms for sample in samples), 3
+                statistics.median(sample.latency_ms for sample in samples),
+                3,
             ),
             "payload_bytes": len(payload),
             "transferred_bytes": sum(sample.transferred_bytes for sample in samples),

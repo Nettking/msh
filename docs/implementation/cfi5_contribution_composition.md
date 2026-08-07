@@ -26,7 +26,20 @@ Recorder enablement is policy-blocked when the compatible recorder role and conf
 
 ## State and reconciliation
 
-Only CF1 `ContributionIntent` values and their revision history are persisted through the existing `SQLiteContributionIntentStore`. Startup reconciliation runs once when persisted intent exists. It may restore an explicitly enabled contribution, keep disabled or ask-later choices fenced, or suspend enabled intent whose inspection/candidate evidence has expired.
+Only CF1 `ContributionIntent` values and their revision history are persisted through the existing `SQLiteContributionIntentStore`.
+
+The long-running Flask application owns one automatic startup reconciliation. Before it can restore enabled intent, it loads the saved inspection and evaluates the saved benchmark review through the normal benchmark validity path. It never runs inspection or a benchmark as part of reconciliation.
+
+The startup outcomes are deliberately asymmetric:
+
+- accepted saved evidence may restore an explicitly enabled contribution;
+- disabled or ask-later choices remain fenced;
+- stale or expired capability evidence cannot reactivate enabled intent and instead sends enabled candidates through the existing suspension/fencing path where the candidate can still be resolved;
+- missing or malformed evidence fails closed and does not trigger an automatic benchmark or inspection run.
+
+The isolated Windows `start.cmd --resume` process performs no contribution authority change. It reconnects the saved Federation and reads persisted evidence; reconciliation is deferred to the long-running Flask application so there is only one automatic authority path.
+
+The explicit `POST /onboarding/contributions/reconcile` operation also requires the same current benchmark-review prerequisite used for contribution choices. A stale benchmark review therefore remains server-side blocked even if a client attempts to call the endpoint directly.
 
 Reconciliation does not recreate membership, enroll providers, allocate storage, assign jobs, grant leases, or invoke compute handlers. Disable and suspend fence future use without removing the device from its Federation.
 

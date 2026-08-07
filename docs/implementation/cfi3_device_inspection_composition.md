@@ -9,7 +9,7 @@ CFI-3 connects the already merged CF2-A inspection kernel and CF2-B concrete ins
 The integration is intentionally limited to:
 
 1. requiring the existing stable device identity and revalidated federation membership;
-2. running one bounded, local, read-only inspection;
+2. running one bounded, local, read-only inspection only from the explicit inspection action;
 3. persisting the frozen CF1 `DeviceInspectionSnapshot` with a monotonic revision;
 4. displaying coarse operating-system, architecture, resource, service, handler, data-source, warning, expiry, and recommended-check evidence in the existing CF5 Inspect step;
 5. preserving benchmark execution and contribution activation as later reviewed changes.
@@ -47,7 +47,7 @@ The following remain unchanged and return the existing safe `409` response:
 - `/onboarding/benchmarks/skip`;
 - `/onboarding/contributions`.
 
-## Persistence boundary
+## Persistence and refresh boundary
 
 CFI-3 stores one canonical `msh.onboarding.device-inspection.v1` object in the existing onboarding SQLite database.
 
@@ -64,6 +64,14 @@ The store enforces:
 
 The snapshot contains evidence only. It stores no internal session binding, enrollment or invitation material, endpoint, credential, local path, provider activation, job ownership, storage assignment, lease, term, grant, or fencing token.
 
+Inspection is not a startup or build step. A saved snapshot is reused across normal starts and `start.cmd --resume`; those paths call `load()` and never `run()`. A new revision is created only by the explicit inspection action.
+
+The frozen snapshot contract retains `expires_at` and `CapabilityInspectionService` retains strict TTL evaluation. The supported product default uses a finite ten-year safety horizon (`315360000` seconds) so elapsed wall-clock time during ordinary use does not turn inspection into a recurring startup task. Administrators may choose a shorter policy with `MSH_INSPECTION_TTL_SECONDS`.
+
+The operator should explicitly use **Inspect again** after a relevant hardware, service, provider, or local capability configuration change. The long safety horizon does not grant authority and does not cause MSH to infer that hardware can never change.
+
+Snapshots created by an older release keep their original immutable expiry. An installation upgrading from the historical short TTL may therefore require one final explicit inspection before it receives the new long-lived snapshot.
+
 ## UI states
 
 The Inspect step supports:
@@ -76,7 +84,7 @@ The Inspect step supports:
 - safe empty service and data-source states;
 - explicit recommended checks with a statement that no benchmark has run.
 
-An expired snapshot remains visible but is not marked complete. A degraded snapshot is not trusted or rendered from raw persisted bytes.
+An expired snapshot remains visible but is not marked complete. It is never automatically rerun by startup or update. A degraded snapshot is not trusted or rendered from raw persisted bytes.
 
 ## Authority and privacy controls
 
@@ -96,13 +104,15 @@ An expired snapshot remains visible but is not marked complete. A degraded snaps
 - identity and trusted-federation prerequisites;
 - safe inspection rendering and persistence;
 - no benchmark execution and no federation authority mutation;
-- monotonic rerun revisions and restart reopen;
-- expiry behavior;
+- monotonic explicit rerun revisions and restart reopen;
+- configurable short-TTL expiry behavior;
 - corrupt-state fail-closed behavior and raw-byte leakage prevention;
 - CSRF and request-context override rejection;
 - existing MTConnect snapshot composition without starting a scan;
 - configured Ollama read-only inventory without inference;
 - continued benchmark and contribution blocking.
+
+`catalog/flask_app/tests/test_existing_setup_resume.py` additionally protects the production lifecycle: update/resume may load persisted inspection evidence but must never invoke `CapabilityInspectionService.run()`.
 
 The dedicated CFI-3 workflow runs focused and affected tests, compilation, Compose validation, Ruff, and diff hygiene on Ubuntu and Windows. The permanent CF7-A gate is extended with the CFI-3 route suite and manifest classification.
 
@@ -110,7 +120,7 @@ The dedicated CFI-3 workflow runs focused and affected tests, compilation, Compo
 
 The following remain separate integration and acceptance changes:
 
-- benchmark run, skip, expiry, invalidation, cancellation, and rerun through Flask;
+- benchmark run, skip, invalidation, cancellation, and explicit rerun through Flask;
 - contribution candidate, intent, enable, disable, suspend, and reconcile actions;
 - compatibility-controlled migration writes and startup/runtime transition;
 - physical Windows and Linux installation checks;

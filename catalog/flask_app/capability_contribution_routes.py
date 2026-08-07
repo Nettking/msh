@@ -393,7 +393,9 @@ def reconcile_contributions() -> Response:
     try:
         _validate_control_payload(payload)
         _validate_server_bound_request(payload, require_command=True)
-        results = get_capability_contribution_service().reconcile()
+        service = get_capability_contribution_service()
+        service.recommend(require_benchmark_review=True)
+        results = service.reconcile()
     except AuthorizationError as exc:
         return _safe_error_response(exc.code, 403)
     except FederationOperationError as exc:
