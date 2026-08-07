@@ -481,6 +481,10 @@ def test_completed_setup_preserves_workbench_and_explicit_legacy_fallback(
     app = _route_app(monkeypatch, tmp_path / "completed", completed)
     client = app.test_client()
 
+    handoff = client.get("/")
+    assert handoff.status_code == 302
+    assert handoff.location == "/federation"
+
     workbench = client.get("/")
     assert workbench.status_code == 200
     assert workbench.location is None
