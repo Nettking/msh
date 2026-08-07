@@ -8,16 +8,21 @@ from flask import Flask
 from catalog.federation.projections import (
     BenchmarkResultsAdapter,
     BenchmarkSnapshot,
+    ContributionRecord,
     DeviceRecord,
     FederationAuthoritySnapshot,
     FederationProjectionService,
     JobAuthoritySnapshot,
     OnboardingSnapshot,
     ProjectionAdapters,
+    ProviderRecord,
     ProviderSnapshot,
     StorageAuthoritySnapshot,
 )
 from catalog.flask_app.services import federation_projection_service as composition
+from catalog.flask_app.services.federation_device_projection import (
+    CapabilityFirstFederationDeviceAdapter,
+)
 
 NOW = datetime(2026, 8, 3, 17, 30, tzinfo=timezone.utc)
 
@@ -94,6 +99,113 @@ def test_empty_optional_surfaces_are_not_false_degraded_states() -> None:
     }
     assert payload["device"]["state_label"] == "Connected"
     assert payload["devices"]["items"][0]["state_label"] == "Connected"
+
+
+def test_capability_first_device_alignment_is_read_only_and_deduplicated() -> None:
+    local_ai = ContributionRecord(
+        candidate_id="candidate-ai",
+        device_id="node-local",
+        capability_type="language-model",
+        protocol="msh-ai",
+        label="Local language model",
+        capacity={},
+        missing_prerequisites=(),
+        policy_state="allowed",
+        desired_state="enabled",
+        activation_state="active",
+        reason=None,
+    )
+    local_storage = ContributionRecord(
+        candidate_id="candidate-storage",
+        device_id="node-local",
+        capability_type="storage",
+        protocol="msh-storage",
+        label="Local storage",
+        capacity={},
+        missing_prerequisites=(),
+        policy_state="allowed",
+        desired_state="enabled",
+        activation_state="active",
+        reason=None,
+    )
+    onboarding = OnboardingSnapshot(
+        available=True,
+        reason_code="current",
+        federation_id="federation-local",
+        connection_state="connected",
+        trusted=True,
+        device_id="node-local",
+        contributions=(local_ai, local_storage),
+    )
+    providers = ProviderSnapshot(
+        available=True,
+        reason_code="current",
+        providers=(
+            ProviderRecord(
+                capability_id="candidate-ai",
+                node_id="node-local",
+                capability_type="language-model",
+                protocol="msh-ai",
+                protocol_version="1.0",
+                enrollment_state="approved",
+                health_state="current",
+                provider_status="ready",
+                activation_state="eligible",
+                reason_code="current",
+                max_concurrent_jobs=1,
+                active_jobs=0,
+                queue_depth=0,
+                utilization_millis=0,
+                can_manage=False,
+                allowed_actions=(),
+            ),
+            ProviderRecord(
+                capability_id="remote-compute",
+                node_id="node-remote",
+                capability_type="compute",
+                protocol="msh-compute",
+                protocol_version="1.0",
+                enrollment_state="approved",
+                health_state="current",
+                provider_status="ready",
+                activation_state="eligible",
+                reason_code="current",
+                max_concurrent_jobs=1,
+                active_jobs=0,
+                queue_depth=0,
+                utilization_millis=0,
+                can_manage=False,
+                allowed_actions=(),
+            ),
+        ),
+    )
+    federation = FederationAuthoritySnapshot(
+        available=True,
+        reason_code="current",
+        label="Local federation",
+        state="active",
+        revision=2,
+        devices=(
+            DeviceRecord("node-local", "This MSH device", "unknown", None, 0),
+            DeviceRecord("node-remote", "This MSH device", "offline", NOW, 0),
+        ),
+    )
+
+    snapshot = CapabilityFirstFederationDeviceAdapter(
+        _StaticAdapter(federation),
+        _StaticAdapter(onboarding),
+        _StaticAdapter(providers),
+    ).snapshot()
+    by_id = {device.node_id: device for device in snapshot.devices}
+
+    assert by_id["node-local"].label == "This MSH device"
+    assert by_id["node-local"].state == "connected"
+    assert by_id["node-local"].capability_count == 2
+    assert by_id["node-remote"].label == "Trusted MSH device"
+    assert by_id["node-remote"].state == "offline"
+    assert by_id["node-remote"].capability_count == 1
+    assert federation.devices[0].state == "unknown"
+    assert federation.devices[0].capability_count == 0
 
 
 def test_production_composition_reads_live_cfi_services(
@@ -220,7 +332,9 @@ def test_production_composition_reads_live_cfi_services(
 
     app = Flask(__name__)
     with app.app_context():
-        payload = composition.get_federation_projection_service().overview().to_dict()
+        service = composition.get_federation_projection_service()
+        payload = service.overview().to_dict()
+        devices = service.devices().to_dict()
 
     assert payload["state"] == "connected"
     assert payload["degraded"]["visible"] is False
@@ -229,4 +343,8 @@ def test_production_composition_reads_live_cfi_services(
     assert payload["contributions"][0]["label"] == "Configured language model"
     assert payload["contributions"][0]["activation_state"] == "active"
     assert _summary(payload, "Trusted devices")["detail"] == "1 connected now"
+    assert payload["devices"]["items"][0]["detail"] == "1 service"
+    assert devices["items"][0]["state"] == "connected"
+    assert devices["items"][0]["state_label"] == "Online"
+    assert devices["items"][0]["value"] == "1 service"
     assert "session-private" not in str(payload)
