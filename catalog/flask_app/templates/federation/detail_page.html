@@ -73,7 +73,11 @@
       <div>
         <span class="federation-eyebrow">{{ vm.title }}</span>
         <h3>{{ vm['items']|length }} visible {{ 'item' if vm['items']|length == 1 else 'items' }}</h3>
+        {% if vm.active_section == 'benchmarks' %}
+        <p>Results are read-only evidence. Run again uses the existing bounded local benchmark action and grants no authority.</p>
+        {% else %}
         <p>Only safe read-only projection data is shown here.</p>
+        {% endif %}
       </div>
       <a class="federation-text-link" href="/federation">Back to overview</a>
     </header>
@@ -81,6 +85,7 @@
     {% if vm['items'] %}
     <ul class="federation-entity-list">
       {% for item in vm['items'] %}
+      {% set item_action = federation_item_actions.get(item.key) if federation_item_actions else none %}
       <li>
         <div>
           <strong>{{ item.label }}</strong>
@@ -88,12 +93,25 @@
           {% if item.details %}
           <dl class="federation-detail-list">
             {% for detail in item.details %}
-            <div><dt>{{ detail.label }}</dt><dd>{{ detail.value }}</dd></div>
+            <div>
+              <dt>{{ 'Recorded expiry' if vm.active_section == 'benchmarks' and detail.label == 'Expires' else detail.label }}</dt>
+              <dd>{{ detail.value }}</dd>
+            </div>
             {% endfor %}
           </dl>
           {% endif %}
         </div>
-        {{ status_badge(item.state, item.state_label) }}
+        <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap">
+          {{ status_badge(item.state, item.state_label) }}
+          {% if item_action %}
+          <form method="post" action="{{ item_action.url }}" style="margin:0">
+            <input type="hidden" name="_csrf_token" value="{{ federation_csrf_token }}">
+            <input type="hidden" name="benchmark_id" value="{{ item_action.benchmark_id }}">
+            <input type="hidden" name="target_service_id" value="{{ item_action.target_service_id }}">
+            <button class="federation-button federation-button--secondary" type="submit">{{ item_action.label }}</button>
+          </form>
+          {% endif %}
+        </div>
       </li>
       {% endfor %}
     </ul>
