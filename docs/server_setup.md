@@ -1,7 +1,7 @@
 # Server setup and deployment
 
 Status: **current administrator guide**  
-Reviewed: **2026-08-06**
+Reviewed: **2026-08-07**
 
 MSH is designed to run as a persistent device that may host several independent capabilities. The normal product setup does not assign the device one permanent role.
 
@@ -39,7 +39,7 @@ start.cmd
 - builds the relay, Flask, and recorder images;
 - starts the relay, Ollama, recorder, and Flask services;
 - installs the configured Ollama model when it is missing;
-- preserves existing device and data state;
+- preserves existing device, capability-evidence, and data state;
 - opens the workbench after readiness checks pass.
 
 Windows web access is local-only by default through `127.0.0.1`. The launcher prints the resolved URL and may select a different host port if `5000` is occupied.
@@ -82,11 +82,13 @@ The steps have these boundaries:
 
 1. **Identity** creates or loads the stable identity of this MSH device.
 2. **Federation** reconnects, joins, or creates a Federation through an authenticated path.
-3. **Inspect** records the device's supported local capabilities.
+3. **Inspect** records and persists the device's supported local capabilities.
 4. **Finish setup** opens the normal workbench after a current inspection.
 5. **Federation** provides the read-only overview and entry points for optional follow-up work.
 
 Benchmarks and contribution decisions are optional after setup. Completing onboarding does not automatically grant recorder, language-model, compute, or storage contribution authority.
+
+Inspection and benchmark execution are explicit evidence-collection actions. Supported production defaults keep their results durable across ordinary starts and updates. Operators may explicitly run **Inspect again** or **Run again** after a relevant hardware, provider, model, service, or configuration change.
 
 The older role-first settings carrier remains in the repository for compatibility until its separately reviewed retirement work is accepted. It is not the canonical user-facing onboarding model.
 
@@ -98,15 +100,26 @@ A normal start preserves all existing state:
 start.cmd
 ```
 
-On Windows, use the explicit resume operation when startup should reconnect the saved Federation, refresh inspection, run the benchmark plan, and reconcile saved contribution intent before opening the workbench:
+On Windows, use the explicit resume operation after an update when startup should reconnect the saved Federation and verify that persisted capability evidence is available before opening the workbench:
 
 ```cmd
 start.cmd --resume
 ```
 
-The resume operation retains the existing identity and Federation. Depending on the result, it opens the Federation overview, benchmark review, guided repair, or onboarding page.
+The resume operation is evidence-preserving:
 
-On Linux/macOS, ordinary `docker compose up -d` preserves the same mounted directories and named volumes. Capability refresh and reconciliation remain available from the Federation product surface.
+- it retains the existing identity and Federation;
+- it loads the saved inspection snapshot rather than running inspection;
+- it loads saved benchmark results rather than executing benchmark probes;
+- it does not change contribution authority in the one-shot resume process.
+
+The long-running Flask app owns the single automatic contribution reconciliation. Persisted intent is reconciled only when the saved inspection and benchmark review are accepted. If saved capability evidence is stale, enabled contribution intent is suspended through the existing fencing path rather than reactivated from stale evidence.
+
+`update.cmd` performs a fast-forward update and then invokes this resume path.
+
+The underlying inspection and benchmark contracts still use finite expiry plus benchmark dependency/version invalidation. The supported production defaults use a long finite safety horizon to make refresh operator-driven rather than restart-driven. A deployment that needs stricter inspection recency may set `MSH_INSPECTION_TTL_SECONDS` explicitly.
+
+On Linux/macOS, ordinary `docker compose up -d` preserves the same mounted directories and named volumes. Inspection and benchmark reruns remain explicit actions from the product surface.
 
 ## Fresh-device reset
 
