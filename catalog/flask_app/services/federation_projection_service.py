@@ -33,6 +33,7 @@ from .capability_onboarding_service import (
     AuthorizedOnboardingContext,
     get_capability_onboarding_service,
 )
+from .federation_device_projection import CapabilityFirstFederationDeviceAdapter
 from .upload_analysis_job_service import get_upload_analysis_job_service
 
 _OPERATOR_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
@@ -251,21 +252,27 @@ def get_federation_projection_service() -> FederationProjectionService:
                 )
             )
 
+        onboarding_adapter = OnboardingContractsAdapter(
+            binding=binding,
+            inspection=inspection,
+            candidates=candidates,
+            intents=intents,
+        )
+        federation_adapter = FederationAuthorityAdapter(
+            coordinator,
+            actor_node_id=actor_node_id,
+            internal_session_id=internal_session_id,
+        )
         adapters = ProjectionAdapters(
-            onboarding=OnboardingContractsAdapter(
-                binding=binding,
-                inspection=inspection,
-                candidates=candidates,
-                intents=intents,
-            ),
+            onboarding=onboarding_adapter,
             providers=provider_adapter,
             benchmarks=_benchmark_adapter(
                 inspection_failed=inspection_failed
             ),
-            federation=FederationAuthorityAdapter(
-                coordinator,
-                actor_node_id=actor_node_id,
-                internal_session_id=internal_session_id,
+            federation=CapabilityFirstFederationDeviceAdapter(
+                federation_adapter,
+                onboarding_adapter,
+                provider_adapter,
             ),
             storage=_storage_adapter(internal_session_id),
             jobs=_job_adapter(internal_session_id),
