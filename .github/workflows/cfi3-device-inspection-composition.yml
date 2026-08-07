@@ -7,8 +7,10 @@ on:
       - "catalog/flask_app/app.py"
       - "catalog/flask_app/capability_inspection_routes.py"
       - "catalog/flask_app/services/capability_inspection_service.py"
+      - "catalog/flask_app/services/run_once_capability_evidence.py"
       - "catalog/flask_app/templates/federation/onboarding/_inspect.html"
       - "catalog/flask_app/tests/test_capability_inspection_route.py"
+      - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
       - "catalog/capabilities/benchmarking/**"
       - "catalog/federation/onboarding_models.py"
       - "catalog/flask_app/services/mtconnect_discovery_service.py"
@@ -22,8 +24,10 @@ on:
       - "catalog/flask_app/app.py"
       - "catalog/flask_app/capability_inspection_routes.py"
       - "catalog/flask_app/services/capability_inspection_service.py"
+      - "catalog/flask_app/services/run_once_capability_evidence.py"
       - "catalog/flask_app/templates/federation/onboarding/_inspect.html"
       - "catalog/flask_app/tests/test_capability_inspection_route.py"
+      - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
       - "catalog/capabilities/benchmarking/**"
       - "catalog/federation/onboarding_models.py"
       - "catalog/flask_app/services/mtconnect_discovery_service.py"
@@ -62,11 +66,14 @@ jobs:
           python -m compileall -q
           catalog/flask_app/capability_inspection_routes.py
           catalog/flask_app/services/capability_inspection_service.py
+          catalog/flask_app/services/run_once_capability_evidence.py
           catalog/flask_app/tests/test_capability_inspection_route.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
       - name: Run CFI-3 and affected regressions
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_capability_inspection_route.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
           catalog/flask_app/tests/test_capability_onboarding_route.py
           catalog/capabilities/tests/test_benchmarking_inspection.py
           catalog/capabilities/tests/test_benchmarking_adapters.py
@@ -86,7 +93,9 @@ jobs:
           catalog/flask_app/app.py
           catalog/flask_app/capability_inspection_routes.py
           catalog/flask_app/services/capability_inspection_service.py
+          catalog/flask_app/services/run_once_capability_evidence.py
           catalog/flask_app/tests/test_capability_inspection_route.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
       - name: Diff hygiene
         shell: bash
         run: |
