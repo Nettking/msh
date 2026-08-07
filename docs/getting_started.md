@@ -1,6 +1,6 @@
 # Getting started with MSH
 
-Status: **current user guide**  
+Status: **current user guide**
 Reviewed: **2026-08-07**
 
 This guide gives you the mental model you need before using MSH. If you only want to install and start the software, go directly to the [Quick start](quick_start.md).
