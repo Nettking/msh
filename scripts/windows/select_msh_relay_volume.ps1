@@ -166,7 +166,7 @@ print(json.dumps(result, sort_keys=True))
 
 try {
     $nodeId = Get-SavedNodeId
-    $candidates = Get-RelayCandidates
+    $candidates = @(Get-RelayCandidates)
     $image = Find-ProbeImage
     $probes = @()
 
@@ -195,7 +195,7 @@ try {
             Sort-Object memberships, sessions, nodes, size -Descending |
             Select-Object -First 1)
         if ($memberMatch.Count -gt 0) {
-            $selected = [string]$memberMatch[0].volume
+            $selected = [string]($memberMatch[0].volume)
         }
     }
 
@@ -205,7 +205,7 @@ try {
             Sort-Object sessions, nodes, size -Descending |
             Select-Object -First 1)
         if ($populated.Count -gt 0) {
-            $selected = [string]$populated[0].volume
+            $selected = [string]($populated[0].volume)
         }
     }
 
@@ -214,7 +214,7 @@ try {
             $selected = "msh_relay_state"
         }
         elseif ($candidates.Count -gt 0) {
-            $selected = [string]$candidates[0]
+            $selected = [string]($candidates[0])
         }
         else {
             $selected = "msh_relay_state"
