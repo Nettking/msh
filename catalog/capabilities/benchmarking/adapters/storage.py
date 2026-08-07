@@ -13,6 +13,7 @@ from catalog.federation.onboarding_models import (
 )
 
 from ..inspection import InspectionContext, InspectionFinding
+from ..policy import DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS
 from ..runner import BenchmarkCancelled, BenchmarkExecutionContext, BenchmarkObservation
 from .common import (
     MAX_ADAPTER_TARGETS,
@@ -45,8 +46,16 @@ class StorageCandidateTarget:
     payload_bytes: int = 256
 
     def __post_init__(self) -> None:
-        object.__setattr__(self, "candidate_id", safe_identifier(self.candidate_id, "candidate_id"))
-        object.__setattr__(self, "display_label", safe_identifier(self.display_label, "display_label"))
+        object.__setattr__(
+            self,
+            "candidate_id",
+            safe_identifier(self.candidate_id, "candidate_id"),
+        )
+        object.__setattr__(
+            self,
+            "display_label",
+            safe_identifier(self.display_label, "display_label"),
+        )
         object.__setattr__(
             self,
             "candidate_fingerprint",
@@ -90,9 +99,7 @@ class StorageCandidateAdapter:
         invalidation_inputs=("candidate_fingerprint",),
         privacy_classification="public-summary",
     )
-    # Evidence is explicitly refreshed by the operator. Keep a finite ten-year
-    # safety horizon so normal restarts and idle time do not force reruns.
-    result_ttl_seconds = 315_360_000
+    result_ttl_seconds = DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS
 
     def __init__(
         self,
@@ -112,7 +119,9 @@ class StorageCandidateAdapter:
         self._monotonic = monotonic
 
     def dependency_inputs(self, candidate_id: str) -> dict[str, str]:
-        return {"candidate_fingerprint": self._targets[candidate_id].candidate_fingerprint}
+        return {
+            "candidate_fingerprint": self._targets[candidate_id].candidate_fingerprint
+        }
 
     def __call__(self, context: InspectionContext) -> InspectionFinding:
         return InspectionFinding(
@@ -133,9 +142,14 @@ class StorageCandidateAdapter:
             return BenchmarkObservation(
                 state=BenchmarkState.FAILED,
                 recommendation=BenchmarkRecommendation.UNSUPPORTED,
-                diagnostics=("Storage candidate is not in the trusted local probe inventory",),
+                diagnostics=(
+                    "Storage candidate is not in the trusted local probe inventory",
+                ),
             )
-        if not dependency_matches(context.dependency_inputs, self.dependency_inputs(target.candidate_id)):
+        if not dependency_matches(
+            context.dependency_inputs,
+            self.dependency_inputs(target.candidate_id),
+        ):
             return BenchmarkObservation(
                 state=BenchmarkState.FAILED,
                 recommendation=BenchmarkRecommendation.RERUN_REQUIRED,
