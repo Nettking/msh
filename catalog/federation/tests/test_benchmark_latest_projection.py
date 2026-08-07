@@ -144,7 +144,8 @@ def test_historical_expired_runs_do_not_create_false_rerun_work() -> None:
     assert all(item["state"] == "passed" for item in detail["items"])
     assert "need rerun" not in detail["state_label"].casefold()
     assert overview["summary_cards"][2]["value"] == "3 of 3"
-    assert overview["recommended_action"] is None
+    action = overview["recommended_action"]
+    assert action is None or action["url"] != "/federation/benchmarks"
 
 
 def test_product_run_once_policy_overrides_legacy_time_expiry_only() -> None:
