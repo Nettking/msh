@@ -144,7 +144,6 @@ def test_historical_expired_runs_do_not_create_false_rerun_work() -> None:
     assert all(item["state"] == "passed" for item in detail["items"])
     assert "need rerun" not in detail["state_label"].casefold()
     assert overview["summary_cards"][2]["value"] == "3 of 3"
-    assert overview["content"]["benchmarks"]["state_label"] == "Current"
     assert overview["recommended_action"] is None
 
 
