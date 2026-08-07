@@ -346,5 +346,5 @@ def test_production_composition_reads_live_cfi_services(
     assert payload["devices"]["items"][0]["detail"] == "1 service"
     assert devices["items"][0]["state"] == "connected"
     assert devices["items"][0]["state_label"] == "Online"
-    assert devices["items"][0]["value"] == "1 service"
+    assert devices["items"][0]["detail"] == "1 service"
     assert "session-private" not in str(payload)
