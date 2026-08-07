@@ -1,6 +1,7 @@
 # Post-v1 product roadmap
 
-Status: **active product roadmap**  
+Status: **active product roadmap**
+
 Reviewed: **2026-08-07 Europe/Oslo**
 
 This roadmap describes product work after the merged capability-first Federation baseline. It does not override the active Federation implementation plan, acceptance manifest, or release-closeout plan.
