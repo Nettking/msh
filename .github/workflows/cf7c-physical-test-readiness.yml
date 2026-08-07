@@ -13,6 +13,7 @@ on:
       - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
       - "docs/implementation/cf7c_physical_test_readiness.md"
+      - "docs/implementation/federation/acceptance/cf7c_physical_test_readiness.md"
   push:
     branches:
       - agent/cf7c-physical-test-readiness
@@ -27,6 +28,7 @@ on:
       - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
       - "docs/implementation/cf7c_physical_test_readiness.md"
+      - "docs/implementation/federation/acceptance/cf7c_physical_test_readiness.md"
 
 permissions:
   contents: read
