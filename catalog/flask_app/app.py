@@ -201,7 +201,7 @@ def create_app() -> Flask:
 
         runtime_manager = get_runtime_manager()
         if not runtime_manager.requires_startup_choice():
-            return None
+            return
         try:
             flags = get_capability_startup_transition_service().capability_flags()
         except Exception as exc:  # noqa: BLE001 - legacy gate remains fail-closed
@@ -209,9 +209,9 @@ def create_app() -> Flask:
                 "Capability runtime request handoff unavailable (%s)",
                 type(exc).__name__,
             )
-            return None
+            return
         if not bool(flags.get("completed")) or not bool(flags.get("runtime")):
-            return None
+            return
         accepted, _message = runtime_manager.choose_startup_mode(
             "continue_existing"
         )
@@ -219,7 +219,7 @@ def create_app() -> Flask:
             app.logger.warning(
                 "Completed capability runtime could not clear legacy startup choice"
             )
-        return None
+        return
 
     # CFI-6 owns capability-first startup and migration before CFI-5 and the
     # retained role-first compatibility gates. It persists intent only and
