@@ -2,9 +2,9 @@
 
 This workflow deliberately reuses durable identity, Federation membership,
 inspection evidence, benchmark evidence, and operator choices. It never creates
-a device identity, creates a Federation, replaces authority, runs inspection, or
-executes benchmarks. After reconnecting, it reads the saved evidence and
-reconciles existing contribution intent through the established authority paths.
+a device identity, creates a Federation, replaces authority, runs inspection,
+executes benchmarks, or reconciles contribution authority. The long-running
+Flask app owns the single evidence-gated contribution reconciliation.
 """
 
 from __future__ import annotations
@@ -185,7 +185,8 @@ class ExistingSetupResumeService:
         if snapshot is None:
             warnings.append("inspection-evidence-missing")
             self._say(
-                "      No saved inspection evidence was found; inspection was not run automatically."
+                "      No saved inspection evidence was found; inspection was not "
+                "run automatically."
             )
         else:
             snapshot_device_id = str(getattr(snapshot, "device_id", device_id) or "")
@@ -206,7 +207,8 @@ class ExistingSetupResumeService:
             if inspection_state == "expired":
                 warnings.append("inspection-evidence-expired")
                 self._say(
-                    f"      Inspection revision {revision} is saved but expired; it was not rerun automatically."
+                    f"      Inspection revision {revision} is saved but expired; "
+                    "it was not rerun automatically."
                 )
             else:
                 self._say(f"      Reusing inspection revision {revision}.")
@@ -248,29 +250,11 @@ class ExistingSetupResumeService:
             f"{'s' if len(runs) != 1 else ''}; no benchmark was executed."
         )
 
-        reconciled = 0
-        contribution = self.contribution_service
-        self._say("[4/4] Reconciling previously saved contribution intent...")
-        if contribution is not None:
-            has_intents = getattr(contribution, "has_persisted_intents", None)
-            reconcile = getattr(contribution, "reconcile", None)
-            try:
-                if callable(has_intents) and has_intents() and callable(reconcile):
-                    reconciled = len(tuple(reconcile()))
-            except (
-                AuthenticationError,
-                AuthorizationError,
-                FederationOperationError,
-                FederationValidationError,
-                OSError,
-                TimeoutError,
-            ) as exc:
-                code = self._code(exc, "contribution-reconciliation-failed")
-                warnings.append(code)
-                self._say(
-                    f"      Warning: contribution reconciliation failed with {code}."
-                )
-        self._say(f"      Reconciled {reconciled} contribution intent(s).")
+        self._say("[4/4] Leaving saved contribution intent unchanged...")
+        self._say(
+            "      The long-running Flask app will reconcile it once, after "
+            "validating saved capability evidence."
+        )
 
         return ResumeReport(
             device_id=device_id,
@@ -279,7 +263,7 @@ class ExistingSetupResumeService:
             benchmark_runs=tuple(runs),
             unavailable_benchmarks=(),
             warnings=tuple(dict.fromkeys(warnings)),
-            reconciled_contributions=reconciled,
+            reconciled_contributions=0,
         )
 
 
@@ -289,10 +273,7 @@ def _print_report(report: ResumeReport) -> None:
     print(f"  Saved benchmark results reused: {len(report.benchmark_runs)}", flush=True)
     for benchmark_id, target, state in report.benchmark_runs:
         print(f"    - {benchmark_id} / {target}: {state}", flush=True)
-    print(
-        f"  Contribution intents reconciled: {report.reconciled_contributions}",
-        flush=True,
-    )
+    print("  Contribution authority changes: deferred to Flask startup", flush=True)
     for warning in report.warnings:
         print(f"  Warning: {warning}", flush=True)
 
