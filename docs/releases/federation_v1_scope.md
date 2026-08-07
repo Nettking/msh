@@ -1,6 +1,7 @@
 # MSH Federation v1 scope
 
-Status: **pre-release scope definition**  
+Status: **pre-release scope definition**
+
 Reviewed: **2026-08-07 Europe/Oslo**
 
 This document defines the intended trusted Federation v1 boundary. It does not declare that a release tag exists or that end-to-end physical acceptance has passed.
