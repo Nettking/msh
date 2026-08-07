@@ -21,6 +21,8 @@ from catalog.federation.projections import (
     assert_public_projection,
 )
 
+from .capability_onboarding_routes import _csrf_token
+from .services.capability_benchmark_service import get_capability_benchmark_service
 from .services.federation_projection_service import (
     get_federation_projection_service,
 )
@@ -55,6 +57,82 @@ def _safe_projection(page: FederationPage) -> dict[str, object]:
         return assert_public_projection(fallback.project(page).to_dict())
 
 
+def _benchmark_item_actions(
+    projection: dict[str, object],
+) -> dict[str, dict[str, str]]:
+    """Map visible local benchmark results to the existing bounded run action.
+
+    The Federation GET surface remains read-only. This helper only exposes a
+    form when the authenticated local benchmark service says the current
+    benchmark/target pair is runnable. The POST itself stays owned by CFI-4 and
+    revalidates CSRF, device identity, Federation context, inspection plan, and
+    target availability before executing anything.
+    """
+
+    try:
+        service = get_capability_benchmark_service()
+        context = service.onboarding_service.authorized_context()
+        snapshot = service.inspection_service.load()
+        if context is None or snapshot is None:
+            return {}
+        device_id = context.credentials.identity.node_id
+        if snapshot.device_id != device_id:
+            return {}
+
+        _summary, cards, _complete = service.view_model(
+            snapshot,
+            connected=True,
+        )
+        runnable: set[tuple[str, str]] = set()
+        for card in cards:
+            if not isinstance(card, dict) or not bool(card.get("can_run")):
+                continue
+            benchmark_id = card.get("benchmark_id")
+            target_service_id = card.get("target_service_id")
+            if isinstance(benchmark_id, str) and isinstance(target_service_id, str):
+                runnable.add((benchmark_id, target_service_id))
+
+        latest: dict[tuple[str, str], object] = {}
+        for result in service.list_results():
+            if result.device_id != device_id:
+                continue
+            key = (result.benchmark_id, result.target_service_id)
+            if key not in runnable:
+                continue
+            previous = latest.get(key)
+            if previous is None or (
+                result.finished_at,
+                result.run_id,
+            ) > (
+                previous.finished_at,
+                previous.run_id,
+            ):
+                latest[key] = result
+
+        visible_run_ids = {
+            item.get("key")
+            for item in projection.get("items", [])
+            if isinstance(item, dict) and isinstance(item.get("key"), str)
+        }
+        actions: dict[str, dict[str, str]] = {}
+        for (benchmark_id, target_service_id), result in latest.items():
+            if result.run_id not in visible_run_ids:
+                continue
+            actions[result.run_id] = {
+                "url": "/onboarding/benchmarks/run",
+                "label": "Run again",
+                "benchmark_id": benchmark_id,
+                "target_service_id": target_service_id,
+            }
+        return actions
+    except Exception as exc:  # noqa: BLE001 - controls fail closed
+        current_app.logger.warning(
+            "Federation benchmark actions unavailable (%s)",
+            type(exc).__name__,
+        )
+        return {}
+
+
 def _page_response(page: FederationPage) -> Response:
     template = (
         "federation_overview.html"
@@ -62,11 +140,18 @@ def _page_response(page: FederationPage) -> Response:
         else "federation/detail_page.html"
     )
     projection = _safe_projection(page)
+    item_actions = (
+        _benchmark_item_actions(projection)
+        if page is FederationPage.BENCHMARKS
+        else {}
+    )
     response = make_response(
         render_template(
             template,
             federation_overview=projection,
             federation_page=projection,
+            federation_item_actions=item_actions,
+            federation_csrf_token=_csrf_token() if item_actions else None,
         )
     )
     response.headers["Cache-Control"] = "no-store"
