@@ -1,6 +1,7 @@
 # MSH architecture
 
-Status: **current architecture reference**  
+Status: **current architecture reference**
+
 Reviewed: **2026-08-07 Europe/Oslo**
 
 MSH is a Flask-first CNC telemetry workbench with a trusted multi-device Federation layer. Local telemetry, operator workflows, and analysis remain usable without remote providers. Federation adds authenticated device identity, membership, capability contribution, storage authority, jobs, transport, and recovery without moving those authorities into the Flask request process.
