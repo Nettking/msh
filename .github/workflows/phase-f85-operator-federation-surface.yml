@@ -93,6 +93,7 @@ jobs:
           catalog/flask_app/tests/test_federation_auto_reconnect.py
           catalog/flask_app/tests/test_existing_setup_resume.py
           catalog/flask_app/tests/test_windows_start_script.py
+          catalog/flask_app/tests/test_windows_update_script.py
           catalog/flask_app/tests/test_windows_volume_name_selection.py
           catalog/flask_app/test_navigation_smoke.py
           catalog/federation/tests/test_onboarding_projection_policy.py
@@ -130,6 +131,7 @@ jobs:
           catalog/flask_app/tests/test_data_upload.py
           catalog/flask_app/tests/test_upload_analysis_jobs.py
           catalog/flask_app/tests/test_windows_start_script.py
+          catalog/flask_app/tests/test_windows_update_script.py
           catalog/flask_app/tests/test_windows_volume_name_selection.py
           catalog/federation/projections/onboarding_adapter.py
           catalog/federation/projections/storage_job_adapters.py
