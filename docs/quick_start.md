@@ -1,7 +1,7 @@
 # Quick start
 
 Status: **current user guide**  
-Reviewed: **2026-08-06**
+Reviewed: **2026-08-07**
 
 This guide describes the normal supported way to start MSH and complete capability-first onboarding.
 
@@ -16,6 +16,8 @@ Identity
 ```
 
 A current device inspection is sufficient to finish setup. Benchmarks and contribution decisions are optional follow-up work and do not block the normal workbench.
+
+Inspection and benchmark results are durable device evidence. Run them when establishing the device, or explicitly again after a relevant hardware, provider, model, service, or configuration change. Normal starts and updates reuse the saved evidence instead of rerunning probes.
 
 ## Prerequisites
 
@@ -41,7 +43,7 @@ The launcher builds and starts the current core services:
 - Flask workbench;
 - managed recorder.
 
-It also checks that the configured Ollama model is installed and downloads it when necessary. Existing identity, Federation, recorder, model, and data state are preserved during normal starts.
+It also checks that the configured Ollama model is installed and downloads it when necessary. Existing identity, Federation, inspection, benchmark, recorder, model, and data state are preserved during normal starts.
 
 The web interface is limited to the local MSH computer by default. Open:
 
@@ -57,15 +59,17 @@ http://localhost:5000/onboarding
 
 The actual web port may differ when port `5000` is already occupied. `start.cmd` prints the resolved address before opening the browser.
 
-### Reconnect and refresh an existing setup
+### Reconnect an existing setup after an update
 
-Use the explicit resume path when you want startup to reconnect the saved Federation, refresh inspection, run the benchmark plan, and reconcile saved contribution intent before opening the workbench:
+Use the explicit resume path when you want startup to reconnect the saved Federation and verify that the existing local capability evidence can be reused before opening the workbench:
 
 ```cmd
 start.cmd --resume
 ```
 
-This does not replace the device identity or create a new Federation.
+Resume is evidence-preserving. It does **not** rerun device inspection or benchmarks, and it does not replace the device identity or create a new Federation. The long-running Flask app reconciles saved contribution intent once; current saved evidence may reactivate an explicitly enabled contribution, while stale evidence is not used to grant fresh activation.
+
+`update.cmd` uses this resume path after a successful fast-forward update.
 
 ### Start as a fresh device
 
@@ -114,7 +118,7 @@ Then open:
 http://localhost:5000/onboarding
 ```
 
-Normal `docker compose` starts preserve device, Federation, recorder, model, and data state.
+Normal `docker compose` starts preserve device, Federation, inspection, benchmark, recorder, model, and data state. Inspection and benchmark execution remain explicit browser actions.
 
 ## Complete first-run onboarding
 
@@ -122,11 +126,13 @@ The mandatory setup is intentionally short:
 
 1. **Identity** — create or load the stable identity for this MSH device.
 2. **Federation** — reconnect, join, or create the user-facing Federation through an authenticated path.
-3. **Inspect** — inspect the device's supported local capabilities.
+3. **Inspect** — inspect the device's supported local capabilities and persist that evidence.
 4. **Finish setup** — enable the normal workbench without granting optional contribution authority.
 5. **Open Federation** — review connected devices and available capabilities.
 
 Finishing setup does not automatically grant recorder, language-model, compute, or storage contribution authority. Optional benchmarks and contribution choices remain available from the Federation pages.
+
+The supported production defaults keep inspection and standard benchmark evidence durable across ordinary restarts. Explicit **Inspect again** and **Run again** actions remain available when the device or a relevant dependency changes. The underlying evidence contracts still retain finite expiry and dependency/version invalidation; deployments may configure a shorter inspection lifetime with `MSH_INSPECTION_TTL_SECONDS` when required.
 
 ## First pages to open
 
@@ -213,3 +219,4 @@ Useful environment variables include:
 - `MSH_SCAN_DIRS` — comma-separated artifact scan roots.
 - `MSH_AI_MODEL` — selected Ollama model.
 - `OLLAMA_BASE_URL` — Ollama API URL.
+- `MSH_INSPECTION_TTL_SECONDS` — optional shorter inspection evidence lifetime; the supported default is a long finite safety horizon intended for explicit refresh.
