@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - ".github/workflows/cf7b-product-physical-acceptance.yml"
+      - "start.cmd"
+      - "update.cmd"
+      - "scripts/windows/**"
       - "catalog/federation/tests/cf7_acceptance/**"
       - "docs/implementation/cf7b_product_physical_acceptance.md"
       - "docs/implementation/cf7_acceptance_harness.md"
@@ -18,6 +21,9 @@ on:
       - "agent/cf7b-*"
     paths:
       - ".github/workflows/cf7b-product-physical-acceptance.yml"
+      - "start.cmd"
+      - "update.cmd"
+      - "scripts/windows/**"
       - "catalog/federation/tests/cf7_acceptance/**"
       - "docs/implementation/cf7b_product_physical_acceptance.md"
       - "docs/implementation/cf7_acceptance_harness.md"
@@ -124,6 +130,9 @@ jobs:
           catalog/flask_app/tests/test_provider_federation_surface.py
           catalog/flask_app/tests/test_recorder_control_service.py
           catalog/flask_app/tests/test_ai_runtime_integration.py
+          catalog/flask_app/tests/test_windows_start_script.py
+          catalog/flask_app/tests/test_windows_update_script.py
+          catalog/flask_app/tests/test_windows_volume_name_selection.py
       - name: Run contribution and projection contracts
         run: >-
           python -m pytest -o addopts= -q
@@ -145,6 +154,7 @@ jobs:
           catalog/federation/tests/cf7_acceptance/physical_evidence.py
           catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
           catalog/federation/tests/cf7_acceptance/test_product_acceptance.py
+          catalog/flask_app/tests/test_windows_update_script.py
       - name: Diff hygiene
         shell: bash
         run: |
