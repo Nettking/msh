@@ -11,7 +11,7 @@ The integration is intentionally limited to:
 1. requiring the existing stable device identity and revalidated federation membership;
 2. running one bounded, local, read-only inspection only from the explicit inspection action;
 3. persisting the frozen CF1 `DeviceInspectionSnapshot` with a monotonic revision;
-4. displaying coarse operating-system, architecture, resource, service, handler, data-source, warning, expiry, and recommended-check evidence in the existing CF5 Inspect step;
+4. displaying coarse operating-system, architecture, resource, service, handler, data-source, warning, temporal-metadata, and recommended-check evidence in the existing CF5 Inspect step;
 5. preserving benchmark execution and contribution activation as later reviewed changes.
 
 ## Production composition
@@ -66,25 +66,24 @@ The snapshot contains evidence only. It stores no internal session binding, enro
 
 Inspection is not a startup or build step. A saved snapshot is reused across normal starts and `start.cmd --resume`; those paths call `load()` and never `run()`. A new revision is created only by the explicit inspection action.
 
-The frozen snapshot contract retains `expires_at` and `CapabilityInspectionService` retains strict TTL evaluation. The supported product default uses a finite ten-year safety horizon (`315360000` seconds) so elapsed wall-clock time during ordinary use does not turn inspection into a recurring startup task. Administrators may choose a shorter policy with `MSH_INSPECTION_TTL_SECONDS`.
+The frozen snapshot contract retains `expires_at`, and the base `CapabilityInspectionService` retains strict TTL evaluation for isolated CF2/CFI contract tests. The installed MSH product composes `RunOnceCapabilityInspectionService`, which treats a valid device-bound saved snapshot as current regardless of elapsed wall-clock time. This product policy applies equally to snapshots written by older releases with the historical short TTL; upgrade does not require a migration rewrite or one final inspection rerun.
 
-The operator should explicitly use **Inspect again** after a relevant hardware, service, provider, or local capability configuration change. The long safety horizon does not grant authority and does not cause MSH to infer that hardware can never change.
+The operator can still explicitly use **Inspect again** after a relevant hardware, service, provider, or local capability configuration change. MSH does not silently infer such a change from elapsed time, and normal startup/update never performs the inspection automatically.
 
-Snapshots created by an older release keep their original immutable expiry. An installation upgrading from the historical short TTL may therefore require one final explicit inspection before it receives the new long-lived snapshot.
+`expires_at` remains immutable historical/compatibility metadata. The installed product does not extend or rewrite an old snapshot to make it appear newer.
 
 ## UI states
 
-The Inspect step supports:
+The installed Inspect step supports:
 
 - blocked before federation connection;
 - ready before the first run;
-- current after a successful run;
-- expired after the configured TTL;
+- current after a saved valid inspection exists, including legacy snapshots whose temporal metadata is in the past;
 - degraded when persisted evidence cannot be read safely;
 - safe empty service and data-source states;
 - explicit recommended checks with a statement that no benchmark has run.
 
-An expired snapshot remains visible but is not marked complete. It is never automatically rerun by startup or update. A degraded snapshot is not trusted or rendered from raw persisted bytes.
+Strict TTL expiry remains covered at the base service/kernel boundary, but elapsed time alone is not an installed-product rerun state. A degraded snapshot is not trusted or rendered from raw persisted bytes.
 
 ## Authority and privacy controls
 
@@ -105,12 +104,14 @@ An expired snapshot remains visible but is not marked complete. It is never auto
 - safe inspection rendering and persistence;
 - no benchmark execution and no federation authority mutation;
 - monotonic explicit rerun revisions and restart reopen;
-- configurable short-TTL expiry behavior;
+- configurable strict short-TTL behavior at the base service boundary;
 - corrupt-state fail-closed behavior and raw-byte leakage prevention;
 - CSRF and request-context override rejection;
 - existing MTConnect snapshot composition without starting a scan;
 - configured Ollama read-only inventory without inference;
 - continued benchmark and contribution blocking.
+
+`catalog/flask_app/tests/test_run_once_capability_evidence.py` protects the installed-product policy: a legacy snapshot whose stored `expires_at` is already in the past remains reusable, while the underlying strict expiry behavior is not removed from the kernel/service contract.
 
 `catalog/flask_app/tests/test_existing_setup_resume.py` additionally protects the production lifecycle: update/resume may load persisted inspection evidence but must never invoke `CapabilityInspectionService.run()`.
 
