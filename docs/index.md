@@ -1,14 +1,18 @@
 # MSH documentation
 
-Start here for supported MSH operation, architecture, current development direction, acceptance, and retained history.
+Start with the user guides below. Development plans, acceptance material, and retained history are available later in this index when you need repository-level detail.
 
-## Start and operate MSH
+## New to MSH
 
-- [Quick start](quick_start.md) — supported startup and capability-first onboarding.
+- [Getting started](getting_started.md) — understand devices, Federations, inspection, contributions, authority, and the normal workbench.
+- [Quick start](quick_start.md) — install MSH, start the supported services, and complete capability-first onboarding.
+- [Operator guide](operator_guide.md) — use Federation, Monitor, Knowledge, System, sources, recording, benchmarks, and contributions.
+- [Troubleshooting](troubleshooting.md) — diagnose startup, data, playback, Docker, runtime, recorder, and connectivity problems.
+
+## Install and administer MSH
+
 - [One-command setup](one_command_setup.md) — default Windows and Compose startup commands.
 - [Server setup](server_setup.md) — network access, recorder configuration, model installation, and advanced deployment administration.
-- [Operator guide](operator_guide.md) — Federation, Monitor, Knowledge, System, sources, recording, benchmarks, and contributions.
-- [Troubleshooting](troubleshooting.md) — startup, data, playback, Docker, runtime, and diagnostic problems.
 - [Termux phone setup](termux_phone.md) — Android development and operation.
 
 ## Use product capabilities
@@ -19,14 +23,16 @@ Start here for supported MSH operation, architecture, current development direct
 - [Source synchronization](source_synchronization.md) — source configuration, normalized landing paths, and synchronization state.
 - [Workflow sessions](workflow_sessions.md) — workflow metadata, filtering, execution, cache reuse, bootstrap, and catch-up.
 
-## Understand the system
+## Understand how MSH works
 
 - [Current architecture](architecture.md) — product model, components, authority boundaries, data flow, storage, jobs, persistence, and acceptance.
 - [Federated network reference](federated_session_network.md) — current identity, membership, control-plane, transport, storage, capability, and failure model.
 - [Data contract](data_contract.md) — telemetry inputs, normalization, derived artifacts, and playback-ready requirements.
 - [Federation v1 scope](releases/federation_v1_scope.md) — intended trusted release boundary and required evidence.
 
-## Current implementation direction
+## Development and implementation
+
+The material below is for development, acceptance, and repository maintenance. It is not the normal starting point for operating MSH.
 
 Use this hierarchy when documents disagree:
 
@@ -46,7 +52,7 @@ Current track entry points:
 - [OSL implementation roadmap](implementation/osl_integration/10_phased_implementation_roadmap.md)
 - [Post-v1 roadmap](roadmap/post_v1_product_roadmap.md)
 
-## Current status
+## Current development status
 
 - Capability-first Federation baseline: merged.
 - Complete physical CF7 acceptance: not accepted.

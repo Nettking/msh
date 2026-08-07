@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ document_title }} · MSH Docs</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/docs.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/docs-home.css') }}">
     <script defer src="{{ url_for('static', filename='js/docs-navigation.js') }}"></script>
   </head>
   <body class="docs-body">
@@ -33,6 +34,14 @@
       </ul>
     {%- endmacro %}
 
+    {% macro nav_link(path, label) -%}
+      <a
+        class="docs-nav-link {% if current_path == path %}is-active{% endif %}"
+        href="{{ url_for('docs_web.document', document_path=path) }}"
+        {% if current_path == path %}aria-current="page"{% endif %}
+      >{{ label }}</a>
+    {%- endmacro %}
+
     <button
       class="docs-nav-toggle"
       type="button"
@@ -41,7 +50,7 @@
       aria-expanded="false"
     >
       <span class="docs-nav-toggle__icon" aria-hidden="true"><i></i><i></i><i></i></span>
-      <span>Documents</span>
+      <span>Documentation</span>
     </button>
 
     <div class="docs-shell">
@@ -51,18 +60,51 @@
             <span class="docs-brand__mark" aria-hidden="true">MSH</span>
             <span>
               <strong>Documentation</strong>
-              <small>{{ document_count }} Markdown files</small>
+              <small>User guide &amp; reference</small>
             </span>
           </a>
           <a class="docs-back" href="/">Back to MSH</a>
         </header>
 
-        <nav class="docs-sidebar__navigation" aria-label="Documentation files">
-          {% if tree.dirs or tree.files %}
-            {{ render_tree(tree) }}
-          {% else %}
-            <p class="docs-sidebar__empty">No Markdown files were found.</p>
-          {% endif %}
+        <nav class="docs-sidebar__navigation" aria-label="Documentation">
+          <div class="docs-sidebar__primary">
+            <section class="docs-nav-group" aria-labelledby="docs-nav-start">
+              <p class="docs-nav-group__title" id="docs-nav-start">Start here</p>
+              {{ nav_link('getting_started.md', 'Getting started') }}
+              {{ nav_link('quick_start.md', 'Quick start') }}
+              {{ nav_link('operator_guide.md', 'Operator guide') }}
+              {{ nav_link('troubleshooting.md', 'Troubleshooting') }}
+            </section>
+
+            <section class="docs-nav-group" aria-labelledby="docs-nav-use">
+              <p class="docs-nav-group__title" id="docs-nav-use">Use MSH</p>
+              {{ nav_link('connected_capabilities.md', 'Connected capabilities') }}
+              {{ nav_link('source_synchronization.md', 'Data sources') }}
+              {{ nav_link('workflow_sessions.md', 'Workflow sessions') }}
+              {{ nav_link('operator_strategy_capture.md', 'Knowledge capture') }}
+              {{ nav_link('ai_explainer.md', 'AI explainer') }}
+            </section>
+
+            <section class="docs-nav-group" aria-labelledby="docs-nav-understand">
+              <p class="docs-nav-group__title" id="docs-nav-understand">Understand MSH</p>
+              {{ nav_link('architecture.md', 'How MSH works') }}
+              {{ nav_link('federated_session_network.md', 'Federated network') }}
+              {{ nav_link('data_contract.md', 'Data contract') }}
+              {{ nav_link('server_setup.md', 'Server & network setup') }}
+            </section>
+          </div>
+
+          <details class="docs-all-files" {% if current_path.startswith('implementation/') or current_path.startswith('roadmap/') %}open{% endif %}>
+            <summary>Development &amp; all files</summary>
+            <p class="docs-all-files__hint">
+              Implementation plans, acceptance material, history, and the raw repository documentation tree.
+            </p>
+            {% if tree.dirs or tree.files %}
+              {{ render_tree(tree) }}
+            {% else %}
+              <p class="docs-sidebar__empty">No Markdown files were found.</p>
+            {% endif %}
+          </details>
         </nav>
       </aside>
 
@@ -92,28 +134,128 @@
               {% endif %}
             </div>
           {% else %}
-            <section class="docs-welcome">
-              <p class="docs-eyebrow">Repository documentation</p>
-              <h1>MSH Documentation</h1>
-              {% if docs_root_exists %}
-                <p>
-                  Browse the Markdown files from the repository's <code>docs/</code>
-                  folder. The navigation follows the real directory structure and
-                  updates after the application is restarted or the page is refreshed.
-                </p>
-                <div class="docs-welcome__facts">
-                  <div><strong>{{ document_count }}</strong><span>documents available</span></div>
-                  <div><strong>Read only</strong><span>the browser cannot edit repository files</span></div>
-                  <div><strong>Local</strong><span>served by the existing MSH Flask app</span></div>
-                </div>
-                <p class="docs-welcome__hint">Choose a document from the navigation panel to begin.</p>
-              {% else %}
+            {% if docs_root_exists %}
+              <section class="docs-home">
+                <header class="docs-home__hero">
+                  <p class="docs-home__eyebrow">MSH documentation</p>
+                  <h1>Build confidence before you build complexity.</h1>
+                  <p class="docs-home__lead">
+                    Everything you need to install, understand, and use MSH. Start with the short path below; development plans and repository internals are available separately when you need them.
+                  </p>
+                  <div class="docs-home__actions">
+                    <a class="docs-home__button docs-home__button--primary" href="{{ url_for('docs_web.document', document_path='quick_start.md') }}">Quick start</a>
+                    <a class="docs-home__button" href="{{ url_for('docs_web.document', document_path='getting_started.md') }}">Understand MSH first</a>
+                  </div>
+                </header>
+
+                <section class="docs-home__section" aria-labelledby="docs-home-new">
+                  <div class="docs-home__section-header">
+                    <h2 id="docs-home-new">New to MSH?</h2>
+                    <p>Follow the user journey instead of browsing repository files.</p>
+                  </div>
+                  <div class="docs-home__cards">
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='quick_start.md') }}">
+                      <span class="docs-home-card__kicker">Start</span>
+                      <strong>Quick start</strong>
+                      <p>Install MSH, start the supported services, and complete first-run onboarding.</p>
+                    </a>
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='getting_started.md') }}">
+                      <span class="docs-home-card__kicker">Learn</span>
+                      <strong>Getting started</strong>
+                      <p>Understand devices, Federations, inspection, contributions, and the normal workbench.</p>
+                    </a>
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='operator_guide.md') }}">
+                      <span class="docs-home-card__kicker">Operate</span>
+                      <strong>Use MSH</strong>
+                      <p>Work with Federation, Monitor, Knowledge, sources, recording, benchmarks, and contributions.</p>
+                    </a>
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='troubleshooting.md') }}">
+                      <span class="docs-home-card__kicker">Fix</span>
+                      <strong>Troubleshooting</strong>
+                      <p>Diagnose startup, Docker, data, recorder, runtime, and connectivity problems.</p>
+                    </a>
+                  </div>
+                </section>
+
+                <section class="docs-home__section" aria-labelledby="docs-home-first-run">
+                  <div class="docs-home__section-header">
+                    <h2 id="docs-home-first-run">First-run path</h2>
+                    <p>The required onboarding path is short. Benchmarks and contribution choices come later.</p>
+                  </div>
+                  <ol class="docs-home__journey">
+                    <li><span>01</span><strong>Create or load device identity</strong></li>
+                    <li><span>02</span><strong>Join, reconnect, or create a Federation</strong></li>
+                    <li><span>03</span><strong>Inspect local capabilities</strong></li>
+                    <li><span>04</span><strong>Finish setup</strong></li>
+                    <li><span>05</span><strong>Open Federation and the workbench</strong></li>
+                  </ol>
+                </section>
+
+                <section class="docs-home__section" aria-labelledby="docs-home-tasks">
+                  <div class="docs-home__section-header">
+                    <h2 id="docs-home-tasks">Common tasks</h2>
+                    <p>Go directly to what you are trying to accomplish.</p>
+                  </div>
+                  <div class="docs-home__cards">
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='connected_capabilities.md') }}">
+                      <span class="docs-home-card__kicker">Federation</span>
+                      <strong>Use another device's capabilities</strong>
+                      <p>Understand trusted connected capabilities and how they become available across devices.</p>
+                    </a>
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='source_synchronization.md') }}">
+                      <span class="docs-home-card__kicker">Data</span>
+                      <strong>Configure and synchronize sources</strong>
+                      <p>Set up source configuration, normalized landing paths, and synchronization state.</p>
+                    </a>
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='ai_explainer.md') }}">
+                      <span class="docs-home-card__kicker">AI</span>
+                      <strong>Ask how MSH works</strong>
+                      <p>Use the read-only AI explainer with a local or connected Ollama provider.</p>
+                    </a>
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='operator_strategy_capture.md') }}">
+                      <span class="docs-home-card__kicker">Knowledge</span>
+                      <strong>Capture operator knowledge</strong>
+                      <p>Capture, structure, compare, review, and export operator decisions.</p>
+                    </a>
+                  </div>
+                </section>
+
+                <section class="docs-home__section" aria-labelledby="docs-home-understand">
+                  <div class="docs-home__section-header">
+                    <h2 id="docs-home-understand">Understand how MSH works</h2>
+                    <p>Use these references when you need the system model rather than a task recipe.</p>
+                  </div>
+                  <div class="docs-home__cards">
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='architecture.md') }}">
+                      <span class="docs-home-card__kicker">Concepts</span>
+                      <strong>Architecture</strong>
+                      <p>Product model, components, authority boundaries, data flow, jobs, storage, and persistence.</p>
+                    </a>
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='federated_session_network.md') }}">
+                      <span class="docs-home-card__kicker">Reference</span>
+                      <strong>Federated network</strong>
+                      <p>Identity, membership, control plane, transport, storage, capabilities, and failure behavior.</p>
+                    </a>
+                  </div>
+                </section>
+
+                <aside class="docs-home__development">
+                  <h2>Developing MSH?</h2>
+                  <p>
+                    Implementation plans, acceptance evidence, roadmaps, and retained history are intentionally kept out of the normal user path. Open <strong>Development &amp; all files</strong> in the sidebar or use the <a href="{{ url_for('docs_web.document', document_path='index.md') }}">full documentation index</a> when you need repository-level material.
+                  </p>
+                </aside>
+              </section>
+            {% else %}
+              <section class="docs-welcome">
+                <p class="docs-eyebrow">Documentation unavailable</p>
+                <h1>MSH Documentation</h1>
                 <div class="docs-warning">
                   <strong>The documentation folder could not be found.</strong>
                   <p>Start MSH from the repository checkout or configure <code>MSH_DOCS_ROOT</code>.</p>
                 </div>
-              {% endif %}
-            </section>
+              </section>
+            {% endif %}
           {% endif %}
         </div>
       </main>
