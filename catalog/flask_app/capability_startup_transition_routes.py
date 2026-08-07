@@ -49,6 +49,7 @@ capability_startup_transition_web = Blueprint(
 )
 
 _LEGACY_FALLBACK_SESSION_KEY = "capability_startup_legacy_fallback"
+_ROOT_HANDOFF_SESSION_KEY = "capability_startup_root_handoff_complete"
 _CONTRIBUTION_RECONCILE_EXTENSION_KEY = (
     "capability_contribution_startup_reconciled"
 )
@@ -250,21 +251,6 @@ def _is_legacy_control_path() -> bool:
     )
 
 
-def _legacy_runtime_requires_startup_choice() -> bool:
-    """Read the existing runtime gate without introducing a second authority."""
-
-    try:
-        from . import routes as web_routes
-
-        return bool(web_routes.get_runtime_manager().requires_startup_choice())
-    except Exception as exc:  # noqa: BLE001 - legacy gate remains authoritative
-        current_app.logger.info(
-            "Legacy runtime startup state unavailable (%s)",
-            type(exc).__name__,
-        )
-        return False
-
-
 @capability_startup_transition_web.before_app_request
 def _startup_transition_gate_and_dispatch() -> Response | None:
     """Require onboarding until complete without replacing workbench navigation."""
@@ -316,7 +302,8 @@ def _startup_transition_gate_and_dispatch() -> Response | None:
         return redirect(url_for("capability_startup_transition_web.onboarding"))
 
     if flags["completed"]:
-        if request.path == "/" and _legacy_runtime_requires_startup_choice():
+        if request.path == "/" and not session.get(_ROOT_HANDOFF_SESSION_KEY):
+            session[_ROOT_HANDOFF_SESSION_KEY] = True
             return redirect(url_for("federation_web.overview"))
         return None
 
