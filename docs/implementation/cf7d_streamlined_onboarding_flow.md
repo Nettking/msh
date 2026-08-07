@@ -1,84 +1,9 @@
-# CF7-D streamlined onboarding and Federation flow
+# CF7-D delivery record moved
 
-Status: focused UX and read-only projection corrections discovered during the
-first physical browser tests.
+Status: **compatibility redirect; non-authoritative**
 
-## Guided onboarding
+The historical delivery record is now:
 
-Capability-first setup remains one continuous flow:
+- [CF7-D streamlined onboarding and Federation flow](federation/history/phases/cf7d_streamlined_onboarding_flow.md)
 
-```text
-Identity -> Federation -> Inspect -> Benchmarks -> Contributions -> Finish
-```
-
-A successful migration or Finish POST returns to
-`/onboarding?step=finish`. The completed Finish panel confirms that the device
-is ready and offers one explicit **Continue to MSH** action. The operator is not
-redirected automatically to the Federation overview.
-
-Capability onboarding uses the existing focused setup shell, so normal product
-navigation is hidden until the operator chooses to continue.
-
-## Federation pages
-
-The overview originally linked to eight detail pages that were not registered
-by the Flask blueprint. All nine projection pages are now exposed through
-bounded GET/HEAD-only routes:
-
-```text
-/federation
-/federation/device
-/federation/devices
-/federation/services
-/federation/benchmarks
-/federation/storage
-/federation/jobs
-/federation/activity
-/federation/settings
-```
-
-They use the existing public-safe CF6 projections, reject writes, strip browser
-query context and share one read-only detail template.
-
-## Live production composition
-
-The Federation surface now reads the same durable capability services used by
-onboarding:
-
-- CFI-3 inspection snapshots;
-- CFI-4 benchmark results;
-- CFI-5 contribution candidates and persisted intent.
-
-Optional provider, storage and job authorities that are not configured are
-represented as available empty surfaces rather than false system failures. An
-actual configured projection failure still produces a degraded state.
-
-The overview also applies consistent empty and connection semantics:
-
-- a trusted current-device binding cannot appear connected in one card and
-  offline in the device list;
-- zero benchmark results are shown as **Not run**, never as all evidence current;
-- a connected device without inspection receives one direct **Open inspection**
-  recommendation.
-
-## Validation and browser retest
-
-Implementation commit `988c66d4d48078fdabb0a4c491dbb68810a5ac21`
-passed CFI-1, CF6 projections, CFI-6 onboarding and the complete CF7-B gate on
-Ubuntu and Windows. Later commits on the branch change documentation only.
-
-Pull the latest `agent/cf7d-streamlined-onboarding-flow`, rebuild the Compose
-deployment and hard-refresh `/federation`. A connected installation without
-inspection should show **Connected**, **1 connected now**, **0 results / Not
-run**, and one **Open inspection** action. The generic degraded warning should
-not appear merely because optional service, storage or job authorities are
-empty.
-
-## Boundaries
-
-These changes do not alter Federation authority, membership, discovery,
-benchmark execution, contribution activation, storage assignment, compute
-registration, persistence schemas or runtime intent. Production composition
-performs existing read-only calls only. Benchmark evidence still never grants
-authority, and storage remains candidate-only until the existing control plane
-assigns it.
+The onboarding sequence formerly described here is superseded. Current mandatory onboarding is `Identity -> Federation -> Inspect -> finish setup`; benchmarks and contribution decisions are optional follow-up work.
