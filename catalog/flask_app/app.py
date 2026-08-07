@@ -210,16 +210,17 @@ def create_app() -> Flask:
                 type(exc).__name__,
             )
             return None
-        if not bool(flags.get("completed")) or not bool(flags.get("runtime")):
+        if not bool(flags.get("completed")):
             return None
-        accepted, _message = runtime_manager.choose_startup_mode(
-            "continue_existing"
-        )
-        if not accepted:
-            app.logger.warning(
-                "Completed capability runtime could not clear legacy startup choice"
+        if bool(flags.get("runtime")):
+            accepted, _message = runtime_manager.choose_startup_mode(
+                "continue_existing"
             )
-            return None
+            if not accepted:
+                app.logger.warning(
+                    "Completed capability runtime could not clear legacy startup choice"
+                )
+                return None
         if request.path == "/":
             return redirect(url_for("federation_web.overview"))
         return None
