@@ -1,6 +1,7 @@
 # Federated MSH network reference
 
-Status: **current technical reference**  
+Status: **current technical reference**
+
 Reviewed: **2026-08-07 Europe/Oslo**
 
 This document describes the merged trusted Federation network. It is not a future implementation proposal and does not define the next delivery sequence. Current work is governed by the active Federation plans and acceptance manifest.
