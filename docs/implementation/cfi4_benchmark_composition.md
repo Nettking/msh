@@ -11,7 +11,7 @@ The integration is intentionally limited to:
 1. deriving a benchmark plan from the current, device-bound CFI-3 inspection snapshot;
 2. running one explicitly selected, registered, bounded local benchmark target;
 3. persisting immutable CF1 `BenchmarkResult` evidence and restart-safe run reservations;
-4. supporting optional skip, explicit rerun, cooperative cancellation, expiry, and dependency invalidation;
+4. supporting optional skip, explicit rerun, cooperative cancellation, strict kernel expiry, and dependency/definition invalidation;
 5. rendering safe evidence in the existing CF5 Benchmarks step;
 6. preserving all contribution actions and authority binding as a later reviewed change.
 
@@ -43,7 +43,7 @@ The CFI-4 blueprint is registered before the CFI-3, CFI-2, and role-first fallba
 | `POST` | `/onboarding/benchmarks/skip` | Persist local skip decisions for the current inspection revision without creating benchmark results |
 | `POST` | `/onboarding/benchmarks/cancel` | Request cooperative cancellation of one active local run |
 
-The existing safe `409` prerequisite boundary is retained when identity exists but trusted Federation context or current inspection evidence is missing.
+The existing safe `409` prerequisite boundary is retained when identity exists but trusted Federation context or accepted inspection evidence is missing.
 
 `/onboarding/contributions` remains owned by the unchanged blocked fallback and returns `409`.
 
@@ -64,31 +64,33 @@ A successful explicit run clears the matching skip decision. A new inspection re
 
 ## Validity and rerun behavior
 
-The existing CF2 validity evaluator marks evidence non-current when:
+The base CF2 validity evaluator remains strict and marks evidence non-current when:
 
 - its TTL expires;
 - the benchmark implementation version changes;
 - declared dependency inputs change;
 - the stored benchmark ID no longer matches the definition.
 
-Those validity rules remain intact. The standard production adapters now use a finite ten-year result horizon (`315360000` seconds) so elapsed wall-clock time during ordinary starts does not itself turn benchmarking into a recurring task. This is a product default, not a change to the frozen `BenchmarkResult` contract or the validity evaluator.
+The installed MSH product adds a narrower run-once evaluator. It deliberately ignores **age alone** while retaining the other three structural checks: benchmark identity, implementation version, and the declared dependency fingerprint. The strict evaluator is not removed or weakened; it remains available for isolated kernel/contract tests.
 
-Dependency and implementation-version invalidation remain active regardless of the longer time horizon. For example, changing the configured Ollama model changes the declared dependency fingerprint and the previous result becomes stale even though its timestamp has not expired.
+This means a result written by an older MSH release with a historical 15-minute `expires_at` can be reused immediately after upgrade when its benchmark definition and dependency inputs still match. MSH does not rewrite that immutable result, extend its timestamp, or require one final rerun simply because the old timestamp is in the past.
 
-Expired and stale results remain visible as historical evidence but do not complete the Benchmarks step. The UI requests an explicit rerun. Reruns create new immutable results with new server-generated run IDs; earlier results are not overwritten.
+Structural invalidation remains fail-closed. For example, changing the configured Ollama model changes the declared dependency fingerprint, so the previous result becomes stale and the UI requires an explicit rerun even if that result is otherwise well formed. A benchmark implementation-version change behaves the same way.
 
-Results created by an older release keep their original immutable expiry. An upgraded installation may therefore require one final explicit benchmark run before it receives the new long-lived result.
+Product UI renders accepted results as saved evidence with their collection time rather than presenting the historical `expires_at` as a countdown. Explicit **Run again** remains available at any time. A rerun creates a new immutable result with a new server-generated run ID; earlier results are never overwritten.
 
-Cancelled and failed results are safe reviewed outcomes but do not recommend activation. Passing evidence also grants no authority and cannot enable a contribution automatically.
+Cancelled and failed results remain safe reviewed outcomes but do not recommend activation. Passing evidence also grants no authority and cannot enable a contribution automatically.
 
 ## Contribution reconciliation boundary
 
-Removing automatic benchmark execution must not allow stale evidence to reactivate authority. The long-running Flask app therefore owns one startup reconciliation gate:
+Run-once reuse must not allow structurally stale evidence to reactivate authority. The long-running Flask app therefore owns one startup reconciliation gate:
 
 1. load the persisted inspection snapshot;
-2. evaluate the persisted benchmark review through the existing benchmark view/validity path;
+2. evaluate the latest saved benchmark review against the current benchmark identity, implementation version, and declared dependency inputs;
 3. reconcile persisted enabled contribution intent only when that saved evidence is accepted;
-4. if saved evidence is stale, suspend enabled contribution intent through the existing fencing path instead of rerunning a benchmark or reactivating from stale evidence.
+4. if the benchmark definition or dependency inputs changed, suspend enabled contribution intent through the existing fencing path instead of rerunning a benchmark or reactivating from stale evidence.
+
+Elapsed time by itself is not a contribution fencing reason in the installed product. Missing, malformed, mismatched, definition-stale, or dependency-stale evidence still fails closed.
 
 The isolated `start.cmd --resume` process performs no contribution authority change. This keeps update/resume evidence-preserving and leaves operational authority to the supported long-running application.
 
@@ -105,7 +107,7 @@ The isolated `start.cmd --resume` process performs no contribution authority cha
 - every benchmark action requires the existing browser CSRF token;
 - actor, device, Federation, membership, target inventory, dependency inputs, and execution bounds are server-owned;
 - current trusted membership is revalidated through `authorized_context()` before run, skip, or cancel;
-- the current inspection must belong to the same device and remain unexpired;
+- the saved inspection must belong to the same device; temporal age alone does not invalidate it in the installed product;
 - raw adapter exceptions, endpoints, credentials, paths, and unsafe diagnostics are not rendered;
 - benchmark execution does not change membership, session revision, provider enrollment, health, contribution intent, storage authority, job state, grants, leases, terms, or fencing;
 - startup and update paths never call a benchmark adapter to recover authority.
@@ -115,20 +117,22 @@ The isolated `start.cmd --resume` process performs no contribution authority cha
 `catalog/flask_app/tests/test_capability_benchmark_route.py` covers:
 
 - app-factory registration and route ownership before earlier gates;
-- trusted Federation and current inspection prerequisites;
+- trusted Federation and inspection prerequisites;
 - durable safe result persistence and rendering;
 - no Federation authority mutation;
 - rerun with new immutable run IDs;
 - skip without probe execution or contribution activation;
 - skip clearing after explicit run;
-- configurable expiry and dependency invalidation;
+- configurable strict expiry and dependency invalidation;
 - cooperative cancellation through Flask;
 - CSRF and browser attempts to override server-owned execution inputs;
 - corrupt-state fail-closed behavior and raw-byte leakage prevention;
 - explicit Ollama inference only after the benchmark POST;
 - continued contribution blocking.
 
-`catalog/flask_app/tests/test_existing_setup_resume.py` protects the installed lifecycle by asserting that update/resume calls neither benchmark planning nor benchmark execution, and that Flask startup suspends enabled contribution intent when the saved benchmark review is stale instead of reconciling it as current.
+`catalog/flask_app/tests/test_run_once_capability_evidence.py` explicitly verifies that a legacy temporally expired result is accepted when definition/dependencies match, while a model/dependency change or implementation-version change is still rejected. It also verifies that the strict CF2 evaluator continues to report the same legacy result as expired.
+
+`catalog/flask_app/tests/test_existing_setup_resume.py` protects the installed lifecycle by asserting that update/resume calls neither benchmark planning nor benchmark execution, and that Flask startup does not execute a benchmark to recover contribution authority.
 
 The dedicated CFI-4 workflow runs focused and affected tests, compilation, Compose validation, Ruff, and diff hygiene on Ubuntu and Windows. The permanent CF7-A workflow and scenario manifest are extended through CFI-4.
 
