@@ -15,6 +15,9 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
+    $PSNativeCommandUseErrorActionPreference = $false
+}
 
 function Test-PortAvailable {
     param(
@@ -201,9 +204,28 @@ if os.path.isfile(path):
 print(json.dumps(result, sort_keys=True))
 '@
 
+    # Windows PowerShell and Docker can reinterpret quotes and newlines passed
+    # directly to `python -c`. Encode the program and pass only simple ASCII
+    # arguments across the native-process boundary.
+    $encoded = [Convert]::ToBase64String(
+        [System.Text.Encoding]::UTF8.GetBytes($probeCode)
+    )
+    $launcher = "import base64;exec(base64.b64decode('$encoded'))"
     $mount = "${VolumeName}:/state:ro"
-    $raw = (& docker run --rm --network none --entrypoint python `
-        -v $mount $ProbeImage -c $probeCode $NodeId 2>$null) -join "`n"
+    $arguments = @(
+        "run", "--rm", "--network", "none",
+        "--entrypoint", "python",
+        "-v", $mount,
+        $ProbeImage,
+        "-c", $launcher,
+        $NodeId
+    )
+    try {
+        $raw = (& docker @arguments 2>$null) -join "`n"
+    }
+    catch {
+        return $null
+    }
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
         return $null
     }
@@ -358,8 +380,34 @@ try {
                 }
             }
         }
+
+        if ([string]::IsNullOrWhiteSpace($selectedRelayVolume)) {
+            $populated = @($probes |
+                Where-Object { $_.sessions -gt 0 -or $_.nodes -gt 0 } |
+                Sort-Object sessions, nodes, size -Descending)
+            if ($populated.Count -gt 0) {
+                $selectedRelayVolume = [string]$populated[0].volume
+                Write-Warning (
+                    "Recovered populated Federation coordinator volume '$selectedRelayVolume'."
+                )
+            }
+        }
+
         if ([string]::IsNullOrWhiteSpace($selectedRelayVolume) -and -not [string]::IsNullOrWhiteSpace($ownerRelayVolume)) {
             $selectedRelayVolume = $ownerRelayVolume
+        }
+        if ([string]::IsNullOrWhiteSpace($selectedRelayVolume) -and $relayCandidates.Count -eq 1) {
+            $selectedRelayVolume = [string]$relayCandidates[0]
+        }
+        if (
+            [string]::IsNullOrWhiteSpace($selectedRelayVolume) -and
+            $relayCandidates.Count -gt 1
+        ) {
+            throw (
+                "Multiple Federation coordinator volumes exist, but none could be selected safely. " +
+                "No state was changed. Set MSH_RELAY_VOLUME_NAME explicitly or run update.cmd " +
+                "after reviewing the retained volumes."
+            )
         }
         if ([string]::IsNullOrWhiteSpace($selectedRelayVolume)) {
             $selectedRelayVolume = "msh_relay_state"
