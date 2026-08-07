@@ -121,13 +121,15 @@ function Find-ProjectVolume {
         return ""
     }
     $values = @(
-        & docker volume ls `
-            --filter "label=com.docker.compose.project=$ProjectName" `
-            --filter "label=com.docker.compose.volume=$LogicalName" `
-            --format "{{.Name}}" 2>$null
-    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        @(
+            & docker volume ls `
+                --filter "label=com.docker.compose.project=$ProjectName" `
+                --filter "label=com.docker.compose.volume=$LogicalName" `
+                --format "{{.Name}}" 2>$null
+        ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+    )
     if ($values.Count -gt 0) {
-        return [string]$values[0]
+        return [string]($values[0])
     }
     return ""
 }
@@ -371,7 +373,7 @@ try {
                 Where-Object { $_.memberships -gt 0 } |
                 Sort-Object memberships, sessions, nodes, size -Descending)
             if ($matching.Count -gt 0) {
-                $selectedRelayVolume = [string]$matching[0].volume
+                $selectedRelayVolume = [string]($matching[0].volume)
                 if ($selectedRelayVolume -ne $ownerRelayVolume) {
                     Write-Warning (
                         "Recovered Federation coordinator volume '$selectedRelayVolume' " +
@@ -386,7 +388,7 @@ try {
                 Where-Object { $_.sessions -gt 0 -or $_.nodes -gt 0 } |
                 Sort-Object sessions, nodes, size -Descending)
             if ($populated.Count -gt 0) {
-                $selectedRelayVolume = [string]$populated[0].volume
+                $selectedRelayVolume = [string]($populated[0].volume)
                 Write-Warning (
                     "Recovered populated Federation coordinator volume '$selectedRelayVolume'."
                 )
@@ -397,7 +399,7 @@ try {
             $selectedRelayVolume = $ownerRelayVolume
         }
         if ([string]::IsNullOrWhiteSpace($selectedRelayVolume) -and $relayCandidates.Count -eq 1) {
-            $selectedRelayVolume = [string]$relayCandidates[0]
+            $selectedRelayVolume = [string]($relayCandidates[0])
         }
         if (
             [string]::IsNullOrWhiteSpace($selectedRelayVolume) -and
