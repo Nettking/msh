@@ -10,9 +10,11 @@ version, and dependency fingerprints.
 from __future__ import annotations
 
 import hashlib
-from datetime import timezone
+from collections.abc import Callable
+from datetime import datetime, timezone
 
 from flask import Flask
+from flask.signals import appcontext_pushed
 
 from catalog.capabilities.benchmarking.policy import evaluate_run_once_result
 from catalog.capabilities.contributions import (
@@ -26,6 +28,8 @@ from catalog.federation.errors import (
 from catalog.federation.onboarding_models import (
     BenchmarkResult,
     BenchmarkState,
+    ContributionCandidate,
+    ContributionIntent,
     DeviceInspectionSnapshot,
 )
 
@@ -120,11 +124,17 @@ class RunOnceCapabilityBenchmarkService(CapabilityBenchmarkService):
                 state = result.state.value
                 state_label = self._recommendation_label(result)
                 summaries = {
-                    BenchmarkState.PASSED: "The bounded local check completed successfully.",
-                    BenchmarkState.FAILED: "The bounded local check did not support activation.",
+                    BenchmarkState.PASSED: (
+                        "The bounded local check completed successfully."
+                    ),
+                    BenchmarkState.FAILED: (
+                        "The bounded local check did not support activation."
+                    ),
                     BenchmarkState.SKIPPED: "The runner skipped this check safely.",
                     BenchmarkState.CANCELLED: "The benchmark was cancelled safely.",
-                    BenchmarkState.EXPIRED: "The saved result requires explicit review.",
+                    BenchmarkState.EXPIRED: (
+                        "The saved result requires explicit review."
+                    ),
                 }
                 summary = summaries[result.state]
                 diagnostic = result.diagnostics[0] if result.diagnostics else None
@@ -183,7 +193,11 @@ class RunOnceCapabilityBenchmarkService(CapabilityBenchmarkService):
 class RunOnceCapabilityContributionService(CapabilityContributionService):
     """Keep explicit contribution intent active across time-only evidence expiry."""
 
-    def _build_service(self, *, generator_clock):
+    def _build_service(
+        self,
+        *,
+        generator_clock: Callable[[], datetime],
+    ) -> ContributionService:
         sources, adapters = self._components()
         registry, _benchmark_adapters = self.benchmark_service._components()
         return ContributionService(
@@ -214,7 +228,7 @@ class RunOnceCapabilityContributionService(CapabilityContributionService):
         self,
         *,
         require_benchmark_review: bool = True,
-    ):
+    ) -> tuple[ContributionCandidate, ...]:
         snapshot, _complete = self._authorized_snapshot(
             require_benchmark_review=require_benchmark_review
         )
@@ -251,7 +265,7 @@ class RunOnceCapabilityContributionService(CapabilityContributionService):
         )
         return service
 
-    def reconcile(self):
+    def reconcile(self) -> tuple[ContributionIntent, ...]:
         if not self.has_persisted_intents():
             return ()
         # Reconciliation may reactivate existing explicit intent, so it must use
@@ -260,11 +274,15 @@ class RunOnceCapabilityContributionService(CapabilityContributionService):
         return self._service_for_reconciliation().reconcile()
 
 
-def install_run_once_capability_evidence(app: Flask) -> None:
-    """Install product-only run-once services without rewriting saved evidence."""
+def _install_services_for_context(app: Flask) -> None:
+    """Resolve configured paths/services only when the first app context exists."""
 
-    with app.app_context():
-        onboarding = get_capability_onboarding_service()
+    onboarding = get_capability_onboarding_service()
+
+    configured_inspection = app.config.get("CAPABILITY_INSPECTION_SERVICE")
+    if isinstance(configured_inspection, CapabilityInspectionService):
+        inspection = configured_inspection
+    else:
         inspection = RunOnceCapabilityInspectionService(
             onboarding_service=onboarding,
             state_database=app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
@@ -281,6 +299,10 @@ def install_run_once_capability_evidence(app: Flask) -> None:
         )
         app.config["CAPABILITY_INSPECTION_SERVICE"] = inspection
 
+    configured_benchmarks = app.config.get("CAPABILITY_BENCHMARK_SERVICE")
+    if isinstance(configured_benchmarks, CapabilityBenchmarkService):
+        benchmarks = configured_benchmarks
+    else:
         benchmarks = RunOnceCapabilityBenchmarkService(
             onboarding_service=onboarding,
             inspection_service=inspection,
@@ -292,7 +314,11 @@ def install_run_once_capability_evidence(app: Flask) -> None:
         )
         app.config["CAPABILITY_BENCHMARK_SERVICE"] = benchmarks
 
-        contributions = RunOnceCapabilityContributionService(
+    configured_contributions = app.config.get("CAPABILITY_CONTRIBUTION_SERVICE")
+    if isinstance(configured_contributions, CapabilityContributionService):
+        return
+    app.config["CAPABILITY_CONTRIBUTION_SERVICE"] = (
+        RunOnceCapabilityContributionService(
             onboarding_service=onboarding,
             inspection_service=inspection,
             benchmark_service=benchmarks,
@@ -311,7 +337,21 @@ def install_run_once_capability_evidence(app: Flask) -> None:
                 app.config.get("CAPABILITY_ONBOARDING_CONTRIBUTION_TTL_SECONDS", 900)
             ),
         )
-        app.config["CAPABILITY_CONTRIBUTION_SERVICE"] = contributions
+    )
+
+
+def install_run_once_capability_evidence(app: Flask) -> None:
+    """Install product-only services lazily without rewriting saved evidence."""
+
+    def install_on_context(sender: Flask, **_extra: object) -> None:
+        if sender is not app:
+            return
+        _install_services_for_context(app)
+
+    # Keep a strong reference both through the signal and the app extension so
+    # the lazy installer has the same lifetime as the Flask application.
+    appcontext_pushed.connect(install_on_context, sender=app, weak=False)
+    app.extensions["run_once_capability_evidence_installer"] = install_on_context
 
 
 __all__ = [
