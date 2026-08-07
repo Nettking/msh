@@ -204,10 +204,13 @@ def test_start_cmd_resume_runs_before_long_running_flask_container() -> None:
         not in script
     )
     assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/federation"' in script
-    assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/federation/benchmarks"' in script
+    assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/federation/benchmarks"' not in script
     assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/onboarding?repair=1"' in script
     assert "No identity or Federation was replaced" in script
     assert "start.cmd --resume" in script
+    assert "reuse saved inspection and benchmark evidence without rerunning" in script
+    assert "Resume mode never runs inspection or benchmarks" in script
+    assert "run its benchmark plan" not in resume_block
 
     flask_start = script.index("docker compose up -d flask")
     assert flask_start < script.index("Waiting for the MSH webapp")
