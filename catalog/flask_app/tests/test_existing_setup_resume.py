@@ -73,7 +73,7 @@ class _Benchmark:
         )
 
     def plan(self, snapshot: object) -> tuple[object, ...]:
-        assert getattr(snapshot, "revision") == 7
+        assert snapshot.revision == 7
         return self.items
 
     def run(self, *, benchmark_id: str, target_service_id: str) -> object:
