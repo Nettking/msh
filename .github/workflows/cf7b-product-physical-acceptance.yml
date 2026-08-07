@@ -138,6 +138,7 @@ jobs:
           python -m pytest -o addopts= -q
           catalog/capabilities/contributions/tests
           catalog/federation/tests/test_federation_projections.py
+          catalog/federation/tests/test_benchmark_latest_projection.py
           catalog/federation/tests/test_onboarding_contracts.py
           catalog/federation/tests/test_onboarding_discovery_service.py
       - name: Run focused Federation authority regressions
