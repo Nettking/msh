@@ -294,7 +294,7 @@ def _validate_provenance(
             candidate_commit,
             scenario_id,
         )
-    except Exception as exc:  # noqa: BLE001 - acceptance must fail closed
+    except Exception as exc:
         raise PhysicalEvidenceError(
             "physical-evidence-revalidation-failed",
             field,
