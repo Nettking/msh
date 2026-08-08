@@ -160,6 +160,7 @@ def test_active_capability_provider_replaces_stale_default_runtime(
         DEFAULT_BASE_URL,
         "AI Explainer — This computer",
     )
+    assert runtime is not None
     assert runtime.provider_status() == (
         {
             "capability_id": "ollama-configured",
@@ -235,3 +236,44 @@ def test_disabled_capability_provider_hides_stale_enabled_navigation_flag(
     injected = ai_routes.inject_live_ai_capability_startup_flags()
 
     assert injected["capability_startup_flags"]["language_model"] is False
+
+
+def test_completed_capability_first_ai_never_falls_back_to_legacy_provider(
+    monkeypatch,
+) -> None:
+    manager = ConfiguredLanguageModelRuntimeManager(session_id="local-ai")
+    monkeypatch.setattr(ai_routes, "AI_RUNTIME_MANAGER", manager)
+    monkeypatch.setattr(ai_routes, "_ACTIVE_RUNTIME", None)
+    monkeypatch.setattr(ai_routes, "_ACTIVE_RUNTIME_KEY", None)
+    monkeypatch.setattr(
+        ai_routes,
+        "get_capability_startup_transition_service",
+        lambda: SimpleNamespace(capability_flags=lambda: {"completed": True}),
+    )
+    monkeypatch.setattr(
+        ai_routes,
+        "load_settings",
+        lambda: SimpleNamespace(
+            configured=True,
+            user_setup_complete=True,
+            ai_enabled=True,
+            ai_model="llama3.2:3b",
+            ollama_base_url="http://legacy-ollama:11434",
+        ),
+    )
+
+    app = Flask(__name__)
+    app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"] = "state.sqlite3"
+    with app.app_context():
+        model, base_url, provider_name = ai_routes._ai_defaults()
+        runtime = ai_routes._build_ai_runtime(
+            model=model,
+            base_url=base_url,
+            provider_name=provider_name,
+        )
+
+    assert model == "llama3.2:3b"
+    assert base_url == DEFAULT_BASE_URL
+    assert provider_name == "No active AI contribution"
+    assert runtime is None
+    assert manager.additional_provider_ids() == ()
