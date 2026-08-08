@@ -1,0 +1,306 @@
+name: Federation v1 release gate
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "README.md"
+      - "catalog/**"
+      - "cmd/msh-peer-sidecar/**"
+      - "constraints-phase2.txt"
+      - "docker-compose.yml"
+      - "docs/**"
+      - "requirements.txt"
+      - "scripts/**"
+      - "start.cmd"
+      - "update.cmd"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "README.md"
+      - "catalog/**"
+      - "cmd/msh-peer-sidecar/**"
+      - "constraints-phase2.txt"
+      - "docker-compose.yml"
+      - "docs/**"
+      - "requirements.txt"
+      - "scripts/**"
+      - "start.cmd"
+      - "update.cmd"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: federation-v1-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-matrix:
+    name: Release matrix (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: "cmd/msh-peer-sidecar/go.mod"
+          cache: false
+
+      - name: Install release dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+
+      - name: Compile maintained product packages
+        run: python -m compileall -q catalog
+
+      - name: Validate acceptance manifest shape
+        run: >-
+          python -c "import json, pathlib;
+          manifest = json.loads(pathlib.Path('catalog/federation/tests/cf7_acceptance/scenarios.json').read_text(encoding='utf-8'));
+          required = {
+            'federation_v1_end_to_end_accepted',
+            'capability_first_onboarding_end_to_end_accepted',
+            'automated_product_acceptance_executable',
+            'physical_evidence_accepted',
+            'executable_now',
+            'blocked_by_cfi',
+            'manual_physical_verification',
+          };
+          assert required <= manifest.keys();
+          assert all(isinstance(manifest[key], bool) for key in (
+            'federation_v1_end_to_end_accepted',
+            'capability_first_onboarding_end_to_end_accepted',
+            'automated_product_acceptance_executable',
+            'physical_evidence_accepted',
+          ));
+          assert manifest['automated_product_acceptance_executable'] is True;
+          assert manifest['executable_now'];
+          assert manifest['manual_physical_verification']"
+
+      - name: Broad automated regression suite
+        if: runner.os == 'Linux'
+        run: python -m pytest -o addopts= -q
+
+      - name: Windows capability and product release regressions
+        if: runner.os == 'Windows'
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/capabilities/tests
+          catalog/ai/tests/test_remote_provider.py
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+          catalog/relay/tests/test_phase_f84_compute_worker_activation.py
+          catalog/federation/tests/cf7_acceptance/test_product_acceptance.py
+          catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_foundation.py
+          catalog/flask_app/tests/test_capability_onboarding_route.py
+          catalog/flask_app/tests/test_capability_inspection_route.py
+          catalog/flask_app/tests/test_capability_benchmark_route.py
+          catalog/flask_app/tests/test_capability_contribution_route.py
+          catalog/flask_app/tests/test_capability_startup_transition_route.py
+          catalog/flask_app/tests/test_federation_overview_route.py
+          catalog/flask_app/test_navigation_smoke.py
+          catalog/flask_app/tests/test_mobile_layout_contract.py
+          catalog/flask_app/tests/test_responsive_routes.py
+          catalog/flask_app/tests/test_post_setup_handoff.py
+          catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_recorder_control_service.py
+          catalog/flask_app/tests/test_ai_runtime_integration.py
+          catalog/flask_app/tests/test_device_state_reset.py
+          catalog/flask_app/tests/test_local_capability_candidates.py
+          catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
+          catalog/flask_app/tests/test_capability_runtime_startup.py
+          catalog/flask_app/tests/test_data_upload.py
+          catalog/flask_app/tests/test_upload_analysis_jobs.py
+          catalog/flask_app/tests/test_federation_auto_reconnect.py
+          catalog/flask_app/tests/test_existing_setup_resume.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
+          catalog/flask_app/tests/test_windows_start_script.py
+          catalog/flask_app/tests/test_windows_update_script.py
+          catalog/flask_app/tests/test_windows_volume_name_selection.py
+          catalog/federation/tests/test_federation_projections.py
+          catalog/federation/tests/test_benchmark_latest_projection.py
+          catalog/federation/tests/test_onboarding_contracts.py
+          catalog/federation/tests/test_onboarding_discovery_service.py
+          catalog/federation/tests/test_onboarding_projection_policy.py
+          catalog/federation/tests/test_release_documentation_links.py
+          catalog/federation/tests/test_phase0.py
+          catalog/federation/tests/test_phase1.py
+          catalog/federation/tests/test_phase2_unit.py
+
+      - name: Windows transport, storage, and failover regressions
+        if: runner.os == 'Windows'
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/node/tests/test_identity.py
+          catalog/node/tests/test_state.py
+          catalog/node/tests/test_client.py
+          catalog/node/tests/test_storage_agent.py
+          catalog/node/tests/test_three_machine_deployment.py
+          catalog/node/tests/test_physical_storage_failover.py
+          catalog/node/tests/test_physical_storage_recovery.py
+          catalog/node/tests/test_phase_f61_transport.py
+          catalog/node/tests/test_phase_f62_direct_peer.py
+          catalog/node/tests/test_phase_f63_relay_loss_continuity.py
+          catalog/node/tests/test_live_storage_replication.py
+          catalog/node/tests/test_live_storage_failover.py
+          catalog/node/tests/test_live_storage_catchup.py
+          catalog/node/tests/test_live_storage_reinstatement.py
+          catalog/node/tests/test_verified_live_failover.py
+          catalog/relay/tests/test_service.py
+          catalog/federation/tests/test_storage_protocol.py
+          catalog/federation/tests/test_local_storage.py
+          catalog/federation/tests/test_phase_d3_control_plane.py
+          catalog/federation/tests/test_phase_d4_write_authority.py
+          catalog/federation/tests/test_phase_d5_logical_storage.py
+          catalog/federation/tests/test_phase_d6_replication.py
+          catalog/federation/tests/test_phase_d7_d8_ack_handover.py
+          catalog/federation/tests/test_phase_e0_contracts.py
+          catalog/federation/tests/test_phase_e1_manifest_store.py
+          catalog/federation/tests/test_phase_e1_service_manifest.py
+          catalog/federation/tests/test_phase_e2_watermarks.py
+          catalog/federation/tests/test_phase_e3_reports.py
+          catalog/federation/tests/test_phase_e4_selection.py
+          catalog/federation/tests/test_phase_e5_degraded_state.py
+          catalog/federation/tests/test_phase_e6_promotion_transaction.py
+          catalog/federation/tests/test_phase_e63_provider_fencing.py
+          catalog/federation/tests/test_phase_e64_authority_grant.py
+          catalog/federation/tests/test_phase_e65_finalization.py
+          catalog/federation/tests/test_phase_e66_recovery.py
+          catalog/federation/tests/test_phase_e67_coordinator_publication.py
+          catalog/federation/tests/test_phase_e71_former_primary_recovery.py
+          catalog/federation/tests/test_phase_e72_former_primary_transfer.py
+          catalog/federation/tests/test_phase_e78_former_primary_completion.py
+
+      - name: Go direct peer sidecar tests
+        working-directory: cmd/msh-peer-sidecar
+        run: |
+          go mod tidy
+          go test ./...
+
+      - name: Ruff maintained release boundaries
+        run: >-
+          python -m ruff check
+          catalog/capabilities
+          catalog/ai/remote_provider.py
+          catalog/common/data_loading.py
+          catalog/flask_app/app.py
+          catalog/flask_app/capability_startup_transition_routes.py
+          catalog/flask_app/data_upload_routes.py
+          catalog/flask_app/docs_routes.py
+          catalog/flask_app/provider_federation_routes.py
+          catalog/flask_app/services/capability_contribution_components.py
+          catalog/flask_app/services/data_upload_service.py
+          catalog/flask_app/services/device_state_reset.py
+          catalog/flask_app/services/existing_setup_resume.py
+          catalog/flask_app/services/federation_pairing_install.py
+          catalog/flask_app/services/local_capability_candidates.py
+          catalog/flask_app/services/resilient_pairing_runtime.py
+          catalog/flask_app/services/run_once_capability_evidence.py
+          catalog/flask_app/services/upload_analysis_job_service.py
+          catalog/flask_app/test_startup_ai_benchmark.py
+          catalog/flask_app/test_startup_saved_landing.py
+          catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
+          catalog/flask_app/tests/test_capability_runtime_startup.py
+          catalog/flask_app/tests/test_capability_startup_transition_route.py
+          catalog/flask_app/tests/test_data_upload.py
+          catalog/flask_app/tests/test_device_state_reset.py
+          catalog/flask_app/tests/test_docs_viewer.py
+          catalog/flask_app/tests/test_existing_setup_resume.py
+          catalog/flask_app/tests/test_federation_auto_reconnect.py
+          catalog/flask_app/tests/test_local_capability_candidates.py
+          catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
+          catalog/flask_app/tests/test_upload_analysis_jobs.py
+          catalog/flask_app/tests/test_windows_start_script.py
+          catalog/flask_app/tests/test_windows_update_script.py
+          catalog/flask_app/tests/test_windows_volume_name_selection.py
+          catalog/federation/projections/benchmark_adapter.py
+          catalog/federation/projections/onboarding_adapter.py
+          catalog/federation/projections/storage_job_adapters.py
+          catalog/federation/tests/cf7_acceptance/physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_product_acceptance.py
+          catalog/federation/tests/test_benchmark_latest_projection.py
+          catalog/federation/tests/test_onboarding_projection_policy.py
+          catalog/federation/tests/test_release_documentation_links.py
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+          catalog/relay/tests/test_phase_f84_compute_worker_activation.py
+          --ignore I001,RUF022,B008,C408,PLC0206,UP035
+
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+
+      - name: Diff hygiene
+        shell: bash
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git diff --check "origin/${{ github.base_ref }}...HEAD"
+          else
+            git diff --check HEAD^ HEAD
+          fi
+
+  postgres-storage:
+    name: PostgreSQL storage release check
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: msh
+          POSTGRES_PASSWORD: msh
+          POSTGRES_DB: msh_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U msh -d msh_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      MSH_TEST_POSTGRES_DSN: postgresql://msh:msh@127.0.0.1:5432/msh_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest
+      - name: PostgreSQL storage authority regression
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/test_phase_d2_postgres.py
+
+  release-verdict:
+    name: Federation v1 automated release verdict
+    if: always()
+    needs: [release-matrix, postgres-storage]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require every automated release job
+        shell: bash
+        run: |
+          test "${{ needs.release-matrix.result }}" = "success"
+          test "${{ needs.postgres-storage.result }}" = "success"

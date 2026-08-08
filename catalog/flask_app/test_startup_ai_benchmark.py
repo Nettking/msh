@@ -50,7 +50,10 @@ def _patch_setup_context(monkeypatch) -> None:
     )
 
 
-def test_startup_ai_step_exposes_model_suggestion_benchmark(monkeypatch, tmp_path):
+def test_explicit_legacy_ai_step_exposes_model_suggestion_benchmark(
+    monkeypatch,
+    tmp_path,
+):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup_context(monkeypatch)
@@ -58,7 +61,7 @@ def test_startup_ai_step_exposes_model_suggestion_benchmark(monkeypatch, tmp_pat
     app = create_app()
     app.config.update(TESTING=True)
 
-    response = app.test_client().get("/startup?next=%2F&step=ai")
+    response = app.test_client().get("/startup?legacy=1&next=%2F&step=ai")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -72,7 +75,7 @@ def test_startup_ai_step_exposes_model_suggestion_benchmark(monkeypatch, tmp_pat
     assert "/server-setup/test-ai-connection" in html
 
 
-def test_first_time_setup_uses_focused_guided_shell(monkeypatch, tmp_path):
+def test_explicit_legacy_setup_uses_focused_guided_shell(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup_context(monkeypatch)
@@ -80,7 +83,7 @@ def test_first_time_setup_uses_focused_guided_shell(monkeypatch, tmp_path):
     app = create_app()
     app.config.update(TESTING=True)
 
-    response = app.test_client().get("/startup")
+    response = app.test_client().get("/startup?legacy=1")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
