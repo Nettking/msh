@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from flask import Flask, current_app
 
 from .capability_recovery_adapters import fresh_capability_inspection_adapters
+from .federation_contribution_publication import publish_local_contributions
 from .federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
+    RemotePairingState,
     RemotePairingStore,
 )
 from .resilient_pairing_runtime import ResilientPairingRelayRuntime
@@ -18,6 +21,9 @@ from .server_setup_service import load_settings
 
 _RECONNECT_EXTENSION_KEY = "federation_saved_membership_reconnect"
 _RETAINED_STARTUP_CHECK_KEY = "capability_onboarding_startup_checked"
+_CONTRIBUTION_RECONCILE_EXTENSION_KEY = "capability_contribution_startup_reconciled"
+_LOCAL_RELAY_CONFIG_KEY = "CAPABILITY_ONBOARDING_LOCAL_RELAY_URL"
+_DEFAULT_COMPOSE_LOCAL_RELAY_URL = "ws://relay:8765"
 _CONNECTED_CHECK_SECONDS = 15.0
 _MAX_RETRY_SECONDS = 60.0
 _TERMINAL_RECONNECT_CODES = frozenset(
@@ -31,6 +37,10 @@ _TERMINAL_RECONNECT_CODES = frozenset(
         "unknown-node",
     }
 )
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
@@ -112,7 +122,15 @@ class LazyPairingOnboardingService(PairingAwareCapabilityOnboardingService):
 
 
 class SavedFederationReconnectMonitor:
-    """Keep one saved remote Federation membership connected automatically."""
+    """Keep one trusted Federation membership present on the authenticated relay.
+
+    Remote members reconnect to their persisted relay root. The local Federation
+    creator also opens an authenticated outbound relay connection through the
+    Compose-internal relay root (or an explicitly configured replacement). This
+    makes coordinator liveness symmetric: a member is reported online because a
+    real authenticated connection and heartbeat exist, not because the local UI
+    special-cases itself.
+    """
 
     def __init__(
         self,
@@ -163,22 +181,90 @@ class SavedFederationReconnectMonitor:
     def stop(self) -> None:
         self._stop.set()
 
+    def _local_relay_url(self) -> str:
+        configured = self.app.config.get(
+            _LOCAL_RELAY_CONFIG_KEY,
+            _DEFAULT_COMPOSE_LOCAL_RELAY_URL,
+        )
+        value = str(configured).strip()
+        if not value:
+            return _DEFAULT_COMPOSE_LOCAL_RELAY_URL
+        return value
+
+    def _connected_state_and_context(self) -> tuple[RemotePairingState, object] | None:
+        remote = self.service.remote_store.load()
+        if remote is not None:
+            context = self.service.authorized_context()
+            if context is None:
+                raise RuntimeError("saved remote Federation context is unavailable")
+            return remote, context
+
+        # A local Federation creator previously had no relay client at all. That
+        # made every remote member see the owner as offline while the owner's UI
+        # locally overrode itself to online. Revalidate the existing membership,
+        # then establish a real authenticated connection using the same identity.
+        context = self.service.authorized_context()
+        if context is None:
+            return None
+        binding = getattr(context, "binding", None)
+        if binding is None:
+            return None
+        local_state = RemotePairingState(self._local_relay_url(), binding)
+        self.service.relay_runtime.ensure_connected(local_state)
+        return local_state, context
+
+    def _publish_contributions(
+        self,
+        runtime_state: RemotePairingState,
+        context: object,
+    ) -> None:
+        # The app's one-shot startup reconciliation must run first. Otherwise a
+        # persisted active intent with stale evidence could briefly be advertised
+        # as ready before the existing fail-closed suspension path fences it.
+        if not self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY):
+            return
+        from .capability_contribution_service import (
+            get_capability_contribution_service,
+        )
+
+        binding = getattr(context, "binding", None)
+        credentials = getattr(context, "credentials", None)
+        identity = getattr(credentials, "identity", None)
+        session_id = getattr(binding, "internal_session_id", None)
+        node_id = getattr(identity, "node_id", None)
+        if not isinstance(session_id, str) or not isinstance(node_id, str):
+            raise RuntimeError("trusted Federation context is incomplete")
+        publish_local_contributions(
+            contribution_service=get_capability_contribution_service(),
+            runtime=self.service.relay_runtime,
+            runtime_state=runtime_state,
+            session_id=session_id,
+            node_id=node_id,
+            now=_utc_now(),
+        )
+
     def _run(self) -> None:
         failures = 0
         while not self._stop.is_set():
             try:
                 with self.app.app_context():
-                    remote = self.service.remote_store.load()
-                    if remote is None:
+                    resolved = self._connected_state_and_context()
+                    if resolved is None:
                         self._set_state(
-                            "no-saved-remote-membership",
+                            "no-saved-membership",
                             attempts=failures,
                         )
                         return
-                    context = self.service.authorized_context()
-                    if context is None:
-                        raise RuntimeError(
-                            "saved remote Federation context is unavailable"
+                    runtime_state, context = resolved
+                    try:
+                        self._publish_contributions(runtime_state, context)
+                    except Exception as exc:  # noqa: BLE001 - metadata sync is fail-closed
+                        # Publication never grants authority. A failed metadata
+                        # refresh must not tear down a valid membership connection;
+                        # the next bounded monitor pass retries it.
+                        self.app.logger.info(
+                            "Federation capability metadata refresh unavailable (%s)",
+                            type(exc).__name__,
                         )
             except Exception as exc:  # noqa: BLE001 - network retry boundary
                 failures += 1
