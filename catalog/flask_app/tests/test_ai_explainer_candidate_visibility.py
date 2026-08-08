@@ -5,12 +5,16 @@ from types import SimpleNamespace
 
 from flask import Flask
 
+from catalog.ai.ollama_client import DEFAULT_BASE_URL
+from catalog.ai.ollama_provider import OllamaLanguageModelProvider
 from catalog.ai.runtime_manager import ConfiguredLanguageModelRuntimeManager
+from catalog.ai.runtime_contracts import AIModality, AIRuntimeRequest
 from catalog.capabilities.contributions import AICandidateSource, AIContributionAdapter
 from catalog.federation.onboarding_models import (
     ContributionActivationState,
     DeviceInspectionSnapshot,
 )
+from catalog.flask_app import ai_routes
 from catalog.flask_app.services.capability_contribution_components import (
     default_components,
 )
@@ -118,3 +122,116 @@ def test_ai_explainer_enable_maps_opaque_federation_identity_to_runtime_id(
     assert provider.node_id.startswith("node-federation-")
     assert provider.node_id != opaque_node_id
     assert provider.node_id == provider.node_id.casefold()
+
+
+def _active_manager() -> ConfiguredLanguageModelRuntimeManager:
+    manager = ConfiguredLanguageModelRuntimeManager(session_id="local-ai")
+    manager.register(
+        OllamaLanguageModelProvider(
+            session_id="local-ai",
+            display_name="AI Explainer — This computer",
+            base_url="http://private-active-provider:11434",
+            models=("llama3.2:3b",),
+            capability_id="ollama-configured",
+            node_id="node-active-ai",
+            chat_callable=lambda **_kwargs: "capability-first answer",
+        )
+    )
+    return manager
+
+
+def test_active_capability_provider_replaces_stale_default_runtime(
+    monkeypatch,
+) -> None:
+    manager = _active_manager()
+    monkeypatch.setattr(ai_routes, "AI_RUNTIME_MANAGER", manager)
+    monkeypatch.setattr(ai_routes, "_ACTIVE_RUNTIME", None)
+    monkeypatch.setattr(ai_routes, "_ACTIVE_RUNTIME_KEY", None)
+
+    model, base_url, provider_name = ai_routes._ai_defaults()
+    runtime = ai_routes._build_ai_runtime(
+        model=model,
+        base_url=base_url,
+        provider_name=provider_name,
+    )
+
+    assert (model, base_url, provider_name) == (
+        "llama3.2:3b",
+        DEFAULT_BASE_URL,
+        "AI Explainer — This computer",
+    )
+    assert runtime.provider_status() == (
+        {
+            "capability_id": "ollama-configured",
+            "provider_name": "AI Explainer — This computer",
+            "status": "ready",
+            "models": ["llama3.2:3b"],
+            "modalities": ["text"],
+            "active_jobs": 0,
+            "max_concurrent_jobs": 1,
+            "queue_depth": 0,
+            "supports_timeout": True,
+            "supports_cancellation": False,
+        },
+    )
+
+    result = runtime.execute(
+        AIRuntimeRequest(
+            request_id="request-active-provider",
+            session_id="local-ai",
+            idempotency_key="request-active-provider",
+            model="llama3.2:3b",
+            modality=AIModality.TEXT,
+            prompt="Explain MSH",
+            system_prompt="Answer from context.",
+            timeout_seconds=5,
+        )
+    )
+    assert result.content == "capability-first answer"
+    assert result.provider_capability_id == "ollama-configured"
+
+
+def test_active_capability_provider_overrides_stale_startup_navigation_flag(
+    monkeypatch,
+) -> None:
+    manager = _active_manager()
+    monkeypatch.setattr(ai_routes, "AI_RUNTIME_MANAGER", manager)
+    monkeypatch.setattr(
+        ai_routes,
+        "get_capability_startup_transition_service",
+        lambda: SimpleNamespace(
+            capability_flags=lambda: {
+                "completed": True,
+                "language_model": False,
+                "runtime": True,
+                "workbench": True,
+            }
+        ),
+    )
+
+    injected = ai_routes.inject_live_ai_capability_startup_flags()
+
+    assert injected["capability_startup_flags"]["language_model"] is True
+
+
+def test_disabled_capability_provider_hides_stale_enabled_navigation_flag(
+    monkeypatch,
+) -> None:
+    manager = ConfiguredLanguageModelRuntimeManager(session_id="local-ai")
+    monkeypatch.setattr(ai_routes, "AI_RUNTIME_MANAGER", manager)
+    monkeypatch.setattr(
+        ai_routes,
+        "get_capability_startup_transition_service",
+        lambda: SimpleNamespace(
+            capability_flags=lambda: {
+                "completed": True,
+                "language_model": True,
+                "runtime": True,
+                "workbench": True,
+            }
+        ),
+    )
+
+    injected = ai_routes.inject_live_ai_capability_startup_flags()
+
+    assert injected["capability_startup_flags"]["language_model"] is False
