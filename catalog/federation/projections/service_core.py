@@ -250,7 +250,7 @@ class FederationProjectionCore:
                 "Review available contributions",
                 "This device has a suitable service that is not currently enabled.",
                 "Review services",
-                "/federation/services",
+                "/onboarding?step=contributions",
             )
         return None
 

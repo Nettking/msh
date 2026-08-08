@@ -13,6 +13,7 @@ on:
       - "catalog/flask_app/tests/test_federation_overview_route.py"
       - "catalog/flask_app/tests/test_federation_detail_routes.py"
       - "catalog/flask_app/tests/test_federation_projection_consistency.py"
+      - "catalog/federation/tests/test_federation_review_services_navigation.py"
       - "catalog/federation/projections/**"
   push:
     branches:
@@ -30,6 +31,7 @@ on:
       - "catalog/flask_app/tests/test_federation_overview_route.py"
       - "catalog/flask_app/tests/test_federation_detail_routes.py"
       - "catalog/flask_app/tests/test_federation_projection_consistency.py"
+      - "catalog/federation/tests/test_federation_review_services_navigation.py"
       - "catalog/federation/projections/**"
 
 permissions:
@@ -68,6 +70,7 @@ jobs:
           catalog/flask_app/tests/test_federation_overview_route.py
           catalog/flask_app/tests/test_federation_detail_routes.py
           catalog/flask_app/tests/test_federation_projection_consistency.py
+          catalog/federation/tests/test_federation_review_services_navigation.py
       - name: Run focused and affected tests
         run: >-
           python -m pytest -o addopts= -q
@@ -76,6 +79,7 @@ jobs:
           catalog/flask_app/tests/test_federation_projection_consistency.py
           catalog/flask_app/tests/test_cf5_ui_shell.py
           catalog/federation/tests/test_federation_projections.py
+          catalog/federation/tests/test_federation_review_services_navigation.py
           catalog/flask_app/tests/test_provider_federation_surface.py
           catalog/flask_app/tests/test_docs_viewer.py
       - name: Ruff CFI-1 integration
@@ -87,6 +91,7 @@ jobs:
           catalog/flask_app/tests/test_federation_overview_route.py
           catalog/flask_app/tests/test_federation_detail_routes.py
           catalog/flask_app/tests/test_federation_projection_consistency.py
+          catalog/federation/tests/test_federation_review_services_navigation.py
       - name: Diff hygiene
         shell: bash
         run: |
