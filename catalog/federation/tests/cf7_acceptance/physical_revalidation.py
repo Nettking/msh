@@ -237,6 +237,7 @@ def changed_paths_between(
     diff = _git(
         repo_root,
         "diff",
+        "--no-renames",
         "--name-only",
         "--diff-filter=ACMRDTUXB",
         f"{baseline}..{candidate}",
