@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, current_app
+from flask import Flask, current_app, request
 
 from .capability_recovery_adapters import fresh_capability_inspection_adapters
 from .federation_contribution_publication import publish_local_contributions
@@ -26,6 +26,13 @@ _LOCAL_RELAY_CONFIG_KEY = "CAPABILITY_ONBOARDING_LOCAL_RELAY_URL"
 _DEFAULT_COMPOSE_LOCAL_RELAY_URL = "ws://relay:8765"
 _CONNECTED_CHECK_SECONDS = 15.0
 _MAX_RETRY_SECONDS = 60.0
+_CONTRIBUTION_MUTATION_ENDPOINTS = frozenset(
+    {
+        "capability_contribution_web.save_contributions",
+        "capability_contribution_web.suspend_contribution",
+        "capability_contribution_web.reconcile_contributions",
+    }
+)
 _TERMINAL_RECONNECT_CODES = frozenset(
     {
         "malformed-remote-pairing-state",
@@ -141,6 +148,7 @@ class SavedFederationReconnectMonitor:
         self.service = service
         self._lock = threading.Lock()
         self._stop = threading.Event()
+        self._wake = threading.Event()
         self._thread: threading.Thread | None = None
         self._state: dict[str, object] = {
             "status": "not-started",
@@ -180,6 +188,19 @@ class SavedFederationReconnectMonitor:
 
     def stop(self) -> None:
         self._stop.set()
+        self._wake.set()
+
+    def request_contribution_refresh(self) -> None:
+        """Wake the monitor after a local contribution intent changes.
+
+        Contribution mutations remain local authority operations. This only asks
+        the existing authenticated relay loop to republish public-safe metadata;
+        it does not grant provider, storage, compute, execution, or membership
+        authority. The event is deliberately non-blocking so a relay outage cannot
+        turn a successful local fence into a failed HTTP request.
+        """
+
+        self._wake.set()
 
     def _local_relay_url(self) -> str:
         configured = self.app.config.get(
@@ -300,7 +321,9 @@ class SavedFederationReconnectMonitor:
                 self.app.logger.info(
                     "Saved Federation membership reconnected automatically"
                 )
-            if self._stop.wait(_CONNECTED_CHECK_SECONDS):
+            self._wake.wait(_CONNECTED_CHECK_SECONDS)
+            self._wake.clear()
+            if self._stop.is_set():
                 return
 
 
@@ -324,6 +347,20 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
         # transient first failure as permanently checked.
         app.extensions[_RETAINED_STARTUP_CHECK_KEY] = True
         monitor.start()
+
+    @app.after_request
+    def _wake_contribution_publication(response):
+        # Local contribution intent is persisted/fenced by the route first. Wake
+        # the authenticated publication loop afterwards so another member sees
+        # enable/disable/suspend/reconcile state without waiting for the periodic
+        # reconnect interval. This remains metadata-only and non-blocking.
+        if (
+            request.method == "POST"
+            and request.endpoint in _CONTRIBUTION_MUTATION_ENDPOINTS
+            and response.status_code < 500
+        ):
+            monitor.request_contribution_refresh()
+        return response
 
     return service
 
