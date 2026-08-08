@@ -46,6 +46,7 @@ from .capability_onboarding_service import (
 
 _SERVICE_EXTENSION_KEY = "capability_benchmark_service"
 _MAX_IDENTIFIER_BYTES = 512
+_SKIPPABLE_REVIEW_STATES = frozenset({"pending", "expired", "stale"})
 
 
 def _utc_now() -> datetime:
@@ -286,7 +287,7 @@ class BenchmarkSkipStore:
             raise FederationValidationError(
                 "benchmark-skip-state-write-failed",
                 "database",
-                "benchmark skip state could not be updated safely",
+                "benchmark state could not be updated safely",
             ) from exc
 
 
@@ -637,10 +638,32 @@ class CapabilityBenchmarkService:
     def skip_all(self) -> int:
         device_id, snapshot = self._authorized_snapshot(require_current=True)
         plan = tuple(item for item in self.plan(snapshot) if item.runnable)
+        latest = self._latest_results(
+            self.list_results(),
+            device_id=device_id,
+        )
+        skipped = self.skip_store.list_for_revision(
+            device_id=device_id,
+            inspection_revision=snapshot.revision,
+        )
+        with self._lock:
+            active_keys = set(self._active)
+        items = tuple(
+            item
+            for item in plan
+            if self._card_model(
+                item=item,
+                result=latest.get(item.key),
+                skipped=item.key in skipped,
+                active=(device_id, *item.key) in active_keys,
+                inspection_current=True,
+            )["state"]
+            in _SKIPPABLE_REVIEW_STATES
+        )
         return self.skip_store.skip_many(
             device_id=device_id,
             inspection_revision=snapshot.revision,
-            items=plan,
+            items=items,
             skipped_at=self._now(),
         )
 
@@ -919,7 +942,9 @@ class CapabilityBenchmarkService:
                 if complete
                 else f"{pending} check{'s' if pending != 1 else ''} need review"
             ),
-            "can_skip": any(item.runnable for item in plan),
+            "can_skip": any(
+                card["state"] in _SKIPPABLE_REVIEW_STATES for card in cards
+            ),
         }
         return summary, cards, complete
 
