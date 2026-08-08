@@ -15,7 +15,6 @@ from .physical_revalidation import (
     scenario_can_carry_forward,
 )
 
-
 PAIRING_IMPACT = (
     "physical.multi-host-relay-and-network-path",
     "physical.mobile-and-desktop-browser-review",
