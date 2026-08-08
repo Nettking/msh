@@ -128,6 +128,30 @@ def test_git_analyzer_requires_ancestor_and_uses_actual_diff(tmp_path: Path) -> 
     assert non_ancestor.value.code == "baseline-not-ancestor"
 
 
+def test_git_analyzer_preserves_old_path_when_product_file_is_renamed(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "cf7@example.invalid")
+    _git(tmp_path, "config", "user.name", "CF7 Test")
+    product = tmp_path / "catalog" / "node" / "client.py"
+    product.parent.mkdir(parents=True)
+    product.write_text("VALUE = 1\n", encoding="utf-8")
+    baseline = _commit(tmp_path, "baseline")
+
+    documentation = tmp_path / "docs" / "client.md"
+    documentation.parent.mkdir(parents=True)
+    product.rename(documentation)
+    candidate = _commit(tmp_path, "rename product path")
+
+    report = analyze_commits(tmp_path, baseline, candidate)
+
+    assert report.safe is True
+    assert "catalog/node/client.py" in report.changed_paths
+    assert "docs/client.md" in report.changed_paths
+    assert report.impacted_scenarios == PAIRING_IMPACT
+
+
 def test_revalidation_cli_prints_machine_readable_plan(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
