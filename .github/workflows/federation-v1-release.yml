@@ -1,0 +1,117 @@
+name: Federation v1 release gate
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+      - "README.md"
+      - "catalog/**"
+      - "constraints-phase2.txt"
+      - "docker-compose.yml"
+      - "docs/**"
+      - "requirements.txt"
+      - "scripts/**"
+      - "start.cmd"
+      - "update.cmd"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/**"
+      - "README.md"
+      - "catalog/**"
+      - "constraints-phase2.txt"
+      - "docker-compose.yml"
+      - "docs/**"
+      - "requirements.txt"
+      - "scripts/**"
+      - "start.cmd"
+      - "update.cmd"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: federation-v1-release-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release-matrix:
+    name: Release matrix (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install release dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+
+      - name: Compile maintained product packages
+        run: >-
+          python -m compileall -q
+          catalog
+
+      - name: Validate acceptance manifest shape
+        run: >-
+          python -c "import json, pathlib;
+          manifest = json.loads(pathlib.Path('catalog/federation/tests/cf7_acceptance/scenarios.json').read_text(encoding='utf-8'));
+          required = {
+            'federation_v1_end_to_end_accepted',
+            'capability_first_onboarding_end_to_end_accepted',
+            'automated_product_acceptance_executable',
+            'physical_evidence_accepted',
+            'executable_now',
+            'blocked_by_cfi',
+            'manual_physical_verification',
+          };
+          assert required <= manifest.keys();
+          assert all(isinstance(manifest[key], bool) for key in (
+            'federation_v1_end_to_end_accepted',
+            'capability_first_onboarding_end_to_end_accepted',
+            'automated_product_acceptance_executable',
+            'physical_evidence_accepted',
+          ));
+          assert manifest['automated_product_acceptance_executable'] is True;
+          assert manifest['executable_now'];
+          assert manifest['manual_physical_verification']"
+
+      - name: Run complete automated catalog test suite
+        run: python -m pytest -o addopts= -q
+
+      - name: Ruff maintained release boundaries
+        run: >-
+          python -m ruff check
+          catalog/capabilities
+          catalog/ai
+          catalog/federation
+          catalog/relay
+          catalog/flask_app
+          catalog/common/data_loading.py
+          --ignore I001,RUF022,B008,C408,PLC0206,UP035
+
+      - name: Validate Compose configuration
+        run: docker compose config --quiet
+
+      - name: Diff hygiene
+        shell: bash
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git diff --check "origin/${{ github.base_ref }}...HEAD"
+          else
+            git diff --check HEAD^ HEAD
+          fi
