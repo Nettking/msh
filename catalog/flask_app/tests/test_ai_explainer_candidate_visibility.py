@@ -192,7 +192,7 @@ def test_active_capability_provider_replaces_stale_default_runtime(
     assert result.provider_capability_id == "ollama-configured"
 
 
-def test_active_capability_provider_overrides_stale_startup_navigation_flag(
+def test_active_capability_provider_keeps_workbench_ai_navigation(
     monkeypatch,
 ) -> None:
     manager = _active_manager()
@@ -215,7 +215,7 @@ def test_active_capability_provider_overrides_stale_startup_navigation_flag(
     assert injected["capability_startup_flags"]["language_model"] is True
 
 
-def test_disabled_capability_provider_hides_stale_enabled_navigation_flag(
+def test_disabled_capability_provider_keeps_workbench_ai_navigation(
     monkeypatch,
 ) -> None:
     manager = ConfiguredLanguageModelRuntimeManager(session_id="local-ai")
@@ -226,7 +226,7 @@ def test_disabled_capability_provider_hides_stale_enabled_navigation_flag(
         lambda: SimpleNamespace(
             capability_flags=lambda: {
                 "completed": True,
-                "language_model": True,
+                "language_model": False,
                 "runtime": True,
                 "workbench": True,
             }
@@ -235,7 +235,7 @@ def test_disabled_capability_provider_hides_stale_enabled_navigation_flag(
 
     injected = ai_routes.inject_live_ai_capability_startup_flags()
 
-    assert injected["capability_startup_flags"]["language_model"] is False
+    assert injected["capability_startup_flags"]["language_model"] is True
 
 
 def test_completed_capability_first_ai_never_falls_back_to_legacy_provider(
