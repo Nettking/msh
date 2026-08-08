@@ -9,6 +9,7 @@ on:
       - "catalog/flask_app/static/js/ai-explainer.js"
       - "catalog/flask_app/services/server_setup_service.py"
       - "catalog/flask_app/tests/test_ai_explainer_chat.py"
+      - "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py"
       - "catalog/flask_app/tests/test_ai_runtime_integration.py"
       - "catalog/flask_app/tests/test_connected_ai_provider.py"
       - "catalog/flask_app/tests/test_model_provider_compose.py"
@@ -23,6 +24,7 @@ on:
       - "catalog/flask_app/static/js/ai-explainer.js"
       - "catalog/flask_app/services/server_setup_service.py"
       - "catalog/flask_app/tests/test_ai_explainer_chat.py"
+      - "catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py"
       - "catalog/flask_app/tests/test_ai_runtime_integration.py"
       - "catalog/flask_app/tests/test_connected_ai_provider.py"
       - "catalog/flask_app/tests/test_model_provider_compose.py"
@@ -62,6 +64,7 @@ jobs:
           catalog/capabilities
           catalog/flask_app/ai_routes.py
           catalog/flask_app/tests/test_ai_explainer_chat.py
+          catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
           catalog/flask_app/tests/test_ai_runtime_integration.py
           catalog/flask_app/tests/test_connected_ai_provider.py
           catalog/flask_app/tests/test_model_provider_compose.py
@@ -70,6 +73,7 @@ jobs:
           python -m pytest -o addopts= -q
           catalog/ai/tests
           catalog/flask_app/tests/test_ai_explainer_chat.py
+          catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
           catalog/flask_app/tests/test_ai_runtime_integration.py
           catalog/flask_app/tests/test_connected_ai_provider.py
           catalog/flask_app/tests/test_model_provider_compose.py
@@ -83,6 +87,7 @@ jobs:
           python -m ruff check
           catalog/ai
           catalog/flask_app/ai_routes.py
+          catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
           catalog/flask_app/tests/test_ai_runtime_integration.py
           --ignore I001,RUF022,B008,C408,PLC0206,UP035
 
