@@ -10,6 +10,7 @@ from catalog.federation.projections import (
     BenchmarkSnapshot,
     ContributionRecord,
     DeviceRecord,
+    FederatedCapabilityRecord,
     FederationAuthoritySnapshot,
     FederationProjectionService,
     JobAuthoritySnapshot,
@@ -60,7 +61,7 @@ def test_empty_optional_surfaces_are_not_false_degraded_states() -> None:
             DeviceRecord(
                 "node-local",
                 "This MSH device",
-                "unknown",
+                "connected",
                 None,
                 0,
             ),
@@ -101,7 +102,7 @@ def test_empty_optional_surfaces_are_not_false_degraded_states() -> None:
     assert payload["devices"]["items"][0]["state_label"] == "Connected"
 
 
-def test_capability_first_device_alignment_is_read_only_and_deduplicated() -> None:
+def test_capability_first_device_alignment_does_not_override_shared_authority() -> None:
     local_ai = ContributionRecord(
         candidate_id="candidate-ai",
         device_id="node-local",
@@ -199,13 +200,68 @@ def test_capability_first_device_alignment_is_read_only_and_deduplicated() -> No
     by_id = {device.node_id: device for device in snapshot.devices}
 
     assert by_id["node-local"].label == "This MSH device"
-    assert by_id["node-local"].state == "connected"
-    assert by_id["node-local"].capability_count == 2
+    assert by_id["node-local"].state == "unknown"
+    assert by_id["node-local"].capability_count == 0
     assert by_id["node-remote"].label == "Trusted MSH device"
     assert by_id["node-remote"].state == "offline"
-    assert by_id["node-remote"].capability_count == 1
+    assert by_id["node-remote"].capability_count == 0
     assert federation.devices[0].state == "unknown"
     assert federation.devices[0].capability_count == 0
+
+
+def test_services_page_includes_remote_authorized_capability_metadata() -> None:
+    onboarding = OnboardingSnapshot(
+        available=True,
+        reason_code="current",
+        federation_id="federation-local",
+        connection_state="connected",
+        trusted=True,
+        device_id="node-local",
+    )
+    federation = FederationAuthoritySnapshot(
+        available=True,
+        reason_code="current",
+        label="Local federation",
+        state="active",
+        revision=4,
+        devices=(
+            DeviceRecord("node-local", "This MSH device", "connected", NOW, 0),
+            DeviceRecord("node-remote", "Trusted MSH device", "connected", NOW, 1),
+        ),
+        capabilities=(
+            FederatedCapabilityRecord(
+                "candidate-remote-ai",
+                "node-remote",
+                "language-model",
+                "msh-ai",
+                "1.0",
+                "disabled",
+                NOW,
+            ),
+        ),
+    )
+    service = FederationProjectionService(
+        ProjectionAdapters(
+            onboarding=_StaticAdapter(onboarding),
+            providers=_StaticAdapter(ProviderSnapshot(False, "not-configured")),
+            benchmarks=_StaticAdapter(BenchmarkSnapshot(True, "current")),
+            federation=_StaticAdapter(federation),
+            storage=_StaticAdapter(StorageAuthoritySnapshot(True, "not-configured")),
+            jobs=_StaticAdapter(JobAuthoritySnapshot(True, "not-configured")),
+        ),
+        now=lambda: NOW,
+    )
+
+    payload = service.services().to_dict()
+
+    remote = next(item for item in payload["items"] if item["key"] == "candidate-remote-ai")
+    assert remote["label"] == "Language Model"
+    assert remote["detail"] == "msh-ai 1.0"
+    assert remote["state_label"] == "Disabled"
+    assert {item["label"]: item["value"] for item in remote["details"]} == {
+        "Device": "Trusted MSH device",
+        "Source": "Federation authority",
+    }
 
 
 def test_production_composition_reads_live_cfi_services(
@@ -229,10 +285,21 @@ def test_production_composition_reads_live_cfi_services(
                     {
                         "node_id": "node-local",
                         "display_name": "This MSH device",
-                        "connection_state": "unknown",
+                        "connection_state": "connected",
                     }
                 ],
-                "capabilities": [],
+                "capabilities": [
+                    {
+                        "session_id": "session-private",
+                        "capability_id": "candidate-ai",
+                        "node_id": "node-local",
+                        "type": "language-model",
+                        "protocol": "msh-ai",
+                        "protocol_version": "1.0",
+                        "status": "ready",
+                        "last_heartbeat": NOW.isoformat(),
+                    }
+                ],
                 "pagination": {"has_more": False, "next_cursor": None},
             }
 
@@ -343,6 +410,7 @@ def test_production_composition_reads_live_cfi_services(
     assert payload["contributions"][0]["label"] == "Configured language model"
     assert payload["contributions"][0]["activation_state"] == "active"
     assert _summary(payload, "Trusted devices")["detail"] == "1 connected now"
+    assert _summary(payload, "Active services")["value"] == "1"
     assert payload["devices"]["items"][0]["detail"] == "1 service"
     assert devices["items"][0]["state"] == "connected"
     assert devices["items"][0]["state_label"] == "Online"
