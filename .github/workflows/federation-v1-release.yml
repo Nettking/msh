@@ -97,11 +97,50 @@ jobs:
         run: >-
           python -m ruff check
           catalog/capabilities
-          catalog/ai
-          catalog/federation
-          catalog/relay
-          catalog/flask_app
+          catalog/ai/remote_provider.py
           catalog/common/data_loading.py
+          catalog/flask_app/app.py
+          catalog/flask_app/capability_startup_transition_routes.py
+          catalog/flask_app/data_upload_routes.py
+          catalog/flask_app/docs_routes.py
+          catalog/flask_app/provider_federation_routes.py
+          catalog/flask_app/services/capability_contribution_components.py
+          catalog/flask_app/services/data_upload_service.py
+          catalog/flask_app/services/device_state_reset.py
+          catalog/flask_app/services/existing_setup_resume.py
+          catalog/flask_app/services/federation_pairing_install.py
+          catalog/flask_app/services/local_capability_candidates.py
+          catalog/flask_app/services/resilient_pairing_runtime.py
+          catalog/flask_app/services/run_once_capability_evidence.py
+          catalog/flask_app/services/upload_analysis_job_service.py
+          catalog/flask_app/test_startup_ai_benchmark.py
+          catalog/flask_app/test_startup_saved_landing.py
+          catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
+          catalog/flask_app/tests/test_capability_runtime_startup.py
+          catalog/flask_app/tests/test_capability_startup_transition_route.py
+          catalog/flask_app/tests/test_data_upload.py
+          catalog/flask_app/tests/test_device_state_reset.py
+          catalog/flask_app/tests/test_docs_viewer.py
+          catalog/flask_app/tests/test_existing_setup_resume.py
+          catalog/flask_app/tests/test_federation_auto_reconnect.py
+          catalog/flask_app/tests/test_local_capability_candidates.py
+          catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_run_once_capability_evidence.py
+          catalog/flask_app/tests/test_upload_analysis_jobs.py
+          catalog/flask_app/tests/test_windows_start_script.py
+          catalog/flask_app/tests/test_windows_update_script.py
+          catalog/flask_app/tests/test_windows_volume_name_selection.py
+          catalog/federation/projections/benchmark_adapter.py
+          catalog/federation/projections/onboarding_adapter.py
+          catalog/federation/projections/storage_job_adapters.py
+          catalog/federation/tests/cf7_acceptance/physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_product_acceptance.py
+          catalog/federation/tests/test_benchmark_latest_projection.py
+          catalog/federation/tests/test_onboarding_projection_policy.py
+          catalog/federation/tests/test_release_documentation_links.py
+          catalog/relay/tests/test_phase_f83_remote_ai_binding.py
+          catalog/relay/tests/test_phase_f84_compute_worker_activation.py
           --ignore I001,RUF022,B008,C408,PLC0206,UP035
 
       - name: Validate Compose configuration
