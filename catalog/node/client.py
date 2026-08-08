@@ -145,7 +145,9 @@ class RelayNodeClient:
         self._websocket: ClientConnection | None = None
         self._send_lock = asyncio.Lock()
         self._pending: dict[str, asyncio.Future[dict[str, Any]]] = {}
-        self._replay_pending: set[str] = set()
+        self._replay_tasks: dict[
+            str, asyncio.Task[dict[str, Any]]
+        ] = {}
         self._gap_replay_tasks: dict[str, asyncio.Task[None]] = {}
         self._receiver_task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
@@ -356,6 +358,7 @@ class RelayNodeClient:
         current = asyncio.current_task()
         heartbeat_task, self._heartbeat_task = self._heartbeat_task, None
         receiver_task, self._receiver_task = self._receiver_task, None
+        replay_tasks = tuple(self._replay_tasks.items())
         gap_replay_tasks = tuple(self._gap_replay_tasks.items())
         websocket, self._websocket = self._websocket, None
         tasks = [
@@ -363,6 +366,7 @@ class RelayNodeClient:
             for task in (
                 heartbeat_task,
                 receiver_task,
+                *(task for _, task in replay_tasks),
                 *(task for _, task in gap_replay_tasks),
             )
             if task is not None and task is not current
@@ -371,6 +375,9 @@ class RelayNodeClient:
             task.cancel()
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
+        for session_id, task in replay_tasks:
+            if self._replay_tasks.get(session_id) is task:
+                self._replay_tasks.pop(session_id, None)
         for session_id, task in gap_replay_tasks:
             if (
                 task is not current
@@ -581,79 +588,143 @@ class RelayNodeClient:
         )
 
     async def request_replay(self, session_id: str) -> dict[str, Any]:
-        if session_id in self._replay_pending:
-            return {"session_id": session_id, "already_replaying": True}
-        self._replay_pending.add(session_id)
-        try:
-            self.state.mark_session_replaying(session_id, now=self._clock())
-            result: dict[str, Any] = {}
-            for _ in range(MAX_REPLAY_PAGES_PER_PASS):
-                before_revision = self.state.last_applied_revision(session_id)
-                result = await self.request(
-                    "event.replay",
-                    session_id=session_id,
-                    payload={"last_applied_revision": before_revision},
-                    timeout=max(
-                        self.request_timeout,
-                        DEFAULT_REPLAY_PAGE_TIMEOUT,
-                    ),
+        task = self._replay_tasks.get(session_id)
+        if task is None or task.done():
+            task = asyncio.create_task(
+                self._request_replay_pass(session_id),
+                name=f"msh-replay-{session_id}",
+            )
+            self._replay_tasks[session_id] = task
+            task.add_done_callback(
+                lambda completed: self._observe_replay_task(
+                    session_id, completed
                 )
-                current_revision = result.get(
-                    "current_revision", result.get("last_revision")
+            )
+        return await asyncio.shield(task)
+
+    async def _request_replay_pass(self, session_id: str) -> dict[str, Any]:
+        self.state.mark_session_replaying(session_id, now=self._clock())
+        result: dict[str, Any] = {}
+        for _ in range(MAX_REPLAY_PAGES_PER_PASS):
+            before_revision = self.state.last_applied_revision(session_id)
+            result = await self.request(
+                "event.replay",
+                session_id=session_id,
+                payload={"last_applied_revision": before_revision},
+                timeout=max(
+                    self.request_timeout,
+                    DEFAULT_REPLAY_PAGE_TIMEOUT,
+                ),
+            )
+            current_revision = result.get(
+                "current_revision", result.get("last_revision")
+            )
+            last_revision = result.get("last_revision", current_revision)
+            has_more = result.get("has_more", False)
+            if (
+                isinstance(current_revision, bool)
+                or not isinstance(current_revision, int)
+                or isinstance(last_revision, bool)
+                or not isinstance(last_revision, int)
+                or not isinstance(has_more, bool)
+            ):
+                raise RelayRemoteError(
+                    "invalid-replay-completion",
+                    "relay did not provide a valid bounded replay completion",
                 )
-                last_revision = result.get("last_revision", current_revision)
-                has_more = result.get("has_more", False)
-                if (
-                    isinstance(current_revision, bool)
-                    or not isinstance(current_revision, int)
-                    or isinstance(last_revision, bool)
-                    or not isinstance(last_revision, int)
-                    or not isinstance(has_more, bool)
-                ):
-                    raise RelayRemoteError(
-                        "invalid-replay-completion",
-                        "relay did not provide a valid bounded replay completion",
-                    )
-                after_revision = self.state.last_applied_revision(session_id)
-                if (
-                    last_revision < before_revision
-                    or after_revision < last_revision
-                    or current_revision < last_revision
-                ):
-                    raise RelayRemoteError(
-                        "invalid-replay-completion",
-                        "relay replay revisions were inconsistent",
-                    )
-                if has_more:
-                    if after_revision <= before_revision:
-                        raise RelayRemoteError(
-                            "revision-gap",
-                            "paged replay made no durable progress",
-                        )
-                    self.state.mark_session_replaying(
-                        session_id,
-                        now=self._clock(),
-                        target_revision=current_revision,
-                    )
-                    continue
-                completed = self.state.complete_replay(
-                    session_id,
-                    final_revision=current_revision,
-                    now=self._clock(),
+            after_revision = self.state.last_applied_revision(session_id)
+            if (
+                last_revision < before_revision
+                or after_revision < last_revision
+                or current_revision < last_revision
+            ):
+                raise RelayRemoteError(
+                    "invalid-replay-completion",
+                    "relay replay revisions were inconsistent",
                 )
-                if not completed.replaying:
-                    return result
+            if has_more:
                 if after_revision <= before_revision:
                     raise RelayRemoteError(
                         "revision-gap",
-                        "coordinator replay did not supply a required revision",
+                        "paged replay made no durable progress",
                     )
-            raise RelayRemoteError(
-                "replay-page-limit-exceeded",
-                "coordinator replay exceeded the bounded page count",
+                self.state.mark_session_replaying(
+                    session_id,
+                    now=self._clock(),
+                    target_revision=current_revision,
+                )
+                continue
+            completed = self.state.complete_replay(
+                session_id,
+                final_revision=current_revision,
+                now=self._clock(),
             )
-        finally:
-            self._replay_pending.discard(session_id)
+            if not completed.replaying:
+                return result
+            if after_revision <= before_revision:
+                raise RelayRemoteError(
+                    "revision-gap",
+                    "coordinator replay did not supply a required revision",
+                )
+        raise RelayRemoteError(
+            "replay-page-limit-exceeded",
+            "coordinator replay exceeded the bounded page count",
+        )
+
+    def _observe_replay_task(
+        self,
+        session_id: str,
+        task: asyncio.Task[dict[str, Any]],
+    ) -> None:
+        if self._replay_tasks.get(session_id) is task:
+            self._replay_tasks.pop(session_id, None)
+        if not task.cancelled():
+            task.exception()
+
+    async def coordinator_replay_page(
+        self,
+        *,
+        session_id: str,
+        last_applied_revision: int,
+        limit: int,
+    ) -> tuple[tuple[SessionEvent, ...], int]:
+        """Refresh authority and return one bounded cached replay page."""
+
+        result = await self.request_replay(session_id)
+        current_revision = result.get("current_revision")
+        if (
+            isinstance(current_revision, bool)
+            or not isinstance(current_revision, int)
+            or current_revision < 0
+        ):
+            raise RelayRemoteError(
+                "invalid-replay-completion",
+                "relay did not provide a valid replay revision",
+            )
+        events = self.state.applied_event_page(
+            session_id,
+            after_revision=last_applied_revision,
+            through_revision=current_revision,
+            limit=limit,
+        )
+        expected_revision = last_applied_revision + 1
+        for event in events:
+            if event.revision != expected_revision:
+                raise RelayRemoteError(
+                    "revision-gap",
+                    "cached replay did not contain a contiguous event page",
+                )
+            expected_revision += 1
+        expected_page_end = min(
+            current_revision,
+            last_applied_revision + limit,
+        )
+        if expected_revision != expected_page_end + 1:
+            raise RelayRemoteError(
+                "revision-gap",
+                "cached replay did not contain the complete event page",
+            )
+        return events, current_revision
 
     async def coordinator_status(self) -> dict[str, Any]:
         """Read one complete status snapshot before returning it to callers."""
