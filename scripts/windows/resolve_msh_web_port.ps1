@@ -100,7 +100,12 @@ function Test-MshFlaskContainer {
 function Get-VolumeInspection {
     param([Parameter(Mandatory = $true)][string]$VolumeName)
 
-    $raw = (& docker volume inspect $VolumeName 2>$null) -join "`n"
+    try {
+        $raw = (& docker volume inspect $VolumeName 2>$null) -join "`n"
+    }
+    catch {
+        return $null
+    }
     if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
         return $null
     }

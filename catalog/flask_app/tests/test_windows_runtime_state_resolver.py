@@ -76,3 +76,18 @@ Write-Output $output
     assert completed.returncode == 0, completed.stderr or completed.stdout
     payload = json.loads(completed.stdout.strip())
     assert payload == {"line": 7, "node": "node with spaces"}
+
+
+def test_missing_docker_volume_is_treated_as_absent_state() -> None:
+    script = _resolver_script()
+    section = script.split("function Get-VolumeInspection", 1)[1].split(
+        "function Find-ProjectVolume", 1
+    )[0]
+
+    inspect = section.index("$raw = (& docker volume inspect $VolumeName 2>$null)")
+    try_start = section.rfind("try {", 0, inspect)
+    catch_start = section.index("catch {", inspect)
+    null_return = section.index("return $null", catch_start)
+
+    assert try_start != -1
+    assert try_start < inspect < catch_start < null_return
