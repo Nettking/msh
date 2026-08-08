@@ -1,4 +1,4 @@
-"""Align legacy Federation device rows with capability-first read-only state."""
+"""Align Federation device labels with capability-first read-only state."""
 
 from __future__ import annotations
 
@@ -7,23 +7,18 @@ from dataclasses import replace
 from catalog.federation.projections import (
     FederationAuthoritySnapshot,
     OnboardingSnapshot,
-    ProviderSnapshot,
 )
 
 
 class CapabilityFirstFederationDeviceAdapter:
-    """Enrich existing member rows without creating membership or authority.
+    """Keep the Federation authority as the device/status/service source.
 
-    The Federation authority remains the source of the visible device set. This
-    adapter only aligns presentation fields that the installed product knows
-    more accurately through the authenticated capability-first composition:
-
-    * the local device is connected when its saved binding is connected/trusted;
-    * visible service counts include deduplicated contribution/provider IDs;
-    * a remote device's default self-label is rendered relative to this viewer.
-
-    Legacy capability counts are retained as a lower bound because the legacy
-    status surface exposes only a count, not IDs that can be safely deduplicated.
+    The previous adapter locally inflated the current device's service count from
+    inspection candidates and locally forced its connection state to connected.
+    Those fields were therefore different depending on which trusted member was
+    viewing the same Federation. Service metadata and liveness now come from the
+    authenticated shared coordinator; this adapter only makes a generic remote
+    self-label relative to the current viewer.
     """
 
     def __init__(
@@ -39,23 +34,10 @@ class CapabilityFirstFederationDeviceAdapter:
     def snapshot(self) -> FederationAuthoritySnapshot:
         federation = self._authority.snapshot()
         onboarding = self._onboarding.snapshot()
-        providers = self._providers.snapshot()
         if not isinstance(federation, FederationAuthoritySnapshot):
             return federation
         if not isinstance(onboarding, OnboardingSnapshot):
             return federation
-        if not isinstance(providers, ProviderSnapshot):
-            return federation
-
-        service_ids: dict[str, set[str]] = {}
-        for contribution in onboarding.contributions:
-            service_ids.setdefault(contribution.device_id, set()).add(
-                contribution.candidate_id
-            )
-        for provider in providers.providers:
-            service_ids.setdefault(provider.node_id, set()).add(
-                provider.capability_id
-            )
 
         aligned = []
         for device in federation.devices:
@@ -67,27 +49,7 @@ class CapabilityFirstFederationDeviceAdapter:
                 and label.strip().casefold() == "this msh device"
             ):
                 label = "Trusted MSH device"
-
-            state = device.state
-            if (
-                is_local
-                and onboarding.connection_state == "connected"
-                and onboarding.trusted
-            ):
-                state = "connected"
-
-            capability_count = max(
-                device.capability_count,
-                len(service_ids.get(device.node_id, ())),
-            )
-            aligned.append(
-                replace(
-                    device,
-                    label=label,
-                    state=state,
-                    capability_count=capability_count,
-                )
-            )
+            aligned.append(replace(device, label=label))
 
         generic_remote_indexes = [
             index
