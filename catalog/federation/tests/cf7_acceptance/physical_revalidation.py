@@ -63,7 +63,10 @@ class ImpactReport:
 
 
 def _normalize_path(value: str) -> str:
-    return value.replace("\\", "/").lstrip("./")
+    normalized = value.replace("\\", "/")
+    while normalized.startswith("./"):
+        normalized = normalized[2:]
+    return normalized
 
 
 def _matches(path: str, patterns: Iterable[str]) -> bool:
