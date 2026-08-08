@@ -3,7 +3,13 @@
 This module is an acceptance tool, not a runtime authority. It validates a
 bounded, redacted document produced after tests on real machines. CI may test
 this validator and its template, but CI cannot create accepted physical
- evidence on behalf of an operator.
+evidence on behalf of an operator.
+
+Version 2 keeps per-environment and per-scenario provenance. Physical evidence
+may be carried forward from an ancestor commit only when the fail-closed impact
+analyzer proves that the corresponding scenario is unaffected by every changed
+path. Unknown paths, non-ancestor provenance, or unavailable impact analysis
+require a physical rerun.
 """
 
 from __future__ import annotations
@@ -12,12 +18,12 @@ import argparse
 import json
 import re
 import sys
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-SCHEMA = "msh.cf7.physical-evidence.v1"
+SCHEMA = "msh.cf7.physical-evidence.v2"
 MAX_DOCUMENT_BYTES = 262_144
 MAX_TEXT_LENGTH = 512
 
@@ -36,6 +42,10 @@ REQUIRED_SCENARIOS = (
     "physical.restart-and-reconciliation",
     "physical.revocation-and-controlled-rejoin",
 )
+
+PROVENANCE_OBSERVED = "observed"
+PROVENANCE_CARRIED_FORWARD = "carried-forward"
+CarryForwardCheck = Callable[[str, str, str], bool]
 
 _REQUIRED_PRIVACY_CONFIRMATIONS = (
     "no_credentials",
@@ -237,7 +247,75 @@ def _reject_private_data(payload: Mapping[str, Any]) -> None:
             )
 
 
-def _validate_environment(name: str, value: object) -> dict[str, str | bool]:
+def _validate_provenance(
+    *,
+    value: object,
+    observed_commit_value: object,
+    candidate_commit: str,
+    scenario_id: str,
+    field: str,
+    carry_forward_check: CarryForwardCheck | None,
+) -> tuple[str, str]:
+    provenance = _require_text(value, f"{field}.provenance").casefold()
+    if provenance not in {PROVENANCE_OBSERVED, PROVENANCE_CARRIED_FORWARD}:
+        raise PhysicalEvidenceError(
+            "invalid-physical-evidence-provenance",
+            f"{field}.provenance",
+            "must be observed or carried-forward",
+        )
+    observed_commit = _require_commit(
+        observed_commit_value,
+        f"{field}.observed_commit",
+    )
+    if provenance == PROVENANCE_OBSERVED:
+        if observed_commit != candidate_commit:
+            raise PhysicalEvidenceError(
+                "physical-evidence-observation-commit-mismatch",
+                f"{field}.observed_commit",
+                "observed evidence must be produced on the accepted candidate",
+            )
+        return provenance, observed_commit
+
+    if observed_commit == candidate_commit:
+        raise PhysicalEvidenceError(
+            "invalid-physical-evidence-provenance",
+            f"{field}.provenance",
+            "same-commit evidence must be marked observed",
+        )
+    if carry_forward_check is None:
+        raise PhysicalEvidenceError(
+            "physical-evidence-revalidation-required",
+            field,
+            "carried-forward evidence requires fail-closed impact analysis",
+        )
+    try:
+        allowed = carry_forward_check(
+            observed_commit,
+            candidate_commit,
+            scenario_id,
+        )
+    except Exception as exc:  # noqa: BLE001 - acceptance must fail closed
+        raise PhysicalEvidenceError(
+            "physical-evidence-revalidation-failed",
+            field,
+            "impact analysis could not authorize carry-forward",
+        ) from exc
+    if allowed is not True:
+        raise PhysicalEvidenceError(
+            "physical-evidence-rerun-required",
+            field,
+            "the candidate changed code that can affect this physical observation",
+        )
+    return provenance, observed_commit
+
+
+def _validate_environment(
+    name: str,
+    value: object,
+    *,
+    candidate_commit: str,
+    carry_forward_check: CarryForwardCheck | None,
+) -> dict[str, str | bool]:
     field = f"environments.{name}"
     environment = _require_mapping(value, field)
     _require_exact_keys(
@@ -248,6 +326,8 @@ def _validate_environment(name: str, value: object) -> dict[str, str | bool]:
             "repository_clean",
             "result",
             "command_log",
+            "provenance",
+            "observed_commit",
         ),
         field=field,
     )
@@ -267,6 +347,15 @@ def _validate_environment(name: str, value: object) -> dict[str, str | bool]:
             f"{field}.result",
             "must be passed",
         )
+    scenario_id = f"physical.fresh-{name}-checkout"
+    provenance, observed_commit = _validate_provenance(
+        value=environment["provenance"],
+        observed_commit_value=environment["observed_commit"],
+        candidate_commit=candidate_commit,
+        scenario_id=scenario_id,
+        field=field,
+        carry_forward_check=carry_forward_check,
+    )
     return {
         "os_family": os_family,
         "fresh_checkout": True,
@@ -276,15 +365,29 @@ def _validate_environment(name: str, value: object) -> dict[str, str | bool]:
             environment["command_log"],
             f"{field}.command_log",
         ),
+        "provenance": provenance,
+        "observed_commit": observed_commit,
     }
 
 
-def _validate_scenario(scenario_id: str, value: object) -> dict[str, object]:
+def _validate_scenario(
+    scenario_id: str,
+    value: object,
+    *,
+    candidate_commit: str,
+    carry_forward_check: CarryForwardCheck | None,
+) -> dict[str, object]:
     field = f"scenarios.{scenario_id}"
     scenario = _require_mapping(value, field)
     _require_exact_keys(
         scenario,
-        expected=("status", "evidence_refs", "notes"),
+        expected=(
+            "status",
+            "provenance",
+            "observed_commit",
+            "evidence_refs",
+            "notes",
+        ),
         field=field,
     )
     status = _require_text(scenario["status"], f"{field}.status").casefold()
@@ -294,6 +397,14 @@ def _validate_scenario(scenario_id: str, value: object) -> dict[str, object]:
             f"{field}.status",
             "must be passed",
         )
+    provenance, observed_commit = _validate_provenance(
+        value=scenario["provenance"],
+        observed_commit_value=scenario["observed_commit"],
+        candidate_commit=candidate_commit,
+        scenario_id=scenario_id,
+        field=field,
+        carry_forward_check=carry_forward_check,
+    )
     refs = scenario["evidence_refs"]
     if not isinstance(refs, list) or not 1 <= len(refs) <= 8:
         raise PhysicalEvidenceError(
@@ -306,13 +417,20 @@ def _validate_scenario(scenario_id: str, value: object) -> dict[str, object]:
         for index, item in enumerate(refs)
     ]
     notes = _require_text(scenario["notes"], f"{field}.notes", max_length=1_024)
-    return {"status": status, "evidence_refs": normalized_refs, "notes": notes}
+    return {
+        "status": status,
+        "provenance": provenance,
+        "observed_commit": observed_commit,
+        "evidence_refs": normalized_refs,
+        "notes": notes,
+    }
 
 
 def validate_physical_evidence(
     payload: object,
     *,
     expected_commit: str | None = None,
+    carry_forward_check: CarryForwardCheck | None = None,
 ) -> dict[str, object]:
     """Return a safe acceptance summary or raise ``PhysicalEvidenceError``."""
 
@@ -357,7 +475,12 @@ def validate_physical_evidence(
         field="environments",
     )
     normalized_environments = {
-        name: _validate_environment(name, environments[name])
+        name: _validate_environment(
+            name,
+            environments[name],
+            candidate_commit=commit_sha,
+            carry_forward_check=carry_forward_check,
+        )
         for name in REQUIRED_ENVIRONMENTS
     }
 
@@ -368,7 +491,12 @@ def validate_physical_evidence(
         field="scenarios",
     )
     normalized_scenarios = {
-        scenario_id: _validate_scenario(scenario_id, scenarios[scenario_id])
+        scenario_id: _validate_scenario(
+            scenario_id,
+            scenarios[scenario_id],
+            candidate_commit=commit_sha,
+            carry_forward_check=carry_forward_check,
+        )
         for scenario_id in REQUIRED_SCENARIOS
     }
 
@@ -404,12 +532,22 @@ def validate_physical_evidence(
         "notes": notes,
     }
     _reject_private_data(normalized)
+    carried_count = sum(
+        item["provenance"] == PROVENANCE_CARRIED_FORWARD
+        for item in normalized_environments.values()
+    ) + sum(
+        item["provenance"] == PROVENANCE_CARRIED_FORWARD
+        for item in normalized_scenarios.values()
+    )
+    observed_count = len(normalized_environments) + len(normalized_scenarios) - carried_count
     return {
         "schema": SCHEMA,
         "commit_sha": commit_sha,
         "executed_at": normalized["executed_at"],
         "environment_count": len(normalized_environments),
         "scenario_count": len(normalized_scenarios),
+        "observed_record_count": observed_count,
+        "carried_forward_record_count": carried_count,
         "accepted": True,
     }
 
@@ -440,13 +578,35 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument(
         "--commit",
         dest="expected_commit",
-        help="Require evidence to be bound to this exact 40-character commit SHA.",
+        help="Require evidence to target this exact 40-character Git commit SHA.",
+    )
+    parser.add_argument(
+        "--repo-root",
+        type=Path,
+        default=Path("."),
+        help="Repository used for fail-closed carry-forward impact analysis.",
     )
     args = parser.parse_args(argv)
+
+    def carry_forward_check(
+        observed_commit: str,
+        candidate_commit: str,
+        scenario_id: str,
+    ) -> bool:
+        from .physical_revalidation import scenario_can_carry_forward
+
+        return scenario_can_carry_forward(
+            args.repo_root,
+            observed_commit,
+            candidate_commit,
+            scenario_id,
+        )
+
     try:
         summary = validate_physical_evidence(
             load_physical_evidence(args.evidence),
             expected_commit=args.expected_commit,
+            carry_forward_check=carry_forward_check,
         )
     except (OSError, PhysicalEvidenceError) as exc:
         print(str(exc), file=sys.stderr)
