@@ -7,6 +7,7 @@ from flask import Flask
 
 from catalog.ai.ollama_client import DEFAULT_BASE_URL
 from catalog.ai.ollama_provider import OllamaLanguageModelProvider
+from catalog.ai.prompts import build_extractive_prompt, build_prompt
 from catalog.ai.runtime_manager import ConfiguredLanguageModelRuntimeManager
 from catalog.ai.runtime_contracts import AIModality, AIRuntimeRequest
 from catalog.capabilities.contributions import AICandidateSource, AIContributionAdapter
@@ -277,3 +278,33 @@ def test_completed_capability_first_ai_never_falls_back_to_legacy_provider(
     assert provider_name == "No active AI contribution"
     assert runtime is None
     assert manager.additional_provider_ids() == ()
+
+
+def test_ai_explainer_prompts_satisfy_runtime_text_contract() -> None:
+    prompts = (
+        build_prompt(
+            "How does data flow through MSH?",
+            "Visible repository context.",
+            ["catalog/example.py"],
+        ),
+        build_extractive_prompt(
+            "How does data flow through MSH?",
+            "Visible repository context.",
+            ["catalog/example.py"],
+        ),
+    )
+
+    for index, prompt in enumerate(prompts):
+        assert prompt
+        assert prompt == prompt.strip()
+        request = AIRuntimeRequest(
+            request_id=f"request-prompt-contract-{index}",
+            session_id="local-ai",
+            idempotency_key=f"request-prompt-contract-{index}",
+            model="llama3.2:3b",
+            modality=AIModality.TEXT,
+            prompt=prompt,
+            system_prompt="Answer from context.",
+            timeout_seconds=5,
+        )
+        assert request.prompt == prompt
