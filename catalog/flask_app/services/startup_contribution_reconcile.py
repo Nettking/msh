@@ -15,7 +15,7 @@ _T = TypeVar("_T")
 def run_startup_contribution_reconcile(
     extensions: MutableMapping[str, object],
     operation: Callable[[], _T],
-) -> tuple[bool, _T | None, BaseException | None]:
+) -> tuple[bool, _T | None, Exception | None]:
     """Run one reconciliation attempt without poisoning later retries.
 
     ``True`` in the shared extension slot means reconciliation completed for this
@@ -32,7 +32,7 @@ def run_startup_contribution_reconcile(
 
     try:
         result = operation()
-    except BaseException as exc:  # caller owns logging and fail-closed behavior
+    except Exception as exc:  # caller owns logging and fail-closed behavior
         with _RECONCILE_LOCK:
             if extensions.get(_RECONCILE_EXTENSION_KEY) == _RECONCILE_IN_PROGRESS:
                 extensions.pop(_RECONCILE_EXTENSION_KEY, None)
