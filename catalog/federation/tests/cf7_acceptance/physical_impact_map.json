@@ -1,0 +1,170 @@
+{
+  "schema": "msh.cf7.physical-impact-map.v1",
+  "all_scenarios": [
+    "physical.fresh-windows-checkout",
+    "physical.fresh-linux-checkout",
+    "physical.multi-host-relay-and-network-path",
+    "physical.mtconnect-recorder-source",
+    "physical.ollama-model-and-accelerator",
+    "physical.mobile-and-desktop-browser-review",
+    "physical.recorder-plus-ai-simultaneous-contribution",
+    "physical.separate-ai-compute-storage-contributors",
+    "physical.benchmark-expiry-and-rerun",
+    "physical.contribution-disable-and-reenable",
+    "physical.restart-and-reconciliation",
+    "physical.revocation-and-controlled-rejoin"
+  ],
+  "no_physical_impact": [
+    "docs/**",
+    ".github/**",
+    "**/tests/**",
+    "**/test_*.py",
+    "catalog/federation/tests/cf7_acceptance/**",
+    "ops/cf7_*.py",
+    "README.md",
+    "**/README.md",
+    "*.md"
+  ],
+  "global_invalidation": [
+    "docker-compose.yml",
+    "Dockerfile",
+    "Dockerfile.*",
+    "requirements*.txt",
+    "constraints*.txt",
+    "start.cmd",
+    "start.sh",
+    "scripts/windows/**",
+    "scripts/linux/**",
+    "catalog/flask_app/app.py",
+    "catalog/flask_app/__init__.py"
+  ],
+  "rules": [
+    {
+      "patterns": [
+        "catalog/flask_app/services/federation_pairing_service.py",
+        "catalog/flask_app/services/resilient_pairing_runtime.py",
+        "catalog/flask_app/federation_pairing_routes.py",
+        "catalog/node/**",
+        "catalog/relay/**",
+        "catalog/federation/onboarding_discovery/**",
+        "catalog/federation/persistence.py"
+      ],
+      "scenarios": [
+        "physical.multi-host-relay-and-network-path",
+        "physical.mobile-and-desktop-browser-review",
+        "physical.separate-ai-compute-storage-contributors",
+        "physical.restart-and-reconciliation",
+        "physical.revocation-and-controlled-rejoin"
+      ]
+    },
+    {
+      "patterns": [
+        "catalog/federation/projections/**",
+        "catalog/flask_app/services/federation_projection_service.py",
+        "catalog/flask_app/services/federation_device_projection.py",
+        "catalog/flask_app/federation_routes.py",
+        "catalog/flask_app/templates/federation/**",
+        "catalog/flask_app/templates/federation_overview.html"
+      ],
+      "scenarios": [
+        "physical.multi-host-relay-and-network-path",
+        "physical.mobile-and-desktop-browser-review",
+        "physical.separate-ai-compute-storage-contributors"
+      ]
+    },
+    {
+      "patterns": [
+        "catalog/flask_app/services/capability_onboarding_service.py",
+        "catalog/flask_app/capability_onboarding_routes.py",
+        "catalog/flask_app/templates/federation/onboarding/**"
+      ],
+      "scenarios": [
+        "physical.fresh-windows-checkout",
+        "physical.fresh-linux-checkout",
+        "physical.multi-host-relay-and-network-path",
+        "physical.mobile-and-desktop-browser-review",
+        "physical.restart-and-reconciliation",
+        "physical.revocation-and-controlled-rejoin"
+      ]
+    },
+    {
+      "patterns": [
+        "catalog/capabilities/benchmarking/**",
+        "catalog/flask_app/services/capability_benchmark_service.py",
+        "catalog/flask_app/capability_benchmark_routes.py"
+      ],
+      "scenarios": [
+        "physical.ollama-model-and-accelerator",
+        "physical.recorder-plus-ai-simultaneous-contribution",
+        "physical.separate-ai-compute-storage-contributors",
+        "physical.benchmark-expiry-and-rerun"
+      ]
+    },
+    {
+      "patterns": [
+        "catalog/capabilities/contributions/**",
+        "catalog/flask_app/services/capability_contribution_service.py",
+        "catalog/flask_app/services/capability_contribution_components.py",
+        "catalog/flask_app/capability_contribution_routes.py"
+      ],
+      "scenarios": [
+        "physical.recorder-plus-ai-simultaneous-contribution",
+        "physical.separate-ai-compute-storage-contributors",
+        "physical.benchmark-expiry-and-rerun",
+        "physical.contribution-disable-and-reenable",
+        "physical.restart-and-reconciliation"
+      ]
+    },
+    {
+      "patterns": [
+        "catalog/ai/**",
+        "catalog/flask_app/services/local_capability_candidates.py",
+        "catalog/flask_app/services/ai_model_benchmark_service.py"
+      ],
+      "scenarios": [
+        "physical.ollama-model-and-accelerator",
+        "physical.recorder-plus-ai-simultaneous-contribution",
+        "physical.separate-ai-compute-storage-contributors",
+        "physical.benchmark-expiry-and-rerun"
+      ]
+    },
+    {
+      "patterns": [
+        "catalog/standalone-recorder_v2/**",
+        "catalog/flask_app/services/recorder_control_service.py",
+        "catalog/flask_app/services/mtconnect_discovery_service.py",
+        "catalog/flask_app/source_routes.py"
+      ],
+      "scenarios": [
+        "physical.mtconnect-recorder-source",
+        "physical.recorder-plus-ai-simultaneous-contribution",
+        "physical.restart-and-reconciliation"
+      ]
+    },
+    {
+      "patterns": [
+        "catalog/capabilities/worker_activation.py",
+        "catalog/capabilities/dispatch.py",
+        "catalog/capabilities/job_store.py",
+        "catalog/capabilities/jobs.py",
+        "catalog/capabilities/lifecycle_*.py",
+        "catalog/capabilities/provider_*.py",
+        "catalog/capabilities/reconciliation.py",
+        "catalog/flask_app/services/upload_analysis_job_service.py"
+      ],
+      "scenarios": [
+        "physical.separate-ai-compute-storage-contributors",
+        "physical.restart-and-reconciliation"
+      ]
+    },
+    {
+      "patterns": [
+        "catalog/flask_app/templates/**",
+        "catalog/flask_app/static/**"
+      ],
+      "scenarios": [
+        "physical.mobile-and-desktop-browser-review"
+      ]
+    }
+  ]
+}
