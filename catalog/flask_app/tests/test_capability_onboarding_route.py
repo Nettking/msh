@@ -8,6 +8,7 @@ import pytest
 from flask import redirect
 
 from catalog.federation.coordinator import SessionCoordinator
+from catalog.federation.errors import FederationValidationError
 from catalog.federation.onboarding_discovery import (
     ConfiguredFederationDiscoveryAdapter,
     FederationDiscoveryCandidate,
@@ -19,6 +20,7 @@ from catalog.flask_app.capability_onboarding_routes import (
 )
 from catalog.flask_app.services.capability_onboarding_service import (
     CapabilityOnboardingService,
+    FederationBindingStore,
 )
 from catalog.node.identity import IdentityStore
 
@@ -623,3 +625,37 @@ def test_corrupt_onboarding_database_is_not_overwritten_by_safe_render(
     assert before == after
     assert b"onboarding state unavailable" not in response.data.lower()
     assert b"Workshop laptop" in response.data
+
+
+def test_binding_store_treats_other_capability_tables_as_empty(tmp_path: Path) -> None:
+    database = tmp_path / "shared-onboarding.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            "CREATE TABLE contribution_intents (candidate_id TEXT PRIMARY KEY)"
+        )
+        connection.execute(
+            "CREATE TABLE contribution_intent_history (event_id INTEGER PRIMARY KEY)"
+        )
+
+    assert FederationBindingStore(database).load() is None
+
+
+def test_binding_store_rejects_binding_table_without_onboarding_schema(
+    tmp_path: Path,
+) -> None:
+    database = tmp_path / "malformed-onboarding.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            CREATE TABLE federation_binding (
+                singleton INTEGER PRIMARY KEY,
+                binding_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+            """
+        )
+
+    with pytest.raises(FederationValidationError) as raised:
+        FederationBindingStore(database).load()
+
+    assert raised.value.code == "unsupported-onboarding-state-schema"

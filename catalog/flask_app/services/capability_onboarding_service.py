@@ -139,6 +139,24 @@ class FederationBindingStore:
             return None
         try:
             with self._connect() as connection:
+                tables = {
+                    str(row["name"])
+                    for row in connection.execute(
+                        """
+                        SELECT name FROM sqlite_master
+                        WHERE type='table'
+                          AND name IN ('onboarding_schema', 'federation_binding')
+                        """
+                    ).fetchall()
+                }
+                if not tables:
+                    return None
+                if "onboarding_schema" not in tables:
+                    raise FederationValidationError(
+                        "unsupported-onboarding-state-schema",
+                        "version",
+                        "the onboarding state schema is missing or unsupported",
+                    )
                 schema = connection.execute(
                     "SELECT version FROM onboarding_schema WHERE singleton=1"
                 ).fetchone()
@@ -148,6 +166,8 @@ class FederationBindingStore:
                         "version",
                         "the onboarding state schema is missing or unsupported",
                     )
+                if "federation_binding" not in tables:
+                    return None
                 row = connection.execute(
                     "SELECT binding_json FROM federation_binding WHERE singleton=1"
                 ).fetchone()
