@@ -103,10 +103,11 @@ jobs:
         run: >-
           python -m pytest -o addopts= -q
           catalog/federation/tests/cf7_acceptance/test_product_acceptance.py
-      - name: Run physical evidence contract tests
+      - name: Run physical evidence and revalidation contract tests
         run: >-
           python -m pytest -o addopts= -q
           catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_physical_revalidation.py
       - name: Run CF7 foundation scenarios
         run: >-
           python -m pytest -o addopts= -q
@@ -153,7 +154,9 @@ jobs:
         run: >-
           python -m ruff check
           catalog/federation/tests/cf7_acceptance/physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/physical_revalidation.py
           catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+          catalog/federation/tests/cf7_acceptance/test_physical_revalidation.py
           catalog/federation/tests/cf7_acceptance/test_product_acceptance.py
           catalog/flask_app/tests/test_windows_update_script.py
       - name: Diff hygiene

@@ -7,6 +7,8 @@ from pathlib import Path
 import pytest
 
 from .physical_evidence import (
+    PROVENANCE_CARRIED_FORWARD,
+    PROVENANCE_OBSERVED,
     REQUIRED_ENVIRONMENTS,
     REQUIRED_SCENARIOS,
     SCHEMA,
@@ -16,6 +18,7 @@ from .physical_evidence import (
 )
 
 COMMIT = "a" * 40
+BASELINE = "b" * 40
 
 
 def _complete_document() -> dict[str, object]:
@@ -31,12 +34,16 @@ def _complete_document() -> dict[str, object]:
                 "repository_clean": True,
                 "result": "passed",
                 "command_log": f"evidence/{name}/commands.txt",
+                "provenance": PROVENANCE_OBSERVED,
+                "observed_commit": COMMIT,
             }
             for name in REQUIRED_ENVIRONMENTS
         },
         "scenarios": {
             scenario_id: {
                 "status": "passed",
+                "provenance": PROVENANCE_OBSERVED,
+                "observed_commit": COMMIT,
                 "evidence_refs": [
                     "evidence/scenarios/"
                     + scenario_id.replace(".", "-")
@@ -57,7 +64,7 @@ def _complete_document() -> dict[str, object]:
     }
 
 
-def test_complete_physical_evidence_is_commit_bound_and_accepted() -> None:
+def test_complete_physical_evidence_is_candidate_bound_and_accepted() -> None:
     summary = validate_physical_evidence(
         _complete_document(),
         expected_commit=COMMIT,
@@ -69,23 +76,26 @@ def test_complete_physical_evidence_is_commit_bound_and_accepted() -> None:
         "executed_at": "2026-08-03T14:00:00Z",
         "environment_count": len(REQUIRED_ENVIRONMENTS),
         "scenario_count": len(REQUIRED_SCENARIOS),
+        "observed_record_count": len(REQUIRED_ENVIRONMENTS)
+        + len(REQUIRED_SCENARIOS),
+        "carried_forward_record_count": 0,
         "accepted": True,
     }
 
 
-def test_cli_validates_complete_document_and_rejects_wrong_commit(
+def test_cli_validates_complete_document_and_rejects_wrong_candidate(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
     path = tmp_path / "physical-evidence.json"
     path.write_text(json.dumps(_complete_document()), encoding="utf-8")
 
-    assert main([str(path), "--commit", COMMIT]) == 0
+    assert main([str(path), "--commit", COMMIT, "--repo-root", str(tmp_path)]) == 0
     output = json.loads(capsys.readouterr().out)
     assert output["accepted"] is True
     assert output["scenario_count"] == len(REQUIRED_SCENARIOS)
 
-    assert main([str(path), "--commit", "b" * 40]) == 2
+    assert main([str(path), "--commit", "c" * 40]) == 2
     assert "physical-evidence-commit-mismatch" in capsys.readouterr().err
 
 
@@ -103,6 +113,71 @@ def test_template_is_complete_in_shape_but_intentionally_not_accepted() -> None:
     with pytest.raises(PhysicalEvidenceError) as incomplete:
         validate_physical_evidence(template)
     assert incomplete.value.code == "incomplete-physical-evidence"
+
+
+def test_carried_forward_scenario_requires_explicit_impact_authorization() -> None:
+    document = _complete_document()
+    scenario_id = "physical.ollama-model-and-accelerator"
+    scenario = document["scenarios"][scenario_id]
+    scenario["provenance"] = PROVENANCE_CARRIED_FORWARD
+    scenario["observed_commit"] = BASELINE
+
+    with pytest.raises(PhysicalEvidenceError) as missing:
+        validate_physical_evidence(document)
+    assert missing.value.code == "physical-evidence-revalidation-required"
+
+    summary = validate_physical_evidence(
+        document,
+        carry_forward_check=lambda observed, candidate, scenario: (
+            observed == BASELINE
+            and candidate == COMMIT
+            and scenario == scenario_id
+        ),
+    )
+    assert summary["carried_forward_record_count"] == 1
+    assert summary["observed_record_count"] == (
+        len(REQUIRED_ENVIRONMENTS) + len(REQUIRED_SCENARIOS) - 1
+    )
+
+
+def test_carried_forward_scenario_fails_when_impact_requires_rerun() -> None:
+    document = _complete_document()
+    scenario = document["scenarios"]["physical.restart-and-reconciliation"]
+    scenario["provenance"] = PROVENANCE_CARRIED_FORWARD
+    scenario["observed_commit"] = BASELINE
+
+    with pytest.raises(PhysicalEvidenceError) as rerun:
+        validate_physical_evidence(
+            document,
+            carry_forward_check=lambda _observed, _candidate, _scenario: False,
+        )
+    assert rerun.value.code == "physical-evidence-rerun-required"
+
+
+def test_carried_forward_environment_uses_corresponding_fresh_scenario() -> None:
+    document = _complete_document()
+    environment = document["environments"]["windows"]
+    environment["provenance"] = PROVENANCE_CARRIED_FORWARD
+    environment["observed_commit"] = BASELINE
+    calls: list[tuple[str, str, str]] = []
+
+    def allow(observed: str, candidate: str, scenario: str) -> bool:
+        calls.append((observed, candidate, scenario))
+        return scenario == "physical.fresh-windows-checkout"
+
+    summary = validate_physical_evidence(document, carry_forward_check=allow)
+    assert summary["carried_forward_record_count"] == 1
+    assert calls == [(BASELINE, COMMIT, "physical.fresh-windows-checkout")]
+
+
+def test_observed_provenance_cannot_point_at_an_older_commit() -> None:
+    document = _complete_document()
+    scenario = document["scenarios"][REQUIRED_SCENARIOS[0]]
+    scenario["observed_commit"] = BASELINE
+
+    with pytest.raises(PhysicalEvidenceError) as mismatch:
+        validate_physical_evidence(document)
+    assert mismatch.value.code == "physical-evidence-observation-commit-mismatch"
 
 
 @pytest.mark.parametrize(
@@ -135,6 +210,12 @@ def test_template_is_complete_in_shape_but_intentionally_not_accepted() -> None:
                 evidence_refs=["../outside.txt"]
             ),
             "unsafe-physical-evidence-path",
+        ),
+        (
+            lambda document: document["scenarios"][REQUIRED_SCENARIOS[0]].update(
+                provenance="invented"
+            ),
+            "invalid-physical-evidence-provenance",
         ),
     ],
 )
