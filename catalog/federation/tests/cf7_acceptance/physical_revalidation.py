@@ -13,9 +13,9 @@ import fnmatch
 import json
 import subprocess
 import sys
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
 
 from .physical_evidence import REQUIRED_SCENARIOS
 
