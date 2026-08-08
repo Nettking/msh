@@ -32,7 +32,7 @@ def run_startup_contribution_reconcile(
 
     try:
         result = operation()
-    except Exception as exc:  # caller owns logging and fail-closed behavior
+    except Exception as exc:  # noqa: BLE001 - caller owns fail-closed logging
         with _RECONCILE_LOCK:
             if extensions.get(_RECONCILE_EXTENSION_KEY) == _RECONCILE_IN_PROGRESS:
                 extensions.pop(_RECONCILE_EXTENSION_KEY, None)
