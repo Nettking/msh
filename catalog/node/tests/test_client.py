@@ -406,3 +406,104 @@ def test_replay_pass_has_a_finite_page_bound_and_keeps_durable_progress(
         assert client.state.get_session("session-a").replaying is True
 
     asyncio.run(scenario())
+
+
+def test_concurrent_replay_requests_share_the_authorized_completion(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        started = asyncio.Event()
+        release = asyncio.Event()
+        calls = 0
+
+        async def blocked_replay(session_id: str) -> dict[str, Any]:
+            nonlocal calls
+            assert session_id == "session-a"
+            calls += 1
+            started.set()
+            await release.wait()
+            return {
+                "session_id": session_id,
+                "current_revision": 3,
+                "last_revision": 3,
+                "has_more": False,
+            }
+
+        client._request_replay_pass = blocked_replay  # type: ignore[method-assign]
+        first = asyncio.create_task(client.request_replay("session-a"))
+        await asyncio.wait_for(started.wait(), timeout=1)
+        second = asyncio.create_task(client.request_replay("session-a"))
+        await asyncio.sleep(0)
+
+        assert calls == 1
+        assert len(client._replay_tasks) == 1
+
+        release.set()
+        first_result, second_result = await asyncio.gather(first, second)
+
+        assert first_result == second_result
+        assert calls == 1
+        assert client._replay_tasks == {}
+
+    asyncio.run(scenario())
+
+
+def test_coordinator_replay_page_rejects_an_incomplete_cached_page(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+
+        async def completed_replay(session_id: str) -> dict[str, Any]:
+            assert session_id == "session-a"
+            return {
+                "session_id": session_id,
+                "current_revision": 1,
+                "last_revision": 1,
+                "has_more": False,
+            }
+
+        client.request_replay = completed_replay  # type: ignore[method-assign]
+        client.state.applied_event_page = (  # type: ignore[method-assign]
+            lambda *_args, **_kwargs: ()
+        )
+
+        with pytest.raises(RelayRemoteError) as rejected:
+            await client.coordinator_replay_page(
+                session_id="session-a",
+                last_applied_revision=0,
+                limit=1,
+            )
+
+        assert rejected.value.code == "revision-gap"
+
+    asyncio.run(scenario())
+
+
+def test_replay_request_never_reuses_a_completed_task(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        stale = asyncio.create_task(
+            asyncio.sleep(0, result={"current_revision": 1})
+        )
+        await stale
+        client._replay_tasks["session-a"] = stale
+        calls = 0
+
+        async def fresh_replay(session_id: str) -> dict[str, Any]:
+            nonlocal calls
+            assert session_id == "session-a"
+            calls += 1
+            return {"current_revision": 2}
+
+        client._request_replay_pass = fresh_replay  # type: ignore[method-assign]
+
+        assert await client.request_replay("session-a") == {
+            "current_revision": 2
+        }
+        assert calls == 1
+
+    asyncio.run(scenario())

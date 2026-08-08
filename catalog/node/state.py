@@ -21,6 +21,7 @@ from catalog.federation.redaction import redact_secrets
 
 SCHEMA_VERSION: Final = 1
 MAX_EVENT_BYTES: Final = 1_048_576
+MAX_EVENT_PAGE_ITEMS: Final = 10_000
 MAX_ID_LENGTH: Final = 512
 MAX_RECONNECT_ATTEMPTS: Final = 100
 MAX_RECONNECT_DELAY_SECONDS: Final = 3_600.0
@@ -970,6 +971,70 @@ class NodeState:
                 ORDER BY revision
                 """,
                 (session_id, after_revision),
+            )
+            try:
+                return tuple(
+                    SessionEvent.from_dict(json.loads(row["event_json"]))
+                    for row in rows
+                )
+            except (json.JSONDecodeError, FederationValidationError) as exc:
+                raise NodeStateError(
+                    "malformed-node-state",
+                    "applied_events",
+                    "persisted event is invalid",
+                ) from exc
+
+    def applied_event_page(
+        self,
+        session_id: str,
+        *,
+        after_revision: int,
+        through_revision: int,
+        limit: int,
+    ) -> tuple[SessionEvent, ...]:
+        """Read one bounded contiguous prefix of already-applied events."""
+
+        session_id = _opaque_text(session_id, "session_id")
+        if (
+            isinstance(after_revision, bool)
+            or not isinstance(after_revision, int)
+            or after_revision < 0
+        ):
+            raise NodeStateError(
+                "invalid-revision",
+                "after_revision",
+                "must be a non-negative integer",
+            )
+        if (
+            isinstance(through_revision, bool)
+            or not isinstance(through_revision, int)
+            or through_revision < after_revision
+        ):
+            raise NodeStateError(
+                "invalid-revision",
+                "through_revision",
+                "must be an integer at or after after_revision",
+            )
+        if (
+            isinstance(limit, bool)
+            or not isinstance(limit, int)
+            or not 1 <= limit <= MAX_EVENT_PAGE_ITEMS
+        ):
+            raise NodeStateError(
+                "invalid-page-limit",
+                "limit",
+                f"must be between 1 and {MAX_EVENT_PAGE_ITEMS}",
+            )
+        self.get_session(session_id)
+        with self._connect() as database:
+            rows = database.execute(
+                """
+                SELECT event_json FROM applied_events
+                WHERE session_id=? AND revision>? AND revision<=?
+                ORDER BY revision
+                LIMIT ?
+                """,
+                (session_id, after_revision, through_revision, limit),
             )
             try:
                 return tuple(

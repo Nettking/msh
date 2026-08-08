@@ -6,9 +6,14 @@ from pathlib import Path
 
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.onboarding_compat import federation_id_from_session_id
+from catalog.federation.projections import FederationAuthorityAdapter
 from catalog.flask_app.services.federation_pairing_service import (
     PairingCodeCodec,
-    PairingRelayRuntime,
+    RemoteCoordinatorFacade,
+    RemotePairingState,
+)
+from catalog.flask_app.services.resilient_pairing_runtime import (
+    ResilientPairingRelayRuntime,
 )
 from catalog.node.identity import IdentityStore
 from catalog.relay.service import RelayServer
@@ -16,7 +21,7 @@ from catalog.relay.service import RelayServer
 NOW = datetime(2026, 8, 3, 18, 30, tzinfo=timezone.utc)
 
 
-def test_signed_pairing_code_joins_the_existing_relay_session(
+def test_signed_pairing_code_projects_same_members_from_both_viewpoints(
     tmp_path: Path,
 ) -> None:
     async def scenario() -> None:
@@ -34,7 +39,7 @@ def test_signed_pairing_code_joins_the_existing_relay_session(
             sweep_interval_seconds=300,
         )
         await relay.start()
-        runtime = PairingRelayRuntime(
+        runtime = ResilientPairingRelayRuntime(
             state_directory=tmp_path / "joiner",
             display_name="Joining device",
             clock=lambda: NOW,
@@ -52,6 +57,18 @@ def test_signed_pairing_code_joins_the_existing_relay_session(
             coordinator.enroll_node(
                 host.identity,
                 token=str(enrollment["token"]),
+            )
+            outsider = IdentityStore(
+                tmp_path / "outsider",
+                display_name="Enrolled outsider",
+            ).load_or_create(now=NOW)
+            outsider_enrollment = coordinator.create_enrollment_token(
+                ttl_seconds=300,
+                max_uses=1,
+            )
+            coordinator.enroll_node(
+                outsider.identity,
+                token=str(outsider_enrollment["token"]),
             )
             session = coordinator.create_session(
                 actor_node_id=host.identity.node_id,
@@ -79,7 +96,7 @@ def test_signed_pairing_code_joins_the_existing_relay_session(
             )
             offer = PairingCodeCodec(clock=lambda: NOW).decode(code)
 
-            binding = await runtime._redeem(offer)
+            binding = await asyncio.to_thread(runtime.redeem, offer)
 
             assert binding.device_id != host.identity.node_id
             assert binding.internal_session_id == session.session_id
@@ -87,16 +104,47 @@ def test_signed_pairing_code_joins_the_existing_relay_session(
             assert coordinator.session_ids_for_node(binding.device_id) == (
                 session.session_id,
             )
-            status = await runtime._client.coordinator_status()  # type: ignore[union-attr]
+            assert coordinator.session_ids_for_node(outsider.identity.node_id) == ()
+            expected_members = {host.identity.node_id, binding.device_id}
+            status = await asyncio.to_thread(runtime.coordinator_status)
             node_ids = {
                 item["node_id"]
                 for item in status["nodes"]
                 if isinstance(item, dict)
             }
-            assert {host.identity.node_id, binding.device_id} <= node_ids
+            assert node_ids == expected_members
+
+            owner_snapshot = FederationAuthorityAdapter(
+                coordinator,
+                actor_node_id=host.identity.node_id,
+                internal_session_id=session.session_id,
+            ).snapshot()
+            remote_state = RemotePairingState(relay.url, binding)
+            remote_snapshot = await asyncio.to_thread(
+                FederationAuthorityAdapter(
+                    RemoteCoordinatorFacade(runtime, remote_state),
+                    actor_node_id=binding.device_id,
+                    internal_session_id=session.session_id,
+                ).snapshot
+            )
+
+            assert owner_snapshot.available is True
+            assert remote_snapshot.available is True
+            assert {item.node_id for item in owner_snapshot.devices} == expected_members
+            assert {item.node_id for item in remote_snapshot.devices} == expected_members
+            assert outsider.identity.node_id not in {
+                item.node_id
+                for snapshot in (owner_snapshot, remote_snapshot)
+                for item in snapshot.devices
+            }
         finally:
-            if runtime._client is not None and runtime._client.connected_event.is_set():
-                await runtime._client.disconnect()
+            if runtime._loop is not None:
+                await asyncio.to_thread(
+                    lambda: runtime._submit(runtime._disconnect_current())
+                )
+                runtime._loop.call_soon_threadsafe(runtime._loop.stop)
+                if runtime._thread is not None:
+                    runtime._thread.join(timeout=5)
             await relay.stop()
 
     asyncio.run(scenario())

@@ -30,7 +30,7 @@ from catalog.federation.errors import (
     FederationOperationError,
     FederationValidationError,
 )
-from catalog.federation.models import NodeIdentity
+from catalog.federation.models import NodeIdentity, SessionEvent
 from catalog.federation.onboarding_compat import federation_id_matches_session
 from catalog.federation.onboarding_models import (
     FederationConnectionState,
@@ -468,7 +468,7 @@ class PairingRelayNodeClient(RelayNodeClient):
         self._websocket = None
         self._send_lock = asyncio.Lock()
         self._pending = {}
-        self._replay_pending = set()
+        self._replay_tasks = {}
         self._gap_replay_tasks = {}
         self._receiver_task = None
         self._heartbeat_task = None
@@ -704,6 +704,62 @@ class PairingRelayRuntime:
             )
         return self._submit(client.coordinator_status())
 
+    async def _coordinator_replay_page(
+        self,
+        state: RemotePairingState,
+        *,
+        session_id: str,
+        actor_node_id: str,
+        last_applied_revision: int,
+        limit: int,
+    ) -> tuple[tuple[SessionEvent, ...], int]:
+        if (
+            actor_node_id != state.binding.device_id
+            or session_id != state.binding.internal_session_id
+        ):
+            raise AuthenticationError(
+                "pairing-membership-mismatch",
+                "remote replay must use the paired device and Federation session",
+                "binding",
+            )
+        await self._ensure_connected(state)
+        client = self._client
+        if client is None or not client.connected_event.is_set():
+            raise FederationOperationError(
+                "pairing-relay-disconnected",
+                "the paired relay is not connected",
+            )
+        if client.node_id != actor_node_id:
+            raise AuthenticationError(
+                "pairing-actor-mismatch",
+                "remote replay must use the authenticated paired identity",
+                "actor_node_id",
+            )
+        return await client.coordinator_replay_page(
+            session_id=session_id,
+            last_applied_revision=last_applied_revision,
+            limit=limit,
+        )
+
+    def coordinator_replay_page(
+        self,
+        state: RemotePairingState,
+        *,
+        session_id: str,
+        actor_node_id: str,
+        last_applied_revision: int,
+        limit: int,
+    ) -> tuple[tuple[SessionEvent, ...], int]:
+        return self._submit(
+            self._coordinator_replay_page(
+                state,
+                session_id=session_id,
+                actor_node_id=actor_node_id,
+                last_applied_revision=last_applied_revision,
+                limit=limit,
+            )
+        )
+
 
 class RemoteCoordinatorFacade:
     """Read-only coordinator shape backed by the authenticated relay client."""
@@ -751,6 +807,31 @@ class RemoteCoordinatorFacade:
                 "the relay client already returns one complete snapshot",
             )
         return self._status()
+
+    def replay_page(
+        self,
+        *,
+        session_id: str,
+        actor_node_id: str,
+        last_applied_revision: int,
+        limit: int,
+    ) -> tuple[tuple[SessionEvent, ...], int]:
+        if (
+            actor_node_id != self.state.binding.device_id
+            or session_id != self.state.binding.internal_session_id
+        ):
+            raise AuthenticationError(
+                "pairing-membership-mismatch",
+                "remote replay must use the paired device and Federation session",
+                "binding",
+            )
+        return self.runtime.coordinator_replay_page(
+            self.state,
+            session_id=session_id,
+            actor_node_id=actor_node_id,
+            last_applied_revision=last_applied_revision,
+            limit=limit,
+        )
 
     def require_membership(self, *, session_id: str, node_id: str) -> None:
         if (
