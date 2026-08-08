@@ -195,7 +195,7 @@ goto :resume_complete
 :resume_complete
 echo.
 echo MSH is running:        %MSH_BASE_URL%
-echo Onboarding:            %MSH_ONBOARDING_URL%
+echo Onboarding:            "%MSH_ONBOARDING_URL%"
 echo Federation:            %MSH_BASE_URL%/federation
 echo Recorder status:       %MSH_BASE_URL%/status
 echo Documentation:         %MSH_BASE_URL%/docs
