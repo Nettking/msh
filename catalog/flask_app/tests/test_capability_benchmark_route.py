@@ -377,6 +377,51 @@ def test_rerun_creates_new_immutable_result_and_clears_skip(tmp_path: Path) -> N
     ) == frozenset()
 
 
+def test_skip_after_completed_result_does_not_mark_completed_check_skipped(
+    tmp_path: Path,
+) -> None:
+    clock = lambda: NOW
+    adapter = BoundedBenchmarkAdapter()
+    onboarding = _onboarding_service(tmp_path, clock=clock)
+    inspection = _inspection_service(
+        tmp_path,
+        onboarding,
+        adapters=(adapter,),
+        clock=clock,
+    )
+    benchmarks = _benchmark_service(
+        tmp_path,
+        onboarding,
+        inspection,
+        clock=clock,
+    )
+    client = _app(onboarding, inspection, benchmarks).test_client()
+    csrf, _command_id = _connect_and_inspect(client)
+    snapshot = inspection.load()
+    assert snapshot is not None
+
+    assert _post_run(client, csrf).status_code == 303
+    response = client.post(
+        "/onboarding/benchmarks/skip",
+        data={"_csrf_token": csrf},
+        follow_redirects=True,
+    )
+
+    assert response.status_code == 200
+    assert b"0 optional benchmark checks skipped. No contribution was enabled." in response.data
+    assert benchmarks.skip_store.list_for_revision(
+        device_id=snapshot.device_id,
+        inspection_revision=snapshot.revision,
+    ) == frozenset()
+    results = benchmarks.list_results()
+    assert len(results) == 1
+    assert results[0].state is BenchmarkState.PASSED
+    summary, cards, complete = benchmarks.view_model(snapshot, connected=True)
+    assert complete is True
+    assert summary["can_skip"] is False
+    assert cards[0]["state"] == "passed"
+
+
 def test_expiry_and_dependency_change_require_rerun(tmp_path: Path) -> None:
     now = [NOW]
     clock = lambda: now[0]
