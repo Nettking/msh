@@ -15,7 +15,7 @@ from catalog.federation.errors import (
     AuthenticationError,
     FederationOperationError,
 )
-from catalog.federation.models import SessionEvent
+from catalog.federation.models import CapabilityAnnouncement, SessionEvent
 from catalog.federation.onboarding_models import (
     FederationConnectionState,
     FederationSessionBinding,
@@ -132,6 +132,71 @@ class ResilientPairingRelayRuntime(PairingRelayRuntime):
                 session_id=session_id,
                 event_type=event_type,
                 payload=payload,
+                request_id=request_id,
+            )
+        )
+
+    async def _announce_capability(
+        self,
+        state: RemotePairingState,
+        capability: CapabilityAnnouncement,
+        *,
+        request_id: str,
+    ) -> CapabilityAnnouncement:
+        """Publish metadata only for the authenticated bound device/session."""
+
+        if (
+            capability.session_id != state.binding.internal_session_id
+            or capability.node_id != state.binding.device_id
+        ):
+            raise AuthenticationError(
+                "pairing-capability-binding-mismatch",
+                "capability metadata must use the paired device and Federation session",
+                "binding",
+            )
+        await self._ensure_connected(state)
+        client = self._connected_client()
+        if client.node_id != capability.node_id:
+            raise AuthenticationError(
+                "pairing-actor-mismatch",
+                "capability metadata must use the authenticated paired identity",
+                "actor_node_id",
+            )
+        result = await client.request(
+            "capability.announce",
+            session_id=capability.session_id,
+            payload={"announcement": capability.to_dict()},
+            request_id=request_id,
+        )
+        value = result.get("announcement")
+        if not isinstance(value, dict):
+            raise FederationOperationError(
+                "invalid-capability-announcement-response",
+                "relay did not return the accepted capability metadata",
+            )
+        accepted = CapabilityAnnouncement.from_dict(value)
+        if accepted != capability:
+            raise FederationOperationError(
+                "capability-announcement-response-mismatch",
+                "relay returned different capability metadata than submitted",
+            )
+        save = getattr(client.state, "save_capability", None)
+        if callable(save):
+            save(accepted, now=self._clock())
+        await client.request_replay(capability.session_id)
+        return accepted
+
+    def announce_capability(
+        self,
+        state: RemotePairingState,
+        capability: CapabilityAnnouncement,
+        *,
+        request_id: str,
+    ) -> CapabilityAnnouncement:
+        return self._submit(
+            self._announce_capability(
+                state,
+                capability,
                 request_id=request_id,
             )
         )
