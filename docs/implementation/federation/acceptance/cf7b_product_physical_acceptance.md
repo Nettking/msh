@@ -150,6 +150,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt -c constraints-phase2.txt
 python -m pip install pytest ruff
 python -m pytest -o addopts= -q catalog/federation/tests/cf7_acceptance
+python -m pytest -o addopts= -q catalog/flask_app/tests/test_capability_onboarding_route.py catalog/flask_app/tests/test_capability_inspection_route.py catalog/flask_app/tests/test_capability_benchmark_route.py catalog/flask_app/tests/test_capability_contribution_route.py catalog/flask_app/tests/test_capability_startup_transition_route.py catalog/flask_app/tests/test_federation_overview_route.py
 docker compose config
 ```
 
@@ -164,6 +165,7 @@ python -m pip install --upgrade pip
 python -m pip install -r requirements.txt -c constraints-phase2.txt
 python -m pip install pytest ruff
 python -m pytest -o addopts= -q catalog/federation/tests/cf7_acceptance
+python -m pytest -o addopts= -q catalog/flask_app/tests/test_capability_onboarding_route.py catalog/flask_app/tests/test_capability_inspection_route.py catalog/flask_app/tests/test_capability_benchmark_route.py catalog/flask_app/tests/test_capability_contribution_route.py catalog/flask_app/tests/test_capability_startup_transition_route.py catalog/flask_app/tests/test_federation_overview_route.py
 docker compose config
 ```
 
