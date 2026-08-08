@@ -3,6 +3,7 @@
 from .authority_adapter import (
     ActivityRecord,
     DeviceRecord,
+    FederatedCapabilityRecord,
     FederationAuthorityAdapter,
     FederationAuthoritySnapshot,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "BenchmarkSnapshot",
     "ContributionRecord",
     "DeviceRecord",
+    "FederatedCapabilityRecord",
     "FederationAuthorityAdapter",
     "FederationAuthoritySnapshot",
     "JobAuthorityAdapter",
