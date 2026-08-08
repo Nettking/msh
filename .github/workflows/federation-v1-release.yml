@@ -191,7 +191,9 @@ jobs:
 
       - name: Go direct peer sidecar tests
         working-directory: cmd/msh-peer-sidecar
-        run: go test ./...
+        run: |
+          go mod tidy
+          go test ./...
 
       - name: Ruff maintained release boundaries
         run: >-
