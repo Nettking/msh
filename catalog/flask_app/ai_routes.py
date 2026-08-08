@@ -3,7 +3,7 @@ from __future__ import annotations
 import threading
 from uuid import uuid4
 
-from flask import Blueprint, jsonify, render_template, request
+from flask import Blueprint, current_app, has_app_context, jsonify, render_template, request
 
 from catalog.ai.grounding import append_grounding_warning
 from catalog.ai.ollama_client import DEFAULT_BASE_URL, DEFAULT_MODEL, chat
@@ -36,6 +36,24 @@ def _active_capability_providers() -> tuple[LanguageModelProvider, ...]:
     """Return only providers activated through capability-first contribution authority."""
 
     return AI_RUNTIME_MANAGER.additional_providers()
+
+
+def _capability_first_complete() -> bool:
+    """Return whether capability-first state owns AI authority in this product app.
+
+    Minimal blueprint unit-test apps do not install the capability-first state
+    database, so they retain legacy/default behavior. In the supported product
+    app, an unreadable completed-state decision fails closed rather than reviving
+    legacy AI authority behind the operator's contribution choice.
+    """
+
+    if not has_app_context() or "CAPABILITY_ONBOARDING_STATE_DATABASE" not in current_app.config:
+        return False
+    try:
+        flags = get_capability_startup_transition_service().capability_flags()
+    except Exception:  # noqa: BLE001 - product authority must fail closed
+        return True
+    return bool(flags.get("completed"))
 
 
 def _active_capability_runtime() -> LanguageModelRuntime | None:
@@ -89,6 +107,15 @@ def _active_capability_defaults() -> tuple[str, str] | None:
     return None
 
 
+def _saved_model_or_default() -> str:
+    try:
+        settings = load_settings()
+    except (OSError, TypeError, ValueError):
+        return DEFAULT_MODEL
+    model = str(getattr(settings, "ai_model", "") or "").strip()
+    return model or DEFAULT_MODEL
+
+
 def _ai_defaults() -> tuple[str, str, str]:
     active = _active_capability_defaults()
     if active is not None:
@@ -97,6 +124,8 @@ def _ai_defaults() -> tuple[str, str, str]:
         # placeholder internal; _build_ai_runtime() does not use it while an
         # active contribution exists, and it is never rendered.
         return model, DEFAULT_BASE_URL, provider_name
+    if _capability_first_complete():
+        return _saved_model_or_default(), DEFAULT_BASE_URL, "No active AI contribution"
     try:
         settings = load_settings()
     except (OSError, TypeError, ValueError):
@@ -120,11 +149,13 @@ def _build_ai_runtime(
     model: str,
     base_url: str,
     provider_name: str,
-) -> LanguageModelRuntime:
+) -> LanguageModelRuntime | None:
     """Reuse one bounded runtime without exposing the private Ollama endpoint."""
     active_runtime = _active_capability_runtime()
     if active_runtime is not None:
         return active_runtime
+    if _capability_first_complete():
+        return None
     return AI_RUNTIME_MANAGER.runtime_for(
         model=model,
         base_url=base_url,
@@ -178,7 +209,24 @@ def _answer_question(
             {
                 "context": context,
                 "sources": sources,
-                "provider_status": list(runtime.provider_status()),
+                "provider_status": (
+                    [] if runtime is None else list(runtime.provider_status())
+                ),
+            }
+        )
+        return result
+    if runtime is None:
+        result = _empty_result(
+            error=(
+                "No active AI contribution is available. Enable a language-model "
+                "contribution in Device setup and try again."
+            )
+        )
+        result.update(
+            {
+                "context": context,
+                "sources": sources,
+                "error_code": "no-active-ai-provider",
             }
         )
         return result
@@ -300,7 +348,7 @@ def ai_page():
         dry_run=False,
         extractive=False,
         ai_provider_name=provider_name,
-        provider_status=list(runtime.provider_status()),
+        provider_status=[] if runtime is None else list(runtime.provider_status()),
     )
 
 
@@ -333,7 +381,12 @@ def ai_ask():
             "dry_run": dry_run,
             "extractive": extractive,
         }
-        status = 400 if not question else (502 if result["error"] else 200)
+        if not question:
+            status = 400
+        elif result.get("error_code") == "no-active-ai-provider":
+            status = 503
+        else:
+            status = 502 if result["error"] else 200
         return jsonify(payload), status
     return _render_ai_page(
         question=question,
