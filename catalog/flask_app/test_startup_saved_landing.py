@@ -61,7 +61,10 @@ def _patch_setup_context(monkeypatch, settings) -> None:
     )
 
 
-def test_saved_startup_shows_runtime_landing_instead_of_wizard(monkeypatch, tmp_path):
+def test_explicit_legacy_saved_startup_shows_runtime_landing(
+    monkeypatch,
+    tmp_path,
+):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup_context(monkeypatch, _configured_full_server_settings())
@@ -69,7 +72,7 @@ def test_saved_startup_shows_runtime_landing_instead_of_wizard(monkeypatch, tmp_
     app = create_app()
     app.config.update(TESTING=True)
 
-    response = app.test_client().get("/startup?next=%2F&step=review")
+    response = app.test_client().get("/startup?legacy=1&next=%2F&step=review")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
@@ -89,7 +92,7 @@ def test_saved_startup_shows_runtime_landing_instead_of_wizard(monkeypatch, tmp_
     assert html.index("Resume session") < html.index("Device setup and changes")
 
 
-def test_saved_startup_edit_mode_shows_wizard(monkeypatch, tmp_path):
+def test_explicit_legacy_saved_startup_edit_mode_shows_wizard(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup_context(monkeypatch, _configured_full_server_settings())
@@ -97,7 +100,7 @@ def test_saved_startup_edit_mode_shows_wizard(monkeypatch, tmp_path):
     app = create_app()
     app.config.update(TESTING=True)
 
-    response = app.test_client().get("/startup?next=%2F&edit=1&step=ai")
+    response = app.test_client().get("/startup?legacy=1&next=%2F&edit=1&step=ai")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
