@@ -41,7 +41,8 @@ def test_start_cmd_builds_background_services_then_starts_web() -> None:
     assert "call :ensure_ollama_model" in script
     assert "Ollama benchmark model is ready" in script
     assert "docker compose port flask 5000" in script
-    assert 'set "MSH_BASE_URL=http://localhost:%MSH_WEB_PORT_RESOLVED%"' in script
+    assert 'set "MSH_WEB_CLIENT_HOST=%MSH_WEB_BIND%"' in script
+    assert 'set "MSH_BASE_URL=http://%MSH_WEB_CLIENT_HOST%:%MSH_WEB_PORT_RESOLVED%"' in script
     assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%"' in script
     assert 'set "MSH_OPEN_URL=%MSH_ONBOARDING_URL%"' in script
     assert "-Uri '%MSH_BASE_URL%/onboarding'" in script
