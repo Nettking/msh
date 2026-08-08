@@ -3,7 +3,14 @@ from __future__ import annotations
 import threading
 from uuid import uuid4
 
-from flask import Blueprint, current_app, has_app_context, jsonify, render_template, request
+from flask import (
+    Blueprint,
+    current_app,
+    has_app_context,
+    jsonify,
+    render_template,
+    request,
+)
 
 from catalog.ai.grounding import append_grounding_warning
 from catalog.ai.ollama_client import DEFAULT_BASE_URL, DEFAULT_MODEL, chat
@@ -47,7 +54,10 @@ def _capability_first_complete() -> bool:
     legacy AI authority behind the operator's contribution choice.
     """
 
-    if not has_app_context() or "CAPABILITY_ONBOARDING_STATE_DATABASE" not in current_app.config:
+    if (
+        not has_app_context()
+        or "CAPABILITY_ONBOARDING_STATE_DATABASE" not in current_app.config
+    ):
         return False
     try:
         flags = get_capability_startup_transition_service().capability_flags()
@@ -130,7 +140,12 @@ def _ai_defaults() -> tuple[str, str, str]:
         settings = load_settings()
     except (OSError, TypeError, ValueError):
         return DEFAULT_MODEL, DEFAULT_BASE_URL, "Default Ollama"
-    if settings.configured and settings.user_setup_complete and settings.ai_enabled and settings.ai_model:
+    if (
+        settings.configured
+        and settings.user_setup_complete
+        and settings.ai_enabled
+        and settings.ai_model
+    ):
         return settings.ai_model, settings.ollama_base_url, ai_provider_label(settings)
     return DEFAULT_MODEL, DEFAULT_BASE_URL, "Default Ollama"
 
@@ -314,12 +329,13 @@ def _render_ai_page(
 
 @ai_web.app_context_processor
 def inject_live_ai_capability_startup_flags() -> dict[str, object]:
-    """Keep navigation aligned with current AI runtime authority after setup.
+    """Keep the workbench AI page discoverable without granting AI authority.
 
-    CapabilityStartupState intentionally records the choices at setup completion;
-    it is not rewritten by later contribution mutations. Navigation, however,
-    must reflect current authority. Override only the presentation copy of the
-    language-model flag and leave the persisted transition state untouched.
+    CapabilityStartupState records choices at setup completion and is not rewritten
+    by later contribution mutations. The AI Explainer page is a workbench surface,
+    while actual model execution is separately gated by the live contribution
+    runtime. Keep the page available for workbench devices even when the provider
+    is disabled or temporarily recovering.
     """
 
     try:
@@ -329,7 +345,7 @@ def inject_live_ai_capability_startup_flags() -> dict[str, object]:
     if not bool(flags.get("completed")):
         return {}
     live_flags = dict(flags)
-    live_flags["language_model"] = bool(_active_capability_providers())
+    live_flags["language_model"] = bool(live_flags.get("workbench"))
     live_flags["degraded"] = False
     return {"capability_startup_flags": live_flags}
 
