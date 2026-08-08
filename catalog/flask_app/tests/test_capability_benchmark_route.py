@@ -60,6 +60,8 @@ class BoundedBenchmarkAdapter:
         self.revision = 1
         self.started = threading.Event()
         self.block_until_cancelled = False
+        self.block_until_released = False
+        self.release = threading.Event()
 
     def __call__(self, _context) -> InspectionFinding:
         self.inspection_calls += 1
@@ -78,6 +80,8 @@ class BoundedBenchmarkAdapter:
     def benchmark(self, context) -> BenchmarkObservation:
         self.benchmark_calls += 1
         self.started.set()
+        if self.block_until_released and not self.release.wait(timeout=3):
+            raise AssertionError("benchmark release was not signalled")
         if self.block_until_cancelled:
             while not context.cancelled:
                 time.sleep(0.01)
@@ -420,6 +424,104 @@ def test_skip_after_completed_result_does_not_mark_completed_check_skipped(
     assert complete is True
     assert summary["can_skip"] is False
     assert cards[0]["state"] == "passed"
+
+
+def test_skip_serializes_with_concurrent_benchmark_completion(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    clock = lambda: NOW
+    adapter = BoundedBenchmarkAdapter()
+    adapter.block_until_released = True
+    onboarding = _onboarding_service(tmp_path, clock=clock)
+    inspection = _inspection_service(
+        tmp_path,
+        onboarding,
+        adapters=(adapter,),
+        clock=clock,
+    )
+    benchmarks = _benchmark_service(
+        tmp_path,
+        onboarding,
+        inspection,
+        clock=clock,
+    )
+    client = _app(onboarding, inspection, benchmarks).test_client()
+    _csrf, _command_id = _connect_and_inspect(client)
+    snapshot = inspection.load()
+    assert snapshot is not None
+
+    original_list_results = benchmarks.list_results
+    original_clear = benchmarks.skip_store.clear
+    list_snapshot_taken = threading.Event()
+    release_list_snapshot = threading.Event()
+    clear_completed = threading.Event()
+
+    def delayed_list_results():
+        results = original_list_results()
+        list_snapshot_taken.set()
+        if not release_list_snapshot.wait(timeout=3):
+            raise AssertionError("list-result snapshot was not released")
+        return results
+
+    def tracked_clear(**kwargs) -> None:
+        original_clear(**kwargs)
+        clear_completed.set()
+
+    monkeypatch.setattr(benchmarks, "list_results", delayed_list_results)
+    monkeypatch.setattr(benchmarks.skip_store, "clear", tracked_clear)
+
+    run_results = []
+    run_errors = []
+    skip_counts = []
+    skip_errors = []
+
+    def run_in_background() -> None:
+        try:
+            run_results.append(
+                benchmarks.run(
+                    benchmark_id=BENCHMARK_ID,
+                    target_service_id=TARGET_ID,
+                )
+            )
+        except BaseException as exc:  # noqa: BLE001 - asserted below
+            run_errors.append(exc)
+
+    def skip_in_background() -> None:
+        try:
+            skip_counts.append(benchmarks.skip_all())
+        except BaseException as exc:  # noqa: BLE001 - asserted below
+            skip_errors.append(exc)
+
+    run_thread = threading.Thread(target=run_in_background, daemon=True)
+    skip_thread = threading.Thread(target=skip_in_background, daemon=True)
+    run_thread.start()
+    assert adapter.started.wait(timeout=2)
+    skip_thread.start()
+
+    try:
+        assert list_snapshot_taken.wait(timeout=2)
+        adapter.release.set()
+        assert clear_completed.wait(timeout=2)
+        run_thread.join(timeout=0.5)
+    finally:
+        adapter.release.set()
+        release_list_snapshot.set()
+        skip_thread.join(timeout=3)
+        run_thread.join(timeout=3)
+
+    assert not skip_thread.is_alive()
+    assert not run_thread.is_alive()
+    assert skip_errors == []
+    assert run_errors == []
+    assert skip_counts == [0]
+    assert len(run_results) == 1
+    assert run_results[0].state is BenchmarkState.PASSED
+    assert original_list_results() == tuple(run_results)
+    assert benchmarks.skip_store.list_for_revision(
+        device_id=snapshot.device_id,
+        inspection_revision=snapshot.revision,
+    ) == frozenset()
 
 
 def test_expiry_and_dependency_change_require_rerun(tmp_path: Path) -> None:
