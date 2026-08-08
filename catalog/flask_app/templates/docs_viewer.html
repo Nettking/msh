@@ -70,10 +70,10 @@
           <div class="docs-sidebar__primary">
             <section class="docs-nav-group" aria-labelledby="docs-nav-start">
               <p class="docs-nav-group__title" id="docs-nav-start">Start here</p>
-              {{ nav_link('getting_started.md', 'Getting started') }}
-              {{ nav_link('quick_start.md', 'Quick start') }}
               {{ nav_link('operator_guide.md', 'Operator guide') }}
+              {{ nav_link('quick_start.md', 'Quick start') }}
               {{ nav_link('troubleshooting.md', 'Troubleshooting') }}
+              {{ nav_link('getting_started.md', 'MSH concepts') }}
             </section>
 
             <section class="docs-nav-group" aria-labelledby="docs-nav-use">
@@ -137,54 +137,66 @@
             {% if docs_root_exists %}
               <section class="docs-home">
                 <header class="docs-home__hero">
-                  <p class="docs-home__eyebrow">MSH documentation</p>
-                  <h1>Get started with MSH</h1>
+                  <p class="docs-home__eyebrow">Current product guide</p>
+                  <h1>MSH documentation</h1>
                   <p class="docs-home__lead">
-                    Install MSH, create or join a Federation, inspect this device, and start using the workbench and shared capabilities. Use the direct paths below instead of browsing repository internals.
+                    Use the current MSH workbench: monitor machine data, capture operator knowledge, manage trusted Federation capabilities, configure sources, and diagnose the local runtime. New installation and onboarding material is available below when you need it.
                   </p>
                   <nav class="docs-home__actions" aria-label="Documentation starting points">
-                    <a class="docs-home__button docs-home__button--primary" href="{{ url_for('docs_web.document', document_path='quick_start.md') }}">Quick start</a>
-                    <a class="docs-home__button" href="{{ url_for('docs_web.document', document_path='one_command_setup.md') }}">Installation</a>
-                    <a class="docs-home__button" href="{{ url_for('docs_web.document', document_path='getting_started.md') }}">Understand MSH</a>
-                    <a class="docs-home__button" href="{{ url_for('docs_web.document', document_path='federated_session_network.md') }}">Federation</a>
+                    <a class="docs-home__button docs-home__button--primary" href="{{ url_for('docs_web.document', document_path='operator_guide.md') }}">Operator guide</a>
+                    <a class="docs-home__button" href="{{ url_for('docs_web.document', document_path='quick_start.md') }}">Quick start</a>
+                    <a class="docs-home__button" href="{{ url_for('docs_web.document', document_path='troubleshooting.md') }}">Troubleshooting</a>
+                    <a class="docs-home__button" href="{{ url_for('docs_web.document', document_path='architecture.md') }}">How MSH works</a>
                   </nav>
                 </header>
 
-                <section class="docs-home__section docs-home__section--first" aria-labelledby="docs-home-start">
+                <section class="docs-home__section docs-home__section--first" aria-labelledby="docs-home-tasks">
                   <div class="docs-home__section-header">
-                    <h2 id="docs-home-start">Start here</h2>
-                    <p>Choose the shortest path for what you need right now.</p>
+                    <h2 id="docs-home-tasks">What do you want to do?</h2>
+                    <p>Start from the product area you are using instead of from repository structure or setup history.</p>
+                  </div>
+                  <div class="docs-home__cards">
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='operator_guide.md') }}#monitor">
+                      <span class="docs-home-card__kicker">Monitor</span>
+                      <strong>Work with machine data</strong>
+                      <p>Use overview, live telemetry, playback, assist, recording status, and diagnostics.</p>
+                    </a>
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='operator_strategy_capture.md') }}">
+                      <span class="docs-home-card__kicker">Knowledge</span>
+                      <strong>Capture operator knowledge</strong>
+                      <p>Capture notes quickly, review them later, structure strategies, and use supported exports.</p>
+                    </a>
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='connected_capabilities.md') }}">
+                      <span class="docs-home-card__kicker">Federation</span>
+                      <strong>Connect devices and capabilities</strong>
+                      <p>Understand trusted membership, contributed services, benchmarks, jobs, storage, and device state.</p>
+                    </a>
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='source_synchronization.md') }}">
+                      <span class="docs-home-card__kicker">System</span>
+                      <strong>Configure sources and data</strong>
+                      <p>Set up supported sources, synchronization, normalized data paths, and runtime checks.</p>
+                    </a>
+                  </div>
+                </section>
+
+                <section class="docs-home__section" aria-labelledby="docs-home-new-device">
+                  <div class="docs-home__section-header">
+                    <h2 id="docs-home-new-device">New installation or device?</h2>
+                    <p>Setup is a bounded path. You do not need to repeat it during normal use.</p>
                   </div>
                   <div class="docs-home__cards">
                     <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='quick_start.md') }}">
                       <span class="docs-home-card__kicker">First run</span>
                       <strong>Quick start</strong>
-                      <p>Start MSH and complete the required identity, Federation, and inspection flow.</p>
+                      <p>Start the supported services, complete device onboarding, and open the workbench.</p>
                     </a>
                     <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='one_command_setup.md') }}">
                       <span class="docs-home-card__kicker">Install</span>
-                      <strong>Installation</strong>
-                      <p>Use the supported Windows and Docker Compose startup commands.</p>
-                    </a>
-                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='getting_started.md') }}">
-                      <span class="docs-home-card__kicker">Concepts</span>
-                      <strong>Understand MSH</strong>
-                      <p>Learn devices, Federations, inspection, contributions, authority, and the workbench.</p>
-                    </a>
-                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='federated_session_network.md') }}">
-                      <span class="docs-home-card__kicker">Federation</span>
-                      <strong>Connect devices</strong>
-                      <p>Understand identity, membership, trusted devices, capabilities, and failure behavior.</p>
+                      <strong>Startup commands</strong>
+                      <p>Use the supported Windows launcher or Docker Compose startup path.</p>
                     </a>
                   </div>
-                </section>
-
-                <section class="docs-home__section" aria-labelledby="docs-home-first-run">
-                  <div class="docs-home__section-header">
-                    <h2 id="docs-home-first-run">First-run path</h2>
-                    <p>The required onboarding path is short. Benchmarks and contribution choices are optional follow-up work.</p>
-                  </div>
-                  <ol class="docs-home__journey">
+                  <ol class="docs-home__journey" aria-label="Required first-run path">
                     <li><span>01</span><strong>Create or load device identity</strong></li>
                     <li><span>02</span><strong>Join, reconnect, or create a Federation</strong></li>
                     <li><span>03</span><strong>Inspect local capabilities</strong></li>
@@ -193,45 +205,26 @@
                   </ol>
                 </section>
 
-                <section class="docs-home__section" aria-labelledby="docs-home-tasks">
-                  <div class="docs-home__section-header">
-                    <h2 id="docs-home-tasks">Common tasks</h2>
-                    <p>Go directly to what you are trying to accomplish.</p>
-                  </div>
-                  <div class="docs-home__cards">
-                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='operator_guide.md') }}">
-                      <span class="docs-home-card__kicker">Operate</span>
-                      <strong>Use the MSH workbench</strong>
-                      <p>Work with Federation, Monitor, Knowledge, sources, recording, benchmarks, and contributions.</p>
-                    </a>
-                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='connected_capabilities.md') }}">
-                      <span class="docs-home-card__kicker">Capabilities</span>
-                      <strong>Use another device's services</strong>
-                      <p>See how trusted connected capabilities become available across MSH devices.</p>
-                    </a>
-                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='source_synchronization.md') }}">
-                      <span class="docs-home-card__kicker">Data</span>
-                      <strong>Configure data sources</strong>
-                      <p>Set up source configuration, normalized landing paths, and synchronization state.</p>
-                    </a>
-                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='troubleshooting.md') }}">
-                      <span class="docs-home-card__kicker">Fix</span>
-                      <strong>Troubleshooting</strong>
-                      <p>Diagnose startup, Docker, data, recorder, runtime, and connectivity problems.</p>
-                    </a>
-                  </div>
-                </section>
-
                 <section class="docs-home__section" aria-labelledby="docs-home-understand">
                   <div class="docs-home__section-header">
-                    <h2 id="docs-home-understand">Reference</h2>
-                    <p>Use these when you need system details rather than a task recipe.</p>
+                    <h2 id="docs-home-understand">Understand the system</h2>
+                    <p>Use these when you need the product model, architecture, trust model, or data contract.</p>
                   </div>
                   <div class="docs-home__cards">
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='getting_started.md') }}">
+                      <span class="docs-home-card__kicker">Concepts</span>
+                      <strong>MSH mental model</strong>
+                      <p>Learn devices, Federations, inspection, contributions, authority, and the workbench.</p>
+                    </a>
                     <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='architecture.md') }}">
                       <span class="docs-home-card__kicker">Architecture</span>
                       <strong>How MSH works</strong>
-                      <p>Product model, components, authority boundaries, data flow, jobs, storage, and persistence.</p>
+                      <p>Product components, authority boundaries, data flow, jobs, storage, and persistence.</p>
+                    </a>
+                    <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='federated_session_network.md') }}">
+                      <span class="docs-home-card__kicker">Trust</span>
+                      <strong>Federated network</strong>
+                      <p>Identity, membership, transport, storage, capabilities, and failure behavior.</p>
                     </a>
                     <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='data_contract.md') }}">
                       <span class="docs-home-card__kicker">Data</span>

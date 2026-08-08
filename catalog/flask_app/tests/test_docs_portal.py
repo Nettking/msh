@@ -21,32 +21,46 @@ def _write_doc(root: Path, relative: str, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def test_docs_home_is_task_first_not_a_repository_or_marketing_landing_page(
+def test_docs_home_starts_from_current_product_tasks_not_only_onboarding(
     tmp_path: Path,
 ) -> None:
+    _write_doc(tmp_path, "operator_guide.md", "# Operator guide\n")
     _write_doc(tmp_path, "quick_start.md", "# Quick start\n\nStart here.\n")
     _write_doc(tmp_path, "one_command_setup.md", "# One-command setup\n")
+    _write_doc(tmp_path, "troubleshooting.md", "# Troubleshooting\n")
+    _write_doc(tmp_path, "architecture.md", "# Architecture\n")
     _write_doc(tmp_path, "getting_started.md", "# Getting started with MSH\n")
+    _write_doc(tmp_path, "connected_capabilities.md", "# Connected capabilities\n")
+    _write_doc(tmp_path, "source_synchronization.md", "# Source synchronization\n")
+    _write_doc(tmp_path, "operator_strategy_capture.md", "# Knowledge capture\n")
     _write_doc(tmp_path, "federated_session_network.md", "# Federation\n")
+    _write_doc(tmp_path, "data_contract.md", "# Data contract\n")
     _write_doc(tmp_path, "implementation/history.md", "# Historical delivery note\n")
 
     response = _app(tmp_path).test_client().get("/docs")
     html = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert "Get started with MSH" in html
-    assert "Install MSH, create or join a Federation" in html
-    assert "Start here" in html
-    assert "First-run path" in html
-    assert "Common tasks" in html
-    assert "Reference" in html
+    assert "Current product guide" in html
+    assert "MSH documentation" in html
+    assert "monitor machine data" in html
+    assert "What do you want to do?" in html
+    assert "New installation or device?" in html
+    assert "Understand the system" in html
     assert "Development &amp; all files" in html
 
+    assert 'href="/docs/operator_guide.md">Operator guide</a>' in html
     assert 'href="/docs/quick_start.md">Quick start</a>' in html
-    assert 'href="/docs/one_command_setup.md">Installation</a>' in html
-    assert 'href="/docs/getting_started.md">Understand MSH</a>' in html
-    assert 'href="/docs/federated_session_network.md">Federation</a>' in html
+    assert 'href="/docs/troubleshooting.md">Troubleshooting</a>' in html
+    assert 'href="/docs/architecture.md">How MSH works</a>' in html
 
+    assert "Work with machine data" in html
+    assert "Capture operator knowledge" in html
+    assert "Connect devices and capabilities" in html
+    assert "Configure sources and data" in html
+
+    assert "Get started with MSH" not in html
+    assert "Install MSH, create or join a Federation" not in html
     assert "Build confidence before you build complexity." not in html
     assert "documents available" not in html
     assert "Markdown files" not in html
@@ -80,6 +94,7 @@ def test_docs_document_keeps_curated_navigation_and_toc(tmp_path: Path) -> None:
     assert "Start here" in html
     assert "Use MSH" in html
     assert "Understand MSH" in html
+    assert "MSH concepts" in html
     assert "Development &amp; all files" in html
     assert 'class="docs-nav-link is-active"' in html
     assert 'aria-current="page"' in html
