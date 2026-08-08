@@ -36,7 +36,8 @@
     "scripts/windows/**",
     "scripts/linux/**",
     "catalog/flask_app/app.py",
-    "catalog/flask_app/__init__.py"
+    "catalog/flask_app/__init__.py",
+    "catalog/federation/persistence.py"
   ],
   "rules": [
     {
@@ -44,12 +45,24 @@
         "catalog/flask_app/services/federation_pairing_service.py",
         "catalog/flask_app/services/resilient_pairing_runtime.py",
         "catalog/flask_app/federation_pairing_routes.py",
-        "catalog/node/**",
-        "catalog/relay/**",
-        "catalog/federation/onboarding_discovery/**",
-        "catalog/federation/persistence.py"
+        "catalog/node/**"
       ],
       "scenarios": [
+        "physical.multi-host-relay-and-network-path",
+        "physical.mobile-and-desktop-browser-review",
+        "physical.separate-ai-compute-storage-contributors",
+        "physical.restart-and-reconciliation",
+        "physical.revocation-and-controlled-rejoin"
+      ]
+    },
+    {
+      "patterns": [
+        "catalog/relay/**",
+        "catalog/federation/onboarding_discovery/**"
+      ],
+      "scenarios": [
+        "physical.fresh-windows-checkout",
+        "physical.fresh-linux-checkout",
         "physical.multi-host-relay-and-network-path",
         "physical.mobile-and-desktop-browser-review",
         "physical.separate-ai-compute-storage-contributors",
@@ -160,7 +173,24 @@
     {
       "patterns": [
         "catalog/flask_app/templates/**",
-        "catalog/flask_app/static/**"
+        "catalog/flask_app/static/js/**"
+      ],
+      "scenarios": [
+        "physical.multi-host-relay-and-network-path",
+        "physical.mtconnect-recorder-source",
+        "physical.ollama-model-and-accelerator",
+        "physical.mobile-and-desktop-browser-review",
+        "physical.recorder-plus-ai-simultaneous-contribution",
+        "physical.separate-ai-compute-storage-contributors",
+        "physical.benchmark-expiry-and-rerun",
+        "physical.contribution-disable-and-reenable",
+        "physical.restart-and-reconciliation",
+        "physical.revocation-and-controlled-rejoin"
+      ]
+    },
+    {
+      "patterns": [
+        "catalog/flask_app/static/css/**"
       ],
       "scenarios": [
         "physical.mobile-and-desktop-browser-review"
