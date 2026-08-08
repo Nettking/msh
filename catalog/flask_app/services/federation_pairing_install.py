@@ -233,7 +233,7 @@ class SavedFederationReconnectMonitor:
         session_id = getattr(binding, "internal_session_id", None)
         node_id = getattr(identity, "node_id", None)
         if not isinstance(session_id, str) or not isinstance(node_id, str):
-            raise RuntimeError("trusted Federation context is incomplete")
+            raise TypeError("trusted Federation context is incomplete")
         publish_local_contributions(
             contribution_service=get_capability_contribution_service(),
             runtime=self.service.relay_runtime,
