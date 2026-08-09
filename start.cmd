@@ -238,6 +238,12 @@ if errorlevel 1 (
     set "MSH_BUILD_COMMIT="
     exit /b 1
 )
+powershell -NoProfile -Command "$status = @(git status --porcelain=v1 --untracked-files=all 2>$null); if ($LASTEXITCODE -eq 0 -and $status.Count -eq 0) { exit 0 } else { exit 1 }"
+if errorlevel 1 (
+    echo MSH refuses to label a build from a checkout with local changes.
+    set "MSH_BUILD_COMMIT="
+    exit /b 1
+)
 for /f "usebackq delims=" %%C in (`powershell -NoProfile -Command "'%MSH_BUILD_COMMIT%'.ToLowerInvariant()"`) do set "MSH_BUILD_COMMIT=%%C"
 exit /b 0
 
