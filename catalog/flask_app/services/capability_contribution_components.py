@@ -38,14 +38,25 @@ from catalog.federation.onboarding_models import (
 from .capability_onboarding_service import CapabilityOnboardingService
 from .local_capability_candidates import local_contribution_components
 from .recorder_control_service import get_recorder_control_service
-from .server_setup_service import ai_provider_label
 
 
 def _payload(settings: object | None) -> dict[str, Any]:
     if settings is None:
         return {}
-    value = settings.to_dict() if callable(getattr(settings, "to_dict", None)) else settings
+    value = (
+        settings.to_dict()
+        if callable(getattr(settings, "to_dict", None))
+        else settings
+    )
     return dict(value) if isinstance(value, Mapping) else {}
+
+
+def _provider_label(setup: Mapping[str, Any]) -> str:
+    """Derive a presentation label from configuration, never role authority."""
+
+    if str(setup.get("ai_provider_mode") or "local") == "connected":
+        return str(setup.get("ai_provider_name") or "Connected computer").strip()
+    return "This computer"
 
 
 def _ai_runtime_node_id(federation_node_id: object) -> str:
@@ -120,8 +131,9 @@ def default_components(
     devices and established topologies remain control-plane owned.
 
     A configured Ollama target remains visible as an AI Explainer candidate even
-    when retained legacy setup had AI disabled. Capability-first onboarding must
-    let the operator review that service explicitly; visibility never enables it.
+    when retained compatibility setup had AI disabled. Capability-first
+    onboarding lets the operator review that service explicitly; visibility
+    never enables it.
     """
 
     sources: list[object] = [RecorderCandidateSource()]
@@ -142,12 +154,7 @@ def default_components(
     ).strip()
     if model and base_url:
         service_id = "ollama-configured"
-        provider_label = (
-            ai_provider_label(settings)
-            if settings is not None and callable(getattr(settings, "to_dict", None))
-            else "This computer"
-        )
-        display_label = f"AI Explainer — {provider_label}"
+        display_label = f"AI Explainer — {_provider_label(setup)}"
         sources.append(
             AICandidateSource(
                 {
@@ -164,7 +171,9 @@ def default_components(
                 }
             )
         )
-        manager = current_app.config.get("CAPABILITY_ONBOARDING_AI_RUNTIME_MANAGER")
+        manager = current_app.config.get(
+            "CAPABILITY_ONBOARDING_AI_RUNTIME_MANAGER"
+        )
         if manager is None:
             from catalog.flask_app.ai_routes import AI_RUNTIME_MANAGER
 
@@ -214,7 +223,12 @@ def default_components(
     is_handler_active = current_app.config.get(
         "CAPABILITY_ONBOARDING_COMPUTE_IS_HANDLER_ACTIVE"
     )
-    compute_values = (inventory, activate_binding, fence_handler, is_handler_active)
+    compute_values = (
+        inventory,
+        activate_binding,
+        fence_handler,
+        is_handler_active,
+    )
     if any(value is not None for value in compute_values):
         if (
             inventory is None
