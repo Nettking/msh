@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from dataclasses import replace
+
 from catalog.flask_app import app as app_module
 from catalog.flask_app import routes as routes_module
 from catalog.flask_app import server_setup_routes
@@ -12,10 +14,10 @@ class FakeRuntimeManager:
         pass
 
     def requires_startup_choice(self) -> bool:
-        return False
+        return True
 
     def startup_decision_snapshot(self) -> dict[str, bool]:
-        return {"requires_choice": False}
+        return {"requires_choice": True}
 
 
 def _patch_runtime(monkeypatch) -> None:
@@ -24,17 +26,29 @@ def _patch_runtime(monkeypatch) -> None:
     monkeypatch.setattr(routes_module, "get_runtime_manager", lambda: manager)
 
 
-def _patch_setup_context(monkeypatch) -> None:
-    settings = default_settings(configured=False)
+def _configured_settings():
+    return replace(
+        default_settings(configured=True),
+        deployment_mode="full-server",
+        ai_enabled=True,
+        ai_profile="laptop-standard",
+        ai_model="llama3.2:3b",
+        recorder_sources="Machine=http://10.20.30.50:5000/current",
+    )
+
+
+def _patch_setup_context(monkeypatch, settings) -> None:
     monkeypatch.setattr(app_module, "load_settings", lambda: settings)
+    monkeypatch.setattr(routes_module, "load_settings", lambda: settings)
+    monkeypatch.setattr(server_setup_routes, "load_settings", lambda: settings)
     monkeypatch.setattr(
         app_module,
         "ollama_status",
         lambda _settings: {
             "running": True,
-            "selected_model": "llama3.2:3b",
+            "selected_model": settings.ai_model,
             "selected_model_installed": True,
-            "models": ["llama3.2:3b"],
+            "models": [settings.ai_model],
             "installed_by_profile": {
                 "edge-small": False,
                 "laptop-standard": True,
@@ -50,63 +64,43 @@ def _patch_setup_context(monkeypatch) -> None:
     )
 
 
-def test_explicit_legacy_ai_step_exposes_model_suggestion_benchmark(
+def test_explicit_legacy_startup_is_read_only_compatibility_notice(
     monkeypatch,
     tmp_path,
-):
+) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
-    _patch_setup_context(monkeypatch)
+    settings = _configured_settings()
+    _patch_setup_context(monkeypatch, settings)
 
     app = create_app()
     app.config.update(TESTING=True)
 
-    response = app.test_client().get("/startup?legacy=1&next=%2F&step=ai")
+    response = app.test_client().get("/startup?legacy=1&edit=1&step=role")
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert 'data-initial-step="ai"' in html
-    assert "Benchmark and model suggestion" in html
-    assert "Benchmark and suggest model" in html
-    assert "/server-setup/test-ai-model" in html
-    assert "Connected computer" in html
-    assert 'name="ai_provider_mode"' in html
-    assert 'name="ollama_base_url"' in html
-    assert "/server-setup/test-ai-connection" in html
+    assert "Legacy device-role setup has been retired" in html
+    assert "Open capability-first onboarding" in html
+    assert "Preserved compatibility settings" in html
+    assert "full-server" in html
+    assert settings.ai_model in html
+    assert settings.recorder_sources in html
+
+    # The old role-first authority and runtime-choice controls must not return.
+    assert 'name="deployment_mode"' not in html
+    assert "/server-setup/save" not in html
+    assert "/startup/choose" not in html
+    assert "Resume session" not in html
+    assert "Start new session" not in html
+    assert "Save setup and continue" not in html
 
 
-def test_explicit_legacy_setup_uses_focused_guided_shell(monkeypatch, tmp_path):
+def test_ai_model_benchmark_endpoint_remains_available(monkeypatch, tmp_path) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
-    _patch_setup_context(monkeypatch)
-
-    app = create_app()
-    app.config.update(TESTING=True)
-
-    response = app.test_client().get("/startup?legacy=1")
-
-    assert response.status_code == 200
-    html = response.get_data(as_text=True)
-    assert '<body class="setup-focus">' in html
-    assert 'class="setup-shell-header"' in html
-    assert "Set up this MSH device" in html
-    assert "Step 1 · Device role" in html
-    assert 'data-step-target="model"' in html
-    assert "Choose a specialized device role" in html
-    assert "site-nav--primary" not in html
-    assert "Artifact scan:" not in html
-    assert "rescan-form" not in html
-    assert "Not sure what to choose?" not in html
-    assert "Advanced: command-driven setup" not in html
-
-
-def test_ai_model_benchmark_endpoint_returns_recommendation(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    _patch_runtime(monkeypatch)
-    _patch_setup_context(monkeypatch)
-
-    settings = default_settings(configured=True)
-    monkeypatch.setattr(server_setup_routes, "load_settings", lambda: settings)
+    settings = _configured_settings()
+    _patch_setup_context(monkeypatch, settings)
 
     def fake_compare(_settings):
         return {
@@ -121,7 +115,11 @@ def test_ai_model_benchmark_endpoint_returns_recommendation(monkeypatch, tmp_pat
                     "result": {
                         "ok": True,
                         "elapsed_ms": 1200,
-                        "assessment": {"key": "fast", "label": "Fast", "description": "Comfortable."},
+                        "assessment": {
+                            "key": "fast",
+                            "label": "Fast",
+                            "description": "Comfortable.",
+                        },
                     },
                 }
             ],

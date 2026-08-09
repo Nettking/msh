@@ -33,52 +33,6 @@ class FakeRuntimeManager:
         }
 
 
-class FakeSetupDiscovery:
-    def last_scan(self) -> dict[str, object]:
-        def result(source_id, source_name, host, display_name, machine_id):
-            return {
-                "source_id": source_id,
-                "source_name": source_name,
-                "display_name": display_name,
-                "base_url": f"http://{host}:5000",
-                "machines": [
-                    {
-                        "display_name": display_name,
-                        "reported_name": "Mazak",
-                        "machine_id": machine_id,
-                        "identity_kind": "uuid",
-                    }
-                ],
-            }
-
-        return {
-            "state": "complete",
-            "cidr": "192.168.200.0/24",
-            "port": 5000,
-            "agents_found": 2,
-            "machines_found": 2,
-            "results": [
-                result(
-                    "source-a",
-                    "M8015RW221N",
-                    "192.168.200.101",
-                    "Mazak [M8015RW221N]",
-                    "M8015RW221N",
-                ),
-                result(
-                    "source-b",
-                    "MAZAK-M7ZDA13010Z",
-                    "192.168.200.249",
-                    "Mazak M7ZDA13010Z",
-                    "MAZAK-M7ZDA13010Z",
-                ),
-            ],
-        }
-
-    def recommended_cidr(self, _settings) -> str:
-        return "192.168.200.0/24"
-
-
 class FakeStartupTransition:
     def __init__(self, settings) -> None:
         self.settings = settings
@@ -149,7 +103,7 @@ def _open_returning_device(client) -> None:
     assert landing.location == "/federation"
 
 
-def test_main_navigation_pages_load(monkeypatch, tmp_path):
+def test_main_navigation_pages_load(monkeypatch, tmp_path) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup(monkeypatch)
@@ -163,10 +117,9 @@ def test_main_navigation_pages_load(monkeypatch, tmp_path):
         ("/", "Overview"),
         ("/guide", "How to use MSH"),
         ("/get-started", "What do you want to do first?"),
-        ("/startup?legacy=1", "MSH is ready"),
         (
-            "/startup?legacy=1&edit=1&step=ai",
-            "Language-model capability",
+            "/startup?legacy=1",
+            "Legacy device-role setup has been retired",
         ),
         ("/sources/", "Sources"),
         ("/status", "Diagnostics"),
@@ -185,7 +138,7 @@ def test_main_navigation_pages_load(monkeypatch, tmp_path):
         assert expected_text in response.get_data(as_text=True), path
 
 
-def test_get_started_is_a_focused_task_handoff(monkeypatch, tmp_path):
+def test_get_started_is_a_focused_task_handoff(monkeypatch, tmp_path) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup(monkeypatch)
@@ -204,10 +157,10 @@ def test_get_started_is_a_focused_task_handoff(monkeypatch, tmp_path):
     assert "Full workbench" in html
 
 
-def test_main_pages_include_mobile_navigation_but_setup_does_not(
+def test_main_pages_include_mobile_navigation_but_compatibility_notice_does_not(
     monkeypatch,
     tmp_path,
-):
+) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup(monkeypatch)
@@ -218,15 +171,16 @@ def test_main_pages_include_mobile_navigation_but_setup_does_not(
     _open_returning_device(client)
 
     overview = client.get("/").get_data(as_text=True)
-    setup = client.get("/startup?legacy=1&edit=1").get_data(as_text=True)
+    notice = client.get("/startup?legacy=1").get_data(as_text=True)
 
     assert 'data-mobile-navigation' in overview
     assert 'aria-label="Mobile primary sections"' in overview
     assert "Rescan now" in overview
-    assert 'data-mobile-navigation' not in setup
+    assert 'data-mobile-navigation' not in notice
+    assert "Legacy device-role setup has been retired" in notice
 
 
-def test_knowledge_navigation_opens_a_choice_page(monkeypatch, tmp_path):
+def test_knowledge_navigation_opens_a_choice_page(monkeypatch, tmp_path) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
     _patch_setup(monkeypatch)
@@ -250,10 +204,7 @@ def test_knowledge_navigation_opens_a_choice_page(monkeypatch, tmp_path):
     assert 'href="/osl-export"' in knowledge_html
 
 
-def test_recorder_setup_contains_inline_discovery_and_role_scoped_saved_view(
-    monkeypatch,
-    tmp_path,
-):
+def test_recorder_only_status_remains_role_scoped(monkeypatch, tmp_path) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch, requires_choice=True)
     settings = replace(
@@ -263,11 +214,6 @@ def test_recorder_setup_contains_inline_discovery_and_role_scoped_saved_view(
         recorder_sources="M8015RW221N=http://192.168.200.101:5000",
     )
     _patch_setup(monkeypatch, settings)
-    monkeypatch.setattr(
-        routes_module,
-        "get_mtconnect_discovery_service",
-        FakeSetupDiscovery,
-    )
 
     def fail_if_ollama_is_contacted(*_args, **_kwargs):
         raise AssertionError("Recorder-only pages must not contact Ollama.")
@@ -279,35 +225,17 @@ def test_recorder_setup_contains_inline_discovery_and_role_scoped_saved_view(
             "Recorder-only status must not build workbench diagnostics."
         )
 
-    monkeypatch.setattr(
-        routes_module,
-        "_catalog",
-        fail_if_workbench_catalog_is_loaded,
-    )
+    monkeypatch.setattr(routes_module, "_catalog", fail_if_workbench_catalog_is_loaded)
 
     app = create_app()
     app.config.update(TESTING=True)
     client = app.test_client()
 
-    edit_html = client.get(
-        "/startup?legacy=1&edit=1&step=recorder"
-    ).get_data(as_text=True)
-    saved_response = client.get("/startup?legacy=1")
     status_html = client.get("/status").get_data(as_text=True)
     first_workbench_response = client.get("/")
     workbench_response = client.get("/")
     guide_response = client.get("/guide")
 
-    assert 'id="setupDiscoveryButton"' in edit_html
-    assert 'id="setupDiscoveryResults"' in edit_html
-    assert edit_html.count('name="source_id"') == 2
-    assert "Mazak [M8015RW221N]" in edit_html
-    assert "Mazak M7ZDA13010Z" in edit_html
-    assert "MAZAK-M7ZDA13010Z" in edit_html
-    assert "Checked MTConnect Agents will be added" in edit_html
-    assert "Scan for MTConnect machines" not in edit_html
-    assert saved_response.status_code == 302
-    assert saved_response.location == "/status"
     assert "AI Explainer" not in status_html
     assert ">Monitor</a>" not in status_html
     assert 'data-recorder-dashboard' in status_html
@@ -321,7 +249,6 @@ def test_recorder_setup_contains_inline_discovery_and_role_scoped_saved_view(
     assert "chart.js" not in status_html
     assert "Open source inventory" not in status_html
     assert "Open control" not in status_html
-    assert "Stop recording" not in edit_html
     assert first_workbench_response.status_code == 302
     assert first_workbench_response.location == "/federation"
     assert workbench_response.status_code == 302
@@ -329,88 +256,10 @@ def test_recorder_setup_contains_inline_discovery_and_role_scoped_saved_view(
     assert guide_response.status_code == 200
 
 
-def test_malformed_saved_discovery_results_do_not_break_setup(
-    monkeypatch,
-    tmp_path,
-):
-    monkeypatch.chdir(tmp_path)
-    _patch_runtime(monkeypatch)
-    _patch_setup(monkeypatch, default_settings(configured=True))
-
-    class MalformedDiscovery(FakeSetupDiscovery):
-        def last_scan(self) -> dict[str, object]:
-            return {
-                "state": "complete",
-                "results": [{"base_url": "invalid", "machines": None}],
-            }
-
-    monkeypatch.setattr(
-        routes_module,
-        "get_mtconnect_discovery_service",
-        MalformedDiscovery,
-    )
-    app = create_app()
-    app.config.update(TESTING=True)
-
-    response = app.test_client().get(
-        "/startup?legacy=1&edit=1&step=recorder"
-    )
-
-    assert response.status_code == 200
-
-
-def test_web_workbench_hides_recorder_only_saved_options(
-    monkeypatch,
-    tmp_path,
-):
-    monkeypatch.chdir(tmp_path)
-    _patch_runtime(monkeypatch)
-    _patch_setup(monkeypatch, default_settings(configured=True))
-
-    app = create_app()
-    app.config.update(TESTING=True)
-    client = app.test_client()
-
-    saved_html = client.get("/startup?legacy=1").get_data(as_text=True)
-    status_html = client.get("/status").get_data(as_text=True)
-
-    assert "<h4>Language-model provider</h4>" in saved_html
-    assert "<h4>Recorder</h4>" not in saved_html
-    assert "MTConnect network discovery" not in status_html
-    assert "Recorder station</h3>" not in status_html
-
-
-def test_web_ui_only_does_not_require_a_runtime_start_choice(
-    monkeypatch,
-    tmp_path,
-):
-    monkeypatch.chdir(tmp_path)
-    _patch_runtime(monkeypatch, requires_choice=True)
-    settings = replace(
-        default_settings(configured=True),
-        deployment_mode="web-ui-only",
-    )
-    _patch_setup(monkeypatch, settings)
-
-    app = create_app()
-    app.config.update(TESTING=True)
-    client = app.test_client()
-
-    first_overview_response = client.get("/")
-    overview_response = client.get("/")
-    saved_html = client.get("/startup?legacy=1").get_data(as_text=True)
-
-    assert first_overview_response.status_code == 302
-    assert first_overview_response.location == "/federation"
-    assert overview_response.status_code == 200
-    assert "Resume session" not in saved_html
-    assert "Open overview" in saved_html
-
-
 def test_full_server_can_open_recorder_status_before_runtime_choice(
     monkeypatch,
     tmp_path,
-):
+) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch, requires_choice=True)
     settings = replace(
@@ -432,7 +281,7 @@ def test_full_server_can_open_recorder_status_before_runtime_choice(
 def test_recorder_live_status_endpoint_is_small_fresh_and_role_scoped(
     monkeypatch,
     tmp_path,
-):
+) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch, requires_choice=True)
     settings = replace(
@@ -511,10 +360,7 @@ def test_recorder_live_status_endpoint_is_small_fresh_and_role_scoped(
 
 def test_recorder_live_script_polls_without_unsafe_html() -> None:
     script = (
-        Path(__file__).parent
-        / "static"
-        / "js"
-        / "recorder-status.js"
+        Path(__file__).parent / "static" / "js" / "recorder-status.js"
     ).read_text(encoding="utf-8")
 
     assert 'cache: "no-store"' in script
