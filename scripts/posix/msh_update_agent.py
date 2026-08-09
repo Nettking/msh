@@ -214,7 +214,9 @@ def wait_runtime(root: Path, target: str) -> str:
     raise RuntimeError("runtime_verification_timeout")
 
 
-def validate_request(value: object) -> tuple[str, str, str | None]:
+def validate_request(
+    value: object,
+) -> tuple[str, str, str | None, datetime | None]:
     if not isinstance(value, dict) or value.get("schema") != REQUEST_SCHEMA:
         raise ValueError("malformed_message")
     request_id = value.get("request_id")
@@ -237,7 +239,19 @@ def validate_request(value: object) -> tuple[str, str, str | None]:
     now = datetime.now(timezone.utc)
     if created.timestamp() > now.timestamp() + 60 or expires <= now or (expires - created).total_seconds() > 900:
         raise ValueError("expired_or_invalid_request")
-    return request_id, action, target
+    activate_after: datetime | None = None
+    if action == "apply":
+        raw_activate_after = value.get("activate_after")
+        if not isinstance(raw_activate_after, str):
+            raise ValueError("malformed_activation_grace")
+        activate_after = utc(raw_activate_after)
+        if (
+            activate_after < created
+            or activate_after > expires
+            or (activate_after - created).total_seconds() > 30
+        ):
+            raise ValueError("invalid_activation_grace")
+    return request_id, action, target, activate_after
 
 
 def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
@@ -255,7 +269,11 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
     os.replace(request_file, processing)
     request_id, action, target = "invalid-request", "unknown", None
     try:
-        request_id, action, target = validate_request(value)
+        request_id, action, target, activate_after = validate_request(value)
+        if activate_after is not None:
+            delay = (activate_after - datetime.now(timezone.utc)).total_seconds()
+            if delay > 0:
+                time.sleep(min(delay, 30.0))
         inspection = inspect_checkout(root, target)
         before = running_commit(root)
         if action == "check":
