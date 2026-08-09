@@ -59,6 +59,42 @@
     {% endfor %}
   </div>
 
+  {% set updates = federation_update|default({'status': 'not_checked', 'devices': []}) %}
+  <section class="federation-panel federation-update-panel">
+    <header class="federation-panel__header">
+      <div>
+        <span class="federation-eyebrow">MSH source checkout updates</span>
+        <h3>{{ (updates.status|default('not_checked')).replace('_', ' ')|title }}</h3>
+        <p>Manual only. This operation changes supported Git source checkouts; it does not rebuild, reinstall, restart, or prove the running MSH installation.</p>
+      </div>
+      <form method="post" action="{{ url_for('federation_web.check_updates') }}">
+        <input type="hidden" name="_csrf_token" value="{{ federation_csrf_token }}">
+        <button class="federation-button federation-button--secondary" type="submit">Check for updates</button>
+      </form>
+    </header>
+    <dl class="federation-detail-list">
+      <div><dt>Last checked</dt><dd>{{ updates.checked_at|default('Not checked yet') }}</dd></div>
+      <div><dt>Source branch</dt><dd>{{ updates.branch|default('main') }}</dd></div>
+      {% if updates.target_commit %}<div><dt>Exact target</dt><dd><code>{{ updates.target_commit[:12] }}</code></dd></div>{% endif %}
+    </dl>
+    {% if updates.devices %}
+    <ul class="federation-entity-list">
+      {% for device in updates.devices %}
+      <li><div><strong>{{ device.label }}</strong><span>{{ device.message or (device.current_commit[:12] if device.current_commit else '') }}</span></div>{{ status_badge(device.state, device.state.replace('_', ' ')|title) }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if updates.eligible_count and updates.target_commit %}
+    <form method="post" action="{{ url_for('federation_web.apply_updates') }}" class="federation-update-confirmation">
+      <input type="hidden" name="_csrf_token" value="{{ federation_csrf_token }}">
+      <input type="hidden" name="target_commit" value="{{ updates.target_commit }}">
+      <label><input type="checkbox" name="confirm_update" value="update-all" required> Fast-forward the source checkout on {{ updates.eligible_count }} currently eligible device{{ '' if updates.eligible_count == 1 else 's' }} to exact commit <code>{{ updates.target_commit[:12] }}</code>. Running installations will remain unchanged until rebuilt/reinstalled and restarted locally. Offline devices will not be queued.</label>
+      <button class="federation-button federation-button--primary" type="submit">Update source on all devices</button>
+    </form>
+    {% endif %}
+    <p class="federation-muted">CSRF protects this browser request; it is not user authentication. Remote requests still require authenticated Federation coordinator authority and independent local Git verification.</p>
+  </section>
+
   <div class="federation-dashboard-grid">
     <section class="federation-panel federation-panel--device">
       <header class="federation-panel__header">

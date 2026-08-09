@@ -386,3 +386,14 @@ def test_rendered_overview_contains_no_private_or_fencing_material() -> None:
         "private-handler-binding",
     )
     assert not any(value.casefold() in page for value in forbidden)
+
+
+def test_update_panel_does_not_claim_to_update_running_installation() -> None:
+    coordinator = _AuthorizedCoordinator()
+    app = _configured_app(_AuthorizedSurface(coordinator))
+
+    page = app.test_client().get("/federation").get_data(as_text=True)
+
+    assert "MSH source checkout updates" in page
+    assert "Update source on all devices" not in page  # hidden before a check
+    assert "does not rebuild, reinstall, restart" in page
