@@ -131,7 +131,7 @@ function Invoke-External {
     $exit = $LASTEXITCODE
     if ($exit -ne 0) {
         $rendered = ($output | ForEach-Object { [string]$_ }) -join "`n"
-        throw "external_command_failed:$FilePath:$exit`n$rendered"
+        throw "external_command_failed:${FilePath}:$exit`n$rendered"
     }
     return @($output | ForEach-Object { [string]$_ })
 }
