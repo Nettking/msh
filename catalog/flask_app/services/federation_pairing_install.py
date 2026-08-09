@@ -17,6 +17,8 @@ from .federation_pairing_service import (
     RemotePairingState,
     RemotePairingStore,
 )
+from .federation_update_events import FederationUpdateEventProcessor
+from .federation_update_handoff import HostUpdateHandoff
 from .recorder_federation_publication_install import (
     install_recorder_federation_publication,
 )
@@ -24,6 +26,7 @@ from .resilient_pairing_runtime import ResilientPairingRelayRuntime
 from .server_setup_service import load_settings
 
 _RECONNECT_EXTENSION_KEY = "federation_saved_membership_reconnect"
+_UPDATE_PROCESSOR_EXTENSION_KEY = "federation_update_event_monitor"
 _RETAINED_STARTUP_CHECK_KEY = "capability_onboarding_startup_checked"
 _CONTRIBUTION_RECONCILE_EXTENSION_KEY = "capability_contribution_startup_reconciled"
 _PROVIDER_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
@@ -31,6 +34,7 @@ _LOCAL_RELAY_CONFIG_KEY = "CAPABILITY_ONBOARDING_LOCAL_RELAY_URL"
 _PAIRING_RELAY_CONFIG_KEY = "CAPABILITY_ONBOARDING_PAIRING_RELAY_URL"
 _DEFAULT_COMPOSE_LOCAL_RELAY_URL = "ws://relay:8765"
 _CONNECTED_CHECK_SECONDS = 15.0
+_UPDATE_POLL_SECONDS = 2.0
 _MAX_RETRY_SECONDS = 60.0
 _CONTRIBUTION_MUTATION_ENDPOINTS = frozenset(
     {
@@ -138,6 +142,80 @@ class LazyPairingOnboardingService(PairingAwareCapabilityOnboardingService):
             if instance is None
             else f"LazyPairingOnboardingService({instance!r})"
         )
+
+
+class FederationUpdateEventMonitor:
+    """Poll bounded update intents without accelerating contribution/AI sync."""
+
+    def __init__(
+        self,
+        app: Flask,
+        service: LazyPairingOnboardingService,
+    ) -> None:
+        self.app = app
+        self.service = service
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._update_processor: FederationUpdateEventProcessor | None = None
+
+    def _processor(self) -> FederationUpdateEventProcessor:
+        processor = self._update_processor
+        if processor is not None:
+            return processor
+        onboarding_database = Path(
+            self.app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"]
+        )
+        federation_root = onboarding_database.parent.parent
+        handoff_directory = Path(
+            self.app.config.get(
+                "FEDERATION_UPDATE_HANDOFF_DIR",
+                federation_root / "update-agent",
+            )
+        )
+        processor_state = Path(
+            self.app.config.get(
+                "FEDERATION_UPDATE_PROCESSOR_STATE",
+                federation_root / "update-events" / "processor.json",
+            )
+        )
+        processor = FederationUpdateEventProcessor(
+            self.service,
+            HostUpdateHandoff(handoff_directory),
+            processor_state,
+        )
+        self._update_processor = processor
+        return processor
+
+    def start(self) -> None:
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                return
+            self._stop.clear()
+            self._thread = threading.Thread(
+                target=self._run,
+                name="msh-federation-update-events",
+                daemon=True,
+            )
+            self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                with self.app.app_context():
+                    context = self.service.authorized_context()
+                    if context is not None:
+                        self._processor().process(context)
+            except Exception as exc:  # noqa: BLE001 - update authority fails closed
+                self.app.logger.warning(
+                    "Federation update event processing unavailable (%s)",
+                    type(exc).__name__,
+                )
+            if self._stop.wait(_UPDATE_POLL_SECONDS):
+                return
 
 
 class SavedFederationReconnectMonitor:
@@ -298,9 +376,6 @@ class SavedFederationReconnectMonitor:
                     try:
                         self._publish_contributions(runtime_state, context)
                     except Exception as exc:  # noqa: BLE001 - metadata sync is fail-closed
-                        # Publication never grants authority. A failed metadata
-                        # refresh must not tear down a valid membership connection;
-                        # the next bounded monitor pass retries it.
                         self.app.logger.info(
                             "Federation capability metadata refresh unavailable (%s)",
                             type(exc).__name__,
@@ -308,9 +383,6 @@ class SavedFederationReconnectMonitor:
                     try:
                         self._sync_remote_ai(runtime_state, context)
                     except Exception as exc:  # noqa: BLE001 - provider sync is fail-closed
-                        # Provider enrollment/health/runtime composition is a
-                        # separate authority path. Failure must not weaken or tear
-                        # down the already valid Federation membership.
                         self.app.logger.info(
                             "Federation remote AI authority refresh unavailable (%s)",
                             type(exc).__name__,
@@ -366,7 +438,9 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
         )
     app.extensions["federation_pairing_service"] = service
     monitor = SavedFederationReconnectMonitor(app, service)
+    update_monitor = FederationUpdateEventMonitor(app, service)
     app.extensions[_RECONNECT_EXTENSION_KEY] = monitor
+    app.extensions[_UPDATE_PROCESSOR_EXTENSION_KEY] = update_monitor
     app.extensions["federated_ai_product_bridge"] = monitor.ai_bridge
     install_recorder_federation_publication(
         app,
@@ -380,6 +454,7 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
         # transient first failure as permanently checked.
         app.extensions[_RETAINED_STARTUP_CHECK_KEY] = True
         monitor.start()
+        update_monitor.start()
 
     @app.after_request
     def _wake_contribution_publication(response):
@@ -407,6 +482,7 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
 
 
 __all__ = [
+    "FederationUpdateEventMonitor",
     "LazyPairingOnboardingService",
     "SavedFederationReconnectMonitor",
     "install_federation_pairing",

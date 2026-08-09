@@ -1,16 +1,20 @@
-"""Read-only Federation product integration for the supported Flask app."""
+"""Federation product integration for the supported Flask app."""
 
 from __future__ import annotations
+
+import hmac
 
 from flask import (
     Blueprint,
     Response,
     abort,
     current_app,
+    flash,
     make_response,
     redirect,
     render_template,
     request,
+    session,
     url_for,
 )
 
@@ -21,11 +25,12 @@ from catalog.federation.projections import (
     assert_public_projection,
 )
 
-from .capability_onboarding_routes import _csrf_token
+from .capability_onboarding_routes import _CSRF_SESSION_KEY, _csrf_token
 from .services.capability_benchmark_service import get_capability_benchmark_service
 from .services.federation_projection_service import (
     get_federation_projection_service,
 )
+from .services.federation_update_service import get_federation_update_service
 
 federation_web = Blueprint("federation_web", __name__)
 
@@ -145,13 +150,27 @@ def _page_response(page: FederationPage) -> Response:
         if page is FederationPage.BENCHMARKS
         else {}
     )
+    update_status = None
+    if page is FederationPage.OVERVIEW:
+        try:
+            update_status = get_federation_update_service().snapshot()
+        except Exception as exc:  # noqa: BLE001 - safe passive degradation
+            current_app.logger.warning(
+                "Federation update status unavailable (%s)", type(exc).__name__
+            )
+            update_status = {"status": "unavailable", "devices": []}
     response = make_response(
         render_template(
             template,
             federation_overview=projection,
             federation_page=projection,
             federation_item_actions=item_actions,
-            federation_csrf_token=_csrf_token() if item_actions else None,
+            federation_csrf_token=(
+                _csrf_token()
+                if item_actions or page is FederationPage.OVERVIEW
+                else None
+            ),
+            federation_update=update_status,
         )
     )
     response.headers["Cache-Control"] = "no-store"
@@ -182,6 +201,69 @@ def overview() -> Response:
     if request.query_string:
         return redirect(url_for("federation_web.overview"))
     return _page_response(FederationPage.OVERVIEW)
+
+
+def _require_update_csrf() -> None:
+    expected = session.get(_CSRF_SESSION_KEY)
+    supplied = request.form.get("_csrf_token")
+    if (
+        not isinstance(expected, str)
+        or not isinstance(supplied, str)
+        or not hmac.compare_digest(expected, supplied)
+    ):
+        abort(403)
+
+
+@federation_web.post("/federation/updates/check")
+def check_updates() -> Response:
+    _require_update_csrf()
+    try:
+        get_federation_update_service().check()
+        flash(
+            "Update check started. Reachable devices will report their locally "
+            "verified source and running-build state.",
+            "success",
+        )
+    except PermissionError:
+        flash(
+            "Only the authoritative Federation coordinator can check updates.",
+            "error",
+        )
+    except Exception as exc:  # noqa: BLE001 - diagnostics remain server-side
+        current_app.logger.warning(
+            "Federation update check failed (%s)", type(exc).__name__
+        )
+        flash("The bounded update check could not be completed safely.", "error")
+    return redirect(url_for("federation_web.overview"), code=303)
+
+
+@federation_web.post("/federation/updates/apply")
+def apply_updates() -> Response:
+    _require_update_csrf()
+    target = str(request.form.get("target_commit") or "")
+    confirmation = request.form.get("confirm_update")
+    if confirmation != "update-all":
+        flash("Explicit Update all confirmation is required.", "error")
+        return redirect(url_for("federation_web.overview"), code=303)
+    try:
+        get_federation_update_service().update_all(confirmed_target=target)
+        flash(
+            "Verified MSH update rollout started. A device reports success only "
+            "after rebuild, restart, and running-commit verification.",
+            "success",
+        )
+    except (PermissionError, ValueError, RuntimeError):
+        flash(
+            "The update was not started because its authority, target, freshness, "
+            "or reachability check failed.",
+            "error",
+        )
+    except Exception as exc:  # noqa: BLE001 - never expose process details
+        current_app.logger.warning(
+            "Federation update failed (%s)", type(exc).__name__
+        )
+        flash("The verified update rollout failed safely.", "error")
+    return redirect(url_for("federation_web.overview"), code=303)
 
 
 @federation_web.get("/federation/<page_name>", strict_slashes=False)
