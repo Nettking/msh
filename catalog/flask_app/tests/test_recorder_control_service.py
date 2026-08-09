@@ -5,23 +5,18 @@ from datetime import datetime, timezone
 
 import pytest
 
+from catalog.flask_app.services.capability_config_service import CapabilityConfig
 from catalog.flask_app.services.recorder_control_service import (
     RecorderControlError,
     RecorderControlService,
 )
-from catalog.flask_app.services.server_setup_service import ServerSetupSettings
 
 
-def _settings(
+def _config(
     *,
-    mode: str = "full-server",
     sources: str = "IG500=http://192.168.200.251:5000/current",
-) -> ServerSetupSettings:
-    return ServerSetupSettings(
-        configured=True,
-        user_setup_complete=True,
-        deployment_mode=mode,
-        ai_enabled=False,
+) -> CapabilityConfig:
+    return CapabilityConfig(
         ai_provider_mode="local",
         ai_provider_name="This computer",
         ai_profile="laptop-standard",
@@ -44,31 +39,36 @@ def _service(tmp_path) -> RecorderControlService:
 
 def test_start_and_stop_write_durable_desired_state(tmp_path) -> None:
     service = _service(tmp_path)
-    settings = _settings()
+    config = _config()
 
-    ok, _ = service.set_enabled(True, settings)
+    ok, _ = service.set_enabled(True, config)
     assert ok is True
     assert json.loads(service.control_path.read_text(encoding="utf-8"))["enabled"] is True
 
-    ok, _ = service.set_enabled(False, settings)
+    ok, _ = service.set_enabled(False, config)
     assert ok is True
     assert json.loads(service.control_path.read_text(encoding="utf-8"))["enabled"] is False
 
 
-def test_start_requires_recorder_role_and_source(tmp_path) -> None:
+def test_start_requires_recorder_source_not_legacy_role(tmp_path) -> None:
     service = _service(tmp_path)
 
-    with pytest.raises(RecorderControlError):
-        service.set_enabled(True, _settings(mode="web-workbench"))
+    with pytest.raises(RecorderControlError, match="MTConnect source"):
+        service.set_enabled(True, _config(sources=""))
 
-    with pytest.raises(RecorderControlError):
-        service.set_enabled(True, _settings(sources=""))
+    roleless = type(
+        "RolelessRecorderConfig",
+        (),
+        {"recorder_sources": "IG500=http://192.168.200.251:5000"},
+    )()
+    ok, _ = service.set_enabled(True, roleless)
+    assert ok is True
 
 
 def test_status_reports_recording_from_fresh_worker_heartbeat(tmp_path) -> None:
     service = _service(tmp_path)
-    settings = _settings()
-    service.set_enabled(True, settings)
+    config = _config()
+    service.set_enabled(True, config)
 
     service.status_path.write_text(
         json.dumps(
@@ -84,7 +84,7 @@ def test_status_reports_recording_from_fresh_worker_heartbeat(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    status = service.status(settings)
+    status = service.status(config)
 
     assert status["worker_alive"] is True
     assert status["requested_enabled"] is True
@@ -95,10 +95,10 @@ def test_status_reports_recording_from_fresh_worker_heartbeat(tmp_path) -> None:
 
 def test_status_distinguishes_requested_recording_from_offline_worker(tmp_path) -> None:
     service = _service(tmp_path)
-    settings = _settings()
-    service.set_enabled(True, settings)
+    config = _config()
+    service.set_enabled(True, config)
 
-    status = service.status(settings)
+    status = service.status(config)
 
     assert status["requested_enabled"] is True
     assert status["worker_alive"] is False
@@ -122,7 +122,7 @@ def test_status_keeps_configured_sources_visible_while_offline(tmp_path) -> None
     )
 
     status = service.status(
-        _settings(
+        _config(
             sources=(
                 "M8015RW221N=http://192.168.200.101:5000;"
                 "MAZAK-M7ZDA13010Z=http://192.168.200.249:5000"
@@ -158,21 +158,19 @@ def test_status_normalizes_malformed_runtime_values(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    status = service.status(_settings())
+    status = service.status(_config())
 
     assert status["records_written"] == 0
     assert status["records_buffered"] == 0
     assert status["source_status"]["IG500"]["next_sequence"] is None
-    assert (
-        status["source_status"]["IG500"]["agent_last_sequence"] is None
-    )
+    assert status["source_status"]["IG500"]["agent_last_sequence"] is None
 
 
 def test_web_status_excludes_debug_paths_and_log_tail(tmp_path) -> None:
     service = _service(tmp_path)
     service.log_path.write_text("secret diagnostic text", encoding="utf-8")
 
-    payload = service.web_status(_settings())
+    payload = service.web_status(_config())
 
     assert payload["schema"] == "msh.recorder.web_status.v1"
     assert payload["poll_after_ms"] == 2000
