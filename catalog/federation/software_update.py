@@ -27,6 +27,8 @@ class UpdateInspection:
     target_commit: str | None = None
     code: str | None = None
     message: str | None = None
+    running_commit: str | None = None
+    request_id: str | None = None
 
     def to_dict(self) -> dict[str, object]:
         return asdict(self)
