@@ -103,6 +103,7 @@ def _write_checkpoint(
     *,
     probe_sha256: str,
     next_sequence: int,
+    storage_aliases: list[str] | None = None,
 ) -> None:
     checkpoint = SourceCheckpoint(
         source_name="Mazak",
@@ -111,6 +112,7 @@ def _write_checkpoint(
         agent_instance_id=77,
         next_sequence=next_sequence,
         probe_sha256=probe_sha256,
+        storage_aliases=list(storage_aliases or []),
     )
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
@@ -136,7 +138,11 @@ def _build_reconciler(
     checkpoint_file = data_dir / "source_state" / "mtconnect_recorder_state.json"
     store = DurableRecorderStore(data_dir)
     outbox = SQLiteOutbox(tmp_path / "publisher" / "outbox.sqlite3")
-    queue = DurableRecorderDeliveryQueue(outbox=outbox, client=client)
+    queue = DurableRecorderDeliveryQueue(
+        outbox=outbox,
+        client=client,
+        session_id="session-1",
+    )
     target = RecorderPublicationTarget(
         session_id="session-1",
         group_id="telemetry-storage",
@@ -152,11 +158,16 @@ def _build_reconciler(
     return store, checkpoint_file, outbox, queue, reconciler
 
 
-def _store_sample(store: DurableRecorderStore, xml_text: str):
+def _store_sample(
+    store: DurableRecorderStore,
+    xml_text: str,
+    *,
+    archive_source_name: str = "Mazak",
+):
     probe = parse_probe(PROBE_XML)
     batch = parse_streams(xml_text, source_name="Mazak", probe=probe)
     stored = store.store_batch(
-        source_name="Mazak",
+        source_name=archive_source_name,
         requested_from=int(batch.first_observation_sequence or 0),
         xml_text=xml_text,
         batch=batch,
@@ -204,6 +215,46 @@ def test_reconcile_publishes_detailed_observations_and_keeps_local_jsonl(tmp_pat
     assert outbox.pending() == ()
 
 
+def test_reconcile_orders_and_deduplicates_batches_across_storage_aliases(
+    tmp_path,
+):
+    client = RecordingClient()
+    store, checkpoint_file, outbox, _queue, reconciler = _build_reconciler(
+        tmp_path,
+        client=client,
+    )
+    probe, _current_batch, _current_stored = _store_sample(
+        store,
+        _second_sample(),
+    )
+    _store_sample(
+        store,
+        SAMPLE_XML,
+        archive_source_name="Mazak Legacy",
+    )
+    _store_sample(
+        store,
+        SAMPLE_XML,
+        archive_source_name="Mazak Backup",
+    )
+    _write_checkpoint(
+        checkpoint_file,
+        probe_sha256=probe.sha256,
+        next_sequence=16,
+        storage_aliases=["Mazak Legacy", "Mazak Backup"],
+    )
+
+    result = reconciler.reconcile()
+
+    assert result.scanned_batches == 2
+    assert result.eligible_batches == 2
+    assert result.publication_chunks == 2
+    assert result.enqueued == 2
+    assert [
+        entry.payload["content"]["first_sequence"] for entry in outbox.pending()
+    ] == [10, 13]
+
+
 def test_uncommitted_raw_archive_is_not_publishable(tmp_path):
     client = RecordingClient()
     store, checkpoint_file, outbox, _queue, reconciler = _build_reconciler(
@@ -248,6 +299,7 @@ def test_delivery_failure_fences_newer_batches_for_same_dataset(tmp_path):
     queue = DurableRecorderDeliveryQueue(
         outbox=outbox,
         client=client,
+        session_id="session-1",
         clock=lambda: now[0],
     )
     for sequence in (10, 11):
@@ -283,6 +335,53 @@ def test_delivery_failure_fences_newer_batches_for_same_dataset(tmp_path):
         "Mazak:77:11:11:hash",
     ]
     assert outbox.pending() == ()
+
+
+def test_delivery_skips_rows_from_a_different_federation_session(tmp_path):
+    now = datetime(2026, 8, 9, 3, 0, tzinfo=timezone.utc)
+    client = RecordingClient()
+    outbox = SQLiteOutbox(tmp_path / "session-bound-outbox.sqlite3")
+    old_session_queue = DurableRecorderDeliveryQueue(
+        outbox=outbox,
+        client=client,
+        session_id="session-old",
+        clock=lambda: now,
+    )
+    current_session_queue = DurableRecorderDeliveryQueue(
+        outbox=outbox,
+        client=client,
+        session_id="session-current",
+        clock=lambda: now,
+    )
+    old_session_queue.enqueue(
+        session_id="session-old",
+        group_id="telemetry-storage",
+        dataset_id="mtconnect:node-1:Mazak",
+        batch_id="Mazak:77:10:10:old",
+        idempotency_key="session-old:dataset:batch-10",
+        content={"sequence": 10},
+        created_at=now,
+    )
+    current_session_queue.enqueue(
+        session_id="session-current",
+        group_id="telemetry-storage",
+        dataset_id="mtconnect:node-1:Mazak",
+        batch_id="Mazak:77:11:11:current",
+        idempotency_key="session-current:dataset:batch-11",
+        content={"sequence": 11},
+        created_at=now,
+    )
+
+    result = asyncio.run(current_session_queue.run_once())
+
+    assert result.attempted == 1
+    assert result.committed == 1
+    assert [call["batch_id"] for call in client.calls] == [
+        "Mazak:77:11:11:current"
+    ]
+    remaining = outbox.pending()
+    assert len(remaining) == 1
+    assert remaining[0].session_id == "session-old"
 
 
 def test_large_committed_batch_is_split_at_observation_boundaries(tmp_path):
