@@ -7,6 +7,9 @@ on:
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
       - "catalog/federation/tests/test_recorder_publication.py"
+      - "catalog/flask_app/services/federation_pairing_install.py"
+      - "catalog/flask_app/services/recorder_federation_publication_install.py"
+      - "catalog/flask_app/tests/test_recorder_federation_publication_install.py"
       - "catalog/mtconnect_recorder/**"
       - "catalog/standalone-recorder_v2/tests/test_lossless_recorder.py"
       - "requirements.txt"
@@ -18,6 +21,9 @@ on:
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
       - "catalog/federation/tests/test_recorder_publication.py"
+      - "catalog/flask_app/services/federation_pairing_install.py"
+      - "catalog/flask_app/services/recorder_federation_publication_install.py"
+      - "catalog/flask_app/tests/test_recorder_federation_publication_install.py"
       - "catalog/mtconnect_recorder/**"
       - "catalog/standalone-recorder_v2/tests/test_lossless_recorder.py"
       - "requirements.txt"
@@ -63,12 +69,15 @@ jobs:
           catalog/mtconnect_recorder
           catalog/federation/recorder_delivery.py
           catalog/federation/recorder_publication.py
+          catalog/flask_app/services/federation_pairing_install.py
+          catalog/flask_app/services/recorder_federation_publication_install.py
 
       - name: Recorder capture and Federation publication regressions
         run: >-
           python -m pytest -o addopts= -q
           catalog/standalone-recorder_v2/tests/test_lossless_recorder.py
           catalog/federation/tests/test_recorder_publication.py
+          catalog/flask_app/tests/test_recorder_federation_publication_install.py
 
       - name: Ruff recorder publication boundary
         run: >-
@@ -76,6 +85,9 @@ jobs:
           catalog/federation/recorder_delivery.py
           catalog/federation/recorder_publication.py
           catalog/federation/tests/test_recorder_publication.py
+          catalog/flask_app/services/federation_pairing_install.py
+          catalog/flask_app/services/recorder_federation_publication_install.py
+          catalog/flask_app/tests/test_recorder_federation_publication_install.py
           --ignore I001,RUF022,B008,C408,PLC0206
 
       - name: Diff hygiene
