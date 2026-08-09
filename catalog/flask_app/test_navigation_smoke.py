@@ -4,9 +4,11 @@ from dataclasses import replace
 from pathlib import Path
 
 from catalog.flask_app import app as app_module
+from catalog.flask_app import capability_product_routes
 from catalog.flask_app import capability_startup_transition_routes as transition_routes
 from catalog.flask_app import routes as routes_module
 from catalog.flask_app.app import create_app
+from catalog.flask_app.services.capability_config_service import from_legacy_settings
 from catalog.flask_app.services.server_setup_service import default_settings
 
 
@@ -75,6 +77,11 @@ def _patch_runtime(monkeypatch, *, requires_choice: bool = False) -> None:
     manager = FakeRuntimeManager(requires_choice=requires_choice)
     monkeypatch.setattr(app_module, "get_runtime_manager", lambda: manager)
     monkeypatch.setattr(routes_module, "get_runtime_manager", lambda: manager)
+    monkeypatch.setattr(
+        capability_product_routes,
+        "get_runtime_manager",
+        lambda: manager,
+    )
 
 
 def _patch_setup(monkeypatch, settings=None) -> None:
@@ -86,6 +93,11 @@ def _patch_setup(monkeypatch, settings=None) -> None:
     monkeypatch.setattr(app_module, "load_settings", load_configured_settings)
     monkeypatch.setattr(routes_module, "load_settings", load_configured_settings)
     monkeypatch.setattr(
+        capability_product_routes,
+        "load_settings",
+        load_configured_settings,
+    )
+    monkeypatch.setattr(
         "catalog.flask_app.server_setup_routes.load_settings",
         load_configured_settings,
     )
@@ -94,6 +106,25 @@ def _patch_setup(monkeypatch, settings=None) -> None:
         transition_routes,
         "get_capability_startup_transition_service",
         lambda: transition,
+    )
+    monkeypatch.setattr(
+        capability_product_routes,
+        "get_capability_startup_transition_service",
+        lambda: transition,
+    )
+    config = from_legacy_settings(configured_settings)
+    monkeypatch.setattr(
+        capability_product_routes,
+        "_load_product_config",
+        lambda: (config, ""),
+    )
+    # Navigation smoke uses configured recorder sources as a compact stand-in for
+    # an already ACTIVE contribution. Tests that exercise authority fencing
+    # override this seam explicitly.
+    monkeypatch.setattr(
+        capability_product_routes,
+        "_active_recorder_contribution",
+        lambda: bool(configured_settings.recorder_sources),
     )
 
 
@@ -204,7 +235,10 @@ def test_knowledge_navigation_opens_a_choice_page(monkeypatch, tmp_path) -> None
     assert 'href="/osl-export"' in knowledge_html
 
 
-def test_recorder_only_status_remains_role_scoped(monkeypatch, tmp_path) -> None:
+def test_legacy_recorder_only_setting_no_longer_scopes_product(
+    monkeypatch,
+    tmp_path,
+) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch, requires_choice=True)
     settings = replace(
@@ -216,47 +250,35 @@ def test_recorder_only_status_remains_role_scoped(monkeypatch, tmp_path) -> None
     _patch_setup(monkeypatch, settings)
 
     def fail_if_ollama_is_contacted(*_args, **_kwargs):
-        raise AssertionError("Recorder-only pages must not contact Ollama.")
+        raise AssertionError("Diagnostics must not probe Ollama implicitly.")
 
     monkeypatch.setattr(app_module, "ollama_status", fail_if_ollama_is_contacted)
-
-    def fail_if_workbench_catalog_is_loaded():
-        raise AssertionError(
-            "Recorder-only status must not build workbench diagnostics."
-        )
-
-    monkeypatch.setattr(routes_module, "_catalog", fail_if_workbench_catalog_is_loaded)
 
     app = create_app()
     app.config.update(TESTING=True)
     client = app.test_client()
 
-    status_html = client.get("/status").get_data(as_text=True)
+    status_response = client.get("/status")
+    status_html = status_response.get_data(as_text=True)
     first_workbench_response = client.get("/")
     workbench_response = client.get("/")
     guide_response = client.get("/guide")
 
-    assert "AI Explainer" not in status_html
-    assert ">Monitor</a>" not in status_html
+    assert status_response.status_code == 200
+    assert "Diagnostics" in status_html
     assert 'data-recorder-dashboard' in status_html
     assert "Records this run" in status_html
     assert "Add or rescan machines" in status_html
-    assert "MTConnect network discovery" not in status_html
     assert "data-source-state" in status_html
     assert "data-next-sequence" in status_html
-    assert 'aria-label="Section pages"' not in status_html
-    assert 'aria-label="Mobile section pages"' not in status_html
-    assert "chart.js" not in status_html
-    assert "Open source inventory" not in status_html
-    assert "Open control" not in status_html
     assert first_workbench_response.status_code == 302
     assert first_workbench_response.location == "/federation"
-    assert workbench_response.status_code == 302
-    assert workbench_response.location == "/status"
+    assert workbench_response.status_code == 200
+    assert "Overview" in workbench_response.get_data(as_text=True)
     assert guide_response.status_code == 200
 
 
-def test_full_server_can_open_recorder_status_before_runtime_choice(
+def test_configured_recorder_is_visible_before_runtime_choice(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -278,7 +300,7 @@ def test_full_server_can_open_recorder_status_before_runtime_choice(
     assert "data-recorder-dashboard" in response.get_data(as_text=True)
 
 
-def test_recorder_live_status_endpoint_is_small_fresh_and_role_scoped(
+def test_recorder_live_status_endpoint_is_small_fresh_and_authority_scoped(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -291,11 +313,16 @@ def test_recorder_live_status_endpoint_is_small_fresh_and_role_scoped(
         recorder_sources="M8015RW221N=http://192.168.200.101:5000",
     )
     _patch_setup(monkeypatch, settings)
+    monkeypatch.setattr(
+        capability_product_routes,
+        "_active_recorder_contribution",
+        lambda: True,
+    )
 
     class FakeRecorder:
         calls = 0
 
-        def web_status(self, _settings):
+        def web_status(self, _config):
             self.calls += 1
             return {
                 "schema": "msh.recorder.web_status.v1",
@@ -328,7 +355,7 @@ def test_recorder_live_status_endpoint_is_small_fresh_and_role_scoped(
 
     fake_recorder = FakeRecorder()
     monkeypatch.setattr(
-        routes_module,
+        capability_product_routes,
         "get_recorder_control_service",
         lambda: fake_recorder,
     )
@@ -373,13 +400,22 @@ def test_recorder_live_script_polls_without_unsafe_html() -> None:
     assert "innerHTML" not in script
 
 
-def test_recorder_live_status_endpoint_rejects_non_recorder_role(
+def test_recorder_live_status_endpoint_rejects_inactive_contribution(
     monkeypatch,
     tmp_path,
 ) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
-    _patch_setup(monkeypatch, default_settings(configured=True))
+    settings = replace(
+        default_settings(configured=True),
+        recorder_sources="M8015RW221N=http://192.168.200.101:5000",
+    )
+    _patch_setup(monkeypatch, settings)
+    monkeypatch.setattr(
+        capability_product_routes,
+        "_active_recorder_contribution",
+        lambda: False,
+    )
 
     app = create_app()
     app.config.update(TESTING=True)
