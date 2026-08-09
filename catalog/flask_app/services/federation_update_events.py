@@ -11,7 +11,7 @@ import hashlib
 import json
 import os
 import tempfile
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -113,7 +113,11 @@ def validate_command_payload(value: object) -> dict[str, object]:
     created = _parse_stamp(value.get("created_at"))
     expires = _parse_stamp(value.get("expires_at"))
     now = datetime.now(timezone.utc)
-    if created > now.replace(microsecond=0) or expires <= now or (expires - created).total_seconds() > 900:
+    if (
+        created > now + timedelta(minutes=1)
+        or expires <= now
+        or (expires - created).total_seconds() > 900
+    ):
         raise ValueError("expired_or_invalid_request")
     _bounded(value)
     return value
@@ -262,7 +266,14 @@ class FederationUpdateEventProcessor:
             ),
             _event_request_id(
                 "update-report",
-                federation_request_id + ":" + event_type,
+                ":".join(
+                    (
+                        federation_request_id,
+                        event_type,
+                        result.state,
+                        result.running_commit or "",
+                    )
+                ),
                 node_id,
             ),
         )
