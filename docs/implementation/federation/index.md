@@ -33,4 +33,8 @@ Acceptance procedures do not change acceptance flags. Acceptance truth comes fro
 
 Reference documents describe maintained technical behavior but cannot grant authority or override the active plan.
 
+The proposed [recorder-to-Federation delivery design](reference/recorder_federation_delivery.md)
+describes how local loss-aware capture can feed logical Federation storage
+without making network availability part of the recorder's commit boundary.
+
 Historical documents explain prior delivery decisions. They are non-authoritative even when they retain imperative language from the original implementation.

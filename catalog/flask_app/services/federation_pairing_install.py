@@ -13,6 +13,9 @@ from .federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
     RemotePairingStore,
 )
+from .recorder_federation_publication_install import (
+    install_recorder_federation_publication,
+)
 from .resilient_pairing_runtime import ResilientPairingRelayRuntime
 from .server_setup_service import load_settings
 
@@ -230,6 +233,10 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
     app.extensions["federation_pairing_service"] = service
     monitor = SavedFederationReconnectMonitor(app, service)
     app.extensions[_RECONNECT_EXTENSION_KEY] = monitor
+    install_recorder_federation_publication(
+        app,
+        onboarding_service=service,
+    )
 
     @app.before_request
     def _start_saved_membership_reconnect() -> None:
