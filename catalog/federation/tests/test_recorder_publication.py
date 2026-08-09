@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from catalog.federation.outbox import SQLiteOutbox
@@ -238,6 +239,50 @@ def test_federation_failure_leaves_local_capture_and_outbox_intact(tmp_path):
     assert stored.observation_path.exists()
     assert stored.normalized_path.exists()
     assert checkpoint_file.read_bytes() == checkpoint_before
+
+
+def test_delivery_failure_fences_newer_batches_for_same_dataset(tmp_path):
+    now = [datetime(2026, 8, 9, 3, 0, tzinfo=timezone.utc)]
+    client = RecordingClient(fail=True)
+    outbox = SQLiteOutbox(tmp_path / "ordered-outbox.sqlite3")
+    queue = DurableRecorderDeliveryQueue(
+        outbox=outbox,
+        client=client,
+        clock=lambda: now[0],
+    )
+    for sequence in (10, 11):
+        queue.enqueue(
+            session_id="session-1",
+            group_id="telemetry-storage",
+            dataset_id="mtconnect:node-1:Mazak",
+            batch_id=f"Mazak:77:{sequence}:{sequence}:hash",
+            idempotency_key=f"session-1:dataset:batch-{sequence}",
+            content={"sequence": sequence},
+            created_at=now[0],
+        )
+
+    first = asyncio.run(queue.run_once())
+    before_retry = asyncio.run(queue.run_once())
+
+    assert first.attempted == 1
+    assert first.pending == 1
+    assert before_retry.attempted == 0
+    assert [call["batch_id"] for call in client.calls] == [
+        "Mazak:77:10:10:hash"
+    ]
+
+    now[0] += timedelta(seconds=1)
+    client.fail = False
+    recovered = asyncio.run(queue.run_once())
+
+    assert recovered.attempted == 2
+    assert recovered.committed == 2
+    assert [call["batch_id"] for call in client.calls] == [
+        "Mazak:77:10:10:hash",
+        "Mazak:77:10:10:hash",
+        "Mazak:77:11:11:hash",
+    ]
+    assert outbox.pending() == ()
 
 
 def test_large_committed_batch_is_split_at_observation_boundaries(tmp_path):
