@@ -24,13 +24,7 @@ from .service_core import (
 class OverviewProjectionMixin:
     @staticmethod
     def _device_connected(snapshot: object, device: object) -> bool:
-        onboarding = snapshot.onboarding
-        if (
-            device.node_id == onboarding.device_id
-            and onboarding.connection_state == "connected"
-            and onboarding.trusted
-        ):
-            return True
+        del snapshot
         return device.state in _ONLINE_DEVICE_STATES
 
     def overview(self, *, include_technical: bool = False) -> FederationViewModel:
@@ -56,15 +50,24 @@ class OverviewProjectionMixin:
         connected_devices = sum(
             self._device_connected(snapshot, device) for device in devices
         )
-        active_services = sum(
-            provider.activation_state in _ACTIVE_PROVIDER_STATES
-            for provider in snapshot.providers.providers
-        )
-        if active_services == 0:
+        shared_capabilities = snapshot.federation.capabilities
+        if shared_capabilities:
             active_services = sum(
-                contribution.activation_state == "active"
-                for contribution in snapshot.onboarding.contributions
+                capability.status == "ready"
+                for capability in shared_capabilities
             )
+        else:
+            # Compatibility fallback for an older authority snapshot that has
+            # not published shared capability metadata yet.
+            active_services = sum(
+                provider.activation_state in _ACTIVE_PROVIDER_STATES
+                for provider in snapshot.providers.providers
+            )
+            if active_services == 0:
+                active_services = sum(
+                    contribution.activation_state == "active"
+                    for contribution in snapshot.onboarding.contributions
+                )
         benchmark_count = len(snapshot.benchmarks.results)
         current_benchmarks = sum(
             result.current for result in snapshot.benchmarks.results
