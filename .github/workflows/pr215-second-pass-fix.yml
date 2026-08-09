@@ -53,35 +53,41 @@ jobs:
               "            # including ordinary /refresh requests without an external job id.\n"
               "            reserved_execution_id = execution_id or f\"runtime-refresh-{uuid.uuid4().hex}\"\n"
               "            self._state.active_execution_id = reserved_execution_id\n"
-              "            self._persist_state()\n"
+              "            try:\n"
+              "                self._persist_state()\n"
+              "            except Exception:\n"
+              "                self._state.active_execution_id = None\n"
+              "                raise\n"
           )
           if reservation_anchor not in text:
               raise SystemExit('request-refresh reservation anchor not found')
           text = text.replace(reservation_anchor, reservation_replacement, 1)
 
-          thread_anchor = '''        threading.Thread(
-              target=self._run_requested_update,
-              kwargs={"bootstrap": False, "execution_id": execution_id},
-              daemon=True,
-          ).start()
-          return True
-          '''
-          thread_replacement = '''        worker = threading.Thread(
-              target=self._run_requested_update,
-              kwargs={"bootstrap": False, "execution_id": reserved_execution_id},
-              daemon=True,
+          thread_anchor = (
+              "        threading.Thread(\n"
+              "            target=self._run_requested_update,\n"
+              "            kwargs={\"bootstrap\": False, \"execution_id\": execution_id},\n"
+              "            daemon=True,\n"
+              "        ).start()\n"
+              "        return True\n"
           )
-          try:
-              worker.start()
-          except Exception:
-              # A worker that never started must not leave the scheduler fenced.
-              with self._lock:
-                  if self._state.active_execution_id == reserved_execution_id:
-                      self._state.active_execution_id = None
-                      self._persist_state()
-              raise
-          return True
-          '''
+          thread_replacement = (
+              "        worker = threading.Thread(\n"
+              "            target=self._run_requested_update,\n"
+              "            kwargs={\"bootstrap\": False, \"execution_id\": reserved_execution_id},\n"
+              "            daemon=True,\n"
+              "        )\n"
+              "        try:\n"
+              "            worker.start()\n"
+              "        except Exception:\n"
+              "            # A worker that never started must not leave the scheduler fenced.\n"
+              "            with self._lock:\n"
+              "                if self._state.active_execution_id == reserved_execution_id:\n"
+              "                    self._state.active_execution_id = None\n"
+              "                    self._persist_state()\n"
+              "            raise\n"
+              "        return True\n"
+          )
           if thread_anchor not in text:
               raise SystemExit('request-refresh thread anchor not found')
           text = text.replace(thread_anchor, thread_replacement, 1)
