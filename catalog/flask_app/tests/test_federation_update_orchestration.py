@@ -263,6 +263,7 @@ def test_apply_aggregation_is_updated_only_when_every_expected_node_verified(
     coordinator = _Coordinator()
     _install_context(monkeypatch, coordinator, ())
     service = FederationUpdateService(_Local(), tmp_path / "updates.json")
+    context = SimpleNamespace(coordinator=coordinator)
     now = datetime.now(timezone.utc)
     base = {
         "operation": "apply",
@@ -294,7 +295,7 @@ def test_apply_aggregation_is_updated_only_when_every_expected_node_verified(
         ],
     }
 
-    complete = service._refresh_apply(base, SimpleNamespace(), ACTOR)
+    complete = service._refresh_apply(base, context, ACTOR)
     assert complete["status"] == "updated"
 
     failed = dict(base)
@@ -313,5 +314,5 @@ def test_apply_aggregation_is_updated_only_when_every_expected_node_verified(
             ),
         ),
     ]
-    partial = service._refresh_apply(failed, SimpleNamespace(), ACTOR)
+    partial = service._refresh_apply(failed, context, ACTOR)
     assert partial["status"] == "update_completed_with_failures"
