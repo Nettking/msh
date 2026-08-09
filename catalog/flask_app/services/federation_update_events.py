@@ -337,8 +337,7 @@ class FederationUpdateEventProcessor:
     def _host_result(self, request_id: str) -> UpdateInspection | None:
         result_for = getattr(self.handoff, "result_for", None)
         if callable(result_for):
-            result = result_for(request_id)
-            return result if isinstance(result, UpdateInspection) else result
+            return result_for(request_id)
         latest = self.handoff.latest_result()
         if latest is None or latest.request_id != request_id:
             return None
