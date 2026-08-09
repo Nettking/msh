@@ -13,12 +13,14 @@ from .federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
     RemotePairingStore,
 )
+from .federation_update_events import FederationUpdateEventProcessor
+from .federation_update_handoff import HostUpdateHandoff
 from .resilient_pairing_runtime import ResilientPairingRelayRuntime
 from .server_setup_service import load_settings
 
 _RECONNECT_EXTENSION_KEY = "federation_saved_membership_reconnect"
 _RETAINED_STARTUP_CHECK_KEY = "capability_onboarding_startup_checked"
-_CONNECTED_CHECK_SECONDS = 15.0
+_CONNECTED_CHECK_SECONDS = 2.0
 _MAX_RETRY_SECONDS = 60.0
 _TERMINAL_RECONNECT_CODES = frozenset(
     {
@@ -124,6 +126,7 @@ class SavedFederationReconnectMonitor:
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._update_processor: FederationUpdateEventProcessor | None = None
         self._state: dict[str, object] = {
             "status": "not-started",
             "attempts": 0,
@@ -147,6 +150,34 @@ class SavedFederationReconnectMonitor:
                 "attempts": attempts,
                 "last_error_code": error_code,
             }
+
+    def _processor(self) -> FederationUpdateEventProcessor:
+        processor = self._update_processor
+        if processor is not None:
+            return processor
+        onboarding_database = Path(
+            self.app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"]
+        )
+        federation_root = onboarding_database.parent.parent
+        handoff_directory = Path(
+            self.app.config.get(
+                "FEDERATION_UPDATE_HANDOFF_DIR",
+                federation_root / "update-agent",
+            )
+        )
+        processor_state = Path(
+            self.app.config.get(
+                "FEDERATION_UPDATE_PROCESSOR_STATE",
+                federation_root / "update-events" / "processor.json",
+            )
+        )
+        processor = FederationUpdateEventProcessor(
+            self.service,
+            HostUpdateHandoff(handoff_directory),
+            processor_state,
+        )
+        self._update_processor = processor
+        return processor
 
     def start(self) -> None:
         with self._lock:
@@ -179,6 +210,13 @@ class SavedFederationReconnectMonitor:
                     if context is None:
                         raise RuntimeError(
                             "saved remote Federation context is unavailable"
+                        )
+                    try:
+                        self._processor().process(context)
+                    except Exception as exc:  # noqa: BLE001 - update path fails closed independently
+                        self.app.logger.warning(
+                            "Federation update event processing unavailable (%s)",
+                            type(exc).__name__,
                         )
             except Exception as exc:  # noqa: BLE001 - network retry boundary
                 failures += 1
