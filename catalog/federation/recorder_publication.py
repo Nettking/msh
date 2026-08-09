@@ -54,9 +54,7 @@ def _slug(value: str) -> str:
 
 
 def _hash(value: str, *, field: str = "sha256") -> str:
-    normalized = value.strip().lower()
-    if normalized.startswith("sha256:"):
-        normalized = normalized[7:]
+    normalized = value.strip().lower().removeprefix("sha256:")
     if len(normalized) != 64 or any(
         character not in "0123456789abcdef" for character in normalized
     ):
