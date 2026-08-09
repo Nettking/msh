@@ -46,6 +46,9 @@ from .services.playback_service import (
     validate_playback_frame,
     validate_playback_source,
 )
+# Import-only compatibility seam for transition tests/integrations that still
+# monkeypatch this historical symbol. No product route uses legacy settings.
+from .services.server_setup_service import load_settings  # noqa: F401
 from .services.strategy_config_service import StrategyConfigService
 from .services.workflow_session_index import get_workflow_session_index
 
