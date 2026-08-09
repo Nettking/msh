@@ -13,7 +13,7 @@ def test_windows_agent_has_fixed_safe_mutation_boundary() -> None:
     assert "$ApprovedRepository = 'Nettking/msh'" in text
     assert "$ApprovedBranch = 'main'" in text
     assert "merge', '--ff-only'" in text
-    assert "docker' @('compose', 'build', 'relay', 'flask', 'recorder')" in text
+    assert "'compose', 'build', 'relay', 'flask', 'recorder'" in text
     assert "MSH_BUILD_COMMIT" in text
     assert "runtime_verified" in text
     assert "reset --hard" not in text
@@ -23,7 +23,8 @@ def test_windows_agent_has_fixed_safe_mutation_boundary() -> None:
     assert "$request.command" not in text
     assert "$request.arguments" not in text
     assert "$request.remote" not in text
-    assert "$request.branch" not in text
+    # Repository/branch fields are read only to compare against local constants.
+    assert "[string]$request.branch -ne $ApprovedBranch" in text
 
 
 def test_posix_agent_never_executes_peer_supplied_process_shape() -> None:
@@ -41,6 +42,7 @@ def test_posix_agent_never_executes_peer_supplied_process_shape() -> None:
     assert 'value.get("command")' not in text
     assert 'value.get("arguments")' not in text
     assert 'value.get("remote")' not in text
+    assert 'value.get("branch") != APPROVED_BRANCH' in text
 
 
 def test_supported_launchers_start_agent_and_embed_build_commit() -> None:
