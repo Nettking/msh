@@ -5,6 +5,10 @@ from types import SimpleNamespace
 
 from flask import Flask
 
+from catalog.flask_app.services import (
+    capability_contribution_service,
+    federation_pairing_install,
+)
 from catalog.flask_app.services.federation_pairing_install import (
     SavedFederationReconnectMonitor,
 )
@@ -49,7 +53,7 @@ def test_local_creator_uses_real_relay_runtime_instead_of_local_ui_override() ->
     binding, context, service = _local_service_context()
 
     app = Flask(__name__)
-    app.config["CAPABILITY_ONBOARDING_LOCAL_RELAY_URL"] = "ws://relay:8765"
+    app.config["CAPABILITY_ONBOARDING_PAIRING_RELAY_URL"] = "ws://127.0.0.1:8765"
     monitor = SavedFederationReconnectMonitor(app, service)  # type: ignore[arg-type]
 
     resolved = monitor._connected_state_and_context()
@@ -58,8 +62,59 @@ def test_local_creator_uses_real_relay_runtime_instead_of_local_ui_override() ->
     state, returned_context = resolved
     assert returned_context is context
     assert state.binding is binding
-    assert state.relay_url == "ws://relay:8765"
+    assert state.relay_url == "ws://127.0.0.1:8765"
     assert service.relay_runtime.states == [state]
+
+
+def test_local_relay_override_takes_priority_over_pairing_relay() -> None:
+    _binding, _context, service = _local_service_context()
+    app = Flask(__name__)
+    app.config["CAPABILITY_ONBOARDING_PAIRING_RELAY_URL"] = "ws://127.0.0.1:8765"
+    app.config["CAPABILITY_ONBOARDING_LOCAL_RELAY_URL"] = "wss://relay.example.test"
+    monitor = SavedFederationReconnectMonitor(app, service)  # type: ignore[arg-type]
+
+    assert monitor._local_relay_url() == "wss://relay.example.test"
+
+
+def test_publication_waits_for_completed_startup_reconciliation(monkeypatch) -> None:
+    _binding, context, service = _local_service_context()
+    app = Flask(__name__)
+    monitor = SavedFederationReconnectMonitor(app, service)  # type: ignore[arg-type]
+    published: list[dict[str, object]] = []
+    synchronized: list[tuple[object, object]] = []
+    runtime_state = SimpleNamespace()
+
+    monkeypatch.setattr(
+        capability_contribution_service,
+        "get_capability_contribution_service",
+        lambda: object(),
+    )
+    monkeypatch.setattr(
+        federation_pairing_install,
+        "publish_local_contributions",
+        lambda **kwargs: published.append(kwargs),
+    )
+    monkeypatch.setattr(
+        monitor.ai_bridge,
+        "sync",
+        lambda state, trusted_context: synchronized.append(
+            (state, trusted_context)
+        ),
+    )
+
+    app.extensions["capability_contribution_startup_reconciled"] = "in-progress"
+    monitor._publish_contributions(runtime_state, context)
+    monitor._sync_remote_ai(runtime_state, context)
+
+    assert published == []
+    assert synchronized == []
+
+    app.extensions["capability_contribution_startup_reconciled"] = True
+    monitor._publish_contributions(runtime_state, context)
+    monitor._sync_remote_ai(runtime_state, context)
+
+    assert len(published) == 1
+    assert synchronized == [(runtime_state, context)]
 
 
 def test_contribution_refresh_interrupts_periodic_wait_immediately(monkeypatch) -> None:

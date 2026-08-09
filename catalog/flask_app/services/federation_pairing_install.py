@@ -28,6 +28,7 @@ _RETAINED_STARTUP_CHECK_KEY = "capability_onboarding_startup_checked"
 _CONTRIBUTION_RECONCILE_EXTENSION_KEY = "capability_contribution_startup_reconciled"
 _PROVIDER_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
 _LOCAL_RELAY_CONFIG_KEY = "CAPABILITY_ONBOARDING_LOCAL_RELAY_URL"
+_PAIRING_RELAY_CONFIG_KEY = "CAPABILITY_ONBOARDING_PAIRING_RELAY_URL"
 _DEFAULT_COMPOSE_LOCAL_RELAY_URL = "ws://relay:8765"
 _CONNECTED_CHECK_SECONDS = 15.0
 _MAX_RETRY_SECONDS = 60.0
@@ -208,14 +209,11 @@ class SavedFederationReconnectMonitor:
         self._wake.set()
 
     def _local_relay_url(self) -> str:
-        configured = self.app.config.get(
-            _LOCAL_RELAY_CONFIG_KEY,
-            _DEFAULT_COMPOSE_LOCAL_RELAY_URL,
-        )
-        value = str(configured).strip()
-        if not value:
-            return _DEFAULT_COMPOSE_LOCAL_RELAY_URL
-        return value
+        for key in (_LOCAL_RELAY_CONFIG_KEY, _PAIRING_RELAY_CONFIG_KEY):
+            configured = self.app.config.get(key)
+            if configured is not None and (value := str(configured).strip()):
+                return value
+        return _DEFAULT_COMPOSE_LOCAL_RELAY_URL
 
     def _connected_state_and_context(self) -> tuple[RemotePairingState, object] | None:
         remote = self.service.remote_store.load()
@@ -247,7 +245,10 @@ class SavedFederationReconnectMonitor:
         # The app's one-shot startup reconciliation must run first. Otherwise a
         # persisted active intent with stale evidence could briefly be advertised
         # as ready before the existing fail-closed suspension path fences it.
-        if not self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY):
+        if (
+            self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY)
+            is not True
+        ):
             return
         from .capability_contribution_service import (
             get_capability_contribution_service,
@@ -274,7 +275,10 @@ class SavedFederationReconnectMonitor:
         runtime_state: RemotePairingState,
         context: object,
     ) -> None:
-        if not self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY):
+        if (
+            self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY)
+            is not True
+        ):
             return
         self.ai_bridge.sync(runtime_state, context)
 
