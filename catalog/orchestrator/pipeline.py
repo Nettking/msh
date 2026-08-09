@@ -20,6 +20,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 import traceback
+import uuid
 
 from catalog.common.artifact_registry import configured_scan_dirs, scan_artifacts
 from catalog.common.basic_metrics import basic_metrics_path, build_basic_metrics_dataset
@@ -554,6 +555,10 @@ class RuntimeOrchestrator:
         state.bootstrap_full_analysis_excluded_scripts = list(
             BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS
         )
+        # In-flight scheduler state belongs to the process that owned the
+        # worker. Persisted ownership cannot survive a process restart.
+        state.update_running = False
+        state.active_execution_id = None
         return state
 
     def _startup_decision_context(self) -> dict[str, Any]:
@@ -753,13 +758,29 @@ class RuntimeOrchestrator:
                 or self._state.active_execution_id is not None
             ):
                 return False
-            self._state.active_execution_id = execution_id
-            self._persist_state()
-        threading.Thread(
+            # Reserve the scheduler before starting every requested worker,
+            # including ordinary /refresh requests without an external job id.
+            reserved_execution_id = execution_id or f"runtime-refresh-{uuid.uuid4().hex}"
+            self._state.active_execution_id = reserved_execution_id
+            try:
+                self._persist_state()
+            except Exception:
+                self._state.active_execution_id = None
+                raise
+        worker = threading.Thread(
             target=self._run_requested_update,
-            kwargs={"bootstrap": False, "execution_id": execution_id},
+            kwargs={"bootstrap": False, "execution_id": reserved_execution_id},
             daemon=True,
-        ).start()
+        )
+        try:
+            worker.start()
+        except Exception:
+            # A worker that never started must not leave the scheduler fenced.
+            with self._lock:
+                if self._state.active_execution_id == reserved_execution_id:
+                    self._state.active_execution_id = None
+                    self._persist_state()
+            raise
         return True
 
     def _run_requested_update(

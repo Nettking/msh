@@ -117,3 +117,75 @@ def test_correlated_execution_reservation_blocks_uncorrelated_update(
     assert result.session_id == "none"
     assert orchestrator._state.active_execution_id == "analysis-upload-race"
     assert orchestrator._state.update_running is False
+
+def test_load_state_clears_process_local_execution_reservation(tmp_path: Path) -> None:
+    orchestrator = pipeline.RuntimeOrchestrator.__new__(pipeline.RuntimeOrchestrator)
+    orchestrator.state_path = tmp_path / "runtime_state.json"
+    state = pipeline.RuntimeOrchestrator._default_state(orchestrator)
+    state.update_running = True
+    state.active_execution_id = "analysis-upload-crashed"
+    state.completed_execution_id = "analysis-upload-previous"
+    state.completed_execution_succeeded = True
+    orchestrator.state_path.write_text(
+        pipeline.json.dumps(state.__dict__) + "\n", encoding="utf-8"
+    )
+
+    loaded = pipeline.RuntimeOrchestrator._load_state(orchestrator)
+
+    assert loaded.update_running is False
+    assert loaded.active_execution_id is None
+    assert loaded.completed_execution_id == "analysis-upload-previous"
+    assert loaded.completed_execution_succeeded is True
+
+
+def test_uncorrelated_refresh_reserves_scheduler_before_worker_start(monkeypatch) -> None:
+    orchestrator = pipeline.RuntimeOrchestrator.__new__(pipeline.RuntimeOrchestrator)
+    orchestrator._lock = threading.Lock()
+    orchestrator._state = pipeline.RuntimeOrchestrator._default_state(orchestrator)
+    orchestrator._state.startup_mode = pipeline.STARTUP_MODE_CLEAN
+    orchestrator._persist_state = lambda: None
+    created = []
+
+    class _DeferredThread:
+        def __init__(self, *, target, kwargs, daemon):
+            created.append((target, kwargs, daemon))
+
+        def start(self):
+            return None
+
+    monkeypatch.setattr(pipeline.threading, "Thread", _DeferredThread)
+
+    accepted = pipeline.RuntimeOrchestrator.request_refresh(orchestrator)
+
+    assert accepted is True
+    assert orchestrator._state.active_execution_id.startswith("runtime-refresh-")
+    assert len(created) == 1
+    assert created[0][1]["execution_id"] == orchestrator._state.active_execution_id
+    assert created[0][2] is True
+
+
+def test_refresh_worker_start_failure_releases_scheduler_reservation(monkeypatch) -> None:
+    orchestrator = pipeline.RuntimeOrchestrator.__new__(pipeline.RuntimeOrchestrator)
+    orchestrator._lock = threading.Lock()
+    orchestrator._state = pipeline.RuntimeOrchestrator._default_state(orchestrator)
+    orchestrator._state.startup_mode = pipeline.STARTUP_MODE_CLEAN
+    orchestrator._persist_state = lambda: None
+
+    class _BrokenThread:
+        def __init__(self, *, target, kwargs, daemon):
+            pass
+
+        def start(self):
+            raise RuntimeError("thread start failed")
+
+    monkeypatch.setattr(pipeline.threading, "Thread", _BrokenThread)
+
+    try:
+        pipeline.RuntimeOrchestrator.request_refresh(orchestrator)
+    except RuntimeError as exc:
+        assert str(exc) == "thread start failed"
+    else:
+        raise AssertionError("request_refresh should propagate worker start failure")
+
+    assert orchestrator._state.active_execution_id is None
+    assert orchestrator._state.update_running is False
