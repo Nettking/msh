@@ -1,4 +1,4 @@
-"""Align legacy Federation device rows with capability-first read-only state."""
+"""Align Federation device labels with capability-first read-only state."""
 
 from __future__ import annotations
 
@@ -7,23 +7,21 @@ from dataclasses import replace
 from catalog.federation.projections import (
     FederationAuthoritySnapshot,
     OnboardingSnapshot,
-    ProviderSnapshot,
 )
 
 
 class CapabilityFirstFederationDeviceAdapter:
-    """Enrich existing member rows without creating membership or authority.
+    """Keep Federation authority as the shared device and capability source.
 
-    The Federation authority remains the source of the visible device set. This
-    adapter only aligns presentation fields that the installed product knows
-    more accurately through the authenticated capability-first composition:
+    The coordinator exposes the complete announced capability inventory, including
+    disabled and unavailable entries. The Devices surface, however, describes a
+    device's currently usable services. When shared capability metadata is
+    available, therefore, the displayed service count includes only capabilities
+    whose coordinator-authorized status is ``ready``. Disabled capabilities remain
+    visible on the Services surface and are never discarded from authority state.
 
-    * the local device is connected when its saved binding is connected/trusted;
-    * visible service counts include deduplicated contribution/provider IDs;
-    * a remote device's default self-label is rendered relative to this viewer.
-
-    Legacy capability counts are retained as a lower bound because the legacy
-    status surface exposes only a count, not IDs that can be safely deduplicated.
+    The adapter also makes a generic remote self-label relative to this viewer.
+    It never creates membership, liveness, provider, storage, or compute authority.
     """
 
     def __init__(
@@ -39,23 +37,25 @@ class CapabilityFirstFederationDeviceAdapter:
     def snapshot(self) -> FederationAuthoritySnapshot:
         federation = self._authority.snapshot()
         onboarding = self._onboarding.snapshot()
-        providers = self._providers.snapshot()
         if not isinstance(federation, FederationAuthoritySnapshot):
             return federation
         if not isinstance(onboarding, OnboardingSnapshot):
             return federation
-        if not isinstance(providers, ProviderSnapshot):
-            return federation
 
-        service_ids: dict[str, set[str]] = {}
-        for contribution in onboarding.contributions:
-            service_ids.setdefault(contribution.device_id, set()).add(
-                contribution.candidate_id
-            )
-        for provider in providers.providers:
-            service_ids.setdefault(provider.node_id, set()).add(
-                provider.capability_id
-            )
+        # ``capability_count`` on the authority record is the complete announced
+        # inventory. The product-facing Devices card should instead answer the
+        # operator question "how many services can this device contribute now?".
+        # Only translate the count when detailed shared capability metadata exists;
+        # retaining the authority count is the compatibility fallback for older
+        # snapshots that expose only the aggregate.
+        active_by_node: dict[str, int] | None = None
+        if federation.capabilities:
+            active_by_node = {}
+            for capability in federation.capabilities:
+                if capability.status == "ready":
+                    active_by_node[capability.node_id] = (
+                        active_by_node.get(capability.node_id, 0) + 1
+                    )
 
         aligned = []
         for device in federation.devices:
@@ -67,24 +67,13 @@ class CapabilityFirstFederationDeviceAdapter:
                 and label.strip().casefold() == "this msh device"
             ):
                 label = "Trusted MSH device"
-
-            state = device.state
-            if (
-                is_local
-                and onboarding.connection_state == "connected"
-                and onboarding.trusted
-            ):
-                state = "connected"
-
-            capability_count = max(
-                device.capability_count,
-                len(service_ids.get(device.node_id, ())),
-            )
+            capability_count = device.capability_count
+            if active_by_node is not None:
+                capability_count = active_by_node.get(device.node_id, 0)
             aligned.append(
                 replace(
                     device,
                     label=label,
-                    state=state,
                     capability_count=capability_count,
                 )
             )
