@@ -1,7 +1,7 @@
 """Durable Federation control-plane events for host-owned software updates.
 
-Update intents travel through the existing authoritative session event log.  They
-contain no command, path, URL, credential, or executable.  Each target device
+Update intents travel through the existing authoritative session event log. They
+contain no command, path, URL, credential, or executable. Each target device
 independently revalidates the exact commit through its local host agent.
 """
 
@@ -30,6 +30,7 @@ CHECK_REQUEST_EVENT = "software.update.check.requested"
 CHECK_REPORT_EVENT = "software.update.check.reported"
 APPLY_REQUEST_EVENT = "software.update.apply.requested"
 APPLY_REPORT_EVENT = "software.update.apply.reported"
+SESSION_CREATED_EVENT = "session.created"
 MAX_TARGETS = 256
 MAX_EVENT_BYTES = 8192
 
@@ -40,7 +41,7 @@ def _stamp(value: datetime) -> str:
 
 def _parse_stamp(value: object) -> datetime:
     if not isinstance(value, str):
-        raise ValueError("malformed_timestamp")
+        raise TypeError("malformed_timestamp")
     parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if parsed.tzinfo is None or parsed.utcoffset() is None:
         raise ValueError("malformed_timestamp")
@@ -74,7 +75,10 @@ def command_payload(
     targets = tuple(dict.fromkeys(target_node_ids))
     if not targets or len(targets) > MAX_TARGETS:
         raise ValueError("malformed_targets")
-    if any(not isinstance(item, str) or not item or len(item) > 512 for item in targets):
+    if any(
+        not isinstance(item, str) or not item or len(item) > 512
+        for item in targets
+    ):
         raise ValueError("malformed_targets")
     if expires_at <= created_at or (expires_at - created_at).total_seconds() > 900:
         raise ValueError("invalid_lifetime")
@@ -100,14 +104,20 @@ def validate_command_payload(value: object) -> dict[str, object]:
     targets = value.get("target_node_ids")
     if not isinstance(request_id, str) or not request_id or len(request_id) > 128:
         raise ValueError("malformed_request_id")
-    if value.get("repository") != APPROVED_REPOSITORY or value.get("branch") != APPROVED_BRANCH:
+    if (
+        value.get("repository") != APPROVED_REPOSITORY
+        or value.get("branch") != APPROVED_BRANCH
+    ):
         raise ValueError("unapproved_source")
     if not isinstance(target, str) or not OID_RE.fullmatch(target):
         raise ValueError("malformed_target")
     if (
         not isinstance(targets, list)
         or not 1 <= len(targets) <= MAX_TARGETS
-        or any(not isinstance(item, str) or not item or len(item) > 512 for item in targets)
+        or any(
+            not isinstance(item, str) or not item or len(item) > 512
+            for item in targets
+        )
     ):
         raise ValueError("malformed_targets")
     created = _parse_stamp(value.get("created_at"))
@@ -148,54 +158,94 @@ def report_payload(
     return value
 
 
-def inspection_from_report(value: object) -> tuple[str, str, UpdateInspection] | None:
+def inspection_from_report(
+    value: object,
+) -> tuple[str, str, UpdateInspection] | None:
     if not isinstance(value, dict) or value.get("schema") != EVENT_SCHEMA:
         return None
     request_id = value.get("request_id")
     node_id = value.get("node_id")
     state = value.get("state")
-    if not all(isinstance(item, str) and item for item in (request_id, node_id, state)):
+    if not all(
+        isinstance(item, str) and item
+        for item in (request_id, node_id, state)
+    ):
         return None
     for field in ("current_commit", "target_commit", "running_commit"):
         commit = value.get(field)
-        if commit is not None and (not isinstance(commit, str) or not OID_RE.fullmatch(commit)):
+        if commit is not None and (
+            not isinstance(commit, str) or not OID_RE.fullmatch(commit)
+        ):
             return None
     return (
         request_id,
         node_id,
         UpdateInspection(
             state=state,
-            current_commit=value.get("current_commit"),
-            target_commit=value.get("target_commit"),
+            current_commit=(
+                value.get("current_commit")
+                if isinstance(value.get("current_commit"), str)
+                else None
+            ),
+            target_commit=(
+                value.get("target_commit")
+                if isinstance(value.get("target_commit"), str)
+                else None
+            ),
             code=value.get("code") if isinstance(value.get("code"), str) else None,
-            message=value.get("message") if isinstance(value.get("message"), str) else None,
-            running_commit=value.get("running_commit"),
+            message=(
+                value.get("message")
+                if isinstance(value.get("message"), str)
+                else None
+            ),
+            running_commit=(
+                value.get("running_commit")
+                if isinstance(value.get("running_commit"), str)
+                else None
+            ),
         ),
     )
 
 
 def _event_request_id(prefix: str, request_id: str, node_id: str) -> str:
-    digest = hashlib.sha256(f"{request_id}\0{node_id}".encode()).hexdigest()[:32]
+    digest = hashlib.sha256(
+        f"{request_id}\0{node_id}".encode()
+    ).hexdigest()[:32]
     return f"{prefix}-{digest}"
 
 
 def _host_request_id(request_id: str, node_id: str) -> str:
-    digest = hashlib.sha256(f"host\0{request_id}\0{node_id}".encode()).hexdigest()[:40]
+    digest = hashlib.sha256(
+        f"host\0{request_id}\0{node_id}".encode()
+    ).hexdigest()[:40]
     return f"fed-{digest}"
+
+
+def _empty_state() -> dict[str, object]:
+    return {
+        "schema": PROCESSOR_SCHEMA,
+        "last_revision": 0,
+        "authority_node_id": None,
+        "pending": {},
+    }
 
 
 def _read_state(path: Path) -> dict[str, object]:
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        return {"schema": PROCESSOR_SCHEMA, "last_revision": 0, "pending": {}}
+        return _empty_state()
     if not isinstance(value, dict) or value.get("schema") != PROCESSOR_SCHEMA:
-        return {"schema": PROCESSOR_SCHEMA, "last_revision": 0, "pending": {}}
+        return _empty_state()
     return value
 
 
 def _write_state(path: Path, value: dict[str, object]) -> None:
-    payload = json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    payload = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+    ).encode()
     path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
     fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
     temporary = Path(name)
@@ -213,7 +263,13 @@ def _write_state(path: Path, value: dict[str, object]) -> None:
         temporary.unlink(missing_ok=True)
 
 
-def _append_remote_event(service: Any, context: Any, event_type: str, payload: dict[str, object], request_id: str) -> None:
+def _append_remote_event(
+    service: Any,
+    context: Any,
+    event_type: str,
+    payload: dict[str, object],
+    request_id: str,
+) -> None:
     remote = service.remote_store.load()
     if remote is None:
         context.coordinator.append_event(
@@ -234,7 +290,7 @@ def _append_remote_event(service: Any, context: Any, event_type: str, payload: d
 
 
 class FederationUpdateEventProcessor:
-    """Replay authoritative update intents and bridge them to the local host agent."""
+    """Replay authoritative update intents and bridge them to the host agent."""
 
     def __init__(
         self,
@@ -278,7 +334,11 @@ class FederationUpdateEventProcessor:
             ),
         )
 
-    def _finish_pending(self, context: Any, state: dict[str, object]) -> None:
+    def _finish_pending(
+        self,
+        context: Any,
+        state: dict[str, object],
+    ) -> None:
         pending = state.get("pending")
         if not isinstance(pending, dict) or not pending:
             return
@@ -308,6 +368,24 @@ class FederationUpdateEventProcessor:
             state["pending"] = pending
             _write_state(self.state_file, state)
 
+    @staticmethod
+    def _pin_authority(
+        state: dict[str, object],
+        event: Any,
+    ) -> str | None:
+        current = state.get("authority_node_id")
+        if current is not None and not isinstance(current, str):
+            raise ValueError("malformed_pinned_update_authority")
+        if event.event_type != SESSION_CREATED_EVENT:
+            return current
+        candidate = getattr(event, "actor_node_id", None)
+        if not isinstance(candidate, str) or not candidate:
+            raise ValueError("missing_session_creator_identity")
+        if isinstance(current, str) and current != candidate:
+            raise ValueError("session_creator_identity_changed")
+        state["authority_node_id"] = candidate
+        return candidate
+
     def process(self, context: Any) -> None:
         remote = self.service.remote_store.load()
         if remote is None:
@@ -315,12 +393,20 @@ class FederationUpdateEventProcessor:
         state = _read_state(self.state_file)
         self._finish_pending(context, state)
         last_revision = state.get("last_revision", 0)
-        if isinstance(last_revision, bool) or not isinstance(last_revision, int) or last_revision < 0:
+        if (
+            isinstance(last_revision, bool)
+            or not isinstance(last_revision, int)
+            or last_revision < 0
+        ):
             last_revision = 0
-        session = context.coordinator.store.get_session(context.binding.internal_session_id)
-        if session is None:
-            return
-        authority = str(session.created_by_node_id)
+        authority = state.get("authority_node_id")
+        if not isinstance(authority, str) or not authority:
+            # Existing paired nodes do not persist the creator identity. Replay
+            # from the immutable session-created event once and pin its
+            # authenticated actor before accepting any update command.
+            authority = None
+            last_revision = 0
+            state["last_revision"] = 0
         local_node = context.credentials.identity.node_id
         for _ in range(64):
             events, current_revision = context.coordinator.replay_page(
@@ -333,7 +419,13 @@ class FederationUpdateEventProcessor:
                 break
             for event in events:
                 try:
-                    if event.actor_node_id != authority or event.event_type not in {CHECK_REQUEST_EVENT, APPLY_REQUEST_EVENT}:
+                    authority = self._pin_authority(state, event)
+                    if event.event_type not in {
+                        CHECK_REQUEST_EVENT,
+                        APPLY_REQUEST_EVENT,
+                    }:
+                        continue
+                    if authority is None or event.actor_node_id != authority:
                         continue
                     payload = validate_command_payload(event.payload)
                     targets = payload["target_node_ids"]
@@ -353,9 +445,16 @@ class FederationUpdateEventProcessor:
                         pending = state.get("pending")
                         if not isinstance(pending, dict):
                             pending = {}
-                        host_request_id = _host_request_id(federation_request_id, local_node)
+                        host_request_id = _host_request_id(
+                            federation_request_id,
+                            local_node,
+                        )
                         latest = self.handoff.latest_result()
-                        if latest is not None and latest.request_id == host_request_id and latest.target_commit == target:
+                        if (
+                            latest is not None
+                            and latest.request_id == host_request_id
+                            and latest.target_commit == target
+                        ):
                             self._report(
                                 context,
                                 event_type=APPLY_REPORT_EVENT,
@@ -364,7 +463,10 @@ class FederationUpdateEventProcessor:
                             )
                             pending.pop(federation_request_id, None)
                         else:
-                            queued = self.handoff.apply(target, request_id=host_request_id)
+                            queued = self.handoff.apply(
+                                target,
+                                request_id=host_request_id,
+                            )
                             pending[federation_request_id] = {
                                 "host_request_id": host_request_id,
                                 "target_commit": target,
@@ -392,6 +494,7 @@ __all__ = [
     "CHECK_REQUEST_EVENT",
     "EVENT_SCHEMA",
     "FederationUpdateEventProcessor",
+    "SESSION_CREATED_EVENT",
     "command_payload",
     "inspection_from_report",
     "report_payload",
