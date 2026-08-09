@@ -32,59 +32,66 @@ jobs:
           pipeline_path = Path('catalog/orchestrator/pipeline.py')
           text = pipeline_path.read_text(encoding='utf-8')
 
-          old = '''        state.bootstrap_full_analysis_excluded_scripts = list(
-              BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS
+          load_anchor = "        return state\n\n    def _startup_decision_context"
+          load_replacement = (
+              "        # In-flight scheduler state belongs to the process that owned the\n"
+              "        # worker. Persisted ownership cannot survive a process restart.\n"
+              "        state.update_running = False\n"
+              "        state.active_execution_id = None\n"
+              "        return state\n\n    def _startup_decision_context"
           )
-          return state
-          '''
-          new = '''        state.bootstrap_full_analysis_excluded_scripts = list(
-              BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS
-          )
-          # In-flight scheduler state belongs to the process that owned the
-          # worker. A persisted reservation/update flag cannot survive restart.
-          state.update_running = False
-          state.active_execution_id = None
-          return state
-          '''
-          if old not in text:
+          if load_anchor not in text:
               raise SystemExit('load-state replacement anchor not found')
-          text = text.replace(old, new, 1)
+          text = text.replace(load_anchor, load_replacement, 1)
 
-          old = '''            if (
-                  self._state.update_running
-                  or self._state.active_execution_id is not None
-              ):
-                  return False
-              self._state.active_execution_id = execution_id
-              self._persist_state()
-          threading.Thread(
+          reservation_anchor = (
+              "            self._state.active_execution_id = execution_id\n"
+              "            self._persist_state()\n"
+          )
+          reservation_replacement = (
+              "            # Reserve the scheduler before starting every requested worker,\n"
+              "            # including ordinary /refresh requests without an external job id.\n"
+              "            reserved_execution_id = execution_id or f\"runtime-refresh-{uuid.uuid4().hex}\"\n"
+              "            self._state.active_execution_id = reserved_execution_id\n"
+              "            self._persist_state()\n"
+          )
+          if reservation_anchor not in text:
+              raise SystemExit('request-refresh reservation anchor not found')
+          text = text.replace(reservation_anchor, reservation_replacement, 1)
+
+          thread_anchor = '''        threading.Thread(
               target=self._run_requested_update,
               kwargs={"bootstrap": False, "execution_id": execution_id},
               daemon=True,
           ).start()
           return True
           '''
-          new = '''            if (
-                  self._state.update_running
-                  or self._state.active_execution_id is not None
-              ):
-                  return False
-              # Even uncorrelated /refresh requests must reserve the scheduler
-              # slot before their worker starts, otherwise the poller can win the
-              # request/start race. External job ids remain unchanged.
-              reserved_execution_id = execution_id or "runtime-refresh"
-              self._state.active_execution_id = reserved_execution_id
-              self._persist_state()
-          threading.Thread(
+          thread_replacement = '''        worker = threading.Thread(
               target=self._run_requested_update,
               kwargs={"bootstrap": False, "execution_id": reserved_execution_id},
               daemon=True,
-          ).start()
+          )
+          try:
+              worker.start()
+          except Exception:
+              # A worker that never started must not leave the scheduler fenced.
+              with self._lock:
+                  if self._state.active_execution_id == reserved_execution_id:
+                      self._state.active_execution_id = None
+                      self._persist_state()
+              raise
           return True
           '''
-          if old not in text:
-              raise SystemExit('request-refresh replacement anchor not found')
-          pipeline_path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          if thread_anchor not in text:
+              raise SystemExit('request-refresh thread anchor not found')
+          text = text.replace(thread_anchor, thread_replacement, 1)
+
+          import_anchor = "import traceback\n"
+          if "import uuid\n" not in text:
+              if import_anchor not in text:
+                  raise SystemExit('uuid import anchor not found')
+              text = text.replace(import_anchor, import_anchor + "import uuid\n", 1)
+          pipeline_path.write_text(text, encoding='utf-8')
 
           test_path = Path('catalog/orchestrator/tests/test_pipeline_bootstrap.py')
           tests = test_path.read_text(encoding='utf-8')
@@ -110,9 +117,7 @@ jobs:
               assert loaded.completed_execution_succeeded is True
 
 
-          def test_uncorrelated_refresh_reserves_scheduler_before_worker_start(
-              tmp_path: Path, monkeypatch
-          ) -> None:
+          def test_uncorrelated_refresh_reserves_scheduler_before_worker_start(monkeypatch) -> None:
               orchestrator = pipeline.RuntimeOrchestrator.__new__(pipeline.RuntimeOrchestrator)
               orchestrator._lock = threading.Lock()
               orchestrator._state = pipeline.RuntimeOrchestrator._default_state(orchestrator)
@@ -132,10 +137,37 @@ jobs:
               accepted = pipeline.RuntimeOrchestrator.request_refresh(orchestrator)
 
               assert accepted is True
-              assert orchestrator._state.active_execution_id == "runtime-refresh"
+              assert orchestrator._state.active_execution_id.startswith("runtime-refresh-")
               assert len(created) == 1
-              assert created[0][1]["execution_id"] == "runtime-refresh"
+              assert created[0][1]["execution_id"] == orchestrator._state.active_execution_id
               assert created[0][2] is True
+
+
+          def test_refresh_worker_start_failure_releases_scheduler_reservation(monkeypatch) -> None:
+              orchestrator = pipeline.RuntimeOrchestrator.__new__(pipeline.RuntimeOrchestrator)
+              orchestrator._lock = threading.Lock()
+              orchestrator._state = pipeline.RuntimeOrchestrator._default_state(orchestrator)
+              orchestrator._state.startup_mode = pipeline.STARTUP_MODE_CLEAN
+              orchestrator._persist_state = lambda: None
+
+              class _BrokenThread:
+                  def __init__(self, *, target, kwargs, daemon):
+                      pass
+
+                  def start(self):
+                      raise RuntimeError("thread start failed")
+
+              monkeypatch.setattr(pipeline.threading, "Thread", _BrokenThread)
+
+              try:
+                  pipeline.RuntimeOrchestrator.request_refresh(orchestrator)
+              except RuntimeError as exc:
+                  assert str(exc) == "thread start failed"
+              else:
+                  raise AssertionError("request_refresh should propagate worker start failure")
+
+              assert orchestrator._state.active_execution_id is None
+              assert orchestrator._state.update_running is False
           '''
           marker = 'def test_load_state_clears_process_local_execution_reservation'
           if marker not in tests:
