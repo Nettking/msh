@@ -1,33 +1,71 @@
-"""Manual-only orchestration for exact-commit Federation MSH updates."""
+"""Manual-only orchestration for verified Federation MSH software updates."""
 
 from __future__ import annotations
 
 import json
+import os
+import tempfile
 import threading
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from flask import current_app
 
+from catalog.federation.projections.authority_adapter import FederationAuthorityAdapter
 from catalog.federation.software_update import (
     APPROVED_BRANCH,
     APPROVED_REPOSITORY,
     OID_RE,
-    GitUpdateAdapter,
     UpdateInspection,
 )
 
 from .capability_onboarding_service import get_capability_onboarding_service
+from .federation_update_events import (
+    APPLY_REPORT_EVENT,
+    APPLY_REQUEST_EVENT,
+    CHECK_REPORT_EVENT,
+    CHECK_REQUEST_EVENT,
+    command_payload,
+    inspection_from_report,
+)
+from .federation_update_handoff import HostUpdateHandoff
 
-SCHEMA = "msh.federation-update.v1"
-MAX_HISTORY = 20
+SCHEMA = "msh.federation-update.v2"
+LEGACY_SCHEMA = "msh.federation-update.v1"
+CHECK_FRESHNESS = timedelta(minutes=10)
+CHECK_REPORT_WINDOW = timedelta(seconds=45)
+APPLY_REPORT_WINDOW = timedelta(minutes=20)
+COMMAND_TTL = timedelta(minutes=10)
+ELIGIBLE_STATES = frozenset({"update_available", "activation_required"})
+PENDING_APPLY_STATES = frozenset({"activation_queued", "updating", "requested"})
+CONNECTED_STATES = frozenset({"connected", "online", "ready", "active"})
+
+
+class LocalUpdateAdapter(Protocol):
+    def inspect(
+        self,
+        *,
+        target: str | None = None,
+        fetch: bool = True,
+    ) -> UpdateInspection: ...
+
+    def apply(
+        self,
+        target: str,
+        *,
+        request_id: str | None = None,
+    ) -> UpdateInspection: ...
+
+    def latest_result(self) -> UpdateInspection | None: ...
 
 
 @dataclass(frozen=True)
 class UpdateIntent:
+    """Retained bounded direct-handler contract for compatibility and tests."""
+
     request_id: str
     session_id: str
     sender_node_id: str
@@ -36,49 +74,41 @@ class UpdateIntent:
     target_commit: str
     created_at: str
     expires_at: str
-    schema: str = SCHEMA
+    schema: str = LEGACY_SCHEMA
 
     def validate(self) -> None:
-        if self.schema != SCHEMA or len(json.dumps(self.__dict__)) > 4096:
+        if self.schema != LEGACY_SCHEMA or len(json.dumps(self.__dict__)) > 4096:
             raise ValueError("malformed_message")
         if not OID_RE.fullmatch(self.target_commit):
             raise ValueError("malformed_target")
         if self.repository != APPROVED_REPOSITORY or self.branch != APPROVED_BRANCH:
             raise ValueError("unapproved_source")
-        if len(self.request_id) > 64 or not self.request_id:
+        if len(self.request_id) > 128 or not self.request_id:
             raise ValueError("malformed_request_id")
 
 
-class UpdatePeer(Protocol):
-    node_id: str
-    label: str
-    reachable: bool
-
-    def inspect_update(self, intent: UpdateIntent) -> UpdateInspection: ...
-    def apply_update(self, intent: UpdateIntent) -> UpdateInspection: ...
-
-
 class FederationUpdateService:
-    """Explicit checks and rollouts bound to the session creator authority.
+    """Coordinate exact-commit updates without granting Flask host execution.
 
-    Membership alone is deliberately insufficient.  Until MSH gains a user
-    login/administrator role, the existing session creator identity is the
-    smallest authoritative coordinator identity available.  Browser CSRF is
-    request-integrity protection, not operator authentication.  Peer adapters
-    must use the existing authenticated, session-bound control path.
+    The authoritative session creator may publish declarative update intents to
+    the existing Federation event log.  Each target device independently asks
+    its local host-owned agent to validate Git, fast-forward, rebuild, restart,
+    and prove the running build commit.  A checkout update alone is never
+    counted as success.
     """
 
-    def __init__(self, git: GitUpdateAdapter, state_file: Path, peers: tuple[UpdatePeer, ...] = ()) -> None:
-        self.git = git
-        self.state_file = state_file
-        self.peers = peers
-        self._lock = threading.Lock()
+    def __init__(self, local: LocalUpdateAdapter, state_file: Path | str) -> None:
+        self.local = local
+        self.state_file = Path(state_file)
+        self._lock = threading.RLock()
 
     def _context(self):
         context = get_capability_onboarding_service().authorized_context()
         if context is None:
             raise PermissionError("federation_authority_required")
-        session = context.coordinator.store.get_session(context.binding.internal_session_id)
+        session = context.coordinator.store.get_session(
+            context.binding.internal_session_id
+        )
         actor = context.credentials.identity.node_id
         if session is None or session.created_by_node_id != actor:
             raise PermissionError("update_authority_required")
@@ -94,142 +124,629 @@ class FederationUpdateService:
             raise PermissionError("unauthorized_sender")
         now = datetime.now(timezone.utc)
         try:
-            created = datetime.fromisoformat(intent.created_at)
-            expires = datetime.fromisoformat(intent.expires_at)
+            created = datetime.fromisoformat(intent.created_at.replace("Z", "+00:00"))
+            expires = datetime.fromisoformat(intent.expires_at.replace("Z", "+00:00"))
         except ValueError as exc:
             raise ValueError("malformed_timestamp") from exc
-        if created.tzinfo is None or expires.tzinfo is None or created > now + timedelta(minutes=1) or expires <= now or expires - created > timedelta(minutes=15):
+        if (
+            created.tzinfo is None
+            or expires.tzinfo is None
+            or created > now + timedelta(minutes=1)
+            or expires <= now
+            or expires - created > timedelta(minutes=15)
+        ):
             raise ValueError("expired_or_invalid_request")
 
     def receive_check(self, intent: UpdateIntent) -> UpdateInspection:
-        """Authenticated control transports call this bounded, read-only handler."""
         self._authorize_intent(intent)
-        return self.git.inspect(target=intent.target_commit, fetch=True)
+        return self._normalize_runtime(
+            self.local.inspect(target=intent.target_commit, fetch=True)
+        )
 
     def receive_apply(self, intent: UpdateIntent) -> UpdateInspection:
-        """Idempotently receive one declarative update intent (never argv)."""
         self._authorize_intent(intent)
-        if not self._lock.acquire(blocking=False):
-            return UpdateInspection("blocked", code="update_in_progress", message="Another update is active on this device.")
-        try:
-            state = self.snapshot()
-            history = state.get("received", [])
-            if not isinstance(history, list):
-                history = []
-            previous = next((item for item in history if isinstance(item, dict) and item.get("request_id") == intent.request_id), None)
-            if previous is not None:
-                if previous.get("target_commit") != intent.target_commit:
-                    return UpdateInspection("blocked", code="request_id_conflict", message="The request identifier was already used for another target.")
-                return UpdateInspection(str(previous.get("state", "unknown")), target_commit=intent.target_commit, code=previous.get("code"), message=previous.get("message"))
-            result = self.git.apply(intent.target_commit)
-            record = {"request_id": intent.request_id, "target_commit": intent.target_commit, "state": result.state, "code": result.code, "message": result.message, "recorded_at": datetime.now(timezone.utc).isoformat()}
-            state["received"] = ([record] + history)[:MAX_HISTORY]
-            self._save(state)
-            return result
-        finally:
-            self._lock.release()
+        return self.local.apply(intent.target_commit, request_id=intent.request_id)
 
-    def snapshot(self) -> dict[str, object]:
+    @staticmethod
+    def _normalize_runtime(result: UpdateInspection) -> UpdateInspection:
+        if (
+            result.state == "up_to_date"
+            and result.target_commit
+            and result.running_commit != result.target_commit
+        ):
+            return UpdateInspection(
+                "activation_required",
+                result.current_commit,
+                result.target_commit,
+                "runtime_outdated",
+                "The source is current, but the running MSH build is not verified at the target commit.",
+                result.running_commit,
+                result.request_id,
+            )
+        if (
+            result.state == "runtime_verified"
+            and (
+                not result.target_commit
+                or result.running_commit != result.target_commit
+            )
+        ):
+            return UpdateInspection(
+                "error",
+                result.current_commit,
+                result.target_commit,
+                "runtime_verification_mismatch",
+                "The host reported completion without proving the requested running commit.",
+                result.running_commit,
+                result.request_id,
+            )
+        return result
+
+    @staticmethod
+    def _device(
+        node_id: str,
+        label: str,
+        result: UpdateInspection,
+        *,
+        reachable: bool = True,
+    ) -> dict[str, object]:
+        return {
+            "node_id": node_id[:512],
+            "label": label[:128],
+            "reachable": reachable,
+            **result.to_dict(),
+        }
+
+    def _load(self) -> dict[str, object]:
         try:
-            value = json.loads(self.state_file.read_text(encoding="utf-8"))
+            raw = self.state_file.read_bytes()
+            if len(raw) > 256 * 1024:
+                raise ValueError
+            value = json.loads(raw.decode("utf-8"))
             if not isinstance(value, dict) or value.get("schema") != SCHEMA:
                 raise ValueError
             return value
-        except (OSError, ValueError, json.JSONDecodeError):
+        except (OSError, UnicodeDecodeError, ValueError, json.JSONDecodeError):
             return {"schema": SCHEMA, "status": "not_checked", "devices": []}
 
     def _save(self, value: dict[str, object]) -> None:
-        self.state_file.parent.mkdir(parents=True, exist_ok=True)
-        temporary = self.state_file.with_suffix(".tmp")
-        temporary.write_text(json.dumps(value, separators=(",", ":")), encoding="utf-8")
-        temporary.replace(self.state_file)
+        value = {**value, "schema": SCHEMA}
+        payload = json.dumps(
+            value,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        if len(payload) > 256 * 1024:
+            raise ValueError("update_state_too_large")
+        self.state_file.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+        descriptor, name = tempfile.mkstemp(
+            prefix=f".{self.state_file.name}.",
+            dir=self.state_file.parent,
+        )
+        temporary = Path(name)
+        try:
+            os.chmod(temporary, 0o600)
+            with os.fdopen(descriptor, "wb") as stream:
+                descriptor = -1
+                stream.write(payload)
+                stream.flush()
+                os.fsync(stream.fileno())
+            os.replace(temporary, self.state_file)
+        finally:
+            if descriptor >= 0:
+                os.close(descriptor)
+            temporary.unlink(missing_ok=True)
 
     @staticmethod
-    def _device(node_id: str, label: str, result: UpdateInspection, reachable: bool = True) -> dict[str, object]:
-        return {"node_id": node_id[:128], "label": label[:128], "reachable": reachable, **result.to_dict()}
+    def _parse_deadline(value: object) -> datetime | None:
+        if not isinstance(value, str):
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return None
+        return parsed.astimezone(timezone.utc)
+
+    @staticmethod
+    def _stamp(value: datetime) -> str:
+        return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+    def _authority_devices(self, context: Any, actor: str) -> tuple[Any, ...]:
+        snapshot = FederationAuthorityAdapter(
+            context.coordinator,
+            actor_node_id=actor,
+            internal_session_id=context.binding.internal_session_id,
+        ).snapshot()
+        return snapshot.devices if snapshot.available else ()
+
+    @staticmethod
+    def _is_connected(state: str) -> bool:
+        return state.casefold() in CONNECTED_STATES
+
+    def _append_request_event(
+        self,
+        context: Any,
+        actor: str,
+        *,
+        event_type: str,
+        request_id: str,
+        target: str,
+        target_node_ids: tuple[str, ...],
+        now: datetime,
+    ) -> None:
+        if not target_node_ids:
+            return
+        context.coordinator.append_event(
+            session_id=context.binding.internal_session_id,
+            actor_node_id=actor,
+            request_id=f"{event_type}-{request_id}",
+            event_type=event_type,
+            payload=command_payload(
+                request_id=request_id,
+                target_commit=target,
+                target_node_ids=target_node_ids,
+                created_at=now,
+                expires_at=now + COMMAND_TTL,
+            ),
+        )
+
+    def _reports(
+        self,
+        context: Any,
+        actor: str,
+        *,
+        event_type: str,
+        request_id: str,
+        target: str,
+    ) -> dict[str, UpdateInspection]:
+        reports: dict[str, UpdateInspection] = {}
+        last_revision = 0
+        for _ in range(128):
+            events, current_revision = context.coordinator.replay_page(
+                session_id=context.binding.internal_session_id,
+                actor_node_id=actor,
+                last_applied_revision=last_revision,
+                limit=1000,
+            )
+            for event in events:
+                last_revision = int(event.revision)
+                if event.event_type != event_type:
+                    continue
+                parsed = inspection_from_report(event.payload)
+                if parsed is None:
+                    continue
+                reported_request, node_id, result = parsed
+                if (
+                    reported_request != request_id
+                    or node_id != event.actor_node_id
+                    or result.target_commit != target
+                ):
+                    continue
+                reports[node_id] = self._normalize_runtime(result)
+            if not events or last_revision >= current_revision:
+                break
+        return reports
+
+    @staticmethod
+    def _devices_by_id(value: dict[str, object]) -> dict[str, dict[str, object]]:
+        raw = value.get("devices")
+        if not isinstance(raw, list):
+            return {}
+        return {
+            str(item.get("node_id")): dict(item)
+            for item in raw
+            if isinstance(item, dict) and isinstance(item.get("node_id"), str)
+        }
+
+    def _refresh_check(
+        self,
+        value: dict[str, object],
+        context: Any,
+        actor: str,
+    ) -> dict[str, object]:
+        request_id = value.get("request_id")
+        target = value.get("target_commit")
+        if not isinstance(request_id, str) or not isinstance(target, str):
+            return value
+        devices = self._devices_by_id(value)
+        expected = tuple(
+            item
+            for item in value.get("expected_report_node_ids", [])
+            if isinstance(item, str)
+        )
+        for node_id, result in self._reports(
+            context,
+            actor,
+            event_type=CHECK_REPORT_EVENT,
+            request_id=request_id,
+            target=target,
+        ).items():
+            if node_id not in expected or node_id not in devices:
+                continue
+            prior = devices[node_id]
+            devices[node_id] = self._device(
+                node_id,
+                str(prior.get("label") or node_id),
+                result,
+                reachable=True,
+            )
+        deadline = self._parse_deadline(value.get("report_deadline"))
+        expired = deadline is not None and datetime.now(timezone.utc) >= deadline
+        if expired:
+            for node_id in expected:
+                current = devices.get(node_id)
+                if current is not None and current.get("state") == "checking":
+                    devices[node_id] = self._device(
+                        node_id,
+                        str(current.get("label") or node_id),
+                        UpdateInspection(
+                            "unavailable",
+                            target_commit=target,
+                            code="check_timeout",
+                            message="The device did not report its bounded update check in time.",
+                        ),
+                        reachable=False,
+                    )
+        ordered = list(devices.values())
+        pending = any(item.get("state") == "checking" for item in ordered)
+        eligible = sum(item.get("state") in ELIGIBLE_STATES for item in ordered)
+        if pending:
+            status = "checking"
+        elif eligible:
+            status = "update_available"
+        elif ordered and all(item.get("state") == "up_to_date" for item in ordered):
+            status = "up_to_date"
+        else:
+            status = "checked"
+        return {
+            **value,
+            "status": status,
+            "devices": ordered,
+            "eligible_count": eligible,
+        }
+
+    def _refresh_apply(
+        self,
+        value: dict[str, object],
+        context: Any,
+        actor: str,
+    ) -> dict[str, object]:
+        request_id = value.get("request_id")
+        target = value.get("target_commit")
+        if not isinstance(request_id, str) or not isinstance(target, str):
+            return value
+        devices = self._devices_by_id(value)
+        expected = tuple(
+            item
+            for item in value.get("expected_update_node_ids", [])
+            if isinstance(item, str)
+        )
+        remote_expected = set(expected) - {actor}
+        for node_id, result in self._reports(
+            context,
+            actor,
+            event_type=APPLY_REPORT_EVENT,
+            request_id=request_id,
+            target=target,
+        ).items():
+            if node_id not in remote_expected or node_id not in devices:
+                continue
+            prior = devices[node_id]
+            devices[node_id] = self._device(
+                node_id,
+                str(prior.get("label") or node_id),
+                result,
+                reachable=result.state != "error",
+            )
+
+        local_host_request = value.get("local_host_request_id")
+        if actor in expected and isinstance(local_host_request, str):
+            latest = self.local.latest_result()
+            if (
+                latest is not None
+                and latest.request_id == local_host_request
+                and latest.target_commit == target
+            ):
+                latest = self._normalize_runtime(latest)
+                prior = devices.get(actor, {"label": "This device"})
+                devices[actor] = self._device(
+                    actor,
+                    str(prior.get("label") or "This device"),
+                    latest,
+                    reachable=latest.state != "error",
+                )
+
+        deadline = self._parse_deadline(value.get("report_deadline"))
+        expired = deadline is not None and datetime.now(timezone.utc) >= deadline
+        if expired:
+            for node_id in expected:
+                current = devices.get(node_id)
+                if current is None or current.get("state") not in PENDING_APPLY_STATES:
+                    continue
+                devices[node_id] = self._device(
+                    node_id,
+                    str(current.get("label") or node_id),
+                    UpdateInspection(
+                        "failed",
+                        target_commit=target,
+                        code="activation_timeout",
+                        message="The device did not prove the requested running commit before the rollout deadline.",
+                    ),
+                    reachable=False,
+                )
+
+        ordered = list(devices.values())
+        expected_states = [
+            devices[node_id].get("state")
+            for node_id in expected
+            if node_id in devices
+        ]
+        pending = any(state in PENDING_APPLY_STATES for state in expected_states)
+        all_verified = bool(expected_states) and all(
+            state == "runtime_verified" for state in expected_states
+        )
+        failures = any(
+            state not in PENDING_APPLY_STATES and state != "runtime_verified"
+            for state in expected_states
+        )
+        if pending:
+            status = "updating"
+        elif all_verified:
+            status = "updated"
+        elif failures:
+            status = "update_completed_with_failures"
+        else:
+            status = "no_update_required"
+        return {
+            **value,
+            "status": status,
+            "devices": ordered,
+            "eligible_count": 0,
+        }
+
+    def _refresh(
+        self,
+        value: dict[str, object],
+        context: Any,
+        actor: str,
+    ) -> dict[str, object]:
+        operation = value.get("operation")
+        if operation == "check":
+            return self._refresh_check(value, context, actor)
+        if operation == "apply":
+            return self._refresh_apply(value, context, actor)
+        return value
+
+    def snapshot(self) -> dict[str, object]:
+        with self._lock:
+            value = self._load()
+            try:
+                context, actor = self._context()
+                refreshed = self._refresh(value, context, actor)
+            except Exception:  # passive status must remain available
+                return value
+            if refreshed != value:
+                self._save(refreshed)
+            return refreshed
 
     def check(self) -> dict[str, object]:
         context, actor = self._context()
-        if not self._lock.acquire(blocking=False):
-            raise RuntimeError("update_in_progress")
-        try:
-            local = self.git.inspect(fetch=True)
-            target = local.target_commit
+        with self._lock:
             now = datetime.now(timezone.utc)
+            local = self._normalize_runtime(self.local.inspect(fetch=True))
+            target = local.target_commit
             devices = [self._device(actor, "This device", local)]
-            if target:
-                intent = UpdateIntent(str(uuid.uuid4()), context.binding.internal_session_id, actor, APPROVED_REPOSITORY, APPROVED_BRANCH, target, now.isoformat(), (now + timedelta(minutes=10)).isoformat())
-                for peer in self.peers:
-                    if not peer.reachable:
-                        devices.append(self._device(peer.node_id, peer.label, UpdateInspection("offline", code="node_offline", message="Device was not reachable during this check."), False))
+            request_id = f"check-{uuid.uuid4().hex}"
+            remote_targets: list[str] = []
+            if isinstance(target, str) and OID_RE.fullmatch(target):
+                for device in self._authority_devices(context, actor):
+                    if device.node_id == actor:
                         continue
-                    try:
-                        result = peer.inspect_update(intent)
-                    except Exception:  # transport diagnostics are never exposed
-                        result = UpdateInspection("error", code="remote_unavailable", message="The device did not complete the bounded check.")
-                    devices.append(self._device(peer.node_id, peer.label, result))
-            eligible = sum(item.get("state") == "update_available" for item in devices)
-            value = {"schema": SCHEMA, "status": "update_available" if eligible else local.state, "checked_at": now.isoformat(), "expires_at": (now + timedelta(minutes=10)).isoformat(), "repository": APPROVED_REPOSITORY, "branch": APPROVED_BRANCH, "target_commit": target, "devices": devices, "eligible_count": eligible}
+                    reachable = self._is_connected(device.state)
+                    if reachable:
+                        remote_targets.append(device.node_id)
+                        result = UpdateInspection(
+                            "checking",
+                            target_commit=target,
+                            message="Waiting for this device to complete its local bounded update check.",
+                        )
+                    else:
+                        result = UpdateInspection(
+                            "offline",
+                            target_commit=target,
+                            code="node_offline",
+                            message="Device was not reachable during this update check.",
+                        )
+                    devices.append(
+                        self._device(
+                            device.node_id,
+                            device.label,
+                            result,
+                            reachable=reachable,
+                        )
+                    )
+                self._append_request_event(
+                    context,
+                    actor,
+                    event_type=CHECK_REQUEST_EVENT,
+                    request_id=request_id,
+                    target=target,
+                    target_node_ids=tuple(remote_targets),
+                    now=now,
+                )
+            eligible = sum(item.get("state") in ELIGIBLE_STATES for item in devices)
+            value: dict[str, object] = {
+                "schema": SCHEMA,
+                "operation": "check",
+                "status": "checking" if remote_targets else (
+                    "update_available" if eligible else local.state
+                ),
+                "request_id": request_id,
+                "checked_at": self._stamp(now),
+                "check_expires_at": self._stamp(now + CHECK_FRESHNESS),
+                "report_deadline": self._stamp(now + CHECK_REPORT_WINDOW),
+                "repository": APPROVED_REPOSITORY,
+                "branch": APPROVED_BRANCH,
+                "target_commit": target,
+                "devices": devices,
+                "expected_report_node_ids": remote_targets,
+                "eligible_count": eligible,
+            }
             self._save(value)
             return value
-        finally:
-            self._lock.release()
 
     def update_all(self, *, confirmed_target: str) -> dict[str, object]:
         context, actor = self._context()
-        if not self._lock.acquire(blocking=False):
-            raise RuntimeError("update_in_progress")
-        try:
-            checked = self.snapshot()
+        with self._lock:
+            checked = self._refresh(self._load(), context, actor)
             target = checked.get("target_commit")
-            expires = checked.get("expires_at")
-            if target != confirmed_target or not isinstance(target, str) or not OID_RE.fullmatch(target):
+            expires = self._parse_deadline(checked.get("check_expires_at"))
+            if (
+                checked.get("operation") != "check"
+                or target != confirmed_target
+                or not isinstance(target, str)
+                or not OID_RE.fullmatch(target)
+            ):
                 raise ValueError("stale_or_mismatched_confirmation")
-            if not isinstance(expires, str) or datetime.fromisoformat(expires) <= datetime.now(timezone.utc):
+            if expires is None or expires <= datetime.now(timezone.utc):
                 raise ValueError("expired_check")
+
             now = datetime.now(timezone.utc)
-            intent = UpdateIntent(str(uuid.uuid4()), context.binding.internal_session_id, actor, APPROVED_REPOSITORY, APPROVED_BRANCH, target, now.isoformat(), (now + timedelta(minutes=10)).isoformat())
-            intent.validate()
-            checked_by_id = {item.get("node_id"): item for item in checked.get("devices", []) if isinstance(item, dict)}
-            results: list[dict[str, object]] = []
-            active = {**checked, "status": "updating", "request_id": intent.request_id, "devices": [
-                {**item, "state": "updating"} if item.get("state") == "update_available" else item
-                for item in checked.get("devices", []) if isinstance(item, dict)
-            ]}
-            self._save(active)
-            # Snapshot reachable peers now; no intent is retained for offline peers.
-            for peer in tuple(self.peers):
-                prior = checked_by_id.get(peer.node_id, {})
-                if not peer.reachable:
-                    results.append(self._device(peer.node_id, peer.label, UpdateInspection("offline", code="node_offline", message="Device was offline when Update source on all devices was pressed."), False))
-                elif prior.get("state") != "update_available":
-                    results.append(self._device(peer.node_id, peer.label, UpdateInspection("blocked", code="not_eligible", message="Device was not eligible in the confirmed check.")))
+            devices = self._devices_by_id(checked)
+            authority = {
+                device.node_id: device
+                for device in self._authority_devices(context, actor)
+            }
+            eligible_ids = {
+                node_id
+                for node_id, item in devices.items()
+                if item.get("state") in ELIGIBLE_STATES
+            }
+            remote_targets: list[str] = []
+            for node_id in sorted(eligible_ids - {actor}):
+                authority_device = authority.get(node_id)
+                if authority_device is not None and self._is_connected(authority_device.state):
+                    remote_targets.append(node_id)
+                    current = devices[node_id]
+                    devices[node_id] = {
+                        **current,
+                        "state": "requested",
+                        "message": "The verified runtime update was requested on this reachable device.",
+                        "code": None,
+                    }
                 else:
-                    try:
-                        results.append(self._device(peer.node_id, peer.label, peer.apply_update(intent)))
-                    except Exception:
-                        results.append(self._device(peer.node_id, peer.label, UpdateInspection("failed", code="remote_unavailable", message="The device did not complete the update.")))
-                active["devices"] = results + [item for item in active["devices"] if item.get("node_id") not in {result["node_id"] for result in results}]
-                self._save(active)
-            # The coordinating checkout is always last.
-            local_prior = checked_by_id.get(actor, {})
-            local = self.git.apply(target) if local_prior.get("state") == "update_available" else UpdateInspection("blocked", code="not_eligible", message="This device was not eligible in the confirmed check.")
-            results.append(self._device(actor, "This device", local))
-            failed = any(item["state"] in {"failed", "error"} for item in results)
-            needs_activation = any(item["state"] == "source_updated_restart_required" for item in results)
-            status = "source_update_completed_with_failures" if failed else "source_updated_restart_required" if needs_activation else "source_update_completed"
-            value = {**checked, "status": status, "request_id": intent.request_id, "updated_at": datetime.now(timezone.utc).isoformat(), "devices": results, "eligible_count": 0}
+                    current = devices[node_id]
+                    devices[node_id] = self._device(
+                        node_id,
+                        str(current.get("label") or node_id),
+                        UpdateInspection(
+                            "offline",
+                            current_commit=current.get("current_commit") if isinstance(current.get("current_commit"), str) else None,
+                            target_commit=target,
+                            code="node_offline_not_queued",
+                            message="The device became unreachable and was not queued for update.",
+                            running_commit=current.get("running_commit") if isinstance(current.get("running_commit"), str) else None,
+                        ),
+                        reachable=False,
+                    )
+
+            request_id = f"apply-{uuid.uuid4().hex}"
+            self._append_request_event(
+                context,
+                actor,
+                event_type=APPLY_REQUEST_EVENT,
+                request_id=request_id,
+                target=target,
+                target_node_ids=tuple(remote_targets),
+                now=now,
+            )
+
+            expected = list(remote_targets)
+            local_host_request_id: str | None = None
+            if actor in eligible_ids:
+                expected.append(actor)
+                local_host_request_id = f"local-{uuid.uuid4().hex}"
+                current = devices.get(actor, {"label": "This device"})
+                devices[actor] = {
+                    **current,
+                    "state": "activation_queued",
+                    "code": "host_activation_queued",
+                    "message": "The local host agent will rebuild, restart, and verify this MSH device last.",
+                }
+
+            value: dict[str, object] = {
+                **checked,
+                "schema": SCHEMA,
+                "operation": "apply",
+                "status": "updating" if expected else "no_update_required",
+                "request_id": request_id,
+                "updated_at": self._stamp(now),
+                "report_deadline": self._stamp(now + APPLY_REPORT_WINDOW),
+                "expected_update_node_ids": expected,
+                "devices": list(devices.values()),
+                "eligible_count": 0,
+                "local_host_request_id": local_host_request_id,
+            }
             self._save(value)
+
+            # Coordinator activation is deliberately queued last.  The host
+            # handoff adds a short activation grace so this HTTP request can
+            # finish before the old Flask container is replaced.
+            if local_host_request_id is not None:
+                local_result = self.local.apply(
+                    target,
+                    request_id=local_host_request_id,
+                )
+                current = devices.get(actor, {"label": "This device"})
+                devices[actor] = self._device(
+                    actor,
+                    str(current.get("label") or "This device"),
+                    self._normalize_runtime(local_result),
+                    reachable=True,
+                )
+                value["devices"] = list(devices.values())
+                self._save(value)
             return value
-        finally:
-            self._lock.release()
 
 
 def get_federation_update_service() -> FederationUpdateService:
     configured = current_app.config.get("FEDERATION_UPDATE_SERVICE")
     if isinstance(configured, FederationUpdateService):
         return configured
-    root = Path(current_app.config.get("MSH_REPOSITORY_ROOT") or Path(__file__).resolve().parents[3])
-    state = Path(current_app.config.get("FEDERATION_UPDATE_STATE") or root / "data" / "federation-update-status.json")
-    peers = tuple(current_app.config.get("FEDERATION_UPDATE_PEERS") or ())
-    return FederationUpdateService(GitUpdateAdapter(root), state, peers)
+
+    configured_adapter = current_app.config.get("FEDERATION_UPDATE_LOCAL_ADAPTER")
+    if configured_adapter is not None:
+        local = configured_adapter
+    else:
+        onboarding_database = Path(
+            current_app.config.get(
+                "CAPABILITY_ONBOARDING_STATE_DATABASE",
+                "data/federation/onboarding/onboarding.sqlite3",
+            )
+        )
+        federation_root = onboarding_database.parent.parent
+        handoff = Path(
+            current_app.config.get(
+                "FEDERATION_UPDATE_HANDOFF_DIR",
+                federation_root / "update-agent",
+            )
+        )
+        local = HostUpdateHandoff(handoff)
+
+    onboarding_database = Path(
+        current_app.config.get(
+            "CAPABILITY_ONBOARDING_STATE_DATABASE",
+            "data/federation/onboarding/onboarding.sqlite3",
+        )
+    )
+    federation_root = onboarding_database.parent.parent
+    state = Path(
+        current_app.config.get(
+            "FEDERATION_UPDATE_STATE",
+            federation_root / "update-status.json",
+        )
+    )
+    return FederationUpdateService(local, state)
