@@ -2,7 +2,7 @@
 
 The Flask process never receives shell, Git, Docker, or host filesystem authority.
 It may only write one declarative request into the existing bind-mounted MSH data
-folder and read the agent's bounded result.  The host agent independently
+folder and read the agent's bounded result. The host agent independently
 revalidates every security-sensitive field before mutating the checkout/runtime.
 """
 
@@ -28,6 +28,7 @@ REQUEST_SCHEMA = "msh.host-update-request.v1"
 RESULT_SCHEMA = "msh.host-update-result.v1"
 MAX_HANDOFF_BYTES = 8192
 ACTIVATION_GRACE_SECONDS = 2
+HOST_REQUEST_TTL_SECONDS = 120
 
 
 def _stamp(value: datetime) -> str:
@@ -52,14 +53,18 @@ class HostUpdateHandoff:
 
     @staticmethod
     def _inspection(value: dict[str, Any]) -> UpdateInspection:
+        def optional_text(field: str) -> str | None:
+            candidate = value.get(field)
+            return candidate if isinstance(candidate, str) else None
+
         return UpdateInspection(
             state=str(value.get("state") or "error"),
-            current_commit=value.get("current_commit") if isinstance(value.get("current_commit"), str) else None,
-            target_commit=value.get("target_commit") if isinstance(value.get("target_commit"), str) else None,
-            code=value.get("code") if isinstance(value.get("code"), str) else None,
-            message=value.get("message") if isinstance(value.get("message"), str) else None,
-            running_commit=value.get("running_commit") if isinstance(value.get("running_commit"), str) else None,
-            request_id=value.get("request_id") if isinstance(value.get("request_id"), str) else None,
+            current_commit=optional_text("current_commit"),
+            target_commit=optional_text("target_commit"),
+            code=optional_text("code"),
+            message=optional_text("message"),
+            running_commit=optional_text("running_commit"),
+            request_id=optional_text("request_id"),
         )
 
     @staticmethod
@@ -90,7 +95,9 @@ class HostUpdateHandoff:
         payload = self._bounded_json(value)
         self.directory.mkdir(parents=True, exist_ok=True, mode=0o700)
         descriptor, temporary_name = tempfile.mkstemp(
-            prefix=".request-", suffix=".json", dir=self.directory
+            prefix=".request-",
+            suffix=".json",
+            dir=self.directory,
         )
         temporary = Path(temporary_name)
         try:
@@ -112,12 +119,14 @@ class HostUpdateHandoff:
         action: str,
         target: str | None,
         request_id: str | None = None,
-        ttl_seconds: int = 120,
+        ttl_seconds: int = HOST_REQUEST_TTL_SECONDS,
     ) -> dict[str, object]:
         if action not in {"check", "apply"}:
             raise ValueError("unsupported_host_update_action")
         if target is not None and not OID_RE.fullmatch(target):
             raise ValueError("invalid_host_update_target")
+        if not 1 <= ttl_seconds <= HOST_REQUEST_TTL_SECONDS:
+            raise ValueError("invalid_host_update_ttl")
         now = datetime.now(timezone.utc)
         value: dict[str, object] = {
             "schema": REQUEST_SCHEMA,
@@ -167,7 +176,12 @@ class HostUpdateHandoff:
             request_id=request_id,
         )
 
-    def apply(self, target: str, *, request_id: str | None = None) -> UpdateInspection:
+    def apply(
+        self,
+        target: str,
+        *,
+        request_id: str | None = None,
+    ) -> UpdateInspection:
         if not OID_RE.fullmatch(target):
             return UpdateInspection(
                 "error",
@@ -179,7 +193,6 @@ class HostUpdateHandoff:
             action="apply",
             target=target,
             request_id=request_id,
-            ttl_seconds=600,
         )
         self._write_request(request)
         return UpdateInspection(
@@ -188,7 +201,8 @@ class HostUpdateHandoff:
             code="host_activation_queued",
             message=(
                 "The exact-commit update was queued for the local host agent. "
-                "Success is reported only after rebuild, restart, and running-commit verification."
+                "Success is reported only after rebuild, restart, and "
+                "running-commit verification."
             ),
             request_id=str(request["request_id"]),
         )
@@ -196,8 +210,9 @@ class HostUpdateHandoff:
 
 __all__ = [
     "ACTIVATION_GRACE_SECONDS",
-    "HostUpdateHandoff",
+    "HOST_REQUEST_TTL_SECONDS",
     "MAX_HANDOFF_BYTES",
     "REQUEST_SCHEMA",
     "RESULT_SCHEMA",
+    "HostUpdateHandoff",
 ]
