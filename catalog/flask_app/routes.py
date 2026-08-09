@@ -7,7 +7,6 @@ from flask import (
     Blueprint,
     current_app,
     flash,
-    jsonify,
     redirect,
     render_template,
     request,
@@ -18,6 +17,7 @@ from catalog.common.telemetry_cache import TelemetryCache, cached_cache_status
 from catalog.orchestrator.pipeline import get_runtime_manager
 from catalog.runner.session_store import list_sessions
 
+from . import capability_product_routes
 from .services.catalog_service import ArtifactCatalog, safe_load_artifact_frame
 from .services.chart_service import (
     category_columns,
@@ -29,9 +29,6 @@ from .services.chart_service import (
 )
 from .services.control_service import get_control_panel_service
 from .services.live_service import get_live_telemetry_service
-from .services.mtconnect_discovery_service import (
-    get_mtconnect_discovery_service,
-)
 from .services.operator_page_cache import get_operator_page_cache
 from .services.operator_scope_service import get_operator_scope_service
 from .services.playback_service import (
@@ -50,17 +47,31 @@ from .services.playback_service import (
     validate_playback_frame,
     validate_playback_source,
 )
-from .services.recorder_control_service import get_recorder_control_service
-from .services.server_setup_service import (
-    ServerSetupError,
-    load_settings,
-    parse_recorder_sources,
-    runtime_should_start,
-)
+# Import-only compatibility seam for transition tests/integrations that still
+# monkeypatch this historical symbol. No product route uses legacy settings.
+from .services.server_setup_service import load_settings  # noqa: F401
 from .services.strategy_config_service import StrategyConfigService
 from .services.workflow_session_index import get_workflow_session_index
 
 web = Blueprint("web", __name__)
+web.add_url_rule(
+    "/status",
+    endpoint="status",
+    view_func=capability_product_routes.status,
+    methods=["GET"],
+)
+web.add_url_rule(
+    "/status/recorder.json",
+    endpoint="recorder_status_snapshot",
+    view_func=capability_product_routes.recorder_status_snapshot,
+    methods=["GET"],
+)
+web.add_url_rule(
+    "/startup",
+    endpoint="startup",
+    view_func=capability_product_routes.startup,
+    methods=["GET"],
+)
 
 
 @web.app_context_processor
@@ -71,59 +82,6 @@ def inject_navigation_helpers() -> dict[str, object]:
         return fallback
 
     return {"endpoint_url": endpoint_url}
-
-
-@web.before_app_request
-def startup_mode_gate():
-    endpoint = request.endpoint or ""
-    if endpoint.startswith("static"):
-        return None
-    try:
-        setup_settings = load_settings()
-    except ServerSetupError:
-        setup_settings = None
-    if (
-        setup_settings is not None
-        and setup_settings.configured
-        and setup_settings.user_setup_complete
-        and setup_settings.deployment_mode == "recorder-only"
-    ):
-        recorder_endpoints = {
-            "web.startup",
-            "web.status",
-            "web.recorder_status_snapshot",
-            "web.guide",
-            "server_setup_web.scan_mtconnect_network",
-            "server_setup_web.save_discovered_mtconnect_sources",
-        }
-        if endpoint in recorder_endpoints:
-            return None
-        return redirect(url_for("web.status"))
-    if (
-        setup_settings is not None
-        and setup_settings.configured
-        and setup_settings.user_setup_complete
-        and not runtime_should_start(setup_settings)
-    ):
-        return None
-
-    allowed = {
-        "web.startup",
-        "web.choose_startup_mode",
-        "web.status",
-        "web.recorder_status_snapshot",
-        "web.rescan",
-        "web.guide",
-        "server_setup_web.scan_mtconnect_network",
-        "server_setup_web.save_discovered_mtconnect_sources",
-        "ai_web.ai_page",
-        "ai_web.ai_ask",
-    }
-    if endpoint in allowed:
-        return None
-    if get_runtime_manager().requires_startup_choice():
-        return redirect(url_for("web.startup", next=request.full_path if request.query_string else request.path))
-    return None
 
 
 def _telemetry_cache_status_model() -> dict[str, object]:
@@ -139,61 +97,6 @@ def _telemetry_cache_status_model() -> dict[str, object]:
         "cached_row_count": status.manifest_row_count,
         "manifest_source_file_count": status.manifest_source_file_count,
         "last_rebuild_time": status.manifest_generated_at,
-    }
-
-
-def _mtconnect_discovery_model() -> dict[str, object]:
-    """Build the shared MTConnect setup/status discovery view model."""
-
-    try:
-        setup_settings = load_settings()
-        configured_sources = parse_recorder_sources(
-            setup_settings.recorder_sources
-        )
-    except ServerSetupError:
-        setup_settings = None
-        configured_sources = {}
-
-    discovery_service = get_mtconnect_discovery_service()
-    saved_scan = discovery_service.last_scan()
-    mtconnect_scan = dict(saved_scan) if isinstance(saved_scan, dict) else {}
-    scan_results = mtconnect_scan.get("results", [])
-    if not isinstance(scan_results, list):
-        scan_results = []
-    configured_urls = {
-        url.casefold(): name for name, url in configured_sources.items()
-    }
-    normalized_results = []
-    for result in scan_results:
-        if not isinstance(result, dict):
-            continue
-        machines = result.get("machines", [])
-        if not isinstance(machines, list):
-            machines = []
-        normalized_results.append(
-            {
-                **result,
-                "machines": [
-                    machine
-                    for machine in machines
-                    if isinstance(machine, dict)
-                ],
-                "configured_as": configured_urls.get(
-                    str(result.get("base_url") or "").casefold(),
-                    "",
-                ),
-            }
-        )
-    mtconnect_scan["results"] = normalized_results
-
-    return {
-        "scan": mtconnect_scan,
-        "recommended_cidr": discovery_service.recommended_cidr(
-            setup_settings
-        ),
-        "default_port": mtconnect_scan.get("port") or 5000,
-        "setup_settings": setup_settings,
-        "configured_sources": configured_sources,
     }
 
 
@@ -395,121 +298,6 @@ def get_started():
 def live():
     snapshot = get_live_telemetry_service().snapshot(_catalog())
     return render_template("live.html", live=snapshot)
-
-
-@web.route("/status")
-def status():
-    try:
-        setup_settings = load_settings()
-    except ServerSetupError:
-        setup_settings = None
-    recorder_status = get_recorder_control_service().status(
-        setup_settings
-    )
-    if (
-        setup_settings is not None
-        and setup_settings.configured
-        and setup_settings.user_setup_complete
-        and setup_settings.deployment_mode == "recorder-only"
-    ):
-        return render_template(
-            "status.html",
-            recorder_status=recorder_status,
-            setup_settings=setup_settings,
-        )
-
-    snap = _catalog().cached_snapshot()
-    runtime_state = get_runtime_manager().state_snapshot()
-    operator_scope = get_operator_scope_service().get()
-    internal_artifacts = [a for a in snap.artifacts if a.get("is_internal")]
-    phase_messages = {
-        "runtime_not_started": "Webapp started. Runtime has not started yet.",
-        "discovery_pending": "Webapp started. Background discovery is running.",
-        "bootstrap_latest_day_playback_ready_analysis": "Running playback-ready health and timeline analysis for latest day in the background.",
-        "historical_catch_up": "Historical catch-up is running one day at a time.",
-        "polling_new_data": "Historical processing is complete. Polling for newly arriving days.",
-        "failed": "Background runtime encountered a failure. Check last failure details below.",
-    }
-    current_phase = runtime_state.get("current_processing_phase", "runtime_not_started")
-    return render_template(
-        "status.html",
-        snapshot=snap,
-        scan_dirs=_catalog().scan_dirs,
-        runtime_state=runtime_state,
-        internal_artifacts=internal_artifacts,
-        phase_message=phase_messages.get(current_phase, "Runtime state is available below."),
-        operator_scope=operator_scope,
-        telemetry_cache_status=_telemetry_cache_status_model(),
-        recorder_status=recorder_status,
-        setup_settings=setup_settings,
-    )
-
-
-@web.get("/status/recorder.json")
-def recorder_status_snapshot():
-    try:
-        setup_settings = load_settings()
-    except ServerSetupError:
-        setup_settings = None
-    if (
-        setup_settings is None
-        or not setup_settings.configured
-        or not setup_settings.user_setup_complete
-    ):
-        response = jsonify(
-            {
-                "schema": "msh.recorder.web_status.v1",
-                "error": "setup_required",
-                "message": "Complete device setup before reading recorder status.",
-            }
-        )
-        response.headers["Cache-Control"] = "no-store, max-age=0"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        return response, 409
-    if setup_settings.deployment_mode not in {
-        "full-server",
-        "recorder-only",
-    }:
-        response = jsonify(
-            {
-                "schema": "msh.recorder.web_status.v1",
-                "error": "recorder_not_enabled",
-                "message": "This device role does not include the recorder.",
-            }
-        )
-        response.headers["Cache-Control"] = "no-store, max-age=0"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        return response, 409
-    payload = get_recorder_control_service().web_status(setup_settings)
-    response = jsonify(payload)
-    response.headers["Cache-Control"] = "no-store, max-age=0"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    return response
-
-
-@web.route("/startup")
-def startup():
-    try:
-        setup_settings = load_settings()
-    except ServerSetupError:
-        setup_settings = None
-    if (
-        setup_settings is not None
-        and setup_settings.configured
-        and setup_settings.user_setup_complete
-        and setup_settings.deployment_mode == "recorder-only"
-        and request.args.get("edit") != "1"
-    ):
-        return redirect(url_for("web.status"))
-
-    next_path = request.args.get("next", "/")
-    startup_state = get_runtime_manager().startup_decision_snapshot()
-    return render_template(
-        "startup.html",
-        startup_state=startup_state,
-        next_path=next_path,
-        mtconnect_discovery=_mtconnect_discovery_model(),
-    )
 
 
 @web.post("/startup/choose")

@@ -1,18 +1,14 @@
-"""Capability-first replacements for retained role-reading Flask entrypoints.
+"""Capability-first Flask product entrypoints.
 
-The large legacy ``routes`` module still contains compatibility implementations
-that read ``ServerSetupSettings``. This module replaces the supported product
-entrypoints at application-composition time so live requests are driven by
-capability configuration and contribution authority instead. The old functions
-can then be deleted separately without combining semantic migration and bulk
-code removal.
+Supported product requests are driven by capability configuration and current
+contribution authority. Legacy ``ServerSetupSettings`` is read only for the
+explicit read-only ``/startup`` compatibility notice.
 """
 
 from __future__ import annotations
 
 from pathlib import Path
-from types import SimpleNamespace
-from typing import Any
+from typing import Any, Callable
 
 from flask import (
     Flask,
@@ -44,21 +40,8 @@ from .services.capability_contribution_service import (
 )
 from .services.operator_scope_service import get_operator_scope_service
 from .services.recorder_control_service import get_recorder_control_service
-from .services.server_setup_service import (
-    AI_MODEL_CHOICES,
-    AI_PROVIDER_MODES,
-    DEPLOYMENT_MODES,
-    ServerSetupError,
-    load_settings,
-)
+from .services.server_setup_service import ServerSetupError, load_settings
 
-_LEGACY_APP_MODULE = "catalog.flask_app.app"
-_LEGACY_ROUTES_MODULE = "catalog.flask_app.routes"
-_REPLACED_ENDPOINTS = (
-    "web.status",
-    "web.recorder_status_snapshot",
-    "web.startup",
-)
 _ALLOWED_RUNTIME_CHOICE_ENDPOINTS = frozenset(
     {
         "web.startup",
@@ -144,7 +127,7 @@ def _telemetry_cache_status_model() -> dict[str, object]:
 
 
 def capability_startup_mode_gate() -> Response | None:
-    """Retain the old runtime-choice guard without device-role decisions."""
+    """Retain the runtime-choice guard without device-role decisions."""
 
     endpoint = request.endpoint or ""
     if endpoint.startswith("static") or request.path.startswith(_SAFE_PREFIXES):
@@ -159,20 +142,6 @@ def capability_startup_mode_gate() -> Response | None:
         next_path = request.full_path if request.query_string else request.path
         return redirect(url_for("web.startup", next=next_path))
     return None
-
-
-def _status_template_adapter(*, recorder_visible: bool) -> object:
-    """Temporary shape adapter for status.html; never used as authority.
-
-    The template still names the old deployment-mode field. Feed it a synthetic
-    non-exclusive value so Diagnostics is always available while recorder UI is
-    visible only when recorder configuration/capability state exists. A later
-    deletion-only cleanup can remove these template variable names.
-    """
-
-    return SimpleNamespace(
-        deployment_mode="full-server" if recorder_visible else "web-workbench"
-    )
 
 
 def status() -> str:
@@ -222,9 +191,7 @@ def status() -> str:
         operator_scope=operator_scope,
         telemetry_cache_status=_telemetry_cache_status_model(),
         recorder_status=recorder_status,
-        setup_settings=_status_template_adapter(
-            recorder_visible=recorder_visible,
-        ),
+        recorder_visible=recorder_visible,
     )
 
 
@@ -285,7 +252,7 @@ def startup() -> str:
 
 
 def inject_capability_product_context() -> dict[str, object]:
-    """Use capability config for product context; read legacy only on /startup."""
+    """Expose technical recorder state and an explicit legacy startup display."""
 
     config, config_error = _load_product_config()
     legacy_settings = None
@@ -299,64 +266,48 @@ def inject_capability_product_context() -> dict[str, object]:
     return {
         "server_setup_settings": legacy_settings,
         "server_setup_error": legacy_error or config_error,
-        "server_setup_modes": DEPLOYMENT_MODES,
-        "server_setup_ai_choices": AI_MODEL_CHOICES,
-        "server_setup_ai_provider_modes": AI_PROVIDER_MODES,
-        "server_setup_ollama_status": None,
         "server_setup_recorder_status": get_recorder_control_service().status(config),
     }
 
 
-def _is_named(function: object, *, module: str, name: str) -> bool:
-    return (
-        getattr(function, "__module__", "") == module
-        and getattr(function, "__name__", "") == name
-    )
+def _bind_product_route(
+    app: Flask,
+    *,
+    rule: str,
+    endpoint: str,
+    view_func: Callable[..., object],
+) -> None:
+    """Own a stable endpoint whether or not an older blueprint defined it."""
+
+    if endpoint in app.view_functions:
+        app.view_functions[endpoint] = view_func
+        return
+    app.add_url_rule(rule, endpoint=endpoint, view_func=view_func, methods=["GET"])
 
 
 def install_capability_product_routes(app: Flask) -> None:
-    """Replace live role-reading handlers after the legacy blueprint is composed."""
+    """Install capability-first product gates, context, and stable endpoints."""
 
-    before = list(app.before_request_funcs.get(None, ()))
-    app.before_request_funcs[None] = [
-        function
-        for function in before
-        if not _is_named(
-            function,
-            module=_LEGACY_ROUTES_MODULE,
-            name="startup_mode_gate",
-        )
-    ]
     app.before_request(capability_startup_mode_gate)
-
-    processors = list(app.template_context_processors.get(None, ()))
-    app.template_context_processors[None] = [
-        function
-        for function in processors
-        if not _is_named(
-            function,
-            module=_LEGACY_APP_MODULE,
-            name="inject_server_setup",
-        )
-    ]
     app.context_processor(inject_capability_product_context)
-
-    replacements = {
-        "web.status": status,
-        "web.recorder_status_snapshot": recorder_status_snapshot,
-        "web.startup": startup,
-    }
-    missing = [
-        endpoint
-        for endpoint in _REPLACED_ENDPOINTS
-        if endpoint not in app.view_functions
-    ]
-    if missing:
-        raise RuntimeError(
-            "Capability product routes require registered legacy endpoints: "
-            + ", ".join(missing)
-        )
-    app.view_functions.update(replacements)
+    _bind_product_route(
+        app,
+        rule="/status",
+        endpoint="web.status",
+        view_func=status,
+    )
+    _bind_product_route(
+        app,
+        rule="/status/recorder.json",
+        endpoint="web.recorder_status_snapshot",
+        view_func=recorder_status_snapshot,
+    )
+    _bind_product_route(
+        app,
+        rule="/startup",
+        endpoint="web.startup",
+        view_func=startup,
+    )
 
 
 __all__ = [

@@ -42,15 +42,11 @@ from .services.capability_startup_transition_service import (
 from .services.catalog_service import ArtifactCatalog
 from .services.federation_pairing_install import install_federation_pairing
 from .services.onboarding_view_normalizer import normalize_onboarding_view_model
-from .services.recorder_control_service import get_recorder_control_service
 from .services.run_once_capability_evidence import install_run_once_capability_evidence
 from .services.server_setup_service import (
-    AI_MODEL_CHOICES,
-    AI_PROVIDER_MODES,
-    DEPLOYMENT_MODES,
     ServerSetupError,
     load_settings,
-    ollama_status,
+    ollama_status,  # noqa: F401 - retained only as an old monkeypatch seam
 )
 from .services.startup_contribution_reconcile import (
     run_startup_contribution_reconcile,
@@ -228,36 +224,6 @@ def create_app() -> Flask:
     def inject_catalog_freshness() -> dict[str, object]:
         return {"artifact_catalog_freshness": catalog.freshness()}
 
-    @app.context_processor
-    def inject_server_setup() -> dict[str, object]:
-        try:
-            settings = load_settings()
-            setup_error = ""
-        except ServerSetupError as exc:
-            settings = None
-            setup_error = str(exc)
-
-        ai_status = None
-        if (
-            settings is not None
-            and settings.configured
-            and settings.user_setup_complete
-            and settings.deployment_mode != "recorder-only"
-            and request.path == "/startup"
-        ):
-            ai_status = ollama_status(settings)
-
-        recorder_status = get_recorder_control_service().status(settings)
-        return {
-            "server_setup_settings": settings,
-            "server_setup_error": setup_error,
-            "server_setup_modes": DEPLOYMENT_MODES,
-            "server_setup_ai_choices": AI_MODEL_CHOICES,
-            "server_setup_ai_provider_modes": AI_PROVIDER_MODES,
-            "server_setup_ollama_status": ai_status,
-            "server_setup_recorder_status": recorder_status,
-        }
-
     register_artifact_catalog_refresh(
         lambda reason: catalog.start_background_rescan_if_idle(reason=reason)
     )
@@ -325,8 +291,8 @@ def create_app() -> Flask:
         return
 
     # CFI-6 owns capability-first startup and migration before CFI-5 and the
-    # retained compatibility endpoints. Capability product composition below
-    # replaces live role-reading handlers without deleting migration code yet.
+    # retained compatibility endpoints. Capability product composition installs
+    # the supported status/startup product endpoints independently of old roles.
     app.register_blueprint(docs_web)
     app.register_blueprint(federation_web)
     app.register_blueprint(federation_pairing_web)
