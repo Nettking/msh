@@ -16,6 +16,9 @@ def test_windows_agent_has_fixed_safe_mutation_boundary() -> None:
     assert "'compose', 'build', 'relay', 'flask', 'recorder'" in text
     assert "MSH_BUILD_COMMIT" in text
     assert "runtime_verified" in text
+    assert "Ensure-OllamaModel" in text
+    assert "Start-ReplacementAgent" in text
+    assert "Get-AgentHash" in text
     assert "reset --hard" not in text
     assert "git clean" not in text
     assert "git stash" not in text
@@ -35,6 +38,9 @@ def test_posix_agent_never_executes_peer_supplied_process_shape() -> None:
     assert 'git(root, "merge", "--ff-only", target)' in text
     assert 'env["MSH_BUILD_COMMIT"] = target' in text
     assert 'state="runtime_verified"' in text
+    assert "ensure_ollama_model(root, env)" in text
+    assert "os.execv(" in text
+    assert "initial_digest = _digest(script_path)" in text
     assert "shell=False" in text
     assert "reset --hard" not in text
     assert "git clean" not in text
