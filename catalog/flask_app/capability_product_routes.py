@@ -76,11 +76,15 @@ _ALLOWED_RUNTIME_CHOICE_ENDPOINTS = frozenset(
 _SAFE_PREFIXES = ("/onboarding", "/federation", "/docs", "/static")
 
 
-def _capability_flags() -> dict[str, object]:
-    """Read the same capability-state seam used by the authoritative CFI-6 gate."""
+def get_capability_startup_transition_service():
+    """Delegate to CFI-6 dynamically so all overrides share one authority seam."""
 
+    return transition_routes.get_capability_startup_transition_service()
+
+
+def _capability_flags() -> dict[str, object]:
     try:
-        return transition_routes.get_capability_startup_transition_service().capability_flags()
+        return get_capability_startup_transition_service().capability_flags()
     except Exception:  # noqa: BLE001 - product gates fail closed
         return {
             "completed": False,
@@ -357,6 +361,7 @@ def install_capability_product_routes(app: Flask) -> None:
 
 __all__ = [
     "capability_startup_mode_gate",
+    "get_capability_startup_transition_service",
     "inject_capability_product_context",
     "install_capability_product_routes",
     "recorder_status_snapshot",
