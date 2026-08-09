@@ -17,6 +17,7 @@ from catalog.common.telemetry_cache import TelemetryCache, cached_cache_status
 from catalog.orchestrator.pipeline import get_runtime_manager
 from catalog.runner.session_store import list_sessions
 
+from . import capability_product_routes
 from .services.catalog_service import ArtifactCatalog, safe_load_artifact_frame
 from .services.chart_service import (
     category_columns,
@@ -53,6 +54,24 @@ from .services.strategy_config_service import StrategyConfigService
 from .services.workflow_session_index import get_workflow_session_index
 
 web = Blueprint("web", __name__)
+web.add_url_rule(
+    "/status",
+    endpoint="status",
+    view_func=capability_product_routes.status,
+    methods=["GET"],
+)
+web.add_url_rule(
+    "/status/recorder.json",
+    endpoint="recorder_status_snapshot",
+    view_func=capability_product_routes.recorder_status_snapshot,
+    methods=["GET"],
+)
+web.add_url_rule(
+    "/startup",
+    endpoint="startup",
+    view_func=capability_product_routes.startup,
+    methods=["GET"],
+)
 
 
 @web.app_context_processor
