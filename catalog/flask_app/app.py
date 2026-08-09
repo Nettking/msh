@@ -43,7 +43,11 @@ from .services.catalog_service import ArtifactCatalog
 from .services.federation_pairing_install import install_federation_pairing
 from .services.onboarding_view_normalizer import normalize_onboarding_view_model
 from .services.run_once_capability_evidence import install_run_once_capability_evidence
-from .services.server_setup_service import ServerSetupError, load_settings
+from .services.server_setup_service import (
+    ServerSetupError,
+    load_settings,
+    ollama_status,  # noqa: F401 - retained only as an old monkeypatch seam
+)
 from .services.startup_contribution_reconcile import (
     run_startup_contribution_reconcile,
 )
