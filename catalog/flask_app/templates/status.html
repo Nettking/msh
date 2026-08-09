@@ -1,9 +1,7 @@
 {% extends 'base.html' %}
 {% block body %}
 {% set recorder = recorder_status %}
-{% set setup_mode = setup_settings.deployment_mode if setup_settings else '' %}
-{% set recorder_role = setup_mode in ['full-server', 'recorder-only'] %}
-{% set recorder_only = setup_mode == 'recorder-only' %}
+{% set show_recorder = recorder_visible|default(false) %}
 {% set phase = runtime_state.current_processing_phase if runtime_state is defined else 'runtime_not_started' %}
 {% set phase_label = phase.replace('_', ' ')|title %}
 {% set indexed_count = snapshot.artifacts|length if snapshot is defined else 0 %}
@@ -17,14 +15,12 @@
 {% set no_data_ready = indexed_count == 0 and (raw_file_count > 0 or cache_missing) %}
 {% set ready_for_views = indexed_count > 0 and cache_fresh and not has_failure %}
 
-{% if not recorder_only %}
 <section class="page-intro">
   <h2>Diagnostics</h2>
-  <p>{% if recorder_role %}Check the recorder and understand what the runtime or cache is doing.{% else %}Understand what the runtime or cache is doing.{% endif %}</p>
+  <p>{% if show_recorder %}Check the recorder and understand what the runtime or cache is doing.{% else %}Understand what the runtime or cache is doing.{% endif %}</p>
 </section>
-{% endif %}
 
-{% if recorder_role %}
+{% if show_recorder %}
 <section
   class="recorder-dashboard"
   id="recorder-status"
@@ -144,7 +140,6 @@
 </section>
 {% endif %}
 
-{% if not recorder_only %}
 <section class="section-block overview-decision {% if has_failure %}overview-decision--error{% elif ready_for_views %}overview-decision--ready{% elif update_running or scan_running %}overview-decision--waiting{% else %}overview-decision--partial{% endif %}">
   <div class="overview-decision__main">
     <span class="metric-label">Current diagnosis</span>
@@ -344,8 +339,7 @@
     {% endif %}
   </section>
 </details>
-{% endif %}
-{% if recorder_role %}
+{% if show_recorder %}
 <script defer src="{{ url_for('static', filename='js/recorder-status.js') }}"></script>
 {% endif %}
 {% endblock %}
