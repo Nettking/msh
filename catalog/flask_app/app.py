@@ -18,6 +18,7 @@ from .capability_benchmark_routes import capability_benchmark_web
 from .capability_contribution_routes import capability_contribution_web
 from .capability_inspection_routes import capability_inspection_web
 from .capability_onboarding_routes import capability_onboarding_web
+from .capability_product_routes import install_capability_product_routes
 from .capability_startup_transition_routes import (
     capability_startup_transition_web,
 )
@@ -324,8 +325,8 @@ def create_app() -> Flask:
         return
 
     # CFI-6 owns capability-first startup and migration before CFI-5 and the
-    # retained role-first compatibility gates. It persists intent only and
-    # delegates every operational authority to the already registered services.
+    # retained compatibility endpoints. Capability product composition below
+    # replaces live role-reading handlers without deleting migration code yet.
     app.register_blueprint(docs_web)
     app.register_blueprint(federation_web)
     app.register_blueprint(federation_pairing_web)
@@ -342,6 +343,7 @@ def create_app() -> Flask:
     app.register_blueprint(operator_support_web)
     app.register_blueprint(ai_web)
     app.register_blueprint(provider_federation_web)
+    install_capability_product_routes(app)
     return app
 
 
