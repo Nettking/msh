@@ -55,6 +55,10 @@ if [ "${#MSH_BUILD_COMMIT}" -ne 40 ]; then
   echo "MSH build commit is not a full Git object ID." >&2
   exit 1
 fi
+if [ -n "$(git status --porcelain=v1 --untracked-files=all)" ]; then
+  echo "MSH refuses to label a build from a checkout with local changes." >&2
+  exit 1
+fi
 MSH_BUILD_COMMIT=$(printf '%s' "$MSH_BUILD_COMMIT" | tr 'A-F' 'a-f')
 export MSH_BUILD_COMMIT
 
