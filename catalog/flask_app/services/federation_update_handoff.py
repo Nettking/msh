@@ -27,6 +27,7 @@ from catalog.federation.software_update import (
 REQUEST_SCHEMA = "msh.host-update-request.v1"
 RESULT_SCHEMA = "msh.host-update-result.v1"
 MAX_HANDOFF_BYTES = 8192
+ACTIVATION_GRACE_SECONDS = 2
 
 
 def _stamp(value: datetime) -> str:
@@ -118,7 +119,7 @@ class HostUpdateHandoff:
         if target is not None and not OID_RE.fullmatch(target):
             raise ValueError("invalid_host_update_target")
         now = datetime.now(timezone.utc)
-        return {
+        value: dict[str, object] = {
             "schema": REQUEST_SCHEMA,
             "request_id": request_id or f"host-update-{uuid.uuid4().hex}",
             "action": action,
@@ -128,6 +129,11 @@ class HostUpdateHandoff:
             "created_at": _stamp(now),
             "expires_at": _stamp(now + timedelta(seconds=ttl_seconds)),
         }
+        if action == "apply":
+            value["activate_after"] = _stamp(
+                now + timedelta(seconds=ACTIVATION_GRACE_SECONDS)
+            )
+        return value
 
     def latest_result(self) -> UpdateInspection | None:
         value = self._read(self.result_file)
@@ -189,6 +195,7 @@ class HostUpdateHandoff:
 
 
 __all__ = [
+    "ACTIVATION_GRACE_SECONDS",
     "HostUpdateHandoff",
     "MAX_HANDOFF_BYTES",
     "REQUEST_SCHEMA",
