@@ -67,9 +67,9 @@
   <section class="federation-panel federation-update-panel">
     <header class="federation-panel__header">
       <div>
-        <span class="federation-eyebrow">MSH source checkout updates</span>
+        <span class="federation-eyebrow">MSH software updates</span>
         <h3>{{ (updates.status|default('not_checked')).replace('_', ' ')|title }}</h3>
-        <p>Manual only. This operation changes supported Git source checkouts; it does not rebuild, reinstall, restart, or prove the running MSH installation.</p>
+        <p>Manual only. Each target independently verifies approved <code>main</code>, fast-forwards only when safe, rebuilds MSH, restores saved Federation state, restarts services, and reports success only after the running build proves the exact target commit.</p>
       </div>
       {% if update_csrf %}
       <form method="post" action="{{ url_for('federation_web.check_updates') }}">
@@ -80,13 +80,20 @@
     </header>
     <dl class="federation-detail-list">
       <div><dt>Last checked</dt><dd>{{ updates.checked_at|default('Not checked yet') }}</dd></div>
-      <div><dt>Source branch</dt><dd>{{ updates.branch|default('main') }}</dd></div>
+      <div><dt>Approved branch</dt><dd>{{ updates.branch|default('main') }}</dd></div>
       {% if update_target %}<div><dt>Exact target</dt><dd><code>{{ update_target[:12] }}</code></dd></div>{% endif %}
     </dl>
     {% if update_devices %}
     <ul class="federation-entity-list">
       {% for device in update_devices %}
-      <li><div><strong>{{ device.label }}</strong><span>{{ device.message or (device.current_commit[:12] if device.current_commit else '') }}</span></div>{{ status_badge(device.state, device.state.replace('_', ' ')|title) }}</li>
+      <li>
+        <div>
+          <strong>{{ device.label }}</strong>
+          <span>{{ device.message or (device.current_commit[:12] if device.current_commit else '') }}</span>
+          {% if device.running_commit|default(none) %}<span>Running: <code>{{ device.running_commit[:12] }}</code></span>{% endif %}
+        </div>
+        {{ status_badge(device.state, device.state.replace('_', ' ')|title) }}
+      </li>
       {% endfor %}
     </ul>
     {% endif %}
@@ -94,11 +101,11 @@
     <form method="post" action="{{ url_for('federation_web.apply_updates') }}" class="federation-update-confirmation">
       <input type="hidden" name="_csrf_token" value="{{ update_csrf }}">
       <input type="hidden" name="target_commit" value="{{ update_target }}">
-      <label><input type="checkbox" name="confirm_update" value="update-all" required> Fast-forward the source checkout on {{ update_eligible }} currently eligible device{{ '' if update_eligible == 1 else 's' }} to exact commit <code>{{ update_target[:12] }}</code>. Running installations will remain unchanged until rebuilt/reinstalled and restarted locally. Offline devices will not be queued.</label>
-      <button class="federation-button federation-button--primary" type="submit">Update source on all devices</button>
+      <label><input type="checkbox" name="confirm_update" value="update-all" required> Update {{ update_eligible }} currently eligible device{{ '' if update_eligible == 1 else 's' }} to exact commit <code>{{ update_target[:12] }}</code>. Offline devices are not queued. Remote devices are requested first; this coordinator activates last.</label>
+      <button class="federation-button federation-button--primary" type="submit">Update all devices</button>
     </form>
     {% endif %}
-    <p class="federation-muted">CSRF protects this browser request; it is not user authentication. Remote requests still require authenticated Federation coordinator authority and independent local Git verification.</p>
+    <p class="federation-muted">CSRF protects this browser request; it is not user authentication. Federation authority selects the exact target. Every host independently revalidates repository, branch, clean checkout, commit ancestry, rebuild, restart, and running-build identity.</p>
   </section>
 
   <div class="federation-dashboard-grid">
