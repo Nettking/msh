@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import json
 import threading
-from dataclasses import replace
 from pathlib import Path
 
 import pytest
 
+from catalog.flask_app.services.capability_config_service import CapabilityConfig
 from catalog.flask_app.services.mtconnect_discovery_service import (
     MAX_CONNECT_TIMEOUT_SECONDS,
     MAX_READ_TIMEOUT_SECONDS,
@@ -14,10 +14,7 @@ from catalog.flask_app.services.mtconnect_discovery_service import (
     MtconnectDiscoveryService,
     validate_scan_cidr,
 )
-from catalog.flask_app.services.server_setup_service import (
-    ServerSetupSettings,
-    parse_recorder_sources,
-)
+from catalog.flask_app.services.server_setup_service import parse_recorder_sources
 
 
 def _probe_xml(
@@ -52,16 +49,8 @@ def _probe_xml(
 """
 
 
-def _settings(
-    *,
-    mode: str = "full-server",
-    sources: str = "",
-) -> ServerSetupSettings:
-    return ServerSetupSettings(
-        configured=True,
-        user_setup_complete=True,
-        deployment_mode=mode,
-        ai_enabled=False,
+def _config(*, sources: str = "") -> CapabilityConfig:
+    return CapabilityConfig(
         ai_provider_mode="local",
         ai_provider_name="This computer",
         ai_profile="laptop-standard",
@@ -213,7 +202,7 @@ def test_one_agent_with_multiple_devices_is_one_recorder_source(tmp_path) -> Non
     } == {"MACHINE-A", "MACHINE-B"}
 
     merged = service.merge_selected_results(
-        _settings(),
+        _config(),
         [scan["results"][0]["source_id"]],
         scan=scan,
     )
@@ -228,13 +217,13 @@ def test_recommended_cidr_prefers_scan_then_settings_then_checkpoint(
         json.dumps({"cidr": "192.168.70.0/25", "results": []}),
         encoding="utf-8",
     )
-    settings = _settings(
+    config = _config(
         sources="Configured=http://10.22.33.44:5000/current"
     )
-    assert service.recommended_cidr(settings) == "192.168.70.0/25"
+    assert service.recommended_cidr(config) == "192.168.70.0/25"
 
     (tmp_path / "scan.json").unlink()
-    assert service.recommended_cidr(settings) == "10.22.33.0/24"
+    assert service.recommended_cidr(config) == "10.22.33.0/24"
 
     (tmp_path / "checkpoint.json").write_text(
         json.dumps(
@@ -246,10 +235,10 @@ def test_recommended_cidr_prefers_scan_then_settings_then_checkpoint(
         ),
         encoding="utf-8",
     )
-    assert service.recommended_cidr(_settings()) == "172.20.7.0/24"
+    assert service.recommended_cidr(_config()) == "172.20.7.0/24"
 
 
-def test_merge_selected_results_preserves_existing_sources_and_requires_role(
+def test_merge_selected_results_preserves_existing_sources_without_role_authority(
     tmp_path,
 ) -> None:
     service = _service(tmp_path, lambda *_args: "")
@@ -259,12 +248,12 @@ def test_merge_selected_results_preserves_existing_sources_and_requires_role(
         "base_url": "http://192.168.200.252:5000",
     }
     scan = {"results": [result]}
-    settings = _settings(
+    config = _config(
         sources="Existing=http://192.168.200.251:5000/current"
     )
 
     merged = service.merge_selected_results(
-        settings,
+        config,
         ["mtconnect-source-new"],
         scan=scan,
     )
@@ -274,14 +263,8 @@ def test_merge_selected_results_preserves_existing_sources_and_requires_role(
         "Mazak-MAZAK-002": "http://192.168.200.252:5000",
     }
     assert merged.updated_at != "before"
-    assert merged.ai_model == settings.ai_model
-
-    with pytest.raises(MtconnectDiscoveryError, match="Full server"):
-        service.merge_selected_results(
-            replace(settings, deployment_mode="web-workbench"),
-            [result],
-            scan=scan,
-        )
+    assert merged.ai_model == config.ai_model
+    assert not hasattr(merged, "deployment_mode")
 
 
 def test_merge_replaces_generic_alias_for_same_agent_with_uuid(tmp_path) -> None:
@@ -293,9 +276,7 @@ def test_merge_replaces_generic_alias_for_same_agent_with_uuid(tmp_path) -> None
     }
 
     merged = service.merge_selected_results(
-        _settings(
-            sources="Mazak=http://192.168.200.249:5000/current"
-        ),
+        _config(sources="Mazak=http://192.168.200.249:5000/current"),
         [result],
         scan={"results": [result]},
     )

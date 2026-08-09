@@ -5,13 +5,9 @@ import os
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Protocol
 
-from .server_setup_service import (
-    ServerSetupError,
-    ServerSetupSettings,
-    parse_recorder_sources,
-)
+from .server_setup_service import ServerSetupError, parse_recorder_sources
 
 CONTROL_PATH = Path("data") / "source_state" / "mtconnect_recorder_control.json"
 STATUS_PATH = Path("data") / "source_state" / "mtconnect_recorder_status.json"
@@ -19,12 +15,23 @@ LOG_PATH = Path("data") / "source_state" / "mtconnect_recorder.log"
 HEARTBEAT_TIMEOUT_SECONDS = 10
 
 
+class RecorderConfiguration(Protocol):
+    """Minimal recorder configuration shape; it carries no runtime authority."""
+
+    recorder_sources: str
+
+
 class RecorderControlError(RuntimeError):
     """Raised when recording cannot be enabled safely."""
 
 
 def _utc_now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
+    return (
+        datetime.now(timezone.utc)
+        .replace(microsecond=0)
+        .isoformat()
+        .replace("+00:00", "Z")
+    )
 
 
 def _read_json(path: Path) -> dict[str, Any]:
@@ -91,6 +98,19 @@ def _text(value: object) -> str:
     return str(value or "").strip()
 
 
+def _configured_sources(
+    config: RecorderConfiguration | object | None,
+) -> dict[str, str]:
+    if config is None:
+        return {}
+    try:
+        return parse_recorder_sources(
+            str(getattr(config, "recorder_sources", "") or "")
+        )
+    except (ServerSetupError, TypeError, ValueError):
+        return {}
+
+
 class RecorderControlService:
     """Control the independent recorder service through durable shared files.
 
@@ -99,6 +119,10 @@ class RecorderControlService:
     records while enabled, and publishes a heartbeat and diagnostics to
     ``STATUS_PATH``. This survives Flask restarts and avoids duplicate child
     processes when multiple web workers are used.
+
+    This service validates recorder *configuration* only. Whether a caller has
+    authority to start recording is decided by capability/contribution state
+    before calling ``set_enabled``; legacy device roles are not authority here.
     """
 
     def __init__(
@@ -113,27 +137,17 @@ class RecorderControlService:
         self.log_path = Path(log_path)
 
     @staticmethod
-    def ready(settings: ServerSetupSettings | None) -> bool:
-        return bool(
-            settings
-            and settings.configured
-            and settings.user_setup_complete
-            and settings.deployment_mode in {"full-server", "recorder-only"}
-            and settings.recorder_sources.strip()
-        )
+    def ready(config: RecorderConfiguration | object | None) -> bool:
+        return bool(_configured_sources(config))
 
     def set_enabled(
         self,
         enabled: bool,
-        settings: ServerSetupSettings,
+        config: RecorderConfiguration | object,
     ) -> tuple[bool, str]:
-        if enabled and not self.ready(settings):
-            if settings.deployment_mode not in {"full-server", "recorder-only"}:
-                raise RecorderControlError(
-                    "Choose the Full server or Recorder station role before starting recording."
-                )
+        if enabled and not self.ready(config):
             raise RecorderControlError(
-                "Add at least one MTConnect source in device setup before starting recording."
+                "Add at least one MTConnect source before starting recording."
             )
 
         payload = {
@@ -144,12 +158,18 @@ class RecorderControlService:
         }
         _write_json_atomic(self.control_path, payload)
         if enabled:
-            return True, "Recording requested. The recorder service will start polling within a few seconds."
-        return True, "Recording stopped. The recorder service will flush buffered rows and remain on standby."
+            return True, (
+                "Recording requested. The recorder service will start polling "
+                "within a few seconds."
+            )
+        return True, (
+            "Recording stopped. The recorder service will flush buffered rows "
+            "and remain on standby."
+        )
 
     def status(
         self,
-        settings: ServerSetupSettings | None,
+        config: RecorderConfiguration | object | None,
         *,
         include_diagnostics: bool = False,
     ) -> dict[str, Any]:
@@ -168,7 +188,7 @@ class RecorderControlService:
             worker_alive = heartbeat_age <= HEARTBEAT_TIMEOUT_SECONDS
 
         runtime_state = str(runtime.get("state") or "offline")
-        recorder_ready = self.ready(settings)
+        recorder_ready = self.ready(config)
         running = bool(
             recorder_ready
             and requested_enabled
@@ -178,41 +198,43 @@ class RecorderControlService:
 
         if not recorder_ready:
             state = "not_configured"
-            message = "Choose a recorder role and configure an MTConnect source."
+            message = "Configure at least one MTConnect source."
         elif not worker_alive:
             state = "offline"
             message = (
-                "Recorder service is not reporting. Rebuild/restart the Docker services, "
-                "then try again."
+                "Recorder service is not reporting. Rebuild/restart the Docker "
+                "services, then try again."
             )
         elif not requested_enabled:
             state = "stopped"
             message = "Recorder service is healthy and waiting. Recording is off."
         elif runtime_state == "recording":
             state = "recording"
-            message = str(runtime.get("message") or "Recording from configured MTConnect sources.")
+            message = str(
+                runtime.get("message")
+                or "Recording from configured MTConnect sources."
+            )
         elif runtime_state == "error":
             state = "error"
-            message = str(runtime.get("last_error") or runtime.get("message") or "Recorder reported an error.")
+            message = str(
+                runtime.get("last_error")
+                or runtime.get("message")
+                or "Recorder reported an error."
+            )
         else:
             state = "starting"
-            message = str(runtime.get("message") or "Recording was requested and is starting.")
+            message = str(
+                runtime.get("message")
+                or "Recording was requested and is starting."
+            )
 
-        configured_sources: dict[str, str] = {}
-        if settings is not None:
-            try:
-                configured_sources = parse_recorder_sources(
-                    settings.recorder_sources
-                )
-            except ServerSetupError:
-                configured_sources = {}
-
+        configured_sources = _configured_sources(config)
         raw_source_status = runtime.get("source_status")
         if not isinstance(raw_source_status, Mapping):
             raw_source_status = {}
         source_names = (
             set(configured_sources)
-            if settings is not None
+            if config is not None
             else {str(name) for name in raw_source_status}
         )
         source_status: dict[str, dict[str, Any]] = {}
@@ -240,9 +262,7 @@ class RecorderControlService:
                     _text(raw_source.get("base_url"))
                     or configured_sources.get(source_name, "")
                 ),
-                "last_success_at": _text(
-                    raw_source.get("last_success_at")
-                ),
+                "last_success_at": _text(raw_source.get("last_success_at")),
                 "next_sequence": _safe_optional_int(
                     raw_source.get("next_sequence")
                 ),
@@ -291,11 +311,11 @@ class RecorderControlService:
 
     def web_status(
         self,
-        settings: ServerSetupSettings | None,
+        config: RecorderConfiguration | object | None,
     ) -> dict[str, Any]:
         """Return the small, debug-free status contract used by live polling."""
 
-        status = self.status(settings)
+        status = self.status(config)
         sources = [
             {
                 "source_name": source_name,

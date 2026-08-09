@@ -1,10 +1,10 @@
 """Bounded MTConnect discovery for recorder setup.
 
-Discovery is deliberately limited to an explicit, private IPv4 subnet.  The
+Discovery is deliberately limited to an explicit, private IPv4 subnet. The
 service probes the standard MTConnect ``/probe`` endpoint concurrently, derives
 machine identity from the returned device model, and stores only the latest
-scan summary.  It does not start recording or change setup settings unless the
-caller explicitly merges selected results.
+scan summary. It does not start recording or grant recorder authority; selected
+results only update recorder configuration.
 """
 
 from __future__ import annotations
@@ -28,16 +28,12 @@ from catalog.mtconnect_recorder.parsing import machine_display_name, parse_probe
 from .server_setup_service import (
     SETTINGS_PATH,
     ServerSetupError,
-    ServerSetupSettings,
     format_recorder_sources,
     load_settings,
     parse_recorder_sources,
-    utc_now,
 )
 
-DEFAULT_SCAN_PATH = (
-    Path("data") / "source_state" / "mtconnect_network_scan.json"
-)
+DEFAULT_SCAN_PATH = Path("data") / "source_state" / "mtconnect_network_scan.json"
 DEFAULT_CHECKPOINT_PATH = (
     Path("data") / "source_state" / "mtconnect_recorder_state.json"
 )
@@ -68,7 +64,7 @@ def validate_scan_cidr(value: str) -> IPv4Network:
     """Return a safe scan network.
 
     Only explicit RFC1918 IPv4 CIDRs with at most 256 total addresses are
-    accepted.  A ``/24`` is the largest allowed network; narrower subnets such
+    accepted. A ``/24`` is the largest allowed network; narrower subnets such
     as ``/25`` or a single ``/32`` are also valid.
     """
 
@@ -265,9 +261,7 @@ def _ensure_unique_names(results: list[dict[str, Any]]) -> None:
 
         original = str(result["source_name"])
         if source_counts.get(original.casefold(), 0) > 1:
-            original = _slug(
-                f"{original}-{result['host']}-{result['port']}"
-            )
+            original = _slug(f"{original}-{result['host']}-{result['port']}")
         candidate = original
         if candidate.casefold() in used_source_names:
             candidate = _slug(
@@ -377,7 +371,9 @@ class MtconnectDiscoveryService:
                     continue
                 results.append(result)
 
-        results.sort(key=lambda item: (IPv4Address(item["host"]), item["port"]))
+        results.sort(
+            key=lambda item: (IPv4Address(item["host"]), item["port"])
+        )
         _ensure_unique_names(results)
         machines_found = sum(len(result["machines"]) for result in results)
         payload = {
@@ -478,11 +474,8 @@ class MtconnectDiscoveryService:
         payload.setdefault("results", [])
         return payload
 
-    def recommended_cidr(
-        self,
-        settings: ServerSetupSettings | None = None,
-    ) -> str:
-        """Derive a safe /24 from scan history, setup, or recorder checkpoint."""
+    def recommended_cidr(self, settings: object | None = None) -> str:
+        """Derive a safe /24 from scan history, config, or recorder checkpoint."""
 
         previous = self.last_scan()
         previous_cidr = _text(previous.get("cidr"))
@@ -499,7 +492,9 @@ class MtconnectDiscoveryService:
                 settings = None
         if settings is not None:
             try:
-                configured = parse_recorder_sources(settings.recorder_sources)
+                configured = parse_recorder_sources(
+                    str(getattr(settings, "recorder_sources", "") or "")
+                )
             except ServerSetupError:
                 configured = {}
             for url in configured.values():
@@ -514,27 +509,24 @@ class MtconnectDiscoveryService:
                 item = sources.get(name)
                 if not isinstance(item, Mapping):
                     continue
-                candidate = _private_ipv4_cidr_from_url(
-                    _text(item.get("base_url"))
-                )
+                candidate = _private_ipv4_cidr_from_url(_text(item.get("base_url")))
                 if candidate:
                     return candidate
         return ""
 
     def merge_selected_results(
         self,
-        settings: ServerSetupSettings,
+        settings: object,
         selected: Iterable[str | Mapping[str, Any]],
         *,
         scan: Mapping[str, Any] | None = None,
-    ) -> ServerSetupSettings:
-        """Merge explicitly selected discovered Agents into recorder settings."""
+    ) -> object:
+        """Merge explicitly selected Agents into recorder configuration only.
 
-        if settings.deployment_mode not in {"full-server", "recorder-only"}:
-            raise MtconnectDiscoveryError(
-                "Choose the Full server or Recorder station role before adding "
-                "discovered recorder sources."
-            )
+        The operation never grants recorder authority. It deliberately ignores
+        legacy deployment roles; capability/contribution state decides whether
+        recording may be activated.
+        """
 
         selected_values = list(selected)
         if not selected_values:
@@ -566,12 +558,15 @@ class MtconnectDiscoveryService:
             result = by_id.get(key) or by_name.get(key)
             if result is None:
                 raise MtconnectDiscoveryError(
-                    f"The selected discovery result is no longer available: {key}"
+                    "The selected discovery result is no longer available: "
+                    f"{key}"
                 )
             resolved.append(result)
 
         try:
-            merged = parse_recorder_sources(settings.recorder_sources)
+            merged = parse_recorder_sources(
+                str(getattr(settings, "recorder_sources", "") or "")
+            )
         except ServerSetupError as exc:
             raise MtconnectDiscoveryError(str(exc)) from exc
         for result in resolved:
@@ -582,36 +577,38 @@ class MtconnectDiscoveryService:
                     "A selected discovery result is missing its source identity "
                     "or MTConnect URL."
                 )
-            # Replace a manual alias for this same Agent with the stable
-            # identity read from /probe. RecorderRuntime reconciles the old
-            # checkpoint by normalized base URL before the next capture.
             for existing_name, existing_url in list(merged.items()):
                 if existing_url.casefold() == base_url.casefold():
                     del merged[existing_name]
             if name in merged and merged[name] != base_url:
-                name = _slug(
-                    f"{name}-{_short_digest(base_url, length=8)}"
-                )
+                name = _slug(f"{name}-{_short_digest(base_url, length=8)}")
             if name in merged and merged[name] != base_url:
                 raise MtconnectDiscoveryError(
-                    f"Could not create a unique recorder source name for {base_url}."
+                    "Could not create a unique recorder source name for "
+                    f"{base_url}."
                 )
             merged[name] = base_url
 
-        return replace(
-            settings,
-            recorder_sources=format_recorder_sources(merged),
-            updated_at=utc_now(),
-        )
+        try:
+            return replace(
+                settings,
+                recorder_sources=format_recorder_sources(merged),
+                updated_at=_utc_now_precise(),
+            )
+        except TypeError as exc:
+            raise MtconnectDiscoveryError(
+                "Recorder configuration must be an immutable dataclass-like "
+                "object with recorder_sources and updated_at fields."
+            ) from exc
 
     def merge_selected_sources(
         self,
-        settings: ServerSetupSettings,
+        settings: object,
         selected: Iterable[str | Mapping[str, Any]],
         *,
         scan: Mapping[str, Any] | None = None,
-    ) -> ServerSetupSettings:
-        """Compatibility alias for recorder-setup callers."""
+    ) -> object:
+        """Compatibility alias for recorder-configuration callers."""
 
         return self.merge_selected_results(settings, selected, scan=scan)
 
