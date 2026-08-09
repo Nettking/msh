@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import threading
 import time
 from pathlib import Path
 
+from catalog.capabilities.job_store import SQLiteJobStore
 from catalog.capabilities.jobs import AttemptStatus, JobStatus
 from catalog.federation.projections.storage_job_adapters import JobAuthorityAdapter
 from catalog.flask_app.services.upload_analysis_job_service import (
@@ -167,3 +169,61 @@ def test_restart_fails_interrupted_job_and_preserves_session_filter(
     assert recovered.job.attempts[-1].error_code == "analysis-interrupted"
     assert len(restarted.snapshots("session-upload-tests")) == 1
     assert restarted.snapshots("different-federation-session") == ()
+
+
+def test_job_snapshot_uses_one_read_transaction_during_concurrent_completion(
+    tmp_path: Path, monkeypatch
+) -> None:
+    runtime = _Runtime()
+    service = _service(tmp_path, runtime)
+    job_id = service.submit_batch(_batch("upload-concurrent-snapshot"))
+    active = service._activate(job_id)
+    ownership = active.ownership
+    assert ownership is not None
+
+    row_loaded = threading.Event()
+    release_reader = threading.Event()
+    original_snapshot_from_row = service.store._snapshot_from_row
+
+    def paused_snapshot_from_row(connection, row):
+        row_loaded.set()
+        assert release_reader.wait(timeout=5)
+        return original_snapshot_from_row(connection, row)
+
+    monkeypatch.setattr(service.store, "_snapshot_from_row", paused_snapshot_from_row)
+    reader_result: list[object] = []
+    reader_errors: list[BaseException] = []
+
+    def read_snapshot() -> None:
+        try:
+            reader_result.append(service.store.snapshot(job_id))
+        except BaseException as exc:  # noqa: BLE001 - test records cross-thread failure
+            reader_errors.append(exc)
+
+    reader = threading.Thread(target=read_snapshot)
+    reader.start()
+    assert row_loaded.wait(timeout=5)
+
+    writer = SQLiteJobStore(service.database)
+    writer.complete(
+        job_id,
+        coordinator_id="node-upload-tests",
+        owner_provider_id=ownership.owner_provider_id,
+        attempt_id=ownership.attempt_id,
+        lease_id=ownership.lease_id,
+        command_id="complete-concurrent-snapshot",
+        expected_revision=active.revision,
+        terminal_status=AttemptStatus.SUCCEEDED,
+        error_code=None,
+        now=service.clock(),
+    )
+    release_reader.set()
+    reader.join(timeout=5)
+
+    assert not reader.is_alive()
+    assert reader_errors == []
+    assert len(reader_result) == 1
+    observed = reader_result[0]
+    assert observed.job.status is JobStatus.ACTIVE
+    assert observed.job.attempts[-1].status is AttemptStatus.RUNNING
+    assert writer.snapshot(job_id).job.status is JobStatus.SUCCEEDED
