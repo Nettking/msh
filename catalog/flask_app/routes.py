@@ -7,7 +7,6 @@ from flask import (
     Blueprint,
     current_app,
     flash,
-    jsonify,
     redirect,
     render_template,
     request,
@@ -29,9 +28,6 @@ from .services.chart_service import (
 )
 from .services.control_service import get_control_panel_service
 from .services.live_service import get_live_telemetry_service
-from .services.mtconnect_discovery_service import (
-    get_mtconnect_discovery_service,
-)
 from .services.operator_page_cache import get_operator_page_cache
 from .services.operator_scope_service import get_operator_scope_service
 from .services.playback_service import (
@@ -50,13 +46,6 @@ from .services.playback_service import (
     validate_playback_frame,
     validate_playback_source,
 )
-from .services.recorder_control_service import get_recorder_control_service
-from .services.server_setup_service import (
-    ServerSetupError,
-    load_settings,
-    parse_recorder_sources,
-    runtime_should_start,
-)
 from .services.strategy_config_service import StrategyConfigService
 from .services.workflow_session_index import get_workflow_session_index
 
@@ -73,59 +62,6 @@ def inject_navigation_helpers() -> dict[str, object]:
     return {"endpoint_url": endpoint_url}
 
 
-@web.before_app_request
-def startup_mode_gate():
-    endpoint = request.endpoint or ""
-    if endpoint.startswith("static"):
-        return None
-    try:
-        setup_settings = load_settings()
-    except ServerSetupError:
-        setup_settings = None
-    if (
-        setup_settings is not None
-        and setup_settings.configured
-        and setup_settings.user_setup_complete
-        and setup_settings.deployment_mode == "recorder-only"
-    ):
-        recorder_endpoints = {
-            "web.startup",
-            "web.status",
-            "web.recorder_status_snapshot",
-            "web.guide",
-            "server_setup_web.scan_mtconnect_network",
-            "server_setup_web.save_discovered_mtconnect_sources",
-        }
-        if endpoint in recorder_endpoints:
-            return None
-        return redirect(url_for("web.status"))
-    if (
-        setup_settings is not None
-        and setup_settings.configured
-        and setup_settings.user_setup_complete
-        and not runtime_should_start(setup_settings)
-    ):
-        return None
-
-    allowed = {
-        "web.startup",
-        "web.choose_startup_mode",
-        "web.status",
-        "web.recorder_status_snapshot",
-        "web.rescan",
-        "web.guide",
-        "server_setup_web.scan_mtconnect_network",
-        "server_setup_web.save_discovered_mtconnect_sources",
-        "ai_web.ai_page",
-        "ai_web.ai_ask",
-    }
-    if endpoint in allowed:
-        return None
-    if get_runtime_manager().requires_startup_choice():
-        return redirect(url_for("web.startup", next=request.full_path if request.query_string else request.path))
-    return None
-
-
 def _telemetry_cache_status_model() -> dict[str, object]:
     status = cached_cache_status(Path("data"))
     state = "fresh" if status.fresh else ("stale" if status.exists else "missing")
@@ -139,61 +75,6 @@ def _telemetry_cache_status_model() -> dict[str, object]:
         "cached_row_count": status.manifest_row_count,
         "manifest_source_file_count": status.manifest_source_file_count,
         "last_rebuild_time": status.manifest_generated_at,
-    }
-
-
-def _mtconnect_discovery_model() -> dict[str, object]:
-    """Build the shared MTConnect setup/status discovery view model."""
-
-    try:
-        setup_settings = load_settings()
-        configured_sources = parse_recorder_sources(
-            setup_settings.recorder_sources
-        )
-    except ServerSetupError:
-        setup_settings = None
-        configured_sources = {}
-
-    discovery_service = get_mtconnect_discovery_service()
-    saved_scan = discovery_service.last_scan()
-    mtconnect_scan = dict(saved_scan) if isinstance(saved_scan, dict) else {}
-    scan_results = mtconnect_scan.get("results", [])
-    if not isinstance(scan_results, list):
-        scan_results = []
-    configured_urls = {
-        url.casefold(): name for name, url in configured_sources.items()
-    }
-    normalized_results = []
-    for result in scan_results:
-        if not isinstance(result, dict):
-            continue
-        machines = result.get("machines", [])
-        if not isinstance(machines, list):
-            machines = []
-        normalized_results.append(
-            {
-                **result,
-                "machines": [
-                    machine
-                    for machine in machines
-                    if isinstance(machine, dict)
-                ],
-                "configured_as": configured_urls.get(
-                    str(result.get("base_url") or "").casefold(),
-                    "",
-                ),
-            }
-        )
-    mtconnect_scan["results"] = normalized_results
-
-    return {
-        "scan": mtconnect_scan,
-        "recommended_cidr": discovery_service.recommended_cidr(
-            setup_settings
-        ),
-        "default_port": mtconnect_scan.get("port") or 5000,
-        "setup_settings": setup_settings,
-        "configured_sources": configured_sources,
     }
 
 
@@ -213,14 +94,24 @@ def _machine_day_detail_from_cache(scope) -> dict | None:
             as_dataframe=True,
         )
     except Exception as exc:  # noqa: BLE001
-        current_app.logger.warning("machine day summary DuckDB cache failed; using session export fallback error=%s", exc)
+        current_app.logger.warning(
+            "machine day summary DuckDB cache failed; using session export fallback error=%s",
+            exc,
+        )
         return None
-    current_app.logger.info("machine day summary using DuckDB/Parquet cache rows=%s", len(frame))
+    current_app.logger.info(
+        "machine day summary using DuckDB/Parquet cache rows=%s",
+        len(frame),
+    )
     return {
         "session_id": "telemetry_cache",
         "source_path": str(status.cache_path),
         "status": "ready" if not frame.empty else "empty_rows",
-        "message": "No cached telemetry rows matched the selected scope." if frame.empty else "",
+        "message": (
+            "No cached telemetry rows matched the selected scope."
+            if frame.empty
+            else ""
+        ),
         "frame": frame,
     }
 
@@ -238,7 +129,11 @@ def _catalog() -> ArtifactCatalog:
 
 def _session_range(session) -> tuple[str | None, str | None]:
     metadata = getattr(session, "metadata", {}) or {}
-    filter_payload = metadata.get("filter") if isinstance(metadata.get("filter"), dict) else {}
+    filter_payload = (
+        metadata.get("filter")
+        if isinstance(metadata.get("filter"), dict)
+        else {}
+    )
     return filter_payload.get("start_date"), filter_payload.get("end_date")
 
 
@@ -250,7 +145,14 @@ def _session_matches_scope(session, *, start_date: str, end_date: str) -> bool:
 
 
 def _machine_day_csv_for_session(session_id: str) -> Path:
-    return Path("results") / "workflows" / session_id / "analyses" / "data_pr_day" / "machine_day_summary.csv"
+    return (
+        Path("results")
+        / "workflows"
+        / session_id
+        / "analyses"
+        / "data_pr_day"
+        / "machine_day_summary.csv"
+    )
 
 
 def _machine_day_readiness_for_session(session_id: str) -> dict:
@@ -260,7 +162,9 @@ def _machine_day_readiness_for_session(session_id: str) -> dict:
         return {
             **base,
             "status": "missing",
-            "message": "Machine/day aggregation has not been generated yet for this session.",
+            "message": (
+                "Machine/day aggregation has not been generated yet for this session."
+            ),
         }
     return {
         **base,
@@ -276,7 +180,9 @@ def _machine_day_detail_for_session(session_id: str) -> dict:
         return {
             **base,
             "status": "missing",
-            "message": "Machine/day aggregation has not been generated yet for this session.",
+            "message": (
+                "Machine/day aggregation has not been generated yet for this session."
+            ),
             "frame": None,
         }
 
@@ -305,7 +211,9 @@ def _machine_day_detail_for_session(session_id: str) -> dict:
 
     prepared = frame.copy()
     prepared["date"] = pd.to_datetime(prepared["date"], errors="coerce")
-    prepared["machine"] = prepared["machine"].astype("string").fillna("unknown").astype(str)
+    prepared["machine"] = (
+        prepared["machine"].astype("string").fillna("unknown").astype(str)
+    )
     prepared["value"] = pd.to_numeric(prepared["value"], errors="coerce")
     prepared = prepared.dropna(subset=["date", "value"])
     if prepared.empty:
@@ -339,18 +247,34 @@ def _telemetry_cache_exploration_artifact() -> dict[str, object] | None:
     }
 
 
-def _load_telemetry_cache_exploration_frame(window_start: str, window_end: str) -> tuple[pd.DataFrame | None, str | None]:
+def _load_telemetry_cache_exploration_frame(
+    window_start: str,
+    window_end: str,
+) -> tuple[pd.DataFrame | None, str | None]:
     status = cached_cache_status(Path("data"))
     if not status.exists or not status.fresh:
-        return None, "Telemetry analytics cache is missing or stale; choose an artifact or rebuild the cache."
+        return (
+            None,
+            "Telemetry analytics cache is missing or stale; choose an artifact or rebuild the cache.",
+        )
     start = (window_start or "1900-01-01")[:10]
     end = (window_end or "2999-12-31")[:10]
     try:
-        frame = TelemetryCache(status.cache_path).samples_by_date_range(start, end, as_dataframe=True)
+        frame = TelemetryCache(status.cache_path).samples_by_date_range(
+            start,
+            end,
+            as_dataframe=True,
+        )
     except Exception as exc:  # noqa: BLE001
-        current_app.logger.warning("exploration DuckDB cache failed; use artifact fallback error=%s", exc)
+        current_app.logger.warning(
+            "exploration DuckDB cache failed; use artifact fallback error=%s",
+            exc,
+        )
         return None, f"Could not query telemetry analytics cache: {exc}"
-    current_app.logger.info("exploration using DuckDB/Parquet cache rows=%s", len(frame))
+    current_app.logger.info(
+        "exploration using DuckDB/Parquet cache rows=%s",
+        len(frame),
+    )
     return frame, None
 
 
@@ -363,9 +287,17 @@ def _serialize_playback_timestamp(series: pd.Series) -> pd.Series:
 def overview():
     route_started = pd.Timestamp.utcnow()
     overview_build_started = pd.Timestamp.utcnow()
-    overview_snapshot, cache_state = get_operator_page_cache().get_overview_snapshot(_catalog())
-    build_ms = max((pd.Timestamp.utcnow() - overview_build_started).total_seconds() * 1000.0, 0.0)
-    total_ms = max((pd.Timestamp.utcnow() - route_started).total_seconds() * 1000.0, 0.0)
+    overview_snapshot, cache_state = get_operator_page_cache().get_overview_snapshot(
+        _catalog()
+    )
+    build_ms = max(
+        (pd.Timestamp.utcnow() - overview_build_started).total_seconds() * 1000.0,
+        0.0,
+    )
+    total_ms = max(
+        (pd.Timestamp.utcnow() - route_started).total_seconds() * 1000.0,
+        0.0,
+    )
     current_app.logger.info(
         "overview GET cache=%s snapshot_ms=%.2f route_ms=%.2f",
         cache_state,
@@ -397,121 +329,6 @@ def live():
     return render_template("live.html", live=snapshot)
 
 
-@web.route("/status")
-def status():
-    try:
-        setup_settings = load_settings()
-    except ServerSetupError:
-        setup_settings = None
-    recorder_status = get_recorder_control_service().status(
-        setup_settings
-    )
-    if (
-        setup_settings is not None
-        and setup_settings.configured
-        and setup_settings.user_setup_complete
-        and setup_settings.deployment_mode == "recorder-only"
-    ):
-        return render_template(
-            "status.html",
-            recorder_status=recorder_status,
-            setup_settings=setup_settings,
-        )
-
-    snap = _catalog().cached_snapshot()
-    runtime_state = get_runtime_manager().state_snapshot()
-    operator_scope = get_operator_scope_service().get()
-    internal_artifacts = [a for a in snap.artifacts if a.get("is_internal")]
-    phase_messages = {
-        "runtime_not_started": "Webapp started. Runtime has not started yet.",
-        "discovery_pending": "Webapp started. Background discovery is running.",
-        "bootstrap_latest_day_playback_ready_analysis": "Running playback-ready health and timeline analysis for latest day in the background.",
-        "historical_catch_up": "Historical catch-up is running one day at a time.",
-        "polling_new_data": "Historical processing is complete. Polling for newly arriving days.",
-        "failed": "Background runtime encountered a failure. Check last failure details below.",
-    }
-    current_phase = runtime_state.get("current_processing_phase", "runtime_not_started")
-    return render_template(
-        "status.html",
-        snapshot=snap,
-        scan_dirs=_catalog().scan_dirs,
-        runtime_state=runtime_state,
-        internal_artifacts=internal_artifacts,
-        phase_message=phase_messages.get(current_phase, "Runtime state is available below."),
-        operator_scope=operator_scope,
-        telemetry_cache_status=_telemetry_cache_status_model(),
-        recorder_status=recorder_status,
-        setup_settings=setup_settings,
-    )
-
-
-@web.get("/status/recorder.json")
-def recorder_status_snapshot():
-    try:
-        setup_settings = load_settings()
-    except ServerSetupError:
-        setup_settings = None
-    if (
-        setup_settings is None
-        or not setup_settings.configured
-        or not setup_settings.user_setup_complete
-    ):
-        response = jsonify(
-            {
-                "schema": "msh.recorder.web_status.v1",
-                "error": "setup_required",
-                "message": "Complete device setup before reading recorder status.",
-            }
-        )
-        response.headers["Cache-Control"] = "no-store, max-age=0"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        return response, 409
-    if setup_settings.deployment_mode not in {
-        "full-server",
-        "recorder-only",
-    }:
-        response = jsonify(
-            {
-                "schema": "msh.recorder.web_status.v1",
-                "error": "recorder_not_enabled",
-                "message": "This device role does not include the recorder.",
-            }
-        )
-        response.headers["Cache-Control"] = "no-store, max-age=0"
-        response.headers["X-Content-Type-Options"] = "nosniff"
-        return response, 409
-    payload = get_recorder_control_service().web_status(setup_settings)
-    response = jsonify(payload)
-    response.headers["Cache-Control"] = "no-store, max-age=0"
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    return response
-
-
-@web.route("/startup")
-def startup():
-    try:
-        setup_settings = load_settings()
-    except ServerSetupError:
-        setup_settings = None
-    if (
-        setup_settings is not None
-        and setup_settings.configured
-        and setup_settings.user_setup_complete
-        and setup_settings.deployment_mode == "recorder-only"
-        and request.args.get("edit") != "1"
-    ):
-        return redirect(url_for("web.status"))
-
-    next_path = request.args.get("next", "/")
-    startup_state = get_runtime_manager().startup_decision_snapshot()
-    return render_template(
-        "startup.html",
-        startup_state=startup_state,
-        next_path=next_path,
-        mtconnect_discovery=_mtconnect_discovery_model(),
-    )
-
-
 @web.post("/startup/choose")
 def choose_startup_mode():
     mode = request.form.get("mode", "")
@@ -526,7 +343,9 @@ def choose_startup_mode():
 @web.route("/analyses")
 def analyses():
     snap = _catalog().cached_snapshot()
-    visible_artifacts = [a for a in snap.artifacts if a.get("visibility") == "default"]
+    visible_artifacts = [
+        a for a in snap.artifacts if a.get("visibility") == "default"
+    ]
     selected_path = request.args.get("path", "")
     selected = _catalog().artifact_by_path(selected_path) if selected_path else None
     if selected and selected.get("visibility") != "default":
@@ -538,22 +357,37 @@ def analyses():
         frame, load_error = safe_load_artifact_frame(selected_path)
         if frame is not None:
             trend = machine_day_trend(frame)
-    return render_template("analyses.html", artifacts=visible_artifacts, selected=selected, frame=frame, load_error=load_error, trend=trend)
+    return render_template(
+        "analyses.html",
+        artifacts=visible_artifacts,
+        selected=selected,
+        frame=frame,
+        load_error=load_error,
+        trend=trend,
+    )
 
 
 def _machine_day_chart_payload(frame: pd.DataFrame) -> tuple[dict, str]:
     required = {"date", "machine", "value"}
     if not required.issubset(frame.columns):
-        return {"labels": [], "series": []}, "Machine/day data is missing required columns: date, machine, value."
+        return (
+            {"labels": [], "series": []},
+            "Machine/day data is missing required columns: date, machine, value.",
+        )
     prepared = frame.copy()
     prepared["date"] = pd.to_datetime(prepared["date"], errors="coerce")
-    prepared["machine"] = prepared["machine"].astype("string").fillna("unknown").astype(str)
+    prepared["machine"] = (
+        prepared["machine"].astype("string").fillna("unknown").astype(str)
+    )
     prepared["value"] = pd.to_numeric(prepared["value"], errors="coerce")
     prepared = prepared.dropna(subset=["date", "value"])
     if prepared.empty:
         return {"labels": [], "series": []}, "No machine/day data available."
     grouped = (
-        prepared.groupby([prepared["date"].dt.strftime("%Y-%m-%d"), "machine"], dropna=False)["value"]
+        prepared.groupby(
+            [prepared["date"].dt.strftime("%Y-%m-%d"), "machine"],
+            dropna=False,
+        )["value"]
         .sum()
         .reset_index()
         .rename(columns={"date": "date"})
@@ -563,8 +397,17 @@ def _machine_day_chart_payload(frame: pd.DataFrame) -> tuple[dict, str]:
     machines = sorted(grouped["machine"].dropna().astype(str).unique().tolist())
     series = []
     for machine in machines:
-        machine_rows = grouped[grouped["machine"] == machine].set_index("date")["value"].to_dict()
-        series.append({"label": machine, "data": [float(machine_rows.get(day, 0)) for day in labels]})
+        machine_rows = (
+            grouped[grouped["machine"] == machine]
+            .set_index("date")["value"]
+            .to_dict()
+        )
+        series.append(
+            {
+                "label": machine,
+                "data": [float(machine_rows.get(day, 0)) for day in labels],
+            }
+        )
     return {"labels": labels, "series": series}, ""
 
 
@@ -573,13 +416,34 @@ def machine_view():
     workflows_root = Path("results") / "workflows"
     sessions = list_sessions(workflows_root)
     runtime_state = get_runtime_manager().state_snapshot()
-    readiness = [_machine_day_readiness_for_session(item.session_id) for item in sessions]
+    readiness = [
+        _machine_day_readiness_for_session(item.session_id) for item in sessions
+    ]
     readiness_by_session = {item["session_id"]: item for item in readiness}
     scope = get_operator_scope_service().get()
     requested_session_id = request.args.get("session_id", "").strip()
-    selected_session = next((item for item in sessions if item.session_id == requested_session_id), None) if requested_session_id else None
+    selected_session = (
+        next(
+            (
+                item
+                for item in sessions
+                if item.session_id == requested_session_id
+            ),
+            None,
+        )
+        if requested_session_id
+        else None
+    )
     if not requested_session_id and scope.is_active and sessions:
-        scoped_sessions = [item for item in sessions if _session_matches_scope(item, start_date=str(scope.start_date), end_date=str(scope.end_date))]
+        scoped_sessions = [
+            item
+            for item in sessions
+            if _session_matches_scope(
+                item,
+                start_date=str(scope.start_date),
+                end_date=str(scope.end_date),
+            )
+        ]
         selected_session = scoped_sessions[0] if scoped_sessions else None
     if not requested_session_id and selected_session is None and sessions:
         selected_session = sessions[0]
@@ -596,9 +460,15 @@ def machine_view():
     elif selected_session is None:
         runtime_phase = runtime_state.get("current_processing_phase")
         if runtime_phase in {"runtime_not_started", "discovery_pending"}:
-            error = "No workflow sessions yet. Webapp is up; background discovery is still running."
+            error = (
+                "No workflow sessions yet. Webapp is up; background discovery is "
+                "still running."
+            )
         else:
-            error = "No workflow sessions were found yet. Background processing may still be running."
+            error = (
+                "No workflow sessions were found yet. Background processing may "
+                "still be running."
+            )
     else:
         selected_readiness = _machine_day_detail_for_session(selected_session.session_id)
         readiness_by_session[selected_session.session_id] = {
@@ -635,15 +505,36 @@ def playback():
     catalog = _catalog()
     snap = catalog.cached_snapshot()
     runtime_manager = get_runtime_manager()
-    runtime_state = runtime_manager.state_snapshot() if hasattr(runtime_manager, "state_snapshot") else {}
+    runtime_state = (
+        runtime_manager.state_snapshot()
+        if hasattr(runtime_manager, "state_snapshot")
+        else {}
+    )
     requested_path = request.args.get("path", "")
 
-    discovered = [a for a in snap.artifacts if a.get("playback_compatible") and a.get("visibility") == "default"]
+    discovered = [
+        a
+        for a in snap.artifacts
+        if a.get("playback_compatible") and a.get("visibility") == "default"
+    ]
     cache_artifact = telemetry_cache_playback_artifact()
     if cache_artifact is not None:
         discovered.append(cache_artifact)
-    playback_artifacts = filter_playback_artifacts_for_runtime(discovered, runtime_state, selected_path=requested_path, logger=current_app.logger)
-    playback_artifacts.sort(key=lambda item: (0 if str(item.get("file_name", "")).lower() == "timeline_rows.csv" else 1, str(item.get("file_name", "")).lower(), str(item.get("path", ""))))
+    playback_artifacts = filter_playback_artifacts_for_runtime(
+        discovered,
+        runtime_state,
+        selected_path=requested_path,
+        logger=current_app.logger,
+    )
+    playback_artifacts.sort(
+        key=lambda item: (
+            0
+            if str(item.get("file_name", "")).lower() == "timeline_rows.csv"
+            else 1,
+            str(item.get("file_name", "")).lower(),
+            str(item.get("path", "")),
+        )
+    )
 
     scope = get_operator_scope_service().get()
     selection = resolve_playback_selection(
@@ -657,7 +548,11 @@ def playback():
     selected_path = selection.selected_path
     machine = selection.machine
     day = selection.day
-    selected = telemetry_cache_playback_artifact() if selected_path == TELEMETRY_CACHE_PLAYBACK_PATH else (_catalog().artifact_by_path(selected_path) if selected_path else None)
+    selected = (
+        telemetry_cache_playback_artifact()
+        if selected_path == TELEMETRY_CACHE_PLAYBACK_PATH
+        else (_catalog().artifact_by_path(selected_path) if selected_path else None)
+    )
 
     prepared_frame = None
     validation_reason = None
@@ -667,7 +562,12 @@ def playback():
     error = None
     row_payload: list[dict] = []
     signal_columns: list[str] = []
-    field_groups: dict[str, list[str]] = {"Signals": [], "State/context": [], "Detection/diagnostics": [], "Other fields": []}
+    field_groups: dict[str, list[str]] = {
+        "Signals": [],
+        "State/context": [],
+        "Detection/diagnostics": [],
+        "Other fields": [],
+    }
     timeline_payload = {"labels": [], "counts": []}
 
     if selected:
@@ -676,10 +576,17 @@ def playback():
             validation_reason = source_validation.reason
         else:
             if selected_path == TELEMETRY_CACHE_PLAYBACK_PATH and machine and day:
-                current_app.logger.info("playback using DuckDB/Parquet cache machine=%s day=%s", machine, day)
+                current_app.logger.info(
+                    "playback using DuckDB/Parquet cache machine=%s day=%s",
+                    machine,
+                    day,
+                )
                 frame, error = load_cached_playback_frame_for_machine_day(machine, day)
             else:
-                current_app.logger.info("playback using session export fallback path=%s", selected_path)
+                current_app.logger.info(
+                    "playback using session export fallback path=%s",
+                    selected_path,
+                )
                 frame, error = load_playback_frame(selected_path)
             if frame is not None:
                 validation = validate_playback_frame(frame)
@@ -689,7 +596,9 @@ def playback():
                     validation_reason = validation.reason
         if prepared_frame is not None:
             if prepared_frame.empty:
-                validation_reason = "This playback export exists, but contains no playable rows."
+                validation_reason = (
+                    "This playback export exists, but contains no playable rows."
+                )
             if machine and day:
                 rows = playback_subset(prepared_frame, machine, day)
                 intervals = interval_rows(rows)
@@ -697,23 +606,52 @@ def playback():
                 if not rows.empty:
                     base_columns = [col for col in rows.columns if col != "day"]
                     payload_frame = rows[base_columns].copy()
-                    payload_frame["timestamp"] = _serialize_playback_timestamp(payload_frame["timestamp"])
+                    payload_frame["timestamp"] = _serialize_playback_timestamp(
+                        payload_frame["timestamp"]
+                    )
                     if "source_timestamp" in payload_frame.columns:
-                        payload_frame["source_timestamp"] = _serialize_playback_timestamp(payload_frame["source_timestamp"])
+                        payload_frame["source_timestamp"] = _serialize_playback_timestamp(
+                            payload_frame["source_timestamp"]
+                        )
                     if "is_synthetic_tick" in payload_frame.columns:
-                        payload_frame["is_synthetic_tick"] = payload_frame["is_synthetic_tick"].fillna(False).astype(bool)
+                        payload_frame["is_synthetic_tick"] = (
+                            payload_frame["is_synthetic_tick"]
+                            .fillna(False)
+                            .astype(bool)
+                        )
                     row_payload = payload_frame.fillna("").to_dict("records")
                     signal_columns = default_live_signal_columns(rows)
-                    field_groups = playback_field_groups([col for col in payload_frame.columns if col != "timestamp"])
+                    field_groups = playback_field_groups(
+                        [
+                            col
+                            for col in payload_frame.columns
+                            if col != "timestamp"
+                        ]
+                    )
                     timeline = rows.copy()
-                    timeline["timestamp"] = pd.to_datetime(timeline["timestamp"], errors="coerce")
+                    timeline["timestamp"] = pd.to_datetime(
+                        timeline["timestamp"],
+                        errors="coerce",
+                    )
                     timeline = timeline.dropna(subset=["timestamp"])
                     if not timeline.empty:
                         timeline["bucket"] = timeline["timestamp"].dt.floor("min")
-                        grouped = timeline.groupby("bucket").size().reset_index(name="count")
-                        timeline_payload = {"labels": grouped["bucket"].dt.strftime("%Y-%m-%d %H:%M:%S").tolist(), "counts": grouped["count"].astype(int).tolist()}
+                        grouped = (
+                            timeline.groupby("bucket")
+                            .size()
+                            .reset_index(name="count")
+                        )
+                        timeline_payload = {
+                            "labels": grouped["bucket"]
+                            .dt.strftime("%Y-%m-%d %H:%M:%S")
+                            .tolist(),
+                            "counts": grouped["count"].astype(int).tolist(),
+                        }
     elif not playback_artifacts:
-        validation_reason = "No playback-ready timeline exports were found. Run or refresh the workflow to generate playback data."
+        validation_reason = (
+            "No playback-ready timeline exports were found. Run or refresh the "
+            "workflow to generate playback data."
+        )
 
     return render_template(
         "playback.html",
@@ -742,13 +680,19 @@ def playback():
 @web.route("/exploration")
 def exploration():
     snap = _catalog().cached_snapshot()
-    visible_artifacts = [a for a in snap.artifacts if a.get("visibility") == "default"]
+    visible_artifacts = [
+        a for a in snap.artifacts if a.get("visibility") == "default"
+    ]
     cache_exploration_artifact = _telemetry_cache_exploration_artifact()
     if cache_exploration_artifact is not None:
         visible_artifacts.insert(0, cache_exploration_artifact)
     selected_path = request.args.get("path", "")
     chart_type = request.args.get("chart", "line")
-    selected = cache_exploration_artifact if selected_path == "telemetry-cache://samples" else (_catalog().artifact_by_path(selected_path) if selected_path else None)
+    selected = (
+        cache_exploration_artifact
+        if selected_path == "telemetry-cache://samples"
+        else (_catalog().artifact_by_path(selected_path) if selected_path else None)
+    )
     if selected and selected.get("visibility") != "default":
         selected = None
     frame = None
@@ -772,16 +716,32 @@ def exploration():
         window_end = f"{scope.end_date}T23:59"
     if selected:
         if selected_path == "telemetry-cache://samples":
-            frame, error = _load_telemetry_cache_exploration_frame(window_start, window_end)
+            frame, error = _load_telemetry_cache_exploration_frame(
+                window_start,
+                window_end,
+            )
         else:
-            current_app.logger.info("exploration using artifact/session fallback path=%s", selected_path)
+            current_app.logger.info(
+                "exploration using artifact/session fallback path=%s",
+                selected_path,
+            )
             frame, error = safe_load_artifact_frame(selected_path)
         if frame is not None and not frame.empty:
             numeric = numeric_columns(frame)
             categorical = category_columns(frame)
-            chosen_numeric = request.args.getlist("num") or numeric[: min(3, len(numeric))]
+            chosen_numeric = request.args.getlist("num") or numeric[
+                : min(3, len(numeric))
+            ]
             if chart_type in {"line", "scatter"} and chosen_numeric:
-                chart_payload = line_or_scatter_data(frame, chosen_numeric, mode=chart_type, window_start=window_start or None, window_end=window_end or None, window_preset=window_preset, aggregation=aggregation)
+                chart_payload = line_or_scatter_data(
+                    frame,
+                    chosen_numeric,
+                    mode=chart_type,
+                    window_start=window_start or None,
+                    window_end=window_end or None,
+                    window_preset=window_preset,
+                    aggregation=aggregation,
+                )
             if chart_type == "histogram" and numeric:
                 hist_col = request.args.get("hist_col", numeric[0])
                 if hist_col in numeric:
@@ -790,7 +750,27 @@ def exploration():
                 cat_col = request.args.get("cat_col", categorical[0])
                 if cat_col in frame.columns:
                     category_payload = category_counts(frame, cat_col)
-    return render_template("exploration.html", artifacts=visible_artifacts, selected=selected, frame=frame, error=error, chart_type=chart_type, numeric=numeric, categorical=categorical, chosen_numeric=chosen_numeric, hist_col=hist_col, cat_col=cat_col, chart_payload=chart_payload, category_payload=category_payload, hist_payload=hist_payload, window_start=window_start, window_end=window_end, window_preset=window_preset, aggregation=aggregation, operator_scope=scope)
+    return render_template(
+        "exploration.html",
+        artifacts=visible_artifacts,
+        selected=selected,
+        frame=frame,
+        error=error,
+        chart_type=chart_type,
+        numeric=numeric,
+        categorical=categorical,
+        chosen_numeric=chosen_numeric,
+        hist_col=hist_col,
+        cat_col=cat_col,
+        chart_payload=chart_payload,
+        category_payload=category_payload,
+        hist_payload=hist_payload,
+        window_start=window_start,
+        window_end=window_end,
+        window_preset=window_preset,
+        aggregation=aggregation,
+        operator_scope=scope,
+    )
 
 
 @web.get("/strategies")
@@ -808,11 +788,28 @@ def save_strategies():
     if validation.errors:
         for error in validation.errors:
             flash(error, "error")
-        page = base_page.__class__(strategies=strategies, labels=base_page.labels, signature=validation.signature, validation_errors=validation.errors, validation_warnings=validation.warnings, summary=service.summary(strategies, validation.signature), supported_types=base_page.supported_types, strategies_path=base_page.strategies_path, labels_path=base_page.labels_path)
+        page = base_page.__class__(
+            strategies=strategies,
+            labels=base_page.labels,
+            signature=validation.signature,
+            validation_errors=validation.errors,
+            validation_warnings=validation.warnings,
+            summary=service.summary(strategies, validation.signature),
+            supported_types=base_page.supported_types,
+            strategies_path=base_page.strategies_path,
+            labels_path=base_page.labels_path,
+        )
         return render_template("strategies.html", page=page), 400
     signature = service.save(strategies)
-    flash(f"Strategy config saved. New active strategy signature: {signature}", "success")
-    flash("Strategy edits invalidate cached candidate outputs; candidate events regenerate the next time playback exports are prepared or rerun.", "info")
+    flash(
+        f"Strategy config saved. New active strategy signature: {signature}",
+        "success",
+    )
+    flash(
+        "Strategy edits invalidate cached candidate outputs; candidate events "
+        "regenerate the next time playback exports are prepared or rerun.",
+        "info",
+    )
     return redirect(url_for("web.strategies"))
 
 
@@ -821,27 +818,55 @@ def control():
     route_started = pd.Timestamp.utcnow()
     selected_session_id = request.args.get("session_id")
     control_build_started = pd.Timestamp.utcnow()
-    panel, cache_state = get_operator_page_cache().get_control_snapshot(selected_session_id=selected_session_id)
-    build_ms = max((pd.Timestamp.utcnow() - control_build_started).total_seconds() * 1000.0, 0.0)
-    total_ms = max((pd.Timestamp.utcnow() - route_started).total_seconds() * 1000.0, 0.0)
-    current_app.logger.info("control GET cache=%s snapshot_ms=%.2f route_ms=%.2f selected_session=%s", cache_state, build_ms, total_ms, selected_session_id or "")
+    panel, cache_state = get_operator_page_cache().get_control_snapshot(
+        selected_session_id=selected_session_id
+    )
+    build_ms = max(
+        (pd.Timestamp.utcnow() - control_build_started).total_seconds() * 1000.0,
+        0.0,
+    )
+    total_ms = max(
+        (pd.Timestamp.utcnow() - route_started).total_seconds() * 1000.0,
+        0.0,
+    )
+    current_app.logger.info(
+        "control GET cache=%s snapshot_ms=%.2f route_ms=%.2f selected_session=%s",
+        cache_state,
+        build_ms,
+        total_ms,
+        selected_session_id or "",
+    )
     operator_scope = get_operator_scope_service().get()
-    return render_template("control.html", panel=panel, operator_scope=operator_scope, telemetry_cache_status=_telemetry_cache_status_model())
+    return render_template(
+        "control.html",
+        panel=panel,
+        operator_scope=operator_scope,
+        telemetry_cache_status=_telemetry_cache_status_model(),
+    )
 
 
 @web.post("/control/scope")
 def control_scope():
     start_date = (request.form.get("start_date") or "").strip()
     end_date = (request.form.get("end_date") or "").strip()
-    selected_session_id = (request.form.get("selected_session_id") or "").strip() or None
+    selected_session_id = (
+        (request.form.get("selected_session_id") or "").strip() or None
+    )
     if not start_date or not end_date:
         get_operator_scope_service().clear()
         flash("Cleared shared operator scope.", "success")
     elif end_date < start_date:
         flash("End date must be greater than or equal to start date.", "error")
     else:
-        get_operator_scope_service().set(start_date=start_date, end_date=end_date, selected_session_id=selected_session_id)
-        flash(f"Shared operator scope set to {start_date}..{end_date}.", "success")
+        get_operator_scope_service().set(
+            start_date=start_date,
+            end_date=end_date,
+            selected_session_id=selected_session_id,
+        )
+        flash(
+            f"Shared operator scope set to {start_date}..{end_date}.",
+            "success",
+        )
     get_operator_page_cache().invalidate_all()
     return redirect(url_for("web.control"))
 
@@ -858,7 +883,16 @@ def control_action():
     get_workflow_session_index().invalidate()
     get_operator_page_cache().invalidate_all()
     flash(message, "success" if ok else "error")
-    return redirect(url_for("web.control", session_id=target_session_id or request.form.get("selected_session_id") or ""))
+    return redirect(
+        url_for(
+            "web.control",
+            session_id=(
+                target_session_id
+                or request.form.get("selected_session_id")
+                or ""
+            ),
+        )
+    )
 
 
 @web.post("/control/script/<script_key>/run")
@@ -874,7 +908,16 @@ def run_script_control(script_key: str):
     get_workflow_session_index().invalidate()
     get_operator_page_cache().invalidate_all()
     flash(message, "success" if ok else "error")
-    return redirect(url_for("web.control", session_id=target_session_id or request.form.get("selected_session_id") or ""))
+    return redirect(
+        url_for(
+            "web.control",
+            session_id=(
+                target_session_id
+                or request.form.get("selected_session_id")
+                or ""
+            ),
+        )
+    )
 
 
 @web.post("/rescan")
@@ -888,7 +931,10 @@ def rescan():
 @web.post("/refresh")
 def refresh():
     if get_runtime_manager().requires_startup_choice():
-        flash("Choose startup mode (Continue vs Start clean) before running refresh.", "error")
+        flash(
+            "Choose startup mode (Continue vs Start clean) before running refresh.",
+            "error",
+        )
         return redirect(url_for("web.startup", next=url_for("web.status")))
     get_runtime_manager().request_refresh()
     _catalog().rescan()
