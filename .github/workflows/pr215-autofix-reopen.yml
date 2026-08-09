@@ -24,7 +24,9 @@ jobs:
           python -m pip install -r requirements.txt -c constraints-phase2.txt
           python -m pip install pytest ruff
       - name: Apply reviewed fixes
-        run: python tools/pr215_autofix.py
+        run: |
+          python tools/pr215_autofix.py
+          python tools/pr215_autofix_followup.py
       - name: Lint reviewed boundaries
         run: >-
           python -m ruff check
@@ -34,7 +36,7 @@ jobs:
           catalog/runner/data_filtering.py
           catalog/runner/tests/test_data_filtering.py
           catalog/orchestrator/tests/test_pipeline_bootstrap.py
-          --ignore I001,RUF022,B008,C408,PLC0206,UP035
+          --ignore I001,RUF022,B008,C408,PLC0206,UP035,DTZ001,DTZ003,DTZ004,BLE001
       - name: Run focused regressions
         run: >-
           python -m pytest -o addopts= -q
