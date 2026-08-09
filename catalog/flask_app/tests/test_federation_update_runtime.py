@@ -52,7 +52,7 @@ def test_handoff_check_is_bounded_and_matches_exact_result(tmp_path: Path) -> No
             encoding="utf-8",
         )
 
-    handoff.directory.mkdir(parents=True)
+    handoff.directory.mkdir(parents=True, exist_ok=True)
     handoff._write_request = write  # type: ignore[method-assign]
 
     result = handoff.inspect(target=TARGET)
