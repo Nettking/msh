@@ -24,6 +24,7 @@ RESULT_SCHEMA = "msh.host-update-result.v1"
 MAX_BYTES = 8192
 OID_RE = re.compile(r"^[0-9a-f]{40}$")
 REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
 
 
 def utc(value: str) -> datetime:
@@ -294,6 +295,85 @@ def wait_runtime(root: Path, target: str) -> str:
     raise RuntimeError("runtime_verification_timeout")
 
 
+def ensure_ollama_model(root: Path, env: dict[str, str]) -> str:
+    """Match the supported launcher model-readiness step for the new image."""
+
+    model_probe = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "run",
+            "--rm",
+            "--no-deps",
+            "--entrypoint",
+            "python",
+            "flask",
+            "-c",
+            "import os; print(os.environ.get('MSH_AI_MODEL') or 'llama3.2:3b')",
+        ],
+        cwd=root,
+        env=env,
+        shell=False,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    if model_probe.returncode:
+        raise RuntimeError("model_configuration_unavailable")
+    lines = [line.strip() for line in model_probe.stdout.splitlines() if line.strip()]
+    if not lines or not MODEL_RE.fullmatch(lines[-1]):
+        raise RuntimeError("invalid_model_identifier")
+    model = lines[-1]
+    shown = subprocess.run(
+        ["docker", "compose", "exec", "-T", "ollama", "ollama", "show", model],
+        cwd=root,
+        env=env,
+        shell=False,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if shown.returncode == 0:
+        return model
+    pulled = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "--profile",
+            "model-install",
+            "run",
+            "--rm",
+            "--entrypoint",
+            "/bin/ollama",
+            "ollama-pull",
+            "pull",
+            model,
+        ],
+        cwd=root,
+        env=env,
+        shell=False,
+        check=False,
+        timeout=3600,
+    )
+    if pulled.returncode:
+        raise RuntimeError("model_install_failed")
+    verified = subprocess.run(
+        ["docker", "compose", "exec", "-T", "ollama", "ollama", "show", model],
+        cwd=root,
+        env=env,
+        shell=False,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    if verified.returncode:
+        raise RuntimeError("model_verification_failed")
+    return model
+
+
 def validate_request(
     value: object,
 ) -> tuple[str, str, str | None, datetime | None]:
@@ -411,8 +491,15 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             raise RuntimeError("source_verification_failed")
         env = os.environ.copy()
         env["MSH_BUILD_COMMIT"] = target
-        for argv in (
+        subprocess.run(
             ["docker", "compose", "build", "relay", "flask", "recorder"],
+            cwd=root,
+            env=env,
+            shell=False,
+            check=True,
+            timeout=900,
+        )
+        subprocess.run(
             [
                 "docker",
                 "compose",
@@ -422,16 +509,21 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
                 "ollama",
                 "recorder",
             ],
+            cwd=root,
+            env=env,
+            shell=False,
+            check=True,
+            timeout=900,
+        )
+        ensure_ollama_model(root, env)
+        subprocess.run(
             ["docker", "compose", "stop", "flask"],
-        ):
-            subprocess.run(
-                argv,
-                cwd=root,
-                env=env,
-                shell=False,
-                check=True,
-                timeout=900,
-            )
+            cwd=root,
+            env=env,
+            shell=False,
+            check=True,
+            timeout=300,
+        )
         resume = subprocess.run(
             [
                 "docker",
@@ -472,8 +564,8 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             running=running,
             code="updated",
             message=(
-                "MSH source, images, services, and running commit were updated "
-                "and verified."
+                "MSH source, images, services, required model, and running "
+                "commit were updated and verified."
             ),
         )
         return True
