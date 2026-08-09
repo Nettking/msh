@@ -19,6 +19,12 @@ def test_windows_agent_has_fixed_safe_mutation_boundary() -> None:
     assert "Ensure-OllamaModel" in text
     assert "Start-ReplacementAgent" in text
     assert "Get-AgentHash" in text
+    assert "Normalize-DirectoryPath" in text
+    assert "Get-RequestResultFile" in text
+    assert "dirty_build_context" in text
+    assert text.index("Move-Item -LiteralPath $RequestFile") < text.index(
+        "[System.IO.File]::ReadAllText($processing)"
+    )
     assert "reset --hard" not in text
     assert "git clean" not in text
     assert "git stash" not in text
@@ -41,6 +47,11 @@ def test_posix_agent_never_executes_peer_supplied_process_shape() -> None:
     assert "ensure_ollama_model(root, env)" in text
     assert "os.execv(" in text
     assert "initial_digest = _digest(script_path)" in text
+    assert "_request_result_path" in text
+    assert "dirty_build_context" in text
+    assert text.index("os.replace(request_file, processing)") < text.index(
+        'processing.read_text(encoding="utf-8")'
+    )
     assert "shell=False" in text
     assert "reset --hard" not in text
     assert "git clean" not in text
@@ -58,9 +69,11 @@ def test_supported_launchers_start_agent_and_embed_build_commit() -> None:
     assert "msh_update_agent.ps1" in windows
     assert "MSH_BUILD_COMMIT" in windows
     assert "docker compose build relay flask recorder" in windows
+    assert "git status --porcelain=v1 --untracked-files=all" in windows
     assert "msh_update_agent.py" in posix
     assert "MSH_BUILD_COMMIT" in posix
     assert "docker compose build relay flask recorder" in posix
+    assert "git status --porcelain=v1 --untracked-files=all" in posix
 
 
 def test_runtime_images_bake_build_identity() -> None:
