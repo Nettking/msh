@@ -263,7 +263,10 @@ def test_apply_aggregation_is_updated_only_when_every_expected_node_verified(
     coordinator = _Coordinator()
     _install_context(monkeypatch, coordinator, ())
     service = FederationUpdateService(_Local(), tmp_path / "updates.json")
-    context = SimpleNamespace(coordinator=coordinator)
+    context = SimpleNamespace(
+        coordinator=coordinator,
+        binding=SimpleNamespace(internal_session_id="session-one"),
+    )
     now = datetime.now(timezone.utc)
     base = {
         "operation": "apply",
