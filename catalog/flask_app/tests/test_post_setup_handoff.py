@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import json
 from dataclasses import replace
+from types import SimpleNamespace
 
 from flask import Flask
 
+from catalog.federation.onboarding_models import (
+    ContributionActivationState,
+    ContributionDesiredState,
+)
 from catalog.flask_app import server_setup_routes
 from catalog.flask_app.services.capability_config_service import (
     CAPABILITY_CONFIG_PATH,
@@ -193,6 +198,52 @@ def test_recorder_config_route_persists_parameters_without_enabling_capability(
     assert mirrored.recorder_sources == "Mazak=http://192.168.200.10:5000"
     assert mirrored.recorder_poll_interval == "0.5"
     assert mirrored.recorder_include_condition is True
+
+
+def test_completed_recorder_control_uses_current_contribution_activation(
+    monkeypatch,
+) -> None:
+    candidate = SimpleNamespace(
+        candidate_id="recorder-local",
+        capability_type="recorder",
+    )
+
+    class FakeContributionService:
+        def __init__(self, intent) -> None:
+            self.intent = intent
+
+        def recommend(self, *, require_benchmark_review: bool):
+            assert require_benchmark_review is False
+            return (candidate,)
+
+        def intents(self):
+            return (self.intent,)
+
+    def authorized(desired_state, activation_state) -> bool:
+        intent = SimpleNamespace(
+            candidate_id="recorder-local",
+            desired_state=desired_state,
+            activation_state=activation_state,
+        )
+        monkeypatch.setattr(
+            server_setup_routes,
+            "get_capability_contribution_service",
+            lambda: FakeContributionService(intent),
+        )
+        return server_setup_routes._active_recorder_contribution()
+
+    assert authorized(
+        ContributionDesiredState.ENABLED,
+        ContributionActivationState.ACTIVE,
+    ) is True
+    assert authorized(
+        ContributionDesiredState.DISABLED,
+        ContributionActivationState.INACTIVE,
+    ) is False
+    assert authorized(
+        ContributionDesiredState.ENABLED,
+        ContributionActivationState.SUSPENDED,
+    ) is False
 
 
 def test_recorder_start_fails_closed_without_capability_intent(
