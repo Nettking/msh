@@ -34,6 +34,7 @@ from catalog.ai.remote_provider import (
 )
 from catalog.ai.runtime import LANGUAGE_MODEL_CAPABILITY, LANGUAGE_MODEL_PROTOCOL
 from catalog.ai.runtime_contracts import AIRuntimeRequest, _logical_id, _text
+from catalog.ai.shared_capacity import SharedCapacityLanguageModelProvider
 from catalog.capabilities.operator_surface import ProviderOperatorSurface
 from catalog.capabilities.provider_health import ProviderHealthRecord
 from catalog.capabilities.provider_reports import ProviderResourceReport, ProviderStatus
@@ -351,6 +352,7 @@ class FederatedAIProductBridge:
         self._authority: CachedFederatedAIHealthAuthority | None = None
         self._remote_runtime_ids: set[str] = set()
         self._owner_session_id: str | None = None
+        self._capacity_wrappers: dict[str, SharedCapacityLanguageModelProvider] = {}
 
     @staticmethod
     def _manager():
@@ -418,6 +420,22 @@ class FederatedAIProductBridge:
         )
         self._owner_session_id = session_id
 
+    def _shared_local_provider(self, provider: object) -> object:
+        capability_id = str(provider.capability_id)
+        if isinstance(provider, SharedCapacityLanguageModelProvider):
+            self._capacity_wrappers[capability_id] = provider
+            return provider
+        current = self._capacity_wrappers.get(capability_id)
+        if current is not None and current.wraps(provider):
+            return current
+        shared = SharedCapacityLanguageModelProvider(provider)  # type: ignore[arg-type]
+        self._manager().replace_registered(
+            (shared,),
+            replace_capability_ids=(capability_id,),
+        )
+        self._capacity_wrappers[capability_id] = shared
+        return shared
+
     def _local_provider(
         self,
         announcement: CapabilityAnnouncement | None,
@@ -431,7 +449,7 @@ class FederatedAIProductBridge:
             if provider.capability_id in self._remote_runtime_ids:
                 continue
             if provider.capability_id == local_candidate_id:
-                return provider
+                return self._shared_local_provider(provider)
         return None
 
     def _request_enrollment(
@@ -463,6 +481,15 @@ class FederatedAIProductBridge:
         node_id: str,
     ) -> None:
         now = _utc_now()
+        max_concurrent_jobs = int(getattr(provider, "max_concurrent_jobs", 1))
+        active_jobs = 0
+        queue_depth = 0
+        if isinstance(provider, SharedCapacityLanguageModelProvider):
+            active_jobs, queue_depth = provider.capacity_snapshot()
+        utilization_millis = min(
+            1000,
+            int(1000 * active_jobs / max(1, max_concurrent_jobs)),
+        )
         report = ProviderResourceReport(
             capability_id=announcement.capability_id,
             node_id=node_id,
@@ -472,10 +499,10 @@ class FederatedAIProductBridge:
             protocol_version=announcement.protocol_version,
             status=ProviderStatus.READY,
             report_revision=self._report_revision,
-            max_concurrent_jobs=int(getattr(provider, "max_concurrent_jobs", 1)),
-            active_jobs=0,
-            queue_depth=0,
-            utilization_millis=0,
+            max_concurrent_jobs=max_concurrent_jobs,
+            active_jobs=active_jobs,
+            queue_depth=queue_depth,
+            utilization_millis=utilization_millis,
             attributes={
                 "label": str(provider.display_name),
                 "models": list(provider.models),
