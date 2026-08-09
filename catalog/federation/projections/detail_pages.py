@@ -171,6 +171,17 @@ class DetailProjectionMixin:
             ),
         )
 
+    @staticmethod
+    def _federated_capability_state(status: str) -> tuple[str, str]:
+        return {
+            "ready": ("active", "Active"),
+            "registering": ("available", "Pending"),
+            "disabled": ("unavailable", "Disabled"),
+            "unavailable": ("degraded", "Unavailable"),
+            "draining": ("degraded", "Draining"),
+            "revoked": ("unavailable", "Revoked"),
+        }.get(status, ("information", _title(status)))
+
     def services(self, *, include_technical: bool = False) -> FederationViewModel:
         snapshot = self._snapshot()
         items: list[ProjectionItem] = []
@@ -189,9 +200,9 @@ class DetailProjectionMixin:
                     ),
                 )
             )
-        contribution_ids = {item.key for item in items}
+        visible_ids = {item.key for item in items}
         for provider in snapshot.providers.providers:
-            if provider.capability_id in contribution_ids:
+            if provider.capability_id in visible_ids:
                 continue
             state, label = _provider_state(provider)
             items.append(
@@ -207,9 +218,43 @@ class DetailProjectionMixin:
                     ),
                 )
             )
+            visible_ids.add(provider.capability_id)
+
+        # Coordinator-announced capabilities are shared metadata only. They let
+        # every trusted member see the same service inventory without importing
+        # provider authority or exposing transport endpoints. Local contribution
+        # cards above remain richer and win on duplicate IDs.
+        device_labels = {
+            device.node_id: device.label for device in snapshot.federation.devices
+        }
+        for capability in snapshot.federation.capabilities:
+            if capability.capability_id in visible_ids:
+                continue
+            state, label = self._federated_capability_state(capability.status)
+            items.append(
+                ProjectionItem(
+                    capability.capability_id,
+                    _title(capability.capability_type),
+                    f"{capability.protocol} {capability.protocol_version}",
+                    state,
+                    label,
+                    (
+                        (
+                            "Device",
+                            device_labels.get(
+                                capability.node_id,
+                                "Trusted MSH device",
+                            ),
+                        ),
+                        ("Source", "Federation authority"),
+                    ),
+                )
+            )
+            visible_ids.add(capability.capability_id)
+
         notice = self._notice(snapshot)
         state = state_label = None
-        if snapshot.providers.available and not items:
+        if snapshot.federation.available and not items:
             state, state_label = ProjectionState.EMPTY, "No services"
             notice = ProjectionNotice(
                 NoticeKind.EMPTY,
@@ -225,7 +270,7 @@ class DetailProjectionMixin:
         return self._page(
             FederationPage.SERVICES,
             "Services",
-            "Review independent contributions and provider health.",
+            "Review shared service metadata and local provider health without granting authority.",
             snapshot,
             items=tuple(items),
             notice=notice,

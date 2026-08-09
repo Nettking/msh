@@ -19,7 +19,7 @@ def _source_block(sources: list[str] | None) -> str:
 
 
 def build_prompt(question: str, context: str, sources: list[str] | None = None) -> str:
-    """Build the user-facing prompt sent to Ollama."""
+    """Build contract-valid user-facing text sent to the language-model runtime."""
     source_block = _source_block(sources)
     return f"""Allowed source list:
 {source_block}
@@ -39,11 +39,11 @@ Answer format:
 - When a source label is useful in the answer, copy it exactly from the allowed source list.
 - Do not list guessed files, templates, modules, or related files.
 - If a file is not in the allowed source list, do not mention it.
-"""
+""".strip()
 
 
 def build_extractive_prompt(question: str, context: str, sources: list[str] | None = None) -> str:
-    """Build a stricter prompt for source-extractive answers."""
+    """Build contract-valid text for stricter source-extractive answers."""
     source_block = _source_block(sources)
     return f"""Allowed source list:
 {source_block}
@@ -71,4 +71,4 @@ Answer format:
 - <fact from context>
 
 Do not add a sources section; the interface presents the allowed source list separately.
-"""
+""".strip()

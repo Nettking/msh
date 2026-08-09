@@ -44,6 +44,7 @@
       "patterns": [
         "catalog/flask_app/services/federation_pairing_service.py",
         "catalog/flask_app/services/resilient_pairing_runtime.py",
+        "catalog/flask_app/services/federation_pairing_install.py",
         "catalog/flask_app/federation_pairing_routes.py",
         "catalog/node/**"
       ],
@@ -51,6 +52,20 @@
         "physical.multi-host-relay-and-network-path",
         "physical.mobile-and-desktop-browser-review",
         "physical.separate-ai-compute-storage-contributors",
+        "physical.restart-and-reconciliation",
+        "physical.revocation-and-controlled-rejoin"
+      ]
+    },
+    {
+      "patterns": [
+        "catalog/flask_app/services/federation_contribution_publication.py"
+      ],
+      "scenarios": [
+        "physical.multi-host-relay-and-network-path",
+        "physical.mobile-and-desktop-browser-review",
+        "physical.recorder-plus-ai-simultaneous-contribution",
+        "physical.separate-ai-compute-storage-contributors",
+        "physical.contribution-disable-and-reenable",
         "physical.restart-and-reconciliation",
         "physical.revocation-and-controlled-rejoin"
       ]
