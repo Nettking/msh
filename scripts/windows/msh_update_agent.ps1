@@ -46,7 +46,7 @@ function Last-Text([object[]]$Values) {
 
 $mutexName = 'Global\MSHUpdateAgent-' + (Get-PathHash $RepoRoot)
 $createdNew = $false
-$mutex = New-Object System.Threading.Mutex($true, $mutexName, [ref]$createdNew)
+$mutex = [System.Threading.Mutex]::new($true, $mutexName, [ref]$createdNew)
 if (-not $createdNew) {
     exit 0
 }
@@ -79,7 +79,11 @@ function Write-AgentResult {
         throw 'result_too_large'
     }
     $temporary = "$ResultFile.tmp-$PID-$([guid]::NewGuid().ToString('N'))"
-    [System.IO.File]::WriteAllText($temporary, $json, (New-Object System.Text.UTF8Encoding($false)))
+    [System.IO.File]::WriteAllText(
+        $temporary,
+        $json,
+        (New-Object System.Text.UTF8Encoding($false))
+    )
     Move-Item -LiteralPath $temporary -Destination $ResultFile -Force
 }
 
@@ -104,18 +108,29 @@ function Test-ApprovedRemote([string]$Value) {
         $normalized = $normalized.Substring(0, $normalized.Length - 4)
     }
     if ($normalized -match '^git@github\.com:(?<repo>[^?&#]+)$') {
-        return $Matches.repo.Equals($ApprovedRepository, [StringComparison]::OrdinalIgnoreCase)
+        return $Matches.repo.Equals(
+            $ApprovedRepository,
+            [StringComparison]::OrdinalIgnoreCase
+        )
     }
     try { $uri = [Uri]$normalized } catch { return $false }
-    if ($uri.Scheme -notin @('https', 'ssh') -or $uri.Host -ne 'github.com') { return $false }
+    if ($uri.Scheme -notin @('https', 'ssh') -or $uri.Host -ne 'github.com') {
+        return $false
+    }
     if ($uri.UserInfo -and $uri.UserInfo -ne 'git') { return $false }
     if ($uri.Query -or $uri.Fragment) { return $false }
-    return $uri.AbsolutePath.Trim('/').Equals($ApprovedRepository, [StringComparison]::OrdinalIgnoreCase)
+    return $uri.AbsolutePath.Trim('/').Equals(
+        $ApprovedRepository,
+        [StringComparison]::OrdinalIgnoreCase
+    )
 }
 
 function Get-RunningCommit {
     try {
-        $output = Invoke-External 'docker' @('compose', 'exec', '-T', 'flask', 'python', '-c', "import os; print(os.environ.get('MSH_BUILD_COMMIT',''))")
+        $output = Invoke-External 'docker' @(
+            'compose', 'exec', '-T', 'flask', 'python', '-c',
+            "import os; print(os.environ.get('MSH_BUILD_COMMIT',''))"
+        )
         $value = (Last-Text $output).Trim().ToLowerInvariant()
         if ($value -match $OidPattern) { return $value }
     }
@@ -132,53 +147,96 @@ function Test-Ancestor([string]$Older, [string]$Newer) {
 
 function Inspect-Checkout([AllowNull()][string]$RequestedTarget) {
     $top = (Last-Text (Invoke-Git @('rev-parse', '--show-toplevel'))).Trim()
-    if ([System.IO.Path]::GetFullPath($top) -ne $RepoRoot) { throw 'unsupported_checkout' }
+    if ([System.IO.Path]::GetFullPath($top) -ne $RepoRoot) {
+        throw 'unsupported_checkout'
+    }
     $remote = (Last-Text (Invoke-Git @('remote', 'get-url', 'origin'))).Trim()
     if (-not (Test-ApprovedRemote $remote)) { throw 'unapproved_remote' }
-    $branch = (Last-Text (Invoke-Git @('symbolic-ref', '--quiet', '--short', 'HEAD'))).Trim()
+    $branch = (Last-Text (
+        Invoke-Git @('symbolic-ref', '--quiet', '--short', 'HEAD')
+    )).Trim()
     if ($branch -ne $ApprovedBranch) { throw 'detached_head' }
-    $current = (Last-Text (Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}'))).Trim().ToLowerInvariant()
+    $current = (Last-Text (
+        Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}')
+    )).Trim().ToLowerInvariant()
     if ($current -notmatch $OidPattern) { throw 'unsupported_checkout' }
     $status = Invoke-Git @('status', '--porcelain=v1', '--untracked-files=all')
     if (($status -join '').Length -gt 0) {
-        return [ordered]@{ state='dirty'; current=$current; target=$RequestedTarget; code='dirty'; message='Local changes must be reviewed before updating.' }
+        return [ordered]@{
+            state='dirty'; current=$current; target=$RequestedTarget;
+            code='dirty'; message='Local changes must be reviewed before updating.'
+        }
     }
     Invoke-Git @('fetch', '--no-tags', 'origin', $ApprovedBranch) | Out-Null
-    $approvedTip = (Last-Text (Invoke-Git @('rev-parse', '--verify', 'FETCH_HEAD^{commit}'))).Trim().ToLowerInvariant()
-    $target = if ($RequestedTarget) { $RequestedTarget.ToLowerInvariant() } else { $approvedTip }
+    $approvedTip = (Last-Text (
+        Invoke-Git @('rev-parse', '--verify', 'FETCH_HEAD^{commit}')
+    )).Trim().ToLowerInvariant()
+    $target = if ($RequestedTarget) {
+        $RequestedTarget.ToLowerInvariant()
+    } else {
+        $approvedTip
+    }
     if ($target -notmatch $OidPattern) { throw 'target_unavailable' }
     & git -C $RepoRoot cat-file -e "$target^{commit}" 2>$null
-    if ($LASTEXITCODE -ne 0 -or -not (Test-Ancestor $target $approvedTip)) { throw 'target_unavailable' }
+    if (
+        $LASTEXITCODE -ne 0 -or
+        -not (Test-Ancestor $target $approvedTip)
+    ) {
+        throw 'target_unavailable'
+    }
     if ($current -eq $target) {
-        return [ordered]@{ state='up_to_date'; current=$current; target=$target; code=$null; message=$null }
+        return [ordered]@{
+            state='up_to_date'; current=$current; target=$target;
+            code=$null; message=$null
+        }
     }
     if (Test-Ancestor $current $target) {
-        return [ordered]@{ state='update_available'; current=$current; target=$target; code=$null; message=$null }
+        return [ordered]@{
+            state='update_available'; current=$current; target=$target;
+            code=$null; message=$null
+        }
     }
     if (Test-Ancestor $target $current) {
-        return [ordered]@{ state='ahead'; current=$current; target=$target; code='ahead'; message='This checkout is ahead of approved main.' }
+        return [ordered]@{
+            state='ahead'; current=$current; target=$target; code='ahead';
+            message='This checkout is ahead of approved main.'
+        }
     }
-    return [ordered]@{ state='diverged'; current=$current; target=$target; code='diverged'; message='This checkout has diverged from approved main.' }
+    return [ordered]@{
+        state='diverged'; current=$current; target=$target; code='diverged';
+        message='This checkout has diverged from approved main.'
+    }
 }
 
 function Wait-RuntimeVerified([string]$Target) {
     $deadline = [DateTimeOffset]::UtcNow.AddSeconds(120)
     while ([DateTimeOffset]::UtcNow -lt $deadline) {
         try {
-            $commitOutput = Invoke-External 'docker' @('compose', 'exec', '-T', 'flask', 'python', '-c', "import os; print(os.environ.get('MSH_BUILD_COMMIT',''))")
+            $commitOutput = Invoke-External 'docker' @(
+                'compose', 'exec', '-T', 'flask', 'python', '-c',
+                "import os; print(os.environ.get('MSH_BUILD_COMMIT',''))"
+            )
             $running = (Last-Text $commitOutput).Trim().ToLowerInvariant()
             if ($running -eq $Target) {
-                Invoke-External 'docker' @('compose', 'exec', '-T', 'flask', 'python', '-c', "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:5000/federation', timeout=3); assert 200 <= r.status < 500") | Out-Null
-                $services = Invoke-External 'docker' @('compose', 'ps', '--status', 'running', '--services')
+                Invoke-External 'docker' @(
+                    'compose', 'exec', '-T', 'flask', 'python', '-c',
+                    "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:5000/federation', timeout=3); assert 200 <= r.status < 500"
+                ) | Out-Null
+                $services = Invoke-External 'docker' @(
+                    'compose', 'ps', '--status', 'running', '--services'
+                )
                 $runningServices = @($services | ForEach-Object { $_.Trim() })
                 foreach ($required in @('relay', 'recorder', 'flask')) {
-                    if ($required -notin $runningServices) { throw "service_not_running:$required" }
+                    if ($required -notin $runningServices) {
+                        throw "service_not_running:$required"
+                    }
                 }
                 return $running
             }
         }
         catch {
-            # The old Flask container is expected to disappear while activation is in progress.
+            # The old Flask container is expected to disappear while activation
+            # is in progress.
         }
         Start-Sleep -Seconds 2
     }
@@ -193,11 +251,16 @@ function Process-Request {
         return $true
     }
     $raw = [System.IO.File]::ReadAllText($RequestFile)
-    try { $request = $raw | ConvertFrom-Json } catch {
+    try {
+        $request = $raw | ConvertFrom-Json
+    }
+    catch {
         Remove-Item -LiteralPath $RequestFile -Force
         return $true
     }
-    $processing = Join-Path $AgentDirectory ("processing-$([guid]::NewGuid().ToString('N')).json")
+    $processing = Join-Path $AgentDirectory (
+        "processing-$([guid]::NewGuid().ToString('N')).json"
+    )
     Move-Item -LiteralPath $RequestFile -Destination $processing -Force
     $requestId = $null
     $action = $null
@@ -205,60 +268,183 @@ function Process-Request {
     try {
         $requestId = [string]$request.request_id
         $action = [string]$request.action
-        $target = if ($null -eq $request.target_commit) { $null } else { ([string]$request.target_commit).ToLowerInvariant() }
+        $target = if ($null -eq $request.target_commit) {
+            $null
+        } else {
+            ([string]$request.target_commit).ToLowerInvariant()
+        }
         if ($request.schema -ne $RequestSchema) { throw 'malformed_message' }
-        if ($requestId -notmatch $RequestIdPattern) { throw 'malformed_request_id' }
+        if ($requestId -notmatch $RequestIdPattern) {
+            throw 'malformed_request_id'
+        }
         if ($action -notin @('check', 'apply')) { throw 'malformed_action' }
-        if ([string]$request.repository -ne $ApprovedRepository -or [string]$request.branch -ne $ApprovedBranch) { throw 'unapproved_source' }
-        if ($action -eq 'apply' -and ($null -eq $target -or $target -notmatch $OidPattern)) { throw 'malformed_target' }
-        if ($target -and $target -notmatch $OidPattern) { throw 'malformed_target' }
-        $created = [DateTimeOffset]::Parse([string]$request.created_at).ToUniversalTime()
-        $expires = [DateTimeOffset]::Parse([string]$request.expires_at).ToUniversalTime()
+        if (
+            [string]$request.repository -ne $ApprovedRepository -or
+            [string]$request.branch -ne $ApprovedBranch
+        ) {
+            throw 'unapproved_source'
+        }
+        if (
+            $action -eq 'apply' -and
+            ($null -eq $target -or $target -notmatch $OidPattern)
+        ) {
+            throw 'malformed_target'
+        }
+        if ($target -and $target -notmatch $OidPattern) {
+            throw 'malformed_target'
+        }
+        $created = [DateTimeOffset]::Parse(
+            [string]$request.created_at
+        ).ToUniversalTime()
+        $expires = [DateTimeOffset]::Parse(
+            [string]$request.expires_at
+        ).ToUniversalTime()
         $now = [DateTimeOffset]::UtcNow
-        if ($created -gt $now.AddMinutes(1) -or $expires -le $now -or ($expires - $created).TotalMinutes -gt 15) { throw 'expired_or_invalid_request' }
+        if (
+            $created -gt $now.AddMinutes(1) -or
+            $expires -le $now -or
+            ($expires - $created).TotalMinutes -gt 15
+        ) {
+            throw 'expired_or_invalid_request'
+        }
+
+        if ($action -eq 'apply') {
+            $activateProperty = $request.PSObject.Properties['activate_after']
+            if ($null -eq $activateProperty) {
+                throw 'malformed_activation_grace'
+            }
+            $activateAfter = [DateTimeOffset]::Parse(
+                [string]$activateProperty.Value
+            ).ToUniversalTime()
+            if (
+                $activateAfter -lt $created -or
+                $activateAfter -gt $expires -or
+                ($activateAfter - $created).TotalSeconds -gt 30
+            ) {
+                throw 'invalid_activation_grace'
+            }
+            $delayMilliseconds = [Math]::Ceiling(
+                ($activateAfter - [DateTimeOffset]::UtcNow).TotalMilliseconds
+            )
+            if ($delayMilliseconds -gt 0) {
+                Start-Sleep -Milliseconds ([int][Math]::Min(
+                    $delayMilliseconds,
+                    30000
+                ))
+            }
+        }
 
         $inspection = Inspect-Checkout $target
         $runningBefore = Get-RunningCommit
         if ($action -eq 'check') {
-            $message = if ($null -eq $inspection.message) { '' } else { [string]$inspection.message }
-            Write-AgentResult -RequestId $requestId -Action $action -State $inspection.state -CurrentCommit $inspection.current -TargetCommit $inspection.target -RunningCommit $runningBefore -Code $inspection.code -Message $message
+            $message = if ($null -eq $inspection.message) {
+                ''
+            } else {
+                [string]$inspection.message
+            }
+            Write-AgentResult `
+                -RequestId $requestId `
+                -Action $action `
+                -State $inspection.state `
+                -CurrentCommit $inspection.current `
+                -TargetCommit $inspection.target `
+                -RunningCommit $runningBefore `
+                -Code $inspection.code `
+                -Message $message
             return $true
         }
         if ($inspection.state -notin @('update_available', 'up_to_date')) {
-            $message = if ($null -eq $inspection.message) { 'The checkout is not eligible for activation.' } else { [string]$inspection.message }
-            Write-AgentResult -RequestId $requestId -Action $action -State $inspection.state -CurrentCommit $inspection.current -TargetCommit $inspection.target -RunningCommit $runningBefore -Code $inspection.code -Message $message
+            $message = if ($null -eq $inspection.message) {
+                'The checkout is not eligible for activation.'
+            } else {
+                [string]$inspection.message
+            }
+            Write-AgentResult `
+                -RequestId $requestId `
+                -Action $action `
+                -State $inspection.state `
+                -CurrentCommit $inspection.current `
+                -TargetCommit $inspection.target `
+                -RunningCommit $runningBefore `
+                -Code $inspection.code `
+                -Message $message
             return $true
         }
         if ($inspection.state -eq 'update_available') {
             Invoke-Git @('merge', '--ff-only', $target) | Out-Null
         }
-        $proven = (Last-Text (Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}'))).Trim().ToLowerInvariant()
+        $proven = (Last-Text (
+            Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}')
+        )).Trim().ToLowerInvariant()
         if ($proven -ne $target) { throw 'source_verification_failed' }
 
         $env:MSH_BUILD_COMMIT = $target
-        Invoke-External 'docker' @('compose', 'build', 'relay', 'flask', 'recorder') | Out-Null
-        Invoke-External 'docker' @('compose', 'up', '-d', 'relay', 'ollama', 'recorder') | Out-Null
+        Invoke-External 'docker' @(
+            'compose', 'build', 'relay', 'flask', 'recorder'
+        ) | Out-Null
+        Invoke-External 'docker' @(
+            'compose', 'up', '-d', 'relay', 'ollama', 'recorder'
+        ) | Out-Null
         & docker compose stop flask *> $null
-        & docker compose run --rm --no-deps --entrypoint python flask -m catalog.flask_app.services.existing_setup_resume
+        & docker compose run --rm --no-deps --entrypoint python flask `
+            -m catalog.flask_app.services.existing_setup_resume
         $resumeExit = $LASTEXITCODE
-        if ($resumeExit -notin @(0, 4)) { throw "resume_failed:$resumeExit" }
-        Invoke-External 'docker' @('compose', 'up', '-d', 'flask') | Out-Null
+        if ($resumeExit -notin @(0, 4)) {
+            throw "resume_failed:$resumeExit"
+        }
+        Invoke-External 'docker' @(
+            'compose', 'up', '-d', 'flask'
+        ) | Out-Null
         $running = Wait-RuntimeVerified $target
-        Write-AgentResult -RequestId $requestId -Action $action -State 'runtime_verified' -CurrentCommit $target -TargetCommit $target -RunningCommit $running -Code 'updated' -Message 'MSH source, images, services, and running commit were updated and verified.'
+        Write-AgentResult `
+            -RequestId $requestId `
+            -Action $action `
+            -State 'runtime_verified' `
+            -CurrentCommit $target `
+            -TargetCommit $target `
+            -RunningCommit $running `
+            -Code 'updated' `
+            -Message 'MSH source, images, services, and running commit were updated and verified.'
         return $true
     }
     catch {
-        $safeRequestId = if ($requestId -and $requestId -match $RequestIdPattern) { $requestId } else { 'invalid-request' }
-        $safeAction = if ($action -in @('check', 'apply')) { $action } else { 'unknown' }
+        $safeRequestId = if (
+            $requestId -and $requestId -match $RequestIdPattern
+        ) {
+            $requestId
+        } else {
+            'invalid-request'
+        }
+        $safeAction = if ($action -in @('check', 'apply')) {
+            $action
+        } else {
+            'unknown'
+        }
         $current = $null
-        try { $current = (Last-Text (Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}'))).Trim().ToLowerInvariant() } catch {}
+        try {
+            $current = (Last-Text (
+                Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}')
+            )).Trim().ToLowerInvariant()
+        }
+        catch {}
         $running = Get-RunningCommit
-        Write-AgentResult -RequestId $safeRequestId -Action $safeAction -State 'error' -CurrentCommit $current -TargetCommit $target -RunningCommit $running -Code 'host_update_failed' -Message 'The host update agent stopped safely before it could verify the requested runtime.'
+        Write-AgentResult `
+            -RequestId $safeRequestId `
+            -Action $safeAction `
+            -State 'error' `
+            -CurrentCommit $current `
+            -TargetCommit $target `
+            -RunningCommit $running `
+            -Code 'host_update_failed' `
+            -Message 'The host update agent stopped safely before it could verify the requested runtime.'
         Write-Warning "MSH update request failed: $($_.Exception.Message)"
         return $true
     }
     finally {
-        Remove-Item -LiteralPath $processing -Force -ErrorAction SilentlyContinue
+        Remove-Item `
+            -LiteralPath $processing `
+            -Force `
+            -ErrorAction SilentlyContinue
     }
 }
 
@@ -267,7 +453,9 @@ try {
     while ($true) {
         $processed = Process-Request
         if ($Once) { break }
-        if (-not $processed) { Start-Sleep -Seconds $PollSeconds }
+        if (-not $processed) {
+            Start-Sleep -Seconds $PollSeconds
+        }
     }
 }
 finally {
