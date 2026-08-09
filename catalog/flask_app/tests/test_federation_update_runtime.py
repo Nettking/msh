@@ -11,7 +11,9 @@ from catalog.federation.software_update import UpdateInspection
 from catalog.flask_app.services import federation_update_events as events
 from catalog.flask_app.services.federation_update_events import (
     APPLY_REPORT_EVENT,
+    CHECK_REQUEST_EVENT,
     EVENT_SCHEMA,
+    SESSION_CREATED_EVENT,
     command_payload,
     report_payload,
     validate_command_payload,
@@ -24,6 +26,8 @@ from catalog.flask_app.services.federation_update_handoff import (
 
 TARGET = "a" * 40
 NODE = "node-target"
+AUTHORITY = "node-authority"
+ATTACKER = "node-attacker"
 
 
 def _parse(value: str) -> datetime:
@@ -134,6 +138,140 @@ def test_command_event_rejects_expired_or_unapproved_input() -> None:
     modified["repository"] = "attacker/msh"
     with pytest.raises(ValueError, match="unapproved_source"):
         validate_command_payload(modified)
+
+
+def test_remote_processor_pins_creator_from_authenticated_session_event(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    now = datetime.now(timezone.utc)
+    malicious = command_payload(
+        request_id="attacker-check",
+        target_commit=TARGET,
+        target_node_ids=(NODE,),
+        created_at=now,
+        expires_at=now + timedelta(minutes=2),
+    )
+    authorized = command_payload(
+        request_id="authority-check",
+        target_commit=TARGET,
+        target_node_ids=(NODE,),
+        created_at=now,
+        expires_at=now + timedelta(minutes=2),
+    )
+    replay = (
+        SimpleNamespace(
+            revision=1,
+            event_type=SESSION_CREATED_EVENT,
+            actor_node_id=AUTHORITY,
+            payload={"session_id": "session-one"},
+        ),
+        SimpleNamespace(
+            revision=2,
+            event_type=CHECK_REQUEST_EVENT,
+            actor_node_id=ATTACKER,
+            payload=malicious,
+        ),
+        SimpleNamespace(
+            revision=3,
+            event_type=CHECK_REQUEST_EVENT,
+            actor_node_id=AUTHORITY,
+            payload=authorized,
+        ),
+    )
+
+    class Handoff:
+        def __init__(self) -> None:
+            self.inspect_calls: list[str] = []
+
+        def latest_result(self):
+            return None
+
+        def inspect(self, *, target: str, fetch: bool):
+            assert fetch is True
+            self.inspect_calls.append(target)
+            return UpdateInspection(
+                "up_to_date",
+                TARGET,
+                TARGET,
+                running_commit=TARGET,
+            )
+
+    handoff = Handoff()
+    recorded: list[tuple[str, dict[str, object]]] = []
+
+    def append(
+        _service,
+        _context,
+        event_type: str,
+        payload: dict[str, object],
+        _request_id: str,
+    ) -> None:
+        recorded.append((event_type, payload))
+
+    monkeypatch.setattr(events, "_append_remote_event", append)
+    coordinator = SimpleNamespace(
+        replay_page=lambda **_kwargs: (replay, 3)
+    )
+    context = SimpleNamespace(
+        credentials=SimpleNamespace(identity=SimpleNamespace(node_id=NODE)),
+        binding=SimpleNamespace(internal_session_id="session-one"),
+        coordinator=coordinator,
+    )
+    service = SimpleNamespace(remote_store=SimpleNamespace(load=lambda: object()))
+    state_file = tmp_path / "processor.json"
+    processor = events.FederationUpdateEventProcessor(
+        service,
+        handoff,
+        state_file,
+    )
+
+    processor.process(context)
+
+    state = json.loads(state_file.read_text(encoding="utf-8"))
+    assert state["authority_node_id"] == AUTHORITY
+    assert state["last_revision"] == 3
+    assert handoff.inspect_calls == [TARGET]
+    assert len(recorded) == 1
+    assert recorded[0][1]["request_id"] == "authority-check"
+
+
+def test_processor_replays_from_zero_if_creator_pin_is_missing(
+    tmp_path: Path,
+) -> None:
+    state_file = tmp_path / "processor.json"
+    state_file.write_text(
+        json.dumps(
+            {
+                "schema": events.PROCESSOR_SCHEMA,
+                "last_revision": 99,
+                "pending": {},
+            }
+        ),
+        encoding="utf-8",
+    )
+    revisions: list[int] = []
+
+    def replay_page(**kwargs):
+        revisions.append(kwargs["last_applied_revision"])
+        return (), 0
+
+    context = SimpleNamespace(
+        credentials=SimpleNamespace(identity=SimpleNamespace(node_id=NODE)),
+        binding=SimpleNamespace(internal_session_id="session-one"),
+        coordinator=SimpleNamespace(replay_page=replay_page),
+    )
+    service = SimpleNamespace(remote_store=SimpleNamespace(load=lambda: object()))
+    handoff = SimpleNamespace(latest_result=lambda: None)
+    processor = events.FederationUpdateEventProcessor(
+        service,
+        handoff,
+        state_file,
+    )
+
+    processor.process(context)
+
+    assert revisions == [0]
 
 
 def test_queued_and_verified_apply_reports_have_distinct_idempotency_keys(
