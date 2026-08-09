@@ -3,7 +3,16 @@ from __future__ import annotations
 import hmac
 import secrets
 
-from flask import Blueprint, flash, jsonify, redirect, request, session, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    request,
+    session,
+    url_for,
+)
 
 from catalog.federation.onboarding_models import (
     ContributionActivationState,
@@ -48,6 +57,39 @@ from .services.server_setup_service import (
 server_setup_web = Blueprint("server_setup_web", __name__)
 
 _MTCONNECT_CSRF_SESSION_KEY = "mtconnect_discovery_csrf_token"
+_EXPLICIT_CONTROL_ENDPOINTS = frozenset(
+    {
+        "server_setup_web.save_language_model_capability_config",
+        "server_setup_web.save_recorder_capability_config",
+        "server_setup_web.test_ai_model",
+        "server_setup_web.test_ai_connection",
+        "server_setup_web.compare_ai_models",
+        "server_setup_web.pull_model",
+        "server_setup_web.start_recording",
+        "server_setup_web.stop_recording",
+        "server_setup_web.scan_mtconnect_network",
+        "server_setup_web.save_discovered_mtconnect_sources",
+    }
+)
+
+
+@server_setup_web.before_app_request
+def dispatch_explicit_capability_controls():
+    """Keep configuration controls independent from analysis-session startup.
+
+    The retired role-first setup used to dispatch these controls before the
+    separate runtime continue/new-session gate.  Preserve that ordering only for
+    explicit configuration/probe/control endpoints.  No legacy setup-save or
+    role mutation endpoint is admitted here.
+    """
+
+    endpoint = request.endpoint or ""
+    if endpoint not in _EXPLICIT_CONTROL_ENDPOINTS:
+        return None
+    view = current_app.view_functions.get(endpoint)
+    if view is None:
+        return None
+    return current_app.ensure_sync(view)(**(request.view_args or {}))
 
 
 def _mtconnect_csrf_token() -> str:
