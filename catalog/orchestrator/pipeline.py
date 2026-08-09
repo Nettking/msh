@@ -20,11 +20,17 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 import traceback
+import uuid
 
 from catalog.common.artifact_registry import configured_scan_dirs, scan_artifacts
 from catalog.common.basic_metrics import basic_metrics_path, build_basic_metrics_dataset
 from catalog.common.data_loading import iter_jsonl_files
-from catalog.runner.data_filtering import discover_available_dates, ensure_session_filtered_data
+from catalog.runner.data_filtering import (
+    date_range_source_signature,
+    discover_available_dates,
+    ensure_session_filtered_data,
+    source_date_signatures,
+)
 from catalog.runner.playback import playback_readiness, prepare_session_playback_exports
 from catalog.runner.script_catalog import discover_runnable_scripts, repo_root
 from catalog.runner.script_exec import execute_script_for_session
@@ -137,6 +143,9 @@ class RuntimeState:
     startup_mode: str
     startup_decision_source: str
     active_runtime_namespace: str
+    active_execution_id: str | None
+    completed_execution_id: str | None
+    completed_execution_succeeded: bool | None
 
 
 def _canonical_scan_roots() -> list[str]:
@@ -158,8 +167,19 @@ def _auto_session_id(start_date: str, end_date: str, *, runtime_namespace: str) 
     return f"auto_{namespace}_{start_date.replace('-', '')}_{end_date.replace('-', '')}"
 
 
-def _load_or_create_auto_session(*, workflows_root: Path, start_date, end_date, script_options, runtime_namespace: str):
-    session_id = _auto_session_id(start_date.isoformat(), end_date.isoformat(), runtime_namespace=runtime_namespace)
+def _load_or_create_auto_session(
+    *,
+    workflows_root: Path,
+    start_date,
+    end_date,
+    script_options,
+    runtime_namespace: str,
+):
+    session_id = _auto_session_id(
+        start_date.isoformat(),
+        end_date.isoformat(),
+        runtime_namespace=runtime_namespace,
+    )
     session_dir = workflows_root / session_id
     if session_dir.exists():
         metadata_path = session_dir / "session_state.json"
@@ -167,7 +187,9 @@ def _load_or_create_auto_session(*, workflows_root: Path, start_date, end_date, 
             import json
 
             metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
-            metadata, changed = normalize_session_metadata(session_dir, metadata, script_options)
+            metadata, changed = normalize_session_metadata(
+                session_dir, metadata, script_options
+            )
             runtime_payload = metadata.setdefault("runtime", {})
             if runtime_payload.get("runtime_namespace") != runtime_namespace:
                 runtime_payload["runtime_namespace"] = runtime_namespace
@@ -205,37 +227,63 @@ def _source_signature(data_dir: Path) -> str:
 
 
 def _machine_day_summary_path(workflows_root: Path, session_id: str) -> Path:
-    return workflows_root / session_id / "analyses" / "data_pr_day" / "machine_day_summary.csv"
+    return (
+        workflows_root
+        / session_id
+        / "analyses"
+        / "data_pr_day"
+        / "machine_day_summary.csv"
+    )
 
 
-def _machine_contract_state(workflows_root: Path, session_id: str | None) -> tuple[str, str]:
+def _machine_contract_state(
+    workflows_root: Path, session_id: str | None
+) -> tuple[str, str]:
     if not session_id:
         return "waiting", "Machine/day aggregation is waiting for a workflow session."
     csv_path = _machine_day_summary_path(workflows_root, session_id)
     if not csv_path.exists():
-        return "waiting", "Machine/day aggregation is manual and not generated yet for the selected session."
+        return (
+            "waiting",
+            "Machine/day aggregation is manual and not generated yet for the selected session.",
+        )
     try:
         with csv_path.open("r", encoding="utf-8", newline="") as handle:
             reader = csv.DictReader(handle)
             if reader.fieldnames is None:
-                return "failed", "Machine/day aggregation CSV is invalid: missing header row."
+                return (
+                    "failed",
+                    "Machine/day aggregation CSV is invalid: missing header row.",
+                )
             required = {"date", "machine", "value"}
             missing = sorted(required - set(reader.fieldnames))
             if missing:
-                return "failed", "Machine/day aggregation CSV is invalid: missing " + ", ".join(missing) + "."
+                return (
+                    "failed",
+                    "Machine/day aggregation CSV is invalid: missing "
+                    + ", ".join(missing)
+                    + ".",
+                )
             first_row = next(reader, None)
             if first_row is None:
                 return "failed", "Machine/day aggregation CSV is empty."
     except OSError as exc:
-        return "failed", f"Machine/day aggregation exists but could not be read: {exc.__class__.__name__}."
+        return (
+            "failed",
+            f"Machine/day aggregation exists but could not be read: {exc.__class__.__name__}.",
+        )
     return "ready", "Machine/day artifact is available for the selected session."
 
 
-def _format_filter_progress_context(*, active_slice: date | str | None, remaining_slices: int | None) -> str:
+def _format_filter_progress_context(
+    *, active_slice: date | str | None, remaining_slices: int | None
+) -> str:
     """Return generic slice context for filter status logs."""
     parts = []
     if active_slice is not None:
-        parts.append(f"active_slice={active_slice.isoformat() if isinstance(active_slice, date) else active_slice}")
+        parts.append(
+            f"active_slice={active_slice.isoformat() if isinstance(active_slice, date) else active_slice}"
+        )
     if remaining_slices is not None:
         parts.append(f"remaining_slices={remaining_slices}")
     return "; " + ", ".join(parts) if parts else ""
@@ -270,7 +318,9 @@ def _run_for_date_slice(
         script_options=script_options,
         runtime_namespace=runtime_namespace,
     )
-    status.info(f"{session_mode} bootstrap/update session: {session_id} ({target_day.isoformat()})")
+    status.info(
+        f"{session_mode} bootstrap/update session: {session_id} ({target_day.isoformat()})"
+    )
 
     matched_records, matched_files, filter_status = ensure_session_filtered_data(
         source_data_dir=data_dir,
@@ -302,7 +352,9 @@ def _run_for_date_slice(
         status.info(f"reusing derived metrics dataset: {derived_dataset}")
     else:
         derived_path, derived_rows = build_basic_metrics_dataset(filtered_data_dir)
-        status.info(f"prepared derived metrics dataset: {derived_rows} rows at {derived_path}")
+        status.info(
+            f"prepared derived metrics dataset: {derived_rows} rows at {derived_path}"
+        )
 
     script_index = {item.key: item for item in script_options}
     script_results: list[dict[str, Any]] = []
@@ -322,14 +374,20 @@ def _run_for_date_slice(
             )
         except Exception as exc:  # pragma: no cover - defensive logging path
             failed_scripts.append(script_key)
-            script_results.append({"script": script_key, "state": "crashed", "exit_code": None})
+            script_results.append(
+                {"script": script_key, "state": "crashed", "exit_code": None}
+            )
             status.warn(
                 f"{script_key} crashed before completion: {exc.__class__.__name__}: {exc}. "
                 f"continuing due to execution policy {EXECUTION_POLICY_BEST_EFFORT}"
             )
-            status.warn("stack trace follows:\n" + "".join(traceback.format_exception(exc)))
+            status.warn(
+                "stack trace follows:\n" + "".join(traceback.format_exception(exc))
+            )
             continue
-        script_results.append({"script": script_key, "state": state, "exit_code": exit_code})
+        script_results.append(
+            {"script": script_key, "state": state, "exit_code": exit_code}
+        )
         if state == "skipped_cached":
             status.info(f"skipping {script_key}: output is up to date")
             continue
@@ -346,7 +404,9 @@ def _run_for_date_slice(
     # before timeline export generation can normalize rows into playback schema.
     ready, missing = playback_readiness(session_dir, metadata)
     if ready:
-        export_path, export_state = prepare_session_playback_exports(session_dir, metadata)
+        export_path, export_state = prepare_session_playback_exports(
+            session_dir, metadata
+        )
         if export_state == "cached":
             status.info(f"playback export already fresh: {export_path}")
         else:
@@ -368,7 +428,9 @@ def _run_for_date_slice(
         write_session_metadata(session_dir, metadata)
 
     artifacts, warnings = scan_artifacts(_canonical_scan_roots())
-    return OrchestrationResult(session_id, session_dir, artifacts, warnings, script_results, failed_scripts)
+    return OrchestrationResult(
+        session_id, session_dir, artifacts, warnings, script_results, failed_scripts
+    )
 
 
 class RuntimeOrchestrator:
@@ -380,7 +442,9 @@ class RuntimeOrchestrator:
     job queue.
     """
 
-    def __init__(self, *, poll_interval_seconds: int = DEFAULT_POLL_INTERVAL_SECONDS) -> None:
+    def __init__(
+        self, *, poll_interval_seconds: int = DEFAULT_POLL_INTERVAL_SECONDS
+    ) -> None:
         self.status = StatusPrinter()
         self.root = repo_root()
         self.data_dir = self.root / "data"
@@ -454,12 +518,17 @@ class RuntimeOrchestrator:
             session_id=None,
             failed_scripts=[],
             bootstrap_full_analysis_scripts=[],
-            bootstrap_full_analysis_excluded_scripts=list(BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS),
+            bootstrap_full_analysis_excluded_scripts=list(
+                BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS
+            ),
             processed_dates_truth_model="verified_session_outputs",
             automatic_coverage_contract=AUTO_COVERAGE_CONTRACT,
             startup_mode=STARTUP_MODE_CONTINUE,
             startup_decision_source="default",
             active_runtime_namespace="default",
+            active_execution_id=None,
+            completed_execution_id=None,
+            completed_execution_succeeded=None,
         )
 
     def _load_state(self) -> RuntimeState:
@@ -472,7 +541,10 @@ class RuntimeOrchestrator:
             return default
         if not isinstance(payload, dict):
             return default
-        fields = {field: payload.get(field, getattr(default, field)) for field in default.__dataclass_fields__}
+        fields = {
+            field: payload.get(field, getattr(default, field))
+            for field in default.__dataclass_fields__
+        }
         state = RuntimeState(**fields)
         if not isinstance(state.processed_dates, list):
             state.processed_dates = []
@@ -480,7 +552,13 @@ class RuntimeOrchestrator:
         if state.bootstrap_date is None:
             state.bootstrap_date = state.last_bootstrap_date
         state.automatic_coverage_contract = AUTO_COVERAGE_CONTRACT
-        state.bootstrap_full_analysis_excluded_scripts = list(BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS)
+        state.bootstrap_full_analysis_excluded_scripts = list(
+            BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS
+        )
+        # In-flight scheduler state belongs to the process that owned the
+        # worker. Persisted ownership cannot survive a process restart.
+        state.update_running = False
+        state.active_execution_id = None
         return state
 
     def _startup_decision_context(self) -> dict[str, Any]:
@@ -526,7 +604,9 @@ class RuntimeOrchestrator:
             loaded = self._load_state()
             loaded.startup_mode = mode
             loaded.startup_decision_source = source
-            loaded.active_runtime_namespace = loaded.active_runtime_namespace or "default"
+            loaded.active_runtime_namespace = (
+                loaded.active_runtime_namespace or "default"
+            )
             self._state = loaded
         else:
             self._state = base
@@ -537,7 +617,9 @@ class RuntimeOrchestrator:
             "source": source,
             "active_runtime_namespace": self._state.active_runtime_namespace,
         }
-        self.startup_state_path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        self.startup_state_path.write_text(
+            json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8"
+        )
         self._persist_state()
 
     def startup_decision_snapshot(self) -> dict[str, Any]:
@@ -570,7 +652,10 @@ class RuntimeOrchestrator:
         return True, f"Startup mode set to {mapped.replace('_', ' ')}."
 
     def _persist_state(self) -> None:
-        self.state_path.write_text(json.dumps(self._state.__dict__, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+        self.state_path.write_text(
+            json.dumps(self._state.__dict__, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
 
     def state_snapshot(self) -> dict[str, Any]:
         with self._lock:
@@ -599,7 +684,9 @@ class RuntimeOrchestrator:
         running = bool(snapshot.get("runtime_started_at"))
         discovery_complete = bool(snapshot.get("discovery_complete"))
         catch_up_complete = bool(snapshot.get("historical_catch_up_complete"))
-        machine_state, machine_message = _machine_contract_state(self.workflows_root, snapshot.get("session_id"))
+        machine_state, machine_message = _machine_contract_state(
+            self.workflows_root, snapshot.get("session_id")
+        )
 
         return {
             "status": {
@@ -615,12 +702,20 @@ class RuntimeOrchestrator:
                 "message": machine_message,
             },
             "historical_catch_up": {
-                "state": "complete" if catch_up_complete else ("running" if running and discovery_complete else "waiting"),
-                "message": "Historical catch-up is complete. Runtime is polling for new days."
-                if catch_up_complete
-                else "Historical catch-up is running in the background one day at a time."
-                if discovery_complete and running
-                else "Historical catch-up will begin after latest-day playback-ready analysis finishes.",
+                "state": (
+                    "complete"
+                    if catch_up_complete
+                    else ("running" if running and discovery_complete else "waiting")
+                ),
+                "message": (
+                    "Historical catch-up is complete. Runtime is polling for new days."
+                    if catch_up_complete
+                    else (
+                        "Historical catch-up is running in the background one day at a time."
+                        if discovery_complete and running
+                        else "Historical catch-up will begin after latest-day playback-ready analysis finishes."
+                    )
+                ),
             },
         }
 
@@ -629,31 +724,81 @@ class RuntimeOrchestrator:
             self._state.mode = "bootstrap_running"
             self._state.phase = "bootstrap"
             self._state.update_running = True
-            self._state.bootstrap_started_at = self._state.bootstrap_started_at or _utc_now_iso()
+            self._state.bootstrap_started_at = (
+                self._state.bootstrap_started_at or _utc_now_iso()
+            )
             self._persist_state()
         result = self._run_update(bootstrap=True)
         return result
 
     def start_background_updates(self) -> None:
         if self.requires_startup_choice():
-            self.status.info("runtime start deferred until startup mode is chosen in /startup")
+            self.status.info(
+                "runtime start deferred until startup mode is chosen in /startup"
+            )
             return
         if self._thread is not None and self._thread.is_alive():
             return
         self._mark_runtime_started()
-        self._thread = threading.Thread(target=self._poll_loop, name="msh-runtime-poller", daemon=True)
+        self._thread = threading.Thread(
+            target=self._poll_loop, name="msh-runtime-poller", daemon=True
+        )
         self._thread.start()
 
-    def request_refresh(self) -> bool:
+    def request_refresh(self, *, execution_id: str | None = None) -> bool:
         """Request an asynchronous catch-up/new-data check from the control panel."""
         with self._lock:
             if self._state.startup_mode == STARTUP_MODE_PENDING:
-                self.status.warn("refresh request ignored: startup mode choice is still pending")
+                self.status.warn(
+                    "refresh request ignored: startup mode choice is still pending"
+                )
                 return False
-            if self._state.update_running:
+            if (
+                self._state.update_running
+                or self._state.active_execution_id is not None
+            ):
                 return False
-        threading.Thread(target=self._run_update, kwargs={"bootstrap": False}, daemon=True).start()
+            # Reserve the scheduler before starting every requested worker,
+            # including ordinary /refresh requests without an external job id.
+            reserved_execution_id = execution_id or f"runtime-refresh-{uuid.uuid4().hex}"
+            self._state.active_execution_id = reserved_execution_id
+            try:
+                self._persist_state()
+            except Exception:
+                self._state.active_execution_id = None
+                raise
+        worker = threading.Thread(
+            target=self._run_requested_update,
+            kwargs={"bootstrap": False, "execution_id": reserved_execution_id},
+            daemon=True,
+        )
+        try:
+            worker.start()
+        except Exception:
+            # A worker that never started must not leave the scheduler fenced.
+            with self._lock:
+                if self._state.active_execution_id == reserved_execution_id:
+                    self._state.active_execution_id = None
+                    self._persist_state()
+            raise
         return True
+
+    def _run_requested_update(
+        self, *, bootstrap: bool, execution_id: str | None
+    ) -> None:
+        """Run an explicitly correlated refresh and durably close it on errors."""
+        try:
+            self._run_update(bootstrap=bootstrap, execution_id=execution_id)
+        except Exception as exc:  # noqa: BLE001 - background boundary persists failure
+            with self._lock:
+                self._state.update_running = False
+                self._state.last_failure = f"{exc.__class__.__name__}: {exc}"
+                self._state.current_processing_phase = "failed"
+                self._state.completed_execution_id = execution_id
+                self._state.completed_execution_succeeded = False
+                self._state.active_execution_id = None
+                self._persist_state()
+            self.status.warn(f"requested update failure: {exc}")
 
     def _poll_loop(self) -> None:
         self.status.info(
@@ -665,6 +810,14 @@ class RuntimeOrchestrator:
         )
         run_bootstrap_once = True
         while not self._stop.is_set():
+            with self._lock:
+                execution_reserved = self._state.active_execution_id is not None
+            if execution_reserved:
+                # Explicit user-triggered work owns this scheduling slot. Do not
+                # let the periodic poller win the race between reservation and the
+                # requested worker entering _run_update().
+                self._stop.wait(1)
+                continue
             try:
                 self._run_update(bootstrap=run_bootstrap_once)
                 run_bootstrap_once = False
@@ -677,7 +830,12 @@ class RuntimeOrchestrator:
                 self.status.warn(f"background update loop failure: {exc}")
             self._stop.wait(1 if run_bootstrap_once else self.poll_interval_seconds)
 
-    def _verified_processed_dates(self, *, script_options) -> set[str]:
+    def _verified_processed_dates(
+        self,
+        *,
+        script_options,
+        source_signatures: dict[str, str] | None = None,
+    ) -> set[str]:
         """Return dates whose on-disk sessions satisfy the automatic contract.
 
         Runtime state can be stale after interrupted runs or manual file edits, so
@@ -688,19 +846,52 @@ class RuntimeOrchestrator:
         verified: set[str] = set()
         sessions = list_sessions(self.workflows_root)
         for session in sessions:
-            metadata, changed = normalize_session_metadata(session.session_dir, dict(session.metadata), script_options)
+            metadata, changed = normalize_session_metadata(
+                session.session_dir, dict(session.metadata), script_options
+            )
             if changed:
                 write_session_metadata(session.session_dir, metadata)
-            runtime_payload = metadata.get("runtime") if isinstance(metadata.get("runtime"), dict) else {}
-            session_namespace = str(runtime_payload.get("runtime_namespace") or "default")
-            if session_namespace != str(self._state.active_runtime_namespace or "default"):
+            runtime_payload = (
+                metadata.get("runtime")
+                if isinstance(metadata.get("runtime"), dict)
+                else {}
+            )
+            session_namespace = str(
+                runtime_payload.get("runtime_namespace") or "default"
+            )
+            if session_namespace != str(
+                self._state.active_runtime_namespace or "default"
+            ):
                 continue
             filter_payload = metadata.get("filter", {})
             start_date = filter_payload.get("start_date")
             end_date = filter_payload.get("end_date")
-            if not isinstance(start_date, str) or not isinstance(end_date, str) or start_date != end_date:
+            if (
+                not isinstance(start_date, str)
+                or not isinstance(end_date, str)
+                or start_date != end_date
+            ):
                 continue
-            filtered_dir = session.session_dir / str(metadata.get("paths", {}).get("filtered_data_dir", "data"))
+            if source_signatures is not None:
+                filter_result = metadata.get("filter_result", {})
+                if not isinstance(filter_result, dict):
+                    continue
+                try:
+                    expected_source_signature = date_range_source_signature(
+                        source_signatures,
+                        date.fromisoformat(start_date),
+                        date.fromisoformat(end_date),
+                    )
+                except ValueError:
+                    continue
+                if (
+                    str(filter_result.get("source_signature") or "")
+                    != expected_source_signature
+                ):
+                    continue
+            filtered_dir = session.session_dir / str(
+                metadata.get("paths", {}).get("filtered_data_dir", "data")
+            )
             if not filtered_dir.exists():
                 continue
             scripts_meta = metadata.get("scripts", {})
@@ -729,20 +920,34 @@ class RuntimeOrchestrator:
         available_set = set(available_iso)
         # Truth model: processed coverage is derived strictly from verified outputs.
         # Persisted state_processed is diagnostic/history and may be stale.
-        processed_set = {item for item in verified_processed_dates if item in available_set}
-        dropped_unverified = {item for item in state_processed if item in available_set and item not in verified_processed_dates}
+        processed_set = {
+            item for item in verified_processed_dates if item in available_set
+        }
+        dropped_unverified = {
+            item
+            for item in state_processed
+            if item in available_set and item not in verified_processed_dates
+        }
         processed_desc = sorted(processed_set, reverse=True)
-        pending_desc = [item for item in reversed(available_dates) if item.isoformat() not in processed_set]
+        pending_desc = [
+            item
+            for item in reversed(available_dates)
+            if item.isoformat() not in processed_set
+        ]
         self._state.processed_dates = sorted(processed_set)
         self._state.processed_days_count = len(processed_set)
         self._state.fully_processed_days_count = self._state.processed_days_count
         self._state.total_available_days = len(available_dates)
         self._state.pending_dates_count = len(pending_desc)
-        self._state.next_planned_date = pending_desc[0].isoformat() if pending_desc else None
+        self._state.next_planned_date = (
+            pending_desc[0].isoformat() if pending_desc else None
+        )
         self._state.next_queued_date = self._state.next_planned_date
         self._state.catch_up_complete = len(pending_desc) == 0
         self._state.historical_catch_up_complete = self._state.catch_up_complete
-        self._state.catch_up_status = "complete" if self._state.catch_up_complete else "running"
+        self._state.catch_up_status = (
+            "complete" if self._state.catch_up_complete else "running"
+        )
         if processed_desc:
             self._state.current_range_start = processed_desc[-1]
             self._state.current_range_end = processed_desc[0]
@@ -751,7 +956,9 @@ class RuntimeOrchestrator:
             self._state.current_range_end = None
         return available_dates, pending_desc, processed_set, dropped_unverified
 
-    def _run_update(self, *, bootstrap: bool) -> OrchestrationResult:
+    def _run_update(
+        self, *, bootstrap: bool, execution_id: str | None = None
+    ) -> OrchestrationResult:
         """Run one bootstrap or incremental catch-up cycle.
 
         Bootstrap always targets the latest discovered day. Non-bootstrap cycles
@@ -761,33 +968,56 @@ class RuntimeOrchestrator:
         with self._lock:
             if self._state.startup_mode == STARTUP_MODE_PENDING:
                 return OrchestrationResult("none", self.workflows_root, [], [], [], [])
+            if (
+                self._state.active_execution_id is not None
+                and self._state.active_execution_id != execution_id
+            ):
+                return OrchestrationResult("none", self.workflows_root, [], [], [], [])
             if self._state.update_running and not bootstrap:
                 return OrchestrationResult("none", self.workflows_root, [], [], [], [])
             now = _utc_now_iso()
             self._state.update_running = True
             self._state.phase = "bootstrap" if bootstrap else "historical_catch_up"
-            self._state.mode = "bootstrap_running" if bootstrap else "incremental_refresh_running"
-            self._state.current_processing_phase = "bootstrap_latest_day_playback_ready_analysis" if bootstrap else "historical_catch_up"
+            self._state.mode = (
+                "bootstrap_running" if bootstrap else "incremental_refresh_running"
+            )
+            self._state.current_processing_phase = (
+                "bootstrap_latest_day_playback_ready_analysis"
+                if bootstrap
+                else "historical_catch_up"
+            )
             self._state.last_update_check_at = now
             self._state.discovery_started_at = self._state.discovery_started_at or now
             self._state.currently_processing_date = None
             if bootstrap:
-                self._state.bootstrap_started_at = self._state.bootstrap_started_at or now
+                self._state.bootstrap_started_at = (
+                    self._state.bootstrap_started_at or now
+                )
             else:
-                self._state.historical_catch_up_started_at = self._state.historical_catch_up_started_at or now
+                self._state.historical_catch_up_started_at = (
+                    self._state.historical_catch_up_started_at or now
+                )
             self._persist_state()
 
         artifacts, warnings = scan_artifacts(_canonical_scan_roots())
         if not self.data_dir.exists():
-            self.status.warn(f"data directory is missing at {self.data_dir}; Flask will run in scan-only mode")
+            self.status.warn(
+                f"data directory is missing at {self.data_dir}; Flask will run in scan-only mode"
+            )
             with self._lock:
                 self._state.update_running = False
                 self._state.phase = "idle"
                 self._state.mode = "scan_only"
                 self._state.discovery_complete = True
                 self._state.current_processing_phase = "idle_no_data_dir"
+                if execution_id is not None:
+                    self._state.completed_execution_id = execution_id
+                    self._state.completed_execution_succeeded = True
+                    self._state.active_execution_id = None
                 self._persist_state()
-            return OrchestrationResult("none", self.workflows_root, artifacts, warnings, [], [])
+            return OrchestrationResult(
+                "none", self.workflows_root, artifacts, warnings, [], []
+            )
 
         available_dates = discover_available_dates(self.data_dir)
         if not available_dates:
@@ -799,22 +1029,40 @@ class RuntimeOrchestrator:
                 self._state.catch_up_status = "idle"
                 self._state.discovery_complete = True
                 self._state.current_processing_phase = "idle_no_discovered_dates"
+                if execution_id is not None:
+                    self._state.completed_execution_id = execution_id
+                    self._state.completed_execution_succeeded = True
+                    self._state.active_execution_id = None
                 self._persist_state()
-            return OrchestrationResult("none", self.workflows_root, artifacts, warnings, [], [])
+            return OrchestrationResult(
+                "none", self.workflows_root, artifacts, warnings, [], []
+            )
 
+        current_source_signatures = source_date_signatures(self.data_dir)
         script_options = discover_runnable_scripts(self.root / "catalog")
         if not script_options:
-            self.status.warn("no runnable scripts discovered; skipping analysis pipeline")
+            self.status.warn(
+                "no runnable scripts discovered; skipping analysis pipeline"
+            )
             with self._lock:
                 self._state.update_running = False
                 self._state.phase = "idle"
                 self._state.mode = "idle_no_scripts"
                 self._state.discovery_complete = True
                 self._state.current_processing_phase = "idle_no_scripts"
+                if execution_id is not None:
+                    self._state.completed_execution_id = execution_id
+                    self._state.completed_execution_succeeded = False
+                    self._state.active_execution_id = None
                 self._persist_state()
-            return OrchestrationResult("none", self.workflows_root, artifacts, warnings, [], [])
+            return OrchestrationResult(
+                "none", self.workflows_root, artifacts, warnings, [], []
+            )
 
-        verified_processed_dates = self._verified_processed_dates(script_options=script_options)
+        verified_processed_dates = self._verified_processed_dates(
+            script_options=script_options,
+            source_signatures=current_source_signatures,
+        )
         latest = available_dates[-1]
         earliest = available_dates[0]
         source_sig = _source_signature(self.data_dir)
@@ -824,7 +1072,11 @@ class RuntimeOrchestrator:
             self._state.latest_available_source_date = latest.isoformat()
             self._state.last_source_signature = source_sig
             self._state.discovery_complete = True
-            self._state.current_processing_phase = "bootstrap_latest_day_playback_ready_analysis" if bootstrap else "historical_catch_up"
+            self._state.current_processing_phase = (
+                "bootstrap_latest_day_playback_ready_analysis"
+                if bootstrap
+                else "historical_catch_up"
+            )
             _, pending_desc, _, dropped_unverified = self._apply_progress_state(
                 available_dates=available_dates,
                 verified_processed_dates=verified_processed_dates,
@@ -840,12 +1092,22 @@ class RuntimeOrchestrator:
             # Latest-day first gives operators the freshest playback view quickly;
             # older source days are handled by the incremental catch-up loop.
             target_days = [latest]
-            bootstrap_script_keys = self._bootstrap_full_analysis_script_keys(script_options)
+            bootstrap_script_keys = self._bootstrap_full_analysis_script_keys(
+                script_options
+            )
             with self._lock:
-                self._state.bootstrap_full_analysis_started_at = self._state.bootstrap_full_analysis_started_at or _utc_now_iso()
-                self._state.bootstrap_full_analysis_scripts = list(bootstrap_script_keys)
-                self._state.bootstrap_full_analysis_excluded_scripts = list(BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS)
-                self._state.current_processing_phase = "bootstrap_latest_day_playback_ready_analysis"
+                self._state.bootstrap_full_analysis_started_at = (
+                    self._state.bootstrap_full_analysis_started_at or _utc_now_iso()
+                )
+                self._state.bootstrap_full_analysis_scripts = list(
+                    bootstrap_script_keys
+                )
+                self._state.bootstrap_full_analysis_excluded_scripts = list(
+                    BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS
+                )
+                self._state.current_processing_phase = (
+                    "bootstrap_latest_day_playback_ready_analysis"
+                )
                 self._persist_state()
             self.status.info(
                 "bootstrap phase: running playback-ready analysis for latest available day "
@@ -864,7 +1126,9 @@ class RuntimeOrchestrator:
                     f"pending_before_cycle={len(pending_desc)})"
                 )
             else:
-                self.status.info("historical catch-up phase: no pending days remain; cycle will idle")
+                self.status.info(
+                    "historical catch-up phase: no pending days remain; cycle will idle"
+                )
 
         with self._lock:
             self._state.new_data_detected = bool(target_days)
@@ -875,7 +1139,9 @@ class RuntimeOrchestrator:
                 "date policy applied "
                 f"({DATE_POLICY_BOOTSTRAP_LATEST_DAY}): processing {', '.join(day.isoformat() for day in target_days)}"
             )
-            final_result = OrchestrationResult("none", self.workflows_root, artifacts, warnings, [], [])
+            final_result = OrchestrationResult(
+                "none", self.workflows_root, artifacts, warnings, [], []
+            )
             failed: list[str] = []
             for day in target_days:
                 with self._lock:
@@ -887,10 +1153,20 @@ class RuntimeOrchestrator:
                     data_dir=self.data_dir,
                     script_options=script_options,
                     target_day=day,
-                    script_keys=bootstrap_script_keys if bootstrap else AUTO_COVERAGE_SCRIPT_KEYS,
-                    run_label="bootstrap_latest_day_playback_ready_analysis" if bootstrap else "historical_catch_up_day",
+                    script_keys=(
+                        bootstrap_script_keys
+                        if bootstrap
+                        else AUTO_COVERAGE_SCRIPT_KEYS
+                    ),
+                    run_label=(
+                        "bootstrap_latest_day_playback_ready_analysis"
+                        if bootstrap
+                        else "historical_catch_up_day"
+                    ),
                     mark_bootstrap_full_analysis_complete=bootstrap,
-                    runtime_namespace=str(self._state.active_runtime_namespace or "default"),
+                    runtime_namespace=str(
+                        self._state.active_runtime_namespace or "default"
+                    ),
                     active_slice=day,
                     remaining_slices=max(0, len(pending_desc) - 1),
                 )
@@ -904,9 +1180,7 @@ class RuntimeOrchestrator:
                 self._state.last_processed_date = target_days[-1].isoformat()
                 self._state.last_completed_date = target_days[-1].isoformat()
                 completed_scripts = ",".join(AUTO_COVERAGE_SCRIPT_KEYS) or "none"
-                self._state.last_completed_step = (
-                    f"automatic_coverage[{completed_scripts}] for {target_days[-1].isoformat()}"
-                )
+                self._state.last_completed_step = f"automatic_coverage[{completed_scripts}] for {target_days[-1].isoformat()}"
                 if bootstrap:
                     self._state.bootstrap_date = target_days[-1].isoformat()
                     self._state.last_bootstrap_date = target_days[-1].isoformat()
@@ -916,8 +1190,15 @@ class RuntimeOrchestrator:
                     self._state.last_catchup_success_at = _utc_now_iso()
                 self._state.last_successful_refresh = _utc_now_iso()
                 self._state.failed_scripts = failed
-                self._state.last_failure = None if not failed else f"Failed scripts: {', '.join(sorted(set(failed)))}"
-                verified_processed_dates = self._verified_processed_dates(script_options=script_options)
+                self._state.last_failure = (
+                    None
+                    if not failed
+                    else f"Failed scripts: {', '.join(sorted(set(failed)))}"
+                )
+                verified_processed_dates = self._verified_processed_dates(
+                    script_options=script_options,
+                    source_signatures=current_source_signatures,
+                )
                 _, pending_desc, _, dropped_unverified = self._apply_progress_state(
                     available_dates=available_dates,
                     verified_processed_dates=verified_processed_dates,
@@ -933,9 +1214,13 @@ class RuntimeOrchestrator:
                     f"remaining={len(pending_desc)}, next={self._state.next_planned_date or 'none'}"
                 )
                 if bootstrap:
-                    self.status.info("bootstrap phase: playback-ready analysis complete; historical catch-up will continue in background")
+                    self.status.info(
+                        "bootstrap phase: playback-ready analysis complete; historical catch-up will continue in background"
+                    )
         else:
-            final_result = OrchestrationResult("none", self.workflows_root, artifacts, warnings, [], [])
+            final_result = OrchestrationResult(
+                "none", self.workflows_root, artifacts, warnings, [], []
+            )
             with self._lock:
                 self._state.failed_scripts = []
                 self._state.last_failure = None
@@ -954,7 +1239,17 @@ class RuntimeOrchestrator:
             self._state.phase = "idle"
             self._state.mode = "idle_incremental"
             self._state.currently_processing_date = None
-            self._state.current_processing_phase = "polling_new_data" if self._state.catch_up_complete else "historical_catch_up"
+            self._state.current_processing_phase = (
+                "polling_new_data"
+                if self._state.catch_up_complete
+                else "historical_catch_up"
+            )
+            if execution_id is not None:
+                self._state.completed_execution_id = execution_id
+                self._state.completed_execution_succeeded = not bool(
+                    self._state.last_failure or self._state.failed_scripts
+                )
+                self._state.active_execution_id = None
             self._persist_state()
         return final_result
 
@@ -969,7 +1264,9 @@ _RUNTIME_MANAGER: RuntimeOrchestrator | None = None
 def get_runtime_manager() -> RuntimeOrchestrator:
     global _RUNTIME_MANAGER
     if _RUNTIME_MANAGER is None:
-        poll_seconds = int(str(os.getenv("MSH_UPDATE_POLL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS)))
+        poll_seconds = int(
+            str(os.getenv("MSH_UPDATE_POLL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS))
+        )
         _RUNTIME_MANAGER = RuntimeOrchestrator(poll_interval_seconds=poll_seconds)
     return _RUNTIME_MANAGER
 
@@ -1000,5 +1297,7 @@ def run_orchestration() -> OrchestrationResult:
     manager.mark_app_started()
     result = manager.bootstrap()
     manager.start_background_updates()
-    status.info(f"orchestration bootstrap completed at {_utc_now_iso()} (failed scripts: {len(result.failed_scripts)})")
+    status.info(
+        f"orchestration bootstrap completed at {_utc_now_iso()} (failed scripts: {len(result.failed_scripts)})"
+    )
     return result

@@ -87,22 +87,68 @@ class DurableRecorderDeliveryQueue:
             now=self.clock(),
         )
 
+    @staticmethod
+    def _ordering_key(entry) -> tuple[str, str, str] | None:
+        payload = entry.payload
+        if not isinstance(payload, dict):
+            return None
+        dataset_id = payload.get("dataset_id")
+        if not isinstance(dataset_id, str) or not dataset_id:
+            return None
+        return entry.session_id, entry.destination_id, dataset_id
+
     async def run_once(self, *, limit: int = 100) -> RecorderDeliveryRunResult:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
-            raise FederationValidationError("invalid-limit", "limit", "must be a positive integer")
-        due = tuple(
-            entry
-            for entry in self.outbox.pending(now=self.clock())
-            if entry.schema_id == RECORDER_STORAGE_SCHEMA
-        )[:limit]
+            raise FederationValidationError(
+                "invalid-limit",
+                "limit",
+                "must be a positive integer",
+            )
+
+        # Preserve recorder sequence order independently per logical dataset.
+        # A failed or not-yet-due older entry fences newer entries for that same
+        # session/group/dataset until the older entry commits. Other datasets
+        # remain free to make progress.
+        now = self.clock()
+        pending_entries = tuple(
+            sorted(
+                (
+                    entry
+                    for entry in self.outbox.pending()
+                    if entry.schema_id == RECORDER_STORAGE_SCHEMA
+                ),
+                key=lambda entry: entry.outbox_id,
+            )
+        )
+        blocked: set[tuple[str, str, str]] = set()
+        attempted = 0
         committed = 0
         pending = 0
-        for entry in due:
+
+        for entry in pending_entries:
+            if attempted >= limit:
+                break
+            ordering_key = self._ordering_key(entry)
+            if ordering_key is not None and ordering_key in blocked:
+                continue
+            if entry.next_attempt_at > now:
+                if ordering_key is not None:
+                    blocked.add(ordering_key)
+                continue
+
+            attempted += 1
             payload = entry.payload
+            failed = False
             try:
                 if not isinstance(payload, dict):
-                    raise FederationValidationError("invalid-recorder-delivery", "payload", "must be an object")
-                created_at = datetime.fromisoformat(str(payload["created_at"]).replace("Z", "+00:00"))
+                    raise FederationValidationError(
+                        "invalid-recorder-delivery",
+                        "payload",
+                        "must be an object",
+                    )
+                created_at = datetime.fromisoformat(
+                    str(payload["created_at"]).replace("Z", "+00:00")
+                )
                 outcome = await self.client.ingest_batch(
                     group_id=str(payload["group_id"]),
                     dataset_id=str(payload["dataset_id"]),
@@ -130,7 +176,24 @@ class DurableRecorderDeliveryQueue:
                         now=self.clock(),
                     )
                     pending += 1
-            except (FederationValidationError, KeyError, TypeError, ValueError, OSError, RuntimeError) as exc:
-                self.outbox.record_failure(entry.outbox_id, error=str(exc), now=self.clock())
+                    failed = True
+            except (
+                FederationValidationError,
+                KeyError,
+                TypeError,
+                ValueError,
+                OSError,
+                RuntimeError,
+            ) as exc:
+                self.outbox.record_failure(
+                    entry.outbox_id,
+                    error=str(exc),
+                    now=self.clock(),
+                )
                 pending += 1
-        return RecorderDeliveryRunResult(len(due), committed, pending)
+                failed = True
+
+            if failed and ordering_key is not None:
+                blocked.add(ordering_key)
+
+        return RecorderDeliveryRunResult(attempted, committed, pending)

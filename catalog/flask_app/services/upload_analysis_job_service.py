@@ -86,19 +86,28 @@ class UploadAnalysisJobService:
     def _initialize_links(self) -> None:
         with self._connect() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
-            connection.execute(
-                """
+            connection.execute("""
                 CREATE TABLE IF NOT EXISTS data_upload_analysis_jobs (
                     job_id TEXT PRIMARY KEY,
                     batch_id TEXT NOT NULL UNIQUE,
                     session_id TEXT NOT NULL,
                     coordinator_id TEXT NOT NULL,
                     provider_id TEXT NOT NULL,
+                    execution_id TEXT,
                     baseline_update_at TEXT,
                     created_at TEXT NOT NULL
                 )
-                """
-            )
+                """)
+            columns = {
+                str(row[1])
+                for row in connection.execute(
+                    "PRAGMA table_info(data_upload_analysis_jobs)"
+                )
+            }
+            if "execution_id" not in columns:
+                connection.execute(
+                    "ALTER TABLE data_upload_analysis_jobs ADD COLUMN execution_id TEXT"
+                )
 
     @staticmethod
     def _worker_id(coordinator_id: str) -> str:
@@ -204,8 +213,8 @@ class UploadAnalysisJobService:
                 """
                 INSERT INTO data_upload_analysis_jobs(
                     job_id,batch_id,session_id,coordinator_id,provider_id,
-                    baseline_update_at,created_at
-                ) VALUES(?,?,?,?,?,?,?)
+                    baseline_update_at,created_at,execution_id
+                ) VALUES(?,?,?,?,?,?,?,?)
                 ON CONFLICT(job_id) DO NOTHING
                 """,
                 (
@@ -216,6 +225,7 @@ class UploadAnalysisJobService:
                     provider_id,
                     None if baseline is None else str(baseline),
                     _stamp(now),
+                    job_id,
                 ),
             )
         return job_id
@@ -341,26 +351,13 @@ class UploadAnalysisJobService:
 
     def _monitor(self, job_id: str) -> None:
         link = self._link(job_id)
-        baseline = link["baseline_update_at"]
         deadline = time.monotonic() + self.monitor_timeout_seconds
-        seen_running = False
         last_renewal = time.monotonic()
         while time.monotonic() < deadline:
             state = self._runtime_snapshot()
-            running = bool(state.get("update_running"))
-            current_update = state.get("last_update_check_at")
-            if running:
-                seen_running = True
-            elif seen_running or (
-                current_update is not None and str(current_update) != str(baseline)
-            ):
+            if state.get("completed_execution_id") == link["execution_id"]:
                 snapshot = self.store.snapshot(job_id)
-                failed_scripts = state.get("failed_scripts")
-                failed = (
-                    state.get("current_processing_phase") == "failed"
-                    or bool(state.get("last_failure"))
-                    or bool(failed_scripts)
-                )
+                failed = not bool(state.get("completed_execution_succeeded"))
                 self._complete(
                     snapshot,
                     success=not failed,
