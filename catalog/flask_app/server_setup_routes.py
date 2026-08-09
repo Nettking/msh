@@ -5,6 +5,10 @@ import secrets
 
 from flask import Blueprint, flash, jsonify, redirect, request, session, url_for
 
+# Temporary import-only compatibility hook for CFI-6 tests and integrations that
+# monkeypatch this historical module symbol. No route behavior depends on it.
+from catalog.orchestrator.pipeline import get_runtime_manager as get_runtime_manager
+
 from .services.ai_model_benchmark_service import compare_ollama_setup_models
 from .services.capability_config_service import (
     CapabilityConfigError,
