@@ -156,6 +156,67 @@ def test_check_targets_only_devices_reported_connected(
     assert by_id[OFFLINE]["reachable"] is False
 
 
+def test_update_all_rejects_while_remote_check_is_pending(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    state_file = tmp_path / "updates.json"
+    local = _Local(state_file)
+    coordinator = _Coordinator()
+    _install_context(
+        monkeypatch,
+        coordinator,
+        (
+            _device(ACTOR, "connected", "Owner"),
+            _device(REMOTE, "connected", "Remote"),
+        ),
+    )
+    service = FederationUpdateService(local, state_file)
+    now = datetime.now(timezone.utc)
+    service._save(
+        {
+            "operation": "check",
+            "status": "checking",
+            "request_id": "check-pending",
+            "checked_at": service._stamp(now),
+            "check_expires_at": service._stamp(now + timedelta(minutes=5)),
+            "report_deadline": service._stamp(now + timedelta(seconds=30)),
+            "target_commit": TARGET,
+            "expected_report_node_ids": [REMOTE],
+            "eligible_count": 1,
+            "devices": [
+                service._device(
+                    ACTOR,
+                    "Owner",
+                    UpdateInspection(
+                        "update_available",
+                        CURRENT,
+                        TARGET,
+                        running_commit=CURRENT,
+                    ),
+                ),
+                service._device(
+                    REMOTE,
+                    "Remote",
+                    UpdateInspection(
+                        "checking",
+                        target_commit=TARGET,
+                    ),
+                ),
+            ],
+        }
+    )
+
+    with pytest.raises(ValueError, match="check_in_progress"):
+        service.update_all(confirmed_target=TARGET)
+
+    assert local.apply_calls == []
+    assert not any(
+        item["event_type"] == APPLY_REQUEST_EVENT
+        for item in coordinator.events
+    )
+
+
 def test_update_all_rechecks_reachability_and_queues_coordinator_last(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
