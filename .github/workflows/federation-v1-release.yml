@@ -215,8 +215,7 @@ jobs:
           catalog/flask_app/services/resilient_pairing_runtime.py
           catalog/flask_app/services/run_once_capability_evidence.py
           catalog/flask_app/services/upload_analysis_job_service.py
-          catalog/flask_app/test_startup_ai_benchmark.py
-          catalog/flask_app/test_startup_saved_landing.py
+          catalog/flask_app/tests/test_legacy_startup_retired.py
           catalog/flask_app/tests/test_ai_explainer_candidate_visibility.py
           catalog/flask_app/tests/test_capability_runtime_startup.py
           catalog/flask_app/tests/test_capability_startup_transition_route.py
