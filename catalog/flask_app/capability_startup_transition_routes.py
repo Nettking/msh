@@ -42,6 +42,9 @@ from .services.capability_contribution_service import (
 from .services.capability_startup_transition_service import (
     get_capability_startup_transition_service,
 )
+from .services.startup_contribution_reconcile import (
+    run_startup_contribution_reconcile,
+)
 
 capability_startup_transition_web = Blueprint(
     "capability_startup_transition_web",
@@ -50,9 +53,6 @@ capability_startup_transition_web = Blueprint(
 
 _LEGACY_FALLBACK_SESSION_KEY = "capability_startup_legacy_fallback"
 _ROOT_HANDOFF_SESSION_KEY = "capability_startup_root_handoff_complete"
-_CONTRIBUTION_RECONCILE_EXTENSION_KEY = (
-    "capability_contribution_startup_reconciled"
-)
 _BASE_FIELDS = frozenset({"_csrf_token", "command_id"})
 _SAFE_PREFIXES = ("/onboarding", "/federation", "/docs", "/static")
 _LEGACY_CONTROL_PREFIXES = (
@@ -200,17 +200,20 @@ def _degraded_view_model(view_model: dict[str, object]) -> dict[str, object]:
 
 
 def _reconcile_contributions_once() -> None:
-    if current_app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY):
-        return
-    current_app.extensions[_CONTRIBUTION_RECONCILE_EXTENSION_KEY] = True
-    try:
+    def operation() -> tuple[object, ...]:
         service = get_capability_contribution_service()
-        if service.has_persisted_intents():
-            service.reconcile()
-    except Exception as exc:  # noqa: BLE001 - startup must remain available
+        if not service.has_persisted_intents():
+            return ()
+        return tuple(service.reconcile())
+
+    attempted, _result, error = run_startup_contribution_reconcile(
+        current_app.extensions,
+        operation,
+    )
+    if attempted and error is not None:
         current_app.logger.info(
             "Capability contribution startup reconcile unavailable (%s)",
-            type(exc).__name__,
+            type(error).__name__,
         )
 
 
