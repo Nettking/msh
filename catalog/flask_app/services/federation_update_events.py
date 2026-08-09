@@ -334,6 +334,16 @@ class FederationUpdateEventProcessor:
             ),
         )
 
+    def _host_result(self, request_id: str) -> UpdateInspection | None:
+        result_for = getattr(self.handoff, "result_for", None)
+        if callable(result_for):
+            result = result_for(request_id)
+            return result if isinstance(result, UpdateInspection) else result
+        latest = self.handoff.latest_result()
+        if latest is None or latest.request_id != request_id:
+            return None
+        return latest
+
     def _finish_pending(
         self,
         context: Any,
@@ -342,25 +352,26 @@ class FederationUpdateEventProcessor:
         pending = state.get("pending")
         if not isinstance(pending, dict) or not pending:
             return
-        latest = self.handoff.latest_result()
-        if latest is None:
-            return
         changed = False
         for federation_request_id, record in list(pending.items()):
             if not isinstance(record, dict):
                 pending.pop(federation_request_id, None)
                 changed = True
                 continue
-            if (
-                latest.request_id != record.get("host_request_id")
-                or latest.target_commit != record.get("target_commit")
-            ):
+            host_request_id = record.get("host_request_id")
+            target_commit = record.get("target_commit")
+            if not isinstance(host_request_id, str):
+                pending.pop(federation_request_id, None)
+                changed = True
+                continue
+            result = self._host_result(host_request_id)
+            if result is None or result.target_commit != target_commit:
                 continue
             self._report(
                 context,
                 event_type=APPLY_REPORT_EVENT,
                 federation_request_id=federation_request_id,
-                result=latest,
+                result=result,
             )
             pending.pop(federation_request_id, None)
             changed = True
@@ -449,17 +460,16 @@ class FederationUpdateEventProcessor:
                             federation_request_id,
                             local_node,
                         )
-                        latest = self.handoff.latest_result()
+                        existing = self._host_result(host_request_id)
                         if (
-                            latest is not None
-                            and latest.request_id == host_request_id
-                            and latest.target_commit == target
+                            existing is not None
+                            and existing.target_commit == target
                         ):
                             self._report(
                                 context,
                                 event_type=APPLY_REPORT_EVENT,
                                 federation_request_id=federation_request_id,
-                                result=latest,
+                                result=existing,
                             )
                             pending.pop(federation_request_id, None)
                         else:
@@ -467,10 +477,16 @@ class FederationUpdateEventProcessor:
                                 target,
                                 request_id=host_request_id,
                             )
-                            pending[federation_request_id] = {
-                                "host_request_id": host_request_id,
-                                "target_commit": target,
-                            }
+                            if queued.state == "activation_queued":
+                                pending[federation_request_id] = {
+                                    "host_request_id": host_request_id,
+                                    "target_commit": target,
+                                }
+                            else:
+                                # A bounded handoff that did not queue the
+                                # request is a terminal report for this command;
+                                # never persist a phantom pending operation.
+                                pending.pop(federation_request_id, None)
                             state["pending"] = pending
                             _write_state(self.state_file, state)
                             self._report(
