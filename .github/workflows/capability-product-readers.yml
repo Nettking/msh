@@ -6,6 +6,9 @@ on:
       - ".github/workflows/capability-product-readers.yml"
       - "catalog/flask_app/app.py"
       - "catalog/flask_app/capability_product_routes.py"
+      - "catalog/flask_app/routes.py"
+      - "catalog/flask_app/templates/status.html"
+      - "catalog/flask_app/test_navigation_smoke.py"
       - "catalog/flask_app/tests/test_capability_product_routes.py"
       - "catalog/flask_app/tests/test_capability_startup_transition_route.py"
       - "catalog/flask_app/tests/test_legacy_startup_retired.py"
@@ -16,6 +19,9 @@ on:
       - ".github/workflows/capability-product-readers.yml"
       - "catalog/flask_app/app.py"
       - "catalog/flask_app/capability_product_routes.py"
+      - "catalog/flask_app/routes.py"
+      - "catalog/flask_app/templates/status.html"
+      - "catalog/flask_app/test_navigation_smoke.py"
       - "catalog/flask_app/tests/test_capability_product_routes.py"
       - "catalog/flask_app/tests/test_capability_startup_transition_route.py"
       - "catalog/flask_app/tests/test_legacy_startup_retired.py"
@@ -59,6 +65,7 @@ jobs:
           python -m compileall -q
           catalog/flask_app/app.py
           catalog/flask_app/capability_product_routes.py
+          catalog/flask_app/routes.py
           catalog/flask_app/tests/test_capability_product_routes.py
           catalog/flask_app/tests/test_capability_startup_transition_route.py
           catalog/flask_app/tests/test_legacy_startup_retired.py
@@ -78,6 +85,7 @@ jobs:
           python -m ruff check
           catalog/flask_app/app.py
           catalog/flask_app/capability_product_routes.py
+          catalog/flask_app/routes.py
           catalog/flask_app/tests/test_capability_product_routes.py
           --ignore I001,RUF022,B008,C408,PLC0206,UP035
 
