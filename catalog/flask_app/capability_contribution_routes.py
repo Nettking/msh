@@ -41,13 +41,15 @@ from .services.capability_benchmark_service import (
 from .services.capability_contribution_service import (
     get_capability_contribution_service,
 )
+from .services.startup_contribution_reconcile import (
+    run_startup_contribution_reconcile,
+)
 
 capability_contribution_web = Blueprint(
     "capability_contribution_web",
     __name__,
 )
 
-_STARTUP_RECONCILE_EXTENSION_KEY = "capability_contribution_startup_reconciled"
 _BASE_FIELDS = frozenset({"_csrf_token", "command_id"})
 _CHOICE_PREFIX = "contribution."
 _MAX_CHOICES = 128
@@ -261,23 +263,27 @@ def _render_onboarding_with_contributions() -> Response:
     )
 
 
+def _reconcile_saved_contributions() -> tuple[object, ...]:
+    service = get_capability_contribution_service()
+    if not service.has_persisted_intents():
+        return ()
+    return tuple(service.reconcile())
+
+
 @capability_contribution_web.before_app_request
 def _startup_reconcile_and_dispatch() -> Response | None:
-    """Reconcile explicit persisted intent once, then dispatch before CFI-4."""
+    """Reconcile explicit persisted intent once, retrying transient startup gaps."""
 
     endpoint = request.endpoint or ""
-    if not endpoint.startswith("static") and not current_app.extensions.get(
-        _STARTUP_RECONCILE_EXTENSION_KEY
-    ):
-        current_app.extensions[_STARTUP_RECONCILE_EXTENSION_KEY] = True
-        try:
-            service = get_capability_contribution_service()
-            if service.has_persisted_intents():
-                service.reconcile()
-        except Exception as exc:  # noqa: BLE001 - startup must remain available
+    if not endpoint.startswith("static"):
+        attempted, _result, error = run_startup_contribution_reconcile(
+            current_app.extensions,
+            _reconcile_saved_contributions,
+        )
+        if attempted and error is not None:
             current_app.logger.info(
                 "Capability contribution startup reconcile unavailable (%s)",
-                type(exc).__name__,
+                type(error).__name__,
             )
 
     if request.blueprint != capability_contribution_web.name:
