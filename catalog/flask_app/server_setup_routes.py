@@ -5,6 +5,10 @@ import secrets
 
 from flask import Blueprint, flash, jsonify, redirect, request, session, url_for
 
+from catalog.federation.onboarding_models import (
+    ContributionActivationState,
+    ContributionDesiredState,
+)
 # Temporary import-only compatibility hook for CFI-6 tests and integrations that
 # monkeypatch this historical module symbol. No route behavior depends on it.
 from catalog.orchestrator.pipeline import get_runtime_manager  # noqa: F401
@@ -18,6 +22,9 @@ from .services.capability_config_service import (
     save_capability_config,
     update_language_model_config,
     update_recorder_config,
+)
+from .services.capability_contribution_service import (
+    get_capability_contribution_service,
 )
 from .services.capability_startup_transition_service import (
     get_capability_startup_transition_service,
@@ -107,10 +114,30 @@ def _capability_flags() -> dict[str, object]:
         }
 
 
+def _active_recorder_contribution() -> bool:
+    """Require current active CF4/CFI-5 authority, failing closed on stale state."""
+
+    try:
+        service = get_capability_contribution_service()
+        recorder_candidates = {
+            candidate.candidate_id
+            for candidate in service.recommend(require_benchmark_review=False)
+            if candidate.capability_type == "recorder"
+        }
+        return any(
+            intent.candidate_id in recorder_candidates
+            and intent.desired_state is ContributionDesiredState.ENABLED
+            and intent.activation_state is ContributionActivationState.ACTIVE
+            for intent in service.intents()
+        )
+    except Exception:  # noqa: BLE001 - legacy control must not bypass authority
+        return False
+
+
 def _recorder_authorized() -> bool:
     flags = _capability_flags()
     if bool(flags.get("completed")):
-        return bool(flags.get("recorder"))
+        return _active_recorder_contribution()
     if not bool(flags.get("needs_migration")):
         return False
     try:
@@ -303,7 +330,7 @@ def _set_recording_from_request(enabled: bool):
         authorized = _recorder_authorized()
         if enabled and not authorized:
             raise RecorderControlError(
-                "Recorder capability is not enabled by capability-first intent."
+                "Recorder capability is not enabled by current contribution authority."
             )
         config = load_capability_config()
         settings = compatibility_settings(
