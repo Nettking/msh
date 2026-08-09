@@ -8,11 +8,13 @@ on:
       - "catalog/flask_app/capability_contribution_routes.py"
       - "catalog/flask_app/services/capability_contribution_components.py"
       - "catalog/flask_app/services/capability_contribution_service.py"
+      - "catalog/flask_app/services/mtconnect_discovery_service.py"
       - "catalog/flask_app/services/recorder_control_service.py"
       - "catalog/flask_app/services/run_once_capability_evidence.py"
       - "catalog/flask_app/services/startup_contribution_reconcile.py"
       - "catalog/flask_app/templates/federation/onboarding/_contributions.html"
       - "catalog/flask_app/tests/test_capability_contribution_route.py"
+      - "catalog/flask_app/tests/test_mtconnect_discovery_service.py"
       - "catalog/flask_app/tests/test_recorder_control_service.py"
       - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
       - "catalog/flask_app/tests/test_startup_contribution_reconcile.py"
@@ -31,11 +33,13 @@ on:
       - "catalog/flask_app/capability_contribution_routes.py"
       - "catalog/flask_app/services/capability_contribution_components.py"
       - "catalog/flask_app/services/capability_contribution_service.py"
+      - "catalog/flask_app/services/mtconnect_discovery_service.py"
       - "catalog/flask_app/services/recorder_control_service.py"
       - "catalog/flask_app/services/run_once_capability_evidence.py"
       - "catalog/flask_app/services/startup_contribution_reconcile.py"
       - "catalog/flask_app/templates/federation/onboarding/_contributions.html"
       - "catalog/flask_app/tests/test_capability_contribution_route.py"
+      - "catalog/flask_app/tests/test_mtconnect_discovery_service.py"
       - "catalog/flask_app/tests/test_recorder_control_service.py"
       - "catalog/flask_app/tests/test_run_once_capability_evidence.py"
       - "catalog/flask_app/tests/test_startup_contribution_reconcile.py"
@@ -79,10 +83,12 @@ jobs:
           catalog/flask_app/capability_contribution_routes.py
           catalog/flask_app/services/capability_contribution_components.py
           catalog/flask_app/services/capability_contribution_service.py
+          catalog/flask_app/services/mtconnect_discovery_service.py
           catalog/flask_app/services/recorder_control_service.py
           catalog/flask_app/services/run_once_capability_evidence.py
           catalog/flask_app/services/startup_contribution_reconcile.py
           catalog/flask_app/tests/test_capability_contribution_route.py
+          catalog/flask_app/tests/test_mtconnect_discovery_service.py
           catalog/flask_app/tests/test_recorder_control_service.py
           catalog/flask_app/tests/test_run_once_capability_evidence.py
           catalog/flask_app/tests/test_startup_contribution_reconcile.py
@@ -118,9 +124,11 @@ jobs:
           catalog/flask_app/capability_contribution_routes.py
           catalog/flask_app/services/capability_contribution_components.py
           catalog/flask_app/services/capability_contribution_service.py
+          catalog/flask_app/services/mtconnect_discovery_service.py
           catalog/flask_app/services/recorder_control_service.py
           catalog/flask_app/services/run_once_capability_evidence.py
           catalog/flask_app/tests/test_capability_contribution_route.py
+          catalog/flask_app/tests/test_mtconnect_discovery_service.py
           catalog/flask_app/tests/test_recorder_control_service.py
           catalog/flask_app/tests/test_run_once_capability_evidence.py
           catalog/flask_app/tests/test_startup_contribution_reconcile.py
