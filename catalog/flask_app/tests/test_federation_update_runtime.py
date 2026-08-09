@@ -34,25 +34,28 @@ def _parse(value: str) -> datetime:
     return datetime.fromisoformat(value.replace("Z", "+00:00"))
 
 
+def _result_payload(request_id: str, state: str = "up_to_date") -> dict[str, object]:
+    return {
+        "schema": RESULT_SCHEMA,
+        "request_id": request_id,
+        "state": state,
+        "current_commit": TARGET,
+        "target_commit": TARGET,
+        "running_commit": TARGET,
+        "code": None,
+        "message": "verified",
+    }
+
+
 def test_handoff_check_is_bounded_and_matches_exact_result(tmp_path: Path) -> None:
     handoff = HostUpdateHandoff(tmp_path, timeout=1.0, poll_interval=0.02)
     captured: dict[str, object] = {}
 
     def write(value: dict[str, object]) -> None:
         captured.update(value)
-        handoff.result_file.write_text(
-            json.dumps(
-                {
-                    "schema": RESULT_SCHEMA,
-                    "request_id": value["request_id"],
-                    "state": "up_to_date",
-                    "current_commit": TARGET,
-                    "target_commit": TARGET,
-                    "running_commit": TARGET,
-                    "code": None,
-                    "message": "verified",
-                }
-            ),
+        request_id = str(value["request_id"])
+        handoff._result_path(request_id).write_text(
+            json.dumps(_result_payload(request_id)),
             encoding="utf-8",
         )
 
@@ -84,6 +87,39 @@ def test_handoff_apply_has_short_activation_grace(tmp_path: Path) -> None:
     assert 0 < (activate_after - created).total_seconds() <= ACTIVATION_GRACE_SECONDS
     assert result.state == "activation_queued"
     assert result.request_id == "request-1"
+
+
+def test_handoff_never_overwrites_an_unclaimed_request(tmp_path: Path) -> None:
+    handoff = HostUpdateHandoff(tmp_path, timeout=1.0, poll_interval=0.02)
+
+    first = handoff.apply(TARGET, request_id="request-first")
+    second = handoff.apply(TARGET, request_id="request-second")
+    persisted = json.loads(handoff.request_file.read_text(encoding="utf-8"))
+
+    assert first.state == "activation_queued"
+    assert second.state == "error"
+    assert second.code == "host_update_busy"
+    assert persisted["request_id"] == "request-first"
+
+
+def test_handoff_results_are_request_scoped(tmp_path: Path) -> None:
+    handoff = HostUpdateHandoff(tmp_path)
+    handoff.directory.mkdir(parents=True, exist_ok=True)
+    first = _result_payload("request-first", "runtime_verified")
+    second = _result_payload("request-second", "error")
+    handoff._result_path("request-first").write_text(
+        json.dumps(first),
+        encoding="utf-8",
+    )
+    handoff._result_path("request-second").write_text(
+        json.dumps(second),
+        encoding="utf-8",
+    )
+    handoff.result_file.write_text(json.dumps(second), encoding="utf-8")
+
+    assert handoff.result_for("request-first").state == "runtime_verified"  # type: ignore[union-attr]
+    assert handoff.result_for("request-second").state == "error"  # type: ignore[union-attr]
+    assert handoff.latest_result().request_id == "request-second"  # type: ignore[union-attr]
 
 
 def test_handoff_rejects_non_object_id_without_writing_request(tmp_path: Path) -> None:
