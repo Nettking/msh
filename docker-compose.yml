@@ -128,7 +128,7 @@ services:
     command:
       - python
       - -m
-      - catalog.relay.service
+      - catalog.relay.provider_service
       - serve
       - --database
       - /var/lib/msh-relay/control.sqlite3
