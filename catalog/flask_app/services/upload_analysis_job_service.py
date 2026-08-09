@@ -400,9 +400,7 @@ class UploadAnalysisJobService:
         for row in rows:
             try:
                 snapshots.append(self.store.snapshot(str(row["job_id"])))
-            except (
-                Exception
-            ):  # noqa: BLE001,S112 - one damaged job must not hide others
+            except Exception:  # noqa: BLE001,S112 - one damaged job must not hide others
                 continue
         return tuple(snapshots)
 
@@ -418,9 +416,7 @@ class UploadAnalysisJobService:
                 if snapshot.job.terminal:
                     continue
                 self.fail(job_id, "analysis-interrupted")
-            except (
-                Exception
-            ):  # noqa: BLE001,S112 - startup remains available and fails closed
+            except Exception:  # noqa: BLE001,S112 - startup remains available and fails closed
                 continue
 
 

@@ -406,9 +406,7 @@ class DataUploadService:
                 completed_at=_utc_now(),
                 published_path=str(published_dir),
             )
-        except (
-            BaseException
-        ) as exc:  # noqa: BLE001 - worker must persist a safe terminal state
+        except Exception as exc:  # noqa: BLE001 - worker must persist a safe terminal state
             code = (
                 exc.code if isinstance(exc, DataUploadError) else "upload-import-failed"
             )
@@ -454,7 +452,7 @@ class DataUploadService:
                             f"{file_row['original_name']} line {line_number} is not a JSON object.",
                         )
                     try:
-                        payload = json.dumps(
+                        json.dumps(
                             value,
                             ensure_ascii=False,
                             sort_keys=True,

@@ -25,8 +25,10 @@ from catalog.common.artifact_registry import configured_scan_dirs, scan_artifact
 from catalog.common.basic_metrics import basic_metrics_path, build_basic_metrics_dataset
 from catalog.common.data_loading import iter_jsonl_files
 from catalog.runner.data_filtering import (
+    date_range_source_signature,
     discover_available_dates,
     ensure_session_filtered_data,
+    source_date_signatures,
 )
 from catalog.runner.playback import playback_readiness, prepare_session_playback_exports
 from catalog.runner.script_catalog import discover_runnable_scripts, repo_root
@@ -787,6 +789,14 @@ class RuntimeOrchestrator:
         )
         run_bootstrap_once = True
         while not self._stop.is_set():
+            with self._lock:
+                execution_reserved = self._state.active_execution_id is not None
+            if execution_reserved:
+                # Explicit user-triggered work owns this scheduling slot. Do not
+                # let the periodic poller win the race between reservation and the
+                # requested worker entering _run_update().
+                self._stop.wait(1)
+                continue
             try:
                 self._run_update(bootstrap=run_bootstrap_once)
                 run_bootstrap_once = False
@@ -799,7 +809,12 @@ class RuntimeOrchestrator:
                 self.status.warn(f"background update loop failure: {exc}")
             self._stop.wait(1 if run_bootstrap_once else self.poll_interval_seconds)
 
-    def _verified_processed_dates(self, *, script_options) -> set[str]:
+    def _verified_processed_dates(
+        self,
+        *,
+        script_options,
+        source_signatures: dict[str, str] | None = None,
+    ) -> set[str]:
         """Return dates whose on-disk sessions satisfy the automatic contract.
 
         Runtime state can be stale after interrupted runs or manual file edits, so
@@ -836,6 +851,23 @@ class RuntimeOrchestrator:
                 or start_date != end_date
             ):
                 continue
+            if source_signatures is not None:
+                filter_result = metadata.get("filter_result", {})
+                if not isinstance(filter_result, dict):
+                    continue
+                try:
+                    expected_source_signature = date_range_source_signature(
+                        source_signatures,
+                        date.fromisoformat(start_date),
+                        date.fromisoformat(end_date),
+                    )
+                except ValueError:
+                    continue
+                if (
+                    str(filter_result.get("source_signature") or "")
+                    != expected_source_signature
+                ):
+                    continue
             filtered_dir = session.session_dir / str(
                 metadata.get("paths", {}).get("filtered_data_dir", "data")
             )
@@ -915,6 +947,11 @@ class RuntimeOrchestrator:
         with self._lock:
             if self._state.startup_mode == STARTUP_MODE_PENDING:
                 return OrchestrationResult("none", self.workflows_root, [], [], [], [])
+            if (
+                self._state.active_execution_id is not None
+                and self._state.active_execution_id != execution_id
+            ):
+                return OrchestrationResult("none", self.workflows_root, [], [], [], [])
             if self._state.update_running and not bootstrap:
                 return OrchestrationResult("none", self.workflows_root, [], [], [], [])
             now = _utc_now_iso()
@@ -980,6 +1017,7 @@ class RuntimeOrchestrator:
                 "none", self.workflows_root, artifacts, warnings, [], []
             )
 
+        current_source_signatures = source_date_signatures(self.data_dir)
         script_options = discover_runnable_scripts(self.root / "catalog")
         if not script_options:
             self.status.warn(
@@ -1001,7 +1039,8 @@ class RuntimeOrchestrator:
             )
 
         verified_processed_dates = self._verified_processed_dates(
-            script_options=script_options
+            script_options=script_options,
+            source_signatures=current_source_signatures,
         )
         latest = available_dates[-1]
         earliest = available_dates[0]
@@ -1136,7 +1175,8 @@ class RuntimeOrchestrator:
                     else f"Failed scripts: {', '.join(sorted(set(failed)))}"
                 )
                 verified_processed_dates = self._verified_processed_dates(
-                    script_options=script_options
+                    script_options=script_options,
+                    source_signatures=current_source_signatures,
                 )
                 _, pending_desc, _, dropped_unverified = self._apply_progress_state(
                     available_dates=available_dates,

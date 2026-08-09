@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from catalog.runner import data_filtering
+from catalog.runner.session_store import initialize_session_metadata
 
 
 def _write_jsonl(path: Path, records: list[dict]) -> None:
@@ -282,3 +283,55 @@ def test_filter_streams_candidate_once_after_indexing(
 
     assert (matched, files) == (5_000, 1)
     assert opens == 2  # one index scan and one constant-memory filtering scan
+
+
+def test_session_filter_cache_invalidates_when_source_changes_for_processed_date(
+    tmp_path: Path, isolated_data_index: Path
+) -> None:
+    data_dir = tmp_path / "data"
+    source = data_dir / "2026-04-11.jsonl"
+    _write_jsonl(
+        source,
+        [{"timestamp": "2026-04-11T08:00:00Z", "machine": "A"}],
+    )
+    session_dir = tmp_path / "session"
+    session_dir.mkdir()
+    metadata = initialize_session_metadata(
+        "session-source-refresh",
+        date(2026, 4, 11),
+        date(2026, 4, 11),
+        start_hour=None,
+        end_hour=None,
+        runtime_namespace="test",
+        script_options=[],
+    )
+
+    first = data_filtering.ensure_session_filtered_data(
+        source_data_dir=data_dir,
+        session_dir=session_dir,
+        metadata=metadata,
+    )
+    assert first == (1, 1, "created")
+
+    _write_jsonl(
+        source,
+        [
+            {"timestamp": "2026-04-11T08:00:00Z", "machine": "A"},
+            {"timestamp": "2026-04-11T09:00:00Z", "machine": "B"},
+        ],
+    )
+    source.touch()
+
+    second = data_filtering.ensure_session_filtered_data(
+        source_data_dir=data_dir,
+        session_dir=session_dir,
+        metadata=metadata,
+    )
+    third = data_filtering.ensure_session_filtered_data(
+        source_data_dir=data_dir,
+        session_dir=session_dir,
+        metadata=metadata,
+    )
+
+    assert second == (2, 1, "created")
+    assert third == (2, 1, "cached")

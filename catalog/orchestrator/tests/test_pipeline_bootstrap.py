@@ -97,3 +97,23 @@ def test_runtime_state_snapshot_exposes_playback_filter_contract_keys(tmp_path: 
     assert snapshot["active_runtime_namespace"] == "clean_20260302T000000Z"
     assert snapshot["session_id"] == "auto_clean_20260302T000000Z_20260302_20260302"
     assert "view_contracts" in snapshot
+
+
+def test_correlated_execution_reservation_blocks_uncorrelated_update(
+    tmp_path: Path,
+) -> None:
+    orchestrator = pipeline.RuntimeOrchestrator.__new__(pipeline.RuntimeOrchestrator)
+    orchestrator._lock = threading.Lock()
+    orchestrator.workflows_root = tmp_path / "workflows"
+    orchestrator.workflows_root.mkdir(parents=True)
+    orchestrator._state = pipeline.RuntimeOrchestrator._default_state(orchestrator)
+    orchestrator._state.startup_mode = pipeline.STARTUP_MODE_CLEAN
+    orchestrator._state.active_execution_id = "analysis-upload-race"
+
+    result = pipeline.RuntimeOrchestrator._run_update(
+        orchestrator, bootstrap=False, execution_id=None
+    )
+
+    assert result.session_id == "none"
+    assert orchestrator._state.active_execution_id == "analysis-upload-race"
+    assert orchestrator._state.update_running is False

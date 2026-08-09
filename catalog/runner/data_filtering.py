@@ -8,6 +8,7 @@ that had no timestamp field.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import shutil
@@ -31,6 +32,47 @@ DATA_INDEX_VERSION = 2
 DATA_INDEX_FILE = ROOT_DIR / "results" / "runner" / "data_index.json"
 FILTER_PROGRESS_FILE_INTERVAL = 25
 FILTER_PROGRESS_RECORD_INTERVAL = 100_000
+
+
+def source_date_signatures(data_dir: Path) -> dict[str, str]:
+    """Return stable source identities grouped by represented telemetry date.
+
+    The data index already owns the repository's conservative size/mtime freshness
+    contract. Reuse that contract to invalidate filtered sessions when a newly
+    published upload changes the source set for a date processed previously.
+    """
+    index_data, root_entries, _stats = _refresh_data_index_for_root(data_dir)
+    _write_data_index(index_data)
+    digests: dict[str, Any] = {}
+    for relative_path, entry in sorted(root_entries.items()):
+        identity = (
+            f"{relative_path}\0{entry.get('file_size')}\0{entry.get('mtime_ns')}\n"
+        ).encode()
+        for represented_date in sorted(
+            _deserialize_dates(entry.get("dates", []))
+        ):
+            key = represented_date.isoformat()
+            digest = digests.setdefault(key, hashlib.sha256())
+            digest.update(identity)
+    return {key: digest.hexdigest() for key, digest in digests.items()}
+
+
+def date_range_source_signature(
+    signatures: dict[str, str], start_date: date, end_date: date
+) -> str:
+    """Combine per-day source identities for one session filter range."""
+    digest = hashlib.sha256()
+    for key in sorted(signatures):
+        try:
+            represented_date = date.fromisoformat(key)
+        except ValueError:
+            continue
+        if start_date <= represented_date <= end_date:
+            digest.update(key.encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(signatures[key].encode("ascii"))
+            digest.update(b"\n")
+    return digest.hexdigest()
 
 
 def discover_available_dates(data_dir: Path) -> list[date]:
@@ -145,7 +187,6 @@ def filter_data_by_date_range(
             matched_files=written_files,
             matched_records=matched_records,
         )
-        records_scanned = 0
         with destination_file.open("w", encoding="utf-8") as dst:
             records_processed = 0
             for record in iter_jsonl_records(source_file):
@@ -232,7 +273,17 @@ def ensure_session_filtered_data(
     """
     filtered_data_dir = session_dir / str(metadata["paths"]["filtered_data_dir"])
     filter_result = metadata.setdefault("filter_result", {})
-    if _session_filter_cache_is_valid(session_dir, metadata):
+    filter_config = metadata["filter"]
+    filter_start_date = date.fromisoformat(str(filter_config["start_date"]))
+    filter_end_date = date.fromisoformat(str(filter_config["end_date"]))
+    source_signature = date_range_source_signature(
+        source_date_signatures(source_data_dir),
+        filter_start_date,
+        filter_end_date,
+    )
+    if _session_filter_cache_is_valid(
+        session_dir, metadata, source_signature=source_signature
+    ):
         return (
             int(filter_result["matched_records"]),
             int(filter_result["matched_files"]),
@@ -242,7 +293,6 @@ def ensure_session_filtered_data(
     if filtered_data_dir.exists():
         shutil.rmtree(filtered_data_dir)
 
-    filter_config = metadata["filter"]
     matched_records, matched_files = filter_data_by_date_range(
         source_data_dir,
         filtered_data_dir,
@@ -263,6 +313,7 @@ def ensure_session_filtered_data(
     )
     filter_result["matched_records"] = matched_records
     filter_result["matched_files"] = matched_files
+    filter_result["source_signature"] = source_signature
     filter_result["filtered_data_path"] = metadata["paths"]["filtered_data_dir"]
     filter_result["generated_at"] = (
         datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
@@ -369,7 +420,12 @@ def _filtered_data_looks_usable(filtered_data_dir: Path, *, expect_files: bool) 
     return any(filtered_data_dir.rglob("*.jsonl"))
 
 
-def _session_filter_cache_is_valid(session_dir: Path, metadata: dict) -> bool:
+def _session_filter_cache_is_valid(
+    session_dir: Path,
+    metadata: dict,
+    *,
+    source_signature: str | None = None,
+) -> bool:
     """Return whether filtered data can be reused for the current filter signature."""
     filtered_data_dir = session_dir / str(
         metadata.get("paths", {}).get("filtered_data_dir", "data")
@@ -385,6 +441,11 @@ def _session_filter_cache_is_valid(session_dir: Path, metadata: dict) -> bool:
     matched_files = int(filter_result.get("matched_files", 0))
     if not _filtered_data_looks_usable(
         filtered_data_dir, expect_files=matched_files > 0
+    ):
+        return False
+    if (
+        source_signature is not None
+        and str(filter_result.get("source_signature") or "") != source_signature
     ):
         return False
     filter_payload = metadata.get("filter", {})
