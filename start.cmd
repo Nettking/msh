@@ -70,7 +70,23 @@ if "%MSH_FRESH_INSTALL%"=="1" (
     if errorlevel 1 exit /b 1
 )
 
-echo Building the current MSH services...
+call :resolve_build_commit
+if errorlevel 1 (
+    echo.
+    echo MSH could not determine an immutable build commit from this checkout.
+    pause
+    exit /b 1
+)
+
+call :start_update_agent
+if errorlevel 1 (
+    echo.
+    echo The MSH host update agent could not be started safely.
+    pause
+    exit /b 1
+)
+
+echo Building the current MSH services from %MSH_BUILD_COMMIT%...
 docker compose build relay flask recorder
 if errorlevel 1 (
     echo.
@@ -127,7 +143,6 @@ if not defined MSH_WEB_PORT_RESOLVED (
     pause
     exit /b 1
 )
-
 set "MSH_WEB_CLIENT_HOST=%MSH_WEB_BIND%"
 if "%MSH_WEB_CLIENT_HOST%"=="0.0.0.0" set "MSH_WEB_CLIENT_HOST=127.0.0.1"
 set "MSH_BASE_URL=http://%MSH_WEB_CLIENT_HOST%:%MSH_WEB_PORT_RESOLVED%"
@@ -203,6 +218,7 @@ echo Recorder status:       %MSH_BASE_URL%/status
 echo Documentation:         %MSH_BASE_URL%/docs
 echo Device data:           %MSH_DATA_DIR%
 echo Federation state:      %MSH_RELAY_VOLUME_NAME%
+echo Running build commit:  %MSH_BUILD_COMMIT%
 echo.
 echo Web access is limited to this MSH machine by default.
 echo To pair another device, open MSH using this machine's LAN or VPN address.
@@ -211,6 +227,32 @@ echo downloaded Ollama models, and recorded data are preserved between normal st
 echo.
 
 start "" "%MSH_OPEN_URL%"
+exit /b 0
+
+:resolve_build_commit
+set "MSH_BUILD_COMMIT="
+for /f "usebackq delims=" %%C in (`git rev-parse --verify HEAD^^{commit} 2^>nul`) do set "MSH_BUILD_COMMIT=%%C"
+if not defined MSH_BUILD_COMMIT exit /b 1
+powershell -NoProfile -Command "if ('%MSH_BUILD_COMMIT%' -match '^[0-9a-fA-F]{40}$') { exit 0 } else { exit 1 }"
+if errorlevel 1 (
+    set "MSH_BUILD_COMMIT="
+    exit /b 1
+)
+powershell -NoProfile -Command "$status = @(git status --porcelain=v1 --untracked-files=all 2>$null); if ($LASTEXITCODE -eq 0 -and $status.Count -eq 0) { exit 0 } else { exit 1 }"
+if errorlevel 1 (
+    echo MSH refuses to label a build from a checkout with local changes.
+    set "MSH_BUILD_COMMIT="
+    exit /b 1
+)
+for /f "usebackq delims=" %%C in (`powershell -NoProfile -Command "'%MSH_BUILD_COMMIT%'.ToLowerInvariant()"`) do set "MSH_BUILD_COMMIT=%%C"
+exit /b 0
+
+:start_update_agent
+if not exist "%~dp0scripts\windows\msh_update_agent.ps1" exit /b 1
+where powershell >nul 2>&1
+if errorlevel 1 exit /b 1
+start "MSH Update Agent" /b powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0scripts\windows\msh_update_agent.ps1" -RepoRoot "%~dp0" -DataDirectory "%MSH_DATA_DIR%" >nul 2>&1
+if errorlevel 1 exit /b 1
 exit /b 0
 
 :resolve_runtime_state
@@ -369,6 +411,7 @@ echo Normal and resume modes preserve identity, Federation membership, recording
 echo source configuration, recorder checkpoints, results, and downloaded models.
 echo Resume mode never runs inspection or benchmarks and never replaces Federation authority.
 echo All modes install and verify the exact configured Ollama benchmark model.
+echo The supported launcher also keeps a bounded local host update agent running.
 echo The --fresh option requires typing RESET and preserves recordings,
 echo source configuration, recorder checkpoints, results, and Ollama models.
 exit /b 0
