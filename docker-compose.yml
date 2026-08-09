@@ -3,6 +3,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        MSH_BUILD_COMMIT: ${MSH_BUILD_COMMIT:-unknown}
     ports:
       - "${MSH_WEB_BIND:-0.0.0.0}:${MSH_WEB_PORT:-5000}:5000"
     environment:
@@ -91,6 +93,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        MSH_BUILD_COMMIT: ${MSH_BUILD_COMMIT:-unknown}
     entrypoint: ["python", "catalog/standalone-recorder_v2/standalone-recorder_v2.py"]
     environment:
       - MSH_RECORDER_MANAGED=true
@@ -118,6 +122,8 @@ services:
     build:
       context: .
       dockerfile: Dockerfile.cli
+      args:
+        MSH_BUILD_COMMIT: ${MSH_BUILD_COMMIT:-unknown}
     entrypoint: []
     command:
       - python
@@ -166,6 +172,9 @@ services:
       - type: bind
         source: ${MSH_DATA_DIR:-./data}
         target: /app/data
+      - type: bind
+        source: ${MSH_RESULTS_DIR:-./results}
+        target: /app/results
 
 volumes:
   ollama_models:
