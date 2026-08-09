@@ -142,26 +142,62 @@ class GitUpdateAdapter:
     def _ancestor(self, older: str, newer: str) -> bool:
         return self._git("merge-base", "--is-ancestor", older, newer).returncode == 0
 
-    def apply(self, target: str) -> UpdateInspection:
+    def apply(
+        self,
+        target: str,
+        *,
+        request_id: str | None = None,
+    ) -> UpdateInspection:
         if not OID_RE.fullmatch(target):
             return self._failure("target_unavailable", target=target)
         inspection = self.inspect(target=target, fetch=True)
         if inspection.state != "update_available":
-            return inspection
+            return UpdateInspection(
+                inspection.state,
+                inspection.current_commit,
+                inspection.target_commit,
+                inspection.code,
+                inspection.message,
+                inspection.running_commit,
+                request_id,
+            )
         # No checkout/reset/clean/stash: merge --ff-only is the sole mutation.
         applied = self._git("merge", "--ff-only", target)
         if applied.returncode:
-            return self._failure("update_failed", inspection.current_commit, target)
+            result = self._failure("update_failed", inspection.current_commit, target)
+            return UpdateInspection(
+                result.state,
+                result.current_commit,
+                result.target_commit,
+                result.code,
+                result.message,
+                request_id=request_id,
+            )
         proven = self._resolve("HEAD")
         if proven != target:
-            return self._failure("update_failed", proven, target)
+            result = self._failure("update_failed", proven, target)
+            return UpdateInspection(
+                result.state,
+                result.current_commit,
+                result.target_commit,
+                result.code,
+                result.message,
+                request_id=request_id,
+            )
         return UpdateInspection(
             "source_updated_restart_required",
             proven,
             target,
             "runtime_not_updated",
             "The source checkout was fast-forwarded. The running MSH installation was not rebuilt, reinstalled, or restarted.",
+            request_id=request_id,
         )
+
+    def latest_result(self) -> UpdateInspection | None:
+        # This primitive has no runtime activation/result channel. Production
+        # uses HostUpdateHandoff instead; the method only keeps the adapter shape
+        # explicit for isolated tests and deliberately returns no runtime proof.
+        return None
 
 
 def utc_now() -> str:
