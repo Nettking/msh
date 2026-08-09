@@ -1,0 +1,84 @@
+name: Federation software update
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+
+jobs:
+  update-contracts:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install test dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile update Python
+        run: >-
+          python -m compileall -q
+          catalog/federation/software_update.py
+          catalog/flask_app/services/federation_update_handoff.py
+          catalog/flask_app/services/federation_update_events.py
+          catalog/flask_app/services/federation_update_service.py
+          catalog/flask_app/tests/test_federation_update_runtime.py
+          catalog/flask_app/tests/test_federation_update_host_agents.py
+      - name: Run update contract tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/federation/tests/test_software_update.py
+          catalog/flask_app/tests/test_federation_update_runtime.py
+          catalog/flask_app/tests/test_federation_update_host_agents.py
+      - name: Ruff update Python
+        run: >-
+          python -m ruff check
+          catalog/federation/software_update.py
+          catalog/flask_app/services/federation_update_handoff.py
+          catalog/flask_app/services/federation_update_events.py
+          catalog/flask_app/services/federation_update_service.py
+          catalog/flask_app/tests/test_federation_update_runtime.py
+          catalog/flask_app/tests/test_federation_update_host_agents.py
+
+      - name: Parse and smoke Windows host agent
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: |
+          $tokens = $null
+          $errors = $null
+          [System.Management.Automation.Language.Parser]::ParseFile(
+            (Resolve-Path 'scripts/windows/msh_update_agent.ps1'),
+            [ref]$tokens,
+            [ref]$errors
+          ) | Out-Null
+          if ($errors.Count -gt 0) {
+            $errors | Format-List | Out-String | Write-Error
+            exit 1
+          }
+          $state = Join-Path $env:RUNNER_TEMP 'msh-update-agent-smoke'
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\msh_update_agent.ps1 `
+            -RepoRoot (Resolve-Path '.').Path `
+            -DataDirectory $state `
+            -Once
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Parse and smoke POSIX host agent
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          bash -n start.sh
+          python scripts/posix/msh_update_agent.py \
+            --repo-root "$PWD" \
+            --data-directory "$RUNNER_TEMP/msh-update-agent-smoke" \
+            --once
