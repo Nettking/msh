@@ -11,6 +11,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import secrets
 import shutil
 import sqlite3
 import threading
@@ -33,6 +34,7 @@ _DEFAULT_MAX_FILE_BYTES = 512 * 1024 * 1024
 _DEFAULT_MAX_TOTAL_BYTES = 1024 * 1024 * 1024
 _DEFAULT_MAX_LINE_BYTES = 4 * 1024 * 1024
 _COPY_CHUNK_BYTES = 1024 * 1024
+_DEFAULT_MAX_PENDING_IMPORTS = 8
 
 
 def _utc_now() -> str:
@@ -72,6 +74,7 @@ class DataUploadService:
         max_file_bytes: int = _DEFAULT_MAX_FILE_BYTES,
         max_total_bytes: int = _DEFAULT_MAX_TOTAL_BYTES,
         max_line_bytes: int = _DEFAULT_MAX_LINE_BYTES,
+        max_pending_imports: int = _DEFAULT_MAX_PENDING_IMPORTS,
     ) -> None:
         self.database = Path(database)
         self.staging_root = Path(staging_root)
@@ -81,8 +84,12 @@ class DataUploadService:
         self.max_file_bytes = max(1, int(max_file_bytes))
         self.max_total_bytes = max(1, int(max_total_bytes))
         self.max_line_bytes = max(1, int(max_line_bytes))
+        self.max_pending_imports = max(1, int(max_pending_imports))
         self._analysis_lock = threading.Lock()
         self._import_lock = threading.Lock()
+        self._import_scheduler_lock = threading.Lock()
+        self._active_imports: set[str] = set()
+        self._import_slots = threading.BoundedSemaphore(self.max_pending_imports)
         self.database.parent.mkdir(parents=True, exist_ok=True)
         self.staging_root.mkdir(parents=True, exist_ok=True)
         self.published_root.mkdir(parents=True, exist_ok=True)
@@ -98,10 +105,10 @@ class DataUploadService:
 
     def _initialize(self) -> None:
         interrupted: tuple[str, ...] = ()
+        interrupted_publications: tuple[str, ...] = ()
         with self._connect() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
-            connection.executescript(
-                """
+            connection.executescript("""
                 CREATE TABLE IF NOT EXISTS data_upload_batches (
                     batch_id TEXT PRIMARY KEY,
                     status TEXT NOT NULL,
@@ -138,37 +145,42 @@ class DataUploadService:
                 );
                 CREATE INDEX IF NOT EXISTS data_upload_records_by_batch
                     ON data_upload_records(batch_id, file_id, line_number);
-                """
-            )
-            interrupted = tuple(
-                str(row["batch_id"])
-                for row in connection.execute(
-                    """
+                """)
+            interrupted = tuple(str(row["batch_id"]) for row in connection.execute("""
                     SELECT batch_id FROM data_upload_batches
                     WHERE status IN ('queued', 'importing', 'publishing')
-                    """
-                ).fetchall()
-            )
-            connection.execute(
-                """
+                    """).fetchall())
+            interrupted_publications = tuple(str(row["batch_id"]) for row in connection.execute("""
+                    SELECT batch_id FROM data_upload_batches
+                    WHERE status='publishing'
+                    """).fetchall())
+            connection.execute("""
                 UPDATE data_upload_batches
-                SET status='failed', error_code='import-interrupted', completed_at=?
+                SET status='queued', error_code=NULL, started_at=NULL, completed_at=NULL
                 WHERE status IN ('queued', 'importing', 'publishing')
-                """,
-                (_utc_now(),),
-            )
-        for batch_id in interrupted:
-            shutil.rmtree(self.staging_root / batch_id, ignore_errors=True)
-            shutil.rmtree(self.published_root / batch_id, ignore_errors=True)
+                """)
+        # Hide incomplete final directories synchronously, before discovery can
+        # observe them and before asynchronous recovery workers are scheduled.
+        for batch_id in interrupted_publications:
+            self._prepare_publication_recovery(batch_id)
+        if interrupted:
+            self._drain_queued_imports()
 
     def enqueue(self, files: Iterable[FileStorage]) -> dict[str, Any]:
         selected = tuple(item for item in files if item and item.filename)
         if not selected:
-            raise DataUploadError("upload-files-required", "Choose at least one JSONL file.")
+            raise DataUploadError(
+                "upload-files-required", "Choose at least one JSONL file."
+            )
         if len(selected) > self.max_files:
             raise DataUploadError(
                 "upload-too-many-files",
                 f"A single upload may contain at most {self.max_files} files.",
+            )
+        if not self._import_slots.acquire(blocking=False):
+            raise DataUploadError(
+                "upload-queue-full",
+                "The upload import queue is full. Wait for an active import to finish.",
             )
 
         batch_id = f"upload-{uuid.uuid4().hex}"
@@ -226,49 +238,97 @@ class DataUploadService:
                 )
         except BaseException:
             shutil.rmtree(staging_dir, ignore_errors=True)
+            self._import_slots.release()
             raise
 
         created_at = _utc_now()
-        with self._connect() as connection:
-            connection.execute("BEGIN IMMEDIATE")
-            connection.execute(
-                """
-                INSERT INTO data_upload_batches(
-                    batch_id,status,file_count,total_bytes,created_at
-                ) VALUES(?,?,?,?,?)
-                """,
-                (batch_id, "queued", len(staged), total_bytes, created_at),
-            )
-            connection.executemany(
-                """
-                INSERT INTO data_upload_files(
-                    file_id,batch_id,original_name,published_name,staged_name,
-                    size_bytes,content_sha256,status
-                ) VALUES(?,?,?,?,?,?,?,'staged')
-                """,
-                [
-                    (
-                        item.file_id,
-                        batch_id,
-                        item.original_name,
-                        item.published_name,
-                        item.staged_name,
-                        item.size_bytes,
-                        item.content_sha256,
-                    )
-                    for item in staged
-                ],
-            )
-            connection.commit()
+        try:
+            with self._connect() as connection:
+                connection.execute("BEGIN IMMEDIATE")
+                connection.execute(
+                    """
+                    INSERT INTO data_upload_batches(
+                        batch_id,status,file_count,total_bytes,created_at
+                    ) VALUES(?,?,?,?,?)
+                    """,
+                    (batch_id, "queued", len(staged), total_bytes, created_at),
+                )
+                connection.executemany(
+                    """
+                    INSERT INTO data_upload_files(
+                        file_id,batch_id,original_name,published_name,staged_name,
+                        size_bytes,content_sha256,status
+                    ) VALUES(?,?,?,?,?,?,?,'staged')
+                    """,
+                    [
+                        (
+                            item.file_id,
+                            batch_id,
+                            item.original_name,
+                            item.published_name,
+                            item.staged_name,
+                            item.size_bytes,
+                            item.content_sha256,
+                        )
+                        for item in staged
+                    ],
+                )
+                connection.commit()
+        except BaseException:
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            self._import_slots.release()
+            raise
 
+        self._start_import(batch_id, slot_acquired=True)
+        return self.batch(batch_id)
+
+    def _start_import(self, batch_id: str, *, slot_acquired: bool = False) -> bool:
+        """Start one queued import, retaining it durably when capacity is full."""
+        with self._import_scheduler_lock:
+            if batch_id in self._active_imports:
+                return True
+            if not slot_acquired and not self._import_slots.acquire(blocking=False):
+                return False
+            self._active_imports.add(batch_id)
         worker = threading.Thread(
-            target=self._import_batch,
+            target=self._import_batch_with_slot,
             args=(batch_id,),
             name=f"msh-jsonl-import-{batch_id[-8:]}",
             daemon=True,
         )
-        worker.start()
-        return self.batch(batch_id)
+        try:
+            worker.start()
+        except BaseException:
+            with self._import_scheduler_lock:
+                self._active_imports.discard(batch_id)
+            self._import_slots.release()
+            raise
+        return True
+
+    def _drain_queued_imports(self) -> None:
+        """Fill available worker slots from the durable FIFO queue."""
+        with self._connect() as connection:
+            queued = tuple(
+                str(row["batch_id"])
+                for row in connection.execute(
+                    """
+                    SELECT batch_id FROM data_upload_batches
+                    WHERE status='queued' ORDER BY created_at,batch_id
+                    """
+                ).fetchall()
+            )
+        for batch_id in queued:
+            if not self._start_import(batch_id):
+                break
+
+    def _import_batch_with_slot(self, batch_id: str) -> None:
+        try:
+            self._import_batch(batch_id)
+        finally:
+            with self._import_scheduler_lock:
+                self._active_imports.discard(batch_id)
+            self._import_slots.release()
+            self._drain_queued_imports()
 
     @staticmethod
     def _unique_name(name: str, used: set[str]) -> str:
@@ -306,12 +366,15 @@ class DataUploadService:
                 connection.execute("BEGIN IMMEDIATE")
                 total_records = 0
                 for file_row in files:
-                    record_count = self._import_file(
-                        connection,
-                        batch_id=batch_id,
-                        file_row=file_row,
-                        staging_dir=staging_dir,
-                    )
+                    if file_row["status"] == "imported":
+                        record_count = int(file_row["imported_records"])
+                    else:
+                        record_count = self._import_file(
+                            connection,
+                            batch_id=batch_id,
+                            file_row=file_row,
+                            staging_dir=staging_dir,
+                        )
                     if record_count == 0:
                         raise DataUploadError(
                             "upload-empty-jsonl",
@@ -343,8 +406,12 @@ class DataUploadService:
                 completed_at=_utc_now(),
                 published_path=str(published_dir),
             )
-        except BaseException as exc:  # noqa: BLE001 - worker must persist a safe terminal state
-            code = exc.code if isinstance(exc, DataUploadError) else "upload-import-failed"
+        except (
+            BaseException
+        ) as exc:  # noqa: BLE001 - worker must persist a safe terminal state
+            code = (
+                exc.code if isinstance(exc, DataUploadError) else "upload-import-failed"
+            )
             self._set_batch_state(
                 batch_id,
                 "failed",
@@ -399,14 +466,10 @@ class DataUploadService:
                             "upload-invalid-json-value",
                             f"{file_row['original_name']} line {line_number} contains an unsupported JSON value.",
                         ) from exc
-                    connection.execute(
-                        """
-                        INSERT INTO data_upload_records(
-                            batch_id,file_id,line_number,payload_json
-                        ) VALUES(?,?,?,?)
-                        """,
-                        (batch_id, file_row["file_id"], line_number, payload),
-                    )
+                    # Validation is intentionally streaming-only.  The staged
+                    # JSONL is the durable source of truth; duplicating every
+                    # payload in SQLite caused roughly 2x temporary disk use and
+                    # held a write transaction for the duration of huge uploads.
                     count += 1
         except UnicodeDecodeError as exc:
             raise DataUploadError(
@@ -417,32 +480,88 @@ class DataUploadService:
 
     def _publish_batch(self, batch_id: str, staging_dir: Path) -> Path:
         final_dir = self.published_root / batch_id
-        if final_dir.exists():
-            raise DataUploadError(
-                "upload-publish-conflict",
-                "The upload publication path already exists.",
-            )
-        final_dir.mkdir(parents=True, exist_ok=False)
+        files = self._publication_files(batch_id)
+        if self._publication_complete(final_dir, files):
+            (final_dir / _IMPORT_MARKER).unlink(missing_ok=True)
+            shutil.rmtree(staging_dir, ignore_errors=True)
+            return final_dir
+
+        final_dir.mkdir(parents=True, exist_ok=True)
         marker = final_dir / _IMPORT_MARKER
         marker.write_text(batch_id, encoding="utf-8")
         # The marker remains if publication fails, so recursive discovery cannot
         # consume a partially published batch.
+        for item in files:
+            source = staging_dir / str(item["staged_name"])
+            destination = final_dir / str(item["published_name"])
+            if self._file_matches(destination, item):
+                source.unlink(missing_ok=True)
+            elif self._file_matches(source, item):
+                os.replace(source, destination)
+            else:
+                raise DataUploadError(
+                    "upload-publish-incomplete",
+                    f"{item['published_name']} is missing or does not match the staged upload.",
+                )
+        if not self._publication_complete(final_dir, files):
+            raise DataUploadError(
+                "upload-publish-incomplete",
+                "The published upload could not be verified safely.",
+            )
+        marker.unlink()
+        if staging_dir.exists():
+            staging_dir.rmdir()
+        return final_dir
+
+    def _publication_files(self, batch_id: str) -> tuple[sqlite3.Row, ...]:
         with self._connect() as connection:
-            files = connection.execute(
+            return tuple(connection.execute(
                 """
-                SELECT staged_name,published_name FROM data_upload_files
+                SELECT staged_name,published_name,size_bytes,content_sha256
+                FROM data_upload_files
                 WHERE batch_id=? ORDER BY published_name,file_id
                 """,
                 (batch_id,),
-            ).fetchall()
-        for item in files:
-            os.replace(
-                staging_dir / str(item["staged_name"]),
-                final_dir / str(item["published_name"]),
-            )
-        marker.unlink()
-        staging_dir.rmdir()
-        return final_dir
+            ).fetchall())
+
+    @staticmethod
+    def _file_matches(path: Path, item: sqlite3.Row) -> bool:
+        try:
+            if not path.is_file() or path.stat().st_size != int(item["size_bytes"]):
+                return False
+            digest = hashlib.sha256()
+            with path.open("rb") as handle:
+                for chunk in iter(lambda: handle.read(_COPY_CHUNK_BYTES), b""):
+                    digest.update(chunk)
+        except OSError:
+            return False
+        return secrets.compare_digest(digest.hexdigest(), str(item["content_sha256"]))
+
+    def _publication_complete(
+        self, final_dir: Path, files: tuple[sqlite3.Row, ...]
+    ) -> bool:
+        if not files or not final_dir.is_dir():
+            return False
+        expected_names = {str(item["published_name"]) for item in files}
+        try:
+            actual_names = {
+                path.name for path in final_dir.iterdir() if path.name != _IMPORT_MARKER
+            }
+        except OSError:
+            return False
+        return actual_names == expected_names and all(
+            self._file_matches(final_dir / str(item["published_name"]), item)
+            for item in files
+        )
+
+    def _prepare_publication_recovery(self, batch_id: str) -> None:
+        """Keep incomplete publication hidden until its worker reconciles it."""
+        final_dir = self.published_root / batch_id
+        if not final_dir.exists():
+            return
+        files = self._publication_files(batch_id)
+        if not self._publication_complete(final_dir, files):
+            (final_dir / _IMPORT_MARKER).write_text(batch_id, encoding="utf-8")
 
     def _set_batch_state(
         self,
@@ -475,9 +594,13 @@ class DataUploadService:
                 ),
             )
             if connection.total_changes != 1:
-                raise DataUploadError("upload-batch-not-found", "Upload batch not found.")
+                raise DataUploadError(
+                    "upload-batch-not-found", "Upload batch not found."
+                )
 
-    def request_analysis(self, batch_id: str) -> dict[str, Any]:
+    def request_analysis(
+        self, batch_id: str, *, execution_id: str | None = None
+    ) -> dict[str, Any]:
         with self._analysis_lock:
             batch = self.batch(batch_id)
             if batch["status"] != "ready":
@@ -488,7 +611,9 @@ class DataUploadService:
             if batch["analysis_state"] == "requested":
                 return batch
             request_refresh = getattr(self.runtime_manager, "request_refresh", None)
-            if not callable(request_refresh) or not bool(request_refresh()):
+            if not callable(request_refresh) or not bool(
+                request_refresh(execution_id=execution_id)
+            ):
                 raise DataUploadError(
                     "analysis-busy",
                     "Background analysis is already running or is not ready to start.",
@@ -516,7 +641,9 @@ class DataUploadService:
                 (batch_id,),
             ).fetchone()
             if row is None:
-                raise DataUploadError("upload-batch-not-found", "Upload batch not found.")
+                raise DataUploadError(
+                    "upload-batch-not-found", "Upload batch not found."
+                )
             files = connection.execute(
                 """
                 SELECT original_name,published_name,size_bytes,imported_records,status

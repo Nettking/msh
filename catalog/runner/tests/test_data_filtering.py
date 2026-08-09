@@ -12,7 +12,9 @@ from catalog.runner import data_filtering
 
 def _write_jsonl(path: Path, records: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text("".join(json.dumps(record) + "\n" for record in records), encoding="utf-8")
+    path.write_text(
+        "".join(json.dumps(record) + "\n" for record in records), encoding="utf-8"
+    )
 
 
 @pytest.fixture()
@@ -22,7 +24,9 @@ def isolated_data_index(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path
     return index_path
 
 
-def test_unchanged_files_reuse_cached_metadata(tmp_path: Path, isolated_data_index: Path) -> None:
+def test_unchanged_files_reuse_cached_metadata(
+    tmp_path: Path, isolated_data_index: Path
+) -> None:
     data_dir = tmp_path / "data"
     source = data_dir / "machine-a" / "2026-04-11.jsonl"
     _write_jsonl(source, [{"timestamp": "2026-04-11T08:00:00Z", "machine": "A"}])
@@ -64,7 +68,9 @@ def test_changed_file_is_reindexed(tmp_path: Path, isolated_data_index: Path) ->
     assert entry["max_timestamp"].startswith("2026-04-11T09:00:00")
 
 
-def test_deleted_file_is_removed_from_index(tmp_path: Path, isolated_data_index: Path) -> None:
+def test_deleted_file_is_removed_from_index(
+    tmp_path: Path, isolated_data_index: Path
+) -> None:
     data_dir = tmp_path / "data"
     keep = data_dir / "2026-04-11.jsonl"
     remove = data_dir / "2026-04-12.jsonl"
@@ -86,9 +92,18 @@ def test_date_range_filtering_skips_files_outside_min_max_timestamp_range(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     data_dir = tmp_path / "data"
-    _write_jsonl(data_dir / "2026-04-10.jsonl", [{"timestamp": "2026-04-10T08:00:00Z", "machine": "A"}])
-    _write_jsonl(data_dir / "2026-04-11.jsonl", [{"timestamp": "2026-04-11T08:00:00Z", "machine": "A"}])
-    _write_jsonl(data_dir / "2026-04-12.jsonl", [{"timestamp": "2026-04-12T08:00:00Z", "machine": "A"}])
+    _write_jsonl(
+        data_dir / "2026-04-10.jsonl",
+        [{"timestamp": "2026-04-10T08:00:00Z", "machine": "A"}],
+    )
+    _write_jsonl(
+        data_dir / "2026-04-11.jsonl",
+        [{"timestamp": "2026-04-11T08:00:00Z", "machine": "A"}],
+    )
+    _write_jsonl(
+        data_dir / "2026-04-12.jsonl",
+        [{"timestamp": "2026-04-12T08:00:00Z", "machine": "A"}],
+    )
     data_filtering.discover_available_dates(data_dir)
 
     opened: list[str] = []
@@ -98,7 +113,9 @@ def test_date_range_filtering_skips_files_outside_min_max_timestamp_range(
         opened.append(Path(path).name)
         yield from original_iter_jsonl_records(path)
 
-    monkeypatch.setattr(data_filtering, "iter_jsonl_records", counting_iter_jsonl_records)
+    monkeypatch.setattr(
+        data_filtering, "iter_jsonl_records", counting_iter_jsonl_records
+    )
 
     matched_records, matched_files = data_filtering.filter_data_by_date_range(
         data_dir,
@@ -131,7 +148,9 @@ def test_files_with_missing_timestamp_metadata_are_handled_conservatively(
         opened.append(Path(path).name)
         yield from original_iter_jsonl_records(path)
 
-    monkeypatch.setattr(data_filtering, "iter_jsonl_records", counting_iter_jsonl_records)
+    monkeypatch.setattr(
+        data_filtering, "iter_jsonl_records", counting_iter_jsonl_records
+    )
 
     matched_records, matched_files = data_filtering.filter_data_by_date_range(
         data_dir,
@@ -145,7 +164,9 @@ def test_files_with_missing_timestamp_metadata_are_handled_conservatively(
     assert matched_files == 0
 
 
-def test_filtered_output_matches_expected_records(tmp_path: Path, isolated_data_index: Path) -> None:
+def test_filtered_output_matches_expected_records(
+    tmp_path: Path, isolated_data_index: Path
+) -> None:
     data_dir = tmp_path / "data"
     _write_jsonl(
         data_dir / "machine-a" / "mixed.jsonl",
@@ -155,7 +176,10 @@ def test_filtered_output_matches_expected_records(tmp_path: Path, isolated_data_
             {"timestamp": "2026-04-12T00:00:00Z", "machine": "A", "value": "after"},
         ],
     )
-    _write_jsonl(data_dir / "machine-b" / "2026-04-11.jsonl", [{"machine": "B", "value": "fallback"}])
+    _write_jsonl(
+        data_dir / "machine-b" / "2026-04-11.jsonl",
+        [{"machine": "B", "value": "fallback"}],
+    )
 
     destination = tmp_path / "filtered"
     matched_records, matched_files = data_filtering.filter_data_by_date_range(
@@ -167,7 +191,10 @@ def test_filtered_output_matches_expected_records(tmp_path: Path, isolated_data_
 
     output_records = []
     for output_file in sorted(destination.rglob("*.jsonl")):
-        output_records.extend(json.loads(line) for line in output_file.read_text(encoding="utf-8").splitlines())
+        output_records.extend(
+            json.loads(line)
+            for line in output_file.read_text(encoding="utf-8").splitlines()
+        )
 
     assert matched_records == 2
     assert matched_files == 2
@@ -192,7 +219,10 @@ def test_filter_progress_logs_operational_counters(
             {"timestamp": "2026-04-11T10:00:00Z", "machine": "A"},
         ],
     )
-    _write_jsonl(data_dir / "2026-04-12.jsonl", [{"timestamp": "2026-04-12T08:00:00Z", "machine": "B"}])
+    _write_jsonl(
+        data_dir / "2026-04-12.jsonl",
+        [{"timestamp": "2026-04-12T08:00:00Z", "machine": "B"}],
+    )
     monkeypatch.setattr(data_filtering, "FILTER_PROGRESS_RECORD_INTERVAL", 2)
 
     matched_records, matched_files = data_filtering.filter_data_by_date_range(
@@ -218,5 +248,37 @@ def test_filter_progress_logs_operational_counters(
     assert "matched_records=3" in output
     assert "active_slice=2026-04-11" in output
     assert "remaining_slices=4" in output
-    assert "phase=reading candidate" in output
+    assert "phase=processing candidate" in output
     assert "file_records_processed=2" in output
+
+
+def test_filter_streams_candidate_once_after_indexing(
+    tmp_path: Path, monkeypatch
+) -> None:
+    source = tmp_path / "source"
+    destination = tmp_path / "filtered"
+    source.mkdir()
+    path = source / "multi-day.jsonl"
+    path.write_text(
+        "".join(
+            f'{{"timestamp":"2026-01-{(index % 2) + 1:02d}T00:00:00Z","value":{index}}}\n'
+            for index in range(10_000)
+        ),
+        encoding="utf-8",
+    )
+    original = data_filtering.iter_jsonl_records
+    opens = 0
+
+    def counted(candidate):
+        nonlocal opens
+        if Path(candidate) == path:
+            opens += 1
+        yield from original(candidate)
+
+    monkeypatch.setattr(data_filtering, "iter_jsonl_records", counted)
+    matched, files = data_filtering.filter_data_by_date_range(
+        source, destination, date(2026, 1, 1), date(2026, 1, 1)
+    )
+
+    assert (matched, files) == (5_000, 1)
+    assert opens == 2  # one index scan and one constant-memory filtering scan

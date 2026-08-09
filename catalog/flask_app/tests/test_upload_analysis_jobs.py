@@ -19,6 +19,8 @@ class _Runtime:
             "last_failure": None,
             "failed_scripts": [],
             "current_processing_phase": "polling_new_data",
+            "completed_execution_id": None,
+            "completed_execution_succeeded": None,
         }
 
     def state_snapshot(self) -> dict[str, object]:
@@ -85,20 +87,11 @@ def test_upload_analysis_job_moves_from_queued_to_active_to_succeeded(
 
     runtime.state.update(
         {
-            "update_running": True,
-            "last_update_check_at": "2026-08-06T10:01:00Z",
-            "current_processing_phase": "historical_catch_up",
-        }
-    )
-    time.sleep(0.03)
-    runtime.state.update(
-        {
             "update_running": False,
-            "last_successful_refresh": "2026-08-06T10:02:00Z",
-            "current_processing_phase": "polling_new_data",
+            "completed_execution_id": job_id,
+            "completed_execution_succeeded": True,
         }
     )
-
     completed = _wait_for_terminal(service, job_id)
 
     assert completed.job.status is JobStatus.SUCCEEDED
@@ -126,26 +119,37 @@ def test_runtime_failure_terminalizes_upload_analysis_job(
 
     runtime.state.update(
         {
-            "update_running": True,
-            "last_update_check_at": "2026-08-06T11:01:00Z",
-            "current_processing_phase": "historical_catch_up",
-        }
-    )
-    time.sleep(0.03)
-    runtime.state.update(
-        {
             "update_running": False,
-            "last_failure": "one script failed",
-            "failed_scripts": ["analysis-step"],
-            "current_processing_phase": "polling_new_data",
+            "completed_execution_id": job_id,
+            "completed_execution_succeeded": False,
         }
     )
-
     completed = _wait_for_terminal(service, job_id)
 
     assert completed.job.status is JobStatus.FAILED
     assert completed.job.attempts[-1].status is AttemptStatus.FAILED
     assert completed.job.attempts[-1].error_code == "analysis-step-failed"
+
+
+def test_unrelated_runtime_completion_cannot_complete_job(tmp_path: Path) -> None:
+    runtime = _Runtime()
+    service = _service(tmp_path, runtime)
+    job_id = service.submit_batch(_batch("upload-owned"))
+    service.start_tracking(job_id)
+
+    runtime.state.update(
+        {
+            "completed_execution_id": "analysis-some-other-upload",
+            "completed_execution_succeeded": True,
+        }
+    )
+    time.sleep(0.05)
+    assert service.store.snapshot(job_id).job.status is JobStatus.ACTIVE
+
+    runtime.state.update(
+        {"completed_execution_id": job_id, "completed_execution_succeeded": True}
+    )
+    assert _wait_for_terminal(service, job_id).job.status is JobStatus.SUCCEEDED
 
 
 def test_restart_fails_interrupted_job_and_preserves_session_filter(

@@ -19,7 +19,11 @@ from typing import Any
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
 from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
-from catalog.common.time_utils import date_from_filename, parse_iso_timestamp, parse_timestamp_to_date
+from catalog.common.time_utils import (
+    date_from_filename,
+    parse_iso_timestamp,
+    parse_timestamp_to_date,
+)
 from catalog.runner.session_store import filter_signature, write_session_metadata
 
 # Versioned JSON cache used for date discovery and conservative file pruning.
@@ -43,7 +47,10 @@ def discover_available_dates(data_dir: Path) -> list[date]:
     for entry in root_entries.values():
         dates.update(_deserialize_dates(entry.get("dates", [])))
 
-    print(f"[runner] Found {stats['total_files']} JSONL files for date discovery", flush=True)
+    print(
+        f"[runner] Found {stats['total_files']} JSONL files for date discovery",
+        flush=True,
+    )
     print(
         f"[runner] Date discovery reused {stats['reused_files']} cached files and reparsed {stats['reparsed_files']} files",
         flush=True,
@@ -75,7 +82,9 @@ def filter_data_by_date_range(
     """
     destination_data_dir.mkdir(parents=True, exist_ok=True)
     source_root = source_data_dir.resolve()
-    use_hour_filter = start_date == end_date and start_hour is not None and end_hour is not None
+    use_hour_filter = (
+        start_date == end_date and start_hour is not None and end_hour is not None
+    )
 
     index_data, root_entries, _stats = _refresh_data_index_for_root(source_data_dir)
     _write_data_index(index_data)
@@ -85,7 +94,10 @@ def filter_data_by_date_range(
         f"[runner] Filtering {len(root_entries)} indexed files for {start_date.isoformat()}..{end_date.isoformat()}",
         flush=True,
     )
-    print(f"[runner] Index pruning selected {len(candidate_entries)} candidate files", flush=True)
+    print(
+        f"[runner] Index pruning selected {len(candidate_entries)} candidate files",
+        flush=True,
+    )
 
     matched_records = 0
     written_files = 0
@@ -106,7 +118,7 @@ def filter_data_by_date_range(
         force=True,
     )
 
-    for relative_path, _entry in candidate_entries:
+    for relative_path, entry in candidate_entries:
         source_file = source_root / relative_path
         if not source_file.is_file():
             continue
@@ -115,15 +127,16 @@ def filter_data_by_date_range(
 
         file_matched = 0
         fallback_file_date = date_from_filename(source_file)
-        file_in_fallback_window = fallback_file_date is not None and start_date <= fallback_file_date <= end_date
+        file_in_fallback_window = (
+            fallback_file_date is not None
+            and start_date <= fallback_file_date <= end_date
+        )
 
-        parsed_records: list[dict] = []
-        file_has_timestamp = False
-
-        # First pass determines whether this file has any trustworthy record
-        # timestamps. Filename fallback is only valid when the whole file lacks
-        # timestamp dates; mixing fallback and timestamp filtering would duplicate
-        # or mis-scope partially malformed files.
+        # The index already made the whole-file fallback decision while scanning
+        # the source once.  Reusing it here avoids both a second full-file pass and
+        # the former ``list[dict]`` allocation, which grew to the size of a
+        # multi-day input file.
+        file_has_timestamp = bool(entry.get("has_timestamp_date"))
         opened_files += 1
         progress.report(
             phase="opening candidate",
@@ -133,29 +146,14 @@ def filter_data_by_date_range(
             matched_records=matched_records,
         )
         records_scanned = 0
-        for record in iter_jsonl_records(source_file):
-            records_scanned += 1
-            parsed_records.append(record)
-            if parse_timestamp_to_date(str(record.get("timestamp", ""))) is not None:
-                file_has_timestamp = True
-            if records_scanned % FILTER_PROGRESS_RECORD_INTERVAL == 0:
-                progress.report(
-                    phase="reading candidate",
-                    opened_files=opened_files,
-                    processed_files=processed_files,
-                    matched_files=written_files,
-                    matched_records=matched_records,
-                    current_file=relative_path,
-                    file_records=records_scanned,
-                    force=True,
-                )
-
         with destination_file.open("w", encoding="utf-8") as dst:
             records_processed = 0
-            for record in parsed_records:
+            for record in iter_jsonl_records(source_file):
                 records_processed += 1
                 if use_hour_filter:
-                    record_dt = _parse_timestamp_to_datetime(str(record.get("timestamp", "")))
+                    record_dt = _parse_timestamp_to_datetime(
+                        str(record.get("timestamp", ""))
+                    )
                     if record_dt is None:
                         continue
                     if record_dt.date() != start_date:
@@ -235,7 +233,11 @@ def ensure_session_filtered_data(
     filtered_data_dir = session_dir / str(metadata["paths"]["filtered_data_dir"])
     filter_result = metadata.setdefault("filter_result", {})
     if _session_filter_cache_is_valid(session_dir, metadata):
-        return int(filter_result["matched_records"]), int(filter_result["matched_files"]), "cached"
+        return (
+            int(filter_result["matched_records"]),
+            int(filter_result["matched_files"]),
+            "cached",
+        )
 
     if filtered_data_dir.exists():
         shutil.rmtree(filtered_data_dir)
@@ -246,15 +248,25 @@ def ensure_session_filtered_data(
         filtered_data_dir,
         date.fromisoformat(str(filter_config["start_date"])),
         date.fromisoformat(str(filter_config["end_date"])),
-        start_hour=int(filter_config["start_hour"]) if filter_config.get("start_hour") is not None else None,
-        end_hour=int(filter_config["end_hour"]) if filter_config.get("end_hour") is not None else None,
+        start_hour=(
+            int(filter_config["start_hour"])
+            if filter_config.get("start_hour") is not None
+            else None
+        ),
+        end_hour=(
+            int(filter_config["end_hour"])
+            if filter_config.get("end_hour") is not None
+            else None
+        ),
         active_slice=active_slice,
         remaining_slices=remaining_slices,
     )
     filter_result["matched_records"] = matched_records
     filter_result["matched_files"] = matched_files
     filter_result["filtered_data_path"] = metadata["paths"]["filtered_data_dir"]
-    filter_result["generated_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    filter_result["generated_at"] = (
+        datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
+    )
     write_session_metadata(session_dir, metadata)
     return matched_records, matched_files, "created"
 
@@ -359,14 +371,21 @@ def _filtered_data_looks_usable(filtered_data_dir: Path, *, expect_files: bool) 
 
 def _session_filter_cache_is_valid(session_dir: Path, metadata: dict) -> bool:
     """Return whether filtered data can be reused for the current filter signature."""
-    filtered_data_dir = session_dir / str(metadata.get("paths", {}).get("filtered_data_dir", "data"))
+    filtered_data_dir = session_dir / str(
+        metadata.get("paths", {}).get("filtered_data_dir", "data")
+    )
     filter_result = metadata.get("filter_result", {})
     if not filtered_data_dir.exists():
         return False
-    if filter_result.get("matched_records") is None or filter_result.get("matched_files") is None:
+    if (
+        filter_result.get("matched_records") is None
+        or filter_result.get("matched_files") is None
+    ):
         return False
     matched_files = int(filter_result.get("matched_files", 0))
-    if not _filtered_data_looks_usable(filtered_data_dir, expect_files=matched_files > 0):
+    if not _filtered_data_looks_usable(
+        filtered_data_dir, expect_files=matched_files > 0
+    ):
         return False
     filter_payload = metadata.get("filter", {})
     expected_signature = filter_signature(
@@ -380,7 +399,9 @@ def _session_filter_cache_is_valid(session_dir: Path, metadata: dict) -> bool:
     return str(metadata.get("session_config_signature", "")) == expected_signature
 
 
-def _refresh_data_index_for_root(data_dir: Path) -> tuple[dict, dict[str, dict], dict[str, int]]:
+def _refresh_data_index_for_root(
+    data_dir: Path,
+) -> tuple[dict, dict[str, dict], dict[str, int]]:
     """Load, incrementally refresh, and return index entries for one data root."""
     data_root = data_dir.resolve()
     index_data = _load_data_index()
@@ -390,7 +411,10 @@ def _refresh_data_index_for_root(data_dir: Path) -> tuple[dict, dict[str, dict],
     reparsed_files = 0
 
     jsonl_files = list(iter_jsonl_files(data_dir, recursive=True))
-    print(f"[runner] Data index refresh: discovered {len(jsonl_files)} JSONL files under {data_root}", flush=True)
+    print(
+        f"[runner] Data index refresh: discovered {len(jsonl_files)} JSONL files under {data_root}",
+        flush=True,
+    )
     for file_index, file_path in enumerate(jsonl_files, start=1):
         relative_path = file_path.resolve().relative_to(data_root).as_posix()
         stat_result = file_path.stat()
@@ -407,7 +431,9 @@ def _refresh_data_index_for_root(data_dir: Path) -> tuple[dict, dict[str, dict],
             )
             continue
 
-        updated_root_entries[relative_path] = _index_jsonl_file(file_path, data_root, stat_result)
+        updated_root_entries[relative_path] = _index_jsonl_file(
+            file_path, data_root, stat_result
+        )
         reparsed_files += 1
         _report_index_refresh_progress(
             file_index=file_index,
@@ -417,12 +443,18 @@ def _refresh_data_index_for_root(data_dir: Path) -> tuple[dict, dict[str, dict],
         )
 
     _store_cached_root_entries(index_data, data_root, updated_root_entries)
-    return index_data, updated_root_entries, {
-        "total_files": len(jsonl_files),
-        "reused_files": reused_files,
-        "reparsed_files": reparsed_files,
-        "deleted_files": max(0, len(cached_root_entries) - len(updated_root_entries)),
-    }
+    return (
+        index_data,
+        updated_root_entries,
+        {
+            "total_files": len(jsonl_files),
+            "reused_files": reused_files,
+            "reparsed_files": reparsed_files,
+            "deleted_files": max(
+                0, len(cached_root_entries) - len(updated_root_entries)
+            ),
+        },
+    )
 
 
 def _report_index_refresh_progress(
@@ -432,7 +464,11 @@ def _report_index_refresh_progress(
     reused_files: int,
     reparsed_files: int,
 ) -> None:
-    if file_index != 1 and file_index % FILTER_PROGRESS_FILE_INTERVAL != 0 and file_index != total_files:
+    if (
+        file_index != 1
+        and file_index % FILTER_PROGRESS_FILE_INTERVAL != 0
+        and file_index != total_files
+    ):
         return
     print(
         "[runner] Data index progress: "
@@ -443,11 +479,17 @@ def _report_index_refresh_progress(
     )
 
 
-def _cache_entry_matches_file(cache_entry: object, file_path: Path, stat_result: Any) -> bool:
+def _cache_entry_matches_file(
+    cache_entry: object, file_path: Path, stat_result: Any
+) -> bool:
     """Return whether an index entry is valid for the current file stat."""
     if not isinstance(cache_entry, dict):
         return False
-    path_matches = cache_entry.get("file_path") in {str(file_path), file_path.as_posix(), file_path.resolve().as_posix()}
+    path_matches = cache_entry.get("file_path") in {
+        str(file_path),
+        file_path.as_posix(),
+        file_path.resolve().as_posix(),
+    }
     return (
         path_matches
         and cache_entry.get("file_size") == stat_result.st_size
@@ -455,7 +497,9 @@ def _cache_entry_matches_file(cache_entry: object, file_path: Path, stat_result:
     )
 
 
-def _index_jsonl_file(file_path: Path, data_root: Path, stat_result: Any | None = None) -> dict:
+def _index_jsonl_file(
+    file_path: Path, data_root: Path, stat_result: Any | None = None
+) -> dict:
     """Parse one JSONL file into conservative filtering metadata."""
     stat_result = file_path.stat() if stat_result is None else stat_result
     relative_path = file_path.resolve().relative_to(data_root).as_posix()
@@ -504,10 +548,15 @@ def _index_jsonl_file(file_path: Path, data_root: Path, stat_result: Any | None 
         "relative_path": relative_path,
         "file_size": stat_result.st_size,
         "size": stat_result.st_size,
-        "modified_time": datetime.utcfromtimestamp(stat_result.st_mtime).replace(microsecond=0).isoformat() + "Z",
+        "modified_time": datetime.utcfromtimestamp(stat_result.st_mtime)
+        .replace(microsecond=0)
+        .isoformat()
+        + "Z",
         "mtime": stat_result.st_mtime,
         "mtime_ns": stat_result.st_mtime_ns,
-        "filename_date": filename_date.isoformat() if filename_date is not None else None,
+        "filename_date": (
+            filename_date.isoformat() if filename_date is not None else None
+        ),
         "min_timestamp": min_dt.isoformat() if min_dt is not None else None,
         "max_timestamp": max_dt.isoformat() if max_dt is not None else None,
         "record_count": record_count,
@@ -523,7 +572,9 @@ def _normalize_datetime_for_index(value: datetime) -> datetime:
     return value.replace(tzinfo=None)
 
 
-def _select_candidate_entries(root_entries: dict[str, dict], start_date: date, end_date: date) -> list[tuple[str, dict]]:
+def _select_candidate_entries(
+    root_entries: dict[str, dict], start_date: date, end_date: date
+) -> list[tuple[str, dict]]:
     """Return files that may contain records in the requested date range."""
     candidates: list[tuple[str, dict]] = []
     for relative_path, entry in sorted(root_entries.items()):
@@ -636,10 +687,16 @@ def _load_cached_root_entries(index_data: dict, data_root: Path) -> dict[str, di
     if not isinstance(files, dict):
         return {}
 
-    return {key: value for key, value in files.items() if isinstance(key, str) and isinstance(value, dict)}
+    return {
+        key: value
+        for key, value in files.items()
+        if isinstance(key, str) and isinstance(value, dict)
+    }
 
 
-def _store_cached_root_entries(index_data: dict, data_root: Path, file_entries: dict[str, dict]) -> None:
+def _store_cached_root_entries(
+    index_data: dict, data_root: Path, file_entries: dict[str, dict]
+) -> None:
     """Store updated cached file entries for one data root."""
     roots = index_data.setdefault("roots", {})
     if not isinstance(roots, dict):
@@ -652,7 +709,9 @@ def _store_cached_root_entries(index_data: dict, data_root: Path, file_entries: 
 def _write_data_index(index_data: dict) -> None:
     """Write the runner data index to disk atomically."""
     DATA_INDEX_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile("w", encoding="utf-8", dir=DATA_INDEX_FILE.parent, delete=False) as tmp:
+    with NamedTemporaryFile(
+        "w", encoding="utf-8", dir=DATA_INDEX_FILE.parent, delete=False
+    ) as tmp:
         json.dump(index_data, tmp, ensure_ascii=False, indent=2, sort_keys=True)
         tmp.write("\n")
         temp_path = Path(tmp.name)

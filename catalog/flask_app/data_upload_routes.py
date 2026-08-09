@@ -113,7 +113,7 @@ def analyze(batch_id: str):
         candidate = uploads.batch(batch_id)
         jobs = get_upload_analysis_job_service()
         job_id = jobs.submit_batch(candidate)
-        batch = uploads.request_analysis(batch_id)
+        batch = uploads.request_analysis(batch_id, execution_id=job_id)
         jobs.start_tracking(job_id)
     except DataUploadError as exc:
         if job_id is not None and jobs is not None:
