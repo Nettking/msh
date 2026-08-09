@@ -12,7 +12,6 @@ import os
 import threading
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
 
 from flask import Flask
 
@@ -46,7 +45,9 @@ def _required_group(value: object) -> str:
             "an explicit logical Federation storage group is required",
         )
     group_id = value.strip()
-    if len(group_id.encode("utf-8")) > 512 or any(ord(char) < 32 for char in group_id):
+    if len(group_id.encode("utf-8")) > 512 or any(
+        ord(char) < 32 for char in group_id
+    ):
         raise FederationValidationError(
             "invalid-recorder-publication-target",
             "group_id",
@@ -97,7 +98,9 @@ class RecorderFederationPublicationMonitor:
             )
 
     def _enabled(self) -> bool:
-        return bool(self.app.config.get("RECORDER_FEDERATION_PUBLICATION_ENABLED", False))
+        return bool(
+            self.app.config.get("RECORDER_FEDERATION_PUBLICATION_ENABLED", False)
+        )
 
     def _client_factory(self):
         factory = self.app.config.get("RECORDER_FEDERATION_STORAGE_CLIENT_FACTORY")
@@ -158,7 +161,9 @@ class RecorderFederationPublicationMonitor:
         checkpoint_file = Path(
             str(self.app.config["RECORDER_FEDERATION_CHECKPOINT_FILE"])
         )
-        outbox_path = Path(str(self.app.config["RECORDER_FEDERATION_OUTBOX_DATABASE"]))
+        outbox_path = Path(
+            str(self.app.config["RECORDER_FEDERATION_OUTBOX_DATABASE"])
+        )
         outbox = SQLiteOutbox(outbox_path)
         queue = DurableRecorderDeliveryQueue(outbox=outbox, client=client)
         reconciler = RecorderArchiveReconciler(
@@ -177,7 +182,9 @@ class RecorderFederationPublicationMonitor:
             poll_interval_seconds=float(
                 self.app.config["RECORDER_FEDERATION_POLL_INTERVAL_SECONDS"]
             ),
-            delivery_limit=int(self.app.config["RECORDER_FEDERATION_DELIVERY_LIMIT"]),
+            delivery_limit=int(
+                self.app.config["RECORDER_FEDERATION_DELIVERY_LIMIT"]
+            ),
         )
 
     async def _run_worker(self, worker: RecorderFederationDeliveryWorker) -> None:
@@ -194,7 +201,11 @@ class RecorderFederationPublicationMonitor:
                     worker = self.build_worker()
             except Exception as exc:  # noqa: BLE001 - retry boundary is deliberate
                 code = str(getattr(exc, "code", type(exc).__name__))
-                self._set_snapshot("waiting", enabled=self._enabled(), error_code=code)
+                self._set_snapshot(
+                    "waiting",
+                    enabled=self._enabled(),
+                    error_code=code,
+                )
                 if self._stop.wait(_DEFAULT_RETRY_SECONDS):
                     return
                 continue
@@ -229,7 +240,11 @@ class RecorderFederationPublicationMonitor:
             )
             self._client_factory()
         except FederationValidationError as exc:
-            self._set_snapshot("not-configured", enabled=True, error_code=exc.code)
+            self._set_snapshot(
+                "not-configured",
+                enabled=True,
+                error_code=exc.code,
+            )
             return
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
