@@ -3,11 +3,41 @@ from __future__ import annotations
 import hmac
 import secrets
 
-from flask import Blueprint, flash, jsonify, redirect, request, session, url_for
+from flask import (
+    Blueprint,
+    current_app,
+    flash,
+    jsonify,
+    redirect,
+    request,
+    session,
+    url_for,
+)
 
-from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
+from catalog.federation.onboarding_models import (
+    ContributionActivationState,
+    ContributionDesiredState,
+)
+# Temporary import-only compatibility hook for CFI-6 tests and integrations that
+# monkeypatch this historical module symbol. No route behavior depends on it.
+from catalog.orchestrator.pipeline import get_runtime_manager  # noqa: F401
 
 from .services.ai_model_benchmark_service import compare_ollama_setup_models
+from .services.capability_config_service import (
+    CapabilityConfigError,
+    compatibility_settings,
+    load_capability_config,
+    mirror_legacy_capability_config,
+    save_capability_config,
+    update_language_model_config,
+    update_recorder_config,
+)
+from .services.capability_contribution_service import (
+    get_capability_contribution_service,
+)
+from .services.capability_startup_transition_service import (
+    get_capability_startup_transition_service,
+)
 from .services.mtconnect_discovery_service import (
     MtconnectDiscoveryError,
     get_mtconnect_discovery_service,
@@ -19,36 +49,47 @@ from .services.recorder_control_service import (
 from .services.server_setup_service import (
     AI_MODEL_CHOICES,
     ServerSetupError,
-    ai_settings_from_form,
-    default_settings,
     load_settings,
     ollama_status,
     pull_ollama_model,
-    role_has_recorder,
-    role_uses_ai,
-    runtime_should_start,
-    save_settings,
-    settings_from_form,
 )
 
 server_setup_web = Blueprint("server_setup_web", __name__)
 
 _MTCONNECT_CSRF_SESSION_KEY = "mtconnect_discovery_csrf_token"
+_EXPLICIT_CONTROL_ENDPOINTS = frozenset(
+    {
+        "server_setup_web.save_language_model_capability_config",
+        "server_setup_web.save_recorder_capability_config",
+        "server_setup_web.test_ai_model",
+        "server_setup_web.test_ai_connection",
+        "server_setup_web.compare_ai_models",
+        "server_setup_web.pull_model",
+        "server_setup_web.start_recording",
+        "server_setup_web.stop_recording",
+        "server_setup_web.scan_mtconnect_network",
+        "server_setup_web.save_discovered_mtconnect_sources",
+    }
+)
 
-_SETUP_PATHS = {
-    "/startup",
-    "/server-setup/save",
-    "/server-setup/pull-model",
-    "/server-setup/test-ai-model",
-    "/server-setup/test-ai-connection",
-    "/server-setup/compare-ai-models",
-    "/server-setup/recording/start",
-    "/server-setup/recording/stop",
-    "/status/recorder.json",
-    "/status/mtconnect-scan",
-    "/status/mtconnect-sources",
-    "/rescan",
-}
+
+@server_setup_web.before_app_request
+def dispatch_explicit_capability_controls():
+    """Keep configuration controls independent from analysis-session startup.
+
+    The retired role-first setup used to dispatch these controls before the
+    separate runtime continue/new-session gate.  Preserve that ordering only for
+    explicit configuration/probe/control endpoints.  No legacy setup-save or
+    role mutation endpoint is admitted here.
+    """
+
+    endpoint = request.endpoint or ""
+    if endpoint not in _EXPLICIT_CONTROL_ENDPOINTS:
+        return None
+    view = current_app.view_functions.get(endpoint)
+    if view is None:
+        return None
+    return current_app.ensure_sync(view)(**(request.view_args or {}))
 
 
 def _mtconnect_csrf_token() -> str:
@@ -67,7 +108,7 @@ def inject_mtconnect_csrf_token():
 
 
 def _require_setup_csrf(*, local_only: bool = False) -> None:
-    """Reject cross-site or tokenless requests before changing local setup."""
+    """Reject cross-site or tokenless local capability-configuration requests."""
 
     if local_only:
         request_host = request.host.casefold()
@@ -81,15 +122,14 @@ def _require_setup_csrf(*, local_only: bool = False) -> None:
             )
     if request.headers.get("Sec-Fetch-Site", "").casefold() == "cross-site":
         raise MtconnectDiscoveryError(
-            "The setup request was blocked because it came from "
-            "another site. Reload the MSH Setup page and try again."
+            "The configuration request was blocked because it came from "
+            "another site. Reload MSH and try again."
         )
     expected = str(session.get(_MTCONNECT_CSRF_SESSION_KEY) or "")
     supplied = str(request.form.get("_csrf_token") or "")
     if not expected or not supplied or not hmac.compare_digest(expected, supplied):
         raise MtconnectDiscoveryError(
-            "The setup form expired. Reload the MSH Setup page "
-            "and try again."
+            "The configuration form expired. Reload MSH and try again."
         )
 
 
@@ -97,226 +137,74 @@ def _require_mtconnect_csrf() -> None:
     _require_setup_csrf(local_only=True)
 
 
-def _next_path() -> str:
-    value = request.form.get("next") or request.args.get("next") or ""
-    if value.startswith("/") and not value.startswith("//"):
-        return value
-    return url_for("web.overview")
-
-
-def _startup_step_url(
-    step: str,
-    *,
-    next_path: str | None = None,
-    edit: bool = False,
-) -> str:
-    if edit:
-        return url_for(
-            "web.startup",
-            edit="1",
-            next=next_path or _next_path(),
-            step=step,
-        )
-    return url_for("web.startup", next=next_path or _next_path(), step=step)
-
-
-@server_setup_web.before_app_request
-def browser_setup_gate():
-    """Ensure one-command Docker startup lands in browser setup first.
-
-    Setup and recorder-control POSTs are handled here before the older runtime
-    choice gate. Recording is intentionally independent from the analysis-session
-    continue-vs-clean decision.
-    """
-
-    if request.endpoint and request.endpoint.startswith("static"):
-        return None
-    if request.path == "/server-setup/save" and request.method == "POST":
-        return _save_from_request()
-    if request.path == "/server-setup/pull-model" and request.method == "POST":
-        return _pull_from_request()
-    if request.path == "/server-setup/test-ai-model" and request.method == "POST":
-        return _test_ai_model_from_request()
-    if request.path == "/server-setup/test-ai-connection" and request.method == "POST":
-        return _test_ai_connection_from_request()
-    if request.path == "/server-setup/compare-ai-models" and request.method == "POST":
-        return _compare_ai_models_from_request()
-    if request.path == "/server-setup/recording/start" and request.method == "POST":
-        return _set_recording_from_request(True)
-    if request.path == "/server-setup/recording/stop" and request.method == "POST":
-        return _set_recording_from_request(False)
-    if request.path in _SETUP_PATHS:
-        return None
-
-    try:
-        settings = load_settings()
-    except ServerSetupError as exc:
-        flash(str(exc), "error")
-        return redirect(
-            url_for(
-                "web.startup",
-                next=request.full_path if request.query_string else request.path,
-            )
-        )
-    if not settings.configured or not settings.user_setup_complete:
-        return redirect(
-            url_for(
-                "web.startup",
-                next=request.full_path if request.query_string else request.path,
-            )
-        )
-    return None
-
-
-def _set_recording_from_request(enabled: bool):
-    destination = request.form.get("next") or url_for("web.startup")
-    if not destination.startswith("/") or destination.startswith("//"):
-        destination = url_for("web.startup")
-
-    try:
-        _require_setup_csrf()
-        settings = load_settings()
-        ok, message = get_recorder_control_service().set_enabled(enabled, settings)
-    except (
-        MtconnectDiscoveryError,
-        ServerSetupError,
-        RecorderControlError,
-    ) as exc:
-        flash(str(exc), "error")
-        return redirect(destination)
-
-    flash(message, "success" if ok else "error")
-    return redirect(destination)
-
-
-@server_setup_web.post("/status/mtconnect-scan")
-def scan_mtconnect_network():
-    wants_json = (
+def _wants_json() -> bool:
+    return (
         request.accept_mimetypes["application/json"]
         > request.accept_mimetypes["text/html"]
     )
+
+
+def _capability_flags() -> dict[str, object]:
     try:
-        _require_mtconnect_csrf()
-        result = get_mtconnect_discovery_service().scan(
-            str(request.form.get("cidr") or ""),
-            port=str(request.form.get("port") or "5000"),
-        )
-    except MtconnectDiscoveryError as exc:
-        message = str(exc)
-        if wants_json:
-            return jsonify({"ok": False, "message": message}), 400
-        flash(message, "error")
-        return redirect(
-            url_for("web.startup", edit="1", step="recorder")
-        )
-
-    message = (
-        "Network scan complete: "
-        f"{result.get('machines_found', 0)} machine(s) from "
-        f"{result.get('agents_found', 0)} MTConnect Agent(s)."
-    )
-    if wants_json:
-        return jsonify({"ok": True, "scan": result, "message": message})
-    flash(
-        message,
-        "success",
-    )
-    return redirect(url_for("web.startup", edit="1", step="recorder"))
+        return get_capability_startup_transition_service().capability_flags()
+    except Exception:  # noqa: BLE001 - operational controls fail closed
+        return {
+            "completed": False,
+            "needs_migration": False,
+            "recorder": False,
+            "language_model": False,
+        }
 
 
-@server_setup_web.post("/status/mtconnect-sources")
-def save_discovered_mtconnect_sources():
+def _active_recorder_contribution() -> bool:
+    """Require current active CF4/CFI-5 authority, failing closed on stale state."""
+
     try:
-        _require_mtconnect_csrf()
+        service = get_capability_contribution_service()
+        recorder_candidates = {
+            candidate.candidate_id
+            for candidate in service.recommend(require_benchmark_review=False)
+            if candidate.capability_type == "recorder"
+        }
+        return any(
+            intent.candidate_id in recorder_candidates
+            and intent.desired_state is ContributionDesiredState.ENABLED
+            and intent.activation_state is ContributionActivationState.ACTIVE
+            for intent in service.intents()
+        )
+    except Exception:  # noqa: BLE001 - legacy control must not bypass authority
+        return False
+
+
+def _recorder_authorized() -> bool:
+    flags = _capability_flags()
+    if bool(flags.get("completed")):
+        return _active_recorder_contribution()
+    if not bool(flags.get("needs_migration")):
+        return False
+    try:
         settings = load_settings()
-        settings = get_mtconnect_discovery_service().merge_selected_results(
-            settings,
-            request.form.getlist("source_id"),
-        )
-        save_settings(settings)
-    except (MtconnectDiscoveryError, ServerSetupError) as exc:
-        flash(str(exc), "error")
-    else:
-        flash(
-            "Selected MTConnect machines were saved as recorder sources. "
-            "Use Start recording when you are ready to collect data.",
-            "success",
-        )
-    return redirect(url_for("web.status") + "#recorder-status")
+    except (OSError, ServerSetupError, TypeError, ValueError):
+        return False
+    return settings.deployment_mode in {"full-server", "recorder-only"}
 
 
-def _save_from_request():
-    try:
-        _require_setup_csrf()
-    except MtconnectDiscoveryError as exc:
-        flash(str(exc), "error")
-        return redirect(_startup_step_url("review", edit=True))
-
-    try:
-        previous_settings = load_settings()
-        first_user_setup = not (
-            previous_settings.configured and previous_settings.user_setup_complete
-        )
-    except ServerSetupError:
-        previous_settings = default_settings(configured=False)
-        first_user_setup = True
-
-    try:
-        settings = settings_from_form(request.form, previous_settings)
-        selected_source_ids = request.form.getlist("source_id")
-        if selected_source_ids:
-            _require_mtconnect_csrf()
-            settings = (
-                get_mtconnect_discovery_service().merge_selected_results(
-                    settings,
-                    selected_source_ids,
-                )
-            )
-        save_settings(settings)
-        if (
-            not role_has_recorder(settings.deployment_mode)
-            or not settings.recorder_sources.strip()
-        ):
-            get_recorder_control_service().set_enabled(False, settings)
-    except (
-        MtconnectDiscoveryError,
-        ServerSetupError,
-        RecorderControlError,
-    ) as exc:
-        flash(str(exc), "error")
-        return redirect(_startup_step_url("review", edit=True))
-
-    if first_user_setup and settings.deployment_mode == "recorder-only":
-        next_path = url_for("web.status") + "#recorder-status"
-    elif first_user_setup:
-        next_path = url_for("web.get_started")
-    else:
-        next_path = _next_path()
-    flash("Device setup saved.", "success")
-    if runtime_should_start(settings):
-        if get_runtime_manager().requires_startup_choice():
-            flash("Choose how runtime should start next.", "info")
-            return redirect(_startup_step_url("runtime", next_path=next_path))
-        start_runtime_background()
-        flash("Runtime background processing is enabled.", "success")
-        return redirect(next_path)
-
-    flash("Background orchestration is disabled for this setup mode.", "info")
-    return redirect(next_path)
+def _persist_capability_config(config) -> None:
+    save_capability_config(config)
+    # Temporary one-way mirror for old runtime readers. This function never
+    # changes deployment_mode, configured/user_setup_complete, or ai_enabled.
+    mirror_legacy_capability_config(config)
 
 
 def _settings_for_ai_form():
-    settings = load_settings()
-    deployment_mode = str(
-        request.form.get("deployment_mode")
-        or settings.deployment_mode
-        or ""
-    ).strip()
-    if not role_uses_ai(deployment_mode):
-        raise ServerSetupError(
-            "Language-model actions are not available for the selected role."
-        )
-    return ai_settings_from_form(request.form, settings)
+    config = update_language_model_config(load_capability_config(), request.form)
+    # Model tests are configuration probes, not contribution activation. The
+    # synthetic enabled flag only satisfies retained Ollama helper signatures.
+    return compatibility_settings(
+        config,
+        capability="language-model",
+        enabled=True,
+    )
 
 
 def _selected_ai_model_from_request(settings) -> str:
@@ -330,7 +218,7 @@ def _selected_ai_model_from_request(settings) -> str:
     return str(request.form.get("model") or settings.ai_model or "").strip()
 
 
-def _legacy_shape_for_ai_page(result: dict) -> dict:
+def _legacy_shape_for_ai_page(result: dict, settings) -> dict:
     recommendation = result.get("recommendation") or {}
     recommended_model = recommendation.get("recommended_model") or ""
     rows = result.get("rows") or []
@@ -341,7 +229,7 @@ def _legacy_shape_for_ai_page(result: dict) -> dict:
     recommended_result = (recommended_row or {}).get("result") or {}
     result.setdefault(
         "model",
-        recommended_model or _selected_ai_model_from_request(load_settings()),
+        recommended_model or _selected_ai_model_from_request(settings),
     )
     result.setdefault("elapsed_ms", recommended_result.get("elapsed_ms"))
     result.setdefault(
@@ -362,22 +250,82 @@ def _legacy_shape_for_ai_page(result: dict) -> dict:
     return result
 
 
-def _test_ai_model_from_request():
+@server_setup_web.post("/capabilities/config/language-model")
+def save_language_model_capability_config():
+    try:
+        _require_setup_csrf()
+        config = update_language_model_config(
+            load_capability_config(),
+            request.form,
+        )
+        _persist_capability_config(config)
+    except (MtconnectDiscoveryError, CapabilityConfigError, ServerSetupError) as exc:
+        if _wants_json():
+            return jsonify({"ok": False, "message": str(exc)}), 400
+        flash(str(exc), "error")
+        return redirect(url_for("federation_web.overview"), code=303)
+
+    if _wants_json():
+        return jsonify(
+            {
+                "ok": True,
+                "provider_mode": config.ai_provider_mode,
+                "provider_name": config.ai_provider_name,
+                "model": config.ai_model,
+            }
+        )
+    flash("Language-model configuration saved.", "success")
+    return redirect(url_for("federation_web.overview"), code=303)
+
+
+@server_setup_web.post("/capabilities/config/recorder")
+def save_recorder_capability_config():
+    try:
+        _require_setup_csrf(local_only=True)
+        config = update_recorder_config(
+            load_capability_config(),
+            recorder_sources=str(request.form.get("recorder_sources") or ""),
+            recorder_poll_interval=str(
+                request.form.get("recorder_poll_interval") or "0.2"
+            ),
+            recorder_include_condition=(
+                request.form.get("recorder_include_condition") == "on"
+            ),
+        )
+        _persist_capability_config(config)
+    except (MtconnectDiscoveryError, CapabilityConfigError, ServerSetupError) as exc:
+        if _wants_json():
+            return jsonify({"ok": False, "message": str(exc)}), 400
+        flash(str(exc), "error")
+        return redirect(url_for("web.status") + "#recorder-status", code=303)
+
+    if _wants_json():
+        return jsonify({"ok": True, "recorder_sources": config.recorder_sources})
+    flash("Recorder configuration saved.", "success")
+    return redirect(url_for("web.status") + "#recorder-status", code=303)
+
+
+@server_setup_web.post("/server-setup/test-ai-model")
+def test_ai_model():
     try:
         _require_setup_csrf()
         settings = _settings_for_ai_form()
-    except (MtconnectDiscoveryError, ServerSetupError) as exc:
+    except (MtconnectDiscoveryError, CapabilityConfigError, ServerSetupError) as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
 
-    result = _legacy_shape_for_ai_page(compare_ollama_setup_models(settings))
+    result = _legacy_shape_for_ai_page(
+        compare_ollama_setup_models(settings),
+        settings,
+    )
     return jsonify(result), 200 if result.get("ok") else 503
 
 
-def _test_ai_connection_from_request():
+@server_setup_web.post("/server-setup/test-ai-connection")
+def test_ai_connection():
     try:
         _require_setup_csrf()
         settings = _settings_for_ai_form()
-    except (MtconnectDiscoveryError, ServerSetupError) as exc:
+    except (MtconnectDiscoveryError, CapabilityConfigError, ServerSetupError) as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
 
     status = ollama_status(settings, timeout_seconds=3.0)
@@ -385,42 +333,133 @@ def _test_ai_connection_from_request():
     return jsonify(status), 200 if status["ok"] else 503
 
 
-def _compare_ai_models_from_request():
+@server_setup_web.post("/server-setup/compare-ai-models")
+def compare_ai_models():
     try:
         _require_setup_csrf()
         settings = _settings_for_ai_form()
-    except (MtconnectDiscoveryError, ServerSetupError) as exc:
+    except (MtconnectDiscoveryError, CapabilityConfigError, ServerSetupError) as exc:
         return jsonify({"ok": False, "message": str(exc)}), 400
 
     result = compare_ollama_setup_models(settings)
     return jsonify(result), 200 if result.get("ok") else 503
 
 
-@server_setup_web.post("/server-setup/test-ai-model")
-def test_ai_model():
-    return _test_ai_model_from_request()
-
-
-@server_setup_web.post("/server-setup/test-ai-connection")
-def test_ai_connection():
-    return _test_ai_connection_from_request()
-
-
-@server_setup_web.post("/server-setup/compare-ai-models")
-def compare_ai_models():
-    return _compare_ai_models_from_request()
-
-
-def _pull_from_request():
+@server_setup_web.post("/server-setup/pull-model")
+def pull_model():
     try:
         _require_setup_csrf()
-        settings = load_settings()
-        if not role_uses_ai(settings.deployment_mode):
-            raise ServerSetupError(
-                "Language-model actions are not available for the selected role."
-            )
+        config = load_capability_config()
+        settings = compatibility_settings(
+            config,
+            capability="language-model",
+            enabled=True,
+        )
         ok, message = pull_ollama_model(settings)
-    except (MtconnectDiscoveryError, ServerSetupError) as exc:
+    except (MtconnectDiscoveryError, CapabilityConfigError, ServerSetupError) as exc:
         ok, message = False, str(exc)
     flash(message, "success" if ok else "error")
-    return redirect(_startup_step_url("runtime"))
+    return redirect(url_for("federation_web.overview"), code=303)
+
+
+def _set_recording_from_request(enabled: bool):
+    destination = request.form.get("next") or (url_for("web.status") + "#recorder-status")
+    if not destination.startswith("/") or destination.startswith("//"):
+        destination = url_for("web.status") + "#recorder-status"
+
+    try:
+        _require_setup_csrf()
+        authorized = _recorder_authorized()
+        if enabled and not authorized:
+            raise RecorderControlError(
+                "Recorder capability is not enabled by current contribution authority."
+            )
+        config = load_capability_config()
+        settings = compatibility_settings(
+            config,
+            capability="recorder",
+            enabled=authorized,
+        )
+        ok, message = get_recorder_control_service().set_enabled(enabled, settings)
+    except (
+        MtconnectDiscoveryError,
+        CapabilityConfigError,
+        ServerSetupError,
+        RecorderControlError,
+    ) as exc:
+        flash(str(exc), "error")
+        return redirect(destination, code=303)
+
+    flash(message, "success" if ok else "error")
+    return redirect(destination, code=303)
+
+
+@server_setup_web.post("/server-setup/recording/start")
+def start_recording():
+    return _set_recording_from_request(True)
+
+
+@server_setup_web.post("/server-setup/recording/stop")
+def stop_recording():
+    return _set_recording_from_request(False)
+
+
+@server_setup_web.post("/status/mtconnect-scan")
+def scan_mtconnect_network():
+    wants_json = _wants_json()
+    try:
+        _require_mtconnect_csrf()
+        result = get_mtconnect_discovery_service().scan(
+            str(request.form.get("cidr") or ""),
+            port=str(request.form.get("port") or "5000"),
+        )
+    except MtconnectDiscoveryError as exc:
+        message = str(exc)
+        if wants_json:
+            return jsonify({"ok": False, "message": message}), 400
+        flash(message, "error")
+        return redirect(url_for("web.status") + "#recorder-status", code=303)
+
+    message = (
+        "Network scan complete: "
+        f"{result.get('machines_found', 0)} machine(s) from "
+        f"{result.get('agents_found', 0)} MTConnect Agent(s)."
+    )
+    if wants_json:
+        return jsonify({"ok": True, "scan": result, "message": message})
+    flash(message, "success")
+    return redirect(url_for("web.status") + "#recorder-status", code=303)
+
+
+@server_setup_web.post("/status/mtconnect-sources")
+def save_discovered_mtconnect_sources():
+    try:
+        _require_mtconnect_csrf()
+        config = load_capability_config()
+        adapter = compatibility_settings(
+            config,
+            capability="recorder",
+            enabled=True,
+        )
+        merged = get_mtconnect_discovery_service().merge_selected_results(
+            adapter,
+            request.form.getlist("source_id"),
+        )
+        config = update_recorder_config(
+            config,
+            recorder_sources=merged.recorder_sources,
+        )
+        _persist_capability_config(config)
+    except (
+        MtconnectDiscoveryError,
+        CapabilityConfigError,
+        ServerSetupError,
+    ) as exc:
+        flash(str(exc), "error")
+    else:
+        flash(
+            "Selected MTConnect machines were saved as recorder sources. "
+            "Enable recorder contribution before starting capture.",
+            "success",
+        )
+    return redirect(url_for("web.status") + "#recorder-status", code=303)
