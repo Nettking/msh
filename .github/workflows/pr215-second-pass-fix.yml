@@ -177,7 +177,7 @@ jobs:
           '''
           marker = 'def test_load_state_clears_process_local_execution_reservation'
           if marker not in tests:
-              test_path.write_text(tests.rstrip() + addition + '\n', encoding='utf-8')
+              test_path.write_text((tests.rstrip() + addition).rstrip() + '\n', encoding='utf-8')
           PY
       - name: Ruff changed boundaries
         run: python -m ruff check catalog/orchestrator/pipeline.py catalog/orchestrator/tests/test_pipeline_bootstrap.py --ignore I001,RUF022,B008,C408,PLC0206,UP035,DTZ001,DTZ003,DTZ004,BLE001,RUF100
