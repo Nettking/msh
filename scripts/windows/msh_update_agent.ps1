@@ -19,13 +19,16 @@ $ResultSchema = 'msh.host-update-result.v1'
 $MaxBytes = 8192
 $OidPattern = '^[0-9a-f]{40}$'
 $RequestIdPattern = '^[A-Za-z0-9._:-]{1,128}$'
+$ModelPattern = '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$'
 
 $RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
 $DataDirectory = [System.IO.Path]::GetFullPath($DataDirectory)
+$AgentScriptPath = [System.IO.Path]::GetFullPath($PSCommandPath)
 $AgentDirectory = Join-Path $DataDirectory 'federation\update-agent'
 $RequestFile = Join-Path $AgentDirectory 'request.json'
 $ResultFile = Join-Path $AgentDirectory 'result.json'
 New-Item -ItemType Directory -Path $AgentDirectory -Force | Out-Null
+$InitialAgentHash = (Get-FileHash -LiteralPath $AgentScriptPath -Algorithm SHA256).Hash
 
 function Get-PathHash([string]$Value) {
     $sha = [System.Security.Cryptography.SHA256]::Create()
@@ -44,12 +47,47 @@ function Last-Text([object[]]$Values) {
     return ([string]$last)
 }
 
+function Get-AgentHash {
+    return (Get-FileHash -LiteralPath $AgentScriptPath -Algorithm SHA256).Hash
+}
+
+function ConvertTo-PowerShellLiteral([string]$Value) {
+    return "'" + $Value.Replace("'", "''") + "'"
+}
+
+function Start-ReplacementAgent {
+    $scriptLiteral = ConvertTo-PowerShellLiteral $AgentScriptPath
+    $rootLiteral = ConvertTo-PowerShellLiteral $RepoRoot
+    $dataLiteral = ConvertTo-PowerShellLiteral $DataDirectory
+    $command = (
+        "Start-Sleep -Milliseconds 500; & $scriptLiteral " +
+        "-RepoRoot $rootLiteral -DataDirectory $dataLiteral " +
+        "-PollSeconds $PollSeconds"
+    )
+    $bytes = [System.Text.Encoding]::Unicode.GetBytes($command)
+    $encoded = [Convert]::ToBase64String($bytes)
+    $process = Start-Process `
+        -FilePath 'powershell.exe' `
+        -ArgumentList @(
+            '-NoProfile',
+            '-WindowStyle', 'Hidden',
+            '-ExecutionPolicy', 'Bypass',
+            '-EncodedCommand', $encoded
+        ) `
+        -WindowStyle Hidden `
+        -PassThru
+    if ($null -eq $process) {
+        throw 'update_agent_reload_failed'
+    }
+}
+
 $mutexName = 'Global\MSHUpdateAgent-' + (Get-PathHash $RepoRoot)
 $createdNew = $false
 $mutex = [System.Threading.Mutex]::new($true, $mutexName, [ref]$createdNew)
 if (-not $createdNew) {
     exit 0
 }
+$mutexReleased = $false
 
 function Write-AgentResult {
     param(
@@ -243,6 +281,31 @@ function Wait-RuntimeVerified([string]$Target) {
     throw 'runtime_verification_timeout'
 }
 
+function Ensure-OllamaModel {
+    $probe = Invoke-External 'docker' @(
+        'compose', 'run', '--rm', '--no-deps', '--entrypoint', 'python',
+        'flask', '-c',
+        "import os; print(os.environ.get('MSH_AI_MODEL') or 'llama3.2:3b')"
+    )
+    $model = (Last-Text $probe).Trim()
+    if ($model -notmatch $ModelPattern) {
+        throw 'invalid_model_identifier'
+    }
+    & docker compose exec -T ollama ollama show $model *> $null
+    if ($LASTEXITCODE -eq 0) {
+        return $model
+    }
+    Invoke-External 'docker' @(
+        'compose', '--profile', 'model-install', 'run', '--rm',
+        '--entrypoint', '/bin/ollama', 'ollama-pull', 'pull', $model
+    ) | Out-Null
+    & docker compose exec -T ollama ollama show $model *> $null
+    if ($LASTEXITCODE -ne 0) {
+        throw 'model_verification_failed'
+    }
+    return $model
+}
+
 function Process-Request {
     if (-not (Test-Path -LiteralPath $RequestFile)) { return $false }
     $info = Get-Item -LiteralPath $RequestFile
@@ -385,7 +448,11 @@ function Process-Request {
         Invoke-External 'docker' @(
             'compose', 'up', '-d', 'relay', 'ollama', 'recorder'
         ) | Out-Null
+        Ensure-OllamaModel | Out-Null
         & docker compose stop flask *> $null
+        if ($LASTEXITCODE -ne 0) {
+            throw 'flask_stop_failed'
+        }
         & docker compose run --rm --no-deps --entrypoint python flask `
             -m catalog.flask_app.services.existing_setup_resume
         $resumeExit = $LASTEXITCODE
@@ -404,7 +471,7 @@ function Process-Request {
             -TargetCommit $target `
             -RunningCommit $running `
             -Code 'updated' `
-            -Message 'MSH source, images, services, and running commit were updated and verified.'
+            -Message 'MSH source, images, services, required model, and running commit were updated and verified.'
         return $true
     }
     catch {
@@ -453,12 +520,23 @@ try {
     while ($true) {
         $processed = Process-Request
         if ($Once) { break }
+        if ($processed -and (Get-AgentHash) -ne $InitialAgentHash) {
+            # Git may have updated this updater. Spawn the newly checked-out
+            # script with a short delay, then release this process's mutex.
+            Start-ReplacementAgent
+            $mutex.ReleaseMutex() | Out-Null
+            $mutexReleased = $true
+            $mutex.Dispose()
+            exit 0
+        }
         if (-not $processed) {
             Start-Sleep -Seconds $PollSeconds
         }
     }
 }
 finally {
-    $mutex.ReleaseMutex() | Out-Null
-    $mutex.Dispose()
+    if (-not $mutexReleased) {
+        $mutex.ReleaseMutex() | Out-Null
+        $mutex.Dispose()
+    }
 }
