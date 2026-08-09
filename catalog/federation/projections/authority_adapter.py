@@ -26,6 +26,17 @@ class DeviceRecord:
 
 
 @dataclass(frozen=True)
+class FederatedCapabilityRecord:
+    capability_id: str
+    node_id: str
+    capability_type: str
+    protocol: str
+    protocol_version: str
+    status: str
+    last_seen_at: datetime | None
+
+
+@dataclass(frozen=True)
 class ActivityRecord:
     revision: int | None
     occurred_at: datetime | None
@@ -43,6 +54,7 @@ class FederationAuthoritySnapshot:
     revision: int | None = None
     devices: tuple[DeviceRecord, ...] = ()
     activity: tuple[ActivityRecord, ...] = ()
+    capabilities: tuple[FederatedCapabilityRecord, ...] = ()
 
 
 _EVENT_COPY = {
@@ -60,6 +72,18 @@ _EVENT_COPY = {
     "capability.updated": (
         "Service updated",
         "A device refreshed a service announcement.",
+    ),
+    "capability.registered": (
+        "Service announced",
+        "A trusted device published service metadata.",
+    ),
+    "capability.status.changed": (
+        "Service updated",
+        "A trusted device refreshed service metadata.",
+    ),
+    "capability.health.changed": (
+        "Service health changed",
+        "Federation service health changed.",
     ),
     "storage.group.created": (
         "Storage group created",
@@ -130,18 +154,20 @@ class FederationAuthorityAdapter:
 
             raw_status = self._authorized_status()
             devices = self._devices(raw_status, member_ids)
+            capabilities = self._capabilities(raw_status, member_ids)
             activity = tuple(
                 self._activity_record(event)
                 for event in events[-self._activity_limit :]
             )
             return FederationAuthoritySnapshot(
-                True,
-                "current",
-                label,
-                state,
-                revision,
-                devices,
-                activity,
+                available=True,
+                reason_code="current",
+                label=label,
+                state=state,
+                revision=revision,
+                devices=devices,
+                activity=activity,
+                capabilities=capabilities,
             )
         except Exception as exc:  # noqa: BLE001
             return FederationAuthoritySnapshot(
@@ -215,7 +241,7 @@ class FederationAuthorityAdapter:
             if _value(capability, "session_id") != self._internal_session_id:
                 continue
             node_id = _value(capability, "node_id")
-            if isinstance(node_id, str):
+            if isinstance(node_id, str) and node_id in member_ids:
                 capability_counts[node_id] = capability_counts.get(node_id, 0) + 1
 
         devices: list[DeviceRecord] = []
@@ -260,6 +286,61 @@ class FederationAuthorityAdapter:
                 )
             )
         return tuple(sorted(devices, key=lambda item: (item.label, item.node_id)))
+
+    def _capabilities(
+        self,
+        raw_status: object,
+        member_ids: set[str],
+    ) -> tuple[FederatedCapabilityRecord, ...]:
+        records: list[FederatedCapabilityRecord] = []
+        for capability in _sequence(_value(raw_status, "capabilities", ())):
+            if _value(capability, "session_id") != self._internal_session_id:
+                continue
+            raw_node_id = _value(capability, "node_id")
+            if not isinstance(raw_node_id, str) or raw_node_id not in member_ids:
+                continue
+            records.append(
+                FederatedCapabilityRecord(
+                    capability_id=_public_text(
+                        _value(capability, "capability_id"),
+                        "unknown-capability",
+                    ),
+                    node_id=_public_text(raw_node_id, "unknown-device"),
+                    capability_type=_public_text(
+                        _value(capability, "type"),
+                        "unknown-capability",
+                    ),
+                    protocol=_public_text(
+                        _value(capability, "protocol"),
+                        "unknown-protocol",
+                    ),
+                    protocol_version=_public_text(
+                        _value(capability, "protocol_version"),
+                        "unknown",
+                    ),
+                    status=_enum_value(
+                        _value(capability, "status"),
+                        "unavailable",
+                    ),
+                    last_seen_at=_timestamp(
+                        _value(
+                            capability,
+                            "last_heartbeat",
+                            _value(capability, "last_heartbeat_at"),
+                        )
+                    ),
+                )
+            )
+        return tuple(
+            sorted(
+                records,
+                key=lambda item: (
+                    item.node_id,
+                    item.capability_type,
+                    item.capability_id,
+                ),
+            )
+        )
 
     @staticmethod
     def _activity_record(event: object) -> ActivityRecord:
