@@ -158,15 +158,13 @@ class RecorderControlService:
         }
         _write_json_atomic(self.control_path, payload)
         if enabled:
-            return (
-                True,
+            return True, (
                 "Recording requested. The recorder service will start polling "
-                "within a few seconds.",
+                "within a few seconds."
             )
-        return (
-            True,
+        return True, (
             "Recording stopped. The recorder service will flush buffered rows "
-            "and remain on standby.",
+            "and remain on standby."
         )
 
     def status(
