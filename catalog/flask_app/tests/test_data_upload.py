@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import hashlib
 import sqlite3
 import time
 from pathlib import Path
@@ -20,7 +21,7 @@ class _Runtime:
         self.accepted = accepted
         self.requests = 0
 
-    def request_refresh(self) -> bool:
+    def request_refresh(self, *, execution_id: str | None = None) -> bool:
         self.requests += 1
         return self.accepted
 
@@ -43,7 +44,12 @@ class _Jobs:
         self.failed.append((job_id, error_code))
 
 
-def _service(tmp_path: Path, runtime: _Runtime | None = None) -> DataUploadService:
+def _service(
+    tmp_path: Path,
+    runtime: _Runtime | None = None,
+    *,
+    max_pending_imports: int = 8,
+) -> DataUploadService:
     return DataUploadService(
         database=tmp_path / "imports" / "uploads.sqlite3",
         staging_root=tmp_path / "imports" / "staging",
@@ -53,6 +59,7 @@ def _service(tmp_path: Path, runtime: _Runtime | None = None) -> DataUploadServi
         max_file_bytes=1024 * 1024,
         max_total_bytes=4 * 1024 * 1024,
         max_line_bytes=64 * 1024,
+        max_pending_imports=max_pending_imports,
     )
 
 
@@ -124,9 +131,7 @@ def test_multiple_jsonl_files_import_then_create_durable_background_job(
             "_csrf_token": csrf,
             "files": [
                 (
-                    io.BytesIO(
-                        b'{"timestamp":"2026-08-05T10:00:00Z","machine":"A"}\n'
-                    ),
+                    io.BytesIO(b'{"timestamp":"2026-08-05T10:00:00Z","machine":"A"}\n'),
                     "first.jsonl",
                 ),
                 (
@@ -154,10 +159,15 @@ def test_multiple_jsonl_files_import_then_create_durable_background_job(
         "second.jsonl",
     ]
     with sqlite3.connect(service.database) as connection:
-        assert connection.execute(
-            "SELECT COUNT(*) FROM data_upload_records WHERE batch_id=?",
-            (batch_id,),
-        ).fetchone()[0] == 3
+        # JSONL remains the single durable payload copy; SQLite stores lifecycle
+        # metadata rather than amplifying large uploads with a second copy.
+        assert (
+            connection.execute(
+                "SELECT COUNT(*) FROM data_upload_records WHERE batch_id=?",
+                (batch_id,),
+            ).fetchone()[0]
+            == 0
+        )
 
     page = client.get(f"/data-upload/?batch={batch_id}")
     assert page.status_code == 200
@@ -196,10 +206,13 @@ def test_invalid_json_rolls_back_database_and_never_publishes_batch(
     assert terminal["error_code"] == "upload-invalid-json"
     assert list(iter_jsonl_files(tmp_path / "data")) == []
     with sqlite3.connect(service.database) as connection:
-        assert connection.execute(
-            "SELECT COUNT(*) FROM data_upload_records WHERE batch_id=?",
-            (batch["batch_id"],),
-        ).fetchone()[0] == 0
+        assert (
+            connection.execute(
+                "SELECT COUNT(*) FROM data_upload_records WHERE batch_id=?",
+                (batch["batch_id"],),
+            ).fetchone()[0]
+            == 0
+        )
 
 
 def test_jsonl_discovery_hides_directory_until_publish_marker_is_removed(
@@ -218,32 +231,122 @@ def test_jsonl_discovery_hides_directory_until_publish_marker_is_removed(
     assert list(iter_jsonl_files(tmp_path / "data")) == [file_path]
 
 
-def test_restart_marks_interrupted_batch_failed_and_removes_partial_directories(
+def test_restart_finalizes_publication_completed_before_ready_update(
     tmp_path: Path,
 ) -> None:
     service = _service(tmp_path)
     batch_id = "upload-interrupted"
+    published_payload = b'{"complete":true}\n'
     with sqlite3.connect(service.database) as connection:
         connection.execute(
             """
             INSERT INTO data_upload_batches(
                 batch_id,status,file_count,total_bytes,created_at
-            ) VALUES(?, 'publishing', 1, 10, '2026-08-06T10:00:00Z')
+            ) VALUES(?, 'publishing', 1, ?, '2026-08-06T10:00:00Z')
             """,
-            (batch_id,),
+            (batch_id, len(published_payload)),
+        )
+        connection.execute(
+            """INSERT INTO data_upload_files(
+                file_id,batch_id,original_name,published_name,staged_name,
+                size_bytes,content_sha256,imported_records,status
+            ) VALUES('file-1',?,'data.jsonl','data.jsonl','data.uploading',?,?,1,'imported')""",
+            (batch_id, len(published_payload), hashlib.sha256(published_payload).hexdigest()),
         )
     staging = service.staging_root / batch_id
     published = service.published_root / batch_id
     staging.mkdir(parents=True)
     published.mkdir(parents=True)
-    (staging / "data.uploading").write_bytes(b"partial")
-    (published / ".msh-importing").write_text(batch_id, encoding="utf-8")
-    (published / "data.jsonl").write_text('{"partial":true}\n', encoding="utf-8")
+    # Every move and marker removal completed before the process died; only the
+    # durable DB transition to ready is missing.
+    (published / "data.jsonl").write_bytes(published_payload)
+    assert not (published / ".msh-importing").exists()
+    assert list(iter_jsonl_files(service.published_root)) == [published / "data.jsonl"]
 
     restarted = _service(tmp_path)
-    recovered = restarted.batch(batch_id)
+    recovered = _wait_for_terminal(restarted, batch_id)
 
-    assert recovered["status"] == "failed"
-    assert recovered["error_code"] == "import-interrupted"
+    assert recovered["status"] == "ready"
+    assert recovered["error_code"] is None
     assert not staging.exists()
-    assert not published.exists()
+    assert (published / "data.jsonl").read_bytes() == published_payload
+
+
+def test_restart_resumes_publication_after_only_some_files_were_moved(
+    tmp_path: Path,
+) -> None:
+    service = _service(tmp_path, max_pending_imports=1)
+    batch_id = "upload-partial-move"
+    payloads = {"first.jsonl": b'{"part":1}\n', "second.jsonl": b'{"part":2}\n'}
+    with sqlite3.connect(service.database) as connection:
+        connection.execute(
+            """INSERT INTO data_upload_batches(
+                batch_id,status,file_count,total_bytes,created_at,imported_records
+            ) VALUES(?, 'publishing', 2, ?, '2026-08-06T10:00:00Z', 2)""",
+            (batch_id, sum(map(len, payloads.values()))),
+        )
+        for index, (name, payload) in enumerate(payloads.items()):
+            connection.execute(
+                """INSERT INTO data_upload_files(
+                    file_id,batch_id,original_name,published_name,staged_name,
+                    size_bytes,content_sha256,imported_records,status
+                ) VALUES(?,?,?,?,?,?,?,1,'imported')""",
+                (
+                    f"file-partial-{index}", batch_id, name, name,
+                    f"{name}.uploading", len(payload), hashlib.sha256(payload).hexdigest(),
+                ),
+            )
+    staging = service.staging_root / batch_id
+    published = service.published_root / batch_id
+    staging.mkdir(parents=True)
+    published.mkdir(parents=True)
+    (published / ".msh-importing").write_text(batch_id, encoding="utf-8")
+    (published / "first.jsonl").write_bytes(payloads["first.jsonl"])
+    # A stale destination with the right size but wrong identity must not be
+    # trusted merely because the final path exists.
+    (published / "second.jsonl").write_bytes(b'{"part":9}\n')
+    (staging / "second.jsonl.uploading").write_bytes(payloads["second.jsonl"])
+    assert list(iter_jsonl_files(service.published_root)) == []
+
+    restarted = _service(tmp_path, max_pending_imports=1)
+    recovered = _wait_for_terminal(restarted, batch_id)
+
+    assert recovered["status"] == "ready"
+    assert not (published / ".msh-importing").exists()
+    assert not staging.exists()
+    assert {path.name: path.read_bytes() for path in published.glob("*.jsonl")} == payloads
+
+
+def test_restart_drains_more_queued_batches_than_worker_capacity(tmp_path: Path) -> None:
+    service = _service(tmp_path, max_pending_imports=2)
+    batch_ids = [f"upload-recovery-{index}" for index in range(5)]
+    with sqlite3.connect(service.database) as connection:
+        for index, batch_id in enumerate(batch_ids):
+            payload = f'{{"batch":{index}}}\n'.encode()
+            connection.execute(
+                """
+                INSERT INTO data_upload_batches(
+                    batch_id,status,file_count,total_bytes,created_at
+                ) VALUES(?, 'publishing', 1, ?, ?)
+                """,
+                (batch_id, len(payload), f"2026-08-06T10:00:{index:02d}Z"),
+            )
+            connection.execute(
+                """INSERT INTO data_upload_files(
+                    file_id,batch_id,original_name,published_name,staged_name,
+                    size_bytes,content_sha256,imported_records,status
+                ) VALUES(?,?, 'data.jsonl','data.jsonl','data.uploading',?,?,1,'imported')""",
+                (f"file-{index}", batch_id, len(payload), hashlib.sha256(payload).hexdigest()),
+            )
+            staging = service.staging_root / batch_id
+            published = service.published_root / batch_id
+            staging.mkdir(parents=True)
+            published.mkdir(parents=True)
+            (published / ".msh-importing").write_text(batch_id, encoding="utf-8")
+            (published / "data.jsonl").write_bytes(payload)
+
+    restarted = _service(tmp_path, max_pending_imports=2)
+
+    recovered = [_wait_for_terminal(restarted, batch_id) for batch_id in batch_ids]
+    assert [batch["status"] for batch in recovered] == ["ready"] * len(batch_ids)
+    assert all(not (restarted.staging_root / batch_id).exists() for batch_id in batch_ids)

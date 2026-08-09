@@ -794,6 +794,11 @@ class SQLiteJobStore:
     def snapshot(self, job_id: str) -> DurableJobSnapshot:
         job_id = _text(job_id, "job_id")
         with self._connect() as connection:
+            # Pin the canonical job row and its normalized attempt rows to one
+            # SQLite read snapshot. Without an explicit read transaction, a
+            # concurrent completion can commit between the two SELECTs and make
+            # a healthy job appear internally inconsistent for one read.
+            connection.execute("BEGIN")
             return self._snapshot_from_row(
                 connection,
                 self._row(connection, job_id),
