@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 from flask import Flask
 
+from catalog.flask_app import app as app_module
 from catalog.flask_app import capability_product_routes
+from catalog.flask_app import routes as routes_module
 from catalog.flask_app.app import create_app
 from catalog.flask_app.services.capability_config_service import CapabilityConfig
 
@@ -23,7 +26,7 @@ def _config(*, sources: str = "") -> CapabilityConfig:
     )
 
 
-def test_app_factory_replaces_role_reading_product_handlers(tmp_path, monkeypatch) -> None:
+def test_app_factory_owns_capability_product_handlers(tmp_path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     app = create_app()
 
@@ -36,25 +39,31 @@ def test_app_factory_replaces_role_reading_product_handlers(tmp_path, monkeypatc
             "catalog.flask_app.capability_product_routes"
         )
 
-    assert not any(
-        getattr(function, "__module__", "") == "catalog.flask_app.routes"
-        and getattr(function, "__name__", "") == "startup_mode_gate"
-        for function in app.before_request_funcs.get(None, ())
-    )
+    assert not hasattr(routes_module, "startup_mode_gate")
+    assert not hasattr(routes_module, "status")
+    assert not hasattr(routes_module, "recorder_status_snapshot")
+    assert not hasattr(routes_module, "startup")
+    assert not hasattr(app_module, "inject_server_setup")
+
     assert any(
         function is capability_product_routes.capability_startup_mode_gate
         for function in app.before_request_funcs.get(None, ())
-    )
-
-    assert not any(
-        getattr(function, "__module__", "") == "catalog.flask_app.app"
-        and getattr(function, "__name__", "") == "inject_server_setup"
-        for function in app.template_context_processors.get(None, ())
     )
     assert any(
         function is capability_product_routes.inject_capability_product_context
         for function in app.template_context_processors.get(None, ())
     )
+
+
+def test_product_routes_can_register_without_legacy_blueprint_endpoints() -> None:
+    app = Flask(__name__)
+
+    capability_product_routes.install_capability_product_routes(app)
+
+    rules = {rule.endpoint: rule.rule for rule in app.url_map.iter_rules()}
+    assert rules["web.status"] == "/status"
+    assert rules["web.recorder_status_snapshot"] == "/status/recorder.json"
+    assert rules["web.startup"] == "/startup"
 
 
 def test_product_context_reads_legacy_settings_only_for_explicit_startup(
@@ -90,18 +99,16 @@ def test_product_context_reads_legacy_settings_only_for_explicit_startup(
             raise AssertionError("explicit /startup must retain the legacy display read")
 
 
-def test_status_template_adapter_never_restores_recorder_only_mode() -> None:
-    visible = capability_product_routes._status_template_adapter(
-        recorder_visible=True
-    )
-    hidden = capability_product_routes._status_template_adapter(
-        recorder_visible=False
-    )
+def test_status_template_has_no_deployment_role_adapter() -> None:
+    template = (
+        Path(__file__).parents[1] / "templates" / "status.html"
+    ).read_text(encoding="utf-8")
 
-    assert visible.deployment_mode == "full-server"
-    assert hidden.deployment_mode == "web-workbench"
-    assert visible.deployment_mode != "recorder-only"
-    assert hidden.deployment_mode != "recorder-only"
+    assert "deployment_mode" not in template
+    assert "recorder-only" not in template
+    assert "full-server" not in template
+    assert "web-workbench" not in template
+    assert "recorder_visible" in template
 
 
 def test_completed_capability_state_bypasses_legacy_runtime_choice(monkeypatch) -> None:
