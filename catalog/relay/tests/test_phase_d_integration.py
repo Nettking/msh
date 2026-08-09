@@ -182,6 +182,7 @@ def test_phase_d_three_nodes_replicate_and_handover(tmp_path: Path) -> None:
             recorder_delivery = DurableRecorderDeliveryQueue(
                 outbox=recorder_outbox,
                 client=client,
+                session_id=session_id,
                 clock=lambda: NOW,
             )
             content = {
@@ -377,6 +378,7 @@ def test_recorder_queue_retains_batch_until_remote_commit(tmp_path: Path) -> Non
     queue = DurableRecorderDeliveryQueue(
         outbox=outbox,
         client=PendingClient(),
+        session_id="session-1",
         clock=lambda: NOW,
     )
     queue.enqueue(

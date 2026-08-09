@@ -370,7 +370,10 @@ def _run_for_date_slice(
                 session_dir=session_dir,
                 metadata=metadata,
                 script=script,
-                force_rerun=False,
+                # A rebuilt filter invalidates analysis outputs derived from the
+                # previous source signature. Preserve normal cache reuse only
+                # when the filtered input itself was reused.
+                force_rerun=filter_status == "created",
             )
         except Exception as exc:  # pragma: no cover - defensive logging path
             failed_scripts.append(script_key)

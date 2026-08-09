@@ -20,6 +20,9 @@ from pathlib import Path
 from .physical_evidence import REQUIRED_SCENARIOS
 
 IMPACT_MAP_PATH = Path(__file__).with_name("physical_impact_map.json")
+IMPACT_MAP_REPOSITORY_PATH = (
+    "catalog/federation/tests/cf7_acceptance/physical_impact_map.json"
+)
 IMPACT_MAP_SCHEMA = "msh.cf7.physical-impact-map.v1"
 PLAN_SCHEMA = "msh.cf7.physical-revalidation-plan.v1"
 
@@ -73,10 +76,10 @@ def _matches(path: str, patterns: Iterable[str]) -> bool:
     return any(fnmatch.fnmatchcase(path, pattern) for pattern in patterns)
 
 
-def load_impact_map(path: Path = IMPACT_MAP_PATH) -> ImpactMap:
+def _parse_impact_map_text(text: str) -> ImpactMap:
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raw = json.loads(text)
+    except json.JSONDecodeError as exc:
         raise PhysicalRevalidationError(
             "invalid-impact-map",
             "impact map could not be read as UTF-8 JSON",
@@ -134,6 +137,17 @@ def load_impact_map(path: Path = IMPACT_MAP_PATH) -> ImpactMap:
         global_invalidation=tuple(global_invalidation),
         rules=tuple(rules),
     )
+
+
+def load_impact_map(path: Path = IMPACT_MAP_PATH) -> ImpactMap:
+    try:
+        value = path.read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError) as exc:
+        raise PhysicalRevalidationError(
+            "invalid-impact-map",
+            "impact map could not be read as UTF-8 JSON",
+        ) from exc
+    return _parse_impact_map_text(value)
 
 
 def classify_changed_paths(
@@ -195,7 +209,7 @@ def _git(
             text=True,
             encoding="utf-8",
         )
-    except (OSError, subprocess.SubprocessError) as exc:
+    except (OSError, UnicodeError, subprocess.SubprocessError) as exc:
         raise PhysicalRevalidationError(
             "git-revalidation-failed",
             "git could not evaluate physical-evidence provenance",
@@ -212,6 +226,27 @@ def _require_commit(value: str, field: str) -> str:
             f"{field} must be one exact lowercase 40-character Git commit SHA",
         )
     return normalized
+
+
+def load_impact_map_from_commit(
+    repo_root: Path,
+    candidate_commit: str,
+) -> ImpactMap:
+    """Read policy from the exact candidate tree being classified."""
+
+    candidate = _require_commit(candidate_commit, "candidate_commit")
+    result = _git(
+        repo_root,
+        "show",
+        f"{candidate}:{IMPACT_MAP_REPOSITORY_PATH}",
+        check=False,
+    )
+    if result.returncode != 0:
+        raise PhysicalRevalidationError(
+            "invalid-impact-map",
+            "candidate commit does not contain the physical impact map",
+        )
+    return _parse_impact_map_text(result.stdout)
 
 
 def changed_paths_between(
@@ -252,9 +287,20 @@ def analyze_commits(
     *,
     impact_map: ImpactMap | None = None,
 ) -> ImpactReport:
+    changed_paths = changed_paths_between(
+        repo_root,
+        baseline_commit,
+        candidate_commit,
+    )
+    resolved_impact_map = impact_map
+    if resolved_impact_map is None:
+        resolved_impact_map = load_impact_map_from_commit(
+            repo_root,
+            candidate_commit,
+        )
     return classify_changed_paths(
-        changed_paths_between(repo_root, baseline_commit, candidate_commit),
-        impact_map=impact_map,
+        changed_paths,
+        impact_map=resolved_impact_map,
     )
 
 

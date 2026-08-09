@@ -48,10 +48,18 @@ class DurableRecorderDeliveryQueue:
         *,
         outbox: SQLiteOutbox,
         client: RecorderStorageClient,
+        session_id: str,
         clock=_now,
     ) -> None:
+        if not isinstance(session_id, str) or not session_id.strip():
+            raise FederationValidationError(
+                "invalid-recorder-delivery",
+                "session_id",
+                "must identify the authenticated Federation session",
+            )
         self.outbox = outbox
         self.client = client
+        self.session_id = session_id.strip()
         self.clock = clock
 
     def enqueue(
@@ -67,6 +75,12 @@ class DurableRecorderDeliveryQueue:
         dataset_schema_name: str = "msh.storage.dataset.opaque",
         dataset_schema_version: int = 1,
     ):
+        if session_id != self.session_id:
+            raise FederationValidationError(
+                "recorder-session-mismatch",
+                "session_id",
+                "must match the queue's authenticated Federation session",
+            )
         content_hash = BatchIngestRequest.calculate_content_hash(content)
         return self.outbox.enqueue(
             session_id=session_id,
@@ -116,6 +130,10 @@ class DurableRecorderDeliveryQueue:
                     entry
                     for entry in self.outbox.pending()
                     if entry.schema_id == RECORDER_STORAGE_SCHEMA
+                    # The client is authenticated for exactly this session.
+                    # Rows from prior sessions remain durable for a worker
+                    # holding the matching authority; they are never sent here.
+                    and entry.session_id == self.session_id
                 ),
                 key=lambda entry: entry.outbox_id,
             )

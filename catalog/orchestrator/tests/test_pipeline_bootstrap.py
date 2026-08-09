@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import threading
 from datetime import date
 from pathlib import Path
-import threading
+
+import pytest
 
 from catalog.orchestrator import pipeline
 from catalog.runner.script_catalog import ScriptOption
@@ -79,6 +81,75 @@ def test_reused_auto_session_metadata_is_updated_to_active_runtime_namespace(tmp
     assert reused_metadata["runtime"]["runtime_namespace"] == active_namespace
     persisted = pipeline.json.loads((session_dir / "session_state.json").read_text(encoding="utf-8"))
     assert persisted["runtime"]["runtime_namespace"] == active_namespace
+
+
+@pytest.mark.parametrize(
+    ("filter_status", "expected_force_rerun"),
+    (("cached", False), ("created", True)),
+)
+def test_date_slice_forces_analysis_only_when_filtered_input_was_rebuilt(
+    monkeypatch,
+    tmp_path: Path,
+    filter_status: str,
+    expected_force_rerun: bool,
+) -> None:
+    session_dir = tmp_path / "workflows" / "auto-session"
+    session_dir.mkdir(parents=True)
+    metadata = {
+        "paths": {"filtered_data_dir": "data"},
+        "runtime": {},
+        "scripts": {},
+    }
+    force_rerun_values: list[bool] = []
+
+    class _Status:
+        def info(self, _message: str) -> None:
+            return None
+
+        def warn(self, _message: str) -> None:
+            return None
+
+    monkeypatch.setattr(
+        pipeline,
+        "_load_or_create_auto_session",
+        lambda **_kwargs: ("auto-session", session_dir, metadata, "reused"),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "ensure_session_filtered_data",
+        lambda **_kwargs: (1, 1, filter_status),
+    )
+    monkeypatch.setattr(
+        pipeline,
+        "build_basic_metrics_dataset",
+        lambda _data_dir: (session_dir / "derived.csv", 1),
+    )
+
+    def _execute(**kwargs):
+        force_rerun_values.append(kwargs["force_rerun"])
+        return "ran", 0
+
+    monkeypatch.setattr(pipeline, "execute_script_for_session", _execute)
+    monkeypatch.setattr(
+        pipeline,
+        "playback_readiness",
+        lambda _session_dir, _metadata: (False, ()),
+    )
+    monkeypatch.setattr(pipeline, "_canonical_scan_roots", lambda: ())
+    monkeypatch.setattr(pipeline, "scan_artifacts", lambda _roots: ([], []))
+
+    pipeline._run_for_date_slice(
+        status=_Status(),
+        workflows_root=tmp_path / "workflows",
+        data_dir=tmp_path / "source",
+        script_options=[_option(1, "data_pr_day")],
+        target_day=date(2026, 3, 2),
+        script_keys=("data_pr_day",),
+        run_label="test",
+        runtime_namespace="default",
+    )
+
+    assert force_rerun_values == [expected_force_rerun]
 
 
 def test_runtime_state_snapshot_exposes_playback_filter_contract_keys(tmp_path: Path):

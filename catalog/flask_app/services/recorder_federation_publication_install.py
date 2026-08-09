@@ -165,7 +165,11 @@ class RecorderFederationPublicationMonitor:
             str(self.app.config["RECORDER_FEDERATION_OUTBOX_DATABASE"])
         )
         outbox = SQLiteOutbox(outbox_path)
-        queue = DurableRecorderDeliveryQueue(outbox=outbox, client=client)
+        queue = DurableRecorderDeliveryQueue(
+            outbox=outbox,
+            client=client,
+            session_id=session_id,
+        )
         reconciler = RecorderArchiveReconciler(
             store=DurableRecorderStore(data_dir),
             checkpoint_file=checkpoint_file,

@@ -41,6 +41,21 @@ def _commit(repo: Path, message: str) -> str:
     return _git(repo, "rev-parse", "HEAD")
 
 
+def _write_impact_map(repo: Path) -> Path:
+    source = Path(__file__).with_name("physical_impact_map.json")
+    destination = (
+        repo
+        / "catalog"
+        / "federation"
+        / "tests"
+        / "cf7_acceptance"
+        / "physical_impact_map.json"
+    )
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+    return destination
+
+
 def test_pr212_pairing_changes_only_invalidate_pairing_dependent_scenarios() -> None:
     report = classify_changed_paths(
         [
@@ -94,6 +109,13 @@ def test_unknown_product_path_fails_closed_and_requires_full_rerun() -> None:
     assert report.carry_forward_scenarios == ()
 
 
+def test_ai_change_requires_restart_and_reconciliation_revalidation() -> None:
+    report = classify_changed_paths(["catalog/ai/runtime.py"])
+
+    assert report.safe is True
+    assert "physical.restart-and-reconciliation" in report.impacted_scenarios
+
+
 def test_git_analyzer_requires_ancestor_and_uses_actual_diff(tmp_path: Path) -> None:
     _git(tmp_path, "init")
     _git(tmp_path, "config", "user.email", "cf7@example.invalid")
@@ -101,6 +123,7 @@ def test_git_analyzer_requires_ancestor_and_uses_actual_diff(tmp_path: Path) -> 
     runtime = tmp_path / "catalog" / "ai" / "runtime.py"
     runtime.parent.mkdir(parents=True)
     runtime.write_text("MODEL = 'a'\n", encoding="utf-8")
+    _write_impact_map(tmp_path)
     baseline = _commit(tmp_path, "baseline")
     runtime.write_text("MODEL = 'b'\n", encoding="utf-8")
     candidate = _commit(tmp_path, "candidate")
@@ -137,6 +160,7 @@ def test_git_analyzer_preserves_old_path_when_product_file_is_renamed(
     product = tmp_path / "catalog" / "node" / "client.py"
     product.parent.mkdir(parents=True)
     product.write_text("VALUE = 1\n", encoding="utf-8")
+    _write_impact_map(tmp_path)
     baseline = _commit(tmp_path, "baseline")
 
     documentation = tmp_path / "docs" / "client.md"
@@ -152,6 +176,55 @@ def test_git_analyzer_preserves_old_path_when_product_file_is_renamed(
     assert report.impacted_scenarios == PAIRING_IMPACT
 
 
+def test_git_analyzer_loads_impact_policy_from_candidate_tree(tmp_path: Path) -> None:
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "cf7@example.invalid")
+    _git(tmp_path, "config", "user.name", "CF7 Test")
+    impact_map_path = _write_impact_map(tmp_path)
+    baseline = _commit(tmp_path, "baseline")
+
+    policy = json.loads(impact_map_path.read_text(encoding="utf-8"))
+    policy["rules"].append(
+        {
+            "patterns": ["catalog/candidate-policy/**"],
+            "scenarios": ["physical.restart-and-reconciliation"],
+        }
+    )
+    impact_map_path.write_text(
+        json.dumps(policy, sort_keys=True) + "\n",
+        encoding="utf-8",
+    )
+    product = tmp_path / "catalog" / "candidate-policy" / "runtime.py"
+    product.parent.mkdir(parents=True)
+    product.write_text("VALUE = 1\n", encoding="utf-8")
+    candidate = _commit(tmp_path, "candidate policy and product change")
+
+    report = analyze_commits(tmp_path, baseline, candidate)
+
+    assert report.safe is True
+    assert report.unknown_paths == ()
+    assert report.impacted_scenarios == ("physical.restart-and-reconciliation",)
+
+
+def test_git_analyzer_fails_closed_when_candidate_impact_map_is_missing(
+    tmp_path: Path,
+) -> None:
+    _git(tmp_path, "init")
+    _git(tmp_path, "config", "user.email", "cf7@example.invalid")
+    _git(tmp_path, "config", "user.name", "CF7 Test")
+    note = tmp_path / "docs" / "note.md"
+    note.parent.mkdir(parents=True)
+    note.write_text("one\n", encoding="utf-8")
+    baseline = _commit(tmp_path, "baseline")
+    note.write_text("two\n", encoding="utf-8")
+    candidate = _commit(tmp_path, "candidate")
+
+    with pytest.raises(PhysicalRevalidationError) as invalid_map:
+        analyze_commits(tmp_path, baseline, candidate)
+
+    assert invalid_map.value.code == "invalid-impact-map"
+
+
 def test_revalidation_cli_prints_machine_readable_plan(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
@@ -162,6 +235,7 @@ def test_revalidation_cli_prints_machine_readable_plan(
     docs = tmp_path / "docs" / "note.md"
     docs.parent.mkdir(parents=True)
     docs.write_text("one\n", encoding="utf-8")
+    _write_impact_map(tmp_path)
     baseline = _commit(tmp_path, "baseline")
     docs.write_text("two\n", encoding="utf-8")
     candidate = _commit(tmp_path, "candidate")

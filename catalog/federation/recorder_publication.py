@@ -16,7 +16,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from catalog.mtconnect_recorder.model import SourceCheckpoint
+from catalog.mtconnect_recorder.model import RawBatchRef, SourceCheckpoint
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
 from .errors import FederationValidationError
@@ -195,6 +195,12 @@ class RecorderArchiveReconciler:
         self.checkpoint_file = Path(checkpoint_file)
         self.queue = queue
         self.target = target
+        if self.queue.session_id != self.target.session_id:
+            raise FederationValidationError(
+                "recorder-session-mismatch",
+                "session_id",
+                "publication target must match the queue's authenticated session",
+            )
         self.max_content_bytes = max_content_bytes
 
     def _checkpoints(self) -> dict[str, SourceCheckpoint]:
@@ -452,108 +458,124 @@ class RecorderArchiveReconciler:
         publication_chunks = 0
         enqueued = 0
         existing = 0
-        seen_manifests: set[Path] = set()
-
         for source_name in sorted(checkpoints):
             checkpoint = checkpoints[source_name]
             archive_names = tuple(
                 dict.fromkeys([source_name, *checkpoint.storage_aliases])
             )
+            archive_refs: dict[
+                tuple[int, int, int, str], tuple[str, RawBatchRef]
+            ] = {}
             for archive_source_name in archive_names:
-                refs = self.store.iter_raw_batches(
+                for ref in self.store.iter_raw_batches(
                     source_name=archive_source_name,
                     instance_id=checkpoint.agent_instance_id,
+                ):
+                    identity = (
+                        ref.first_sequence,
+                        ref.last_sequence,
+                        ref.next_sequence,
+                        ref.raw_sha256,
+                    )
+                    archive_refs.setdefault(identity, (archive_source_name, ref))
+
+            ordered_refs = sorted(
+                archive_refs.values(),
+                key=lambda item: (
+                    item[1].first_sequence,
+                    item[1].last_sequence,
+                    item[1].next_sequence,
+                    item[1].raw_sha256,
+                    item[1].manifest_path.as_posix(),
+                ),
+            )
+            for archive_source_name, ref in ordered_refs:
+                scanned += 1
+                if ref.next_sequence > checkpoint.next_sequence:
+                    continue
+                eligible += 1
+                day = ref.manifest_path.parent.name
+                observation_path = self._observation_path(
+                    source_name=source_name,
+                    archive_source_name=archive_source_name,
+                    instance_id=checkpoint.agent_instance_id,
+                    first_sequence=ref.first_sequence,
+                    last_sequence=ref.last_sequence,
+                    next_sequence=ref.next_sequence,
+                    day=day,
                 )
-                for ref in refs:
-                    if ref.manifest_path in seen_manifests:
-                        continue
-                    seen_manifests.add(ref.manifest_path)
-                    scanned += 1
-                    if ref.next_sequence > checkpoint.next_sequence:
-                        continue
-                    eligible += 1
-                    day = ref.manifest_path.parent.name
-                    observation_path = self._observation_path(
-                        source_name=source_name,
-                        archive_source_name=archive_source_name,
-                        instance_id=checkpoint.agent_instance_id,
-                        first_sequence=ref.first_sequence,
-                        last_sequence=ref.last_sequence,
-                        next_sequence=ref.next_sequence,
-                        day=day,
+                observations = self._read_observations(observation_path)
+                sequences = [int(item["sequence"]) for item in observations]
+                if (
+                    sequences[0] != ref.first_sequence
+                    or sequences[-1] != ref.last_sequence
+                    or len(observations) != ref.observation_count
+                    or sequences
+                    != list(range(ref.first_sequence, ref.last_sequence + 1))
+                ):
+                    raise FederationValidationError(
+                        "recorder-sequence-mismatch",
+                        "observation_file",
+                        (
+                            "detailed observation archive does not match "
+                            "its raw manifest or contains a sequence "
+                            "discontinuity"
+                        ),
                     )
-                    observations = self._read_observations(observation_path)
-                    sequences = [int(item["sequence"]) for item in observations]
-                    if (
-                        sequences[0] != ref.first_sequence
-                        or sequences[-1] != ref.last_sequence
-                        or len(observations) != ref.observation_count
-                        or sequences
-                        != list(range(ref.first_sequence, ref.last_sequence + 1))
-                    ):
-                        raise FederationValidationError(
-                            "recorder-sequence-mismatch",
-                            "observation_file",
-                            (
-                                "detailed observation archive does not match "
-                                "its raw manifest or contains a sequence "
-                                "discontinuity"
-                            ),
-                        )
-                    created_at = self._received_at(
-                        ref.manifest_path,
-                        observations,
+                created_at = self._received_at(
+                    ref.manifest_path,
+                    observations,
+                )
+                chunks = self._chunks(
+                    source_name=source_name,
+                    checkpoint=checkpoint,
+                    raw_sha256=ref.raw_sha256,
+                    raw_first_sequence=ref.first_sequence,
+                    raw_last_sequence=ref.last_sequence,
+                    observations=observations,
+                )
+                dataset_id = self.target.dataset_id(source_name)
+                raw_hash = _hash(
+                    ref.raw_sha256,
+                    field="raw_sha256",
+                )[7:]
+                for chunk in chunks:
+                    publication_chunks += 1
+                    first_sequence = int(chunk[0]["sequence"])
+                    last_sequence = int(chunk[-1]["sequence"])
+                    batch_id = (
+                        f"{_slug(source_name)}:"
+                        f"{checkpoint.agent_instance_id}:"
+                        f"{first_sequence}:{last_sequence}:{raw_hash}"
                     )
-                    chunks = self._chunks(
+                    idempotency_key = (
+                        f"{self.target.session_id}:{dataset_id}:{batch_id}"
+                    )
+                    content = self._content(
                         source_name=source_name,
                         checkpoint=checkpoint,
                         raw_sha256=ref.raw_sha256,
                         raw_first_sequence=ref.first_sequence,
                         raw_last_sequence=ref.last_sequence,
-                        observations=observations,
+                        observations=chunk,
                     )
-                    dataset_id = self.target.dataset_id(source_name)
-                    raw_hash = _hash(
-                        ref.raw_sha256,
-                        field="raw_sha256",
-                    )[7:]
-                    for chunk in chunks:
-                        publication_chunks += 1
-                        first_sequence = int(chunk[0]["sequence"])
-                        last_sequence = int(chunk[-1]["sequence"])
-                        batch_id = (
-                            f"{_slug(source_name)}:"
-                            f"{checkpoint.agent_instance_id}:"
-                            f"{first_sequence}:{last_sequence}:{raw_hash}"
-                        )
-                        idempotency_key = (
-                            f"{self.target.session_id}:{dataset_id}:{batch_id}"
-                        )
-                        content = self._content(
-                            source_name=source_name,
-                            checkpoint=checkpoint,
-                            raw_sha256=ref.raw_sha256,
-                            raw_first_sequence=ref.first_sequence,
-                            raw_last_sequence=ref.last_sequence,
-                            observations=chunk,
-                        )
-                        _entry, created = self.queue.enqueue(
-                            session_id=self.target.session_id,
-                            group_id=self.target.group_id,
-                            dataset_id=dataset_id,
-                            dataset_schema_name=self.target.dataset_schema_name,
-                            dataset_schema_version=(
-                                self.target.dataset_schema_version
-                            ),
-                            batch_id=batch_id,
-                            idempotency_key=idempotency_key,
-                            content=content,
-                            created_at=created_at,
-                        )
-                        if created:
-                            enqueued += 1
-                        else:
-                            existing += 1
+                    _entry, created = self.queue.enqueue(
+                        session_id=self.target.session_id,
+                        group_id=self.target.group_id,
+                        dataset_id=dataset_id,
+                        dataset_schema_name=self.target.dataset_schema_name,
+                        dataset_schema_version=(
+                            self.target.dataset_schema_version
+                        ),
+                        batch_id=batch_id,
+                        idempotency_key=idempotency_key,
+                        content=content,
+                        created_at=created_at,
+                    )
+                    if created:
+                        enqueued += 1
+                    else:
+                        existing += 1
 
         return RecorderReconcileResult(
             scanned_batches=scanned,
