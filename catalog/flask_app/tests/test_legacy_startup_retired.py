@@ -3,9 +3,11 @@ from __future__ import annotations
 from dataclasses import replace
 
 from catalog.flask_app import app as app_module
+from catalog.flask_app import capability_product_routes
 from catalog.flask_app import routes as routes_module
 from catalog.flask_app import server_setup_routes
 from catalog.flask_app.app import create_app
+from catalog.flask_app.services.capability_config_service import from_legacy_settings
 from catalog.flask_app.services.server_setup_service import default_settings
 
 
@@ -24,6 +26,11 @@ def _patch_runtime(monkeypatch) -> None:
     manager = FakeRuntimeManager()
     monkeypatch.setattr(app_module, "get_runtime_manager", lambda: manager)
     monkeypatch.setattr(routes_module, "get_runtime_manager", lambda: manager)
+    monkeypatch.setattr(
+        capability_product_routes,
+        "get_runtime_manager",
+        lambda: manager,
+    )
 
 
 def _configured_settings():
@@ -42,25 +49,15 @@ def _patch_setup_context(monkeypatch, settings) -> None:
     monkeypatch.setattr(routes_module, "load_settings", lambda: settings)
     monkeypatch.setattr(server_setup_routes, "load_settings", lambda: settings)
     monkeypatch.setattr(
-        app_module,
-        "ollama_status",
-        lambda _settings: {
-            "running": True,
-            "selected_model": settings.ai_model,
-            "selected_model_installed": True,
-            "models": [settings.ai_model],
-            "installed_by_profile": {
-                "edge-small": False,
-                "laptop-standard": True,
-                "workstation-strong": False,
-            },
-            "installed_by_model": {
-                "smollm2:360m": False,
-                "llama3.2:3b": True,
-                "qwen2.5:7b": False,
-            },
-            "message": "Ollama is running.",
-        },
+        capability_product_routes,
+        "load_settings",
+        lambda: settings,
+    )
+    config = from_legacy_settings(settings)
+    monkeypatch.setattr(
+        capability_product_routes,
+        "_load_product_config",
+        lambda: (config, ""),
     )
 
 
