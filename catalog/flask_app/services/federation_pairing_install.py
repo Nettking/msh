@@ -9,12 +9,12 @@ from typing import Any
 from flask import Flask, current_app
 
 from .capability_recovery_adapters import fresh_capability_inspection_adapters
+from .federation_update_events import FederationUpdateEventProcessor
+from .federation_update_handoff import HostUpdateHandoff
 from .federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
     RemotePairingStore,
 )
-from .federation_update_events import FederationUpdateEventProcessor
-from .federation_update_handoff import HostUpdateHandoff
 from .recorder_federation_publication_install import (
     install_recorder_federation_publication,
 )
