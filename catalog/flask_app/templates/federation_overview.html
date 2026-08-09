@@ -48,6 +48,17 @@
   </section>
   {% endif %}
 
+  {% if provider_operator_available|default(false) %}
+  <section class="recommended-action">
+    <div>
+      <span class="federation-eyebrow">Provider authority</span>
+      <h3>Review provider approvals</h3>
+      <p>Contributions are advertised separately from execution authority. Review pending providers before another trusted device may use them.</p>
+    </div>
+    <a class="federation-button federation-button--secondary" href="{{ url_for('provider_federation_web.index') }}">Review provider approvals</a>
+  </section>
+  {% endif %}
+
   <div class="federation-summary-grid">
     {% for card in vm.summary_cards %}
     <article class="federation-summary-card">
@@ -97,7 +108,7 @@
       {% endfor %}
     </ul>
     {% endif %}
-    {% if update_eligible and update_target and update_csrf %}
+    {% if updates.status|default('not_checked') != 'checking' and update_eligible and update_target and update_csrf %}
     <form method="post" action="{{ url_for('federation_web.apply_updates') }}" class="federation-update-confirmation">
       <input type="hidden" name="_csrf_token" value="{{ update_csrf }}">
       <input type="hidden" name="target_commit" value="{{ update_target }}">
