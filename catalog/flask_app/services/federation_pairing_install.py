@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, current_app
+from flask import Flask, current_app, request
 
 from .capability_recovery_adapters import fresh_capability_inspection_adapters
+from .federated_ai_product_bridge import FederatedAIProductBridge
+from .federation_contribution_publication import publish_local_contributions
 from .federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
+    RemotePairingState,
     RemotePairingStore,
 )
 from .federation_update_events import FederationUpdateEventProcessor
@@ -22,9 +26,29 @@ from .resilient_pairing_runtime import ResilientPairingRelayRuntime
 from .server_setup_service import load_settings
 
 _RECONNECT_EXTENSION_KEY = "federation_saved_membership_reconnect"
+_UPDATE_PROCESSOR_EXTENSION_KEY = "federation_update_event_monitor"
 _RETAINED_STARTUP_CHECK_KEY = "capability_onboarding_startup_checked"
-_CONNECTED_CHECK_SECONDS = 2.0
+_CONTRIBUTION_RECONCILE_EXTENSION_KEY = "capability_contribution_startup_reconciled"
+_PROVIDER_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
+_LOCAL_RELAY_CONFIG_KEY = "CAPABILITY_ONBOARDING_LOCAL_RELAY_URL"
+_PAIRING_RELAY_CONFIG_KEY = "CAPABILITY_ONBOARDING_PAIRING_RELAY_URL"
+_DEFAULT_COMPOSE_LOCAL_RELAY_URL = "ws://relay:8765"
+_CONNECTED_CHECK_SECONDS = 15.0
+_UPDATE_POLL_SECONDS = 2.0
 _MAX_RETRY_SECONDS = 60.0
+_CONTRIBUTION_MUTATION_ENDPOINTS = frozenset(
+    {
+        "capability_contribution_web.save_contributions",
+        "capability_contribution_web.suspend_contribution",
+        "capability_contribution_web.reconcile_contributions",
+    }
+)
+_PROVIDER_MUTATION_ENDPOINTS = frozenset(
+    {
+        "provider_federation_web.provider_action_html",
+        "provider_federation_web.provider_action_api",
+    }
+)
 _TERMINAL_RECONNECT_CODES = frozenset(
     {
         "malformed-remote-pairing-state",
@@ -36,6 +60,10 @@ _TERMINAL_RECONNECT_CODES = frozenset(
         "unknown-node",
     }
 )
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
 
 
 def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
@@ -116,8 +144,8 @@ class LazyPairingOnboardingService(PairingAwareCapabilityOnboardingService):
         )
 
 
-class SavedFederationReconnectMonitor:
-    """Keep one saved remote Federation membership connected automatically."""
+class FederationUpdateEventMonitor:
+    """Poll bounded update intents without accelerating contribution/AI sync."""
 
     def __init__(
         self,
@@ -130,29 +158,6 @@ class SavedFederationReconnectMonitor:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._update_processor: FederationUpdateEventProcessor | None = None
-        self._state: dict[str, object] = {
-            "status": "not-started",
-            "attempts": 0,
-            "last_error_code": None,
-        }
-
-    def snapshot(self) -> dict[str, object]:
-        with self._lock:
-            return dict(self._state)
-
-    def _set_state(
-        self,
-        status: str,
-        *,
-        attempts: int,
-        error_code: str | None = None,
-    ) -> None:
-        with self._lock:
-            self._state = {
-                "status": status,
-                "attempts": attempts,
-                "last_error_code": error_code,
-            }
 
     def _processor(self) -> FederationUpdateEventProcessor:
         processor = self._update_processor
@@ -189,7 +194,7 @@ class SavedFederationReconnectMonitor:
             self._stop.clear()
             self._thread = threading.Thread(
                 target=self._run,
-                name="msh-federation-auto-reconnect",
+                name="msh-federation-update-events",
                 daemon=True,
             )
             self._thread.start()
@@ -198,27 +203,188 @@ class SavedFederationReconnectMonitor:
         self._stop.set()
 
     def _run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                with self.app.app_context():
+                    context = self.service.authorized_context()
+                    if context is not None:
+                        self._processor().process(context)
+            except Exception as exc:  # noqa: BLE001 - update authority fails closed
+                self.app.logger.warning(
+                    "Federation update event processing unavailable (%s)",
+                    type(exc).__name__,
+                )
+            if self._stop.wait(_UPDATE_POLL_SECONDS):
+                return
+
+
+class SavedFederationReconnectMonitor:
+    """Keep one trusted Federation membership present on the authenticated relay.
+
+    Remote members reconnect to their persisted relay root. The local Federation
+    creator also opens an authenticated outbound relay connection through the
+    Compose-internal relay root (or an explicitly configured replacement). This
+    makes coordinator liveness symmetric: a member is reported online because a
+    real authenticated connection and heartbeat exist, not because the local UI
+    special-cases itself.
+    """
+
+    def __init__(
+        self,
+        app: Flask,
+        service: LazyPairingOnboardingService,
+    ) -> None:
+        self.app = app
+        self.service = service
+        self.ai_bridge = FederatedAIProductBridge(app, service)
+        self._lock = threading.Lock()
+        self._stop = threading.Event()
+        self._wake = threading.Event()
+        self._thread: threading.Thread | None = None
+        self._state: dict[str, object] = {
+            "status": "not-started",
+            "attempts": 0,
+            "last_error_code": None,
+        }
+
+    def snapshot(self) -> dict[str, object]:
+        with self._lock:
+            return dict(self._state)
+
+    def _set_state(
+        self,
+        status: str,
+        *,
+        attempts: int,
+        error_code: str | None = None,
+    ) -> None:
+        with self._lock:
+            self._state = {
+                "status": status,
+                "attempts": attempts,
+                "last_error_code": error_code,
+            }
+
+    def start(self) -> None:
+        with self._lock:
+            if self._thread is not None and self._thread.is_alive():
+                return
+            self._stop.clear()
+            self._thread = threading.Thread(
+                target=self._run,
+                name="msh-federation-auto-reconnect",
+                daemon=True,
+            )
+            self._thread.start()
+
+    def stop(self) -> None:
+        self._stop.set()
+        self._wake.set()
+
+    def request_contribution_refresh(self) -> None:
+        """Wake the monitor after contribution or provider authority changes."""
+
+        self._wake.set()
+
+    def _local_relay_url(self) -> str:
+        for key in (_LOCAL_RELAY_CONFIG_KEY, _PAIRING_RELAY_CONFIG_KEY):
+            configured = self.app.config.get(key)
+            if configured is not None and (value := str(configured).strip()):
+                return value
+        return _DEFAULT_COMPOSE_LOCAL_RELAY_URL
+
+    def _connected_state_and_context(self) -> tuple[RemotePairingState, object] | None:
+        remote = self.service.remote_store.load()
+        if remote is not None:
+            context = self.service.authorized_context()
+            if context is None:
+                raise RuntimeError("saved remote Federation context is unavailable")
+            return remote, context
+
+        # A local Federation creator previously had no relay client at all. That
+        # made every remote member see the owner as offline while the owner's UI
+        # locally overrode itself to online. Revalidate the existing membership,
+        # then establish a real authenticated connection using the same identity.
+        context = self.service.authorized_context()
+        if context is None:
+            return None
+        binding = getattr(context, "binding", None)
+        if binding is None:
+            return None
+        local_state = RemotePairingState(self._local_relay_url(), binding)
+        self.service.relay_runtime.ensure_connected(local_state)
+        return local_state, context
+
+    def _publish_contributions(
+        self,
+        runtime_state: RemotePairingState,
+        context: object,
+    ) -> None:
+        # The app's one-shot startup reconciliation must run first. Otherwise a
+        # persisted active intent with stale evidence could briefly be advertised
+        # as ready before the existing fail-closed suspension path fences it.
+        if (
+            self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY)
+            is not True
+        ):
+            return
+        from .capability_contribution_service import (
+            get_capability_contribution_service,
+        )
+
+        binding = getattr(context, "binding", None)
+        credentials = getattr(context, "credentials", None)
+        identity = getattr(credentials, "identity", None)
+        session_id = getattr(binding, "internal_session_id", None)
+        node_id = getattr(identity, "node_id", None)
+        if not isinstance(session_id, str) or not isinstance(node_id, str):
+            raise TypeError("trusted Federation context is incomplete")
+        publish_local_contributions(
+            contribution_service=get_capability_contribution_service(),
+            runtime=self.service.relay_runtime,
+            runtime_state=runtime_state,
+            session_id=session_id,
+            node_id=node_id,
+            now=_utc_now(),
+        )
+
+    def _sync_remote_ai(
+        self,
+        runtime_state: RemotePairingState,
+        context: object,
+    ) -> None:
+        if (
+            self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY)
+            is not True
+        ):
+            return
+        self.ai_bridge.sync(runtime_state, context)
+
+    def _run(self) -> None:
         failures = 0
         while not self._stop.is_set():
             try:
                 with self.app.app_context():
-                    remote = self.service.remote_store.load()
-                    if remote is None:
+                    resolved = self._connected_state_and_context()
+                    if resolved is None:
                         self._set_state(
-                            "no-saved-remote-membership",
+                            "no-saved-membership",
                             attempts=failures,
                         )
                         return
-                    context = self.service.authorized_context()
-                    if context is None:
-                        raise RuntimeError(
-                            "saved remote Federation context is unavailable"
+                    runtime_state, context = resolved
+                    try:
+                        self._publish_contributions(runtime_state, context)
+                    except Exception as exc:  # noqa: BLE001 - metadata sync is fail-closed
+                        self.app.logger.info(
+                            "Federation capability metadata refresh unavailable (%s)",
+                            type(exc).__name__,
                         )
                     try:
-                        self._processor().process(context)
-                    except Exception as exc:  # noqa: BLE001 - update path fails closed independently
-                        self.app.logger.warning(
-                            "Federation update event processing unavailable (%s)",
+                        self._sync_remote_ai(runtime_state, context)
+                    except Exception as exc:  # noqa: BLE001 - provider sync is fail-closed
+                        self.app.logger.info(
+                            "Federation remote AI authority refresh unavailable (%s)",
                             type(exc).__name__,
                         )
             except Exception as exc:  # noqa: BLE001 - network retry boundary
@@ -255,7 +421,9 @@ class SavedFederationReconnectMonitor:
                 self.app.logger.info(
                     "Saved Federation membership reconnected automatically"
                 )
-            if self._stop.wait(_CONNECTED_CHECK_SECONDS):
+            self._wake.wait(_CONNECTED_CHECK_SECONDS)
+            self._wake.clear()
+            if self._stop.is_set():
                 return
 
 
@@ -270,7 +438,10 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
         )
     app.extensions["federation_pairing_service"] = service
     monitor = SavedFederationReconnectMonitor(app, service)
+    update_monitor = FederationUpdateEventMonitor(app, service)
     app.extensions[_RECONNECT_EXTENSION_KEY] = monitor
+    app.extensions[_UPDATE_PROCESSOR_EXTENSION_KEY] = update_monitor
+    app.extensions["federated_ai_product_bridge"] = monitor.ai_bridge
     install_recorder_federation_publication(
         app,
         onboarding_service=service,
@@ -283,11 +454,35 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
         # transient first failure as permanently checked.
         app.extensions[_RETAINED_STARTUP_CHECK_KEY] = True
         monitor.start()
+        update_monitor.start()
+
+    @app.after_request
+    def _wake_contribution_publication(response):
+        # Local contribution intent and explicit provider decisions are persisted
+        # by their authorities first. Wake the authenticated synchronization loop
+        # afterwards so peers observe the resulting metadata/health promptly.
+        if (
+            request.method == "POST"
+            and request.endpoint
+            in (_CONTRIBUTION_MUTATION_ENDPOINTS | _PROVIDER_MUTATION_ENDPOINTS)
+            and response.status_code < 500
+        ):
+            monitor.request_contribution_refresh()
+        return response
+
+    @app.context_processor
+    def _provider_operator_availability() -> dict[str, bool]:
+        return {
+            "provider_operator_available": (
+                app.config.get(_PROVIDER_SURFACE_CONFIG_KEY) is not None
+            )
+        }
 
     return service
 
 
 __all__ = [
+    "FederationUpdateEventMonitor",
     "LazyPairingOnboardingService",
     "SavedFederationReconnectMonitor",
     "install_federation_pairing",
