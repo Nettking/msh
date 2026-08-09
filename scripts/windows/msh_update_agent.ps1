@@ -21,8 +21,19 @@ $OidPattern = '^[0-9a-f]{40}$'
 $RequestIdPattern = '^[A-Za-z0-9._:-]{1,128}$'
 $ModelPattern = '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$'
 
-$RepoRoot = [System.IO.Path]::GetFullPath($RepoRoot)
-$DataDirectory = [System.IO.Path]::GetFullPath($DataDirectory)
+function Normalize-DirectoryPath([string]$Value) {
+    $full = [System.IO.Path]::GetFullPath($Value)
+    $root = [System.IO.Path]::GetPathRoot($full)
+    if ($full.Length -le $root.Length) { return $full }
+    $separators = [char[]]@(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+    return $full.TrimEnd($separators)
+}
+
+$RepoRoot = Normalize-DirectoryPath $RepoRoot
+$DataDirectory = Normalize-DirectoryPath $DataDirectory
 $AgentScriptPath = [System.IO.Path]::GetFullPath($PSCommandPath)
 $AgentDirectory = Join-Path $DataDirectory 'federation\update-agent'
 $RequestFile = Join-Path $AgentDirectory 'request.json'
@@ -35,6 +46,18 @@ function Get-PathHash([string]$Value) {
     try {
         $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value.ToLowerInvariant())
         return ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').Substring(0, 24)
+    }
+    finally {
+        $sha.Dispose()
+    }
+}
+
+function Get-RequestResultFile([string]$RequestId) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($RequestId)
+        $digest = ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+        return Join-Path $AgentDirectory "result-$digest.json"
     }
     finally {
         $sha.Dispose()
@@ -89,6 +112,16 @@ if (-not $createdNew) {
 }
 $mutexReleased = $false
 
+function Write-AtomicJsonFile([string]$Path, [string]$Json) {
+    $temporary = "$Path.tmp-$PID-$([guid]::NewGuid().ToString('N'))"
+    [System.IO.File]::WriteAllText(
+        $temporary,
+        $Json,
+        (New-Object System.Text.UTF8Encoding($false))
+    )
+    Move-Item -LiteralPath $temporary -Destination $Path -Force
+}
+
 function Write-AgentResult {
     param(
         [string]$RequestId,
@@ -116,13 +149,9 @@ function Write-AgentResult {
     if ([System.Text.Encoding]::UTF8.GetByteCount($json) -gt $MaxBytes) {
         throw 'result_too_large'
     }
-    $temporary = "$ResultFile.tmp-$PID-$([guid]::NewGuid().ToString('N'))"
-    [System.IO.File]::WriteAllText(
-        $temporary,
-        $json,
-        (New-Object System.Text.UTF8Encoding($false))
-    )
-    Move-Item -LiteralPath $temporary -Destination $ResultFile -Force
+    $requestResultFile = Get-RequestResultFile $RequestId
+    Write-AtomicJsonFile $requestResultFile $json
+    Write-AtomicJsonFile $ResultFile $json
 }
 
 function Invoke-External {
@@ -185,7 +214,7 @@ function Test-Ancestor([string]$Older, [string]$Newer) {
 
 function Inspect-Checkout([AllowNull()][string]$RequestedTarget) {
     $top = (Last-Text (Invoke-Git @('rev-parse', '--show-toplevel'))).Trim()
-    if ([System.IO.Path]::GetFullPath($top) -ne $RepoRoot) {
+    if ((Normalize-DirectoryPath $top) -ne $RepoRoot) {
         throw 'unsupported_checkout'
     }
     $remote = (Last-Text (Invoke-Git @('remote', 'get-url', 'origin'))).Trim()
@@ -308,27 +337,33 @@ function Ensure-OllamaModel {
 
 function Process-Request {
     if (-not (Test-Path -LiteralPath $RequestFile)) { return $false }
-    $info = Get-Item -LiteralPath $RequestFile
-    if ($info.Length -gt $MaxBytes) {
-        Remove-Item -LiteralPath $RequestFile -Force
-        return $true
-    }
-    $raw = [System.IO.File]::ReadAllText($RequestFile)
-    try {
-        $request = $raw | ConvertFrom-Json
-    }
-    catch {
-        Remove-Item -LiteralPath $RequestFile -Force
-        return $true
-    }
     $processing = Join-Path $AgentDirectory (
         "processing-$([guid]::NewGuid().ToString('N')).json"
     )
-    Move-Item -LiteralPath $RequestFile -Destination $processing -Force
+    try {
+        Move-Item -LiteralPath $RequestFile -Destination $processing -ErrorAction Stop
+    }
+    catch {
+        if (-not (Test-Path -LiteralPath $RequestFile)) { return $false }
+        throw
+    }
+
     $requestId = $null
     $action = $null
     $target = $null
     try {
+        $info = Get-Item -LiteralPath $processing
+        if ($info.Length -gt $MaxBytes) {
+            return $true
+        }
+        $raw = [System.IO.File]::ReadAllText($processing)
+        try {
+            $request = $raw | ConvertFrom-Json
+        }
+        catch {
+            return $true
+        }
+
         $requestId = [string]$request.request_id
         $action = [string]$request.action
         $target = if ($null -eq $request.target_commit) {
@@ -440,6 +475,12 @@ function Process-Request {
             Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}')
         )).Trim().ToLowerInvariant()
         if ($proven -ne $target) { throw 'source_verification_failed' }
+        $buildStatus = Invoke-Git @(
+            'status', '--porcelain=v1', '--untracked-files=all'
+        )
+        if (($buildStatus -join '').Length -gt 0) {
+            throw 'dirty_build_context'
+        }
 
         $env:MSH_BUILD_COMMIT = $target
         Invoke-External 'docker' @(
