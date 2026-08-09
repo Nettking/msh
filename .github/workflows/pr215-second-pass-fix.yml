@@ -1,0 +1,155 @@
+name: PR 215 second-pass fix
+
+on:
+  pull_request:
+    types: [reopened]
+
+permissions:
+  contents: write
+
+jobs:
+  fix-and-test:
+    if: github.event.pull_request.number == 215
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix-production-readiness-issues-in-pipeline
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: |
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Apply second-pass runtime fixes
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          pipeline_path = Path('catalog/orchestrator/pipeline.py')
+          text = pipeline_path.read_text(encoding='utf-8')
+
+          old = '''        state.bootstrap_full_analysis_excluded_scripts = list(
+              BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS
+          )
+          return state
+          '''
+          new = '''        state.bootstrap_full_analysis_excluded_scripts = list(
+              BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS
+          )
+          # In-flight scheduler state belongs to the process that owned the
+          # worker. A persisted reservation/update flag cannot survive restart.
+          state.update_running = False
+          state.active_execution_id = None
+          return state
+          '''
+          if old not in text:
+              raise SystemExit('load-state replacement anchor not found')
+          text = text.replace(old, new, 1)
+
+          old = '''            if (
+                  self._state.update_running
+                  or self._state.active_execution_id is not None
+              ):
+                  return False
+              self._state.active_execution_id = execution_id
+              self._persist_state()
+          threading.Thread(
+              target=self._run_requested_update,
+              kwargs={"bootstrap": False, "execution_id": execution_id},
+              daemon=True,
+          ).start()
+          return True
+          '''
+          new = '''            if (
+                  self._state.update_running
+                  or self._state.active_execution_id is not None
+              ):
+                  return False
+              # Even uncorrelated /refresh requests must reserve the scheduler
+              # slot before their worker starts, otherwise the poller can win the
+              # request/start race. External job ids remain unchanged.
+              reserved_execution_id = execution_id or "runtime-refresh"
+              self._state.active_execution_id = reserved_execution_id
+              self._persist_state()
+          threading.Thread(
+              target=self._run_requested_update,
+              kwargs={"bootstrap": False, "execution_id": reserved_execution_id},
+              daemon=True,
+          ).start()
+          return True
+          '''
+          if old not in text:
+              raise SystemExit('request-refresh replacement anchor not found')
+          pipeline_path.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          test_path = Path('catalog/orchestrator/tests/test_pipeline_bootstrap.py')
+          tests = test_path.read_text(encoding='utf-8')
+          addition = '''
+
+          def test_load_state_clears_process_local_execution_reservation(tmp_path: Path) -> None:
+              orchestrator = pipeline.RuntimeOrchestrator.__new__(pipeline.RuntimeOrchestrator)
+              orchestrator.state_path = tmp_path / "runtime_state.json"
+              state = pipeline.RuntimeOrchestrator._default_state(orchestrator)
+              state.update_running = True
+              state.active_execution_id = "analysis-upload-crashed"
+              state.completed_execution_id = "analysis-upload-previous"
+              state.completed_execution_succeeded = True
+              orchestrator.state_path.write_text(
+                  pipeline.json.dumps(state.__dict__) + "\\n", encoding="utf-8"
+              )
+
+              loaded = pipeline.RuntimeOrchestrator._load_state(orchestrator)
+
+              assert loaded.update_running is False
+              assert loaded.active_execution_id is None
+              assert loaded.completed_execution_id == "analysis-upload-previous"
+              assert loaded.completed_execution_succeeded is True
+
+
+          def test_uncorrelated_refresh_reserves_scheduler_before_worker_start(
+              tmp_path: Path, monkeypatch
+          ) -> None:
+              orchestrator = pipeline.RuntimeOrchestrator.__new__(pipeline.RuntimeOrchestrator)
+              orchestrator._lock = threading.Lock()
+              orchestrator._state = pipeline.RuntimeOrchestrator._default_state(orchestrator)
+              orchestrator._state.startup_mode = pipeline.STARTUP_MODE_CLEAN
+              orchestrator._persist_state = lambda: None
+              created = []
+
+              class _DeferredThread:
+                  def __init__(self, *, target, kwargs, daemon):
+                      created.append((target, kwargs, daemon))
+
+                  def start(self):
+                      return None
+
+              monkeypatch.setattr(pipeline.threading, "Thread", _DeferredThread)
+
+              accepted = pipeline.RuntimeOrchestrator.request_refresh(orchestrator)
+
+              assert accepted is True
+              assert orchestrator._state.active_execution_id == "runtime-refresh"
+              assert len(created) == 1
+              assert created[0][1]["execution_id"] == "runtime-refresh"
+              assert created[0][2] is True
+          '''
+          marker = 'def test_load_state_clears_process_local_execution_reservation'
+          if marker not in tests:
+              test_path.write_text(tests.rstrip() + addition + '\n', encoding='utf-8')
+          PY
+      - name: Ruff changed boundaries
+        run: python -m ruff check catalog/orchestrator/pipeline.py catalog/orchestrator/tests/test_pipeline_bootstrap.py --ignore I001,RUF022,B008,C408,PLC0206,UP035,DTZ001,DTZ003,DTZ004,BLE001
+      - name: Run focused runtime regressions
+        run: python -m pytest -o addopts= -q catalog/orchestrator/tests/test_pipeline_bootstrap.py catalog/flask_app/tests/test_upload_analysis_jobs.py catalog/flask_app/tests/test_data_upload.py
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add catalog/orchestrator/pipeline.py catalog/orchestrator/tests/test_pipeline_bootstrap.py
+          git diff --cached --check
+          git commit -m "Recover runtime refresh reservations safely"
+          git push origin HEAD:fix-production-readiness-issues-in-pipeline
