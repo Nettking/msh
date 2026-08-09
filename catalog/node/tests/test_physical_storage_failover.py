@@ -40,7 +40,9 @@ from catalog.node.storage_failover_drill import (
 from catalog.relay.service import RelayServer
 
 NOW = datetime(2026, 7, 31, 14, 0, tzinfo=timezone.utc)
-TIMEOUT = 5.0
+# Match the product's bounded relay/storage timeout. Five seconds is too tight for
+# loaded Windows hosted runners and can expire while the local relay is healthy.
+TIMEOUT = 15.0
 
 
 async def _wait_for_control_waiting(
