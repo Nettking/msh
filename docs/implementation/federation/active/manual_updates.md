@@ -45,6 +45,11 @@ constants, request identity, and lifetime. Target devices act only when:
 - the event is fresh and bounded; and
 - the local host agent independently accepts the same target.
 
+Remote nodes derive and durably pin the coordinator identity from the
+authenticated `session.created` event before accepting any update intent. This
+works for already-paired devices without expanding the persisted pairing format.
+An otherwise valid update event from another Federation member is ignored.
+
 Check and activation results return as authenticated member events. Report
 payloads contain only bounded state, source/target/running commit IDs, safe
 reason codes, and safe messages. A device restart does not lose the operation:
@@ -67,11 +72,13 @@ For an eligible target it:
 2. exports the exact target as `MSH_BUILD_COMMIT`;
 3. rebuilds the `relay`, `flask`, and `recorder` images;
 4. starts/restarts the background services;
-5. stops the old Flask container and runs the existing saved-setup resume path;
-6. starts the new Flask container;
-7. reads the immutable build commit baked into the running image;
-8. checks the Federation HTTP surface from inside the container; and
-9. requires `relay`, `recorder`, and `flask` to be running.
+5. reads the required Ollama model from the newly built Flask image and verifies
+   or installs that exact model before replacing the old Flask runtime;
+6. stops the old Flask container and runs the existing saved-setup resume path;
+7. starts the new Flask container;
+8. reads the immutable build commit baked into the running image;
+9. checks the Federation HTTP surface from inside the container; and
+10. requires `relay`, `recorder`, and `flask` to be running.
 
 Docker images receive `MSH_BUILD_COMMIT` as a build argument and bake it into the
 image environment and label. Runtime success therefore cannot be inferred from
@@ -80,6 +87,12 @@ host `HEAD` alone.
 The only success state for an activation is `runtime_verified`, and it requires
 `running_commit == target_commit`. Source-only fast-forward is intentionally not
 success.
+
+The update agent also hashes its own implementation at startup. If a successful
+fast-forward changed the updater itself, the POSIX agent replaces its process
+with the newly checked-out script and the Windows agent starts the newly checked-
+out PowerShell script after releasing its single-instance mutex. Future rollouts
+therefore do not remain on stale host mutation code.
 
 ## Rollout ordering and failure semantics
 
@@ -99,3 +112,18 @@ There is no automatic update-on-start, reconnect-triggered update, delayed queue
 for offline devices, destructive rollback, or self-selected target. An operator
 must explicitly check, inspect the results, confirm the exact checked target,
 and press **Update all devices**.
+
+## Bootstrap requirement
+
+Federation-wide runtime updates require the host-owned update agent and the
+update-event processor to already exist on each participating device. A device
+running an MSH version from before this capability was introduced cannot use a
+remote update message to install the capability that would be needed to process
+that message.
+
+Such legacy devices need one normal manual update to an updater-capable `main`
+commit and one start through the supported launcher (`start.cmd` or
+`bash start.sh`). After that bootstrap, future approved `main` updates can use
+the Federation flow. This transition is deliberate: MSH does not grant legacy
+Flask containers a new shell/Docker escape hatch merely to bootstrap the first
+remote update.
