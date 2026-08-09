@@ -138,7 +138,8 @@
         "physical.ollama-model-and-accelerator",
         "physical.recorder-plus-ai-simultaneous-contribution",
         "physical.separate-ai-compute-storage-contributors",
-        "physical.benchmark-expiry-and-rerun"
+        "physical.benchmark-expiry-and-rerun",
+        "physical.restart-and-reconciliation"
       ]
     },
     {
