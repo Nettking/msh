@@ -444,7 +444,11 @@ class FederationUpdateService:
 
         local_host_request = value.get("local_host_request_id")
         if actor in expected and isinstance(local_host_request, str):
-            latest = self.local.latest_result()
+            result_for = getattr(self.local, "result_for", None)
+            if callable(result_for):
+                latest = result_for(local_host_request)
+            else:
+                latest = self.local.latest_result()
             if (
                 latest is not None
                 and latest.request_id == local_host_request
@@ -613,9 +617,15 @@ class FederationUpdateService:
                 raise ValueError("stale_or_mismatched_confirmation")
             if expires is None or expires <= datetime.now(timezone.utc):
                 raise ValueError("expired_check")
+            checked_devices = self._devices_by_id(checked)
+            if checked.get("status") == "checking" or any(
+                item.get("state") == "checking"
+                for item in checked_devices.values()
+            ):
+                raise ValueError("check_in_progress")
 
             now = datetime.now(timezone.utc)
-            devices = self._devices_by_id(checked)
+            devices = checked_devices
             authority = {
                 device.node_id: device
                 for device in self._authority_devices(context, actor)
