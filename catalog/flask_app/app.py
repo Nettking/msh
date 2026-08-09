@@ -51,9 +51,10 @@ from .services.server_setup_service import (
     load_settings,
     ollama_status,
 )
+from .services.startup_contribution_reconcile import (
+    run_startup_contribution_reconcile,
+)
 from .source_routes import source_web
-
-_CONTRIBUTION_RECONCILE_EXTENSION_KEY = "capability_contribution_startup_reconciled"
 
 
 def _resume_persisted_contributions_safely() -> tuple[int, int]:
@@ -264,24 +265,25 @@ def create_app() -> Flask:
 
     @app.before_request
     def reconcile_persisted_contributions_from_current_evidence():
-        """Own the single automatic contribution reconciliation for this app."""
+        """Restore persisted authority once, retrying transient startup gaps."""
 
         endpoint = request.endpoint or ""
-        if endpoint.startswith("static") or app.extensions.get(
-            _CONTRIBUTION_RECONCILE_EXTENSION_KEY
-        ):
+        if endpoint.startswith("static"):
             return
-        # Set this before doing any work so the retained CFI-5/CFI-6 hooks see
-        # the reconciliation as owned here and cannot execute a second path.
-        app.extensions[_CONTRIBUTION_RECONCILE_EXTENSION_KEY] = True
-        try:
-            reconciled, suspended = _resume_persisted_contributions_safely()
-        except Exception as exc:  # noqa: BLE001 - startup must remain available
+        attempted, result, error = run_startup_contribution_reconcile(
+            app.extensions,
+            _resume_persisted_contributions_safely,
+        )
+        if not attempted:
+            return
+        if error is not None:
             app.logger.info(
                 "Capability contribution startup reconcile unavailable (%s)",
-                type(exc).__name__,
+                type(error).__name__,
             )
             return
+        assert result is not None
+        reconciled, suspended = result
         if suspended:
             app.logger.info(
                 "Suspended %d enabled contribution(s) because saved capability "
