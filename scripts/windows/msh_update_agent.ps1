@@ -38,6 +38,12 @@ function Get-PathHash([string]$Value) {
     }
 }
 
+function Last-Text([object[]]$Values) {
+    $last = $Values | Select-Object -Last 1
+    if ($null -eq $last) { return '' }
+    return ([string]$last)
+}
+
 $mutexName = 'Global\MSHUpdateAgent-' + (Get-PathHash $RepoRoot)
 $createdNew = $false
 $mutex = New-Object System.Threading.Mutex($true, $mutexName, [ref]$createdNew)
@@ -93,7 +99,10 @@ function Invoke-Git([string[]]$Arguments) {
 }
 
 function Test-ApprovedRemote([string]$Value) {
-    $normalized = $Value.Trim().TrimEnd('/').TrimEnd('.git')
+    $normalized = $Value.Trim().TrimEnd('/')
+    if ($normalized.EndsWith('.git', [StringComparison]::OrdinalIgnoreCase)) {
+        $normalized = $normalized.Substring(0, $normalized.Length - 4)
+    }
     if ($normalized -match '^git@github\.com:(?<repo>[^?&#]+)$') {
         return $Matches.repo.Equals($ApprovedRepository, [StringComparison]::OrdinalIgnoreCase)
     }
@@ -107,7 +116,7 @@ function Test-ApprovedRemote([string]$Value) {
 function Get-RunningCommit {
     try {
         $output = Invoke-External 'docker' @('compose', 'exec', '-T', 'flask', 'python', '-c', "import os; print(os.environ.get('MSH_BUILD_COMMIT',''))")
-        $value = (($output | Select-Object -Last 1) ?? '').Trim().ToLowerInvariant()
+        $value = (Last-Text $output).Trim().ToLowerInvariant()
         if ($value -match $OidPattern) { return $value }
     }
     catch {
@@ -122,20 +131,20 @@ function Test-Ancestor([string]$Older, [string]$Newer) {
 }
 
 function Inspect-Checkout([AllowNull()][string]$RequestedTarget) {
-    $top = ((Invoke-Git @('rev-parse', '--show-toplevel')) | Select-Object -Last 1).Trim()
+    $top = (Last-Text (Invoke-Git @('rev-parse', '--show-toplevel'))).Trim()
     if ([System.IO.Path]::GetFullPath($top) -ne $RepoRoot) { throw 'unsupported_checkout' }
-    $remote = ((Invoke-Git @('remote', 'get-url', 'origin')) | Select-Object -Last 1).Trim()
+    $remote = (Last-Text (Invoke-Git @('remote', 'get-url', 'origin'))).Trim()
     if (-not (Test-ApprovedRemote $remote)) { throw 'unapproved_remote' }
-    $branch = ((Invoke-Git @('symbolic-ref', '--quiet', '--short', 'HEAD')) | Select-Object -Last 1).Trim()
+    $branch = (Last-Text (Invoke-Git @('symbolic-ref', '--quiet', '--short', 'HEAD'))).Trim()
     if ($branch -ne $ApprovedBranch) { throw 'detached_head' }
-    $current = ((Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}')) | Select-Object -Last 1).Trim().ToLowerInvariant()
+    $current = (Last-Text (Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}'))).Trim().ToLowerInvariant()
     if ($current -notmatch $OidPattern) { throw 'unsupported_checkout' }
     $status = Invoke-Git @('status', '--porcelain=v1', '--untracked-files=all')
     if (($status -join '').Length -gt 0) {
         return [ordered]@{ state='dirty'; current=$current; target=$RequestedTarget; code='dirty'; message='Local changes must be reviewed before updating.' }
     }
     Invoke-Git @('fetch', '--no-tags', 'origin', $ApprovedBranch) | Out-Null
-    $approvedTip = ((Invoke-Git @('rev-parse', '--verify', 'FETCH_HEAD^{commit}')) | Select-Object -Last 1).Trim().ToLowerInvariant()
+    $approvedTip = (Last-Text (Invoke-Git @('rev-parse', '--verify', 'FETCH_HEAD^{commit}'))).Trim().ToLowerInvariant()
     $target = if ($RequestedTarget) { $RequestedTarget.ToLowerInvariant() } else { $approvedTip }
     if ($target -notmatch $OidPattern) { throw 'target_unavailable' }
     & git -C $RepoRoot cat-file -e "$target^{commit}" 2>$null
@@ -157,7 +166,7 @@ function Wait-RuntimeVerified([string]$Target) {
     while ([DateTimeOffset]::UtcNow -lt $deadline) {
         try {
             $commitOutput = Invoke-External 'docker' @('compose', 'exec', '-T', 'flask', 'python', '-c', "import os; print(os.environ.get('MSH_BUILD_COMMIT',''))")
-            $running = (($commitOutput | Select-Object -Last 1) ?? '').Trim().ToLowerInvariant()
+            $running = (Last-Text $commitOutput).Trim().ToLowerInvariant()
             if ($running -eq $Target) {
                 Invoke-External 'docker' @('compose', 'exec', '-T', 'flask', 'python', '-c', "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:5000/federation', timeout=3); assert 200 <= r.status < 500") | Out-Null
                 $services = Invoke-External 'docker' @('compose', 'ps', '--status', 'running', '--services')
@@ -190,6 +199,9 @@ function Process-Request {
     }
     $processing = Join-Path $AgentDirectory ("processing-$([guid]::NewGuid().ToString('N')).json")
     Move-Item -LiteralPath $RequestFile -Destination $processing -Force
+    $requestId = $null
+    $action = $null
+    $target = $null
     try {
         $requestId = [string]$request.request_id
         $action = [string]$request.action
@@ -208,17 +220,19 @@ function Process-Request {
         $inspection = Inspect-Checkout $target
         $runningBefore = Get-RunningCommit
         if ($action -eq 'check') {
-            Write-AgentResult -RequestId $requestId -Action $action -State $inspection.state -CurrentCommit $inspection.current -TargetCommit $inspection.target -RunningCommit $runningBefore -Code $inspection.code -Message ([string]($inspection.message ?? ''))
+            $message = if ($null -eq $inspection.message) { '' } else { [string]$inspection.message }
+            Write-AgentResult -RequestId $requestId -Action $action -State $inspection.state -CurrentCommit $inspection.current -TargetCommit $inspection.target -RunningCommit $runningBefore -Code $inspection.code -Message $message
             return $true
         }
         if ($inspection.state -notin @('update_available', 'up_to_date')) {
-            Write-AgentResult -RequestId $requestId -Action $action -State $inspection.state -CurrentCommit $inspection.current -TargetCommit $inspection.target -RunningCommit $runningBefore -Code $inspection.code -Message ([string]($inspection.message ?? 'The checkout is not eligible for activation.'))
+            $message = if ($null -eq $inspection.message) { 'The checkout is not eligible for activation.' } else { [string]$inspection.message }
+            Write-AgentResult -RequestId $requestId -Action $action -State $inspection.state -CurrentCommit $inspection.current -TargetCommit $inspection.target -RunningCommit $runningBefore -Code $inspection.code -Message $message
             return $true
         }
         if ($inspection.state -eq 'update_available') {
             Invoke-Git @('merge', '--ff-only', $target) | Out-Null
         }
-        $proven = ((Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}')) | Select-Object -Last 1).Trim().ToLowerInvariant()
+        $proven = (Last-Text (Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}'))).Trim().ToLowerInvariant()
         if ($proven -ne $target) { throw 'source_verification_failed' }
 
         $env:MSH_BUILD_COMMIT = $target
@@ -237,7 +251,7 @@ function Process-Request {
         $safeRequestId = if ($requestId -and $requestId -match $RequestIdPattern) { $requestId } else { 'invalid-request' }
         $safeAction = if ($action -in @('check', 'apply')) { $action } else { 'unknown' }
         $current = $null
-        try { $current = ((Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}')) | Select-Object -Last 1).Trim().ToLowerInvariant() } catch {}
+        try { $current = (Last-Text (Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}'))).Trim().ToLowerInvariant() } catch {}
         $running = Get-RunningCommit
         Write-AgentResult -RequestId $safeRequestId -Action $safeAction -State 'error' -CurrentCommit $current -TargetCommit $target -RunningCommit $running -Code 'host_update_failed' -Message 'The host update agent stopped safely before it could verify the requested runtime.'
         Write-Warning "MSH update request failed: $($_.Exception.Message)"
