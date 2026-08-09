@@ -219,6 +219,11 @@ def atomic_json(path: Path, value: dict[str, object]) -> None:
         temporary.unlink(missing_ok=True)
 
 
+def _request_result_path(result_file: Path, request_id: str) -> Path:
+    digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+    return result_file.with_name(f"result-{digest}.json")
+
+
 def write_result(
     path: Path,
     *,
@@ -231,23 +236,22 @@ def write_result(
     code: str | None,
     message: str,
 ) -> None:
-    atomic_json(
-        path,
-        {
-            "schema": RESULT_SCHEMA,
-            "request_id": request_id,
-            "action": action,
-            "state": state,
-            "current_commit": current,
-            "target_commit": target,
-            "running_commit": running,
-            "code": code,
-            "message": message,
-            "completed_at": datetime.now(timezone.utc)
-            .isoformat()
-            .replace("+00:00", "Z"),
-        },
-    )
+    value: dict[str, object] = {
+        "schema": RESULT_SCHEMA,
+        "request_id": request_id,
+        "action": action,
+        "state": state,
+        "current_commit": current,
+        "target_commit": target,
+        "running_commit": running,
+        "code": code,
+        "message": message,
+        "completed_at": datetime.now(timezone.utc)
+        .isoformat()
+        .replace("+00:00", "Z"),
+    }
+    atomic_json(_request_result_path(path, request_id), value)
+    atomic_json(path, value)
 
 
 def wait_runtime(root: Path, target: str) -> str:
@@ -426,22 +430,22 @@ def validate_request(
 
 
 def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
-    if not request_file.exists():
-        return False
-    if request_file.stat().st_size > MAX_BYTES:
-        request_file.unlink(missing_ok=True)
-        return True
-    try:
-        value = json.loads(request_file.read_text(encoding="utf-8"))
-    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
-        request_file.unlink(missing_ok=True)
-        return True
     processing = request_file.with_name(
         f"processing-{os.getpid()}-{time.time_ns()}.json"
     )
-    os.replace(request_file, processing)
+    try:
+        os.replace(request_file, processing)
+    except FileNotFoundError:
+        return False
     request_id, action, target = "invalid-request", "unknown", None
     try:
+        if processing.stat().st_size > MAX_BYTES:
+            return True
+        try:
+            value = json.loads(processing.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return True
+
         request_id, action, target, activate_after = validate_request(value)
         if activate_after is not None:
             delay = (
@@ -489,6 +493,13 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
         )
         if proven != target:
             raise RuntimeError("source_verification_failed")
+        if git(
+            root,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+        ).stdout:
+            raise RuntimeError("dirty_build_context")
         env = os.environ.copy()
         env["MSH_BUILD_COMMIT"] = target
         subprocess.run(
