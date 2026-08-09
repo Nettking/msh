@@ -1,9 +1,9 @@
 """Capability-first replacements for retained role-reading Flask entrypoints.
 
 The large legacy ``routes`` module still contains compatibility implementations
-that read ``ServerSetupSettings``.  This module replaces the supported product
+that read ``ServerSetupSettings``. This module replaces the supported product
 entrypoints at application-composition time so live requests are driven by
-capability configuration and contribution authority instead.  The old functions
+capability configuration and contribution authority instead. The old functions
 can then be deleted separately without combining semantic migration and bulk
 code removal.
 """
@@ -32,6 +32,7 @@ from catalog.federation.onboarding_models import (
 )
 from catalog.orchestrator.pipeline import get_runtime_manager
 
+from . import capability_startup_transition_routes as transition_routes
 from .services.capability_config_service import (
     CapabilityConfig,
     CapabilityConfigError,
@@ -41,9 +42,7 @@ from .services.capability_config_service import (
 from .services.capability_contribution_service import (
     get_capability_contribution_service,
 )
-from .services.capability_startup_transition_service import (
-    get_capability_startup_transition_service,
-)
+from .services.operator_scope_service import get_operator_scope_service
 from .services.recorder_control_service import get_recorder_control_service
 from .services.server_setup_service import (
     AI_MODEL_CHOICES,
@@ -52,7 +51,6 @@ from .services.server_setup_service import (
     ServerSetupError,
     load_settings,
 )
-from .services.operator_scope_service import get_operator_scope_service
 
 _LEGACY_APP_MODULE = "catalog.flask_app.app"
 _LEGACY_ROUTES_MODULE = "catalog.flask_app.routes"
@@ -79,8 +77,10 @@ _SAFE_PREFIXES = ("/onboarding", "/federation", "/docs", "/static")
 
 
 def _capability_flags() -> dict[str, object]:
+    """Read the same capability-state seam used by the authoritative CFI-6 gate."""
+
     try:
-        return get_capability_startup_transition_service().capability_flags()
+        return transition_routes.get_capability_startup_transition_service().capability_flags()
     except Exception:  # noqa: BLE001 - product gates fail closed
         return {
             "completed": False,
@@ -160,9 +160,9 @@ def capability_startup_mode_gate() -> Response | None:
 def _status_template_adapter(*, recorder_visible: bool) -> object:
     """Temporary shape adapter for status.html; never used as authority.
 
-    The template still names the old deployment-mode field.  Feed it a synthetic
+    The template still names the old deployment-mode field. Feed it a synthetic
     non-exclusive value so Diagnostics is always available while recorder UI is
-    visible only when recorder configuration/capability state exists.  A later
+    visible only when recorder configuration/capability state exists. A later
     deletion-only cleanup can remove these template variable names.
     """
 
@@ -342,7 +342,11 @@ def install_capability_product_routes(app: Flask) -> None:
         "web.recorder_status_snapshot": recorder_status_snapshot,
         "web.startup": startup,
     }
-    missing = [endpoint for endpoint in _REPLACED_ENDPOINTS if endpoint not in app.view_functions]
+    missing = [
+        endpoint
+        for endpoint in _REPLACED_ENDPOINTS
+        if endpoint not in app.view_functions
+    ]
     if missing:
         raise RuntimeError(
             "Capability product routes require registered legacy endpoints: "
