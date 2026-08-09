@@ -34,12 +34,14 @@ jobs:
           catalog/flask_app/services/federation_update_events.py
           catalog/flask_app/services/federation_update_service.py
           catalog/flask_app/tests/test_federation_update_runtime.py
+          catalog/flask_app/tests/test_federation_update_orchestration.py
           catalog/flask_app/tests/test_federation_update_host_agents.py
       - name: Run update contract tests
         run: >-
           python -m pytest -o addopts= -q
           catalog/federation/tests/test_software_update.py
           catalog/flask_app/tests/test_federation_update_runtime.py
+          catalog/flask_app/tests/test_federation_update_orchestration.py
           catalog/flask_app/tests/test_federation_update_host_agents.py
       - name: Ruff update Python
         # TRY004: malformed event fields intentionally use the same ValueError
@@ -52,6 +54,7 @@ jobs:
           catalog/flask_app/services/federation_update_events.py
           catalog/flask_app/services/federation_update_service.py
           catalog/flask_app/tests/test_federation_update_runtime.py
+          catalog/flask_app/tests/test_federation_update_orchestration.py
           catalog/flask_app/tests/test_federation_update_host_agents.py
 
       - name: Parse and smoke Windows host agent
