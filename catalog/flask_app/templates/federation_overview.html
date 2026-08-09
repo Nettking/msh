@@ -60,6 +60,7 @@
   </div>
 
   {% set updates = federation_update|default({'status': 'not_checked', 'devices': []}) %}
+  {% set update_csrf = federation_csrf_token|default(none) %}
   <section class="federation-panel federation-update-panel">
     <header class="federation-panel__header">
       <div>
@@ -67,10 +68,12 @@
         <h3>{{ (updates.status|default('not_checked')).replace('_', ' ')|title }}</h3>
         <p>Manual only. This operation changes supported Git source checkouts; it does not rebuild, reinstall, restart, or prove the running MSH installation.</p>
       </div>
+      {% if update_csrf %}
       <form method="post" action="{{ url_for('federation_web.check_updates') }}">
-        <input type="hidden" name="_csrf_token" value="{{ federation_csrf_token }}">
+        <input type="hidden" name="_csrf_token" value="{{ update_csrf }}">
         <button class="federation-button federation-button--secondary" type="submit">Check for updates</button>
       </form>
+      {% endif %}
     </header>
     <dl class="federation-detail-list">
       <div><dt>Last checked</dt><dd>{{ updates.checked_at|default('Not checked yet') }}</dd></div>
@@ -84,9 +87,9 @@
       {% endfor %}
     </ul>
     {% endif %}
-    {% if updates.eligible_count and updates.target_commit %}
+    {% if updates.eligible_count and updates.target_commit and update_csrf %}
     <form method="post" action="{{ url_for('federation_web.apply_updates') }}" class="federation-update-confirmation">
-      <input type="hidden" name="_csrf_token" value="{{ federation_csrf_token }}">
+      <input type="hidden" name="_csrf_token" value="{{ update_csrf }}">
       <input type="hidden" name="target_commit" value="{{ updates.target_commit }}">
       <label><input type="checkbox" name="confirm_update" value="update-all" required> Fast-forward the source checkout on {{ updates.eligible_count }} currently eligible device{{ '' if updates.eligible_count == 1 else 's' }} to exact commit <code>{{ updates.target_commit[:12] }}</code>. Running installations will remain unchanged until rebuilt/reinstalled and restarted locally. Offline devices will not be queued.</label>
       <button class="federation-button federation-button--primary" type="submit">Update source on all devices</button>
