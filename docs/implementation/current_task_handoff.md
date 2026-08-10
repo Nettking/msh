@@ -6,7 +6,7 @@ Reviewed: **2026-08-11 Europe/Oslo**
 
 ## Repository state
 
-- Repository: `Nettking/msh` (product name: Federated Capability Platform / FCP)
+- Repository: the current FCP source repository.
 - Default branch: `main`
 - Always resolve the current `main` head directly before starting work.
 - Published Federation v1 release tag: not created.
