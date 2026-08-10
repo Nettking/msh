@@ -1,9 +1,9 @@
 """Recorder-side execution of bounded Federation control requests.
 
 The worker consumes authenticated session events after the recorder has joined a
-Federation.  It deliberately exposes only two operations: run the existing
+Federation. It deliberately exposes only two operations: run the existing
 bounded RFC1918 MTConnect scan, and add/remove recorder sources selected from the
-latest scan.  It never executes remote shell text and never accepts arbitrary
+latest scan. It never executes remote shell text and never accepts arbitrary
 source URLs from another device.
 """
 
@@ -14,11 +14,11 @@ import json
 import os
 import socket
 import threading
-from dataclasses import replace
 from datetime import datetime, timezone
 from ipaddress import IPv4Address, IPv4Network, ip_address, ip_network
 from pathlib import Path
 from typing import Any, Mapping
+from urllib.parse import urlsplit
 
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.recorder_control_events import (
@@ -47,6 +47,7 @@ from catalog.flask_app.services.mtconnect_discovery_service import (
 
 _STATE_SCHEMA = "fcp.recorder-control-processor.v1"
 _CONTROL_SCHEMA = "fcp.mtconnect_recorder.control.v1"
+_AUTO_CONFIG_SCHEMA = "fcp.mtconnect_recorder.autoconfig.v1"
 _RFC1918 = (
     IPv4Network("10.0.0.0/8"),
     IPv4Network("172.16.0.0/12"),
@@ -88,7 +89,7 @@ def infer_private_scan_cidr(preferred_host: str | None = None) -> str:
     """Infer one bounded /24 from the host's normal private-network routes.
 
     Route selection is tried before hostname enumeration so Docker/virtual
-    adapters do not normally win.  This function performs no network scan and
+    adapters do not normally win. This function performs no network scan and
     sends no application payload; UDP ``connect`` is used only to ask the OS
     which local address it would route from.
     """
@@ -160,6 +161,9 @@ class RecorderFederationControlWorker:
         self.control_path = (
             self.data_directory / "source_state" / "mtconnect_recorder_control.json"
         )
+        self.auto_config_path = (
+            self.data_directory / "source_state" / "mtconnect_recorder_autoconfig.json"
+        )
         self.state_path = (
             self.data_directory / "federation" / "recorder_control" / "processor.json"
         )
@@ -215,15 +219,26 @@ class RecorderFederationControlWorker:
     def _save_state(self, value: dict[str, Any]) -> None:
         _write_json_atomic(self.state_path, {**value, "schema": _STATE_SCHEMA})
 
+    def _mark_source_selection_complete(self, *, requested_by: str) -> None:
+        _write_json_atomic(
+            self.auto_config_path,
+            {
+                "schema": _AUTO_CONFIG_SCHEMA,
+                "initial_selection_complete": True,
+                "updated_at": _stamp(_utc_now()),
+                "requested_by": requested_by[:128],
+            },
+        )
+
     @staticmethod
     def _report_request_id(revision: int, request_id: str) -> str:
         digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()[:20]
         return f"recorder-control-report-{revision}-{digest}"
 
-    def _flush_pending(self, remote: Any, state: dict[str, Any]) -> bool:
+    def _flush_pending(self, remote: Any, state: dict[str, Any]) -> None:
         pending = state.get("pending_report")
         if not isinstance(pending, dict):
-            return True
+            return
         event_type = pending.get("event_type")
         payload = pending.get("payload")
         revision = pending.get("revision")
@@ -238,7 +253,7 @@ class RecorderFederationControlWorker:
         ):
             state["pending_report"] = None
             self._save_state(state)
-            return True
+            return
         self.node.runtime.append_session_event(
             remote,
             session_id=remote.binding.internal_session_id,
@@ -249,7 +264,6 @@ class RecorderFederationControlWorker:
         state["last_revision"] = revision
         state["pending_report"] = None
         self._save_state(state)
-        return True
 
     def _queue_report(
         self,
@@ -310,9 +324,9 @@ class RecorderFederationControlWorker:
         if not cidr:
             preferred_host = None
             try:
-                preferred_host = socket.gethostbyname(
-                    str(remote.relay_url).split("://", 1)[-1].split(":", 1)[0]
-                )
+                host = urlsplit(str(remote.relay_url)).hostname
+                if host:
+                    preferred_host = socket.gethostbyname(host)
             except OSError:
                 preferred_host = None
             cidr = infer_private_scan_cidr(preferred_host)
@@ -382,12 +396,14 @@ class RecorderFederationControlWorker:
                 recorder_sources=config.recorder_sources,
             )
         save_capability_config(config, self.config_path)
+        self._mark_source_selection_complete(
+            requested_by="federation-recorder-control"
+        )
         configured = _safe_sources(config)
-        if configured:
-            # Source management is an explicit request to record these sources.
-            self._set_recording_desired(True, requested_by="federation-recorder-control")
-        else:
-            self._set_recording_desired(False, requested_by="federation-recorder-control")
+        self._set_recording_desired(
+            bool(configured),
+            requested_by="federation-recorder-control",
+        )
         self._reannounce_sources(remote, config)
         return SOURCES_REPORT_EVENT, sources_report_payload(
             request_id=request_id,
@@ -409,8 +425,15 @@ class RecorderFederationControlWorker:
         error: BaseException,
     ) -> tuple[str, dict[str, Any]]:
         code = str(getattr(error, "code", type(error).__name__))[:128]
-        message = str(getattr(error, "message", str(error) or type(error).__name__))[:512]
-        configured = tuple(_safe_sources(load_capability_config(self.config_path)))
+        message = str(
+            getattr(error, "message", str(error) or type(error).__name__)
+        )[:512]
+        try:
+            configured = tuple(
+                _safe_sources(load_capability_config(self.config_path))
+            )
+        except Exception:  # noqa: BLE001 - failure report must remain bounded
+            configured = ()
         if command.get("command") == "sources":
             return SOURCES_REPORT_EVENT, sources_report_payload(
                 request_id=str(command["request_id"]),
@@ -443,9 +466,7 @@ class RecorderFederationControlWorker:
         state = self._state()
         while not self._stop.is_set():
             try:
-                if not self._flush_pending(remote, state):
-                    self._stop.wait(self.poll_seconds)
-                    continue
+                self._flush_pending(remote, state)
                 events = self.node.runtime.session_events(
                     remote,
                     session_id=remote.binding.internal_session_id,
