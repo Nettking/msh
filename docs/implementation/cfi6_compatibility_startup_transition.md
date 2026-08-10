@@ -13,7 +13,7 @@ The transition is additive. Existing setup fields, protocol v1 session boundarie
 
 ## Persisted state
 
-The local document uses schema `msh.onboarding.v1` and records only:
+The local document uses schema `fcp.onboarding.v1` and records only:
 
 - stable device ID;
 - public federation ID and existing internal session ID;

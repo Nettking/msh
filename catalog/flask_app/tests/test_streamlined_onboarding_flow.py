@@ -25,7 +25,7 @@ def test_completed_setup_offers_explicit_continue_instead_of_overview() -> None:
         "completed_steps": [],
         "migration": {},
         "actions": {},
-        "storage_key": "msh.onboarding.device.cfi5",
+        "storage_key": "fcp.onboarding.device.cfi5",
     }
 
     service.apply_to_onboarding_view_model(
@@ -36,8 +36,8 @@ def test_completed_setup_offers_explicit_continue_instead_of_overview() -> None:
     assert view_model["current_step"] == "finish"
     assert view_model["finish"]["next_action"] == {
         "title": "Setup complete",
-        "message": "Continue to MSH when you are ready.",
-        "label": "Continue to MSH",
+        "message": "Continue to FCP when you are ready.",
+        "label": "Continue to FCP",
         "url": "/",
     }
     assert view_model["completed_steps"] == ["finish"]

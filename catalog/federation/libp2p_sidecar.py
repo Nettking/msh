@@ -91,11 +91,11 @@ class Libp2pSidecarClient:
         self._ready = ChannelReady(peer_id, tuple(listen_addrs))
         self._reader_task = asyncio.create_task(
             self._reader_loop(),
-            name=f"msh-libp2p-sidecar-{peer_id}",
+            name=f"fcp-libp2p-sidecar-{peer_id}",
         )
         self._stderr_task = asyncio.create_task(
             self._drain_stderr(),
-            name=f"msh-libp2p-sidecar-stderr-{peer_id}",
+            name=f"fcp-libp2p-sidecar-stderr-{peer_id}",
         )
         return self._ready
 

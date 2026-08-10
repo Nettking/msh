@@ -1,7 +1,7 @@
-"""Export Observer Phoenix trend measurements into MSH-compatible JSONL.
+"""Export Observer Phoenix trend measurements into FCP-compatible JSONL.
 
 This command is intentionally source-specific at the boundary and conservative at
-MSH's core boundary: only normalized telemetry JSONL is written under ``data/``.
+FCP's core boundary: only normalized telemetry JSONL is written under ``data/``.
 Source state and watermarks are stored separately as JSON so recursive telemetry
 scans do not ingest connector metadata as if it were machine data.
 """
@@ -25,11 +25,11 @@ WATERMARK_NAME = "trend_measurements"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Export Observer Phoenix trend measurements to MSH JSONL.")
+    parser = argparse.ArgumentParser(description="Export Observer Phoenix trend measurements to FCP JSONL.")
     parser.add_argument("--base-url", default=None, help="Observer Phoenix base URL. Defaults to runtime settings or OBSERVER_PHOENIX_BASE_URL.")
     parser.add_argument("--username", default=None, help="Observer username. Defaults to runtime settings or OBSERVER_PHOENIX_USERNAME.")
     parser.add_argument("--password", default=None, help="Observer password. Defaults to runtime settings or OBSERVER_PHOENIX_PASSWORD.")
-    parser.add_argument("--data-dir", type=Path, default=Path("data"), help="MSH data directory.")
+    parser.add_argument("--data-dir", type=Path, default=Path("data"), help="FCP data directory.")
     parser.add_argument("--from-utc", default=None, help="Inclusive UTC start timestamp. Defaults to saved watermark or lookback window.")
     parser.add_argument("--to-utc", default=None, help="Inclusive UTC end timestamp. Defaults to current UTC time.")
     parser.add_argument("--lookback-hours", type=int, default=24, help="First-run lookback when no watermark exists.")

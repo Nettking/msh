@@ -222,7 +222,7 @@ def test_jsonl_discovery_hides_directory_until_publish_marker_is_removed(
     batch_dir.mkdir(parents=True)
     file_path = batch_dir / "data.jsonl"
     file_path.write_text('{"value":1}\n', encoding="utf-8")
-    marker = batch_dir / ".msh-importing"
+    marker = batch_dir / ".fcp-importing"
     marker.write_text("upload-test", encoding="utf-8")
 
     assert list(iter_jsonl_files(tmp_path / "data")) == []
@@ -260,7 +260,7 @@ def test_restart_finalizes_publication_completed_before_ready_update(
     # Every move and marker removal completed before the process died; only the
     # durable DB transition to ready is missing.
     (published / "data.jsonl").write_bytes(published_payload)
-    assert not (published / ".msh-importing").exists()
+    assert not (published / ".fcp-importing").exists()
     assert list(iter_jsonl_files(service.published_root)) == [published / "data.jsonl"]
 
     restarted = _service(tmp_path)
@@ -300,7 +300,7 @@ def test_restart_resumes_publication_after_only_some_files_were_moved(
     published = service.published_root / batch_id
     staging.mkdir(parents=True)
     published.mkdir(parents=True)
-    (published / ".msh-importing").write_text(batch_id, encoding="utf-8")
+    (published / ".fcp-importing").write_text(batch_id, encoding="utf-8")
     (published / "first.jsonl").write_bytes(payloads["first.jsonl"])
     # A stale destination with the right size but wrong identity must not be
     # trusted merely because the final path exists.
@@ -312,7 +312,7 @@ def test_restart_resumes_publication_after_only_some_files_were_moved(
     recovered = _wait_for_terminal(restarted, batch_id)
 
     assert recovered["status"] == "ready"
-    assert not (published / ".msh-importing").exists()
+    assert not (published / ".fcp-importing").exists()
     assert not staging.exists()
     assert {path.name: path.read_bytes() for path in published.glob("*.jsonl")} == payloads
 
@@ -342,7 +342,7 @@ def test_restart_drains_more_queued_batches_than_worker_capacity(tmp_path: Path)
             published = service.published_root / batch_id
             staging.mkdir(parents=True)
             published.mkdir(parents=True)
-            (published / ".msh-importing").write_text(batch_id, encoding="utf-8")
+            (published / ".fcp-importing").write_text(batch_id, encoding="utf-8")
             (published / "data.jsonl").write_bytes(payload)
 
     restarted = _service(tmp_path, max_pending_imports=2)

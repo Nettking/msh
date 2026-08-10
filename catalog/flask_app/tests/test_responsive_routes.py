@@ -138,7 +138,7 @@ def test_state_snapshot_does_not_call_artifact_scan(monkeypatch, tmp_path: Path)
 def test_catalog_cached_snapshot_does_not_check_signature(monkeypatch, tmp_path: Path) -> None:
     root = tmp_path / "results"
     root.mkdir()
-    monkeypatch.setenv("MSH_SCAN_DIRS", str(root))
+    monkeypatch.setenv("FCP_SCAN_DIRS", str(root))
     catalog = ArtifactCatalog(cached_snapshot_ttl_seconds=0.0)
     catalog.rescan()
 

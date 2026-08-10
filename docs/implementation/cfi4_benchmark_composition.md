@@ -49,7 +49,7 @@ The existing safe `409` prerequisite boundary is retained when identity exists b
 
 ## Persistence boundary
 
-The existing `SQLiteBenchmarkResultStore` writes immutable `msh.onboarding.benchmark-result.v1` objects and restart-safe run reservations to the onboarding benchmark database.
+The existing `SQLiteBenchmarkResultStore` writes immutable `fcp.onboarding.benchmark-result.v1` objects and restart-safe run reservations to the onboarding benchmark database.
 
 CFI-4 adds one local `benchmark_skip_decision` table keyed by:
 
@@ -71,9 +71,9 @@ The base CF2 validity evaluator remains strict and marks evidence non-current wh
 - declared dependency inputs change;
 - the stored benchmark ID no longer matches the definition.
 
-The installed MSH product adds a narrower run-once evaluator. It deliberately ignores **age alone** while retaining the other three structural checks: benchmark identity, implementation version, and the declared dependency fingerprint. The strict evaluator is not removed or weakened; it remains available for isolated kernel/contract tests.
+The installed FCP product adds a narrower run-once evaluator. It deliberately ignores **age alone** while retaining the other three structural checks: benchmark identity, implementation version, and the declared dependency fingerprint. The strict evaluator is not removed or weakened; it remains available for isolated kernel/contract tests.
 
-This means a result written by an older MSH release with a historical 15-minute `expires_at` can be reused immediately after upgrade when its benchmark definition and dependency inputs still match. MSH does not rewrite that immutable result, extend its timestamp, or require one final rerun simply because the old timestamp is in the past.
+This means a result written by an older FCP release with a historical 15-minute `expires_at` can be reused immediately after upgrade when its benchmark definition and dependency inputs still match. FCP does not rewrite that immutable result, extend its timestamp, or require one final rerun simply because the old timestamp is in the past.
 
 Structural invalidation remains fail-closed. For example, changing the configured Ollama model changes the declared dependency fingerprint, so the previous result becomes stale and the UI requires an explicit rerun even if that result is otherwise well formed. A benchmark implementation-version change behaves the same way.
 

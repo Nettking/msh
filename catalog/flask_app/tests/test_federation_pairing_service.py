@@ -25,7 +25,7 @@ from catalog.flask_app.services.federation_pairing_service import (
     RemotePairingStore,
 )
 from catalog.node.identity import IdentityStore
-from reset_msh import reset_repository_state
+from reset_fcp import reset_repository_state
 
 NOW = datetime(2026, 8, 3, 18, 0, tzinfo=timezone.utc)
 SESSION_ID = "session-pairing-one"
@@ -131,7 +131,7 @@ def test_pairing_routes_and_ui_are_registered(tmp_path: Path, monkeypatch) -> No
     assert page.status_code == 200
     assert (
         "Create pairing code" in body
-        or "Pairing code from the other MSH device" in body
+        or "Pairing code from the other FCP device" in body
     )
     assert "A public device ID alone never grants membership" in body
 
@@ -151,7 +151,7 @@ def test_pairing_code_route_accepts_the_onboarding_csrf_token(
     class PairingServiceStub:
         def create_pairing_code(self, *, relay_url: str) -> str:
             calls.append(relay_url)
-            return "MSH1-test-code"
+            return "FCP1-test-code"
 
     monkeypatch.setattr(
         federation_pairing_routes,

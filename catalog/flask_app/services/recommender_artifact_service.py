@@ -17,7 +17,7 @@ class RecommenderArtifactService:
 
     def generate(self) -> tuple[int, str]:
         artifacts = [self._artifact_from_note(note) for note in self.note_service.reusable_records(limit=500)]
-        payload = {"schema": "msh.recommender_artifacts.v1", "artifacts": artifacts}
+        payload = {"schema": "fcp.recommender_artifacts.v1", "artifacts": artifacts}
         self.output_path.parent.mkdir(parents=True, exist_ok=True)
         self.output_path.write_text(json.dumps(payload, indent=2, sort_keys=True, ensure_ascii=False) + "\n", encoding="utf-8")
         return len(artifacts), self.output_path.as_posix()

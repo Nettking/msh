@@ -78,6 +78,6 @@ to inspect the current device, Federation members, services, benchmarks, storage
 
 ## Specialized deployment commands
 
-`setup_msh.py` and optional Compose profiles remain compatibility and administration tools for explicit deployments. They are not the normal first-run product flow, and selecting a deployment mode does not grant Federation, provider, storage, compute, job, or artifact authority.
+`setup_fcp.py` and optional Compose profiles remain compatibility and administration tools for explicit deployments. They are not the normal first-run product flow, and selecting a deployment mode does not grant Federation, provider, storage, compute, job, or artifact authority.
 
 See [Quick start](quick_start.md) and [Server setup](server_setup.md) for reset boundaries, network binding, recorder configuration, model installation, and advanced deployment choices.

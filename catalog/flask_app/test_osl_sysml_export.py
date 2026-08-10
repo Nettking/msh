@@ -36,7 +36,7 @@ def test_osl_export_preview_uses_paper_keyword_style(tmp_path):
 
     preview = OslExportService(note_service=notes, export_path=tmp_path / "operator_strategies.sysml").preview()
 
-    assert "package MSH_OperatorStrategies" in preview
+    assert "package FCP_OperatorStrategies" in preview
     assert "import OSLCore::*" in preview
     assert "import OSLMetadata::*" in preview
     assert "#operator_strategy Chatter" in preview

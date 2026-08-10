@@ -145,7 +145,7 @@ def descriptor(handler_id: str, operation: str = "echo") -> LocalComputeHandlerD
     return LocalComputeHandlerDescriptor(
         handler_id=handler_id,
         capability_type="synthetic-compute",
-        protocol="msh-synthetic",
+        protocol="fcp-synthetic",
         protocol_version="1.0",
         attributes={"operation": operation, "modalities": ["json"]},
     )
@@ -165,7 +165,7 @@ def announce_and_approve(
             node_id=provider.identity.node_id,
             session_id=SESSION_ID,
             type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             status=CapabilityStatus.READY,
             properties={"operation": "echo", "modalities": ["json"]},
@@ -240,7 +240,7 @@ def active_job(job_id: str = "job-f84") -> JobContract:
         idempotency_key=f"{SESSION_ID}:{job_id}",
         capability=CapabilityRequirement(
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             requirements={"operation": "echo", "modalities": ["json"]},
         ),
@@ -248,7 +248,7 @@ def active_job(job_id: str = "job-f84") -> JobContract:
             ArtifactReference(
                 reference_id=f"input-{job_id}",
                 session_id=SESSION_ID,
-                schema_name="msh.synthetic-input.v1",
+                schema_name="fcp.synthetic-input.v1",
                 media_type="application/json",
             ),
         ),
@@ -256,7 +256,7 @@ def active_job(job_id: str = "job-f84") -> JobContract:
             ArtifactReference(
                 reference_id=f"output-{job_id}",
                 session_id=SESSION_ID,
-                schema_name="msh.synthetic-output.v1",
+                schema_name="fcp.synthetic-output.v1",
                 media_type="application/json",
             ),
         ),
@@ -347,7 +347,7 @@ def test_descriptor_roundtrip_and_rejects_executable_metadata() -> None:
         LocalComputeHandlerDescriptor(
             handler_id="unsafe-handler",
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             attributes={"module_path": "plugins.unsafe:run"},
         )

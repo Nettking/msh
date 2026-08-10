@@ -32,7 +32,7 @@ Coordinator process
   authoritative PhaseDControlPlane
   StorageControlPublicationStore
            |
-           | signed msh-storage-control-v1 plan
+           | signed fcp-storage-control-v1 plan
            v
 Relay server
     |                         |
@@ -83,7 +83,7 @@ python -m catalog.node.live_storage_agent \
 ```
 
 On first startup, provide enrollment and invitation tokens through
-`MSH_ENROLLMENT_TOKEN` and `MSH_SESSION_INVITATION`. Tokens are not stored in the
+`FCP_ENROLLMENT_TOKEN` and `FCP_SESSION_INVITATION`. Tokens are not stored in the
 configuration.
 
 Publish the plan after both nodes are connected and waiting for control:

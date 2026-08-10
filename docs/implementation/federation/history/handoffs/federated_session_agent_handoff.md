@@ -22,7 +22,7 @@ The implementation agent must read these files before changing code:
 4. `docs/connected_capabilities.md`
 5. `catalog/mtconnect_recorder/storage.py`
 6. `catalog/flask_app/services/server_setup_service.py`
-7. `setup_msh.py`
+7. `setup_fcp.py`
 8. `docker-compose.yml`
 
 The federated implementation extends the current system. It must not replace the local Flask orchestrator, current recorder behavior, JSONL compatibility view, or existing AI-provider flow in the first changes.
@@ -42,7 +42,7 @@ Do not reopen these decisions during implementation unless a concrete blocker is
 - A healthy, complete current leader remains leader when candidates are equivalent.
 - Completeness is measured against committed manifests, hashes, watermarks, and missing ranges, not row count.
 - Recorder writes remain local-first and durable until the required remote acknowledgements exist.
-- Databases are accessed through an MSH Storage API, never directly by unrelated application components.
+- Databases are accessed through an FCP Storage API, never directly by unrelated application components.
 - The first cross-network transport is relay-first with outbound node connections.
 - Direct peer transport is a later optimization and must retain relay fallback.
 - Existing local filesystem storage becomes a provider; it is not discarded.
@@ -164,7 +164,7 @@ Exit criteria:
 
 Deliver:
 
-- versioned `msh-storage-v1` API;
+- versioned `fcp-storage-v1` API;
 - filesystem and PostgreSQL storage providers;
 - registration of multiple storage providers;
 - coordinator-controlled primary/replica assignments;
@@ -245,7 +245,7 @@ Do not silently replace a required safety mechanism with a placeholder that appe
 Adapt paths to the actual changed files, but complete at least:
 
 ```bash
-python -m compileall catalog setup_msh.py
+python -m compileall catalog setup_fcp.py
 pytest -q catalog
 ruff check <changed-python-paths>
 docker compose config --quiet

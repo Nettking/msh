@@ -11,7 +11,7 @@ from .outbox import SQLiteOutbox
 from .phase_d_client import PhaseDIngestOutcome
 from .storage_protocol import BatchIngestRequest
 
-RECORDER_STORAGE_SCHEMA = "msh.recorder.storage_delivery.v1"
+RECORDER_STORAGE_SCHEMA = "fcp.recorder.storage_delivery.v1"
 
 
 def _now() -> datetime:
@@ -28,7 +28,7 @@ class RecorderStorageClient(Protocol):
         idempotency_key: str,
         content: object,
         created_at: datetime,
-        dataset_schema_name: str = "msh.storage.dataset.opaque",
+        dataset_schema_name: str = "fcp.storage.dataset.opaque",
         dataset_schema_version: int = 1,
     ) -> PhaseDIngestOutcome: ...
 
@@ -72,7 +72,7 @@ class DurableRecorderDeliveryQueue:
         idempotency_key: str,
         content: object,
         created_at: datetime,
-        dataset_schema_name: str = "msh.storage.dataset.opaque",
+        dataset_schema_name: str = "fcp.storage.dataset.opaque",
         dataset_schema_version: int = 1,
     ):
         if session_id != self.session_id:
@@ -173,7 +173,7 @@ class DurableRecorderDeliveryQueue:
                     dataset_schema_name=str(
                         payload.get(
                             "dataset_schema_name",
-                            "msh.storage.dataset.opaque",
+                            "fcp.storage.dataset.opaque",
                         )
                     ),
                     dataset_schema_version=int(

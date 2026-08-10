@@ -1,4 +1,4 @@
-"""Small repository index for the read-only MSH AI explainer."""
+"""Small repository index for the read-only FCP AI explainer."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ EXCLUDED_DIRS = {".git", ".cache", "__pycache__", "data", "results", "legacy", "
 EXCLUDED_SUFFIXES = {".pyc", ".parquet", ".duckdb", ".jsonl"}
 TOKEN_RE = re.compile(r"[A-Za-z0-9_./-]+")
 INDEX_VERSION = 2
-DEFAULT_INDEX_PATH = Path(".cache") / "msh_ai_index.json"
+DEFAULT_INDEX_PATH = Path(".cache") / "fcp_ai_index.json"
 
 
 @dataclass(frozen=True)

@@ -17,14 +17,14 @@ from catalog.federation.errors import (
 from .job_store import DurableJobSnapshot, _canonical, _text, _timestamp, _utc
 from .jobs import ArtifactReference, protocol_major
 
-LIFECYCLE_PROTOCOL = "msh-capability-lifecycle"
+LIFECYCLE_PROTOCOL = "fcp-capability-lifecycle"
 LIFECYCLE_PROTOCOL_VERSION = "1.0"
 LIFECYCLE_PROTOCOL_MAJOR = 1
-CANCELLATION_REQUEST_SCHEMA = "msh.capability-cancellation.v1"
-CANCELLATION_RESPONSE_SCHEMA = "msh.capability-cancellation-response.v1"
-HEARTBEAT_SCHEMA = "msh.capability-job-heartbeat.v1"
-RETRY_STATE_SCHEMA = "msh.capability-job-retry-state.v1"
-RESULT_COMMIT_SCHEMA = "msh.capability-result-commit.v1"
+CANCELLATION_REQUEST_SCHEMA = "fcp.capability-cancellation.v1"
+CANCELLATION_RESPONSE_SCHEMA = "fcp.capability-cancellation-response.v1"
+HEARTBEAT_SCHEMA = "fcp.capability-job-heartbeat.v1"
+RETRY_STATE_SCHEMA = "fcp.capability-job-retry-state.v1"
+RESULT_COMMIT_SCHEMA = "fcp.capability-result-commit.v1"
 MAX_LIFECYCLE_MESSAGE_BYTES = 131_072
 MAX_HEARTBEAT_TIMEOUT_SECONDS = 3_600
 

@@ -14,14 +14,14 @@ from catalog.federation.errors import (
     ProtocolCompatibilityError,
 )
 
-ARTIFACT_PROTOCOL = "msh-capability-artifacts"
+ARTIFACT_PROTOCOL = "fcp-capability-artifacts"
 ARTIFACT_PROTOCOL_VERSION = "1.0"
 ARTIFACT_PROTOCOL_MAJOR = 1
-ARTIFACT_DESCRIPTOR_SCHEMA = "msh.capability-artifact.v1"
-ARTIFACT_INPUT_REFERENCE_SCHEMA = "msh.capability-artifact-input.v1"
-OUTPUT_PLACEMENT_POLICY_SCHEMA = "msh.capability-output-placement.v1"
-ARTIFACT_GRANT_SCHEMA = "msh.capability-artifact-grant.v1"
-ARTIFACT_PUBLICATION_SCHEMA = "msh.capability-artifact-publication.v1"
+ARTIFACT_DESCRIPTOR_SCHEMA = "fcp.capability-artifact.v1"
+ARTIFACT_INPUT_REFERENCE_SCHEMA = "fcp.capability-artifact-input.v1"
+OUTPUT_PLACEMENT_POLICY_SCHEMA = "fcp.capability-output-placement.v1"
+ARTIFACT_GRANT_SCHEMA = "fcp.capability-artifact-grant.v1"
+ARTIFACT_PUBLICATION_SCHEMA = "fcp.capability-artifact-publication.v1"
 MAX_ARTIFACT_CONTROL_MESSAGE_BYTES = 131_072
 MAX_ARTIFACT_GRANT_SECONDS = 3_600
 MAX_ARTIFACTS_PER_GRANT = 256

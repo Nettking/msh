@@ -18,7 +18,7 @@ from .storage_protocol import (
     StorageResponseEnvelope,
 )
 
-RELAY_STORAGE_KIND = "msh-storage-v1"
+RELAY_STORAGE_KIND = "fcp-storage-v1"
 
 
 class RelayMessageClient(Protocol):
@@ -86,7 +86,7 @@ class RelayStorageEndpoint:
         if self._reader_task is None:
             self._reader_task = asyncio.create_task(
                 self._reader_loop(),
-                name=f"msh-storage-relay-{self.relay_client.node_id}",
+                name=f"fcp-storage-relay-{self.relay_client.node_id}",
             )
 
     async def close(self) -> None:

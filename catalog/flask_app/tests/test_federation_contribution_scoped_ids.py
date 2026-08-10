@@ -15,7 +15,7 @@ def _candidate(node_id: str) -> SimpleNamespace:
         candidate_id="ollama-configured",
         device_id=node_id,
         capability_type="language-model",
-        capability_protocol="msh-language-model",
+        capability_protocol="fcp-language-model",
         display_label="AI Explainer — This computer",
         capacity_envelope={"protocol_version": "1.0"},
     )
@@ -37,7 +37,7 @@ def test_same_local_candidate_id_is_device_scoped_after_remote_collision() -> No
         "capability_id": "ollama-configured",
         "node_id": "node-one",
         "type": "language-model",
-        "protocol": "msh-language-model",
+        "protocol": "fcp-language-model",
         "protocol_version": "1.0",
         "status": "ready",
         "properties": {

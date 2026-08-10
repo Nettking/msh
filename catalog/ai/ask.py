@@ -1,7 +1,7 @@
-"""Command-line entry point for the read-only MSH AI explainer.
+"""Command-line entry point for the read-only FCP AI explainer.
 
 Usage:
-    python -m catalog.ai.ask "How does data flow through MSH?"
+    python -m catalog.ai.ask "How does data flow through FCP?"
     python -m catalog.ai.ask --dry-run "What does /control do?"
     python -m catalog.ai.ask --show-sources "Where are workflow artifacts stored?"
     python -m catalog.ai.ask --extractive "What does /control do?"
@@ -27,7 +27,7 @@ CLI_AI_SESSION_ID = "local-ai-cli"
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Ask a read-only question about the MSH repository.")
+    parser = argparse.ArgumentParser(description="Ask a read-only question about the FCP repository.")
     parser.add_argument("question", help="Question to ask about the repository.")
     parser.add_argument("--model", default=DEFAULT_MODEL, help="Ollama model name.")
     parser.add_argument("--root", type=Path, default=None, help="Repository root. Defaults to auto-detection.")

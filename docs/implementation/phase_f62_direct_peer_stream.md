@@ -17,7 +17,7 @@ large-object transfer, or AI/compute scheduling.
 - `catalog.federation.direct_peer.DirectStorageEndpoint`
   - preserves the existing `request(target_node_id, envelope)` storage shape;
   - encrypts every storage request and response before handing it to the sidecar;
-  - binds the libp2p peer identity to the enrolled MSH node identity;
+  - binds the libp2p peer identity to the enrolled FCP node identity;
   - dispatches only to an explicitly registered local storage provider;
   - retains a bounded accepted-key replay window.
 - `catalog.federation.libp2p_sidecar.Libp2pSidecarClient`
@@ -25,11 +25,11 @@ large-object transfer, or AI/compute scheduling.
   - uses bounded JSON-lines IPC over stdin/stdout;
   - multiplexes outbound responses and inbound request callbacks;
   - does not expose peer addresses through adaptive public status.
-- `cmd/msh-peer-sidecar`
+- `cmd/fcp-peer-sidecar`
   - creates a Go libp2p host on one explicit listen multiaddress;
   - disables libp2p relay and identify-based address discovery for F6.2;
   - accepts only an explicit target peer ID plus matching `/p2p/...` multiaddress;
-  - opens `/msh/direct-storage/1.0.0` streams;
+  - opens `/fcp/direct-storage/1.0.0` streams;
   - keeps application payloads opaque to the sidecar.
 
 The sidecar is a data-plane tunnel. It does not decide storage leadership,
@@ -40,13 +40,13 @@ leases, fencing, acknowledgement policy, or provider authorization.
 1. Each Python endpoint starts its local sidecar.
 2. The sidecar returns an authenticated libp2p peer ID and direct listen address.
 3. The Python endpoint creates a process-lifetime X25519 receiver key.
-4. The endpoint constructs a private `msh.direct_peer.descriptor.v1` containing:
-   - MSH node ID;
+4. The endpoint constructs a private `fcp.direct_peer.descriptor.v1` containing:
+   - FCP node ID;
    - libp2p peer ID;
    - directly reachable multiaddress;
    - X25519 receiver public key.
 5. The two descriptors are exchanged by an explicit trusted setup step.
-6. Each endpoint binds the remote libp2p peer ID to the expected enrolled MSH
+6. Each endpoint binds the remote libp2p peer ID to the expected enrolled FCP
    node ID before accepting application data.
 
 The descriptor is local route configuration. It is intentionally absent from
@@ -56,14 +56,14 @@ physical network address.
 ## Application encryption
 
 For each storage request, the source generates a fresh X25519 key pair and a
-fresh key ID. The signed `msh.peer_stream.open.v1` object binds:
+fresh key ID. The signed `fcp.peer_stream.open.v1` object binds:
 
 ```text
 session
 stream
 request
-source MSH node
-target MSH node
+source FCP node
+target FCP node
 key ID
 source ephemeral X25519 public key
 protocol version
@@ -76,7 +76,7 @@ The source ephemeral private key and target process-lifetime X25519 public key
 produce the shared secret. HKDF-SHA256 derives independent request and response
 keys using session, source, target, stream, request, key ID, and direction as
 context. ChaCha20-Poly1305 encrypts the canonical storage envelope. The existing
-`msh.peer_stream.frame.v1` signs and binds the resulting ciphertext.
+`fcp.peer_stream.frame.v1` signs and binds the resulting ciphertext.
 
 Request and response directions both use sequence zero, but use independent
 HKDF-derived keys and therefore do not reuse an AEAD key/nonce pair.
@@ -87,7 +87,7 @@ A direct request is accepted only when all of the following agree:
 
 - transport-authenticated libp2p peer ID;
 - explicitly registered peer descriptor;
-- signed MSH source node ID;
+- signed FCP source node ID;
 - enrolled Ed25519 public identity;
 - session, source, target, request, stream, and key bindings;
 - ciphertext hash, signature, and AEAD authentication;
@@ -144,7 +144,7 @@ the establishment-failure portion of F5-002:
 2. request and response plaintext are absent from the sidecar packet;
 3. expected direct reachability failure falls back to relay;
 4. security/protocol failures do not downgrade to relay;
-5. libp2p peer identity must match the registered MSH node descriptor;
+5. libp2p peer identity must match the registered FCP node descriptor;
 6. replaying an already accepted stream key is rejected before a second provider dispatch;
 7. the Go sidecar establishes a real direct encrypted libp2p stream on loopback;
 8. Linux and Windows build and test the sidecar and run focused Python contracts.
@@ -154,15 +154,15 @@ the establishment-failure portion of F5-002:
 Build the sidecar from the repository root:
 
 ```bash
-cd cmd/msh-peer-sidecar
-go build -trimpath -o ../../build/msh-peer-sidecar .
+cd cmd/fcp-peer-sidecar
+go build -trimpath -o ../../build/fcp-peer-sidecar .
 ```
 
 Windows:
 
 ```powershell
-cd cmd/msh-peer-sidecar
-go build -trimpath -o ..\..\build\msh-peer-sidecar.exe .
+cd cmd/fcp-peer-sidecar
+go build -trimpath -o ..\..\build\fcp-peer-sidecar.exe .
 ```
 
 The node process should launch the binary through `Libp2pSidecarClient`, exchange

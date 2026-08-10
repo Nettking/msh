@@ -160,7 +160,7 @@ class DomainModel:
 
 @dataclass(frozen=True)
 class NodeIdentity(DomainModel):
-    SCHEMA: ClassVar[str] = "msh.node.v1"
+    SCHEMA: ClassVar[str] = "fcp.node.v1"
     node_id: str
     display_name: str
     public_key: str
@@ -181,7 +181,7 @@ class NodeIdentity(DomainModel):
 
 @dataclass(frozen=True)
 class Session(DomainModel):
-    SCHEMA: ClassVar[str] = "msh.session.v1"
+    SCHEMA: ClassVar[str] = "fcp.session.v1"
     session_id: str
     display_name: str
     state: SessionState
@@ -213,7 +213,7 @@ class Session(DomainModel):
 
 @dataclass(frozen=True)
 class CapabilityAnnouncement(DomainModel):
-    SCHEMA: ClassVar[str] = "msh.capability.v1"
+    SCHEMA: ClassVar[str] = "fcp.capability.v1"
     capability_id: str
     node_id: str
     session_id: str
@@ -277,7 +277,7 @@ class CapabilityAnnouncement(DomainModel):
 
 @dataclass(frozen=True)
 class SessionEvent(DomainModel):
-    SCHEMA: ClassVar[str] = "msh.session_event.v1"
+    SCHEMA: ClassVar[str] = "fcp.session_event.v1"
     session_id: str
     revision: int
     event_id: str
@@ -349,7 +349,7 @@ def _coverages(value: Any, field: str = "datasets") -> dict[str, DatasetCoverage
 
 @dataclass(frozen=True)
 class StorageManifest(DomainModel):
-    SCHEMA: ClassVar[str] = "msh.storage_manifest.v1"
+    SCHEMA: ClassVar[str] = "fcp.storage_manifest.v1"
     session_id: str
     group_id: str
     revision: int
@@ -376,7 +376,7 @@ class StorageManifest(DomainModel):
 
 @dataclass(frozen=True)
 class StorageBatch(DomainModel):
-    SCHEMA: ClassVar[str] = "msh.storage_batch.v1"
+    SCHEMA: ClassVar[str] = "fcp.storage_batch.v1"
     session_id: str
     group_id: str
     dataset_id: str
@@ -401,7 +401,7 @@ class StorageBatch(DomainModel):
 
 @dataclass(frozen=True)
 class StorageNodeState(DomainModel):
-    SCHEMA: ClassVar[str] = "msh.storage_node_state.v1"
+    SCHEMA: ClassVar[str] = "fcp.storage_node_state.v1"
     session_id: str
     group_id: str
     node_id: str
@@ -438,7 +438,7 @@ class StorageNodeState(DomainModel):
 
 @dataclass(frozen=True)
 class LeadershipGrant(DomainModel):
-    SCHEMA: ClassVar[str] = "msh.leadership_grant.v1"
+    SCHEMA: ClassVar[str] = "fcp.leadership_grant.v1"
     session_id: str
     group_id: str
     node_id: str

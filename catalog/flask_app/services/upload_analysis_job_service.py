@@ -26,7 +26,7 @@ from catalog.capabilities.jobs import (
 from catalog.orchestrator.pipeline import get_runtime_manager
 from catalog.runner.script_catalog import repo_root
 
-_LOCAL_ANALYSIS_PROTOCOL = "msh-background-analysis"
+_LOCAL_ANALYSIS_PROTOCOL = "fcp-background-analysis"
 _LOCAL_ANALYSIS_PROTOCOL_VERSION = "1.0"
 _LEASE_SECONDS = 45 * 60
 _RENEW_AFTER_SECONDS = 20 * 60
@@ -171,7 +171,7 @@ class UploadAnalysisJobService:
                 ArtifactReference(
                     reference_id=f"input-{batch_id}",
                     session_id=session_id,
-                    schema_name="msh.jsonl-upload-batch.v1",
+                    schema_name="fcp.jsonl-upload-batch.v1",
                     media_type="application/x-ndjson",
                 ),
             ),
@@ -179,7 +179,7 @@ class UploadAnalysisJobService:
                 ArtifactReference(
                     reference_id=f"output-{batch_id}",
                     session_id=session_id,
-                    schema_name="msh.analysis-workflow.v1",
+                    schema_name="fcp.analysis-workflow.v1",
                     media_type="application/json",
                 ),
             ),
@@ -297,7 +297,7 @@ class UploadAnalysisJobService:
         threading.Thread(
             target=self._monitor,
             args=(job_id,),
-            name=f"msh-upload-analysis-{job_id[-8:]}",
+            name=f"fcp-upload-analysis-{job_id[-8:]}",
             daemon=True,
         ).start()
 

@@ -9,7 +9,7 @@ def test_compose_defines_installable_language_model_provider() -> None:
 
     assert "model-provider:" in compose
     assert 'profiles: ["provider"]' in compose
-    assert "${MSH_PROVIDER_BIND:-0.0.0.0}:${MSH_PROVIDER_PORT:-11434}:11434" in compose
+    assert "${FCP_PROVIDER_BIND:-0.0.0.0}:${FCP_PROVIDER_PORT:-11434}:11434" in compose
     assert (
         "    volumes:\n"
         "      - type: volume\n"
@@ -17,13 +17,13 @@ def test_compose_defines_installable_language_model_provider() -> None:
         "        target: /root/.ollama"
     ) in compose
     assert (
-        "name: ${MSH_MODEL_PROVIDER_VOLUME_NAME:-msh_model_provider_models}"
+        "name: ${FCP_MODEL_PROVIDER_VOLUME_NAME:-fcp_model_provider_models}"
         in compose
     )
-    assert "no.msh.capability=language-model" in compose
+    assert "no.fcp.capability=language-model" in compose
     assert "model-provider-install:" in compose
     assert "OLLAMA_HOST=http://model-provider:11434" in compose
-    assert '${MSH_PROVIDER_MODEL:-smollm2:360m}' in compose
+    assert '${FCP_PROVIDER_MODEL:-smollm2:360m}' in compose
 
 
 def test_compose_restores_local_model_installer_referenced_by_setup() -> None:
@@ -31,4 +31,4 @@ def test_compose_restores_local_model_installer_referenced_by_setup() -> None:
 
     assert "ollama-pull:" in compose
     assert "OLLAMA_HOST=http://ollama:11434" in compose
-    assert '${MSH_AI_MODEL:-llama3.2:3b}' in compose
+    assert '${FCP_AI_MODEL:-llama3.2:3b}' in compose

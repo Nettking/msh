@@ -48,13 +48,13 @@ class FederatedOperatorConfirmationService(
     OperatorConfirmationService,
 ):
     COLLECTION = "operator-confirmations"
-    DOCUMENT_SCHEMA = "msh.operator_confirmations.v1"
+    DOCUMENT_SCHEMA = "fcp.operator_confirmations.v1"
     ITEMS_KEY = "confirmations"
 
 
 class FederatedFirstPartService(_FederatedCollectionMixin, FirstPartService):
     COLLECTION = "first-part-checks"
-    DOCUMENT_SCHEMA = "msh.first_part_checks.v1"
+    DOCUMENT_SCHEMA = "fcp.first_part_checks.v1"
     ITEMS_KEY = "checks"
 
 
@@ -63,13 +63,13 @@ class FederatedQualityOutcomeService(
     QualityOutcomeService,
 ):
     COLLECTION = "quality-outcomes"
-    DOCUMENT_SCHEMA = "msh.quality_outcomes.v1"
+    DOCUMENT_SCHEMA = "fcp.quality_outcomes.v1"
     ITEMS_KEY = "outcomes"
 
 
 class FederatedMachineNotesService(_FederatedCollectionMixin, MachineNotesService):
     COLLECTION = "machine-notes"
-    DOCUMENT_SCHEMA = "msh.machine_notes.v1"
+    DOCUMENT_SCHEMA = "fcp.machine_notes.v1"
     ITEMS_KEY = "notes"
 
 

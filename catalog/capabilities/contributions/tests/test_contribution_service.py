@@ -34,7 +34,7 @@ NOW = datetime(2026, 8, 2, 20, tzinfo=timezone.utc)
 class Descriptor:
     handler_id: str = "safe-handler"
     capability_type: str = "synthetic-compute"
-    protocol: str = "msh-synthetic"
+    protocol: str = "fcp-synthetic"
     protocol_version: str = "1.0"
     descriptor_fingerprint: str = "sha256:" + "c" * 64
 
@@ -101,7 +101,7 @@ class Harness:
                     {
                         "storage-local": StorageCandidateSpec(
                             "storage-local",
-                            "msh-storage",
+                            "fcp-storage",
                             "Local storage",
                             {},
                         )

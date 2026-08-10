@@ -11,7 +11,7 @@ from catalog.federation.errors import FederationValidationError
 from catalog.federation.protocol import protocol_major
 from catalog.node.identity import verify_signature
 
-AUTHENTICATION_SCHEMA: Final = "msh.relay.authentication.v1"
+AUTHENTICATION_SCHEMA: Final = "fcp.relay.authentication.v1"
 NONCE_BYTES: Final = 32
 
 

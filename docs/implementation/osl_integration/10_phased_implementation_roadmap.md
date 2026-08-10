@@ -1,8 +1,8 @@
 # OSL implementation execution plan
 
-Status: **authoritative implementation sequence**.  
-Last reconciled: **2026-08-06 Europe/Oslo**.  
-Reconciled MSH baseline: `349da7cd0007bf3e0f97127ea6696fd325e3c583`.
+Status: **authoritative implementation sequence**.
+Last reconciled: **2026-08-06 Europe/Oslo**.
+Reconciled FCP baseline: `349da7cd0007bf3e0f97127ea6696fd325e3c583`.
 
 This document is the single source of truth for what is implemented next, what
 is blocked, and which acceptance gate must pass before work continues.
@@ -21,7 +21,7 @@ Use the planning material in this order:
    change ideas. Revalidate every path against current `main` before use.
 3. `00`-`05` and `07`-`09` provide source traceability, architecture, contracts,
    user journeys, validation, and migration analysis.
-4. `docs/planned-work/method-osl-msh-alignment.md` defines the W3 end-to-end
+4. `docs/planned-work/method-osl-fcp-alignment.md` defines the W3 end-to-end
    acceptance scenario. It is not a separate implementation plan or a one-PR
    instruction.
 5. `docs/implementation/federation/active/capability_first_federation_plan.md` governs the
@@ -36,7 +36,7 @@ rather than choosing the more permissive interpretation.
 
 ### Completed
 
-- Source-pinned analysis of `systems-paper`, `paper-repo`, and the analyzed MSH
+- Source-pinned analysis of `systems-paper`, `paper-repo`, and the analyzed FCP
   snapshot.
 - Target architecture, proposed contracts, file plan, user journeys, test
   strategy, migration strategy, and phased delivery analysis.
@@ -45,7 +45,7 @@ rather than choosing the more permissive interpretation.
 ### Not implemented
 
 - No canonical `catalog/osl/` production package.
-- No accepted MSH OSL profile or compatibility policy.
+- No accepted FCP OSL profile or compatibility policy.
 - No canonical OSL persistence, lifecycle, API, UI, AI integration, migration,
   or current SysML v2 adapter.
 - No evidence that the existing operator-note model or legacy SysML exporter is
@@ -53,10 +53,10 @@ rather than choosing the more permissive interpretation.
 
 ### Baseline drift rule
 
-The detailed plan originally analyzed MSH at
-`f580c71f7269643a077cc7e7db8ba9bf6050bb6a`. MSH has advanced since that
+The detailed plan originally analyzed FCP at
+`f580c71f7269643a077cc7e7db8ba9bf6050bb6a`. FCP has advanced since that
 snapshot, including capability-first onboarding and benchmark runtime changes.
-The paper source pins remain deliberate research inputs, but every MSH file,
+The paper source pins remain deliberate research inputs, but every FCP file,
 service, route, test, security assumption, and integration point must be checked
 against current `main` at the start of each delivery.
 
@@ -248,7 +248,7 @@ For every implementation delivery:
 
 1. branch from updated `main`;
 2. state exactly one delivery ID in the branch and PR;
-3. re-audit relevant current MSH paths before editing;
+3. re-audit relevant current FCP paths before editing;
 4. declare owned files and do not overlap shared files with another agent;
 5. prefer new bounded modules and narrow adapters;
 6. commit after each coherent contract, implementation, test, or documentation
@@ -268,7 +268,7 @@ For every implementation delivery:
 Stop and report when:
 
 - code would decide an unresolved profile or paper contradiction;
-- the analyzed MSH path is stale and no current integration seam is confirmed;
+- the analyzed FCP path is stale and no current integration seam is confirmed;
 - raw source or a canonical revision would be overwritten;
 - validation, review, approval, publication, recommendation, authorization, or
   execution would collapse into one status;

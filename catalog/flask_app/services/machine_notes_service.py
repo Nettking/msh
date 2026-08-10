@@ -40,20 +40,20 @@ class MachineNotesService:
 
     def _load(self) -> dict[str, Any]:
         if not self.path.exists():
-            return {"schema": "msh.machine_notes.v1", "updated_at": "", "notes": []}
+            return {"schema": "fcp.machine_notes.v1", "updated_at": "", "notes": []}
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            return {"schema": "msh.machine_notes.v1", "updated_at": "", "notes": []}
+            return {"schema": "fcp.machine_notes.v1", "updated_at": "", "notes": []}
         if not isinstance(payload, dict):
-            return {"schema": "msh.machine_notes.v1", "updated_at": "", "notes": []}
+            return {"schema": "fcp.machine_notes.v1", "updated_at": "", "notes": []}
         payload.setdefault("notes", [])
         payload["notes"] = [item for item in payload["notes"] if isinstance(item, dict)]
         return payload
 
     def _write(self, payload: dict[str, Any]) -> None:
         payload = dict(payload)
-        payload["schema"] = "msh.machine_notes.v1"
+        payload["schema"] = "fcp.machine_notes.v1"
         payload["updated_at"] = _now_utc()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")

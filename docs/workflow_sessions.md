@@ -38,7 +38,7 @@ Date discovery and session filtering refresh this index incrementally: unchanged
 
 ## Cache reuse and invalidation
 
-MSH reuses session data and script outputs when metadata says they match the requested scope and the expected output folders still exist. It invalidates stale script statuses when a script is marked `done` but its output path is missing.
+FCP reuses session data and script outputs when metadata says they match the requested scope and the expected output folders still exist. It invalidates stale script statuses when a script is marked `done` but its output path is missing.
 
 Playback exports have their own manifest. They are reused only when the manifest session config signature and filtered-data generation timestamp match current session metadata.
 

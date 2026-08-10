@@ -31,15 +31,15 @@ def test_device_service_count_uses_ready_shared_capabilities_only() -> None:
         state="active",
         revision=7,
         devices=(
-            DeviceRecord("node-local", "This MSH device", "connected", NOW, 3),
-            DeviceRecord("node-remote", "This MSH device", "connected", NOW, 3),
+            DeviceRecord("node-local", "This FCP device", "connected", NOW, 3),
+            DeviceRecord("node-remote", "This FCP device", "connected", NOW, 3),
         ),
         capabilities=(
             FederatedCapabilityRecord(
                 "local-storage",
                 "node-local",
                 "storage",
-                "msh-storage-candidate",
+                "fcp-storage-candidate",
                 "1.0",
                 "ready",
                 NOW,
@@ -48,7 +48,7 @@ def test_device_service_count_uses_ready_shared_capabilities_only() -> None:
                 "local-ai",
                 "node-local",
                 "language-model",
-                "msh-language-model",
+                "fcp-language-model",
                 "1.0",
                 "disabled",
                 NOW,
@@ -57,7 +57,7 @@ def test_device_service_count_uses_ready_shared_capabilities_only() -> None:
                 "local-compute",
                 "node-local",
                 "compute",
-                "msh-compute-handler",
+                "fcp-compute-handler",
                 "1.0",
                 "disabled",
                 NOW,
@@ -66,7 +66,7 @@ def test_device_service_count_uses_ready_shared_capabilities_only() -> None:
                 "remote-storage",
                 "node-remote",
                 "storage",
-                "msh-storage-candidate",
+                "fcp-storage-candidate",
                 "1.0",
                 "disabled",
                 NOW,
@@ -75,7 +75,7 @@ def test_device_service_count_uses_ready_shared_capabilities_only() -> None:
                 "remote-ai",
                 "node-remote",
                 "language-model",
-                "msh-language-model",
+                "fcp-language-model",
                 "1.0",
                 "disabled",
                 NOW,
@@ -84,7 +84,7 @@ def test_device_service_count_uses_ready_shared_capabilities_only() -> None:
                 "remote-compute",
                 "node-remote",
                 "compute",
-                "msh-compute-handler",
+                "fcp-compute-handler",
                 "1.0",
                 "disabled",
                 NOW,
@@ -109,7 +109,7 @@ def test_device_service_count_uses_ready_shared_capabilities_only() -> None:
     by_id = {device.node_id: device for device in snapshot.devices}
     assert by_id["node-local"].capability_count == 1
     assert by_id["node-remote"].capability_count == 0
-    assert by_id["node-remote"].label == "Trusted MSH device"
+    assert by_id["node-remote"].label == "Trusted FCP device"
 
     # The authoritative inventory is unchanged; disabled capabilities remain
     # available to the Services projection for explicit Disabled rendering.
@@ -126,7 +126,7 @@ def test_device_service_count_keeps_aggregate_for_legacy_snapshot() -> None:
         state="active",
         revision=2,
         devices=(
-            DeviceRecord("node-local", "This MSH device", "connected", NOW, 2),
+            DeviceRecord("node-local", "This FCP device", "connected", NOW, 2),
         ),
     )
     onboarding = OnboardingSnapshot(

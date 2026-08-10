@@ -56,9 +56,9 @@ SAMPLE_XML = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 def load_recorder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("MSH_RECORDER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("FCP_RECORDER_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv(
-        "MSH_RECORDER_LOG_FILE",
+        "FCP_RECORDER_LOG_FILE",
         str(tmp_path / "data" / "source_state" / "recorder.log"),
     )
     module_name = f"lossless_recorder_{tmp_path.name}"
@@ -158,7 +158,7 @@ def test_source_names_cannot_share_a_storage_directory(tmp_path, monkeypatch):
 def test_json_source_names_cannot_share_a_storage_directory(tmp_path, monkeypatch):
     recorder = load_recorder(tmp_path, monkeypatch)
     monkeypatch.setenv(
-        "MSH_RECORDER_SOURCES_JSON",
+        "FCP_RECORDER_SOURCES_JSON",
         json.dumps(
             {
                 "Mazak One": "http://10.0.0.1:5000",
@@ -250,7 +250,7 @@ def test_checkpoint_only_contains_committed_next_sequence(tmp_path, monkeypatch)
     runtime.executor.shutdown(wait=True, cancel_futures=True)
 
     payload = json.loads(state_file.read_text())
-    assert payload["schema"] == "msh.mtconnect_recorder.checkpoints.v3"
+    assert payload["schema"] == "fcp.mtconnect_recorder.checkpoints.v3"
     assert payload["sources"]["Mazak"]["next_sequence"] == 13
     assert payload["sources"]["Mazak"]["last_raw_file"] == "raw.xml.gz"
     assert payload["sources"]["Mazak"]["latest_values"]["MAZAK-001"]["Xabs"] == 2.5

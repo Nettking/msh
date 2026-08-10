@@ -110,7 +110,7 @@ def environment(tmp_path: Path):
     compute_descriptor = LocalComputeHandlerDescriptor(
         handler_id="echo-handler",
         capability_type="synthetic-compute",
-        protocol="msh-synthetic",
+        protocol="fcp-synthetic",
         protocol_version="1.0",
         attributes={"operation": "echo", "modalities": ["json"]},
     )
@@ -191,7 +191,7 @@ def publish_language_model(
             node_id=provider.identity.node_id,
             session_id=SESSION_ID,
             capability_type="language-model",
-            protocol="msh-language-model",
+            protocol="fcp-language-model",
             protocol_version="1.0",
             status=ProviderStatus.READY,
             report_revision=revision,
@@ -230,7 +230,7 @@ def publish_compute(
             node_id=provider.identity.node_id,
             session_id=SESSION_ID,
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             status=ProviderStatus.READY,
             report_revision=revision,
@@ -273,7 +273,7 @@ def ready_environment(tmp_path: Path):
         provider=provider,
         capability_id="remote-model",
         capability_type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         properties={"label": "Remote model", "models": ["small"]},
     )
     announce(
@@ -281,7 +281,7 @@ def ready_environment(tmp_path: Path):
         provider=provider,
         capability_id="compute-provider",
         capability_type="synthetic-compute",
-        protocol="msh-synthetic",
+        protocol="fcp-synthetic",
         properties={"operation": "echo"},
     )
     for capability_id in ("remote-model", "compute-provider"):
@@ -423,7 +423,7 @@ def test_owner_commands_preserve_revision_and_idempotency_fences(tmp_path: Path)
         provider=provider,
         capability_id="pending-provider",
         capability_type="synthetic-compute",
-        protocol="msh-synthetic",
+        protocol="fcp-synthetic",
         properties={"operation": "pending"},
     )
     surface = ProviderOperatorSurface(

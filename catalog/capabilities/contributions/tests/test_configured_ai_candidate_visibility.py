@@ -30,7 +30,7 @@ def _source() -> AICandidateSource:
         {
             "ollama-configured": AICandidateSpec(
                 service_id="ollama-configured",
-                protocol="msh-language-model",
+                protocol="fcp-language-model",
                 display_label="Configured Ollama model",
                 capacity_envelope={"model": "qwen2.5:7b"},
             )

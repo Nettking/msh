@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Host-owned exact-commit MSH update agent for Linux/POSIX launchers."""
+"""Host-owned exact-commit FCP update agent for Linux/POSIX launchers."""
 
 from __future__ import annotations
 
@@ -19,8 +19,8 @@ from urllib.parse import urlsplit
 
 APPROVED_REPOSITORY = "Nettking/msh"
 APPROVED_BRANCH = "main"
-REQUEST_SCHEMA = "msh.host-update-request.v1"
-RESULT_SCHEMA = "msh.host-update-result.v1"
+REQUEST_SCHEMA = "fcp.host-update-request.v1"
+RESULT_SCHEMA = "fcp.host-update-result.v1"
 MAX_BYTES = 8192
 OID_RE = re.compile(r"^[0-9a-f]{40}$")
 REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -107,7 +107,7 @@ def running_commit(root: Path) -> str | None:
                 "flask",
                 "python",
                 "-c",
-                "import os; print(os.environ.get('MSH_BUILD_COMMIT',''))",
+                "import os; print(os.environ.get('FCP_BUILD_COMMIT',''))",
             ],
             cwd=root,
         )
@@ -313,7 +313,7 @@ def ensure_ollama_model(root: Path, env: dict[str, str]) -> str:
             "python",
             "flask",
             "-c",
-            "import os; print(os.environ.get('MSH_AI_MODEL') or 'llama3.2:3b')",
+            "import os; print(os.environ.get('FCP_AI_MODEL') or 'llama3.2:3b')",
         ],
         cwd=root,
         env=env,
@@ -501,7 +501,7 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
         ).stdout:
             raise RuntimeError("dirty_build_context")
         env = os.environ.copy()
-        env["MSH_BUILD_COMMIT"] = target
+        env["FCP_BUILD_COMMIT"] = target
         subprocess.run(
             ["docker", "compose", "build", "relay", "flask", "recorder"],
             cwd=root,
@@ -575,7 +575,7 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             running=running,
             code="updated",
             message=(
-                "MSH source, images, services, required model, and running "
+                "FCP source, images, services, required model, and running "
                 "commit were updated and verified."
             ),
         )
@@ -609,7 +609,7 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             ),
         )
         print(
-            f"MSH update request failed: {type(exc).__name__}: {exc}",
+            f"FCP update request failed: {type(exc).__name__}: {exc}",
             file=sys.stderr,
         )
         return True

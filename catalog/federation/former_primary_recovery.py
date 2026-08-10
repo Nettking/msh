@@ -29,7 +29,7 @@ from .promotion_publication import (
 from .provider_fencing import ProviderFenceStore
 from .reporting import StorageReplicaAssessment
 
-FORMER_PRIMARY_RECOVERY_SCHEMA = "msh.storage_former_primary_recovery.v1"
+FORMER_PRIMARY_RECOVERY_SCHEMA = "fcp.storage_former_primary_recovery.v1"
 
 
 def _text(value: Any, field: str) -> str:

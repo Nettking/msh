@@ -747,7 +747,7 @@ class PhaseDControlPlane:
         if row is None:
             return None
         return PromotionTransactionRecord(
-            schema="msh.storage_promotion_transaction.v1",
+            schema="fcp.storage_promotion_transaction.v1",
             promotion_id=row["promotion_id"],
             session_id=row["session_id"],
             group_id=row["group_id"],
@@ -876,7 +876,7 @@ class PhaseDControlPlane:
         previous_provider_id = None if current is None else str(current["provider_id"])
         previous_term = None if current is None else int(current["term"])
         return PromotionTransactionRecord(
-            schema="msh.storage_promotion_transaction.v1",
+            schema="fcp.storage_promotion_transaction.v1",
             promotion_id=promotion_id,
             session_id=session_id,
             group_id=group_id,

@@ -46,7 +46,7 @@ def _job(**overrides: object) -> JobContract:
             ArtifactReference(
                 reference_id="artifact-input-1",
                 session_id="session-001",
-                schema_name="msh.prompt.v1",
+                schema_name="fcp.prompt.v1",
                 media_type="application/json",
                 content_hash="sha256:" + "a" * 64,
                 size_bytes=128,
@@ -56,7 +56,7 @@ def _job(**overrides: object) -> JobContract:
             ArtifactReference(
                 reference_id="artifact-output-1",
                 session_id="session-001",
-                schema_name="msh.ai-response.v1",
+                schema_name="fcp.ai-response.v1",
                 media_type="application/json",
             ),
         ),

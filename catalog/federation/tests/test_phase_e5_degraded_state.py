@@ -70,7 +70,7 @@ def _manifest(*, revision: int = 0, term: int = 7) -> AuthoritativeStorageManife
 
 def _report(manifest: AuthoritativeStorageManifest, *, provider_id: str, integrity_verified: bool = True, manifest_hash: str | None = None, report_revision: int = 1) -> StorageReplicaReport:
     return StorageReplicaReport(
-        schema="msh.storage_replica_report.v1",
+        schema="fcp.storage_replica_report.v1",
         protocol_version="1.0",
         session_id=manifest.session_id,
         group_id=manifest.group_id,

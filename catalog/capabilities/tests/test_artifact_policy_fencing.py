@@ -41,7 +41,7 @@ def test_f76_worker_cannot_widen_issued_placement_policy(tmp_path: Path) -> None
     _, authority = _authority(tmp_path)
     _grant_output(authority)
     widened = _placement(
-        allowed_schema_ids=("msh.output.v1", "msh.private.v1"),
+        allowed_schema_ids=("fcp.output.v1", "fcp.private.v1"),
         max_artifact_bytes=8192,
         max_artifacts=10,
         resumable_threshold_bytes=2048,

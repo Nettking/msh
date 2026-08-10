@@ -45,7 +45,7 @@ DEFAULT_READ_TIMEOUT_SECONDS = 1.5
 MAX_CONNECT_TIMEOUT_SECONDS = 1.0
 MAX_READ_TIMEOUT_SECONDS = 3.0
 MAX_PROBE_BYTES = 8 * 1024 * 1024
-SCAN_SCHEMA = "msh.mtconnect.network_scan.v1"
+SCAN_SCHEMA = "fcp.mtconnect.network_scan.v1"
 
 _RFC1918_NETWORKS = (
     IPv4Network("10.0.0.0/8"),
@@ -133,7 +133,7 @@ def _default_probe_fetcher(
 
     with requests.get(
         probe_url,
-        headers={"User-Agent": "MSH-MTConnect-discovery/1.0"},
+        headers={"User-Agent": "FCP-MTConnect-discovery/1.0"},
         timeout=(connect_timeout_seconds, read_timeout_seconds),
         allow_redirects=False,
         stream=True,

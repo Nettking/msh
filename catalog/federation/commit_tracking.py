@@ -59,7 +59,7 @@ class DurableAcknowledgementStore:
                     dataset_id TEXT NOT NULL
                         DEFAULT 'legacy-unknown-dataset',
                     dataset_schema_name TEXT NOT NULL
-                        DEFAULT 'msh.storage.dataset.opaque',
+                        DEFAULT 'fcp.storage.dataset.opaque',
                     dataset_schema_version INTEGER NOT NULL DEFAULT 1
                         CHECK(dataset_schema_version > 0),
                     required_replica_acks INTEGER NOT NULL CHECK(required_replica_acks >= 0),
@@ -101,7 +101,7 @@ class DurableAcknowledgementStore:
                 connection.execute(
                     """ALTER TABLE storage_commits
                        ADD COLUMN dataset_schema_name TEXT NOT NULL
-                       DEFAULT 'msh.storage.dataset.opaque'"""
+                       DEFAULT 'fcp.storage.dataset.opaque'"""
                 )
             if "dataset_schema_version" not in columns:
                 connection.execute(

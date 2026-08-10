@@ -2,7 +2,7 @@
         <header class="onboarding-panel__header">
           <div>
             <span class="onboarding-panel__step">Step 2 of 6</span>
-            <h3 id="federation-heading">Connect the MSH devices</h3>
+            <h3 id="federation-heading">Connect the FCP devices</h3>
             <p>Create a signed pairing code on one device and paste it into the other. A public device ID alone never grants membership.</p>
           </div>
           {{ status_badge(vm.federation.state, vm.federation.state_label, True) }}
@@ -35,7 +35,7 @@
         {% if vm.federation.can_generate_pairing_code|default(false) %}
         <section class="local-federation-action" aria-labelledby="pairing-code-heading">
           <div>
-            <strong id="pairing-code-heading">Connect another MSH device</strong>
+            <strong id="pairing-code-heading">Connect another FCP device</strong>
             <span>Generate a signed one-use code. It expires after five minutes.</span>
           </div>
           <form method="post" action="{{ vm.actions.pairing_code_url|default('/onboarding/federation/pairing-code') }}">
@@ -57,7 +57,7 @@
         <form method="post" action="{{ vm.actions.pair_url|default('/onboarding/federation/pair') }}" class="federation-candidate-form">
           <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
           <label>
-            <span>Pairing code from the other MSH device</span>
+            <span>Pairing code from the other FCP device</span>
             <textarea name="pairing_code" rows="5" maxlength="32768" autocomplete="off" spellcheck="false" required></textarea>
           </label>
           <p>Pairing switches this device to the shared Federation only after the signed code and relay membership are verified.</p>

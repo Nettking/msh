@@ -24,8 +24,8 @@ from catalog.federation.software_update import (
 
 from .federation_update_handoff import HostUpdateHandoff
 
-EVENT_SCHEMA = "msh.federation-update-event.v1"
-PROCESSOR_SCHEMA = "msh.federation-update-processor.v1"
+EVENT_SCHEMA = "fcp.federation-update-event.v1"
+PROCESSOR_SCHEMA = "fcp.federation-update-processor.v1"
 CHECK_REQUEST_EVENT = "software.update.check.requested"
 CHECK_REPORT_EVENT = "software.update.check.reported"
 APPLY_REQUEST_EVENT = "software.update.apply.requested"

@@ -19,7 +19,7 @@ def _definition(
     return BenchmarkDefinition(
         benchmark_id=benchmark_id,
         capability_type="compute",
-        capability_protocol="msh.compute.v1",
+        capability_protocol="fcp.compute.v1",
         implementation_version="1.0.0",
         max_duration_seconds=1,
         max_parallelism=1,
@@ -59,7 +59,7 @@ def test_inspection_is_coarse_extensible_and_redacts_private_details() -> None:
             detected_data_sources=("source.logical-1", "C:\\private\\source"),
             available_prerequisites=("gpu.available",),
             recommended_benchmark_ids=("benchmark.gpu", "benchmark.unknown"),
-            warnings=("Bearer msh_join_private",),
+            warnings=("Bearer fcp_join_private",),
         )
 
     def failed_probe(context) -> InspectionFinding:
@@ -96,4 +96,4 @@ def test_inspection_is_coarse_extensible_and_redacts_private_details() -> None:
     assert "10.0.0.3" not in serialized
     assert "127.0.0.1" not in serialized
     assert "private\\source" not in serialized
-    assert "msh_join_private" not in serialized
+    assert "fcp_join_private" not in serialized

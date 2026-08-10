@@ -133,7 +133,7 @@ class PhaseDLogicalStorageClient:
         idempotency_key: str,
         content: object,
         created_at: datetime,
-        dataset_schema_name: str = "msh.storage.dataset.opaque",
+        dataset_schema_name: str = "fcp.storage.dataset.opaque",
         dataset_schema_version: int = 1,
     ) -> PhaseDIngestOutcome:
         placeholder = BatchIngestRequest(

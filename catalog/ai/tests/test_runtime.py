@@ -41,7 +41,7 @@ def _request(
         idempotency_key=request_id,
         model=model,
         modality=modality,
-        prompt="Explain MSH.",
+        prompt="Explain FCP.",
         system_prompt="Use repository evidence.",
         timeout_seconds=timeout_seconds,
     )

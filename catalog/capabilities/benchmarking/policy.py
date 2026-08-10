@@ -12,7 +12,7 @@ from .validity import BenchmarkValidity, BenchmarkValidityReason
 
 # Inspection and standard benchmark evidence is explicitly refreshed by the
 # operator. The finite timestamp remains in the frozen evidence contract, but
-# the installed MSH product does not use age alone as a refresh trigger.
+# the installed FCP product does not use age alone as a refresh trigger.
 DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS = 315_360_000
 
 

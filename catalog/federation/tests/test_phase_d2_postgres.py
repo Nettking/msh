@@ -22,8 +22,8 @@ from catalog.federation.storage_protocol import (
 )
 
 POSTGRES_DSN = os.environ.get(
-    "MSH_TEST_POSTGRES_DSN",
-    "postgresql://msh:msh@127.0.0.1:5432/msh_test",
+    "FCP_TEST_POSTGRES_DSN",
+    "postgresql://fcp:fcp@127.0.0.1:5432/fcp_test",
 )
 
 
@@ -101,7 +101,7 @@ def test_shared_provider_conformance(provider) -> None:
     assert retry.state is BatchIngestState.ALREADY_STORED
 
     description = provider.describe()
-    assert description["protocol"] == "msh-storage-v1"
+    assert description["protocol"] == "fcp-storage-v1"
     assert description["backend"] in {"filesystem", "postgresql"}
     assert provider.health()["status"] == "ready"
 
@@ -161,7 +161,7 @@ def test_shared_provider_rejects_dataset_schema_conflict(provider) -> None:
         content_hash=original.content_hash,
         content=original.content,
         created_at=original.created_at,
-        dataset_schema_name="msh.telemetry.observations",
+        dataset_schema_name="fcp.telemetry.observations",
         dataset_schema_version=2,
     )
 
@@ -205,7 +205,7 @@ def test_postgresql_provider_migrates_legacy_schema() -> None:
         with psycopg.connect(isolated_dsn) as connection:
             connection.execute(
                 """
-                CREATE TABLE msh_storage_batches (
+                CREATE TABLE fcp_storage_batches (
                     session_id TEXT NOT NULL,
                     group_id TEXT NOT NULL,
                     dataset_id TEXT NOT NULL,
@@ -220,7 +220,7 @@ def test_postgresql_provider_migrates_legacy_schema() -> None:
                 """
             )
             connection.execute(
-                """INSERT INTO msh_storage_batches
+                """INSERT INTO fcp_storage_batches
                    (session_id, group_id, dataset_id, batch_id,
                     idempotency_key, content_hash, content, created_at)
                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s)""",
@@ -244,7 +244,7 @@ def test_postgresql_provider_migrates_legacy_schema() -> None:
         )
 
         assert identity is not None
-        assert identity.dataset_schema_name == "msh.storage.dataset.opaque"
+        assert identity.dataset_schema_name == "fcp.storage.dataset.opaque"
         assert identity.dataset_schema_version == 1
         assert provider.ingest(request).state is BatchIngestState.ALREADY_STORED
     finally:

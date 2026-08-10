@@ -117,18 +117,18 @@ def _require_setup_csrf(*, local_only: bool = False) -> None:
         if not local_host:
             raise MtconnectDiscoveryError(
                 "MTConnect network discovery can only be changed from the "
-                "browser on the MSH machine."
+                "browser on the FCP machine."
             )
     if request.headers.get("Sec-Fetch-Site", "").casefold() == "cross-site":
         raise MtconnectDiscoveryError(
             "The configuration request was blocked because it came from "
-            "another site. Reload MSH and try again."
+            "another site. Reload FCP and try again."
         )
     expected = str(session.get(_MTCONNECT_CSRF_SESSION_KEY) or "")
     supplied = str(request.form.get("_csrf_token") or "")
     if not expected or not supplied or not hmac.compare_digest(expected, supplied):
         raise MtconnectDiscoveryError(
-            "The configuration form expired. Reload MSH and try again."
+            "The configuration form expired. Reload FCP and try again."
         )
 
 

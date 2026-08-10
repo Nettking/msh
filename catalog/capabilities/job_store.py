@@ -136,7 +136,7 @@ def _lease_window(
 
 @dataclass(frozen=True)
 class OwnershipLease:
-    SCHEMA: ClassVar[str] = "msh.job-ownership-lease.v1"
+    SCHEMA: ClassVar[str] = "fcp.job-ownership-lease.v1"
     job_id: str
     session_id: str
     attempt_id: str
@@ -228,7 +228,7 @@ class OwnershipLease:
 
 @dataclass(frozen=True)
 class DurableJobSnapshot:
-    SCHEMA: ClassVar[str] = "msh.durable-job-snapshot.v1"
+    SCHEMA: ClassVar[str] = "fcp.durable-job-snapshot.v1"
     job: JobContract
     revision: int
     attempt_generation: int
@@ -346,7 +346,7 @@ class DurableJobSnapshot:
 
 @dataclass(frozen=True)
 class JobStoreResult:
-    SCHEMA: ClassVar[str] = "msh.job-store-result.v1"
+    SCHEMA: ClassVar[str] = "fcp.job-store-result.v1"
     snapshot: DurableJobSnapshot
     changed: bool
 

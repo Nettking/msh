@@ -151,28 +151,28 @@
         <p>Open Control or inspect logs before trying to continue processing.</p>
       </div>
     {% elif no_data_ready and (update_running or scan_running) %}
-      <h3>MSH is still preparing data</h3>
+      <h3>FCP is still preparing data</h3>
       <p class="overview-decision__summary">Raw telemetry files exist, but Diagnostics has not indexed usable artifacts yet. A background update or rescan is currently running.</p>
       <div class="overview-decision__next">
         <strong>Recommended next step</strong>
         <p>Wait for the running job to finish, then refresh Diagnostics or Overview. Do not trust Playback/Machine until indexed artifacts appear.</p>
       </div>
     {% elif no_data_ready %}
-      <h3>Raw data exists, but MSH has no usable index yet</h3>
-      <p class="overview-decision__summary">MSH sees source files, but the artifact index/cache is not ready. The app has files to work from, but the main views cannot use them yet.</p>
+      <h3>Raw data exists, but FCP has no usable index yet</h3>
+      <p class="overview-decision__summary">FCP sees source files, but the artifact index/cache is not ready. The app has files to work from, but the main views cannot use them yet.</p>
       <div class="overview-decision__next">
         <strong>Recommended next step</strong>
         <p>Run a rescan or continue processing from Control. If the cache stays missing, rebuild/refresh the workflow output.</p>
       </div>
     {% elif ready_for_views %}
-      <h3>MSH has usable data</h3>
+      <h3>FCP has usable data</h3>
       <p class="overview-decision__summary">The cache is fresh and artifacts are indexed. Use Overview, Live, Playback, or Machine depending on what you want to inspect.</p>
       <div class="overview-decision__next">
         <strong>Recommended next step</strong>
         <p>Open the view that matches your task, or use Control to run more processing.</p>
       </div>
     {% else %}
-      <h3>MSH is partially ready</h3>
+      <h3>FCP is partially ready</h3>
       <p class="overview-decision__summary">The runtime is available, but some data products or view contracts are still waiting.</p>
       <div class="overview-decision__next">
         <strong>Recommended next step</strong>
@@ -218,7 +218,7 @@
       {% if cache_fresh %}
       <p>The telemetry cache is fresh, so repeated reads should be faster.</p>
       {% elif cache_missing %}
-      <p>The telemetry cache is missing. MSH may need to build it before analytics-heavy views become useful.</p>
+      <p>The telemetry cache is missing. FCP may need to build it before analytics-heavy views become useful.</p>
       {% else %}
       <p>The telemetry cache exists, but it may be stale or incomplete.</p>
       {% endif %}

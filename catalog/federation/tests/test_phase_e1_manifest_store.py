@@ -39,7 +39,7 @@ def proposal(
     idempotency_key: str = "recorder-a:batch-1",
     content_digit: str = "1",
     dataset_id: str = "telemetry",
-    schema_name: str = "msh.telemetry",
+    schema_name: str = "fcp.telemetry",
     schema_version: int = 1,
     expected_control_revision: int = 1,
     committed_at: datetime = NOW,

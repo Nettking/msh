@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>{{ document_title }} · MSH Docs</title>
+    <title>{{ document_title }} · FCP Docs</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/docs.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/docs-home.css') }}">
     <script defer src="{{ url_for('static', filename='js/docs-navigation.js') }}"></script>
@@ -57,13 +57,13 @@
       <aside class="docs-sidebar" id="docs-sidebar" data-docs-sidebar>
         <header class="docs-sidebar__header">
           <a class="docs-brand" href="{{ url_for('docs_web.index') }}">
-            <span class="docs-brand__mark" aria-hidden="true">MSH</span>
+            <span class="docs-brand__mark" aria-hidden="true">FCP</span>
             <span>
               <strong>Documentation</strong>
               <small>User guide &amp; reference</small>
             </span>
           </a>
-          <a class="docs-back" href="/">Back to MSH</a>
+          <a class="docs-back" href="/">Back to FCP</a>
         </header>
 
         <nav class="docs-sidebar__navigation" aria-label="Documentation">
@@ -73,11 +73,11 @@
               {{ nav_link('operator_guide.md', 'Operator guide') }}
               {{ nav_link('quick_start.md', 'Quick start') }}
               {{ nav_link('troubleshooting.md', 'Troubleshooting') }}
-              {{ nav_link('getting_started.md', 'MSH concepts') }}
+              {{ nav_link('getting_started.md', 'FCP concepts') }}
             </section>
 
             <section class="docs-nav-group" aria-labelledby="docs-nav-use">
-              <p class="docs-nav-group__title" id="docs-nav-use">Use MSH</p>
+              <p class="docs-nav-group__title" id="docs-nav-use">Use FCP</p>
               {{ nav_link('connected_capabilities.md', 'Connected capabilities') }}
               {{ nav_link('source_synchronization.md', 'Data sources') }}
               {{ nav_link('workflow_sessions.md', 'Workflow sessions') }}
@@ -86,8 +86,8 @@
             </section>
 
             <section class="docs-nav-group" aria-labelledby="docs-nav-understand">
-              <p class="docs-nav-group__title" id="docs-nav-understand">Understand MSH</p>
-              {{ nav_link('architecture.md', 'How MSH works') }}
+              <p class="docs-nav-group__title" id="docs-nav-understand">Understand FCP</p>
+              {{ nav_link('architecture.md', 'How FCP works') }}
               {{ nav_link('federated_session_network.md', 'Federated network') }}
               {{ nav_link('data_contract.md', 'Data contract') }}
               {{ nav_link('server_setup.md', 'Server & network setup') }}
@@ -138,15 +138,15 @@
               <section class="docs-home">
                 <header class="docs-home__hero">
                   <p class="docs-home__eyebrow">Current product guide</p>
-                  <h1>MSH documentation</h1>
+                  <h1>FCP documentation</h1>
                   <p class="docs-home__lead">
-                    Use the current MSH workbench: monitor machine data, capture operator knowledge, manage trusted Federation capabilities, configure sources, and diagnose the local runtime. New installation and onboarding material is available below when you need it.
+                    Use the current FCP workbench: monitor machine data, capture operator knowledge, manage trusted Federation capabilities, configure sources, and diagnose the local runtime. New installation and onboarding material is available below when you need it.
                   </p>
                   <nav class="docs-home__actions" aria-label="Documentation starting points">
                     <a class="docs-home__button docs-home__button--primary" href="{{ url_for('docs_web.document', document_path='operator_guide.md') }}">Operator guide</a>
                     <a class="docs-home__button" href="{{ url_for('docs_web.document', document_path='quick_start.md') }}">Quick start</a>
                     <a class="docs-home__button" href="{{ url_for('docs_web.document', document_path='troubleshooting.md') }}">Troubleshooting</a>
-                    <a class="docs-home__button" href="{{ url_for('docs_web.document', document_path='architecture.md') }}">How MSH works</a>
+                    <a class="docs-home__button" href="{{ url_for('docs_web.document', document_path='architecture.md') }}">How FCP works</a>
                   </nav>
                 </header>
 
@@ -213,12 +213,12 @@
                   <div class="docs-home__cards">
                     <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='getting_started.md') }}">
                       <span class="docs-home-card__kicker">Concepts</span>
-                      <strong>MSH mental model</strong>
+                      <strong>FCP mental model</strong>
                       <p>Learn devices, Federations, inspection, contributions, authority, and the workbench.</p>
                     </a>
                     <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='architecture.md') }}">
                       <span class="docs-home-card__kicker">Architecture</span>
-                      <strong>How MSH works</strong>
+                      <strong>How FCP works</strong>
                       <p>Product components, authority boundaries, data flow, jobs, storage, and persistence.</p>
                     </a>
                     <a class="docs-home-card" href="{{ url_for('docs_web.document', document_path='federated_session_network.md') }}">
@@ -235,7 +235,7 @@
                 </section>
 
                 <aside class="docs-home__development">
-                  <h2>Developing MSH?</h2>
+                  <h2>Developing FCP?</h2>
                   <p>
                     Implementation plans, acceptance evidence, roadmaps, and retained history stay outside the normal user path. Open <strong>Development &amp; all files</strong> in the sidebar or use the <a href="{{ url_for('docs_web.document', document_path='index.md') }}">full documentation index</a> for repository-level material.
                   </p>
@@ -244,10 +244,10 @@
             {% else %}
               <section class="docs-welcome">
                 <p class="docs-eyebrow">Documentation unavailable</p>
-                <h1>MSH Documentation</h1>
+                <h1>FCP Documentation</h1>
                 <div class="docs-warning">
                   <strong>The documentation folder could not be found.</strong>
-                  <p>Start MSH from the repository checkout or configure <code>MSH_DOCS_ROOT</code>.</p>
+                  <p>Start FCP from the repository checkout or configure <code>FCP_DOCS_ROOT</code>.</p>
                 </div>
               </section>
             {% endif %}

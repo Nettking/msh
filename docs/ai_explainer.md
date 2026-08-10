@@ -1,10 +1,10 @@
 # AI Explainer
 
-This document defines the read-only AI integration for MSH. The goal is to let an Ollama-backed assistant explain how the system works without changing code, running operational actions, or inspecting raw telemetry by default. Ollama may run with MSH or be contributed by a connected computer.
+This document defines the read-only AI integration for FCP. The goal is to let an Ollama-backed assistant explain how the system works without changing code, running operational actions, or inspecting raw telemetry by default. Ollama may run with FCP or be contributed by a connected computer.
 
 ## Purpose
 
-The AI explainer should answer system-understanding questions about the MSH codebase and documentation, for example:
+The AI explainer should answer system-understanding questions about the FCP codebase and documentation, for example:
 
 - how telemetry flows from raw JSONL data into workflow sessions, derived artifacts, playback exports, and Flask views
 - what the main Flask routes are responsible for
@@ -16,7 +16,7 @@ The explainer is not intended to be an autonomous developer agent in the first v
 
 ## Setup-managed Ollama provider and model
 
-Setup can use the internal Ollama service at `http://ollama:11434` or a connected computer at a trusted LAN/VPN URL such as `http://192.168.1.50:11434`. The saved provider is used by status checks, benchmarks, model installation, and AI Explainer requests without rebuilding MSH. See [Connected capabilities](connected_capabilities.md) for the phone-to-laptop flow.
+Setup can use the internal Ollama service at `http://ollama:11434` or a connected computer at a trusted LAN/VPN URL such as `http://192.168.1.50:11434`. The saved provider is used by status checks, benchmarks, model installation, and AI Explainer requests without rebuilding FCP. See [Connected capabilities](connected_capabilities.md) for the phone-to-laptop flow.
 
 The three standard setup choices are:
 
@@ -30,7 +30,7 @@ The Docker Compose services are:
 
 ```text
 ollama       persistent local model server
-ollama-pull  one-shot installer that pulls MSH_AI_MODEL
+ollama-pull  one-shot installer that pulls FCP_AI_MODEL
 ```
 
 Manual retry:
@@ -134,7 +134,7 @@ The explainer should give short, practical answers grounded in retrieved context
 Use these questions to validate the implementation:
 
 ```text
-How does data flow through MSH?
+How does data flow through FCP?
 What does the /control page do?
 What is the difference between raw JSONL and the telemetry analytics cache?
 Where are workflow session artifacts stored?

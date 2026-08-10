@@ -103,7 +103,7 @@ def descriptor() -> LocalComputeHandlerDescriptor:
     return LocalComputeHandlerDescriptor(
         handler_id="relay-echo-handler",
         capability_type="synthetic-compute",
-        protocol="msh-synthetic",
+        protocol="fcp-synthetic",
         protocol_version="1.0",
         attributes={"operation": "echo", "modalities": ["json"]},
     )
@@ -150,7 +150,7 @@ def active_job(session_id: str, job_id: str) -> JobContract:
         idempotency_key=f"{session_id}:{job_id}",
         capability=CapabilityRequirement(
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             requirements={"operation": "echo", "modalities": ["json"]},
         ),
@@ -158,7 +158,7 @@ def active_job(session_id: str, job_id: str) -> JobContract:
             ArtifactReference(
                 reference_id=f"input-{job_id}",
                 session_id=session_id,
-                schema_name="msh.synthetic-input.v1",
+                schema_name="fcp.synthetic-input.v1",
                 media_type="application/json",
             ),
         ),
@@ -166,7 +166,7 @@ def active_job(session_id: str, job_id: str) -> JobContract:
             ArtifactReference(
                 reference_id=f"output-{job_id}",
                 session_id=session_id,
-                schema_name="msh.synthetic-output.v1",
+                schema_name="fcp.synthetic-output.v1",
                 media_type="application/json",
             ),
         ),

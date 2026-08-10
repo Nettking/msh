@@ -1,8 +1,8 @@
-"""Reset an MSH checkout while retaining recorded MTConnect JSONL data.
+"""Reset an FCP checkout while retaining recorded MTConnect JSONL data.
 
 Run from the repository root:
 
-    python reset_msh.py --yes
+    python reset_fcp.py --yes
 
 The command stops the Compose stack, removes named volumes (including Ollama
 models and Federation relay state), clears generated local state, and preserves
@@ -74,7 +74,7 @@ def reset_repository_state(
     root = Path(repository_root).resolve()
     if not (root / "docker-compose.yml").is_file():
         raise RuntimeError(
-            "Run the reset from an MSH repository root containing docker-compose.yml."
+            "Run the reset from an FCP repository root containing docker-compose.yml."
         )
 
     if stop_compose:
@@ -106,7 +106,7 @@ def reset_repository_state(
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
-            "Reset MSH identity, Federation, configuration, generated results, "
+            "Reset FCP identity, Federation, configuration, generated results, "
             "and Docker volumes while preserving recorder JSONL files."
         )
     )
@@ -135,7 +135,7 @@ def main() -> int:
         Path(__file__).resolve().parent,
         stop_compose=not args.skip_docker,
     )
-    print("MSH fresh-install reset complete.")
+    print("FCP fresh-install reset complete.")
     print(f"Preserved recorder JSONL files: {summary.preserved_jsonl_files}")
     print(f"Removed files: {summary.removed_files}")
     print(f"Removed directories: {summary.removed_directories}")

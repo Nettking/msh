@@ -112,7 +112,7 @@ def capability(
         node_id=node_id,
         session_id=session_id,
         type=capability_type,
-        protocol=f"msh-{capability_type}-test",
+        protocol=f"fcp-{capability_type}-test",
         protocol_version="1.0",
         status=status,
         properties={"label": capability_id},
@@ -1440,7 +1440,7 @@ def test_capability_metadata_rejects_token_shaped_values_after_mutation(
         node_id=owner.identity.node_id,
         capability_id="capability-secret",
     )
-    announcement.properties["label"] = "msh_join_not-for-metadata"
+    announcement.properties["label"] = "fcp_join_not-for-metadata"
 
     with pytest.raises(FederationValidationError) as rejected:
         store.upsert_capability(
@@ -1477,7 +1477,7 @@ def test_public_identity_and_capability_fields_are_bounded_and_nonsecret(
     tmp_path: Path,
 ) -> None:
     owner = credentials(tmp_path, "Owner")
-    token = "msh_join_not-for-public-metadata"
+    token = "fcp_join_not-for-public-metadata"
 
     with pytest.raises(FederationValidationError) as identity_secret:
         NodeIdentity(
@@ -1575,7 +1575,7 @@ def test_authorized_status_is_scoped_deterministic_and_secret_free(
     )
 
     assert first == second
-    assert first["schema"] == "msh.coordinator_status.v1"
+    assert first["schema"] == "fcp.coordinator_status.v1"
     assert [session["session_id"] for session in first["sessions"]] == [
         shared.session_id
     ]

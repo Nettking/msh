@@ -4,31 +4,31 @@ services:
       context: .
       dockerfile: Dockerfile
       args:
-        MSH_BUILD_COMMIT: ${MSH_BUILD_COMMIT:-unknown}
+        FCP_BUILD_COMMIT: ${FCP_BUILD_COMMIT:-unknown}
     ports:
-      - "${MSH_WEB_BIND:-0.0.0.0}:${MSH_WEB_PORT:-5000}:5000"
+      - "${FCP_WEB_BIND:-0.0.0.0}:${FCP_WEB_PORT:-5000}:5000"
     environment:
-      - MSH_SCAN_DIRS=${MSH_SCAN_DIRS:-results,data}
-      - MSH_SKIP_ORCHESTRATION=${MSH_SKIP_ORCHESTRATION:-0}
-      - MSH_FLASK_SECRET=${MSH_FLASK_SECRET:-msh-dev}
-      - MSH_AI_MODEL=${MSH_AI_MODEL:-llama3.2:3b}
+      - FCP_SCAN_DIRS=${FCP_SCAN_DIRS:-results,data}
+      - FCP_SKIP_ORCHESTRATION=${FCP_SKIP_ORCHESTRATION:-0}
+      - FCP_FLASK_SECRET=${FCP_FLASK_SECRET:-fcp-dev}
+      - FCP_AI_MODEL=${FCP_AI_MODEL:-llama3.2:3b}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
-      - MSH_DEVICE_NAME=${MSH_DEVICE_NAME:-This MSH device}
-      - MSH_RELAY_PORT=${MSH_RELAY_PORT:-8765}
-      - MSH_PAIRING_RELAY_URL=${MSH_PAIRING_RELAY_URL:-}
-      - MSH_FEDERATION_NODE_STATE_DIR=${MSH_FEDERATION_NODE_STATE_DIR:-/app/data/federation/device}
-      - MSH_FEDERATION_ONBOARDING_DATABASE=${MSH_FEDERATION_ONBOARDING_DATABASE:-/app/data/federation/onboarding/onboarding.sqlite3}
-      - MSH_FEDERATION_COORDINATOR_DATABASE=${MSH_FEDERATION_COORDINATOR_DATABASE:-/var/lib/msh-relay/control.sqlite3}
+      - FCP_DEVICE_NAME=${FCP_DEVICE_NAME:-This FCP device}
+      - FCP_RELAY_PORT=${FCP_RELAY_PORT:-8765}
+      - FCP_PAIRING_RELAY_URL=${FCP_PAIRING_RELAY_URL:-}
+      - FCP_FEDERATION_NODE_STATE_DIR=${FCP_FEDERATION_NODE_STATE_DIR:-/app/data/federation/device}
+      - FCP_FEDERATION_ONBOARDING_DATABASE=${FCP_FEDERATION_ONBOARDING_DATABASE:-/app/data/federation/onboarding/onboarding.sqlite3}
+      - FCP_FEDERATION_COORDINATOR_DATABASE=${FCP_FEDERATION_COORDINATOR_DATABASE:-/var/lib/fcp-relay/control.sqlite3}
     volumes:
       - type: bind
-        source: ${MSH_RESULTS_DIR:-./results}
+        source: ${FCP_RESULTS_DIR:-./results}
         target: /app/results
       - type: bind
-        source: ${MSH_DATA_DIR:-./data}
+        source: ${FCP_DATA_DIR:-./data}
         target: /app/data
       - type: volume
         source: relay_state
-        target: /var/lib/msh-relay
+        target: /var/lib/fcp-relay
     restart: unless-stopped
 
   ollama:
@@ -54,13 +54,13 @@ services:
     environment:
       - OLLAMA_HOST=http://ollama:11434
     entrypoint: ["/bin/ollama"]
-    command: ["pull", "${MSH_AI_MODEL:-llama3.2:3b}"]
+    command: ["pull", "${FCP_AI_MODEL:-llama3.2:3b}"]
 
   model-provider:
     profiles: ["provider"]
     image: ollama/ollama:latest
     ports:
-      - "${MSH_PROVIDER_BIND:-0.0.0.0}:${MSH_PROVIDER_PORT:-11434}:11434"
+      - "${FCP_PROVIDER_BIND:-0.0.0.0}:${FCP_PROVIDER_PORT:-11434}:11434"
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
     volumes:
@@ -75,8 +75,8 @@ services:
       retries: 30
       start_period: 5s
     labels:
-      - "no.msh.capability=language-model"
-      - "no.msh.protocol=ollama"
+      - "no.fcp.capability=language-model"
+      - "no.fcp.protocol=ollama"
 
   model-provider-install:
     profiles: ["provider"]
@@ -87,31 +87,31 @@ services:
     environment:
       - OLLAMA_HOST=http://model-provider:11434
     entrypoint: ["/bin/ollama"]
-    command: ["pull", "${MSH_PROVIDER_MODEL:-smollm2:360m}"]
+    command: ["pull", "${FCP_PROVIDER_MODEL:-smollm2:360m}"]
 
   recorder:
     build:
       context: .
       dockerfile: Dockerfile
       args:
-        MSH_BUILD_COMMIT: ${MSH_BUILD_COMMIT:-unknown}
+        FCP_BUILD_COMMIT: ${FCP_BUILD_COMMIT:-unknown}
     entrypoint: ["python", "catalog/standalone-recorder_v2/standalone-recorder_v2.py"]
     environment:
-      - MSH_RECORDER_MANAGED=true
-      - MSH_RECORDER_DATA_DIR=data
-      - MSH_RECORDER_STATE_FILE=data/source_state/mtconnect_recorder_state.json
-      - MSH_RECORDER_CONTROL_FILE=data/source_state/mtconnect_recorder_control.json
-      - MSH_RECORDER_CONFIG_FILE=data/capabilities/config.json
-      - MSH_RECORDER_STATUS_FILE=data/source_state/mtconnect_recorder_status.json
-      - MSH_RECORDER_LOG_FILE=data/source_state/mtconnect_recorder.log
-      - MSH_RECORDER_REQUEST_TIMEOUT=${MSH_RECORDER_REQUEST_TIMEOUT:-10.0}
-      - MSH_RECORDER_BATCH_SIZE=${MSH_RECORDER_BATCH_SIZE:-1000}
-      - MSH_RECORDER_MAX_BATCHES_PER_CYCLE=${MSH_RECORDER_MAX_BATCHES_PER_CYCLE:-20}
-      - MSH_RECORDER_CONFIG_REFRESH_INTERVAL=${MSH_RECORDER_CONFIG_REFRESH_INTERVAL:-1.0}
-      - MSH_RECORDER_STATUS_INTERVAL=${MSH_RECORDER_STATUS_INTERVAL:-1.0}
+      - FCP_RECORDER_MANAGED=true
+      - FCP_RECORDER_DATA_DIR=data
+      - FCP_RECORDER_STATE_FILE=data/source_state/mtconnect_recorder_state.json
+      - FCP_RECORDER_CONTROL_FILE=data/source_state/mtconnect_recorder_control.json
+      - FCP_RECORDER_CONFIG_FILE=data/capabilities/config.json
+      - FCP_RECORDER_STATUS_FILE=data/source_state/mtconnect_recorder_status.json
+      - FCP_RECORDER_LOG_FILE=data/source_state/mtconnect_recorder.log
+      - FCP_RECORDER_REQUEST_TIMEOUT=${FCP_RECORDER_REQUEST_TIMEOUT:-10.0}
+      - FCP_RECORDER_BATCH_SIZE=${FCP_RECORDER_BATCH_SIZE:-1000}
+      - FCP_RECORDER_MAX_BATCHES_PER_CYCLE=${FCP_RECORDER_MAX_BATCHES_PER_CYCLE:-20}
+      - FCP_RECORDER_CONFIG_REFRESH_INTERVAL=${FCP_RECORDER_CONFIG_REFRESH_INTERVAL:-1.0}
+      - FCP_RECORDER_STATUS_INTERVAL=${FCP_RECORDER_STATUS_INTERVAL:-1.0}
     volumes:
       - type: bind
-        source: ${MSH_DATA_DIR:-./data}
+        source: ${FCP_DATA_DIR:-./data}
         target: /app/data
     restart: unless-stopped
 
@@ -123,7 +123,7 @@ services:
       context: .
       dockerfile: Dockerfile.cli
       args:
-        MSH_BUILD_COMMIT: ${MSH_BUILD_COMMIT:-unknown}
+        FCP_BUILD_COMMIT: ${FCP_BUILD_COMMIT:-unknown}
     entrypoint: []
     command:
       - python
@@ -131,18 +131,18 @@ services:
       - catalog.relay.provider_service
       - serve
       - --database
-      - /var/lib/msh-relay/control.sqlite3
+      - /var/lib/fcp-relay/control.sqlite3
       - --host
       - 0.0.0.0
       - --port
       - "8765"
       - --unsafe-development-plaintext
     ports:
-      - "${MSH_RELAY_BIND:-0.0.0.0}:${MSH_RELAY_PORT:-8765}:8765"
+      - "${FCP_RELAY_BIND:-0.0.0.0}:${FCP_RELAY_PORT:-8765}:8765"
     volumes:
       - type: volume
         source: relay_state
-        target: /var/lib/msh-relay
+        target: /var/lib/fcp-relay
     restart: unless-stopped
 
   prep:
@@ -151,13 +151,13 @@ services:
       context: .
       dockerfile: Dockerfile.cli
     environment:
-      - MSH_SCAN_DIRS=${MSH_SCAN_DIRS:-results,data}
+      - FCP_SCAN_DIRS=${FCP_SCAN_DIRS:-results,data}
     volumes:
       - type: bind
-        source: ${MSH_DATA_DIR:-./data}
+        source: ${FCP_DATA_DIR:-./data}
         target: /app/data
       - type: bind
-        source: ${MSH_RESULTS_DIR:-./results}
+        source: ${FCP_RESULTS_DIR:-./results}
         target: /app/results
 
   observer-sync:
@@ -167,19 +167,19 @@ services:
       dockerfile: Dockerfile
     entrypoint: ["python", "-m", "catalog.observer_phoenix.export_jsonl"]
     environment:
-      - MSH_SCAN_DIRS=${MSH_SCAN_DIRS:-results,data}
+      - FCP_SCAN_DIRS=${FCP_SCAN_DIRS:-results,data}
     volumes:
       - type: bind
-        source: ${MSH_DATA_DIR:-./data}
+        source: ${FCP_DATA_DIR:-./data}
         target: /app/data
       - type: bind
-        source: ${MSH_RESULTS_DIR:-./results}
+        source: ${FCP_RESULTS_DIR:-./results}
         target: /app/results
 
 volumes:
   ollama_models:
-    name: ${MSH_OLLAMA_VOLUME_NAME:-msh_ollama_models}
+    name: ${FCP_OLLAMA_VOLUME_NAME:-fcp_ollama_models}
   model_provider_models:
-    name: ${MSH_MODEL_PROVIDER_VOLUME_NAME:-msh_model_provider_models}
+    name: ${FCP_MODEL_PROVIDER_VOLUME_NAME:-fcp_model_provider_models}
   relay_state:
-    name: ${MSH_RELAY_VOLUME_NAME:-msh_relay_state}
+    name: ${FCP_RELAY_VOLUME_NAME:-fcp_relay_state}

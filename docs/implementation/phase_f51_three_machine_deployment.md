@@ -46,7 +46,7 @@ Plain `ws://` is accepted only for an explicitly enabled loopback test.
 
 ## Prerequisites on all machines
 
-Use the same tested MSH commit on all three machines:
+Use the same tested FCP commit on all three machines:
 
 ```text
 9b0e828e22a0129c18958b75819e5326a660dbf9 or a later commit containing F5.1
@@ -100,13 +100,13 @@ Set the returned token only in the current shell.
 PowerShell:
 
 ```powershell
-$env:MSH_ENROLLMENT_TOKEN = "<authority-enrollment-token>"
+$env:FCP_ENROLLMENT_TOKEN = "<authority-enrollment-token>"
 ```
 
 Bash:
 
 ```bash
-export MSH_ENROLLMENT_TOKEN='<authority-enrollment-token>'
+export FCP_ENROLLMENT_TOKEN='<authority-enrollment-token>'
 ```
 
 Bootstrap the permanent authority identity, create the session, and issue one invitation for each storage machine:
@@ -132,11 +132,11 @@ Copy each invitation to its intended machine through a protected channel. Do not
 Clear the authority enrollment token:
 
 ```powershell
-Remove-Item Env:MSH_ENROLLMENT_TOKEN
+Remove-Item Env:FCP_ENROLLMENT_TOKEN
 ```
 
 ```bash
-unset MSH_ENROLLMENT_TOKEN
+unset FCP_ENROLLMENT_TOKEN
 ```
 
 ## 2. Configure Machine B
@@ -203,8 +203,8 @@ Run the command twice and send one result to each storage machine.
 On Machine B, set its enrollment token and the **primary** invitation:
 
 ```powershell
-$env:MSH_ENROLLMENT_TOKEN = "<machine-b-enrollment-token>"
-$env:MSH_SESSION_INVITATION = "<primary-session-invitation>"
+$env:FCP_ENROLLMENT_TOKEN = "<machine-b-enrollment-token>"
+$env:FCP_SESSION_INVITATION = "<primary-session-invitation>"
 python -m catalog.node.live_storage_agent `
   --config f51/storage-node.json `
   --control-authority-node-id <authority-node-id> `
@@ -214,8 +214,8 @@ python -m catalog.node.live_storage_agent `
 On Machine C, use its enrollment token and the **replica** invitation:
 
 ```powershell
-$env:MSH_ENROLLMENT_TOKEN = "<machine-c-enrollment-token>"
-$env:MSH_SESSION_INVITATION = "<replica-session-invitation>"
+$env:FCP_ENROLLMENT_TOKEN = "<machine-c-enrollment-token>"
+$env:FCP_SESSION_INVITATION = "<replica-session-invitation>"
 python -m catalog.node.live_storage_agent `
   --config f51/storage-node.json `
   --control-authority-node-id <authority-node-id> `

@@ -43,7 +43,7 @@ def test_guide_page_explains_knowledge_flow(monkeypatch, tmp_path):
 
     assert response.status_code == 200
     html = response.get_data(as_text=True)
-    assert "How to use MSH" in html
+    assert "How to use FCP" in html
     assert "Three areas, three purposes" in html
     assert "Start here" in html
     assert "At the machine" in html

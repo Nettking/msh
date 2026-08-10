@@ -373,7 +373,7 @@ class CapabilityOnboardingService:
                 continue
             federation_id = federation_id_from_session_id(session_id)
             digest = hashlib.sha256(
-                ("msh-trusted-membership-v1\0" + federation_id).encode("utf-8")
+                ("fcp-trusted-membership-v1\0" + federation_id).encode("utf-8")
             ).hexdigest()
             candidates.append(
                 FederationDiscoveryCandidate(
@@ -671,7 +671,7 @@ class CapabilityOnboardingService:
             federation_label = "No federation found"
 
         return {
-            "page_title": "Set up this MSH device",
+            "page_title": "Set up this FCP device",
             "page_intro": (
                 "Load one stable device identity, then join a trusted "
                 "federation or create one locally."
@@ -683,9 +683,9 @@ class CapabilityOnboardingService:
                 connected_binding.revision if connected_binding is not None else 1
             ),
             "storage_key": (
-                f"msh.onboarding.{identity.node_id}.cfi2"
+                f"fcp.onboarding.{identity.node_id}.cfi2"
                 if identity is not None
-                else "msh.onboarding.pending.cfi2"
+                else "fcp.onboarding.pending.cfi2"
             ),
             "completed_steps": completed_steps,
             "steps": steps,

@@ -10,7 +10,7 @@ At this delivery stage, capability-first setup used:
 Identity -> Federation -> Inspect -> Benchmarks -> Contributions -> Finish
 ```
 
-A successful migration or Finish POST returned to `/onboarding?step=finish`. The completed Finish panel confirmed that the device was ready and offered one explicit **Continue to MSH** action.
+A successful migration or Finish POST returned to `/onboarding?step=finish`. The completed Finish panel confirmed that the device was ready and offered one explicit **Continue to FCP** action.
 
 ## Federation pages delivered
 

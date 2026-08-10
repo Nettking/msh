@@ -6,7 +6,7 @@ Phase F1 turns the existing Phase D/E storage implementation into a process that
 
 - one persistent Ed25519 node identity;
 - one outbound authenticated WebSocket connection to the relay;
-- one filesystem-backed `msh-storage-v1` provider;
+- one filesystem-backed `fcp-storage-v1` provider;
 - the existing Phase D/E authority, fencing, lease, replication, acknowledgement, manifest, and recovery rules;
 - durable local control, outbox, acknowledgement, node-state, and provider data;
 - automatic capability re-announcement after reconnect;
@@ -22,7 +22,7 @@ Create a local JSON file. Relative paths are resolved relative to the configurat
 
 ```json
 {
-  "schema": "msh.storage_node_config.v1",
+  "schema": "fcp.storage_node_config.v1",
   "state_directory": "state",
   "relay_url": "wss://relay.example.org/federation",
   "display_name": "Storage laptop A",
@@ -69,16 +69,16 @@ First startup uses protected environment input:
 Windows CMD:
 
 ```cmd
-set MSH_ENROLLMENT_TOKEN=<one-time-enrollment-token>
-set MSH_SESSION_INVITATION=<one-time-session-invitation>
+set FCP_ENROLLMENT_TOKEN=<one-time-enrollment-token>
+set FCP_SESSION_INVITATION=<one-time-session-invitation>
 python -m catalog.node.storage_agent --config storage-node.json run
 ```
 
 PowerShell:
 
 ```powershell
-$env:MSH_ENROLLMENT_TOKEN = "<one-time-enrollment-token>"
-$env:MSH_SESSION_INVITATION = "<one-time-session-invitation>"
+$env:FCP_ENROLLMENT_TOKEN = "<one-time-enrollment-token>"
+$env:FCP_SESSION_INVITATION = "<one-time-session-invitation>"
 python -m catalog.node.storage_agent --config storage-node.json run
 ```
 

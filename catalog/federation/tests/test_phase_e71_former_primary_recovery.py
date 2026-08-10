@@ -96,12 +96,12 @@ class Runtime:
             content_hash=BatchIngestRequest.calculate_content_hash(content),
             content=content,
             created_at=NOW,
-            dataset_schema_name="msh.telemetry.observations",
+            dataset_schema_name="fcp.telemetry.observations",
             dataset_schema_version=3,
         )
         envelope = StorageRequestEnvelope(
             request_id=f"request-{suffix}",
-            protocol="msh-storage-v1",
+            protocol="fcp-storage-v1",
             protocol_version=STORAGE_PROTOCOL_VERSION,
             operation=StorageOperation.BATCH_INGEST,
             session_id=SESSION_ID,
@@ -135,7 +135,7 @@ class Runtime:
         )
         assert transaction is not None
         report = StorageReplicaReport(
-            schema="msh.storage_replica_report.v1",
+            schema="fcp.storage_replica_report.v1",
             protocol_version="1.0",
             session_id=SESSION_ID,
             group_id=GROUP_ID,
@@ -353,7 +353,7 @@ def test_e71_recovery_store_isolated_per_group(tmp_path: Path) -> None:
             item_id=f"item-{group_id}",
             kind="batch",
             dataset_id="telemetry",
-            schema_name="msh.telemetry.observations",
+            schema_name="fcp.telemetry.observations",
             schema_version=3,
             idempotency_key=f"idem-{group_id}",
             content_hash="sha256:" + ("a" if group_id == "group-a" else "b") * 64,

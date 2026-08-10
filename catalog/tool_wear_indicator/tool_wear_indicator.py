@@ -29,7 +29,7 @@ DEFAULT_SUMMARY_NAME = "tool_wear_signal_summary.csv"
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Generate early tool-wear candidate events from telemetry JSONL.")
-    parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR, help="Directory containing MSH JSONL telemetry.")
+    parser.add_argument("--data-dir", type=Path, default=DEFAULT_DATA_DIR, help="Directory containing FCP JSONL telemetry.")
     parser.add_argument(
         "--source",
         default="observer_phoenix",
@@ -47,7 +47,7 @@ def parse_args() -> argparse.Namespace:
 
 
 def _resolve_session_dir() -> Path:
-    from_env = os.getenv("MSH_SESSION_DIR", "").strip()
+    from_env = os.getenv("FCP_SESSION_DIR", "").strip()
     if from_env:
         return Path(from_env).expanduser().resolve()
 

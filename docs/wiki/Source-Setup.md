@@ -1,6 +1,6 @@
 # Source Setup
 
-System -> Sources is where MSH stores machine and source configuration.
+System -> Sources is where FCP stores machine and source configuration.
 
 ## What belongs here
 
@@ -33,7 +33,7 @@ A machine can include:
 
 The Test MTConnect button checks the configured MTConnect endpoint from the Flask server/container.
 
-If the URL is a base adapter URL, MSH tests `/current` automatically.
+If the URL is a base adapter URL, FCP tests `/current` automatically.
 
 Example:
 
@@ -42,15 +42,15 @@ Example:
 -> http://10.0.0.20:5000/current
 ```
 
-A successful test means MSH reached the endpoint and received a response.
+A successful test means FCP reached the endpoint and received a response.
 
 ## VPN/network test
 
 The Test VPN/network button opens a TCP connection from the Flask server/container to the configured host and port.
 
-This does not prove that the VPN client is connected at the operating-system level. It proves the operationally useful thing for MSH: whether the app can reach the configured machine-network target from where it is running.
+This does not prove that the VPN client is connected at the operating-system level. It proves the operationally useful thing for FCP: whether the app can reach the configured machine-network target from where it is running.
 
-If no VPN/network test host is configured, MSH falls back to the MTConnect host and port when possible.
+If no VPN/network test host is configured, FCP falls back to the MTConnect host and port when possible.
 
 ## Vibration sensors
 

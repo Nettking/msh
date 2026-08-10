@@ -194,7 +194,7 @@ class FederationUpdateEventMonitor:
             self._stop.clear()
             self._thread = threading.Thread(
                 target=self._run,
-                name="msh-federation-update-events",
+                name="fcp-federation-update-events",
                 daemon=True,
             )
             self._thread.start()
@@ -272,7 +272,7 @@ class SavedFederationReconnectMonitor:
             self._stop.clear()
             self._thread = threading.Thread(
                 target=self._run,
-                name="msh-federation-auto-reconnect",
+                name="fcp-federation-auto-reconnect",
                 daemon=True,
             )
             self._thread.start()

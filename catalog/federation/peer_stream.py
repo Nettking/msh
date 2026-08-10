@@ -12,7 +12,7 @@ from typing import Any
 from .errors import FederationValidationError, ProtocolCompatibilityError
 from .redaction import redact_secrets
 
-PEER_STREAM_SCHEMA = "msh.peer_stream.frame.v1"
+PEER_STREAM_SCHEMA = "fcp.peer_stream.frame.v1"
 PEER_STREAM_PROTOCOL_VERSION = "1.0"
 PEER_STREAM_PROTOCOL_MAJOR = 1
 PEER_STREAM_CIPHER_SUITE = "x25519-hkdf-sha256+chacha20-poly1305"

@@ -2,7 +2,7 @@
 
 ## Purpose and source basis
 
-This document plans how MSH exposes the versioned OSL language model and the
+This document plans how FCP exposes the versioned OSL language model and the
 Notebook-to-OSL product workflow. The browser and HTTP representations are
 adapters; the canonical model, lifecycle and provenance remain in the OSL
 subsystem planned in [03_target_architecture.md](03_target_architecture.md) and
@@ -14,7 +14,7 @@ subsystem planned in [03_target_architecture.md](03_target_architecture.md) and
 | `Nettking/paper-repo` | `abe3fbcddee590c3f399b06f63cb329e8615977c` | Notebook-to-OSL stages and evidence retention traced in `04_notebook_to_osl_workflow.md` |
 | `Nettking/msh` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` | Flask routes, services, templates, AI runtime and responsive test conventions |
 
-The markers `paper-defined`, `existing-in-MSH`, `proposed-for-MSH` and
+The markers `paper-defined`, `existing-in-FCP`, `proposed-for-FCP` and
 `requires-research-clarification` are used as defined in
 [00_scope_and_sources.md](00_scope_and_sources.md).
 
@@ -28,39 +28,39 @@ The markers `paper-defined`, `existing-in-MSH`, `proposed-for-MSH` and
 - `paper-defined`: the analyzed systems-paper profile is design-time. Its
   semantic contract section 13 excludes runtime activation, execution, factual
   truth, causal proof, safety assurance and automatic recommendation.
-- `proposed-for-MSH`: HTML, JavaScript and API payloads are not a source of
+- `proposed-for-FCP`: HTML, JavaScript and API payloads are not a source of
   truth. They can request application commands and render authorized
   projections only.
-- `proposed-for-MSH`: a checkbox, AI result, support-card confirmation,
+- `proposed-for-FCP`: a checkbox, AI result, support-card confirmation,
   `reusable_strategy` value, syntactically successful import or SysML export
   cannot constitute review, approval, publication or operational authorization.
-- `proposed-for-MSH`: published means an authorized knowledge artefact. It does
+- `proposed-for-FCP`: published means an authorized knowledge artefact. It does
   not mean active, safe, executable or authorized for action.
-- `proposed-for-MSH`: no initial route executes OperatorAction, invokes the
+- `proposed-for-FCP`: no initial route executes OperatorAction, invokes the
   intervention runner, dispatches a capability job, chooses a provider, grants
   storage/compute authority or creates a machine-control binding.
-- `proposed-for-MSH`: every mutation requires authenticated server-derived
+- `proposed-for-FCP`: every mutation requires authenticated server-derived
   actor/scope, object authorization, CSRF protection for browser sessions,
   idempotency key and expected revision/content hash.
-- `proposed-for-MSH`: source bytes, accepted excerpts and prior fragment
+- `proposed-for-FCP`: source bytes, accepted excerpts and prior fragment
   revisions are immutable. A submitted form can only create a new object,
   command result or revision.
-- `proposed-for-MSH`: manual capture/edit/review remains functional when AI is
+- `proposed-for-FCP`: manual capture/edit/review remains functional when AI is
   absent. AI is a candidate generator and explainer with no lifecycle port.
 
-## Existing MSH surface and gaps
+## Existing FCP surface and gaps
 
 ### Operator-strategy routes
 
-At the analyzed MSH commit,
+At the analyzed FCP commit,
 `catalog/flask_app/operator_strategy_routes.py` exposes the following legacy
 surface:
 
 | Existing route/source | Current behavior | OSL planning consequence |
 |---|---|---|
-| `GET /operator-strategies`, lines 23-50 | counts `captured`, `structured` and `reusable` notes | `existing-in-MSH` navigation pattern is reusable; state vocabulary is not the OSL lifecycle |
-| `GET /operator-strategies/capture`, lines 53-69 | shows a statement form and recent raw text | `existing-in-MSH` source-first pattern is useful; raw recent text must not leak in an unscoped list |
-| `GET /operator-strategies/review`, lines 72-86 | lists notes for structuring | `existing-in-MSH` queue pattern is useful; assignment and authorization are missing |
+| `GET /operator-strategies`, lines 23-50 | counts `captured`, `structured` and `reusable` notes | `existing-in-FCP` navigation pattern is reusable; state vocabulary is not the OSL lifecycle |
+| `GET /operator-strategies/capture`, lines 53-69 | shows a statement form and recent raw text | `existing-in-FCP` source-first pattern is useful; raw recent text must not leak in an unscoped list |
+| `GET /operator-strategies/review`, lines 72-86 | lists notes for structuring | `existing-in-FCP` queue pattern is useful; assignment and authorization are missing |
 | `GET /operator-strategies/structure/<record_id>`, lines 89-101 | combines source and derived fields | retain source visibility, but split evidence, interpretation, Decision and Action |
 | `POST /operator-strategies/save`, lines 104-112 | writes one mutable note | must not back canonical capture: no actor binding, CSRF, bounds, revision or idempotency |
 | `POST .../structure` and `.../outcome`, lines 115-134 | overwrites fields | canonical edits and feedback append new revisions/records |
@@ -69,45 +69,45 @@ surface:
 
 `catalog/flask_app/operator_support_routes.py:26-113` exposes adjacent support
 confirmation, first-part, quality outcome, machine-note, recommender and export
-routes. These are `existing-in-MSH` product features but do not supply OSL
+routes. These are `existing-in-FCP` product features but do not supply OSL
 authority. In particular, `GET /osl-export` and `POST /osl-export/run` at lines
 84-94 produce the current legacy export; success does not validate language
 semantics.
 
 ### Templates and interaction conventions
 
-- `existing-in-MSH` `operator_capture.html:3-38` provides a compact
+- `existing-in-FCP` `operator_capture.html:3-38` provides a compact
   raw-statement capture pattern; lines 54-65 disclose recent raw statements.
-- `existing-in-MSH` `operator_review.html:14-46` provides a queue, but also
+- `existing-in-FCP` `operator_review.html:14-46` provides a queue, but also
   offers direct reusable/delete actions that cannot be copied.
-- `existing-in-MSH` `operator_structure.html:10-52` keeps the original visible
+- `existing-in-FCP` `operator_structure.html:10-52` keeps the original visible
   while editing; line 39 labels a combined "Decision / strategy action" field,
   which conflicts with OSL separation.
-- `existing-in-MSH` `strategy_comparison.html:3-31` offers a useful comparison
+- `existing-in-FCP` `strategy_comparison.html:3-31` offers a useful comparison
   layout over legacy, loose fields.
-- `existing-in-MSH` `assist.html:3-38` communicates that assistance does not
+- `existing-in-FCP` `assist.html:3-38` communicates that assistance does not
   decide, but its confirmation is not authenticated review or approval.
-- `existing-in-MSH` `base.html:2,5,51-57` and
+- `existing-in-FCP` `base.html:2,5,51-57` and
   `catalog/flask_app/tests/test_mobile_layout_contract.py:4-39` establish
   viewport/navigation/responsive conventions.
-- `existing-in-MSH` `osl_export.html:3-19` previews the heuristic export and
+- `existing-in-FCP` `osl_export.html:3-19` previews the heuristic export and
   overstates the confidence of inferred evidence status; it is a legacy surface.
 
 ### Security and degraded-state gaps
 
-- `existing-in-MSH` `catalog/flask_app/app.py:37` defaults `SECRET_KEY` to
-  `msh-dev` and line 125 binds to `0.0.0.0` by default.
-- `existing-in-MSH` the operator routes have no authenticated human principal,
+- `existing-in-FCP` `catalog/flask_app/app.py:37` defaults `SECRET_KEY` to
+  `fcp-dev` and line 125 binds to `0.0.0.0` by default.
+- `existing-in-FCP` the operator routes have no authenticated human principal,
   role/scope authorization or CSRF boundary.
-- `existing-in-MSH` `operator_strategy_routes.py:67,85` passes backend storage
+- `existing-in-FCP` `operator_strategy_routes.py:67,85` passes backend storage
   paths to templates; OSL projections must never expose them.
-- `existing-in-MSH` `_source_inventory()` at lines 16-20 turns any exception
+- `existing-in-FCP` `_source_inventory()` at lines 16-20 turns any exception
   into an empty list, conflating failure with "no data".
-- `existing-in-MSH` `capability_onboarding_routes.py:36-60,122-143` and
+- `existing-in-FCP` `capability_onboarding_routes.py:36-60,122-143` and
   `provider_federation_routes.py:39-52,94-105,145-147` contain useful CSRF and
   server-bound-context patterns. Their capability/federation permissions are
   not OSL semantic authority.
-- `existing-in-MSH` federation projection models distinguish empty, degraded
+- `existing-in-FCP` federation projection models distinguish empty, degraded
   and repair states (`catalog/federation/projections/models.py:249-390`); OSL
   views should reuse the explicit-state convention, not federation meaning.
 
@@ -130,7 +130,7 @@ Use the file boundaries committed in
 - `catalog/ai/osl_candidate_adapter.py`: optional adapter to the existing
   versioned AI runtime. It implements the candidate inference port only.
 
-`requires-research-clarification`: MSH has no adequate authenticated human
+`requires-research-clarification`: FCP has no adequate authenticated human
 identity mechanism at the analyzed commit. Read-only redacted routes may be
 built behind an accepted principal adapter, but production-capable mutation
 routes remain disabled until authentication, secure session configuration,
@@ -295,7 +295,7 @@ workflow state, validation outcome, evidence review and publication.
 for typed relations/comparison only. Server validation, policy, lifecycle and
 persistence must work without or despite JavaScript.
 
-`proposed-for-MSH`: sensitive OSL pages load no new third-party analytics,
+`proposed-for-FCP`: sensitive OSL pages load no new third-party analytics,
 fonts or scripts. `base.html` currently includes CDN-hosted assets; the
 implementation must self-host necessary assets or use a sensitive-page base
 that omits unnecessary third-party requests.
@@ -336,7 +336,7 @@ rendered as "action authorized" or "action performed".
 
 ## Actor and authority matrix
 
-This is a `proposed-for-MSH` product authorization model, not paper-defined
+This is a `proposed-for-FCP` product authorization model, not paper-defined
 semantics:
 
 | Actor/capability | Read | Capture/candidate | Draft | Review | Approve | Publish/export | Operational action |
@@ -348,7 +348,7 @@ semantics:
 | approver | exact reviewed revision/findings | no | cannot edit target | read | human decision | no implied publish | no |
 | publisher/curator | approved safe projection | no | no | no | no implied approval | publish/audience; export if granted | no |
 | AI/provider | explicitly allowlisted excerpt only | returns candidate data | no | no | no | no | no |
-| MSH administrator | operational administration | no semantic permission by default | no | no | no | policy-dependent export only | no OSL-derived right |
+| FCP administrator | operational administration | no semantic permission by default | no | no | no | policy-dependent export only | no OSL-derived right |
 
 `requires-research-clarification`: decide whether reviewer, approver and
 publisher must be different people, whether small sites may combine human roles,
@@ -413,7 +413,7 @@ combination.
 
 ## Explaining AI suggestions
 
-`existing-in-MSH`: the current AI explainer is read-only/non-operational
+`existing-in-FCP`: the current AI explainer is read-only/non-operational
 (`docs/ai_explainer.md:3,15,49-52,92,106,147` and
 `catalog/ai/prompts.py:3-13`). Its repository index excludes `data`
 (`catalog/ai/repo_index.py:12-18,43-57`), so it is not an existing
@@ -438,7 +438,7 @@ provider with a different disclosure policy.
 
 ## Accessibility and mobile use
 
-New surfaces target WCAG 2.2 AA as a `proposed-for-MSH` product requirement:
+New surfaces target WCAG 2.2 AA as a `proposed-for-FCP` product requirement:
 
 - one descriptive heading and logical hierarchy; full labels, not placeholders;
 - semantic `fieldset`/`legend` groups for evidence, Decision, Action, review and
@@ -467,7 +467,7 @@ remain profile-defined even when operator labels are localized.
 ### Journey 1: unchanged notebook text to source and excerpts
 
 1. A knowledge capturer opens `GET /osl/sources/new`. The page explains
-   `paper-defined` capture purpose and `proposed-for-MSH` immutability,
+   `paper-defined` capture purpose and `proposed-for-FCP` immutability,
    classification, consent and the fact that capture does not create a strategy.
 2. The user pastes text or uploads an allowed media type and supplies context
    known at capture time. UI does not require OSL concepts yet.
@@ -597,7 +597,7 @@ unchanged and supplies a safe recovery action.
 
 ## Legacy coexistence
 
-- `proposed-for-MSH`: keep `/operator-strategies/*` clearly labelled as legacy
+- `proposed-for-FCP`: keep `/operator-strategies/*` clearly labelled as legacy
   during migration. Do not reinterpret `reusable` as approved/published.
 - Do not redirect a legacy record to canonical OSL without an explicit migration
   map. Do not dual-write legacy and canonical stores.
@@ -609,7 +609,7 @@ unchanged and supplies a safe recovery action.
 - Change navigation/docs only in the delivery where the corresponding route is
   real. Relevant later files include `base.html`, `guide.html`,
   `knowledge.html`, `overview.html`, `docs/operator_guide.md` and
-  `docs/msh_workflow_navigation.md`.
+  `docs/fcp_workflow_navigation.md`.
 
 ## Planned UI/API tests
 
@@ -641,26 +641,26 @@ export eligibility and Ubuntu/Windows responsive contracts.
 
 ## Decisions fixed by this plan
 
-- `proposed-for-MSH`: canonical state is below Flask; UI/API never derives or
+- `proposed-for-FCP`: canonical state is below Flask; UI/API never derives or
   sets lifecycle directly.
-- `proposed-for-MSH`: HTML and JSON use the same application services and
+- `proposed-for-FCP`: HTML and JSON use the same application services and
   authorization/redaction projections.
-- `proposed-for-MSH`: source access is independent of fragment access.
-- `proposed-for-MSH`: every content edit appends a revision; every review,
+- `proposed-for-FCP`: source access is independent of fragment access.
+- `proposed-for-FCP`: every content edit appends a revision; every review,
   approval and publication binds an exact hash.
-- `proposed-for-MSH`: manual workflow is first-class; AI is disclosed and
+- `proposed-for-FCP`: manual workflow is first-class; AI is disclosed and
   candidate-only.
-- `proposed-for-MSH`: import is dry-run then source/candidate/draft only; export
+- `proposed-for-FCP`: import is dry-run then source/candidate/draft only; export
   is a non-mutating, immutable projection.
-- `proposed-for-MSH`: empty, withheld, incomplete and degraded are distinct.
-- `proposed-for-MSH`: publishing cannot expose an execute/activate control.
-- `proposed-for-MSH`: legacy and canonical routes coexist without semantic
+- `proposed-for-FCP`: empty, withheld, incomplete and degraded are distinct.
+- `proposed-for-FCP`: publishing cannot expose an execute/activate control.
+- `proposed-for-FCP`: legacy and canonical routes coexist without semantic
   aliasing or dual writes.
 
 ## Open paper and product decisions
 
 - `requires-research-clarification`: which paper lifecycle/readiness terms are
-  normative language semantics versus method examples or MSH product states?
+  normative language semantics versus method examples or FCP product states?
 - `requires-research-clarification`: which identity provider and role/scope
   model protects Flask routes, and must approval/publication require recent
   authentication or two-person control?

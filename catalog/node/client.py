@@ -294,10 +294,10 @@ class RelayNodeClient:
         self.disconnected_event.clear()
         self.connected_event.set()
         self._receiver_task = asyncio.create_task(
-            self._receiver_loop(), name=f"msh-receiver-{self.node_id}"
+            self._receiver_loop(), name=f"fcp-receiver-{self.node_id}"
         )
         self._heartbeat_task = asyncio.create_task(
-            self._heartbeat_loop(), name=f"msh-heartbeat-{self.node_id}"
+            self._heartbeat_loop(), name=f"fcp-heartbeat-{self.node_id}"
         )
         try:
             coordinator_status = await self.coordinator_status()
@@ -592,7 +592,7 @@ class RelayNodeClient:
         if task is None or task.done():
             task = asyncio.create_task(
                 self._request_replay_pass(session_id),
-                name=f"msh-replay-{session_id}",
+                name=f"fcp-replay-{session_id}",
             )
             self._replay_tasks[session_id] = task
             task.add_done_callback(
@@ -763,7 +763,7 @@ class RelayNodeClient:
             schema = page.get("schema")
             coordinator_id = page.get("coordinator_id")
             if (
-                schema != "msh.coordinator_status.v1"
+                schema != "fcp.coordinator_status.v1"
                 or not isinstance(coordinator_id, str)
                 or not coordinator_id
             ):
@@ -804,7 +804,7 @@ class RelayNodeClient:
             actual_count = sum(len(values) for values in page_sections.values())
             if (
                 pagination.get("schema")
-                != "msh.coordinator_status.pagination.v1"
+                != "fcp.coordinator_status.pagination.v1"
                 or isinstance(page_start, bool)
                 or not isinstance(page_start, int)
                 or page_start != expected_start
@@ -993,7 +993,7 @@ class RelayNodeClient:
             return existing
         task = asyncio.create_task(
             self._run_gap_replay(session_id),
-            name=f"msh-gap-replay-{session_id}",
+            name=f"fcp-gap-replay-{session_id}",
         )
         self._gap_replay_tasks[session_id] = task
         task.add_done_callback(self._observe_gap_replay_task)
@@ -1137,12 +1137,12 @@ def _parser() -> argparse.ArgumentParser:
             command.add_argument("--send-target-node-id")
             command.add_argument(
                 "--send-payload",
-                default='{"text":"MSH relay test"}',
+                default='{"text":"FCP relay test"}',
             )
         elif name == "send":
             command.add_argument("--session-id", required=True)
             command.add_argument("--target-node-id", required=True)
-            command.add_argument("--payload", default='{"text":"MSH relay test"}')
+            command.add_argument("--payload", default='{"text":"FCP relay test"}')
         elif name == "append-event":
             command.add_argument("--session-id", required=True)
             command.add_argument("--event-type", required=True)
@@ -1164,7 +1164,7 @@ async def _print_inbound_messages(client: RelayNodeClient) -> None:
         print(
             json.dumps(
                 {
-                    "schema": "msh.relay.received_message.v1",
+                    "schema": "fcp.relay.received_message.v1",
                     "request_id": envelope.request_id,
                     "session_id": envelope.session_id,
                     "actor_node_id": envelope.actor_node_id,
@@ -1188,7 +1188,7 @@ async def _run_agent_command(
             "--send-session-id and --send-target-node-id must be provided together"
         )
     runner = asyncio.create_task(
-        client.run_forever(), name=f"msh-run-{client.node_id}"
+        client.run_forever(), name=f"fcp-run-{client.node_id}"
     )
     connection_waiter = asyncio.create_task(client.connected_event.wait())
     printer: asyncio.Task[None] | None = None
@@ -1202,7 +1202,7 @@ async def _run_agent_command(
             return
         printer = asyncio.create_task(
             _print_inbound_messages(client),
-            name=f"msh-print-{client.node_id}",
+            name=f"fcp-print-{client.node_id}",
         )
         if has_session:
             result = await client.send_message(

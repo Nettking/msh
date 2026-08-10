@@ -6,7 +6,7 @@ Baseline: `main` after Phase F8 closeout and the addition of the experimental Ma
 
 ## Purpose
 
-This audit establishes the cleanup boundary for **MSH Federation v1.0**. The goal is to turn the completed federation implementation into one stable, supportable release before adding more federation features.
+This audit establishes the cleanup boundary for **FCP Federation v1.0**. The goal is to turn the completed federation implementation into one stable, supportable release before adding more federation features.
 
 The audit separates the repository into five classes:
 
@@ -166,10 +166,10 @@ Classification: design prototype, not production implementation.
 
 Reason:
 
-- starts an independent Flask application on the same default port as MSH;
+- starts an independent Flask application on the same default port as FCP;
 - reads its own sample `docs/` directory rather than the repository documentation;
 - owns separate templates, static files, and dependency list;
-- is not registered through the MSH application factory.
+- is not registered through the FCP application factory.
 
 Required treatment:
 
@@ -181,7 +181,7 @@ Required treatment:
 
 Classification: experiments requiring individual review.
 
-Known examples include desktop-agent and step scripts. They must not be assumed to be supported MSH commands merely because they are committed.
+Known examples include desktop-agent and step scripts. They must not be assumed to be supported FCP commands merely because they are committed.
 
 Required treatment:
 
@@ -282,4 +282,4 @@ git diff --check
 
 ## Current decision
 
-MSH Federation enters release stabilization. Feature expansion is frozen until v1 closeout. UI and documentation product improvements are intentionally preserved as future updates in the post-v1 roadmap rather than mixed into the initial repository audit or deletion change.
+FCP Federation enters release stabilization. Feature expansion is frozen until v1 closeout. UI and documentation product improvements are intentionally preserved as future updates in the post-v1 roadmap rather than mixed into the initial repository audit or deletion change.

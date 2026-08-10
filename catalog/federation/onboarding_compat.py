@@ -20,9 +20,9 @@ from .onboarding_models import (
 
 LEGACY_SETUP_SCHEMAS = {
     None,
-    "msh.server_setup.v1",
-    "msh.server_setup.v2",
-    "msh.server_setup.v3",
+    "fcp.server_setup.v1",
+    "fcp.server_setup.v2",
+    "fcp.server_setup.v3",
 }
 LEGACY_DEPLOYMENT_MODES = {
     "full-server",
@@ -46,7 +46,7 @@ def federation_id_from_session_id(session_id: str) -> str:
 
     session_id = _safe_text(session_id, "session_id")
     digest = hashlib.sha256(
-        ("msh-federation-id-v1\0" + session_id).encode("utf-8")
+        ("fcp-federation-id-v1\0" + session_id).encode("utf-8")
     ).hexdigest()
     return f"federation-{digest[:32]}"
 
@@ -63,7 +63,7 @@ def federation_id_matches_session(
 class LegacySetupMigrationPreview(OnboardingModel):
     """Safe preview of a future migration; never an activation command."""
 
-    SCHEMA: ClassVar[str] = "msh.onboarding.legacy-migration-preview.v1"
+    SCHEMA: ClassVar[str] = "fcp.onboarding.legacy-migration-preview.v1"
 
     source_schema: str
     source_mode: str

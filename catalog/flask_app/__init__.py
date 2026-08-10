@@ -1,1 +1,1 @@
-"""Flask-first web application package for MSH."""
+"""Flask-first web application package for FCP."""

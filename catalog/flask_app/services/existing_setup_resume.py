@@ -1,4 +1,4 @@
-"""Reconnect an existing MSH setup after a code update.
+"""Reconnect an existing FCP setup after a code update.
 
 This workflow deliberately reuses durable identity, Federation membership,
 inspection evidence, benchmark evidence, and operator choices. It never creates
@@ -268,7 +268,7 @@ class ExistingSetupResumeService:
 
 
 def _print_report(report: ResumeReport) -> None:
-    print("Existing MSH setup resumed safely.", flush=True)
+    print("Existing FCP setup resumed safely.", flush=True)
     print(f"  Saved inspection revision: {report.inspection_revision}", flush=True)
     print(f"  Saved benchmark results reused: {len(report.benchmark_runs)}", flush=True)
     for benchmark_id, target, state in report.benchmark_runs:
@@ -306,20 +306,20 @@ def main() -> int:
             report = service.resume()
         except ExistingSetupRequired:
             print(
-                "No saved MSH identity and Federation membership were found. "
+                "No saved FCP identity and Federation membership were found. "
                 "First-time onboarding is required.",
                 flush=True,
             )
             return 2
         except ExistingSetupResumeError as exc:
             print(
-                f"Existing MSH setup needs repair: {exc.code}",
+                f"Existing FCP setup needs repair: {exc.code}",
                 flush=True,
             )
             return 3
         except Exception as exc:  # noqa: BLE001 - CLI boundary must not leak secrets
             print(
-                "Existing MSH setup resume failed safely: "
+                "Existing FCP setup resume failed safely: "
                 f"{type(exc).__name__}",
                 flush=True,
             )

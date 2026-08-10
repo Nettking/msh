@@ -1,6 +1,6 @@
-# MSH Wiki Home
+# FCP Wiki Home
 
-This is the versioned wiki source for MSH. It mirrors the user-facing app structure so the documentation stays aligned with the UI.
+This is the versioned wiki source for FCP. It mirrors the user-facing app structure so the documentation stays aligned with the UI.
 
 ## App structure
 

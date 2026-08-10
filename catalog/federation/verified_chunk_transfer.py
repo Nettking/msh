@@ -49,11 +49,11 @@ from .object_transfer import (
 from .object_transfer_staging import FilesystemObjectTransferChunkStore
 from .peer_stream import PeerStreamFrame, peer_stream_nonce, validate_peer_public_text
 
-DIRECT_OBJECT_TRANSFER_PACKET_SCHEMA = "msh.direct_object_transfer.packet.v1"
-DIRECT_OBJECT_TRANSFER_MESSAGE_SCHEMA = "msh.direct_object_transfer.message.v1"
-DIRECT_OBJECT_TRANSFER_ACK_SCHEMA = "msh.direct_object_transfer.ack.v1"
+DIRECT_OBJECT_TRANSFER_PACKET_SCHEMA = "fcp.direct_object_transfer.packet.v1"
+DIRECT_OBJECT_TRANSFER_MESSAGE_SCHEMA = "fcp.direct_object_transfer.message.v1"
+DIRECT_OBJECT_TRANSFER_ACK_SCHEMA = "fcp.direct_object_transfer.ack.v1"
 DIRECT_OBJECT_TRANSFER_PROTOCOL_VERSION = "1.0"
-DIRECT_OBJECT_TRANSFER_CIPHER_CONTEXT = "msh-verified-object-transfer-v1"
+DIRECT_OBJECT_TRANSFER_CIPHER_CONTEXT = "fcp-verified-object-transfer-v1"
 MAX_DIRECT_OBJECT_TRANSFER_PACKET_BYTES = 131_072
 DEFAULT_TRANSFER_ATTEMPTS = 4
 DEFAULT_TRANSFER_SEQUENCE_GAP = 64
@@ -252,7 +252,7 @@ class ObjectTransferAck:
             )
         if self.receipt is not None and (
             not isinstance(self.receipt, dict)
-            or self.receipt.get("schema") != "msh.object_transfer.receipt.v1"
+            or self.receipt.get("schema") != "fcp.object_transfer.receipt.v1"
             or self.receipt.get("verified") is not True
             or not self.accepted
             or self.action != "complete"
@@ -507,7 +507,7 @@ class VerifiedChunkTransferEndpoint:
         if staging_parent is not None:
             Path(staging_parent).mkdir(parents=True, exist_ok=True)
         self._temporary = tempfile.TemporaryDirectory(
-            prefix="msh-f642-",
+            prefix="fcp-f642-",
             dir=str(staging_parent) if staging_parent is not None else None,
         )
         self.store = FilesystemObjectTransferChunkStore(
@@ -701,7 +701,7 @@ class VerifiedChunkTransferEndpoint:
 
     @staticmethod
     def _write_temporary_source(content: bytes) -> Path:
-        with tempfile.NamedTemporaryFile(prefix="msh-f642-source-", delete=False) as handle:
+        with tempfile.NamedTemporaryFile(prefix="fcp-f642-source-", delete=False) as handle:
             handle.write(content)
             handle.flush()
             return Path(handle.name)

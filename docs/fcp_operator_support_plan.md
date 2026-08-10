@@ -1,17 +1,17 @@
-# MSH operator support direction
+# FCP operator support direction
 
-MSH should not only be a dashboard. The app should become an operator support system that helps capture, structure, reuse, and validate operator strategies.
+FCP should not only be a dashboard. The app should become an operator support system that helps capture, structure, reuse, and validate operator strategies.
 
 ## Core idea
 
-MSH is the practical collection and use layer for operator knowledge:
+FCP is the practical collection and use layer for operator knowledge:
 
 ```text
 operator experience
-  -> MSH captures a raw statement
+  -> FCP captures a raw statement
   -> the statement is reviewed later
   -> the note is structured with OSL/paper keywords
-  -> MSH can compare strategies and define intervention logic
+  -> FCP can compare strategies and define intervention logic
   -> reusable strategies export to SysML
   -> Digital Twin / recommender uses the strategy for support
   -> operator validates the outcome
@@ -124,7 +124,7 @@ Learning mode should reuse structured operator notes, quality outcomes, first-pa
 4. Do not automate unsafe CNC decisions. Actions such as tool changes, offset changes, feed reduction, pause production, part inspection, and supervisor calls should support operator confirmation.
 5. Keep diagnostics separate from operator support. Diagnostics explains why the system is not ready; Assist explains what can be done.
 6. Connect strategy to quality. A strategy becomes more valuable when the app stores whether it improved surface finish, dimensional accuracy, or production stability.
-7. Treat MSH as the OSL data collector. OSL is the formal strategy structure. MSH is where strategies are captured, validated, compared, and exported.
+7. Treat FCP as the OSL data collector. OSL is the formal strategy structure. FCP is where strategies are captured, validated, compared, and exported.
 
 ## Minimum useful milestone
 
@@ -138,4 +138,4 @@ The first useful version should include:
 6. SysML export for reusable strategies.
 7. In-app Guide page for users.
 
-This moves MSH from a dashboard toward a practical operator support system while keeping the app understandable during field use.
+This moves FCP from a dashboard toward a practical operator support system while keeping the app understandable during field use.

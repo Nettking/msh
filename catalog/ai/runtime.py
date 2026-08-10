@@ -36,7 +36,7 @@ from .runtime_contracts import (
 )
 
 LANGUAGE_MODEL_CAPABILITY = "language-model"
-LANGUAGE_MODEL_PROTOCOL = "msh-language-model"
+LANGUAGE_MODEL_PROTOCOL = "fcp-language-model"
 LANGUAGE_MODEL_PROTOCOL_VERSION = "1.0"
 MAX_REGISTERED_AI_PROVIDERS = 128
 MAX_PENDING_AI_REQUESTS = 1024

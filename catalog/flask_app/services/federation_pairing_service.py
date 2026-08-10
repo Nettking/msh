@@ -1,4 +1,4 @@
-"""Authenticated copy-and-paste pairing for physical MSH devices.
+"""Authenticated copy-and-paste pairing for physical FCP devices.
 
 The public device ID identifies a key but grants no membership. Pairing therefore
 uses a signed, short-lived bundle containing one-use enrollment and invitation
@@ -51,10 +51,10 @@ from .capability_onboarding_service import (
     CapabilityOnboardingService,
 )
 
-PAIRING_CODE_PREFIX: Final = "MSH1-"
-PAIRING_CODE_SCHEMA: Final = "msh.federation.pairing-code.v1"
-PAIRING_PAYLOAD_SCHEMA: Final = "msh.federation.pairing-offer.v1"
-PAIRING_STATE_SCHEMA: Final = "msh.federation.remote-pairing.v1"
+PAIRING_CODE_PREFIX: Final = "FCP1-"
+PAIRING_CODE_SCHEMA: Final = "fcp.federation.pairing-code.v1"
+PAIRING_PAYLOAD_SCHEMA: Final = "fcp.federation.pairing-offer.v1"
+PAIRING_STATE_SCHEMA: Final = "fcp.federation.remote-pairing.v1"
 MAX_PAIRING_CODE_BYTES: Final = 32_768
 MAX_PAIRING_TTL_SECONDS: Final = 600
 DEFAULT_PAIRING_TTL_SECONDS: Final = 300
@@ -584,7 +584,7 @@ class PairingRelayRuntime:
 
             thread = threading.Thread(
                 target=run,
-                name="msh-pairing-relay",
+                name="fcp-pairing-relay",
                 daemon=True,
             )
             self._thread = thread

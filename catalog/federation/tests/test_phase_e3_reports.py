@@ -43,7 +43,7 @@ def _control(database: Path) -> PhaseDControlPlane:
 
 def _report(*, revision: int = 1, manifest_revision: int = 1, manifest_hash: str, datasets: tuple[DatasetManifest, ...], committed_hashes: tuple[str, ...], eligible: bool = True, reasons: tuple[str, ...] = ("eligible",), integrity_verified: bool = True, synchronization_state: str = "synchronized", provider_id: str = "provider-a", session_id: str = "session-1", group_id: str = "storage-main") -> StorageReplicaReport:
     return StorageReplicaReport(
-        schema="msh.storage_replica_report.v1",
+        schema="fcp.storage_replica_report.v1",
         protocol_version="1.0",
         session_id=session_id,
         group_id=group_id,
@@ -97,7 +97,7 @@ def test_e3_rejects_wrong_session_group_sender_and_unknown_protocol() -> None:
     )
     with pytest.raises(FederationValidationError):
         StorageReplicaReport(
-            schema="msh.storage_replica_report.v9",
+            schema="fcp.storage_replica_report.v9",
             protocol_version="1.0",
             session_id="session-1",
             group_id="storage-main",
@@ -125,7 +125,7 @@ def test_e3_rejects_wrong_session_group_sender_and_unknown_protocol() -> None:
 
     with pytest.raises(FederationValidationError):
         StorageReplicaReport(
-            schema="msh.storage_replica_report.v1",
+            schema="fcp.storage_replica_report.v1",
             protocol_version="2.0",
             session_id="session-1",
             group_id="storage-main",

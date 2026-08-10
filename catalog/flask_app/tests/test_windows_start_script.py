@@ -28,7 +28,7 @@ def _port_resolver_script() -> str:
         _repository_root()
         / "scripts"
         / "windows"
-        / "resolve_msh_web_port.ps1"
+        / "resolve_fcp_web_port.ps1"
     ).read_text(encoding="utf-8")
 
 
@@ -41,18 +41,18 @@ def test_start_cmd_builds_background_services_then_starts_web() -> None:
     assert "call :ensure_ollama_model" in script
     assert "Ollama benchmark model is ready" in script
     assert "docker compose port flask 5000" in script
-    assert 'set "MSH_WEB_CLIENT_HOST=%MSH_WEB_BIND%"' in script
-    assert 'set "MSH_BASE_URL=http://%MSH_WEB_CLIENT_HOST%:%MSH_WEB_PORT_RESOLVED%"' in script
-    assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%"' in script
-    assert 'set "MSH_OPEN_URL=%MSH_ONBOARDING_URL%"' in script
-    assert "-Uri '%MSH_BASE_URL%/onboarding'" in script
-    assert 'start "" "%MSH_OPEN_URL%"' in script
-    assert "%MSH_BASE_URL%/federation" in script
-    assert "%MSH_BASE_URL%/status" in script
-    assert "%MSH_BASE_URL%/docs" in script
+    assert 'set "FCP_WEB_CLIENT_HOST=%FCP_WEB_BIND%"' in script
+    assert 'set "FCP_BASE_URL=http://%FCP_WEB_CLIENT_HOST%:%FCP_WEB_PORT_RESOLVED%"' in script
+    assert 'set "FCP_OPEN_URL=%FCP_BASE_URL%"' in script
+    assert 'set "FCP_OPEN_URL=%FCP_ONBOARDING_URL%"' in script
+    assert "-Uri '%FCP_BASE_URL%/onboarding'" in script
+    assert 'start "" "%FCP_OPEN_URL%"' in script
+    assert "%FCP_BASE_URL%/federation" in script
+    assert "%FCP_BASE_URL%/status" in script
+    assert "%FCP_BASE_URL%/docs" in script
     assert "docker compose ps relay ollama flask recorder" in script
-    assert 'set "MSH_WEB_BIND=127.0.0.1"' in script
-    assert 'set "COMPOSE_PROJECT_NAME=msh"' in script
+    assert 'set "FCP_WEB_BIND=127.0.0.1"' in script
+    assert 'set "COMPOSE_PROJECT_NAME=fcp"' in script
     assert "Invoke-WebRequest" in script
     assert script.index("docker compose up -d relay ollama recorder") < script.index(
         "call :ensure_ollama_model"
@@ -61,7 +61,7 @@ def test_start_cmd_builds_background_services_then_starts_web() -> None:
         "docker compose up -d flask"
     )
     assert script.index("Invoke-WebRequest") < script.index(
-        'start "" "%MSH_OPEN_URL%"'
+        'start "" "%FCP_OPEN_URL%"'
     )
     assert "docker compose up --build" not in script
 
@@ -71,37 +71,37 @@ def test_start_cmd_recovers_runtime_state_before_compose_start() -> None:
     resolver = _port_resolver_script()
 
     assert "call :resolve_runtime_state" in script
-    assert "resolve_msh_web_port.ps1" in script
-    assert 'set "MSH_WEB_PORT=5000"' in script
-    assert 'set "MSH_WEB_PORT_EXPLICIT=0"' in script
-    assert 'set "MSH_DATA_DIR_DEFAULTED=1"' in script
-    assert 'set "MSH_RESULTS_DIR_DEFAULTED=1"' in script
+    assert "resolve_fcp_web_port.ps1" in script
+    assert 'set "FCP_WEB_PORT=5000"' in script
+    assert 'set "FCP_WEB_PORT_EXPLICIT=0"' in script
+    assert 'set "FCP_DATA_DIR_DEFAULTED=1"' in script
+    assert 'set "FCP_RESULTS_DIR_DEFAULTED=1"' in script
     assert "-AllowFallback" in script
-    assert '-OutputFile "%MSH_RUNTIME_FILE%"' in script
-    assert '> "%MSH_RUNTIME_FILE%"' not in script
-    assert 'if /I "%%A"=="MSH_RELAY_VOLUME_NAME"' in script
-    assert 'if /I "%%A"=="MSH_DATA_DIR"' in script
-    assert "Runtime-state resolver omitted MSH_WEB_PORT" in script
+    assert '-OutputFile "%FCP_RUNTIME_FILE%"' in script
+    assert '> "%FCP_RUNTIME_FILE%"' not in script
+    assert 'if /I "%%A"=="FCP_RELAY_VOLUME_NAME"' in script
+    assert 'if /I "%%A"=="FCP_DATA_DIR"' in script
+    assert "Runtime-state resolver omitted FCP_WEB_PORT" in script
     assert "Resolver output was:" in script
     assert script.index("call :resolve_runtime_state") < script.index(
         "docker compose build relay flask recorder"
     )
 
-    assert '[string]$CurrentProjectName = "msh"' in resolver
+    assert '[string]$CurrentProjectName = "fcp"' in resolver
     assert '[string]$OutputFile = ""' in resolver
     assert "System.Text.UTF8Encoding($false)" in resolver
     assert "WriteAllLines" in resolver
     assert 'docker ps --filter "publish=$PreferredPort"' in resolver
-    assert "Test-MshFlaskContainer" in resolver
+    assert "Test-FcpFlaskContainer" in resolver
     assert "Get-IdentityNodeId" in resolver
     assert "Get-RelayVolumeProbe" in resolver
     assert "session_memberships" in resolver
     assert "memberships -gt 0" in resolver
     assert "Recovered Federation coordinator volume" in resolver
-    assert "MSH_RELAY_VOLUME_NAME=" in resolver
-    assert "MSH_DATA_DIR=" in resolver
+    assert "FCP_RELAY_VOLUME_NAME=" in resolver
+    assert "FCP_DATA_DIR=" in resolver
     assert "No Docker volume is deleted" in resolver
-    assert "MSH will use http://localhost:$candidate" in resolver
+    assert "FCP will use http://localhost:$candidate" in resolver
     assert "docker volume rm" not in resolver
     assert "docker volume prune" not in resolver
     assert "Stop-Process" not in resolver
@@ -111,12 +111,12 @@ def test_start_cmd_recovers_runtime_state_before_compose_start() -> None:
 def test_compose_uses_selected_state_and_host_data_locations() -> None:
     compose = _compose_file()
 
-    assert "source: ${MSH_DATA_DIR:-./data}" in compose
-    assert "source: ${MSH_RESULTS_DIR:-./results}" in compose
-    assert "name: ${MSH_RELAY_VOLUME_NAME:-msh_relay_state}" in compose
-    assert "name: ${MSH_OLLAMA_VOLUME_NAME:-msh_ollama_models}" in compose
+    assert "source: ${FCP_DATA_DIR:-./data}" in compose
+    assert "source: ${FCP_RESULTS_DIR:-./results}" in compose
+    assert "name: ${FCP_RELAY_VOLUME_NAME:-fcp_relay_state}" in compose
+    assert "name: ${FCP_OLLAMA_VOLUME_NAME:-fcp_ollama_models}" in compose
     assert (
-        "name: ${MSH_MODEL_PROVIDER_VOLUME_NAME:-msh_model_provider_models}"
+        "name: ${FCP_MODEL_PROVIDER_VOLUME_NAME:-fcp_model_provider_models}"
         in compose
     )
 
@@ -127,7 +127,7 @@ def test_windows_port_resolver_has_valid_powershell_syntax() -> None:
         _repository_root()
         / "scripts"
         / "windows"
-        / "resolve_msh_web_port.ps1"
+        / "resolve_fcp_web_port.ps1"
     )
     escaped_path = str(path).replace("'", "''")
     command = (
@@ -150,23 +150,23 @@ def test_start_cmd_verifies_the_exact_ollama_model_before_opening_browser() -> N
     script = _start_script()
 
     assert ":ensure_ollama_model" in script
-    assert "os.environ.get('MSH_AI_MODEL') or 'llama3.2:3b'" in script
-    assert 'ollama show "%MSH_AI_MODEL_RESOLVED%"' in script
+    assert "os.environ.get('FCP_AI_MODEL') or 'llama3.2:3b'" in script
+    assert 'ollama show "%FCP_AI_MODEL_RESOLVED%"' in script
     assert (
         "docker compose --profile model-install run --rm --entrypoint "
-        "/bin/ollama ollama-pull pull \"%MSH_AI_MODEL_RESOLVED%\""
+        "/bin/ollama ollama-pull pull \"%FCP_AI_MODEL_RESOLVED%\""
         in script
     )
-    assert "attempt %MSH_MODEL_ATTEMPT% of 3" in script
-    assert "if %MSH_MODEL_ATTEMPT% GEQ 3" in script
+    assert "attempt %FCP_MODEL_ATTEMPT% of 3" in script
+    assert "if %FCP_MODEL_ATTEMPT% GEQ 3" in script
     assert "Ollama does not contain the required model" in script
     assert "webapp will not be opened with a missing benchmark model" in script
     assert script.index("call :ensure_ollama_model") < script.index(
-        'start "" "%MSH_OPEN_URL%"'
+        'start "" "%FCP_OPEN_URL%"'
     )
 
     assert (
-        "MSH will continue, but the language-model benchmark may be unavailable"
+        "FCP will continue, but the language-model benchmark may be unavailable"
         not in script
     )
 
@@ -175,7 +175,7 @@ def test_start_cmd_resume_runs_before_long_running_flask_container() -> None:
     script = _start_script()
 
     assert 'if /I "%~1"=="--resume"' in script
-    assert 'set "MSH_RESUME_EXISTING=1"' in script
+    assert 'set "FCP_RESUME_EXISTING=1"' in script
     assert "call :run_existing_setup_resume" in script
     resume_command = (
         "docker compose run --rm --no-deps --entrypoint python flask -m "
@@ -204,9 +204,9 @@ def test_start_cmd_resume_runs_before_long_running_flask_container() -> None:
         "catalog.flask_app.services.existing_setup_resume"
         not in script
     )
-    assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/federation"' in script
-    assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/federation/benchmarks"' not in script
-    assert 'set "MSH_OPEN_URL=%MSH_BASE_URL%/onboarding?repair=1"' in script
+    assert 'set "FCP_OPEN_URL=%FCP_BASE_URL%/federation"' in script
+    assert 'set "FCP_OPEN_URL=%FCP_BASE_URL%/federation/benchmarks"' not in script
+    assert 'set "FCP_OPEN_URL=%FCP_BASE_URL%/onboarding?repair=1"' in script
     assert "No identity or Federation was replaced" in script
     assert "start.cmd --resume" in script
     assert "reuse saved inspection and benchmark evidence without rerunning" in script
@@ -214,9 +214,9 @@ def test_start_cmd_resume_runs_before_long_running_flask_container() -> None:
     assert "run its benchmark plan" not in resume_block
 
     flask_start = script.index("docker compose up -d flask")
-    assert flask_start < script.index("Waiting for the MSH webapp")
-    assert script.index("Waiting for the MSH webapp") < script.index(
-        'start "" "%MSH_OPEN_URL%"'
+    assert flask_start < script.index("Waiting for the FCP webapp")
+    assert script.index("Waiting for the FCP webapp") < script.index(
+        'start "" "%FCP_OPEN_URL%"'
     )
 
 
@@ -265,7 +265,7 @@ def test_start_cmd_fresh_mode_resets_and_verifies_authoritative_state() -> None:
     assert "Remove-Item -LiteralPath 'data\\source_state'" not in script
 
 
-def test_fresh_launch_clears_only_msh_onboarding_browser_progress() -> None:
+def test_fresh_launch_clears_only_fcp_onboarding_browser_progress() -> None:
     script = (
         _repository_root()
         / "catalog"
@@ -276,7 +276,7 @@ def test_fresh_launch_clears_only_msh_onboarding_browser_progress() -> None:
     ).read_text(encoding="utf-8")
 
     assert 'url.searchParams.get("fresh") !== "1"' in script
-    assert 'key.indexOf("msh.onboarding.") === 0' in script
+    assert 'key.indexOf("fcp.onboarding.") === 0' in script
     assert "window.localStorage.removeItem(key)" in script
     assert 'url.searchParams.delete("fresh")' in script
     assert 'url.searchParams.delete("reset")' in script
@@ -286,17 +286,17 @@ def test_fresh_launch_clears_only_msh_onboarding_browser_progress() -> None:
 def test_start_cmd_uses_bound_address_for_local_readiness() -> None:
     script = _start_script()
 
-    assert 'set "MSH_WEB_CLIENT_HOST=%MSH_WEB_BIND%"' in script
+    assert 'set "FCP_WEB_CLIENT_HOST=%FCP_WEB_BIND%"' in script
     assert (
-        'if "%MSH_WEB_CLIENT_HOST%"=="0.0.0.0" '
-        'set "MSH_WEB_CLIENT_HOST=127.0.0.1"'
+        'if "%FCP_WEB_CLIENT_HOST%"=="0.0.0.0" '
+        'set "FCP_WEB_CLIENT_HOST=127.0.0.1"'
     ) in script
     assert (
-        'set "MSH_BASE_URL=http://%MSH_WEB_CLIENT_HOST%:%MSH_WEB_PORT_RESOLVED%"'
+        'set "FCP_BASE_URL=http://%FCP_WEB_CLIENT_HOST%:%FCP_WEB_PORT_RESOLVED%"'
         in script
     )
-    assert 'set "MSH_BASE_URL=http://localhost:%MSH_WEB_PORT_RESOLVED%"' not in script
-    assert "-Uri '%MSH_BASE_URL%/onboarding'" in script
+    assert 'set "FCP_BASE_URL=http://localhost:%FCP_WEB_PORT_RESOLVED%"' not in script
+    assert "-Uri '%FCP_BASE_URL%/onboarding'" in script
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows cmd expansion regression")
@@ -311,17 +311,17 @@ def test_start_cmd_expands_reachable_client_base_url(
 ) -> None:
     script = _start_script()
     lines = script.splitlines()
-    start = lines.index('set "MSH_WEB_CLIENT_HOST=%MSH_WEB_BIND%"')
+    start = lines.index('set "FCP_WEB_CLIENT_HOST=%FCP_WEB_BIND%"')
     base_url_lines = lines[start : start + 3]
 
     batch_file = tmp_path / "resolve-client-base.cmd"
     batch_file.write_text(
         "@echo off\n"
-        f'set "MSH_WEB_BIND={bind_address}"\n'
-        'set "MSH_WEB_PORT_RESOLVED=5004"\n'
+        f'set "FCP_WEB_BIND={bind_address}"\n'
+        'set "FCP_WEB_PORT_RESOLVED=5004"\n'
         + "\n".join(base_url_lines)
         + "\n"
-        + "echo %MSH_BASE_URL%\n",
+        + "echo %FCP_BASE_URL%\n",
         encoding="utf-8",
     )
 

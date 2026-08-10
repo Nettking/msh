@@ -264,7 +264,7 @@ class BenchmarkRunner:
 
         thread = threading.Thread(
             target=invoke,
-            name=f"msh-benchmark-{entry.definition.benchmark_id}",
+            name=f"fcp-benchmark-{entry.definition.benchmark_id}",
             daemon=True,
         )
         try:

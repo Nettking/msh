@@ -31,8 +31,8 @@ from catalog.federation.tests.cf7_acceptance.physical_evidence import (
     validate_physical_evidence,
 )
 
-LOCAL_SCHEMA: Final = "msh.cf7.physical-readiness.v1"
-TOPOLOGY_SCHEMA: Final = "msh.cf7.physical-topology.v1"
+LOCAL_SCHEMA: Final = "fcp.cf7.physical-readiness.v1"
+TOPOLOGY_SCHEMA: Final = "fcp.cf7.physical-topology.v1"
 MAX_HTTP_BYTES: Final = 1_048_576
 DEFAULT_TIMEOUT_SECONDS: Final = 5.0
 
@@ -41,19 +41,19 @@ MACHINE_PROFILES: Final[dict[str, dict[str, object]]] = {
         "expected_os": "windows",
         "roles": ("language-model", "desktop-browser"),
         "required_environment": (
-            "MSH_CF7_OLLAMA_URL",
-            "MSH_CF7_OLLAMA_MODEL",
+            "FCP_CF7_OLLAMA_URL",
+            "FCP_CF7_OLLAMA_MODEL",
         ),
     },
     "cnc-recorder": {
         "expected_os": None,
         "roles": ("recorder", "mtconnect"),
-        "required_environment": ("MSH_CF7_MTCONNECT_ENDPOINTS",),
+        "required_environment": ("FCP_CF7_MTCONNECT_ENDPOINTS",),
     },
     "school-control": {
         "expected_os": None,
         "roles": ("control", "registered-compute", "storage-candidate"),
-        "required_environment": ("MSH_CF7_PEERS",),
+        "required_environment": ("FCP_CF7_PEERS",),
     },
 }
 
@@ -272,11 +272,11 @@ def _safe_join_endpoint(base_url: str, suffix: str) -> str:
 
 
 def probe_ollama() -> dict[str, object]:
-    base_url = os.environ.get("MSH_CF7_OLLAMA_URL", "").strip()
-    model = os.environ.get("MSH_CF7_OLLAMA_MODEL", "").strip()
+    base_url = os.environ.get("FCP_CF7_OLLAMA_URL", "").strip()
+    model = os.environ.get("FCP_CF7_OLLAMA_MODEL", "").strip()
     if not base_url or not model:
         raise ReadinessError(
-            "set MSH_CF7_OLLAMA_URL and MSH_CF7_OLLAMA_MODEL"
+            "set FCP_CF7_OLLAMA_URL and FCP_CF7_OLLAMA_MODEL"
         )
     started = time.monotonic()
     inventory = _http_json(_safe_join_endpoint(base_url, "/api/tags"))
@@ -302,7 +302,7 @@ def probe_ollama() -> dict[str, object]:
 
 
 def probe_mtconnect() -> dict[str, object]:
-    endpoints = parse_private_mapping("MSH_CF7_MTCONNECT_ENDPOINTS")
+    endpoints = parse_private_mapping("FCP_CF7_MTCONNECT_ENDPOINTS")
     if len(endpoints) < 2:
         raise ReadinessError(
             "configure aliases for both physical CNC MTConnect agents"
@@ -374,7 +374,7 @@ def _parse_host_port(value: str) -> tuple[str, int]:
 
 
 def probe_peers() -> dict[str, object]:
-    targets = parse_private_mapping("MSH_CF7_PEERS")
+    targets = parse_private_mapping("FCP_CF7_PEERS")
     if len(targets) < 2:
         raise ReadinessError(
             "configure at least two independent peer aliases"

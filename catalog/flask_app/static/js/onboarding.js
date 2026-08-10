@@ -41,7 +41,7 @@
     try {
       for (var index = window.localStorage.length - 1; index >= 0; index -= 1) {
         var key = window.localStorage.key(index);
-        if (key && key.indexOf("msh.onboarding.") === 0) {
+        if (key && key.indexOf("fcp.onboarding.") === 0) {
           window.localStorage.removeItem(key);
         }
       }

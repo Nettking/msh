@@ -60,9 +60,9 @@ PROBE_XML = """<?xml version="1.0" encoding="UTF-8"?>
 
 
 def load_recorder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
-    monkeypatch.setenv("MSH_RECORDER_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("FCP_RECORDER_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv(
-        "MSH_RECORDER_LOG_FILE",
+        "FCP_RECORDER_LOG_FILE",
         str(tmp_path / "data" / "source_state" / "recorder.log"),
     )
     module_name = f"ordered_recorder_{tmp_path.name}"

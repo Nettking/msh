@@ -23,7 +23,7 @@ from .storage_protocol import StorageOperation
 if TYPE_CHECKING:
     from .phase_d_control import PhaseDControlPlane
 
-PROMOTION_PUBLICATION_SCHEMA = "msh.storage_promotion_publication.v1"
+PROMOTION_PUBLICATION_SCHEMA = "fcp.storage_promotion_publication.v1"
 _COORDINATOR_ACTOR = "phase-e-promotion-coordinator"
 
 

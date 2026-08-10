@@ -2,32 +2,32 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONTAINER="${MSH_PHONE_CONTAINER:-msh-phone}"
-STATE_DIR="${MSH_PHONE_STATE:-$HOME/msh-phone-state}"
+CONTAINER="${FCP_PHONE_CONTAINER:-fcp-phone}"
+STATE_DIR="${FCP_PHONE_STATE:-$HOME/fcp-phone-state}"
 DATA_DIR="$STATE_DIR/data"
 RESULTS_DIR="$STATE_DIR/results"
 LOG_FILE="$RESULTS_DIR/termux-phone.log"
 PID_FILE="$RESULTS_DIR/termux-phone.pid"
-PORT="${MSH_PHONE_PORT:-5000}"
+PORT="${FCP_PHONE_PORT:-5000}"
 URL="http://127.0.0.1:$PORT"
-STOP_WAIT_SECONDS="${MSH_PHONE_STOP_WAIT_SECONDS:-10}"
-KILL_WAIT_SECONDS="${MSH_PHONE_KILL_WAIT_SECONDS:-3}"
-PROC_ROOT="${MSH_PHONE_PROC_ROOT:-/proc}"
+STOP_WAIT_SECONDS="${FCP_PHONE_STOP_WAIT_SECONDS:-10}"
+KILL_WAIT_SECONDS="${FCP_PHONE_KILL_WAIT_SECONDS:-3}"
+PROC_ROOT="${FCP_PHONE_PROC_ROOT:-/proc}"
 
 usage() {
     cat <<'USAGE'
-Usage: bash termux/msh-phone.sh COMMAND [ARGS]
+Usage: bash termux/fcp-phone.sh COMMAND [ARGS]
 
 Commands:
   doctor                 Check the Termux/PRoot installation.
-  start                  Start MSH in the background.
-  foreground             Run MSH in the foreground for debugging.
-  stop                   Stop all MSH phone sessions.
-  restart                Stop and start MSH.
+  start                  Start FCP in the background.
+  foreground             Run FCP in the foreground for debugging.
+  stop                   Stop all FCP phone sessions.
+  restart                Stop and start FCP.
   status                 Show PRoot and HTTP status.
   logs [LINES]           Show the latest log lines (default 120).
-  open                   Open MSH in the Android browser.
-  shell                  Open a shell inside the MSH Linux container.
+  open                   Open FCP in the Android browser.
+  shell                  Open a shell inside the FCP Linux container.
   demo-reset             Replace data/demo with the bundled example data.
   cache-rebuild          Rebuild the Parquet/DuckDB telemetry cache.
   prep                    Run the one-shot orchestration CLI.
@@ -63,7 +63,7 @@ login_base=(
     --work-dir /app
     --env "FLASK_RUN_HOST=0.0.0.0"
     --env "FLASK_RUN_PORT=$PORT"
-    --env "MSH_FLASK_SECRET=msh-phone-local"
+    --env "FCP_FLASK_SECRET=fcp-phone-local"
     --env "MPLBACKEND=Agg"
     --env "PYTHONDONTWRITEBYTECODE=1"
 )
@@ -123,7 +123,7 @@ container_session_pids() {
 
     # PRoot-Distro 5.3 has no `ps` or `kill` command. Its proot process still
     # exposes the container rootfs in /proc, which lets us find only sessions
-    # belonging to this MSH container (including sessions started before the
+    # belonging to this FCP container (including sessions started before the
     # PID file was introduced).
     for cmdline_file in "$PROC_ROOT"/[0-9]*/cmdline; do
         [[ -r "$cmdline_file" ]] || continue
@@ -201,13 +201,13 @@ stop_server() {
     fi
 
     if http_ready; then
-        echo "MSH is still responding at $URL; stop was not confirmed." >&2
+        echo "FCP is still responding at $URL; stop was not confirmed." >&2
         return 1
     fi
 
     rm -f "$PID_FILE"
-    if [[ "$quiet" != "true" && "${MSH_PHONE_STOP_QUIET:-0}" != "1" ]]; then
-        echo "MSH stopped."
+    if [[ "$quiet" != "true" && "${FCP_PHONE_STOP_QUIET:-0}" != "1" ]]; then
+        echo "FCP stopped."
     fi
 }
 
@@ -225,7 +225,7 @@ start_server_process() {
         </dev/null >> "$LOG_FILE" 2>&1 &
     local server_pid=$!
     if ! remember_server_pid "$server_pid"; then
-        echo "Could not record the MSH server process." >&2
+        echo "Could not record the FCP server process." >&2
         kill "$server_pid" 2>/dev/null || true
         return 1
     fi
@@ -234,7 +234,7 @@ start_server_process() {
 
 doctor() {
     local status=0
-    echo "MSH phone doctor"
+    echo "FCP phone doctor"
     echo "Repository: $ROOT"
     echo "Container:  $CONTAINER"
     echo "State:      $STATE_DIR"
@@ -266,15 +266,15 @@ start_server() {
     rm -f "$PID_FILE"
     start_server_process
 
-    echo "Starting MSH at $URL ..."
+    echo "Starting FCP at $URL ..."
     for _ in $(seq 1 30); do
         if http_ready; then
-            echo "MSH is ready: $URL"
+            echo "FCP is ready: $URL"
             return 0
         fi
         sleep 1
     done
-    echo "MSH did not become ready within 30 seconds." >&2
+    echo "FCP did not become ready within 30 seconds." >&2
     tail -n 120 "$LOG_FILE" 2>/dev/null || true
     stop_server true || true
     return 1
@@ -318,9 +318,9 @@ main() {
             session_pids="$(container_session_pids)"
             if [[ -n "$session_pids" ]]; then
                 session_pids="${session_pids//$'\n'/, }"
-                echo "PRoot: MSH session found (PID $session_pids)"
+                echo "PRoot: FCP session found (PID $session_pids)"
             else
-                echo "PRoot: no MSH session found"
+                echo "PRoot: no FCP session found"
             fi
         fi
         if http_ready; then
@@ -363,12 +363,12 @@ main() {
         sources="${2:-}"
         [[ -n "$sources" ]] || {
             echo "Provide recorder sources, e.g.:" >&2
-            echo "  bash termux/msh-phone.sh recorder 'IG500=http://host:5000/current'" >&2
+            echo "  bash termux/fcp-phone.sh recorder 'IG500=http://host:5000/current'" >&2
             exit 2
         }
         require_ready
         "${login_base[@]}" \
-            --env "MSH_RECORDER_SOURCES=$sources" \
+            --env "FCP_RECORDER_SOURCES=$sources" \
             "$CONTAINER" -- python catalog/standalone-recorder_v2/standalone-recorder_v2.py
         ;;
     update)
@@ -383,7 +383,7 @@ main() {
             fi
             return 1
         fi
-        MSH_PHONE_RESTART_AFTER_SETUP="$update_was_running" \
+        FCP_PHONE_RESTART_AFTER_SETUP="$update_was_running" \
             bash termux/setup-phone.sh --update
         ;;
     rebuild)

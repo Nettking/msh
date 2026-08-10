@@ -2,7 +2,7 @@
 
 ## Scope
 
-F6.6.2 adds a bounded, session-scoped rendezvous mechanism for exchanging direct or circuit-v2 route descriptors between enrolled MSH nodes.
+F6.6.2 adds a bounded, session-scoped rendezvous mechanism for exchanging direct or circuit-v2 route descriptors between enrolled FCP nodes.
 
 The implementation is additive:
 
@@ -50,7 +50,7 @@ Expired entries are removed before publish, resolve and count operations. Nodes 
 
 ### `route.publish`
 
-The authenticated node submits one signed `msh.session_route.descriptor.v1` object. A repeated identical generation is idempotent. An older generation or a different descriptor with the same generation is rejected.
+The authenticated node submits one signed `fcp.session_route.descriptor.v1` object. A repeated identical generation is idempotent. An older generation or a different descriptor with the same generation is rejected.
 
 ### `route.resolve`
 

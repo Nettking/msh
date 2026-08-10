@@ -45,10 +45,10 @@ from .storage_agent import (
     StorageNodeConfig,
 )
 
-DEPLOYMENT_SCHEMA = "msh.storage_three_machine_deployment.v1"
-BOOTSTRAP_SCHEMA = "msh.storage_authority_bootstrap.v1"
-EVIDENCE_SCHEMA = "msh.storage_three_machine_evidence.v1"
-REPORT_SCHEMA = "msh.storage_three_machine_report.v1"
+DEPLOYMENT_SCHEMA = "fcp.storage_three_machine_deployment.v1"
+BOOTSTRAP_SCHEMA = "fcp.storage_authority_bootstrap.v1"
+EVIDENCE_SCHEMA = "fcp.storage_three_machine_evidence.v1"
+REPORT_SCHEMA = "fcp.storage_three_machine_report.v1"
 _EXPECTED_ACK_MODE = AcknowledgementMode.ONE_REPLICA
 _FORBIDDEN_KEY_MARKERS = ("token", "password", "secret", "private_key")
 
@@ -689,7 +689,7 @@ async def provision_and_publish(
             (deployment.primary.node_id, deployment.replica.node_id),
         )
         return {
-            "schema": "msh.storage_three_machine_provisioning.v1",
+            "schema": "fcp.storage_three_machine_provisioning.v1",
             "deployment_id": deployment.deployment_id,
             "publication_id": result.publication_id,
             "publication_revision": result.publication_revision,
@@ -773,7 +773,7 @@ async def probe_write(
                 "authoritative manifest does not contain the probe batch",
             )
         return {
-            "schema": "msh.storage_three_machine_probe.v1",
+            "schema": "fcp.storage_three_machine_probe.v1",
             "deployment_id": deployment.deployment_id,
             "batch_id": batch_id,
             "content_hash": outcome.result.content_hash,

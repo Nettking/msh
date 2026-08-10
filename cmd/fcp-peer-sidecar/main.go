@@ -25,7 +25,7 @@ import (
 )
 
 const (
-	streamProtocol             = protocol.ID("/msh/direct-storage/1.0.0")
+	streamProtocol             = protocol.ID("/fcp/direct-storage/1.0.0")
 	maxMessageBytes            = 2 * 1024 * 1024
 	requestTimeout             = 20 * time.Second
 	maxStaticRelays            = 8
@@ -436,7 +436,7 @@ func sendRequest(
 	}
 	streamContext := requestContext
 	if strings.Contains(targetMultiaddr, "/p2p-circuit") {
-		streamContext = network.WithAllowLimitedConn(requestContext, "msh-circuit-v2")
+		streamContext = network.WithAllowLimitedConn(requestContext, "fcp-circuit-v2")
 	}
 	stream, err := h.NewStream(streamContext, info.ID, streamProtocol)
 	if err != nil {

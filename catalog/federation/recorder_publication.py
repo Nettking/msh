@@ -23,8 +23,8 @@ from .errors import FederationValidationError
 from .outbox import MAX_PAYLOAD_BYTES
 from .recorder_delivery import DurableRecorderDeliveryQueue, RecorderDeliveryRunResult
 
-RECORDER_TELEMETRY_SCHEMA = "msh.mtconnect.observations.v1"
-RECORDER_DATASET_SCHEMA_NAME = "msh.mtconnect.observations"
+RECORDER_TELEMETRY_SCHEMA = "fcp.mtconnect.observations.v1"
+RECORDER_DATASET_SCHEMA_NAME = "fcp.mtconnect.observations"
 RECORDER_DATASET_SCHEMA_VERSION = 1
 MAX_SAFE_CONTENT_BYTES = min(900_000, MAX_PAYLOAD_BYTES - 64 * 1024)
 DEFAULT_MAX_CONTENT_BYTES = MAX_SAFE_CONTENT_BYTES
@@ -222,12 +222,12 @@ class RecorderArchiveReconciler:
             ) from exc
         if (
             not isinstance(payload, dict)
-            or payload.get("schema") != "msh.mtconnect_recorder.checkpoints.v3"
+            or payload.get("schema") != "fcp.mtconnect_recorder.checkpoints.v3"
         ):
             raise FederationValidationError(
                 "unsupported-recorder-state",
                 "schema",
-                "expected msh.mtconnect_recorder.checkpoints.v3",
+                "expected fcp.mtconnect_recorder.checkpoints.v3",
             )
         sources = payload.get("sources")
         if not isinstance(sources, dict):

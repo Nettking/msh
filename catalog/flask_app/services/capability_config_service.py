@@ -33,7 +33,7 @@ from .server_setup_service import (
 )
 
 CAPABILITY_CONFIG_PATH = Path("data") / "capabilities" / "config.json"
-CAPABILITY_CONFIG_SCHEMA = "msh.capability_config.v1"
+CAPABILITY_CONFIG_SCHEMA = "fcp.capability_config.v1"
 
 
 class CapabilityConfigError(RuntimeError):

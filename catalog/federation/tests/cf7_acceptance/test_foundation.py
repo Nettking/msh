@@ -296,7 +296,7 @@ def test_partial_and_corrupted_identity_state_fail_closed(
 def test_scenario_manifest_separates_executable_blocked_and_manual_status() -> None:
     manifest = load_scenario_manifest(Path(__file__).with_name("scenarios.json"))
 
-    assert manifest["schema"] == "msh.cf7.acceptance-manifest.v1"
+    assert manifest["schema"] == "fcp.cf7.acceptance-manifest.v1"
     assert manifest["acceptance_claim"] == "foundation-only"
     assert manifest["federation_v1_end_to_end_accepted"] is False
     assert manifest["capability_first_onboarding_end_to_end_accepted"] is False

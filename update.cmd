@@ -1,6 +1,6 @@
 @echo off
 setlocal EnableExtensions
-title MSH Update and Resume
+title FCP Update and Resume
 
 cd /d "%~dp0"
 
@@ -12,11 +12,11 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Updating MSH with a safe fast-forward pull...
+echo Updating FCP with a safe fast-forward pull...
 git pull --ff-only
 if errorlevel 1 (
     echo.
-    echo MSH was not changed because the repository could not be fast-forwarded safely.
+    echo FCP was not changed because the repository could not be fast-forwarded safely.
     echo Commit, stash, or review local changes before trying again.
     pause
     exit /b 1
@@ -29,57 +29,57 @@ rem explicitly makes the general runtime resolver skip its legacy probe path.
 rem Keep selection in a subroutine rather than a parenthesized block: cmd.exe
 rem expands %%VARIABLE%% references for a whole block before commands in that
 rem block run, which can otherwise turn a newly assigned output path into "".
-if defined MSH_RELAY_VOLUME_NAME goto :relay_state_explicit
+if defined FCP_RELAY_VOLUME_NAME goto :relay_state_explicit
 call :select_relay_volume
 if errorlevel 1 exit /b %ERRORLEVEL%
 goto :relay_state_ready
 
 :relay_state_explicit
 echo.
-echo Using explicitly selected Federation state: %MSH_RELAY_VOLUME_NAME%
+echo Using explicitly selected Federation state: %FCP_RELAY_VOLUME_NAME%
 
 :relay_state_ready
 echo.
-echo Starting MSH with the saved identity and Federation membership...
+echo Starting FCP with the saved identity and Federation membership...
 call start.cmd --resume
-set "MSH_UPDATE_EXIT=%ERRORLEVEL%"
-if not "%MSH_UPDATE_EXIT%"=="0" (
+set "FCP_UPDATE_EXIT=%ERRORLEVEL%"
+if not "%FCP_UPDATE_EXIT%"=="0" (
     echo.
-    echo MSH update or resume stopped with exit code %MSH_UPDATE_EXIT%.
+    echo FCP update or resume stopped with exit code %FCP_UPDATE_EXIT%.
     pause
-    exit /b %MSH_UPDATE_EXIT%
+    exit /b %FCP_UPDATE_EXIT%
 )
 
 exit /b 0
 
 :select_relay_volume
-set "MSH_RELAY_SELECTION_FILE=%TEMP%\msh-relay-selection-%RANDOM%-%RANDOM%.txt"
-set "MSH_RELAY_SELECTION_EXIT="
-if exist "%MSH_RELAY_SELECTION_FILE%" del /q "%MSH_RELAY_SELECTION_FILE%" >nul 2>&1
+set "FCP_RELAY_SELECTION_FILE=%TEMP%\fcp-relay-selection-%RANDOM%-%RANDOM%.txt"
+set "FCP_RELAY_SELECTION_EXIT="
+if exist "%FCP_RELAY_SELECTION_FILE%" del /q "%FCP_RELAY_SELECTION_FILE%" >nul 2>&1
 echo.
 echo Locating the saved Federation coordinator state...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\select_msh_relay_volume.ps1" -DataDirectory "%~dp0data" -OutputFile "%MSH_RELAY_SELECTION_FILE%"
-set "MSH_RELAY_SELECTION_EXIT=%ERRORLEVEL%"
-if "%MSH_RELAY_SELECTION_EXIT%"=="0" goto :relay_selection_read
-if exist "%MSH_RELAY_SELECTION_FILE%" del /q "%MSH_RELAY_SELECTION_FILE%" >nul 2>&1
-echo Federation state selection stopped with exit code %MSH_RELAY_SELECTION_EXIT%.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\select_fcp_relay_volume.ps1" -DataDirectory "%~dp0data" -OutputFile "%FCP_RELAY_SELECTION_FILE%"
+set "FCP_RELAY_SELECTION_EXIT=%ERRORLEVEL%"
+if "%FCP_RELAY_SELECTION_EXIT%"=="0" goto :relay_selection_read
+if exist "%FCP_RELAY_SELECTION_FILE%" del /q "%FCP_RELAY_SELECTION_FILE%" >nul 2>&1
+echo Federation state selection stopped with exit code %FCP_RELAY_SELECTION_EXIT%.
 pause
-exit /b %MSH_RELAY_SELECTION_EXIT%
+exit /b %FCP_RELAY_SELECTION_EXIT%
 
 :relay_selection_read
-if exist "%MSH_RELAY_SELECTION_FILE%" goto :relay_selection_load
+if exist "%FCP_RELAY_SELECTION_FILE%" goto :relay_selection_load
 echo Federation state selection did not create its result file.
 pause
 exit /b 1
 
 :relay_selection_load
-set /p "MSH_RELAY_VOLUME_NAME="<"%MSH_RELAY_SELECTION_FILE%"
-del /q "%MSH_RELAY_SELECTION_FILE%" >nul 2>&1
-if defined MSH_RELAY_VOLUME_NAME goto :relay_selection_success
+set /p "FCP_RELAY_VOLUME_NAME="<"%FCP_RELAY_SELECTION_FILE%"
+del /q "%FCP_RELAY_SELECTION_FILE%" >nul 2>&1
+if defined FCP_RELAY_VOLUME_NAME goto :relay_selection_success
 echo Federation state selection returned an empty volume name.
 pause
 exit /b 1
 
 :relay_selection_success
-echo Federation state selected: %MSH_RELAY_VOLUME_NAME%
+echo Federation state selected: %FCP_RELAY_VOLUME_NAME%
 exit /b 0

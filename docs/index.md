@@ -1,8 +1,8 @@
-# MSH documentation
+# FCP documentation
 
-Use the guides below for the current MSH product. Start from the task or product area you are working with; installation and first-run onboarding are a separate path for new devices.
+Use the guides below for the current FCP product. Start from the task or product area you are working with; installation and first-run onboarding are a separate path for new devices.
 
-## Use MSH
+## Use FCP
 
 - [Operator guide](operator_guide.md) — use Federation, Monitor, Knowledge, System, sources, recording, benchmarks, contributions, and diagnostics.
 - [Connected capabilities](connected_capabilities.md) — use capabilities contributed by another trusted device.
@@ -14,7 +14,7 @@ Use the guides below for the current MSH product. Start from the task or product
 
 ## New installation or device
 
-- [Quick start](quick_start.md) — start MSH, complete capability-first onboarding, and open the workbench.
+- [Quick start](quick_start.md) — start FCP, complete capability-first onboarding, and open the workbench.
 - [One-command setup](one_command_setup.md) — use the supported Windows launcher or Docker Compose startup commands.
 - [Getting started](getting_started.md) — understand devices, Federations, inspection, contributions, authority, and the workbench mental model.
 - [Server setup](server_setup.md) — administer network access, recorder configuration, model installation, and advanced deployments.
@@ -22,7 +22,7 @@ Use the guides below for the current MSH product. Start from the task or product
 
 The required first-run product path remains `Identity -> Federation -> Inspect -> finish setup`. Benchmarks and contribution choices are optional follow-up work rather than prerequisites for normal workbench access.
 
-## Understand how MSH works
+## Understand how FCP works
 
 - [Current architecture](architecture.md) — product model, components, authority boundaries, data flow, storage, jobs, persistence, and acceptance.
 - [Federated network reference](federated_session_network.md) — identity, membership, control-plane, transport, storage, capability, and failure behavior.
@@ -31,7 +31,7 @@ The required first-run product path remains `Identity -> Federation -> Inspect -
 
 ## Development and implementation
 
-The material below is for development, acceptance, and repository maintenance. It is not the normal starting point for operating MSH.
+The material below is for development, acceptance, and repository maintenance. It is not the normal starting point for operating FCP.
 
 Use this hierarchy when documents disagree:
 

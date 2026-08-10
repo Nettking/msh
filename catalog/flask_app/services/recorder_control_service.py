@@ -151,7 +151,7 @@ class RecorderControlService:
             )
 
         payload = {
-            "schema": "msh.mtconnect_recorder.control.v1",
+            "schema": "fcp.mtconnect_recorder.control.v1",
             "enabled": bool(enabled),
             "updated_at": _utc_now(),
             "requested_by": "web",
@@ -331,7 +331,7 @@ class RecorderControlService:
             for source_name, source in status["source_status"].items()
         ]
         return {
-            "schema": "msh.recorder.web_status.v1",
+            "schema": "fcp.recorder.web_status.v1",
             "generated_at": _utc_now(),
             "poll_after_ms": 2000,
             "ready": status["ready"],

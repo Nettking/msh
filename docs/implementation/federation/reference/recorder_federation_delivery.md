@@ -74,7 +74,7 @@ Use stable identities derived only from durable facts:
 | Field | Proposed value |
 | --- | --- |
 | Dataset ID | `mtconnect:<recorder-node-id>:<source-slug>` |
-| Dataset schema | `msh.mtconnect.observations` version `1` |
+| Dataset schema | `fcp.mtconnect.observations` version `1` |
 | Batch ID | `<source-slug>:<agent-instance-id>:<first-sequence>:<last-sequence>:<raw-sha256>` |
 | Idempotency key | `<session-id>:<dataset-id>:<batch-id>` |
 | Created time | recorder receipt time from the raw manifest |

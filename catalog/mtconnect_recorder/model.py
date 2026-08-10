@@ -324,26 +324,26 @@ def _parse_sources_text(value: str) -> dict[str, str]:
 
 
 def _sources_from_environment() -> dict[str, str]:
-    json_text = os.getenv("MSH_RECORDER_SOURCES_JSON", "").strip()
+    json_text = os.getenv("FCP_RECORDER_SOURCES_JSON", "").strip()
     if json_text:
         payload = json.loads(json_text)
         if not isinstance(payload, dict):
-            raise ValueError("MSH_RECORDER_SOURCES_JSON must be an object.")
+            raise ValueError("FCP_RECORDER_SOURCES_JSON must be an object.")
         sources = {
             str(name).strip(): normalize_agent_base_url(str(url))
             for name, url in payload.items()
             if str(name).strip() and str(url).strip()
         }
         if not sources:
-            raise ValueError("MSH_RECORDER_SOURCES_JSON contains no valid sources.")
+            raise ValueError("FCP_RECORDER_SOURCES_JSON contains no valid sources.")
         _validate_source_storage_names(sources)
         return sources
 
-    list_text = os.getenv("MSH_RECORDER_SOURCES", "").strip()
+    list_text = os.getenv("FCP_RECORDER_SOURCES", "").strip()
     if list_text:
         sources = _parse_sources_text(list_text)
         if not sources:
-            raise ValueError("MSH_RECORDER_SOURCES contains no valid sources.")
+            raise ValueError("FCP_RECORDER_SOURCES contains no valid sources.")
         return sources
 
     return dict(DEFAULT_SOURCES)

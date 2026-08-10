@@ -64,9 +64,9 @@ class CapabilityFirstFederationDeviceAdapter:
             if (
                 not is_local
                 and onboarding.device_id is not None
-                and label.strip().casefold() == "this msh device"
+                and label.strip().casefold() == "this fcp device"
             ):
-                label = "Trusted MSH device"
+                label = "Trusted FCP device"
             capability_count = device.capability_count
             if active_by_node is not None:
                 capability_count = active_by_node.get(device.node_id, 0)
@@ -82,13 +82,13 @@ class CapabilityFirstFederationDeviceAdapter:
             index
             for index, device in enumerate(aligned)
             if device.node_id != onboarding.device_id
-            and device.label == "Trusted MSH device"
+            and device.label == "Trusted FCP device"
         ]
         if len(generic_remote_indexes) > 1:
             for ordinal, index in enumerate(generic_remote_indexes, start=1):
                 aligned[index] = replace(
                     aligned[index],
-                    label=f"Trusted MSH device {ordinal}",
+                    label=f"Trusted FCP device {ordinal}",
                 )
 
         return replace(federation, devices=tuple(aligned))

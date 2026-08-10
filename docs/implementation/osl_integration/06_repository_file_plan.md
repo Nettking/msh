@@ -3,18 +3,18 @@
 ## Purpose and planning baseline
 
 This document converts the target architecture into reviewable file changes for
-later implementation in MSH. It is a plan only: none of the paths described as
-new exist at the analyzed MSH commit, and this planning task does not add
+later implementation in FCP. It is a plan only: none of the paths described as
+new exist at the analyzed FCP commit, and this planning task does not add
 production code.
 
 Source baseline:
 
-- MSH: `f580c71f7269643a077cc7e7db8ba9bf6050bb6a`;
+- FCP: `f580c71f7269643a077cc7e7db8ba9bf6050bb6a`;
 - systems-paper: `ff098ce52f15b489b6a07d5b55c6c788d862e3be`;
 - paper-repo: `abe3fbcddee590c3f399b06f63cb329e8615977c`.
 
-The classifications `paper-defined`, `existing-in-MSH`,
-`proposed-for-MSH`, and `requires-research-clarification` have the meanings
+The classifications `paper-defined`, `existing-in-FCP`,
+`proposed-for-FCP`, and `requires-research-clarification` have the meanings
 established in [00_scope_and_sources.md](00_scope_and_sources.md). Paper source
 citations and their normative status are traced in
 [01_language_requirements.md](01_language_requirements.md) and the method/source
@@ -22,7 +22,7 @@ boundary is traced in [04_notebook_to_osl_workflow.md](04_notebook_to_osl_workfl
 
 ## File-plan rules
 
-1. `proposed-for-MSH`: put the language and workflow in a new
+1. `proposed-for-FCP`: put the language and workflow in a new
    `catalog/osl/` package. Flask routes, current operator-note JSON, capability
    jobs, federation storage, telemetry and AI providers are adapters or adjacent
    systems, never the canonical language model.
@@ -31,13 +31,13 @@ boundary is traced in [04_notebook_to_osl_workflow.md](04_notebook_to_osl_workfl
    separation from `systems-paper/sysml/osl-core.sysml` and
    `systems-paper/evaluation/osl-semantic-contract.md`. Do not flatten them into
    the current note form.
-3. `proposed-for-MSH`: every canonical write is an authenticated command with
+3. `proposed-for-FCP`: every canonical write is an authenticated command with
    expected revision, command ID and server-derived principal. The initial core
    is non-executing and cannot grant approval, compute, storage or action
    authority.
-4. `proposed-for-MSH`: immutable source blobs, immutable fragment revisions and
+4. `proposed-for-FCP`: immutable source blobs, immutable fragment revisions and
    append-only audit records precede AI, UI and migration work.
-5. `existing-in-MSH`: reuse patterns from `catalog/capabilities/job_store.py`,
+5. `existing-in-FCP`: reuse patterns from `catalog/capabilities/job_store.py`,
    federation local storage/projections and the versioned AI runtime only behind
    OSL-owned ports. Do not import their domain authority.
 6. `requires-research-clarification`: SysML v2 import, operational bindings,
@@ -51,7 +51,7 @@ boundary is traced in [04_notebook_to_osl_workflow.md](04_notebook_to_osl_workfl
 
 | Delivery | Outcome | Dependency | Explicit non-goals |
 |---|---|---|---|
-| D0-A | Freeze the first MSH-supported research profile and authority policy | this plan and paper clarification | runtime code, UI, persistence |
+| D0-A | Freeze the first FCP-supported research profile and authority policy | this plan and paper clarification | runtime code, UI, persistence |
 | D1-A | Pure identifiers, source and fragment contracts | accepted D0-A | parsing, writes, Flask, AI |
 | D1-B | Review, lifecycle and validation-result contracts | D1-A | lifecycle commands or approval routes |
 | D2-A | Profile registry and canonical JSON codec | D1 | semantic validation, YAML, SysML |
@@ -76,8 +76,8 @@ silently deciding unresolved research and product policy.
 
 | Path | Action | Responsibility and contents | Dependencies | Tests/checks | Migration | Phase |
 |---|---|---|---|---|---|---|
-| `docs/osl_language_profile.md` | create | `proposed-for-MSH` supported profile identifier; exact included element/relation kinds; WF1-WF15 interpretation; maturity and evidence dimensions; extension policy; canonical JSON status; link to analyzed paper SHA | 01 and accepted research decisions | reviewed decision table; link/source check | none | D0-A |
-| `docs/osl_authority_boundary.md` | create | `proposed-for-MSH` principal/role vocabulary; capture, edit, review, approve, publish and read-sensitive permissions; explicit denial of AI, execution, compute and storage authority | MSH deployment/auth decision | threat-model review; deny matrix completeness | none | D0-A |
+| `docs/osl_language_profile.md` | create | `proposed-for-FCP` supported profile identifier; exact included element/relation kinds; WF1-WF15 interpretation; maturity and evidence dimensions; extension policy; canonical JSON status; link to analyzed paper SHA | 01 and accepted research decisions | reviewed decision table; link/source check | none | D0-A |
+| `docs/osl_authority_boundary.md` | create | `proposed-for-FCP` principal/role vocabulary; capture, edit, review, approve, publish and read-sensitive permissions; explicit denial of AI, execution, compute and storage authority | FCP deployment/auth decision | threat-model review; deny matrix completeness | none | D0-A |
 | `docs/osl_compatibility_policy.md` | create | language/profile/contract version meanings, reader/writer compatibility, extension preservation, deprecation window, export stability and migration ownership | language profile | examples for supported/unsupported version pairs | defines future migrations | D0-A |
 | `docs/agent_notes/osl_sysml_alignment.md` | change | mark current legacy exporter facts against the selected profile; preserve it as historical/legacy behavior rather than canonical conformance evidence | existing note and D0 decisions | documentation diff review | none | D0-A |
 
@@ -115,7 +115,7 @@ Design constraints:
 
 - `paper-defined` element names are preserved where the first profile adopts
   them. Product-only objects such as SourceArtefact and FragmentRevision are
-  outside the language graph and marked `proposed-for-MSH`.
+  outside the language graph and marked `proposed-for-FCP`.
 - A raw excerpt is not an Observation; an Observation is not Evidence; a
   Decision is not an OperatorAction; a candidate action is not a selected,
   recommended or authorized action.
@@ -175,7 +175,7 @@ validator version, not approval.
 
 ## D3-A: immutable source storage and repository foundation
 
-`existing-in-MSH` patterns in `catalog/capabilities/job_store.py` and
+`existing-in-FCP` patterns in `catalog/capabilities/job_store.py` and
 `catalog/federation/local_storage.py` justify SQLite transactions, optimistic
 revision checks and content-addressed local objects. Their job, capability,
 membership and storage authority must not leak into OSL contracts.
@@ -195,9 +195,9 @@ membership and storage authority must not leak into OSL contracts.
 Planned storage boundaries:
 
 - default metadata database: configured path such as
-  `MSH_OSL_DB_PATH`, not a hard-coded home-directory location;
+  `FCP_OSL_DB_PATH`, not a hard-coded home-directory location;
 - default protected blob root: separately configured
-  `MSH_OSL_BLOB_ROOT` with resolved-path containment checks;
+  `FCP_OSL_BLOB_ROOT` with resolved-path containment checks;
 - raw bytes are immutable after hash verification. A correction creates a new
   SourceRevision and lineage; it never replaces a blob reference;
 - metadata rows bind serialized canonical content hash, language profile,
@@ -310,13 +310,13 @@ machine or allocate resources.
 
 ### Hard prerequisite outside OSL
 
-At analyzed MSH SHA `f580c71f7269643a077cc7e7db8ba9bf6050bb6a`,
+At analyzed FCP SHA `f580c71f7269643a077cc7e7db8ba9bf6050bb6a`,
 the Flask operator routes do not provide a sufficient authenticated principal,
 CSRF boundary or production-secret guarantee for canonical OSL writes. D7-A
 may add read-only, redacted surfaces only after the application supplies a
 tested server-derived principal/scope contract. D7-B mutation routes remain
 blocked until CSRF, secure sessions and permission enforcement are accepted.
-This is `existing-in-MSH` risk plus `proposed-for-MSH` prerequisite, not a claim
+This is `existing-in-FCP` risk plus `proposed-for-FCP` prerequisite, not a claim
 that OSL should own general application authentication.
 
 | Proposed path | Action | Responsibility/key symbols | Dependencies | Tests | Migration |
@@ -406,7 +406,7 @@ valid import remains a draft until local review/approval policy is satisfied.
 | `catalog/osl/tests/test_sysml_v2_export.py` | create | selected positive/negative fixtures, golden snippets and downstream parser when available | D9 | pytest/external parser gate if reproducible | none |
 | `catalog/flask_app/services/osl_export_adapter.py` | create or fold into application facade | safe media response and finding mapping; replace no existing service yet | exporter | response tests | none |
 
-`existing-in-MSH` `catalog/flask_app/services/osl_export_service.py` remains the
+`existing-in-FCP` `catalog/flask_app/services/osl_export_service.py` remains the
 legacy operator-note exporter. Do not rewrite it into the canonical adapter in
 the same PR. It uses heuristic inference and legacy concepts such as
 `EvidenceStatus`, so treating it as the new serializer would create false
@@ -528,7 +528,7 @@ Every implementation PR derived from this file must include:
 - Linux and Windows results for filesystem, SQLite, encoding or line-ending
   sensitive work;
 - migration fixture and backup/restore evidence for schema changes;
-- documentation that states `paper-defined` versus `proposed-for-MSH` claims;
+- documentation that states `paper-defined` versus `proposed-for-FCP` claims;
 - a diff audit showing no accidental execution, compute, storage, review,
   approval or publication authority;
 - no empty future modules, unrelated refactors or silent legacy behavior

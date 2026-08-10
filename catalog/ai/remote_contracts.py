@@ -24,11 +24,11 @@ from .runtime_contracts import (
     _utc,
 )
 
-REMOTE_AI_PROTOCOL = "msh-remote-language-model"
+REMOTE_AI_PROTOCOL = "fcp-remote-language-model"
 REMOTE_AI_PROTOCOL_VERSION = "1.0"
 REMOTE_AI_PROTOCOL_MAJOR = 1
-REMOTE_AI_REQUEST_SCHEMA = "msh.remote-ai-invocation-request.v1"
-REMOTE_AI_RESPONSE_SCHEMA = "msh.remote-ai-invocation-response.v1"
+REMOTE_AI_REQUEST_SCHEMA = "fcp.remote-ai-invocation-request.v1"
+REMOTE_AI_RESPONSE_SCHEMA = "fcp.remote-ai-invocation-response.v1"
 MAX_REMOTE_AI_CONTROL_MESSAGE_BYTES = 5 * 1024 * 1024
 MAX_REMOTE_AI_INVOCATION_TTL_SECONDS = 3_600
 
@@ -46,7 +46,7 @@ def _node_id(value: Any, field: str) -> str:
         raise FederationValidationError(
             "invalid-node-id",
             field,
-            "must be a derived MSH node identity",
+            "must be a derived FCP node identity",
         )
     return value
 

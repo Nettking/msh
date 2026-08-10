@@ -43,7 +43,7 @@ class BoundedBenchmarkAdapter:
     definition = BenchmarkDefinition(
         benchmark_id=BENCHMARK_ID,
         capability_type="fixture",
-        capability_protocol="msh-fixture",
+        capability_protocol="fcp-fixture",
         implementation_version="1.0.0",
         max_duration_seconds=3,
         max_parallelism=1,

@@ -6,7 +6,7 @@ It is a **screening indicator**, not a verified tool-wear detector. The script f
 
 ## Input
 
-The script reads recursive MSH JSONL telemetry from `data/` by default. It works best with records produced by the Observer Phoenix connector, for example:
+The script reads recursive FCP JSONL telemetry from `data/` by default. It works best with records produced by the Observer Phoenix connector, for example:
 
 ```json
 {
@@ -49,7 +49,7 @@ The default candidate threshold is `z_score >= 2.5` for at least three candidate
 
 ## Output
 
-Default outputs are written under the active workflow session when the script is run through MSH, or under the current directory fallback when run directly:
+Default outputs are written under the active workflow session when the script is run through FCP, or under the current directory fallback when run directly:
 
 ```text
 results/workflows/<session-id>/analyses/tool_wear_indicator/tool_wear_candidates.csv

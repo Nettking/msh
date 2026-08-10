@@ -26,7 +26,7 @@ Any identity or content conflict stops fail-closed with operator attention.
 2. Verify that current primary authority still matches that failover.
 3. Request an authenticated manifest-bound report from the returning provider.
 4. Inspect every authoritative batch and persist a deterministic item ledger.
-5. Read only missing batches from the current primary over `msh-storage-v1`.
+5. Read only missing batches from the current primary over `fcp-storage-v1`.
 6. Ingest them through the dedicated coordinator-authorized recovery route.
 7. Reconcile a lost response by inspecting durable target identity before resend.
 8. Re-read every item and verify immutable identity and canonical content hash.
@@ -60,8 +60,8 @@ python -m catalog.node.storage_catchup \
 
 On first startup, provide the existing protected environment inputs:
 
-- `MSH_ENROLLMENT_TOKEN`
-- `MSH_SESSION_INVITATION`
+- `FCP_ENROLLMENT_TOKEN`
+- `FCP_SESSION_INVITATION`
 
 The command returns `caught-up`, `retryable`, or `operator-attention` as JSON.
 `retryable` can be run again with the same databases. `caught-up` is evidence

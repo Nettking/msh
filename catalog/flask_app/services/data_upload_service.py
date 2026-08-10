@@ -28,7 +28,7 @@ from werkzeug.utils import secure_filename
 from catalog.orchestrator.pipeline import get_runtime_manager
 from catalog.runner.script_catalog import repo_root
 
-_IMPORT_MARKER = ".msh-importing"
+_IMPORT_MARKER = ".fcp-importing"
 _DEFAULT_MAX_FILES = 50
 _DEFAULT_MAX_FILE_BYTES = 512 * 1024 * 1024
 _DEFAULT_MAX_TOTAL_BYTES = 1024 * 1024 * 1024
@@ -293,7 +293,7 @@ class DataUploadService:
         worker = threading.Thread(
             target=self._import_batch_with_slot,
             args=(batch_id,),
-            name=f"msh-jsonl-import-{batch_id[-8:]}",
+            name=f"fcp-jsonl-import-{batch_id[-8:]}",
             daemon=True,
         )
         try:

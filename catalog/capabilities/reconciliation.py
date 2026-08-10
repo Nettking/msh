@@ -44,10 +44,10 @@ from .worker_activation import (
 )
 
 PROVIDER_RECONCILIATION_CHECKPOINT_SCHEMA = (
-    "msh.provider-reconciliation-checkpoint.v1"
+    "fcp.provider-reconciliation-checkpoint.v1"
 )
-PROVIDER_RECONCILIATION_BINDING_SCHEMA = "msh.provider-reconciliation-binding.v1"
-PROVIDER_RECONCILIATION_RESULT_SCHEMA = "msh.provider-reconciliation-result.v1"
+PROVIDER_RECONCILIATION_BINDING_SCHEMA = "fcp.provider-reconciliation-binding.v1"
+PROVIDER_RECONCILIATION_RESULT_SCHEMA = "fcp.provider-reconciliation-result.v1"
 PROVIDER_RECONCILIATION_STORE_SCHEMA_VERSION = 1
 MAX_RECONCILIATION_TEXT_BYTES = 512
 MAX_RECONCILIATION_BINDINGS = 512

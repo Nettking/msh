@@ -23,7 +23,7 @@ from .capability_onboarding_service import get_capability_onboarding_service
 
 UPSERT_EVENT = "knowledge.document.upserted"
 DELETE_EVENT = "knowledge.document.deleted"
-CHANGE_SCHEMA = "msh.federation.knowledge-change.v1"
+CHANGE_SCHEMA = "fcp.federation.knowledge-change.v1"
 MAX_DOCUMENT_BYTES = 32_000
 
 

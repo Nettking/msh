@@ -1,4 +1,4 @@
-# MSH Federation v1 scope
+# FCP Federation v1 scope
 
 Status: **pre-release scope definition**
 
@@ -8,7 +8,7 @@ This document defines the intended trusted Federation v1 boundary. It does not d
 
 ## Release identity
 
-Product milestone: **MSH Federation v1 technical baseline with capability-first onboarding**.
+Product milestone: **FCP Federation v1 technical baseline with capability-first onboarding**.
 
 Current release state:
 
@@ -21,7 +21,7 @@ Current release state:
 
 ## Product model
 
-Every installation is one persistent MSH device. A device may use the workbench and independently contribute any supported combination of recording, language-model, registered-compute, storage-candidate, or future versioned capabilities.
+Every installation is one persistent FCP device. A device may use the workbench and independently contribute any supported combination of recording, language-model, registered-compute, storage-candidate, or future versioned capabilities.
 
 The required first-run flow is:
 

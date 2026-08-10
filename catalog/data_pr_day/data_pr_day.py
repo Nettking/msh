@@ -28,7 +28,7 @@ from catalog.common.data_loading import iter_records_with_parsed_timestamps
 DATA_DIR = "data"
 
 def _resolve_session_dir() -> Path:
-    from_env = os.getenv("MSH_SESSION_DIR", "").strip()
+    from_env = os.getenv("FCP_SESSION_DIR", "").strip()
     if from_env:
         return Path(from_env).expanduser().resolve()
 

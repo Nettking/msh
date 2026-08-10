@@ -1,7 +1,7 @@
-# Target architecture for OSL in MSH
+# Target architecture for OSL in FCP
 
 Status: proposed target architecture; no component described here exists unless
-explicitly marked `existing-in-MSH`.
+explicitly marked `existing-in-FCP`.
 
 Source baselines:
 
@@ -13,12 +13,12 @@ Source baselines:
   `abe3fbcddee590c3f399b06f63cb329e8615977c`.
 
 The language requirements and current-system findings in
-`01_language_requirements.md` and `02_current_msh_architecture.md` are
+`01_language_requirements.md` and `02_current_fcp_architecture.md` are
 prerequisites for this design.
 
 ## Architectural outcome
 
-`proposed-for-MSH`: OSL becomes a local-first, versioned, non-executing domain
+`proposed-for-FCP`: OSL becomes a local-first, versioned, non-executing domain
 subsystem under `catalog/osl/`. Its canonical state is an immutable,
 source-traceable domain graph and lifecycle history held behind a repository
 port. Flask, AI, JSON/YAML, SysML v2, support cards, recommender artefacts, and
@@ -67,7 +67,7 @@ Mandatory dependency direction:
 
 ## Authority vocabulary
 
-`proposed-for-MSH` defines these separate scopes:
+`proposed-for-FCP` defines these separate scopes:
 
 | Scope | Permits | Explicitly does not permit |
 | --- | --- | --- |
@@ -87,7 +87,7 @@ ownership decisions, but the separation is an implementation invariant.
 
 ## Component 1: OSL domain model
 
-- **Classification:** `proposed-for-MSH`, new.
+- **Classification:** `proposed-for-FCP`, new.
 - **Proposed placement:** `catalog/osl/source_models.py`,
   `catalog/osl/strategy_models.py`, `catalog/osl/review_models.py`, and
   `catalog/osl/identifiers.py`.
@@ -108,8 +108,8 @@ ownership decisions, but the separation is an implementation invariant.
 - **Security boundary:** no secrets, raw credentials, provider endpoints, or
   executable callables in domain objects. Source content is referenced by ID
   and read under a separate source permission.
-- **Existing basis:** frozen/versioned MSH contract conventions are
-  `existing-in-MSH` in `catalog/federation/models.py` and
+- **Existing basis:** frozen/versioned FCP contract conventions are
+  `existing-in-FCP` in `catalog/federation/models.py` and
   `catalog/capabilities/jobs.py`; their domain types are not reused.
 
 The canonical graph must give every path element and relation usage an immutable
@@ -118,7 +118,7 @@ ID. `DecisionOption` and `ActionSelection` remain distinct relation types;
 
 ## Component 2: language and version registry
 
-- **Classification:** `proposed-for-MSH`, new.
+- **Classification:** `proposed-for-FCP`, new.
 - **Proposed placement:** `catalog/osl/language_registry.py` and profile
   descriptors under `catalog/osl/profiles/`.
 - **Responsibility:** register supported OSL profiles, source paper SHA,
@@ -141,7 +141,7 @@ ID. `DecisionOption` and `ActionSelection` remain distinct relation types;
 
 ## Component 3: parser and canonical serializer
 
-- **Classification:** `proposed-for-MSH`, new.
+- **Classification:** `proposed-for-FCP`, new.
 - **Proposed placement:** `catalog/osl/serialization/json_codec.py` plus
   `catalog/osl/serialization/contracts.py`. YAML is deferred unless an actual
   compatibility need is approved.
@@ -171,7 +171,7 @@ unknown/invalid import without claiming that the object is an OSL fragment.
 
 ## Component 4: semantic validator
 
-- **Classification:** `proposed-for-MSH`, new implementation of the selected
+- **Classification:** `proposed-for-FCP`, new implementation of the selected
   `paper-defined` profile.
 - **Proposed placement:** `catalog/osl/semantic_validation.py` and rule modules
   under `catalog/osl/validation_rules/` only when size warrants the split.
@@ -190,7 +190,7 @@ unknown/invalid import without claiming that the object is an OSL fragment.
 - **Security boundary:** pure local processing with bounded graph size and
   deterministic traversal; no network, filesystem, AI, or external command.
 - **Existing basis:** systems-paper's validator is research evidence and a test
-  oracle source, not code to import blindly. MSH must encode and test the named
+  oracle source, not code to import blindly. FCP must encode and test the named
   selected profile.
 
 The first validator covers WF1--WF15 as scoped in
@@ -200,7 +200,7 @@ and element-level composition.
 
 ## Component 5: lifecycle policy
 
-- **Classification:** `proposed-for-MSH`, new.
+- **Classification:** `proposed-for-FCP`, new.
 - **Proposed placement:** `catalog/osl/lifecycle.py`.
 - **Responsibility:** define legal transitions and semantic preconditions for
   candidate/draft/review/approval/publication/deprecation states, separately
@@ -217,7 +217,7 @@ and element-level composition.
   insufficient scope.
 - **Security boundary:** fail closed; no UI boolean or AI claim can satisfy actor
   or review requirements.
-- **Existing basis:** `existing-in-MSH` job lifecycle validation and expected
+- **Existing basis:** `existing-in-FCP` job lifecycle validation and expected
   revisions are pattern references; job states and semantics are not reused.
 
 Proposed primary transitions:
@@ -237,7 +237,7 @@ and approval for the older content hash. “Executable” is not a state.
 
 ## Component 6: repository port and local persistence adapter
 
-- **Classification:** `proposed-for-MSH`, new; reuses `existing-in-MSH`
+- **Classification:** `proposed-for-FCP`, new; reuses `existing-in-FCP`
   transaction patterns.
 - **Proposed placement:** `catalog/osl/repository.py` for protocols/commands and
   `catalog/osl/sqlite_repository.py` for the first adapter.
@@ -269,7 +269,7 @@ governance commands that preserve tombstone and lineage, not silent deletion.
 
 ## Component 7: source artefact and excerpt service
 
-- **Classification:** `proposed-for-MSH`, new; replaces the legacy record as the
+- **Classification:** `proposed-for-FCP`, new; replaces the legacy record as the
   capture boundary.
 - **Proposed placement:** `catalog/osl/source_service.py`.
 - **Responsibility:** capture source bytes/text and metadata unchanged, compute
@@ -288,12 +288,12 @@ governance commands that preserve tombstone and lineage, not silent deletion.
 - **Security boundary:** source content never appears in general logs/audit;
   readers require server-side scope; corrections create new artefact/revision
   with lineage.
-- **Paper boundary:** immutable bytes/hashes are `proposed-for-MSH` hardening of
+- **Paper boundary:** immutable bytes/hashes are `proposed-for-FCP` hardening of
   the `paper-defined` requirement that raw capture remain available.
 
 ## Component 8: provenance and audit service
 
-- **Classification:** `proposed-for-MSH`, new.
+- **Classification:** `proposed-for-FCP`, new.
 - **Proposed placement:** `catalog/osl/provenance.py` and
   `catalog/osl/events.py`.
 - **Responsibility:** define transformation lineage and security/audit events,
@@ -318,7 +318,7 @@ governance commands that preserve tombstone and lineage, not silent deletion.
 
 ## Component 9: candidate and draft application service
 
-- **Classification:** `proposed-for-MSH`, new.
+- **Classification:** `proposed-for-FCP`, new.
 - **Proposed placement:** `catalog/osl/candidate_service.py` and
   `catalog/osl/fragment_service.py`.
 - **Responsibility:** create human/AI extracted candidates from excerpts and
@@ -344,8 +344,8 @@ governance commands that preserve tombstone and lineage, not silent deletion.
 
 ## Component 10: AI candidate generator
 
-- **Classification:** `proposed-for-MSH`, new outer adapter over
-  `existing-in-MSH` AI runtime.
+- **Classification:** `proposed-for-FCP`, new outer adapter over
+  `existing-in-FCP` AI runtime.
 - **Proposed placement:** `catalog/osl/ai_candidate_generator.py` plus a narrow
   inference protocol in `catalog/osl/ports.py`.
 - **Responsibility:** propose segmentation, classification, typed fields,
@@ -372,7 +372,7 @@ governance commands that preserve tombstone and lineage, not silent deletion.
 
 ## Component 11: review, approval, and publication services
 
-- **Classification:** `proposed-for-MSH`, new.
+- **Classification:** `proposed-for-FCP`, new.
 - **Proposed placement:** `catalog/osl/review_service.py` and
   `catalog/osl/publication_service.py`.
 - **Responsibility:** record domain-review decisions, separately approve an
@@ -396,14 +396,14 @@ governance commands that preserve tombstone and lineage, not silent deletion.
   where configured, CSRF for browser commands, no client-supplied signer, and
   exact content hash binding.
 - **Paper boundary:** domain-review semantics are `paper-defined`; approval and
-  publication are `proposed-for-MSH` workflow concepts.
+  publication are `proposed-for-FCP` workflow concepts.
 
 If a reviewed revision is corrected or narrowed, the service creates/requests a
 new draft revision. Prior review is retained and does not transfer automatically.
 
 ## Component 12: query and projection layer
 
-- **Classification:** `proposed-for-MSH`, new; reuses `existing-in-MSH` safe
+- **Classification:** `proposed-for-FCP`, new; reuses `existing-in-FCP` safe
   projection conventions.
 - **Proposed placement:** `catalog/osl/projections.py` and
   `catalog/osl/query_service.py`.
@@ -429,7 +429,7 @@ new draft revision. Prior review is retained and does not transfer automatically
 
 ## Component 13: import/export coordinator
 
-- **Classification:** `proposed-for-MSH`, new.
+- **Classification:** `proposed-for-FCP`, new.
 - **Proposed placement:** `catalog/osl/import_service.py` and
   `catalog/osl/export_service.py`.
 - **Responsibility:** coordinate bounded decode, profile lookup, validation,
@@ -449,13 +449,13 @@ new draft revision. Prior review is retained and does not transfer automatically
 - **Security boundary:** content-type/size/decompression limits, no path
   traversal, safe filenames, no remote URI resolution by default, source
   classification/audience enforcement, and no error echo of sensitive input.
-- **Compatibility:** legacy MSH note import is a separate adapter that produces
+- **Compatibility:** legacy FCP note import is a separate adapter that produces
   conservative findings; `reusable` never maps to approval.
 
 ## Component 14: SysML v2 adapter
 
-- **Classification:** `proposed-for-MSH`, new replacement behind a compatibility
-  facade; `existing-in-MSH` `OslExportService` is migration-only.
+- **Classification:** `proposed-for-FCP`, new replacement behind a compatibility
+  facade; `existing-in-FCP` `OslExportService` is migration-only.
 - **Proposed placement:** `catalog/osl/exporters/sysml_v2.py`.
 - **Responsibility:** deterministically render a supported canonical OSL
   revision to SysML v2-compatible OSL text and produce mapping diagnostics.
@@ -474,15 +474,15 @@ new draft revision. Prior review is retained and does not transfer automatically
 - **Security boundary:** comments/identifiers are escaped; no filesystem path
   comes from model text; content is exported only for an authorized audience.
 - **Normativity:** SysML v2 is a paper-defined primary engineering notation and
-  a product interoperability adapter, not the MSH repository/lifecycle.
+  a product interoperability adapter, not the FCP repository/lifecycle.
 
 A future import adapter requires independent fidelity evidence; export support
 does not imply safe round trip.
 
 ## Component 15: Flask/API and UI adapter
 
-- **Classification:** `proposed-for-MSH`, new routes/templates that can reuse
-  `existing-in-MSH` navigation and responsive UI conventions.
+- **Classification:** `proposed-for-FCP`, new routes/templates that can reuse
+  `existing-in-FCP` navigation and responsive UI conventions.
 - **Proposed placement:** `catalog/flask_app/osl_routes.py`,
   `catalog/flask_app/services/osl_application_service.py`, templates under
   `catalog/flask_app/templates/osl/`, and dedicated CSS/limited progressive JS.
@@ -509,7 +509,7 @@ does not imply safe round trip.
 
 ## Optional future component: federation adapter
 
-- **Classification:** `proposed-for-MSH`, deferred and
+- **Classification:** `proposed-for-FCP`, deferred and
   `requires-research-clarification`.
 - **Responsibility:** replicate or expose explicitly published OSL artefacts
   under a knowledge-specific membership/access/consistency policy.
@@ -671,20 +671,20 @@ Neither path may invent missing semantics.
 
 ### Fixed by this plan
 
-- `proposed-for-MSH` canonical OSL is a typed, versioned domain graph, not a
+- `proposed-for-FCP` canonical OSL is a typed, versioned domain graph, not a
   flat record or serialization schema.
-- `proposed-for-MSH` source artefacts and fragment revisions are immutable.
-- `proposed-for-MSH` initial persistence is local and transactional.
-- `proposed-for-MSH` language maturity, product lifecycle, review, approval,
+- `proposed-for-FCP` source artefacts and fragment revisions are immutable.
+- `proposed-for-FCP` initial persistence is local and transactional.
+- `proposed-for-FCP` language maturity, product lifecycle, review, approval,
   publication, and external authority are separate.
-- `proposed-for-MSH` AI is candidate-only; SysML is adapter-only; Flask is
+- `proposed-for-FCP` AI is candidate-only; SysML is adapter-only; Flask is
   delivery-only; projections are read-only.
-- `proposed-for-MSH` there is no operational binding in the initial roadmap.
+- `proposed-for-FCP` there is no operational binding in the initial roadmap.
 
 ### Still open
 
 - `requires-research-clarification` public identifier and exact scope for the
-  first MSH OSL language profile.
+  first FCP OSL language profile.
 - `requires-research-clarification` whether `ValidationNeed` alone satisfies
   provisional-path gap requirements.
 - `requires-research-clarification` applicability warning versus mandatory

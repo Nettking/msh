@@ -11,13 +11,13 @@ from typing import Any, ClassVar, Self
 
 from catalog.federation.errors import FederationValidationError, ProtocolCompatibilityError
 
-AI_RUNTIME_PROTOCOL = "msh-language-model"
+AI_RUNTIME_PROTOCOL = "fcp-language-model"
 AI_RUNTIME_PROTOCOL_VERSION = "1.0"
 AI_RUNTIME_PROTOCOL_MAJOR = 1
-AI_REQUEST_SCHEMA = "msh.ai-request.v1"
-AI_SELECTION_STATUS_SCHEMA = "msh.ai-selection-status.v1"
-AI_ATTEMPT_SCHEMA = "msh.ai-provider-attempt.v1"
-AI_RESULT_SCHEMA = "msh.ai-result.v1"
+AI_REQUEST_SCHEMA = "fcp.ai-request.v1"
+AI_SELECTION_STATUS_SCHEMA = "fcp.ai-selection-status.v1"
+AI_ATTEMPT_SCHEMA = "fcp.ai-provider-attempt.v1"
+AI_RESULT_SCHEMA = "fcp.ai-result.v1"
 MAX_AI_CONTROL_MESSAGE_BYTES = 524_288
 MAX_AI_PROMPT_BYTES = 262_144
 MAX_AI_RESPONSE_BYTES = 4 * 1024 * 1024
@@ -25,7 +25,7 @@ MAX_AI_TIMEOUT_SECONDS = 7 * 24 * 60 * 60
 MAX_AI_ATTEMPTS = 32
 
 _LOGICAL_ID_RE = re.compile(r"^[a-z0-9][a-z0-9._-]{0,127}$")
-_SCHEMA_RE = re.compile(r"^(?P<name>msh\.[a-z0-9.-]+)\.v(?P<major>[0-9]+)$")
+_SCHEMA_RE = re.compile(r"^(?P<name>fcp\.[a-z0-9.-]+)\.v(?P<major>[0-9]+)$")
 
 
 class AIModality(str, Enum):

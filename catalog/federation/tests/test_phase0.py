@@ -33,7 +33,7 @@ AUTHORITATIVE_POLICY = StorageGroupPolicy(authoritative_fencing_token=8)
 def coverage(dataset_id: str = "telemetry", **changes: object) -> DatasetCoverage:
     values = {
         "dataset_id": dataset_id,
-        "schema_name": "msh.test",
+        "schema_name": "fcp.test",
         "schema_version": 1,
         "required": True,
         "committed_revision": 10,
@@ -450,7 +450,7 @@ def test_f0_017_and_018_all_protocol_models_round_trip_and_ignore_additive_field
     models = [
         NodeIdentity("node", "Node", "public", NOW, 1),
         Session("session", "Session", "active", 10, NOW, "node", "coordinator"),
-        CapabilityAnnouncement("cap", "node", "session", "storage", "msh-storage-v1", "1.0", "ready", {}, NOW),
+        CapabilityAnnouncement("cap", "node", "session", "storage", "fcp-storage-v1", "1.0", "ready", {}, NOW),
         SessionEvent("session", 10, "event", "session.active", NOW, "node", {}),
         manifest(),
         StorageBatch("session", "main", "telemetry", "batch", "node", "key", "sha256:data", 1, 1, 1, NOW),
@@ -480,7 +480,7 @@ def test_f0_017_invalid_values_are_structured(mutator) -> None:
 
 def test_f0_019_protocol_major_mismatch_is_rejected() -> None:
     value = NodeIdentity("node", "Node", "public", NOW, 1).to_dict()
-    value["schema"] = "msh.node.v2"
+    value["schema"] = "fcp.node.v2"
     with pytest.raises(ProtocolCompatibilityError, match="unsupported-schema"):
         NodeIdentity.from_dict(value)
 

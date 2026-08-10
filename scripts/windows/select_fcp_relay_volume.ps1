@@ -39,7 +39,7 @@ function Get-SavedNodeId {
 }
 
 function Find-ProbeImage {
-    foreach ($image in @("msh-relay:latest", "msh-flask:latest", "msh-recorder:latest")) {
+    foreach ($image in @("fcp-relay:latest", "fcp-flask:latest", "fcp-recorder:latest")) {
         & docker image inspect $image *> $null
         if ($LASTEXITCODE -eq 0) {
             return $image
@@ -54,7 +54,7 @@ function Get-RelayCandidates {
         & docker volume ls --format "{{.Name}}" 2>$null
     ) | Where-Object {
         -not [string]::IsNullOrWhiteSpace($_) -and (
-            $_ -eq "msh_relay_state" -or
+            $_ -eq "fcp_relay_state" -or
             $_ -match "(^|_)relay_state$"
         )
     }
@@ -76,7 +76,7 @@ function Get-RelayCandidates {
             }
             $mount = @($inspection[0].Mounts) |
                 Where-Object {
-                    [string]$_.Destination -eq "/var/lib/msh-relay" -and
+                    [string]$_.Destination -eq "/var/lib/fcp-relay" -and
                     [string]$_.Type -eq "volume"
                 } |
                 Select-Object -First 1
@@ -210,14 +210,14 @@ try {
     }
 
     if ([string]::IsNullOrWhiteSpace($selected)) {
-        if ($candidates -contains "msh_relay_state") {
-            $selected = "msh_relay_state"
+        if ($candidates -contains "fcp_relay_state") {
+            $selected = "fcp_relay_state"
         }
         elseif ($candidates.Count -gt 0) {
             $selected = [string]($candidates[0])
         }
         else {
-            $selected = "msh_relay_state"
+            $selected = "fcp_relay_state"
         }
     }
 
@@ -226,7 +226,7 @@ try {
 }
 catch {
     [Console]::Error.WriteLine(
-        "MSH Federation volume selection failed: " + $_.Exception.Message
+        "FCP Federation volume selection failed: " + $_.Exception.Message
     )
     exit 1
 }

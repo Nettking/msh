@@ -45,7 +45,7 @@ def test_ai_page_starts_as_chat_with_model_calls_enabled(monkeypatch) -> None:
 
     assert response.status_code == 200
     assert 'data-ai-chat' in html
-    assert "Ask a question about how MSH works." in html
+    assert "Ask a question about how FCP works." in html
     assert "How does data flow?" in html
     assert 'name="dry_run" value="1" checked' not in html
     assert "Retrieved context" not in html

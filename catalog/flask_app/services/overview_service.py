@@ -221,7 +221,7 @@ def _overview_decision(
         return _decision(
             state="waiting",
             title="Artifacts exist, but runtime is not started",
-            summary="MSH can see files, but no active runtime session is driving machine or playback readiness yet.",
+            summary="FCP can see files, but no active runtime session is driving machine or playback readiness yet.",
             next_step="Open Control to start or continue a workflow session. Use Status if you want to inspect the startup state first.",
             primary_label="Open control",
             primary_href="/control",
@@ -254,7 +254,7 @@ def _overview_decision(
     return _decision(
         state="partial",
         title="System is partially ready",
-        summary="MSH has enough information to open some views, but not all runtime outputs are available yet.",
+        summary="FCP has enough information to open some views, but not all runtime outputs are available yet.",
         next_step="Use Status to inspect readiness, then continue from Control if workflow output is missing.",
         primary_label="Open status",
         primary_href="/status",

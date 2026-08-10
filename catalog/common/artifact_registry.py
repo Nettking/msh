@@ -81,7 +81,7 @@ class DataArtifact:
 
 
 def configured_scan_dirs() -> list[str]:
-    configured = os.getenv("MSH_SCAN_DIRS", "results,data").strip()
+    configured = os.getenv("FCP_SCAN_DIRS", "results,data").strip()
     dirs = [d.strip() for d in configured.split(",") if d.strip()]
     return dirs or ["results", "data"]
 

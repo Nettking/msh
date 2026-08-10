@@ -47,9 +47,9 @@ from .storage_failover_drill import (
     REPORT_SCHEMA as F52_REPORT_SCHEMA,
 )
 
-EVIDENCE_SCHEMA = "msh.storage_physical_recovery_evidence.v1"
-REPORT_SCHEMA = "msh.storage_physical_recovery_report.v1"
-OPERATION_SCHEMA = "msh.storage_physical_recovery_operation.v1"
+EVIDENCE_SCHEMA = "fcp.storage_physical_recovery_evidence.v1"
+REPORT_SCHEMA = "fcp.storage_physical_recovery_report.v1"
+OPERATION_SCHEMA = "fcp.storage_physical_recovery_operation.v1"
 
 
 def _now() -> datetime:
@@ -249,7 +249,7 @@ def validate_f52_baseline(
             "F5.2 storage roles or verified control are inconsistent",
         )
     return {
-        "schema": "msh.storage_physical_recovery_baseline.v1",
+        "schema": "fcp.storage_physical_recovery_baseline.v1",
         "deployment_id": deployment.deployment_id,
         "session_id": deployment.session_id,
         "group_id": deployment.group_id,

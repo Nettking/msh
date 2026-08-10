@@ -13,7 +13,7 @@ from catalog.flask_app.services.catalog_service import ArtifactCatalog, ScanRoot
 def test_ensure_scanned_refreshes_when_timeline_export_appears(tmp_path: Path, monkeypatch, caplog) -> None:
     results_root = tmp_path / "results"
     results_root.mkdir()
-    monkeypatch.setenv("MSH_SCAN_DIRS", str(results_root))
+    monkeypatch.setenv("FCP_SCAN_DIRS", str(results_root))
 
     catalog = ArtifactCatalog(signature_ttl_seconds=0.0)
     initial = catalog.ensure_scanned()
@@ -43,7 +43,7 @@ def test_ensure_scanned_refreshes_when_timeline_export_appears(tmp_path: Path, m
 def test_force_signature_check_bypasses_ttl_for_playback_fallback(tmp_path: Path, monkeypatch) -> None:
     results_root = tmp_path / "results"
     results_root.mkdir()
-    monkeypatch.setenv("MSH_SCAN_DIRS", str(results_root))
+    monkeypatch.setenv("FCP_SCAN_DIRS", str(results_root))
 
     catalog = ArtifactCatalog(signature_ttl_seconds=60.0)
     assert catalog.ensure_scanned().artifacts == []
@@ -68,7 +68,7 @@ def test_force_signature_check_bypasses_ttl_for_playback_fallback(tmp_path: Path
 def test_ensure_scanned_reuses_signature_within_ttl(tmp_path: Path, monkeypatch) -> None:
     results_root = tmp_path / "results"
     results_root.mkdir()
-    monkeypatch.setenv("MSH_SCAN_DIRS", str(results_root))
+    monkeypatch.setenv("FCP_SCAN_DIRS", str(results_root))
 
     class CountingCatalog(ArtifactCatalog):
         def __init__(self) -> None:
@@ -90,7 +90,7 @@ def test_ensure_scanned_reuses_signature_within_ttl(tmp_path: Path, monkeypatch)
 def test_background_rescan_request_during_active_scan_runs_pending_scan(tmp_path: Path, monkeypatch) -> None:
     results_root = tmp_path / "results"
     results_root.mkdir()
-    monkeypatch.setenv("MSH_SCAN_DIRS", str(results_root))
+    monkeypatch.setenv("FCP_SCAN_DIRS", str(results_root))
     catalog = ArtifactCatalog()
     first_scan_started = threading.Event()
     allow_first_scan_to_finish = threading.Event()

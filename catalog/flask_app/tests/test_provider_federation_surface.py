@@ -25,7 +25,7 @@ class StubOperatorSurface(ProviderOperatorSurface):
             capability_id="provider-one",
             node_id="node-provider-one",
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             discovered=True,
             announcement_status="ready",

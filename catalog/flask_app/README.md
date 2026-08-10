@@ -1,4 +1,4 @@
-# MSH Flask Web App
+# FCP Flask Web App
 
 Primary Flask operator interface for runtime visibility and operator playback workflows.
 
@@ -40,7 +40,7 @@ This keeps `/` useful before discovery/session outputs exist, during catch-up, a
 ## Runtime (prepare + serve)
 
 ```bash
-MSH_SCAN_DIRS=results,data python -m catalog.flask_app.app
+FCP_SCAN_DIRS=results,data python -m catalog.flask_app.app
 ```
 
 Startup now performs **webapp-first runtime**:
@@ -109,7 +109,7 @@ Verification uses the bounded automatic coverage contract (`runtime_playback_rea
 
 Runtime reconciliation checks session metadata and required automatic-coverage outputs on disk; if a previously tracked day is missing/corrupt/incomplete for that automatic contract, it is automatically re-queued in historical catch-up.
 
-Set `MSH_SKIP_ORCHESTRATION=1` to skip that pre-start phase when needed.
+Set `FCP_SKIP_ORCHESTRATION=1` to skip that pre-start phase when needed.
 
 ## Operator control panel (terminal controls moved to web)
 

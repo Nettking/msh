@@ -15,7 +15,7 @@ from catalog.orchestrator.pipeline import run_orchestration
 def main() -> int:
     print("[deprecated] catalog/runner/menu.py is deprecated as an operational workflow.", flush=True)
     print("[deprecated] Use automatic orchestration + Flask startup instead.", flush=True)
-    if os.getenv("MSH_LEGACY_MENU_ENABLED", "0") == "1":
+    if os.getenv("FCP_LEGACY_MENU_ENABLED", "0") == "1":
         print("[deprecated] Legacy menu mode is no longer available in this build.", flush=True)
         return 1
 

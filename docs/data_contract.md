@@ -1,6 +1,6 @@
 # Data contract
 
-This document describes the data shapes MSH expects and the artifacts it creates. It is descriptive, not a promise that every historical file is clean. For session lifecycle and cache behavior, see [Workflow sessions](workflow_sessions.md). For external source synchronization, see [Source synchronization](source_synchronization.md).
+This document describes the data shapes FCP expects and the artifacts it creates. It is descriptive, not a promise that every historical file is clean. For session lifecycle and cache behavior, see [Workflow sessions](workflow_sessions.md). For external source synchronization, see [Source synchronization](source_synchronization.md).
 
 ## Raw telemetry input
 
@@ -17,7 +17,7 @@ If records in a file do not contain parseable timestamps, some date discovery an
 
 ## Multi-source telemetry input
 
-MSH can now receive telemetry from more than one source system. Source-specific connectors must normalize records before writing JSONL under `data/` so that recursive JSONL discovery does not ingest vendor metadata or non-telemetry API dumps.
+FCP can now receive telemetry from more than one source system. Source-specific connectors must normalize records before writing JSONL under `data/` so that recursive JSONL discovery does not ingest vendor metadata or non-telemetry API dumps.
 
 Recommended source landing layout:
 
@@ -53,7 +53,7 @@ Connectors may add source-specific fields such as `point_id`, `point_name`, `cha
 The active MTConnect recorder maintains two normalized representations in
 addition to the immutable raw XML archive.
 
-The MSH-compatible scan path contains one wide state snapshot per MTConnect
+The FCP-compatible scan path contains one wide state snapshot per MTConnect
 observation sequence:
 
 ```text
@@ -153,5 +153,5 @@ Health scripts often validate raw telemetry availability and sequence behavior. 
 - Cache reuse is based on workflow session metadata signatures, timestamps, and output existence; it is not a full semantic validation of changed source data or changed script code.
 - JSONL records with inconsistent field names may require script-specific handling.
 - Filename-date fallback can include records without timestamps when the whole file has no parseable timestamp and the filename date is in scope.
-- Source connectors are responsible for producing MSH-compatible JSONL. Non-telemetry source metadata should not be written as `.jsonl` under `data/`.
+- Source connectors are responsible for producing FCP-compatible JSONL. Non-telemetry source metadata should not be written as `.jsonl` under `data/`.
 - MTConnect capture can only be complete while required observations remain in the Agent buffer. Any overwritten interval must be treated as an explicit gap.

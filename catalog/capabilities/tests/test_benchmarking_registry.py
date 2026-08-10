@@ -22,7 +22,7 @@ def _definition(
     return BenchmarkDefinition(
         benchmark_id=benchmark_id,
         capability_type="compute",
-        capability_protocol="msh.compute.v1",
+        capability_protocol="fcp.compute.v1",
         implementation_version="1.0.0",
         max_duration_seconds=2,
         max_parallelism=1,

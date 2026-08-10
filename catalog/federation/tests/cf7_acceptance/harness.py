@@ -33,7 +33,7 @@ class HarnessTimeoutError(RuntimeError):
 
 @dataclass(frozen=True)
 class DeviceState:
-    """One independent MSH device state root used only by tests."""
+    """One independent FCP device state root used only by tests."""
 
     name: str
     root: Path
@@ -54,7 +54,7 @@ class DeviceState:
 
 @dataclass(frozen=True)
 class MultiDeviceState:
-    """Separate state directories for independent MSH devices."""
+    """Separate state directories for independent FCP devices."""
 
     root: Path
     devices: tuple[DeviceState, ...]
@@ -198,7 +198,7 @@ def write_partial_json(path: Path) -> None:
     """Inject a deterministic interrupted JSON write into an existing format."""
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(b'{"schema":"msh.node.v1","node_id":')
+    path.write_bytes(b'{"schema":"fcp.node.v1","node_id":')
 
 
 def write_corrupted_bytes(path: Path) -> None:

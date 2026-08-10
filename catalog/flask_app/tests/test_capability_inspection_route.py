@@ -28,7 +28,7 @@ class InspectionOnlyAdapter:
     definition = BenchmarkDefinition(
         benchmark_id="benchmark.fixture.read-only.v1",
         capability_type="fixture",
-        capability_protocol="msh-fixture",
+        capability_protocol="fcp-fixture",
         implementation_version="1.0.0",
         max_duration_seconds=2,
         max_parallelism=1,
@@ -405,7 +405,7 @@ def test_default_composition_reads_existing_mtconnect_scan_without_starting_scan
     def scan_supplier():
         supplier_calls.append("read")
         return {
-            "schema": "msh.mtconnect.network_scan.v1",
+            "schema": "fcp.mtconnect.network_scan.v1",
             "state": "complete",
             "finished_at": "2026-08-03T01:00:00Z",
             "results": [

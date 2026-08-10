@@ -7,7 +7,7 @@ param(
     [ValidateRange(1, 65535)]
     [int]$PreferredPort,
 
-    [string]$CurrentProjectName = "msh",
+    [string]$CurrentProjectName = "fcp",
 
     [string]$OutputFile = "",
 
@@ -74,7 +74,7 @@ function Get-Mount {
         Select-Object -First 1
 }
 
-function Test-MshFlaskContainer {
+function Test-FcpFlaskContainer {
     param([Parameter(Mandatory = $true)]$Inspection)
 
     $labels = $Inspection.Config.Labels
@@ -88,13 +88,13 @@ function Test-MshFlaskContainer {
         return $false
     }
 
-    $hasMshEnvironment = @($Inspection.Config.Env) | Where-Object {
-        $_ -like "MSH_FLASK_SECRET=*" -or
-        $_ -like "MSH_SCAN_DIRS=*" -or
-        $_ -like "MSH_FEDERATION_NODE_STATE_DIR=*"
+    $hasFcpEnvironment = @($Inspection.Config.Env) | Where-Object {
+        $_ -like "FCP_FLASK_SECRET=*" -or
+        $_ -like "FCP_SCAN_DIRS=*" -or
+        $_ -like "FCP_FEDERATION_NODE_STATE_DIR=*"
     }
-    $hasMshDataMount = Get-Mount -Inspection $Inspection -Destination "/app/data"
-    return @($hasMshEnvironment).Count -gt 0 -or $null -ne $hasMshDataMount
+    $hasFcpDataMount = Get-Mount -Inspection $Inspection -Destination "/app/data"
+    return @($hasFcpEnvironment).Count -gt 0 -or $null -ne $hasFcpDataMount
 }
 
 function Get-VolumeInspection {
@@ -161,7 +161,7 @@ function Get-IdentityNodeId {
 }
 
 function Find-ProbeImage {
-    foreach ($image in @("msh-relay:latest", "msh-flask:latest", "msh-recorder:latest")) {
+    foreach ($image in @("fcp-relay:latest", "fcp-flask:latest", "fcp-recorder:latest")) {
         & docker image inspect $image *> $null
         if ($LASTEXITCODE -eq 0) {
             return $image
@@ -244,7 +244,7 @@ print(json.dumps(result, sort_keys=True))
     }
 }
 
-function Remove-LegacyMshProject {
+function Remove-LegacyFcpProject {
     param([Parameter(Mandatory = $true)][string]$ProjectName)
 
     if ([string]::IsNullOrWhiteSpace($ProjectName) -or $ProjectName -eq $CurrentProjectName) {
@@ -252,7 +252,7 @@ function Remove-LegacyMshProject {
     }
 
     Write-Warning ((
-        "Port {0} is owned by the older MSH Compose project '{1}'. " +
+        "Port {0} is owned by the older FCP Compose project '{1}'. " +
         "Its containers will be replaced after its data paths and named volumes " +
         "have been retained. No Docker volume is deleted."
     ) -f $PreferredPort, $ProjectName)
@@ -268,12 +268,12 @@ function Remove-LegacyMshProject {
         if ($running -eq "true") {
             & docker stop --time 20 $containerId 2>$null | Out-Null
             if ($LASTEXITCODE -ne 0) {
-                throw "Could not stop the older MSH container $containerId."
+                throw "Could not stop the older FCP container $containerId."
             }
         }
         & docker rm $containerId 2>$null | Out-Null
         if ($LASTEXITCODE -ne 0) {
-            throw "Could not remove the older MSH container $containerId."
+            throw "Could not remove the older FCP container $containerId."
         }
     }
 }
@@ -296,8 +296,8 @@ function Write-ResolvedState {
 }
 
 try {
-    $selectedDataDirectory = [string]$env:MSH_DATA_DIR
-    $selectedResultsDirectory = [string]$env:MSH_RESULTS_DIR
+    $selectedDataDirectory = [string]$env:FCP_DATA_DIR
+    $selectedResultsDirectory = [string]$env:FCP_RESULTS_DIR
     $ownerProject = ""
     $ownerRelayVolume = ""
     $ownerDataDirectory = ""
@@ -309,11 +309,11 @@ try {
 
     foreach ($containerId in $publishedOwners) {
         $inspection = Get-ContainerInspection -ContainerId $containerId
-        if ($null -eq $inspection -or -not (Test-MshFlaskContainer -Inspection $inspection)) {
+        if ($null -eq $inspection -or -not (Test-FcpFlaskContainer -Inspection $inspection)) {
             continue
         }
         $ownerProject = Get-ComposeProjectName -Inspection $inspection
-        $relayMount = Get-Mount -Inspection $inspection -Destination "/var/lib/msh-relay"
+        $relayMount = Get-Mount -Inspection $inspection -Destination "/var/lib/fcp-relay"
         $dataMount = Get-Mount -Inspection $inspection -Destination "/app/data"
         $resultsMount = Get-Mount -Inspection $inspection -Destination "/app/results"
         if ($null -ne $relayMount -and [string]$relayMount.Type -eq "volume") {
@@ -328,15 +328,15 @@ try {
         break
     }
 
-    if ($env:MSH_DATA_DIR_DEFAULTED -eq "1" -and -not [string]::IsNullOrWhiteSpace($ownerDataDirectory)) {
+    if ($env:FCP_DATA_DIR_DEFAULTED -eq "1" -and -not [string]::IsNullOrWhiteSpace($ownerDataDirectory)) {
         $selectedDataDirectory = $ownerDataDirectory
     }
-    if ($env:MSH_RESULTS_DIR_DEFAULTED -eq "1" -and -not [string]::IsNullOrWhiteSpace($ownerResultsDirectory)) {
+    if ($env:FCP_RESULTS_DIR_DEFAULTED -eq "1" -and -not [string]::IsNullOrWhiteSpace($ownerResultsDirectory)) {
         $selectedResultsDirectory = $ownerResultsDirectory
     }
 
     $nodeId = Get-IdentityNodeId -DataDirectory $selectedDataDirectory
-    $selectedRelayVolume = [string]$env:MSH_RELAY_VOLUME_NAME
+    $selectedRelayVolume = [string]$env:FCP_RELAY_VOLUME_NAME
     $relayWasExplicit = -not [string]::IsNullOrWhiteSpace($selectedRelayVolume)
     $probeImage = Find-ProbeImage
 
@@ -412,12 +412,12 @@ try {
         ) {
             throw (
                 "Multiple Federation coordinator volumes exist, but none could be selected safely. " +
-                "No state was changed. Set MSH_RELAY_VOLUME_NAME explicitly or run update.cmd " +
+                "No state was changed. Set FCP_RELAY_VOLUME_NAME explicitly or run update.cmd " +
                 "after reviewing the retained volumes."
             )
         }
         if ([string]::IsNullOrWhiteSpace($selectedRelayVolume)) {
-            $selectedRelayVolume = "msh_relay_state"
+            $selectedRelayVolume = "fcp_relay_state"
         }
     }
 
@@ -430,24 +430,24 @@ try {
         $stateProject = $ownerProject
     }
 
-    $selectedOllamaVolume = [string]$env:MSH_OLLAMA_VOLUME_NAME
+    $selectedOllamaVolume = [string]$env:FCP_OLLAMA_VOLUME_NAME
     if ([string]::IsNullOrWhiteSpace($selectedOllamaVolume)) {
         $selectedOllamaVolume = Find-ProjectVolume -ProjectName $stateProject -LogicalName "ollama_models"
         if ([string]::IsNullOrWhiteSpace($selectedOllamaVolume)) {
-            $selectedOllamaVolume = "msh_ollama_models"
+            $selectedOllamaVolume = "fcp_ollama_models"
         }
     }
 
-    $selectedProviderVolume = [string]$env:MSH_MODEL_PROVIDER_VOLUME_NAME
+    $selectedProviderVolume = [string]$env:FCP_MODEL_PROVIDER_VOLUME_NAME
     if ([string]::IsNullOrWhiteSpace($selectedProviderVolume)) {
         $selectedProviderVolume = Find-ProjectVolume -ProjectName $stateProject -LogicalName "model_provider_models"
         if ([string]::IsNullOrWhiteSpace($selectedProviderVolume)) {
-            $selectedProviderVolume = "msh_model_provider_models"
+            $selectedProviderVolume = "fcp_model_provider_models"
         }
     }
 
     if (-not [string]::IsNullOrWhiteSpace($ownerProject) -and $ownerProject -ne $CurrentProjectName) {
-        Remove-LegacyMshProject -ProjectName $ownerProject
+        Remove-LegacyFcpProject -ProjectName $ownerProject
     }
 
     $selectedPort = $PreferredPort
@@ -456,8 +456,8 @@ try {
     if (-not $portAvailable -and -not $currentOwnerStillUsesPort) {
         if (-not $AllowFallback) {
             [Console]::Error.WriteLine(
-                "MSH web port $PreferredPort is already in use by a non-MSH process. " +
-                "Close that process or choose another port with MSH_WEB_PORT."
+                "FCP web port $PreferredPort is already in use by a non-FCP process. " +
+                "Close that process or choose another port with FCP_WEB_PORT."
             )
             exit 2
         }
@@ -468,33 +468,33 @@ try {
                 $selectedPort = $candidate
                 Write-Warning (
                     "Port $PreferredPort is in use by another application. " +
-                    "MSH will use http://localhost:$candidate for this start."
+                    "FCP will use http://localhost:$candidate for this start."
                 )
                 break
             }
         }
         if ($selectedPort -eq 0) {
             [Console]::Error.WriteLine(
-                "No free MSH web port was found between $PreferredPort and $maximumPort."
+                "No free FCP web port was found between $PreferredPort and $maximumPort."
             )
             exit 3
         }
     }
 
     $resolved = @(
-        "MSH_WEB_PORT=$selectedPort",
-        "MSH_RELAY_VOLUME_NAME=$selectedRelayVolume",
-        "MSH_OLLAMA_VOLUME_NAME=$selectedOllamaVolume",
-        "MSH_MODEL_PROVIDER_VOLUME_NAME=$selectedProviderVolume",
-        "MSH_DATA_DIR=$selectedDataDirectory",
-        "MSH_RESULTS_DIR=$selectedResultsDirectory"
+        "FCP_WEB_PORT=$selectedPort",
+        "FCP_RELAY_VOLUME_NAME=$selectedRelayVolume",
+        "FCP_OLLAMA_VOLUME_NAME=$selectedOllamaVolume",
+        "FCP_MODEL_PROVIDER_VOLUME_NAME=$selectedProviderVolume",
+        "FCP_DATA_DIR=$selectedDataDirectory",
+        "FCP_RESULTS_DIR=$selectedResultsDirectory"
     )
     Write-ResolvedState -Lines $resolved
     exit 0
 }
 catch {
     [Console]::Error.WriteLine(
-        "MSH runtime-state resolver failed: " + $_.Exception.Message
+        "FCP runtime-state resolver failed: " + $_.Exception.Message
     )
     exit 10
 }

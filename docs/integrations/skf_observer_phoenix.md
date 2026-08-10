@@ -1,23 +1,23 @@
 # SKF Observer Phoenix integration
 
-This document summarizes how MSH should ingest data from SKF Observer Phoenix Data Service REST API without committing the vendor reference PDF or binding the core pipeline to one vendor schema.
+This document summarizes how FCP should ingest data from SKF Observer Phoenix Data Service REST API without committing the vendor reference PDF or binding the core pipeline to one vendor schema.
 
 ## Integration position
 
-Observer Phoenix is an additional telemetry source. It should be synchronized into MSH before workflow sessions are prepared and before the Parquet/DuckDB analytics cache is rebuilt.
+Observer Phoenix is an additional telemetry source. It should be synchronized into FCP before workflow sessions are prepared and before the Parquet/DuckDB analytics cache is rebuilt.
 
 ```text
 Observer Phoenix REST API
   -> catalog.observer_phoenix exporter
   -> data/sources/observer_phoenix/jsonl/*.jsonl
-  -> existing MSH cache/session/playback pipeline
+  -> existing FCP cache/session/playback pipeline
 ```
 
 ## Relevant API areas
 
-The first implementation uses only the parts that map cleanly to the current MSH scalar telemetry contract.
+The first implementation uses only the parts that map cleanly to the current FCP scalar telemetry contract.
 
-| API area | Endpoint | MSH use |
+| API area | Endpoint | FCP use |
 | --- | --- | --- |
 | Authentication | `POST /token` | Get OAuth bearer token. |
 | Machines | `GET /v1/machines/` | Discover machine IDs and names. |
@@ -132,7 +132,7 @@ Each channel-level trend measurement becomes one JSONL record. Example:
 }
 ```
 
-The fields beyond the core MSH contract are intentionally source-specific. Shared scripts should continue to tolerate extra columns.
+The fields beyond the core FCP contract are intentionally source-specific. Shared scripts should continue to tolerate extra columns.
 
 ## Synchronization behavior
 

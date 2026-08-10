@@ -28,7 +28,7 @@ from .former_primary_repair import (
 from .local_storage import BatchStorageProvider
 from .reporting import StorageReplicaAssessment, StorageReplicaReport
 
-FORMER_PRIMARY_COMPLETION_SCHEMA = "msh.storage_former_primary_completion.v1"
+FORMER_PRIMARY_COMPLETION_SCHEMA = "fcp.storage_former_primary_completion.v1"
 
 
 def _now() -> datetime:

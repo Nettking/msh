@@ -34,7 +34,7 @@ data/
       second.jsonl
 ```
 
-The Data upload page accepts several JSONL files in one batch. Every nonblank line is validated as a JSON object and stored transactionally in `data/imports/uploads.sqlite3`. The corresponding JSONL files are published under `data/uploads/` only after the full database import succeeds. A temporary `.msh-importing` marker hides incomplete publication directories from supported recursive discovery.
+The Data upload page accepts several JSONL files in one batch. Every nonblank line is validated as a JSON object and stored transactionally in `data/imports/uploads.sqlite3`. The corresponding JSONL files are published under `data/uploads/` only after the full database import succeeds. A temporary `.fcp-importing` marker hides incomplete publication directories from supported recursive discovery.
 
 ## Current support level
 

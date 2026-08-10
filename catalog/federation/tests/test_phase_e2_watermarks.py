@@ -47,7 +47,7 @@ def _seed_manifest(
             session_id="session-1",
             group_id=group_id,
             dataset_id=dataset_id,
-            schema_name="msh.telemetry",
+            schema_name="fcp.telemetry",
             schema_version=1,
             required=True,
             source_id=source_id,
@@ -78,7 +78,7 @@ def test_e2_normalizes_merges_and_splits_ranges() -> None:
 def test_e2_empty_dataset_has_no_watermark_or_missing_ranges() -> None:
     empty = DatasetManifest(
         dataset_id="telemetry",
-        schema_name="msh.telemetry",
+        schema_name="fcp.telemetry",
         schema_version=1,
         required=True,
         source_id=None,
@@ -92,7 +92,7 @@ def test_e2_empty_dataset_has_no_watermark_or_missing_ranges() -> None:
 def test_e2_first_committed_range_and_contiguous_append() -> None:
     dataset = DatasetManifest(
         dataset_id="telemetry",
-        schema_name="msh.telemetry",
+        schema_name="fcp.telemetry",
         schema_version=1,
         required=True,
         source_id="source-a",
@@ -110,7 +110,7 @@ def test_e2_first_committed_range_and_contiguous_append() -> None:
 def test_e2_gap_creation_and_gap_filling_is_deterministic() -> None:
     dataset = DatasetManifest(
         dataset_id="telemetry",
-        schema_name="msh.telemetry",
+        schema_name="fcp.telemetry",
         schema_version=1,
         required=True,
         source_id="source-a",
@@ -132,7 +132,7 @@ def test_e2_gap_creation_and_gap_filling_is_deterministic() -> None:
 def test_e2_overlapping_identical_evidence_merges_and_conflicting_ranges_fail_closed() -> None:
     dataset = DatasetManifest(
         dataset_id="telemetry",
-        schema_name="msh.telemetry",
+        schema_name="fcp.telemetry",
         schema_version=1,
         required=True,
         source_id="source-a",
@@ -160,7 +160,7 @@ def test_e2_restart_reconstructs_the_same_coverage_state(
             session_id="session-1",
             group_id="storage-main",
             dataset_id="telemetry",
-            schema_name="msh.telemetry",
+            schema_name="fcp.telemetry",
             schema_version=1,
             required=True,
             source_id="source-a",
@@ -190,7 +190,7 @@ def test_e2_multiple_datasets_sources_and_groups_are_isolated(
             session_id="session-1",
             group_id="storage-a",
             dataset_id="telemetry",
-            schema_name="msh.telemetry",
+            schema_name="fcp.telemetry",
             schema_version=1,
             required=True,
             source_id="source-a",
@@ -204,7 +204,7 @@ def test_e2_multiple_datasets_sources_and_groups_are_isolated(
             session_id="session-1",
             group_id="storage-b",
             dataset_id="audio",
-            schema_name="msh.audio",
+            schema_name="fcp.audio",
             schema_version=1,
             required=False,
             source_id="source-b",
@@ -229,7 +229,7 @@ def test_e2_rejects_malformed_negative_and_conflicting_coverage_updates(
     with pytest.raises(FederationValidationError) as negative:
         DatasetManifest(
             dataset_id="telemetry",
-            schema_name="msh.telemetry",
+            schema_name="fcp.telemetry",
             schema_version=1,
             required=True,
             source_id="source-a",
@@ -244,7 +244,7 @@ def test_e2_rejects_malformed_negative_and_conflicting_coverage_updates(
                 session_id="session-1",
                 group_id="storage-main",
                 dataset_id="telemetry",
-                schema_name="msh.telemetry",
+                schema_name="fcp.telemetry",
                 schema_version=2,
                 required=True,
                 source_id="source-a",

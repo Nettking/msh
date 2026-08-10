@@ -68,11 +68,11 @@ def test_two_authenticated_members_see_same_online_devices_and_services(
         )
         host_credentials = IdentityStore(
             tmp_path / "host",
-            display_name="This MSH device",
+            display_name="This FCP device",
         ).load_or_create(now=NOW)
         peer_credentials = IdentityStore(
             tmp_path / "peer",
-            display_name="This MSH device",
+            display_name="This FCP device",
         ).load_or_create(now=NOW)
 
         for credentials in (host_credentials, peer_credentials):
@@ -112,13 +112,13 @@ def test_two_authenticated_members_see_same_online_devices_and_services(
         await relay.start()
         host_runtime = ResilientPairingRelayRuntime(
             state_directory=tmp_path / "host",
-            display_name="This MSH device",
+            display_name="This FCP device",
             clock=lambda: NOW,
             timeout_seconds=5,
         )
         peer_runtime = ResilientPairingRelayRuntime(
             state_directory=tmp_path / "peer",
-            display_name="This MSH device",
+            display_name="This FCP device",
             clock=lambda: NOW,
             timeout_seconds=5,
         )
@@ -150,7 +150,7 @@ def test_two_authenticated_members_see_same_online_devices_and_services(
                             node_id=node_id,
                             session_id=session.session_id,
                             type=capability_type,
-                            protocol=f"msh-{capability_type}",
+                            protocol=f"fcp-{capability_type}",
                             protocol_version="1.0",
                             status=(
                                 CapabilityStatus.READY

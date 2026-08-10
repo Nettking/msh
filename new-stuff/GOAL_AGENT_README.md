@@ -1,10 +1,10 @@
-# MSH Goal Agent
+# FCP Goal Agent
 
 This is an experimental desktop automation layer for `new-stuff`.
 
 It is different from `desktop-agent.py`:
 
-- `desktop-agent.py` is a specialized workflow for GitHub Desktop, repository sync, and starting MSH.
+- `desktop-agent.py` is a specialized workflow for GitHub Desktop, repository sync, and starting FCP.
 - `goal-agent.py` is a reusable goal runner. It asks what you want to do, proposes a task list, asks before starting each task, then uses screenshots, Ollama vision, clicks, keyboard actions, and user confirmations to work through the tasks.
 
 ## What it can do
@@ -32,7 +32,7 @@ The agent should then:
 Install the same core dependencies used by the other `new-stuff` scripts:
 
 ```powershell
-cd C:\wsl\msh\new-stuff
+cd C:\wsl\fcp\new-stuff
 py -m venv .venv
 .\.venv\Scripts\activate
 py -m pip install requests pillow pyautogui pyperclip
@@ -61,7 +61,7 @@ curl http://192.168.10.172:11434/api/tags
 ## Run interactively
 
 ```powershell
-cd C:\wsl\msh\new-stuff
+cd C:\wsl\fcp\new-stuff
 .\.venv\Scripts\activate
 py goal-agent.py
 ```
@@ -97,11 +97,11 @@ py goal-agent.py --confirm-each-action
 You can override the hard-coded defaults without editing the code:
 
 ```powershell
-$env:MSH_GOAL_AGENT_OLLAMA_URL="http://192.168.10.172:11434"
-$env:MSH_GOAL_AGENT_MODEL="qwen3-vl:8b-instruct"
-$env:MSH_GOAL_AGENT_DRY_RUN="1"
-$env:MSH_GOAL_AGENT_CONFIRM_EACH_ACTION="1"
-$env:MSH_GOAL_AGENT_MAX_ACTIONS_PER_TASK="20"
+$env:FCP_GOAL_AGENT_OLLAMA_URL="http://192.168.10.172:11434"
+$env:FCP_GOAL_AGENT_MODEL="qwen3-vl:8b-instruct"
+$env:FCP_GOAL_AGENT_DRY_RUN="1"
+$env:FCP_GOAL_AGENT_CONFIRM_EACH_ACTION="1"
+$env:FCP_GOAL_AGENT_MAX_ACTIONS_PER_TASK="20"
 ```
 
 ## Allowed desktop actions

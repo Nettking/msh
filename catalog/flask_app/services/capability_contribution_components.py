@@ -147,7 +147,7 @@ def default_components(
     settings = setup_loader()
     setup = _payload(settings)
     model = str(
-        os.environ.get("MSH_AI_MODEL") or setup.get("ai_model") or ""
+        os.environ.get("FCP_AI_MODEL") or setup.get("ai_model") or ""
     ).strip()
     base_url = str(
         os.environ.get("OLLAMA_BASE_URL") or setup.get("ollama_base_url") or ""
@@ -160,7 +160,7 @@ def default_components(
                 {
                     service_id: AICandidateSpec(
                         service_id=service_id,
-                        protocol="msh-language-model",
+                        protocol="fcp-language-model",
                         display_label=display_label,
                         capacity_envelope={
                             "model": model,

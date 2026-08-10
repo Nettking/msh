@@ -61,7 +61,7 @@ def _job(**overrides: object) -> JobContract:
             ArtifactReference(
                 reference_id="artifact-input-1",
                 session_id="session-001",
-                schema_name="msh.prompt.v1",
+                schema_name="fcp.prompt.v1",
                 media_type="application/json",
                 content_hash=_sha256("a"),
                 size_bytes=128,
@@ -71,7 +71,7 @@ def _job(**overrides: object) -> JobContract:
             ArtifactReference(
                 reference_id="artifact-output-1",
                 session_id="session-001",
-                schema_name="msh.ai-response.v1",
+                schema_name="fcp.ai-response.v1",
                 media_type="application/json",
             ),
         ),
@@ -115,7 +115,7 @@ def test_f71_003_unknown_job_protocol_major_is_rejected() -> None:
 
 def test_f71_004_unknown_nested_schema_major_is_rejected() -> None:
     value = _job().to_dict()
-    value["retry_policy"]["schema"] = "msh.job-retry-policy.v2"
+    value["retry_policy"]["schema"] = "fcp.job-retry-policy.v2"
 
     with pytest.raises(ProtocolCompatibilityError) as exc_info:
         JobContract.from_dict(value)
@@ -138,7 +138,7 @@ def test_f71_006_non_json_requirements_are_rejected() -> None:
     with pytest.raises(FederationValidationError) as exc_info:
         CapabilityRequirement(
             capability_type="compute-worker",
-            protocol="msh-compute",
+            protocol="fcp-compute",
             protocol_version="1.0",
             requirements={"not_json": object()},
         )
@@ -150,7 +150,7 @@ def test_f71_007_cross_session_artifact_reference_is_rejected() -> None:
     reference = ArtifactReference(
         reference_id="artifact-other",
         session_id="session-other",
-        schema_name="msh.input.v1",
+        schema_name="fcp.input.v1",
         media_type="application/json",
     )
 
@@ -165,7 +165,7 @@ def test_f71_008_artifact_identity_requires_hash_and_size_together() -> None:
         ArtifactReference(
             reference_id="artifact-input",
             session_id="session-001",
-            schema_name="msh.input.v1",
+            schema_name="fcp.input.v1",
             media_type="application/json",
             content_hash=_sha256(),
         )

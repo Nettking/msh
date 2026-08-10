@@ -326,7 +326,7 @@
         throw new Error(`Recorder status returned ${response.status}`);
       }
       const payload = await response.json();
-      if (payload?.schema !== "msh.recorder.web_status.v1") {
+      if (payload?.schema !== "fcp.recorder.web_status.v1") {
         throw new Error("Recorder status returned an unexpected response");
       }
       renderStatus(payload);

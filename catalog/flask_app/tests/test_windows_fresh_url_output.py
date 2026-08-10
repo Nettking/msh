@@ -20,7 +20,7 @@ def _onboarding_status_line() -> str:
 
 def test_start_cmd_quotes_onboarding_url_in_status_output() -> None:
     assert _onboarding_status_line() == (
-        'echo Onboarding:            "%MSH_ONBOARDING_URL%"'
+        'echo Onboarding:            "%FCP_ONBOARDING_URL%"'
     )
 
 
@@ -32,7 +32,7 @@ def test_fresh_onboarding_query_is_printed_without_executing_reset_fragment(
     batch_file = tmp_path / "print-onboarding-url.cmd"
     batch_file.write_text(
         "@echo off\n"
-        f'set "MSH_ONBOARDING_URL={onboarding_url}"\n'
+        f'set "FCP_ONBOARDING_URL={onboarding_url}"\n'
         f"{_onboarding_status_line()}\n",
         encoding="utf-8",
     )

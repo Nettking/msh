@@ -1,4 +1,4 @@
-"""Pure, versioned job contracts for distributed MSH capabilities.
+"""Pure, versioned job contracts for distributed FCP capabilities.
 
 The module defines data and deterministic state validation only. It does not
 perform provider selection, dispatch, ownership, storage, networking, or runtime
@@ -15,22 +15,22 @@ from typing import Any, ClassVar, Self
 
 from catalog.federation.errors import FederationValidationError, ProtocolCompatibilityError
 
-JOBS_PROTOCOL = "msh-jobs"
+JOBS_PROTOCOL = "fcp-jobs"
 JOBS_PROTOCOL_VERSION = "1.0"
 JOBS_PROTOCOL_MAJOR = 1
-JOB_SCHEMA = "msh.job.v1"
-CAPABILITY_REQUIREMENT_SCHEMA = "msh.job-capability-requirement.v1"
-ARTIFACT_REFERENCE_SCHEMA = "msh.job-artifact-reference.v1"
-RETRY_POLICY_SCHEMA = "msh.job-retry-policy.v1"
-TIMEOUT_POLICY_SCHEMA = "msh.job-timeout-policy.v1"
-ATTEMPT_SCHEMA = "msh.job-attempt.v1"
+JOB_SCHEMA = "fcp.job.v1"
+CAPABILITY_REQUIREMENT_SCHEMA = "fcp.job-capability-requirement.v1"
+ARTIFACT_REFERENCE_SCHEMA = "fcp.job-artifact-reference.v1"
+RETRY_POLICY_SCHEMA = "fcp.job-retry-policy.v1"
+TIMEOUT_POLICY_SCHEMA = "fcp.job-timeout-policy.v1"
+ATTEMPT_SCHEMA = "fcp.job-attempt.v1"
 MAX_JOB_MESSAGE_BYTES = 262_144
 MAX_TEXT_BYTES = 512
 MAX_REFERENCE_COUNT = 128
 MAX_ATTEMPTS = 32
 MAX_TIMEOUT_SECONDS = 7 * 24 * 60 * 60
 
-_SCHEMA_RE = re.compile(r"^(?P<name>msh\.[a-z0-9.-]+)\.v(?P<major>[0-9]+)$")
+_SCHEMA_RE = re.compile(r"^(?P<name>fcp\.[a-z0-9.-]+)\.v(?P<major>[0-9]+)$")
 _HASH_RE = re.compile(r"^sha256:[0-9a-f]{64}$")
 
 

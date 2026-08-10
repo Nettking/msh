@@ -45,20 +45,20 @@ class QualityOutcomeService:
 
     def _load(self) -> dict[str, Any]:
         if not self.path.exists():
-            return {"schema": "msh.quality_outcomes.v1", "updated_at": "", "outcomes": []}
+            return {"schema": "fcp.quality_outcomes.v1", "updated_at": "", "outcomes": []}
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            return {"schema": "msh.quality_outcomes.v1", "updated_at": "", "outcomes": []}
+            return {"schema": "fcp.quality_outcomes.v1", "updated_at": "", "outcomes": []}
         if not isinstance(payload, dict):
-            return {"schema": "msh.quality_outcomes.v1", "updated_at": "", "outcomes": []}
+            return {"schema": "fcp.quality_outcomes.v1", "updated_at": "", "outcomes": []}
         payload.setdefault("outcomes", [])
         payload["outcomes"] = [item for item in payload["outcomes"] if isinstance(item, dict)]
         return payload
 
     def _write(self, payload: dict[str, Any]) -> None:
         payload = dict(payload)
-        payload["schema"] = "msh.quality_outcomes.v1"
+        payload["schema"] = "fcp.quality_outcomes.v1"
         payload["updated_at"] = _now_utc()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")

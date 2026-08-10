@@ -50,7 +50,7 @@ def _job(*, status: JobStatus = JobStatus.ACTIVE, job_id: str = "job-1") -> JobC
         idempotency_key=f"session-1:{job_id}",
         capability=CapabilityRequirement(
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             requirements={"operation": "echo", "modalities": ["json"]},
         ),
@@ -58,7 +58,7 @@ def _job(*, status: JobStatus = JobStatus.ACTIVE, job_id: str = "job-1") -> JobC
             ArtifactReference(
                 reference_id="input-1",
                 session_id="session-1",
-                schema_name="msh.synthetic-input.v1",
+                schema_name="fcp.synthetic-input.v1",
                 media_type="application/json",
             ),
         ),
@@ -66,7 +66,7 @@ def _job(*, status: JobStatus = JobStatus.ACTIVE, job_id: str = "job-1") -> JobC
             ArtifactReference(
                 reference_id="output-1",
                 session_id="session-1",
-                schema_name="msh.synthetic-output.v1",
+                schema_name="fcp.synthetic-output.v1",
                 media_type="application/json",
             ),
         ),
@@ -112,7 +112,7 @@ def _registration(**overrides: object) -> WorkerRegistration:
         "node_id": "node-worker",
         "provider_id": "provider-worker",
         "capability_type": "synthetic-compute",
-        "protocol": "msh-synthetic",
+        "protocol": "fcp-synthetic",
         "protocol_version": "1.2",
         "attributes": {"operation": "echo", "modalities": ["json", "text"]},
     }
@@ -174,7 +174,7 @@ def test_f74_002_response_round_trip_and_additive_fields() -> None:
 
 def test_f74_003_unknown_schema_and_protocol_major_fail_closed() -> None:
     value = _request().to_dict()
-    value["schema"] = "msh.capability-dispatch.v2"
+    value["schema"] = "fcp.capability-dispatch.v2"
     with pytest.raises(ProtocolCompatibilityError) as schema:
         DispatchRequest.from_dict(value)
     assert schema.value.code == "unsupported-schema-major"

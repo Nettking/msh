@@ -41,7 +41,7 @@ NOW = datetime(2026, 8, 2, 20, 37, tzinfo=timezone.utc)
 FORBIDDEN_FRAGMENTS = (
     "internal_session_id",
     "session-secret",
-    "msh_join_",
+    "fcp_join_",
     "bearer ",
     "127.0.0.1",
     "http://",
@@ -66,7 +66,7 @@ def _complete_adapters(*, expired_benchmark: bool = False) -> ProjectionAdapters
         candidate_id="candidate-ai",
         device_id="node-local",
         capability_type="language-model",
-        protocol="msh-ai",
+        protocol="fcp-ai",
         label="Local language model",
         capacity={"use": "interactive", "concurrency": 1},
         missing_prerequisites=(),
@@ -79,7 +79,7 @@ def _complete_adapters(*, expired_benchmark: bool = False) -> ProjectionAdapters
         candidate_id="candidate-storage",
         device_id="node-local",
         capability_type="storage",
-        protocol="msh-storage",
+        protocol="fcp-storage",
         label="Local storage candidate",
         capacity={"capacity_band": "32-63-gib"},
         missing_prerequisites=(),
@@ -118,7 +118,7 @@ def _complete_adapters(*, expired_benchmark: bool = False) -> ProjectionAdapters
                 capability_id="candidate-ai",
                 node_id="node-local",
                 capability_type="language-model",
-                protocol="msh-ai",
+                protocol="fcp-ai",
                 protocol_version="1.0",
                 enrollment_state="approved",
                 health_state="current",
@@ -180,7 +180,7 @@ def _complete_adapters(*, expired_benchmark: bool = False) -> ProjectionAdapters
             StorageProviderRecord(
                 "storage-a",
                 "node-recorder",
-                "msh-storage",
+                "fcp-storage",
                 "1.0",
                 "ready",
                 True,
@@ -246,7 +246,7 @@ def test_all_nine_pages_are_framework_neutral_and_public_safe() -> None:
         page.value for page in FederationPage
     }
     for payload in payloads:
-        assert payload["schema"] == "msh.federation-product-view.v1"
+        assert payload["schema"] == "fcp.federation-product-view.v1"
         assert payload["active_section"] == payload["page"]
         assert len(payload["sections"]) == 9
         assert payload["technical_details"] == []
@@ -344,7 +344,7 @@ def test_existing_operator_surface_adapter_omits_bound_session_context() -> None
                         capability_id="provider-ai",
                         node_id="node-ai",
                         capability_type="language-model",
-                        protocol="msh-ai",
+                        protocol="fcp-ai",
                         protocol_version="1.0",
                         enrollment_state=State.APPROVED,
                         health_state=State.CURRENT,
@@ -391,7 +391,7 @@ def test_cf1_and_cf2_adapters_redact_private_values_and_preserve_safe_evidence()
         resource_observations={
             "cpu": {"band": "8-15"},
             "endpoint": "http://127.0.0.1:11434",
-            "local_path": "/var/lib/msh",
+            "local_path": "/var/lib/fcp",
         },
         detected_services=("ollama", "http://127.0.0.1:11434"),
         registered_handlers=("image-analysis",),
@@ -529,7 +529,7 @@ def test_storage_and_job_adapters_do_not_publish_authority_secrets() -> None:
             "storage-a": SimpleNamespace(
                 provider_id="storage-a",
                 node_id="node-storage",
-                protocol="msh-storage",
+                protocol="fcp-storage",
                 protocol_version="1.0",
                 status="ready",
                 authorized=True,

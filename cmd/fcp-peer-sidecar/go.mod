@@ -1,4 +1,4 @@
-module github.com/Nettking/msh/cmd/msh-peer-sidecar
+module github.com/Nettking/msh/cmd/fcp-peer-sidecar
 
 go 1.25.7
 

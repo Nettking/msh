@@ -75,12 +75,12 @@ Graphify files are generated repository-analysis output. They contain source mti
 | `new-stuff/vision2.py` | Isolated experiment | Separate vision-driven script added with the desktop-agent experiments. | Same as above. | Same as above. | DELETE CANDIDATE after optional export. |
 | `new-stuff/bildebeskrivelser.md` if tracked | Generated experiment output | Contains failed local Ollama connection results and was later added to `.gitignore`. | None. | Confirm tracked state with `git ls-files`. | DELETE CANDIDATE. |
 
-### B2. Windows desktop and MSH walkthrough experiments
+### B2. Windows desktop and FCP walkthrough experiments
 
 | Path | Classification | Evidence | Replacement or migration | Required tests | Decision |
 | --- | --- | --- | --- | --- | --- |
 | `new-stuff/desktop-agent.py` | Machine-specific experiment | Windows/PyAutoGUI/COM automation with hard-coded local Ollama endpoint and GitHub Desktop workflow. | Preserve externally only if the experiment is still wanted; it is not Federation v1 functionality. | `git grep desktop-agent.py`; startup/Compose/requirements review. | DELETE CANDIDATE after optional export. |
-| `new-stuff/step2.py` | Machine-specific test/walkthrough | Uses local MSH and hard-coded LAN Ollama addresses to perform a visual page walkthrough. It is not part of the automated test suite. | Any useful page-walkthrough expectations should become normal Flask tests in a future change. | Search launch references; compare covered routes with Flask tests. | VERIFY BEFORE DELETE, then remove or migrate unique assertions. |
+| `new-stuff/step2.py` | Machine-specific test/walkthrough | Uses local FCP and hard-coded LAN Ollama addresses to perform a visual page walkthrough. It is not part of the automated test suite. | Any useful page-walkthrough expectations should become normal Flask tests in a future change. | Search launch references; compare covered routes with Flask tests. | VERIFY BEFORE DELETE, then remove or migrate unique assertions. |
 | `new-stuff/desktop_agent_output/**` if tracked | Generated runtime output | Output directory is already intended to be ignored. | None. | Confirm tracked state. | DELETE CANDIDATE if any tracked files exist. |
 | `new-stuff/goal_agent_output/**` if tracked | Generated runtime output | Experimental agent logs/screenshots. | None. | Confirm tracked state. | DELETE CANDIDATE if any tracked files exist. |
 
@@ -88,7 +88,7 @@ Graphify files are generated repository-analysis output. They contain source mti
 
 | Path | Classification | Evidence | Replacement or migration | Required tests | Decision |
 | --- | --- | --- | --- | --- | --- |
-| `new-stuff/goal_agent_lib.py` | Isolated experimental library | Added as a reusable desktop goal-agent library; not imported by production MSH. | Optional export to a dedicated experiment repository before deletion. | `git grep goal_agent_lib`; dependency and launcher review. | VERIFY OWNER PRESERVATION PREFERENCE, then DELETE CANDIDATE. |
+| `new-stuff/goal_agent_lib.py` | Isolated experimental library | Added as a reusable desktop goal-agent library; not imported by production FCP. | Optional export to a dedicated experiment repository before deletion. | `git grep goal_agent_lib`; dependency and launcher review. | VERIFY OWNER PRESERVATION PREFERENCE, then DELETE CANDIDATE. |
 | `new-stuff/goal-agent.py` | Experimental launcher | Imports only the local `goal_agent_lib` and runs the desktop agent interactively. | Export together with library if retained elsewhere. | Same as above. | VERIFY OWNER PRESERVATION PREFERENCE, then DELETE CANDIDATE. |
 | `new-stuff/GOAL_AGENT_README.md` | Experimental documentation | Explicitly describes the feature as an experimental desktop automation layer under `new-stuff`. | Move with code if exported; otherwise Git history is sufficient. | Link/reference check. | DELETE CANDIDATE with goal-agent family. |
 
@@ -104,7 +104,7 @@ The intended product behavior is preserved in `docs/roadmap/post_v1_product_road
 | `new-stuff/md_viewer/templates/base.html` | Prototype template | Uses the standalone viewer app. | Future Flask-first docs templates. | Same as above. | DELETE CANDIDATE with prototype. |
 | `new-stuff/md_viewer/templates/home.html` | Prototype template | Standalone viewer home/tree. | Future Flask-first docs templates. | Same as above. | DELETE CANDIDATE with prototype. |
 | `new-stuff/md_viewer/templates/view.html` | Prototype template | Standalone Markdown rendering view. | Future Flask-first docs templates. | Same as above. | DELETE CANDIDATE with prototype. |
-| `new-stuff/md_viewer/docs/README.md` | Sample content | Sample docs, not canonical MSH documentation. | None; use repository `docs/` in V1.1. | Link check. | DELETE CANDIDATE with prototype. |
+| `new-stuff/md_viewer/docs/README.md` | Sample content | Sample docs, not canonical FCP documentation. | None; use repository `docs/` in V1.1. | Link check. | DELETE CANDIDATE with prototype. |
 | `new-stuff/md_viewer/docs/getting-started/installation.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
 | `new-stuff/md_viewer/docs/getting-started/quickstart.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |
 | `new-stuff/md_viewer/docs/reference/config.md` | Sample content | Prototype-only sample. | None. | Same as above. | DELETE CANDIDATE. |

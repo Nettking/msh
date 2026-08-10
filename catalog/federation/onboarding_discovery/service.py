@@ -52,7 +52,7 @@ def _safe_failure_result(
     reason: str,
 ) -> FederationDiscoveryResult:
     digest = hashlib.sha256(
-        f"msh-onboarding-source-failure-v1\0{source_index}".encode()
+        f"fcp-onboarding-source-failure-v1\0{source_index}".encode()
     ).hexdigest()
     return FederationDiscoveryResult(
         discovery_id=f"discovery-unavailable-{digest[:24]}",
@@ -277,7 +277,7 @@ class FederationOnboardingDiscoveryService:
         request_id: str,
         discovery_id: str | None = None,
         verification_code: str | None = None,
-        local_display_name: str = "Local MSH federation",
+        local_display_name: str = "Local FCP federation",
         local_session_id: str | None = None,
     ) -> FederationSessionBinding:
         """Join one selected candidate or create locally when none exists."""

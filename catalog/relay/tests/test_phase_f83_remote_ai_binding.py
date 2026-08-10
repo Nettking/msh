@@ -45,7 +45,7 @@ class LocalLanguageModelProvider:
         self.node_id = node_id
         self.capability_id = CAPABILITY_ID
         self.display_name = "Relay model"
-        self.protocol = "msh-language-model"
+        self.protocol = "fcp-language-model"
         self.protocol_version = "1.0"
         self.models = ("small",)
         self.modalities = ("text",)
@@ -149,7 +149,7 @@ def health_report(
         node_id=provider_node_id,
         session_id=session_id,
         capability_type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         protocol_version="1.0",
         status=ProviderStatus.READY,
         report_revision=revision,
@@ -204,7 +204,7 @@ def test_f83_remote_provider_invokes_once_over_authenticated_relay(
                     node_id=provider_node.node_id,
                     session_id=session_id,
                     type="language-model",
-                    protocol="msh-language-model",
+                    protocol="fcp-language-model",
                     protocol_version="1.0",
                     status=CapabilityStatus.READY,
                     properties={

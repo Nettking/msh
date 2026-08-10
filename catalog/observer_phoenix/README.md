@@ -1,6 +1,6 @@
 # Observer Phoenix source connector
 
-This package contains the first MSH connector for SKF Observer Phoenix Data Service REST API data.
+This package contains the first FCP connector for SKF Observer Phoenix Data Service REST API data.
 
 It is a source adapter, not an analysis script. It is intentionally not runner-visible from `/control`; run it as a preparation/synchronization step before rebuilding the telemetry analytics cache or starting a workflow session.
 
@@ -13,7 +13,7 @@ Observer Phoenix /v1/points/{pointId}/trendMeasurements
         -> data/sources/observer_phoenix/jsonl/<YYYY-MM-DD>.jsonl
 ```
 
-The output is normalized to the MSH JSONL contract with fields such as `timestamp`, `machine_id`, `source`, `source_record_id`, `point_id`, `measurement_type`, `channel`, `value`, and `unit`.
+The output is normalized to the FCP JSONL contract with fields such as `timestamp`, `machine_id`, `source`, `source_record_id`, `point_id`, `measurement_type`, `channel`, `value`, and `unit`.
 
 Spectrum/TWF, diagnoses, captures, notes, and alarms are deliberately not mixed into the first trend telemetry stream. They should be added later as separate source artifacts or annotation streams.
 
@@ -59,7 +59,7 @@ The connector writes state to:
 data/source_state/observer_phoenix.json
 ```
 
-This file stores watermarks and run metadata. It is JSON, not JSONL, so MSH's recursive telemetry scanner will not treat it as raw telemetry.
+This file stores watermarks and run metadata. It is JSON, not JSONL, so FCP's recursive telemetry scanner will not treat it as raw telemetry.
 
 ## After export
 

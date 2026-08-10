@@ -35,7 +35,7 @@ def test_transition_projects_legacy_technical_values_without_role_fields(tmp_pat
 
     assert persisted.ai_provider_name == "Laptop"
     assert persisted.recorder_sources == "Mazak=http://192.168.200.10:5000"
-    assert payload["schema"] == "msh.capability_config.v1"
+    assert payload["schema"] == "fcp.capability_config.v1"
     assert "deployment_mode" not in payload
     assert "ai_enabled" not in payload
     assert "configured" not in payload

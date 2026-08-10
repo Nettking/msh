@@ -1,5 +1,5 @@
 {
-  "schema": "msh.cf7.acceptance-manifest.v1",
+  "schema": "fcp.cf7.acceptance-manifest.v1",
   "scope": "CF7-B automated product acceptance and physical evidence contract",
   "acceptance_claim": "foundation-only",
   "federation_v1_end_to_end_accepted": false,

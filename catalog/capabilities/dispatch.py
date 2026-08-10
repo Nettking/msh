@@ -22,14 +22,14 @@ from catalog.federation.errors import FederationValidationError, ProtocolCompati
 from .job_store import DurableJobSnapshot, SQLiteJobStore
 from .jobs import AttemptStatus, JobAttempt, JobContract, JobStatus, protocol_major
 
-DISPATCH_PROTOCOL = "msh-capability-dispatch"
+DISPATCH_PROTOCOL = "fcp-capability-dispatch"
 DISPATCH_PROTOCOL_VERSION = "1.0"
 DISPATCH_PROTOCOL_MAJOR = 1
-DISPATCH_REQUEST_SCHEMA = "msh.capability-dispatch.v1"
-DISPATCH_EVENT_SCHEMA = "msh.capability-dispatch-event.v1"
-DISPATCH_RESPONSE_SCHEMA = "msh.capability-dispatch-response.v1"
-EXECUTION_RESULT_SCHEMA = "msh.capability-execution-result.v1"
-WORKER_REGISTRATION_SCHEMA = "msh.capability-worker-registration.v1"
+DISPATCH_REQUEST_SCHEMA = "fcp.capability-dispatch.v1"
+DISPATCH_EVENT_SCHEMA = "fcp.capability-dispatch-event.v1"
+DISPATCH_RESPONSE_SCHEMA = "fcp.capability-dispatch-response.v1"
+EXECUTION_RESULT_SCHEMA = "fcp.capability-execution-result.v1"
+WORKER_REGISTRATION_SCHEMA = "fcp.capability-worker-registration.v1"
 MAX_DISPATCH_BYTES = 524_288
 MAX_RESULT_BYTES = 65_536
 

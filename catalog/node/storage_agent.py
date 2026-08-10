@@ -36,10 +36,10 @@ from .client import RelayNodeClient
 from .identity import IdentityStore
 from .state import EnrollmentState
 
-STORAGE_NODE_CONFIG_SCHEMA = "msh.storage_node_config.v1"
-STORAGE_NODE_STATUS_SCHEMA = "msh.storage_node_status.v1"
-DEFAULT_ENROLLMENT_TOKEN_ENV = "MSH_ENROLLMENT_TOKEN"
-DEFAULT_SESSION_INVITATION_ENV = "MSH_SESSION_INVITATION"
+STORAGE_NODE_CONFIG_SCHEMA = "fcp.storage_node_config.v1"
+STORAGE_NODE_STATUS_SCHEMA = "fcp.storage_node_status.v1"
+DEFAULT_ENROLLMENT_TOKEN_ENV = "FCP_ENROLLMENT_TOKEN"
+DEFAULT_SESSION_INVITATION_ENV = "FCP_SESSION_INVITATION"
 _MAX_INTERVAL_SECONDS = 3_600.0
 
 
@@ -451,7 +451,7 @@ async def _run(arguments: argparse.Namespace) -> int:
         print(
             json.dumps(
                 {
-                    "schema": "msh.storage_node_initialization.v1",
+                    "schema": "fcp.storage_node_initialization.v1",
                     "identity": credentials.identity.to_dict(),
                     "provider_id": config.provider_id,
                     "session_id": config.session_id,

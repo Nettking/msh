@@ -110,7 +110,7 @@ class RelayEnvelope:
     the authenticated connection, durable membership, and session revisions.
     """
 
-    SCHEMA: ClassVar[str] = "msh.relay.envelope.v1"
+    SCHEMA: ClassVar[str] = "fcp.relay.envelope.v1"
 
     request_id: str
     actor_node_id: str

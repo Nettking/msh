@@ -36,7 +36,7 @@ class LocalProvider:
     node_id = "node-localruntime0123456789"
     capability_id = CAPABILITY_ID
     display_name = "AI Explainer — This computer"
-    protocol = "msh-language-model"
+    protocol = "fcp-language-model"
     protocol_version = "1.0"
     models = ("llama3.2:3b",)
     modalities = ("text",)
@@ -58,7 +58,7 @@ class BlockingLocalProvider:
     node_id = "node-local-capacity"
     capability_id = "ollama-shared-capacity"
     display_name = "Shared capacity provider"
-    protocol = "msh-language-model"
+    protocol = "fcp-language-model"
     protocol_version = "1.0"
     models = ("llama3.2:3b",)
     modalities = ("text",)
@@ -124,7 +124,7 @@ def health_record() -> ProviderHealthRecord:
         node_id=PROVIDER_NODE,
         session_id=SESSION_ID,
         capability_type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         protocol_version="1.0",
         status=ProviderStatus.READY,
         report_revision=0,
@@ -147,7 +147,7 @@ def health_record() -> ProviderHealthRecord:
         capability_id=CAPABILITY_ID,
         node_id=PROVIDER_NODE,
         capability_type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         protocol_version="1.0",
         protocol_major=1,
         state="approved",

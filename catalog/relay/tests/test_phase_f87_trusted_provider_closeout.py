@@ -80,7 +80,7 @@ class LocalLanguageModelProvider:
         self.session_id = session_id
         self.node_id = node_id
         self.display_name = label
-        self.protocol = "msh-language-model"
+        self.protocol = "fcp-language-model"
         self.protocol_version = "1.0"
         self.models = ("small",)
         self.modalities = ("text",)
@@ -173,7 +173,7 @@ def _descriptor(provider_id: str) -> LocalComputeHandlerDescriptor:
     return LocalComputeHandlerDescriptor(
         handler_id=f"handler-{provider_id}",
         capability_type="synthetic-compute",
-        protocol="msh-synthetic",
+        protocol="fcp-synthetic",
         protocol_version="1.0",
         attributes={"operation": "echo", "modalities": ["json"]},
     )
@@ -238,7 +238,7 @@ def _ai_report(
         node_id=node_id,
         session_id=session_id,
         capability_type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         protocol_version="1.0",
         status=ProviderStatus.READY,
         report_revision=revision,
@@ -330,7 +330,7 @@ def _active_job(session_id: str, job_id: str) -> JobContract:
         idempotency_key=f"{session_id}:{job_id}",
         capability=CapabilityRequirement(
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             requirements={"operation": "echo", "modalities": ["json"]},
         ),
@@ -338,7 +338,7 @@ def _active_job(session_id: str, job_id: str) -> JobContract:
             ArtifactReference(
                 reference_id=f"input-{job_id}",
                 session_id=session_id,
-                schema_name="msh.synthetic-input.v1",
+                schema_name="fcp.synthetic-input.v1",
                 media_type="application/json",
             ),
         ),
@@ -346,7 +346,7 @@ def _active_job(session_id: str, job_id: str) -> JobContract:
             ArtifactReference(
                 reference_id=f"output-{job_id}",
                 session_id=session_id,
-                schema_name="msh.synthetic-output.v1",
+                schema_name="fcp.synthetic-output.v1",
                 media_type="application/json",
             ),
         ),
@@ -479,28 +479,28 @@ def test_f87_multiple_trusted_ai_and_compute_providers_close_out_over_relay(
                     ai_alpha_node,
                     AI_A,
                     "language-model",
-                    "msh-language-model",
+                    "fcp-language-model",
                     {"models": ["small"], "modalities": ["text"]},
                 ),
                 (
                     ai_beta_node,
                     AI_B,
                     "language-model",
-                    "msh-language-model",
+                    "fcp-language-model",
                     {"models": ["small"], "modalities": ["text"]},
                 ),
                 (
                     compute_alpha_node,
                     COMPUTE_A,
                     "synthetic-compute",
-                    "msh-synthetic",
+                    "fcp-synthetic",
                     compute_alpha_descriptor.attributes,
                 ),
                 (
                     compute_beta_node,
                     COMPUTE_B,
                     "synthetic-compute",
-                    "msh-synthetic",
+                    "fcp-synthetic",
                     compute_beta_descriptor.attributes,
                 ),
             )

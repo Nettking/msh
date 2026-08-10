@@ -207,7 +207,7 @@ def recorder_status_snapshot():
     if not bool(flags.get("completed")):
         return _no_store_json(
             {
-                "schema": "msh.recorder.web_status.v1",
+                "schema": "fcp.recorder.web_status.v1",
                 "error": "setup_required",
                 "message": (
                     "Complete capability-first onboarding before reading recorder "
@@ -219,7 +219,7 @@ def recorder_status_snapshot():
     if not _active_recorder_contribution():
         return _no_store_json(
             {
-                "schema": "msh.recorder.web_status.v1",
+                "schema": "fcp.recorder.web_status.v1",
                 "error": "recorder_not_enabled",
                 "message": "The recorder contribution is not active on this device.",
             },
@@ -230,7 +230,7 @@ def recorder_status_snapshot():
     if config_error:
         return _no_store_json(
             {
-                "schema": "msh.recorder.web_status.v1",
+                "schema": "fcp.recorder.web_status.v1",
                 "error": "recorder_config_unavailable",
                 "message": config_error,
             },

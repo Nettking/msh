@@ -1,4 +1,4 @@
-"""Pure contracts for the versioned ``msh-storage-v1`` application protocol.
+"""Pure contracts for the versioned ``fcp-storage-v1`` application protocol.
 
 This module intentionally contains no provider, network, coordinator, or database
 implementation.  It freezes the request/response envelope, immutable batch ingest
@@ -17,10 +17,10 @@ from typing import Any, ClassVar, Self
 from .errors import FederationValidationError, ProtocolCompatibilityError
 
 JSON = dict[str, Any]
-STORAGE_PROTOCOL = "msh-storage-v1"
+STORAGE_PROTOCOL = "fcp-storage-v1"
 STORAGE_PROTOCOL_MAJOR = 1
 STORAGE_PROTOCOL_VERSION = "1.0"
-DEFAULT_DATASET_SCHEMA_NAME = "msh.storage.dataset.opaque"
+DEFAULT_DATASET_SCHEMA_NAME = "fcp.storage.dataset.opaque"
 DEFAULT_DATASET_SCHEMA_VERSION = 1
 
 
@@ -175,7 +175,7 @@ class WriteAuthority:
 
 @dataclass(frozen=True)
 class StorageRequestEnvelope:
-    SCHEMA: ClassVar[str] = "msh.storage_request.v1"
+    SCHEMA: ClassVar[str] = "fcp.storage_request.v1"
 
     request_id: str
     protocol: str
@@ -289,7 +289,7 @@ class StorageError:
 
 @dataclass(frozen=True)
 class StorageResponseEnvelope:
-    SCHEMA: ClassVar[str] = "msh.storage_response.v1"
+    SCHEMA: ClassVar[str] = "fcp.storage_response.v1"
 
     request_id: str
     protocol: str
@@ -358,7 +358,7 @@ class StorageResponseEnvelope:
 
 @dataclass(frozen=True)
 class BatchIngestRequest:
-    SCHEMA: ClassVar[str] = "msh.batch_ingest.v1"
+    SCHEMA: ClassVar[str] = "fcp.batch_ingest.v1"
 
     authority: WriteAuthority
     dataset_id: str
@@ -478,7 +478,7 @@ class BatchIngestRequest:
 
 @dataclass(frozen=True)
 class BatchIngestResult:
-    SCHEMA: ClassVar[str] = "msh.batch_ingest_result.v1"
+    SCHEMA: ClassVar[str] = "fcp.batch_ingest_result.v1"
 
     batch_id: str
     idempotency_key: str

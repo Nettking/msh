@@ -1,6 +1,6 @@
-# Agent note: keep MSH SysML export aligned with the OSL paper
+# Agent note: keep FCP SysML export aligned with the OSL paper
 
-This repository generates SysML from MSH Operator Notes. The exporter must stay aligned with the paper repository, but the paper repository must not be changed from MSH tasks unless the user explicitly asks for it.
+This repository generates SysML from FCP Operator Notes. The exporter must stay aligned with the paper repository, but the paper repository must not be changed from FCP tasks unless the user explicitly asks for it.
 
 ## Source of truth
 
@@ -20,7 +20,7 @@ coded CNC strategy statement
 
 ## Required export style
 
-MSH must export reusable operator notes using the paper keyword style, not a flat generic attribute dump.
+FCP must export reusable operator notes using the paper keyword style, not a flat generic attribute dump.
 
 Use imports:
 
@@ -86,7 +86,7 @@ The exporter test should fail if the output moves back to:
 
 ## When the paper changes
 
-If the keyword set or SysML structure changes in `Nettking/systems-paper`, update MSH in this order:
+If the keyword set or SysML structure changes in `Nettking/systems-paper`, update FCP in this order:
 
 1. Read the paper SysML files again.
 2. Update this agent note.

@@ -40,7 +40,7 @@ Retries are bounded by `max_attempts` (default 4, maximum 32). Exhaustion raises
 
 ## Acknowledgements
 
-`msh.direct_object_transfer.ack.v1` binds the acknowledgement to:
+`fcp.direct_object_transfer.ack.v1` binds the acknowledgement to:
 
 - transfer ID;
 - object ID;

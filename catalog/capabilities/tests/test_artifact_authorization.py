@@ -51,7 +51,7 @@ def _job() -> JobContract:
         idempotency_key=f"{SESSION}:request-artifact-1",
         capability=CapabilityRequirement(
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             requirements={"operation": "transform"},
         ),
@@ -59,7 +59,7 @@ def _job() -> JobContract:
             ArtifactReference(
                 reference_id=INPUT_ID,
                 session_id=SESSION,
-                schema_name="msh.input.v1",
+                schema_name="fcp.input.v1",
                 media_type="application/json",
                 content_hash=INPUT_HASH,
                 size_bytes=64,
@@ -69,7 +69,7 @@ def _job() -> JobContract:
             ArtifactReference(
                 reference_id=OUTPUT_ID,
                 session_id=SESSION,
-                schema_name="msh.output.v1",
+                schema_name="fcp.output.v1",
                 media_type="application/json",
             ),
         ),
@@ -152,7 +152,7 @@ def _input_descriptor(**overrides: object) -> ArtifactDescriptor:
         "artifact_id": INPUT_ID,
         "session_id": SESSION,
         "job_id": "producer-job-1",
-        "schema_id": "msh.input.v1",
+        "schema_id": "fcp.input.v1",
         "media_type": "application/json",
         "content_hash": INPUT_HASH,
         "size_bytes": 64,
@@ -171,7 +171,7 @@ def _input_reference(**overrides: object) -> ArtifactInputReference:
         "session_id": SESSION,
         "job_id": "producer-job-1",
         "content_hash": INPUT_HASH,
-        "schema_id": "msh.input.v1",
+        "schema_id": "fcp.input.v1",
         "endpoint_id": ENDPOINT,
     }
     values.update(overrides)
@@ -186,7 +186,7 @@ def _placement(**overrides: object) -> OutputPlacementPolicy:
         "endpoint_kind": ArtifactEndpointKind.LOGICAL_STORAGE,
         "endpoint_id": ENDPOINT,
         "namespace": "sessions/session-artifact-1/jobs/job-artifact-1/outputs",
-        "allowed_schema_ids": ("msh.output.v1",),
+        "allowed_schema_ids": ("fcp.output.v1",),
         "max_artifact_bytes": 4096,
         "max_artifacts": 2,
         "resumable_threshold_bytes": 1024,
@@ -201,7 +201,7 @@ def _output_descriptor(**overrides: object) -> ArtifactDescriptor:
         "artifact_id": OUTPUT_ID,
         "session_id": SESSION,
         "job_id": JOB_ID,
-        "schema_id": "msh.output.v1",
+        "schema_id": "fcp.output.v1",
         "media_type": "application/json",
         "content_hash": OUTPUT_HASH,
         "size_bytes": 128,
@@ -516,7 +516,7 @@ def test_f76_output_policy_enforces_schema_size_and_count(tmp_path: Path) -> Non
     with pytest.raises(FederationValidationError) as schema:
         authority.authorize_output(
             "grant-output-1",
-            _output_descriptor(schema_id="msh.private.v1"),
+            _output_descriptor(schema_id="fcp.private.v1"),
             policy,
             authenticated_session_id=SESSION,
             authenticated_worker_node_id="worker-a",

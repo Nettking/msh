@@ -35,18 +35,18 @@ def test_private_mapping_is_environment_only_and_alias_bounded(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setenv(
-        "MSH_CF7_MTCONNECT_ENDPOINTS",
+        "FCP_CF7_MTCONNECT_ENDPOINTS",
         json.dumps({"cnc-one": "http://private-one", "cnc-two": "http://private-two"}),
     )
 
-    result = readiness.parse_private_mapping("MSH_CF7_MTCONNECT_ENDPOINTS")
+    result = readiness.parse_private_mapping("FCP_CF7_MTCONNECT_ENDPOINTS")
 
     assert set(result) == {"cnc-one", "cnc-two"}
     assert "private-one" in result["cnc-one"]
 
-    monkeypatch.setenv("MSH_CF7_MTCONNECT_ENDPOINTS", '{"bad alias": "value"}')
+    monkeypatch.setenv("FCP_CF7_MTCONNECT_ENDPOINTS", '{"bad alias": "value"}')
     with pytest.raises(readiness.ReadinessError):
-        readiness.parse_private_mapping("MSH_CF7_MTCONNECT_ENDPOINTS")
+        readiness.parse_private_mapping("FCP_CF7_MTCONNECT_ENDPOINTS")
 
 
 def test_initialize_evidence_uses_template_and_never_embeds_private_endpoints(
@@ -66,7 +66,7 @@ def test_initialize_evidence_uses_template_and_never_embeds_private_endpoints(
     template.write_text(
         json.dumps(
             {
-                "schema": "msh.cf7.physical-evidence.v1",
+                "schema": "fcp.cf7.physical-evidence.v1",
                 "commit_sha": "0" * 40,
                 "executed_at": "1970-01-01T00:00:00Z",
                 "operator": "pending",
@@ -83,7 +83,7 @@ def test_initialize_evidence_uses_template_and_never_embeds_private_endpoints(
         "verify_checkout",
         lambda *_args, **_kwargs: {"commit_sha": COMMIT, "repository_clean": True},
     )
-    monkeypatch.setenv("MSH_CF7_OLLAMA_URL", "http://192.168.10.172:11434")
+    monkeypatch.setenv("FCP_CF7_OLLAMA_URL", "http://192.168.10.172:11434")
 
     evidence_root = checkout / "evidence"
     evidence_path = readiness.initialize_evidence(
@@ -109,8 +109,8 @@ def test_initialize_evidence_uses_template_and_never_embeds_private_endpoints(
 def test_ollama_probe_reports_inventory_without_persisting_endpoint(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    monkeypatch.setenv("MSH_CF7_OLLAMA_URL", "http://192.168.10.172:11434")
-    monkeypatch.setenv("MSH_CF7_OLLAMA_MODEL", "qwen2.5:7b")
+    monkeypatch.setenv("FCP_CF7_OLLAMA_URL", "http://192.168.10.172:11434")
+    monkeypatch.setenv("FCP_CF7_OLLAMA_MODEL", "qwen2.5:7b")
     requested: list[str] = []
 
     def fake_http_json(url: str, **_kwargs):
@@ -241,8 +241,8 @@ def test_preflight_delegates_only_to_selected_physical_role(
     )
     monkeypatch.setattr(readiness, "os_family", lambda: "windows")
     monkeypatch.setattr(readiness.shutil, "which", lambda _name: "/safe/command")
-    monkeypatch.setenv("MSH_CF7_OLLAMA_URL", "http://private-provider")
-    monkeypatch.setenv("MSH_CF7_OLLAMA_MODEL", "qwen2.5:7b")
+    monkeypatch.setenv("FCP_CF7_OLLAMA_URL", "http://private-provider")
+    monkeypatch.setenv("FCP_CF7_OLLAMA_MODEL", "qwen2.5:7b")
     monkeypatch.setattr(
         readiness,
         "probe_ollama",

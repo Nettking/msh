@@ -1,4 +1,4 @@
-"""Documented runtime policy names for the MSH orchestrator.
+"""Documented runtime policy names for the FCP orchestrator.
 
 This module is intentionally side-effect free. It gives documentation, tests, and
 future refactors a stable place to reference policy names without importing the

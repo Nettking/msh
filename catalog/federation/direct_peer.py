@@ -32,10 +32,10 @@ from .storage_protocol import (
     StorageResponseEnvelope,
 )
 
-DIRECT_PEER_DESCRIPTOR_SCHEMA = "msh.direct_peer.descriptor.v1"
-DIRECT_PEER_OPEN_SCHEMA = "msh.peer_stream.open.v1"
-DIRECT_STORAGE_REQUEST_SCHEMA = "msh.direct_storage.request.v1"
-DIRECT_STORAGE_RESPONSE_SCHEMA = "msh.direct_storage.response.v1"
+DIRECT_PEER_DESCRIPTOR_SCHEMA = "fcp.direct_peer.descriptor.v1"
+DIRECT_PEER_OPEN_SCHEMA = "fcp.peer_stream.open.v1"
+DIRECT_STORAGE_REQUEST_SCHEMA = "fcp.direct_storage.request.v1"
+DIRECT_STORAGE_RESPONSE_SCHEMA = "fcp.direct_storage.response.v1"
 DIRECT_PEER_PROTOCOL_VERSION = "1.0"
 DIRECT_PEER_PROTOCOL_MAJOR = 1
 X25519_PUBLIC_KEY_PREFIX = "x25519:"
@@ -340,7 +340,7 @@ class _CryptographicContext:
 
     def value(self) -> JSON:
         return {
-            "protocol": "msh-direct-storage-v1",
+            "protocol": "fcp-direct-storage-v1",
             "session_id": self.session_id,
             "stream_id": self.stream_id,
             "request_id": self.request_id,

@@ -17,7 +17,7 @@ def _resolver_script() -> str:
         _repository_root()
         / "scripts"
         / "windows"
-        / "resolve_msh_web_port.ps1"
+        / "resolve_fcp_web_port.ps1"
     ).read_text(encoding="utf-8")
 
 

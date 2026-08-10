@@ -94,7 +94,7 @@ class _Benchmark:
             SimpleNamespace(
                 device_id="node-existing",
                 benchmark_id="benchmark.compute",
-                target_service_id="msh-system-summary",
+                target_service_id="fcp-system-summary",
                 state=SimpleNamespace(value="passed"),
             ),
             SimpleNamespace(
@@ -214,7 +214,7 @@ def test_resume_retries_reconnect_then_reuses_existing_evidence() -> None:
     assert report.inspection_revision == 7
     assert report.benchmark_runs == (
         ("benchmark.ai", "ollama-configured", "passed"),
-        ("benchmark.compute", "msh-system-summary", "passed"),
+        ("benchmark.compute", "fcp-system-summary", "passed"),
     )
     assert report.unavailable_benchmarks == ()
     assert report.reconciled_contributions == 0

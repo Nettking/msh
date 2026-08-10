@@ -46,12 +46,12 @@ class PostgreSQLBatchStorageProvider:
         with self._connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
-                CREATE TABLE IF NOT EXISTS msh_storage_batches (
+                CREATE TABLE IF NOT EXISTS fcp_storage_batches (
                     session_id TEXT NOT NULL,
                     group_id TEXT NOT NULL,
                     dataset_id TEXT NOT NULL,
                     dataset_schema_name TEXT NOT NULL
-                        DEFAULT 'msh.storage.dataset.opaque',
+                        DEFAULT 'fcp.storage.dataset.opaque',
                     dataset_schema_version INTEGER NOT NULL
                         DEFAULT 1 CHECK(dataset_schema_version > 0),
                     batch_id TEXT NOT NULL,
@@ -65,12 +65,12 @@ class PostgreSQLBatchStorageProvider:
                 """
             )
             cursor.execute(
-                """ALTER TABLE msh_storage_batches
+                """ALTER TABLE fcp_storage_batches
                    ADD COLUMN IF NOT EXISTS dataset_schema_name TEXT NOT NULL
-                   DEFAULT 'msh.storage.dataset.opaque'"""
+                   DEFAULT 'fcp.storage.dataset.opaque'"""
             )
             cursor.execute(
-                """ALTER TABLE msh_storage_batches
+                """ALTER TABLE fcp_storage_batches
                    ADD COLUMN IF NOT EXISTS dataset_schema_version
                    INTEGER NOT NULL DEFAULT 1
                    CHECK(dataset_schema_version > 0)"""
@@ -89,7 +89,7 @@ class PostgreSQLBatchStorageProvider:
                 """
                 SELECT dataset_id, dataset_schema_name,
                        dataset_schema_version, batch_id, content_hash
-                FROM msh_storage_batches
+                FROM fcp_storage_batches
                 WHERE session_id = %s AND group_id = %s AND idempotency_key = %s
                 """,
                 (
@@ -134,7 +134,7 @@ class PostgreSQLBatchStorageProvider:
                 """
                 SELECT dataset_id, dataset_schema_name,
                        dataset_schema_version, idempotency_key, content_hash
-                FROM msh_storage_batches
+                FROM fcp_storage_batches
                 WHERE session_id = %s AND group_id = %s AND batch_id = %s
                 """,
                 (authority.session_id, authority.group_id, request.batch_id),
@@ -163,7 +163,7 @@ class PostgreSQLBatchStorageProvider:
 
             cursor.execute(
                 """
-                INSERT INTO msh_storage_batches (
+                INSERT INTO fcp_storage_batches (
                     session_id, group_id, dataset_id, dataset_schema_name,
                     dataset_schema_version, batch_id,
                     idempotency_key, content_hash, content, created_at
@@ -219,7 +219,7 @@ class PostgreSQLBatchStorageProvider:
                 SELECT dataset_id, dataset_schema_name,
                        dataset_schema_version, batch_id, idempotency_key,
                        content_hash
-                FROM msh_storage_batches
+                FROM fcp_storage_batches
                 WHERE session_id = %s AND group_id = %s AND batch_id = %s
                 """,
                 (session_id, group_id, batch_id),
@@ -242,7 +242,7 @@ class PostgreSQLBatchStorageProvider:
         with self._connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT content FROM msh_storage_batches
+                SELECT content FROM fcp_storage_batches
                 WHERE session_id = %s AND group_id = %s AND batch_id = %s
                 """,
                 (session_id, group_id, batch_id),

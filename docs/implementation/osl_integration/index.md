@@ -38,7 +38,7 @@ Do not add production OSL modules in D0-A.
 | [10 — implementation roadmap](10_phased_implementation_roadmap.md) | **Authoritative:** delivery order, status, gates, acceptance, and stop conditions |
 | [00 — scope and sources](00_scope_and_sources.md) | source pins and claim boundaries |
 | [01 — language requirements](01_language_requirements.md) | source-derived requirements and open research questions |
-| [02 — current MSH architecture](02_current_msh_architecture.md) | analyzed historical MSH snapshot; revalidate every seam against current `main` |
+| [02 — current FCP architecture](02_current_fcp_architecture.md) | analyzed historical FCP snapshot; revalidate every seam against current `main` |
 | [03 — target architecture](03_target_architecture.md) | proposed OSL component and authority boundaries |
 | [04 — Notebook-to-OSL workflow](04_notebook_to_osl_workflow.md) | proposed research-to-product workflow |
 | [05 — data model and contracts](05_data_model_and_contracts.md) | proposed contract shapes and examples |

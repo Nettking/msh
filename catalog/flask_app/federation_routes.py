@@ -248,7 +248,7 @@ def apply_updates() -> Response:
     try:
         get_federation_update_service().update_all(confirmed_target=target)
         flash(
-            "Verified MSH update rollout started. A device reports success only "
+            "Verified FCP update rollout started. A device reports success only "
             "after rebuild, restart, and running-commit verification.",
             "success",
         )

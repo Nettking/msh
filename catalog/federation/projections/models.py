@@ -249,7 +249,7 @@ class TechnicalDetail:
 class FederationViewModel:
     """One complete safe page projection with at most one next action."""
 
-    SCHEMA: ClassVar[str] = "msh.federation-product-view.v1"
+    SCHEMA: ClassVar[str] = "fcp.federation-product-view.v1"
 
     page: FederationPage
     title: str

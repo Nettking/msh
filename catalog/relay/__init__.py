@@ -1,4 +1,4 @@
-"""Independent relay-first transport for federated MSH sessions."""
+"""Independent relay-first transport for federated FCP sessions."""
 
 from .authentication import authentication_message
 

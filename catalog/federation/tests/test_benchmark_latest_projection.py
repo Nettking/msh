@@ -68,8 +68,8 @@ def _result(
 
 def test_historical_expired_runs_do_not_create_false_rerun_work() -> None:
     definitions = (
-        ("benchmark-storage", "msh-local-data-storage"),
-        ("benchmark-compute", "msh-system-summary"),
+        ("benchmark-storage", "fcp-local-data-storage"),
+        ("benchmark-compute", "fcp-system-summary"),
         ("benchmark-ai", "ollama-configured"),
     )
     stored: list[object] = []
@@ -159,7 +159,7 @@ def test_product_run_once_policy_overrides_legacy_time_expiry_only() -> None:
     structurally_stale = _result(
         run_id="legacy-stale",
         benchmark_id="benchmark-storage",
-        target_service_id="msh-local-data-storage",
+        target_service_id="fcp-local-data-storage",
         finished_at=NOW - timedelta(hours=2),
         expires_at=NOW - timedelta(hours=1),
     )

@@ -104,7 +104,7 @@ def _job(session_id: str) -> JobContract:
         idempotency_key=f"{session_id}:request-relay-1",
         capability=CapabilityRequirement(
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             requirements={"operation": "echo", "modalities": ["json"]},
         ),
@@ -112,7 +112,7 @@ def _job(session_id: str) -> JobContract:
             ArtifactReference(
                 reference_id="input-relay-1",
                 session_id=session_id,
-                schema_name="msh.synthetic-input.v1",
+                schema_name="fcp.synthetic-input.v1",
                 media_type="application/json",
             ),
         ),
@@ -120,7 +120,7 @@ def _job(session_id: str) -> JobContract:
             ArtifactReference(
                 reference_id="output-relay-1",
                 session_id=session_id,
-                schema_name="msh.synthetic-output.v1",
+                schema_name="fcp.synthetic-output.v1",
                 media_type="application/json",
             ),
         ),
@@ -194,7 +194,7 @@ def test_f74_two_nodes_complete_synthetic_job_over_existing_relay(
                     node_id=worker_node.node_id,
                     provider_id="provider-synthetic",
                     capability_type="synthetic-compute",
-                    protocol="msh-synthetic",
+                    protocol="fcp-synthetic",
                     protocol_version="1.1",
                     attributes={
                         "operation": "echo",

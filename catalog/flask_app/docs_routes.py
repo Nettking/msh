@@ -37,14 +37,14 @@ docs_web = Blueprint("docs_web", __name__, url_prefix="/docs")
 
 
 def _repository_root() -> Path:
-    configured = current_app.config.get("MSH_REPOSITORY_ROOT")
+    configured = current_app.config.get("FCP_REPOSITORY_ROOT")
     if configured:
         return Path(configured).expanduser().resolve()
     return Path(__file__).resolve().parents[2]
 
 
 def _docs_root() -> Path:
-    configured = current_app.config.get("MSH_DOCS_ROOT")
+    configured = current_app.config.get("FCP_DOCS_ROOT")
     if configured:
         root = Path(configured).expanduser()
         if not root.is_absolute():
@@ -256,7 +256,7 @@ class _DocumentationLinkExtension(Extension):
     def extendMarkdown(self, md):  # type: ignore[no-untyped-def, N802]
         md.treeprocessors.register(
             _DocumentationLinkProcessor(md, self.document_path),
-            "msh_documentation_links",
+            "fcp_documentation_links",
             1,
         )
 
@@ -298,7 +298,7 @@ def _render_index() -> Response:
         docs_root_exists=_docs_root().is_dir(),
         current_path="",
         document=None,
-        document_title="MSH Documentation",
+        document_title="FCP Documentation",
         document_html="",
         document_toc="",
         breadcrumbs=[{"label": "Documentation", "url": None}],

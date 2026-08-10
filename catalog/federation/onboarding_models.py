@@ -329,7 +329,7 @@ class OnboardingModel:
 
 @dataclass(frozen=True)
 class FederationSessionBinding(OnboardingModel):
-    SCHEMA: ClassVar[str] = "msh.onboarding.federation-binding.v1"
+    SCHEMA: ClassVar[str] = "fcp.onboarding.federation-binding.v1"
 
     federation_id: str
     internal_session_id: str
@@ -384,7 +384,7 @@ class FederationSessionBinding(OnboardingModel):
 
 @dataclass(frozen=True)
 class FederationDiscoveryResult(OnboardingModel):
-    SCHEMA: ClassVar[str] = "msh.onboarding.discovery-result.v1"
+    SCHEMA: ClassVar[str] = "fcp.onboarding.discovery-result.v1"
 
     discovery_id: str
     federation_label: str
@@ -460,7 +460,7 @@ class FederationDiscoveryResult(OnboardingModel):
 
 @dataclass(frozen=True)
 class DeviceInspectionSnapshot(OnboardingModel):
-    SCHEMA: ClassVar[str] = "msh.onboarding.device-inspection.v1"
+    SCHEMA: ClassVar[str] = "fcp.onboarding.device-inspection.v1"
 
     device_id: str
     revision: int
@@ -512,7 +512,7 @@ class DeviceInspectionSnapshot(OnboardingModel):
 
 @dataclass(frozen=True)
 class BenchmarkDefinition(OnboardingModel):
-    SCHEMA: ClassVar[str] = "msh.onboarding.benchmark-definition.v1"
+    SCHEMA: ClassVar[str] = "fcp.onboarding.benchmark-definition.v1"
 
     benchmark_id: str
     capability_type: str
@@ -558,7 +558,7 @@ class BenchmarkDefinition(OnboardingModel):
 
 @dataclass(frozen=True)
 class BenchmarkResult(OnboardingModel):
-    SCHEMA: ClassVar[str] = "msh.onboarding.benchmark-result.v1"
+    SCHEMA: ClassVar[str] = "fcp.onboarding.benchmark-result.v1"
 
     run_id: str
     device_id: str
@@ -644,7 +644,7 @@ class BenchmarkResult(OnboardingModel):
 
 @dataclass(frozen=True)
 class ContributionCandidate(OnboardingModel):
-    SCHEMA: ClassVar[str] = "msh.onboarding.contribution-candidate.v1"
+    SCHEMA: ClassVar[str] = "fcp.onboarding.contribution-candidate.v1"
 
     candidate_id: str
     device_id: str
@@ -725,7 +725,7 @@ class ContributionCandidate(OnboardingModel):
 
 @dataclass(frozen=True)
 class ContributionIntent(OnboardingModel):
-    SCHEMA: ClassVar[str] = "msh.onboarding.contribution-intent.v1"
+    SCHEMA: ClassVar[str] = "fcp.onboarding.contribution-intent.v1"
 
     candidate_id: str
     device_id: str

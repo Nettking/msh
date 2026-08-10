@@ -575,7 +575,7 @@ class RuntimeOrchestrator:
         }
 
     def _load_startup_mode_from_env(self) -> str | None:
-        raw = str(os.getenv("MSH_STARTUP_MODE", "")).strip().lower()
+        raw = str(os.getenv("FCP_STARTUP_MODE", "")).strip().lower()
         if raw in {"continue", "continue_existing", "resume"}:
             return STARTUP_MODE_CONTINUE
         if raw in {"clean", "start_clean", "fresh"}:
@@ -744,7 +744,7 @@ class RuntimeOrchestrator:
             return
         self._mark_runtime_started()
         self._thread = threading.Thread(
-            target=self._poll_loop, name="msh-runtime-poller", daemon=True
+            target=self._poll_loop, name="fcp-runtime-poller", daemon=True
         )
         self._thread.start()
 
@@ -1268,7 +1268,7 @@ def get_runtime_manager() -> RuntimeOrchestrator:
     global _RUNTIME_MANAGER
     if _RUNTIME_MANAGER is None:
         poll_seconds = int(
-            str(os.getenv("MSH_UPDATE_POLL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS))
+            str(os.getenv("FCP_UPDATE_POLL_SECONDS", DEFAULT_POLL_INTERVAL_SECONDS))
         )
         _RUNTIME_MANAGER = RuntimeOrchestrator(poll_interval_seconds=poll_seconds)
     return _RUNTIME_MANAGER

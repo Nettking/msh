@@ -12,7 +12,7 @@ from .errors import FederationValidationError, ProtocolCompatibilityError
 from .manifest import AuthoritativeStorageManifest, DatasetManifest
 from .storage_protocol import validate_protocol_version
 
-REPORT_SCHEMA = "msh.storage_replica_report.v1"
+REPORT_SCHEMA = "fcp.storage_replica_report.v1"
 REPORT_PROTOCOL_VERSION = "1.0"
 
 
