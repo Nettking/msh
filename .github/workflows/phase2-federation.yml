@@ -6,7 +6,7 @@ on:
       - "catalog/federation/**"
       - "catalog/node/**"
       - "catalog/relay/**"
-      - "cmd/msh-peer-sidecar/**"
+      - "cmd/fcp-peer-sidecar/**"
       - "docker-compose.yml"
       - "requirements.txt"
       - "constraints-phase2.txt"
@@ -23,7 +23,7 @@ on:
       - "catalog/federation/**"
       - "catalog/node/**"
       - "catalog/relay/**"
-      - "cmd/msh-peer-sidecar/**"
+      - "cmd/fcp-peer-sidecar/**"
       - "docker-compose.yml"
       - "requirements.txt"
       - "constraints-phase2.txt"
@@ -50,18 +50,18 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: msh
-          POSTGRES_PASSWORD: msh
-          POSTGRES_DB: msh_test
+          POSTGRES_USER: fcp
+          POSTGRES_PASSWORD: fcp
+          POSTGRES_DB: fcp_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U msh -d msh_test"
+          --health-cmd "pg_isready -U fcp -d fcp_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      MSH_TEST_POSTGRES_DSN: postgresql://msh:msh@127.0.0.1:5432/msh_test
+      FCP_TEST_POSTGRES_DSN: postgresql://fcp:fcp@127.0.0.1:5432/fcp_test
     steps:
       - uses: actions/checkout@v4
         with:
@@ -72,7 +72,7 @@ jobs:
           cache: pip
       - uses: actions/setup-go@v5
         with:
-          go-version-file: "cmd/msh-peer-sidecar/go.mod"
+          go-version-file: "cmd/fcp-peer-sidecar/go.mod"
           cache: false
       - name: Install dependencies
         run: |
@@ -80,7 +80,7 @@ jobs:
           python -m pip install -r requirements.txt -c constraints-phase2.txt
           python -m pip install pytest ruff
       - name: Go direct peer sidecar
-        working-directory: cmd/msh-peer-sidecar
+        working-directory: cmd/fcp-peer-sidecar
         run: |
           go mod tidy
           echo BEGIN_GO_MOD
@@ -91,19 +91,19 @@ jobs:
           echo END_GO_SUM
           go test ./...
           mkdir -p ../../build
-          go build -trimpath -o ../../build/msh-peer-sidecar .
+          go build -trimpath -o ../../build/fcp-peer-sidecar .
       - name: Capture Go module lock
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: f62-go-module-lock
           path: |
-            cmd/msh-peer-sidecar/go.mod
-            cmd/msh-peer-sidecar/go.sum
+            cmd/fcp-peer-sidecar/go.mod
+            cmd/fcp-peer-sidecar/go.sum
           if-no-files-found: error
           retention-days: 1
       - name: Compile
-        run: python -m compileall catalog setup_msh.py
+        run: python -m compileall catalog setup_fcp.py
       - name: Phase 0 and 1 regressions
         run: python -m pytest -o addopts= -q catalog/federation/tests/test_phase0.py catalog/federation/tests/test_phase1.py
       - name: Phase D and E storage tests
@@ -159,7 +159,7 @@ jobs:
           cache: pip
       - uses: actions/setup-go@v5
         with:
-          go-version-file: "cmd/msh-peer-sidecar/go.mod"
+          go-version-file: "cmd/fcp-peer-sidecar/go.mod"
           cache: false
       - name: Install dependencies
         run: |
@@ -167,12 +167,12 @@ jobs:
           python -m pip install -r requirements.txt -c constraints-phase2.txt
           python -m pip install pytest
       - name: Go direct peer sidecar
-        working-directory: cmd/msh-peer-sidecar
+        working-directory: cmd/fcp-peer-sidecar
         run: |
           go mod tidy
           go test ./...
           New-Item -ItemType Directory -Force -Path ../../build
-          go build -trimpath -o ../../build/msh-peer-sidecar.exe .
+          go build -trimpath -o ../../build/fcp-peer-sidecar.exe .
       - name: Identity, state, protocol, relay, and Phase F tests
         run: >-
           python -m pytest -o addopts= -q
