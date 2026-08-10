@@ -79,6 +79,36 @@ jobs:
             -Once
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+          # Dot-source one no-request pass so the native-process helper remains
+          # available for an explicit Windows PowerShell 5.1 stderr regression.
+          $probeState = Join-Path $env:RUNNER_TEMP 'fcp-update-agent-native-probe'
+          . .\scripts\windows\fcp_update_agent.ps1 `
+            -RepoRoot (Resolve-Path '.').Path `
+            -DataDirectory $probeState `
+            -Once
+          $probe = Invoke-External 'powershell.exe' @(
+            '-NoProfile',
+            '-Command',
+            "[Console]::Error.WriteLine('stderr-ok'); exit 0"
+          )
+          if (($probe -join "`n") -notmatch 'stderr-ok') {
+            throw 'native_stderr_success_was_not_preserved'
+          }
+          $nonzeroRejected = $false
+          try {
+            Invoke-External 'powershell.exe' @(
+              '-NoProfile', '-Command', 'exit 7'
+            ) | Out-Null
+          }
+          catch {
+            $nonzeroRejected = (
+              $_.Exception.Message -match 'external_command_failed:powershell.exe:7'
+            )
+          }
+          if (-not $nonzeroRejected) {
+            throw 'native_nonzero_exit_was_not_rejected'
+          }
+
       - name: Parse and smoke POSIX host agent
         if: runner.os == 'Linux'
         shell: bash
