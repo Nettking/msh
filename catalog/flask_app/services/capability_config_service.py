@@ -1,8 +1,8 @@
 """Capability-scoped technical configuration with no legacy role authority.
 
 ``CapabilityConfig`` is the only runtime configuration shape for AI and recorder
-technical parameters.  Legacy ``server_settings.json`` is intentionally not read
-here; supported upgrades are handled explicitly by ``legacy_settings_migration``.
+technical parameters. Legacy setup files are intentionally not read here;
+supported upgrades are handled explicitly by ``legacy_settings_migration``.
 """
 
 from __future__ import annotations

@@ -3,7 +3,6 @@ from __future__ import annotations
 from catalog.flask_app import app as app_module
 from catalog.flask_app import routes as routes_module
 from catalog.flask_app.app import create_app
-from catalog.flask_app.services.server_setup_service import default_settings
 
 
 class FakeRuntimeManager:
@@ -23,18 +22,9 @@ def _patch_runtime(monkeypatch) -> None:
     monkeypatch.setattr(routes_module, "get_runtime_manager", lambda: manager)
 
 
-def _patch_setup(monkeypatch) -> None:
-    def load_configured_settings():
-        return default_settings(configured=True)
-
-    monkeypatch.setattr(app_module, "load_settings", load_configured_settings)
-    monkeypatch.setattr("catalog.flask_app.server_setup_routes.load_settings", load_configured_settings)
-
-
 def test_operator_strategy_capture_is_statement_first(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
-    _patch_setup(monkeypatch)
 
     app = create_app()
     app.config.update(TESTING=True)
@@ -55,7 +45,6 @@ def test_operator_strategy_capture_is_statement_first(monkeypatch, tmp_path):
 def test_operator_strategy_review_explains_later_structuring(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
-    _patch_setup(monkeypatch)
 
     app = create_app()
     app.config.update(TESTING=True)

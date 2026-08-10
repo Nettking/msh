@@ -3,7 +3,6 @@ from __future__ import annotations
 from catalog.flask_app import app as app_module
 from catalog.flask_app import routes as routes_module
 from catalog.flask_app.app import create_app
-from catalog.flask_app.services.server_setup_service import default_settings
 
 
 class FakeRuntimeManager:
@@ -23,18 +22,9 @@ def _patch_runtime(monkeypatch) -> None:
     monkeypatch.setattr(routes_module, "get_runtime_manager", lambda: manager)
 
 
-def _patch_setup(monkeypatch) -> None:
-    def load_configured_settings():
-        return default_settings(configured=True)
-
-    monkeypatch.setattr(app_module, "load_settings", load_configured_settings)
-    monkeypatch.setattr("catalog.flask_app.server_setup_routes.load_settings", load_configured_settings)
-
-
 def test_guide_page_explains_knowledge_flow(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
-    _patch_setup(monkeypatch)
 
     app = create_app()
     app.config.update(TESTING=True)
@@ -51,8 +41,11 @@ def test_guide_page_explains_knowledge_flow(monkeypatch, tmp_path):
     assert "Capture a raw statement" in html
     assert "Do not try to model everything while standing at the machine" in html
     assert "Setup guide" in html
-    assert "Choose the computer role" in html
-    assert "Continue vs Start clean" in html
+    assert "Create this device and join a Federation" in html
+    assert "Review capabilities and finish" in html
+    assert "Web workbench" not in html
+    assert "Full server" not in html
+    assert "Recorder station" not in html
     assert "Strategy" in html
     assert "Intervention Logic" in html
     assert "SysML Export" in html

@@ -1,14 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import replace
+from pathlib import Path
+
+from flask import Flask
 
 from catalog.flask_app import app as app_module
-from catalog.flask_app import capability_product_routes
-from catalog.flask_app import routes as routes_module
+from catalog.flask_app import capability_startup_transition_routes as transition_routes
 from catalog.flask_app import server_setup_routes
 from catalog.flask_app.app import create_app
-from catalog.flask_app.services.capability_config_service import from_legacy_settings
-from catalog.flask_app.services.server_setup_service import default_settings
+from catalog.flask_app.services.capability_config_service import (
+    default_capability_config,
+)
 
 
 class FakeRuntimeManager:
@@ -16,90 +18,60 @@ class FakeRuntimeManager:
         pass
 
     def requires_startup_choice(self) -> bool:
-        return True
-
-    def startup_decision_snapshot(self) -> dict[str, bool]:
-        return {"requires_choice": True}
+        return False
 
 
-def _patch_runtime(monkeypatch) -> None:
-    manager = FakeRuntimeManager()
-    monkeypatch.setattr(app_module, "get_runtime_manager", lambda: manager)
-    monkeypatch.setattr(routes_module, "get_runtime_manager", lambda: manager)
-    monkeypatch.setattr(
-        capability_product_routes,
-        "get_runtime_manager",
-        lambda: manager,
-    )
+class FakeTransitionService:
+    def capability_flags(self) -> dict[str, object]:
+        return {
+            "workbench": False,
+            "runtime": False,
+            "recorder": False,
+            "language_model": False,
+            "compute": False,
+            "storage": False,
+            "completed": False,
+            "needs_migration": True,
+            "source": "legacy-migration",
+            "state": None,
+        }
 
 
-def _configured_settings():
-    return replace(
-        default_settings(configured=True),
-        deployment_mode="full-server",
-        ai_enabled=True,
-        ai_profile="laptop-standard",
-        ai_model="llama3.2:3b",
-        recorder_sources="Machine=http://10.20.30.50:5000/current",
-    )
-
-
-def _patch_setup_context(monkeypatch, settings) -> None:
-    monkeypatch.setattr(app_module, "load_settings", lambda: settings)
-    monkeypatch.setattr(routes_module, "load_settings", lambda: settings)
-    monkeypatch.setattr(server_setup_routes, "load_settings", lambda: settings)
-    monkeypatch.setattr(
-        capability_product_routes,
-        "load_settings",
-        lambda: settings,
-    )
-    config = from_legacy_settings(settings)
-    monkeypatch.setattr(
-        capability_product_routes,
-        "_load_product_config",
-        lambda: (config, ""),
-    )
-
-
-def test_explicit_legacy_startup_is_read_only_compatibility_notice(
+def test_explicit_legacy_startup_query_routes_to_capability_onboarding(
     monkeypatch,
     tmp_path,
 ) -> None:
     monkeypatch.chdir(tmp_path)
-    _patch_runtime(monkeypatch)
-    settings = _configured_settings()
-    _patch_setup_context(monkeypatch, settings)
+    manager = FakeRuntimeManager()
+    transition = FakeTransitionService()
+    monkeypatch.setattr(app_module, "get_runtime_manager", lambda: manager)
+    monkeypatch.setattr(
+        transition_routes,
+        "get_capability_startup_transition_service",
+        lambda: transition,
+    )
 
     app = create_app()
     app.config.update(TESTING=True)
 
     response = app.test_client().get("/startup?legacy=1&edit=1&step=role")
 
-    assert response.status_code == 200
-    html = response.get_data(as_text=True)
-    assert "Legacy device-role setup has been retired" in html
-    assert "Open capability-first onboarding" in html
-    assert "Preserved compatibility settings" in html
-    assert "full-server" in html
-    assert settings.ai_model in html
-    assert settings.recorder_sources in html
-
-    # The old role-first authority and runtime-choice controls must not return.
-    assert 'name="deployment_mode"' not in html
-    assert "/server-setup/save" not in html
-    assert "/startup/choose" not in html
-    assert "Resume session" not in html
-    assert "Start new session" not in html
-    assert "Save setup and continue" not in html
+    assert response.status_code in {302, 303}
+    assert response.location == "/onboarding?step=finish"
+    templates = Path(app_module.__file__).with_name("templates")
+    assert not (templates / "startup.html").exists()
 
 
-def test_ai_model_benchmark_endpoint_remains_available(monkeypatch, tmp_path) -> None:
-    monkeypatch.chdir(tmp_path)
-    _patch_runtime(monkeypatch)
-    settings = _configured_settings()
-    _patch_setup_context(monkeypatch, settings)
+def test_ai_model_benchmark_endpoint_remains_available(monkeypatch) -> None:
+    config = default_capability_config()
+    monkeypatch.setattr(
+        server_setup_routes,
+        "load_capability_config",
+        lambda: config,
+    )
 
-    def fake_compare(_settings):
+    def fake_compare(selected_config):
+        assert selected_config.ai_profile == "edge-small"
         return {
             "ok": True,
             "rows": [
@@ -132,9 +104,10 @@ def test_ai_model_benchmark_endpoint_remains_available(monkeypatch, tmp_path) ->
         }
 
     monkeypatch.setattr(server_setup_routes, "compare_ollama_setup_models", fake_compare)
+    app = Flask(__name__)
+    app.config["SECRET_KEY"] = "test"
+    app.register_blueprint(server_setup_routes.server_setup_web)
 
-    app = create_app()
-    app.config.update(TESTING=True)
     client = app.test_client()
     with client.session_transaction() as browser_session:
         browser_session["mtconnect_discovery_csrf_token"] = "test-csrf-token"
@@ -142,7 +115,7 @@ def test_ai_model_benchmark_endpoint_remains_available(monkeypatch, tmp_path) ->
         "/server-setup/test-ai-model",
         data={
             "_csrf_token": "test-csrf-token",
-            "ai_enabled": "on",
+            "ai_provider_mode": "local",
             "ai_profile": "edge-small",
         },
     )

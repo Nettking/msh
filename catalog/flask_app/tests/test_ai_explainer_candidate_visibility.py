@@ -8,14 +8,17 @@ from flask import Flask
 from catalog.ai.ollama_client import DEFAULT_BASE_URL
 from catalog.ai.ollama_provider import OllamaLanguageModelProvider
 from catalog.ai.prompts import build_extractive_prompt, build_prompt
-from catalog.ai.runtime_manager import ConfiguredLanguageModelRuntimeManager
 from catalog.ai.runtime_contracts import AIModality, AIRuntimeRequest
+from catalog.ai.runtime_manager import ConfiguredLanguageModelRuntimeManager
 from catalog.capabilities.contributions import AICandidateSource, AIContributionAdapter
 from catalog.federation.onboarding_models import (
     ContributionActivationState,
     DeviceInspectionSnapshot,
 )
 from catalog.flask_app import ai_routes
+from catalog.flask_app.services.capability_config_service import (
+    default_capability_config,
+)
 from catalog.flask_app.services.capability_contribution_components import (
     default_components,
 )
@@ -40,19 +43,11 @@ def _inspection() -> DeviceInspectionSnapshot:
     )
 
 
-def _legacy_setup() -> dict[str, object]:
-    return {
-        "configured": True,
-        "user_setup_complete": True,
-        "deployment_mode": "web-workbench",
-        "ai_enabled": False,
-        "ai_provider_mode": "local",
-        "ai_model": "llama3.2:3b",
-        "ollama_base_url": "http://ollama:11434",
-    }
+def _capability_config():
+    return default_capability_config()
 
 
-def test_legacy_ai_disabled_does_not_hide_configured_ai_explainer(
+def test_capability_config_exposes_configured_ai_explainer(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("FCP_AI_MODEL", "llama3.2:3b")
@@ -64,7 +59,7 @@ def test_legacy_ai_disabled_does_not_hide_configured_ai_explainer(
     with app.app_context():
         sources, adapters = default_components(
             onboarding_service=object(),  # type: ignore[arg-type]
-            setup_loader=_legacy_setup,
+            config_loader=_capability_config,
         )
         ai_sources = tuple(
             source for source in sources if isinstance(source, AICandidateSource)
@@ -110,7 +105,7 @@ def test_ai_explainer_enable_maps_opaque_federation_identity_to_runtime_id(
     with app.app_context():
         _sources, adapters = default_components(
             onboarding_service=onboarding,  # type: ignore[arg-type]
-            setup_loader=_legacy_setup,
+            config_loader=_capability_config,
         )
         ai_adapter = next(
             adapter for adapter in adapters if isinstance(adapter, AIContributionAdapter)
@@ -239,7 +234,7 @@ def test_disabled_capability_provider_keeps_workbench_ai_navigation(
     assert injected["capability_startup_flags"]["language_model"] is True
 
 
-def test_completed_capability_first_ai_never_falls_back_to_legacy_provider(
+def test_completed_capability_first_ai_uses_config_without_activating_provider(
     monkeypatch,
 ) -> None:
     manager = ConfiguredLanguageModelRuntimeManager(session_id="local-ai")
@@ -251,17 +246,8 @@ def test_completed_capability_first_ai_never_falls_back_to_legacy_provider(
         "get_capability_startup_transition_service",
         lambda: SimpleNamespace(capability_flags=lambda: {"completed": True}),
     )
-    monkeypatch.setattr(
-        ai_routes,
-        "load_settings",
-        lambda: SimpleNamespace(
-            configured=True,
-            user_setup_complete=True,
-            ai_enabled=True,
-            ai_model="llama3.2:3b",
-            ollama_base_url="http://legacy-ollama:11434",
-        ),
-    )
+    assert not hasattr(ai_routes, "load_settings")
+    monkeypatch.setattr(ai_routes, "load_capability_config", _capability_config)
 
     app = Flask(__name__)
     app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"] = "state.sqlite3"
@@ -274,8 +260,8 @@ def test_completed_capability_first_ai_never_falls_back_to_legacy_provider(
         )
 
     assert model == "llama3.2:3b"
-    assert base_url == DEFAULT_BASE_URL
-    assert provider_name == "No active AI contribution"
+    assert base_url == _capability_config().ollama_base_url == "http://ollama:11434"
+    assert provider_name == "No active AI contribution (This computer configured)"
     assert runtime is None
     assert manager.additional_provider_ids() == ()
 

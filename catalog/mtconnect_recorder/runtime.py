@@ -129,7 +129,7 @@ def _managed_configuration(payload: Mapping[str, Any]) -> tuple[dict[str, str], 
 
     ``fcp.server_setup.v3`` is accepted only as an explicit backward-compatible
     technical input when an older deployment still points the recorder at that
-    file. ``deployment_mode`` and ``ai_enabled`` are deliberately ignored.
+    file. Legacy role and AI-enable fields are deliberately ignored.
     """
 
     if not payload:

@@ -22,6 +22,9 @@ from catalog.flask_app.services.capability_onboarding_service import (
     CapabilityOnboardingService,
     FederationBindingStore,
 )
+from catalog.flask_app.services.legacy_settings_migration import (
+    LegacySettingsSnapshot,
+)
 from catalog.node.identity import IdentityStore
 
 NOW = datetime(2026, 8, 3, 0, 30, tzinfo=timezone.utc)
@@ -32,7 +35,6 @@ def _service(
     *,
     coordinator: SessionCoordinator | None = None,
     sources=(),
-    setup_payload: dict[str, object] | None = None,
 ) -> CapabilityOnboardingService:
     coordinator = coordinator or SessionCoordinator(
         tmp_path / "coordinator.sqlite3",
@@ -44,20 +46,24 @@ def _service(
         coordinator_database=coordinator,
         device_name="Workshop laptop",
         discovery_sources=sources,
-        setup_loader=lambda: setup_payload or {
-            "configured": False,
-            "user_setup_complete": False,
-        },
         clock=lambda: NOW,
     )
 
 
-def _app(service: CapabilityOnboardingService):
+def _app(
+    service: CapabilityOnboardingService,
+    *,
+    legacy_loader=None,
+):
     app = create_app()
     app.config.update(
         TESTING=True,
         CAPABILITY_ONBOARDING_SERVICE=service,
+        CAPABILITY_ONBOARDING_STATE_DATABASE=service.binding_store.database,
+        CAPABILITY_ONBOARDING_TRANSITION_DATABASE=service.binding_store.database,
     )
+    if legacy_loader is not None:
+        app.config["CAPABILITY_LEGACY_SETTINGS_LOADER"] = legacy_loader
     return app
 
 
@@ -199,38 +205,41 @@ def test_identity_route_bypasses_legacy_gate_and_reopens_stably(
     assert reopened.identity == identity.identity
 
 
-def test_legacy_migration_preview_never_renders_private_values(
+def test_legacy_migration_notice_never_renders_role_or_private_values(
     tmp_path: Path,
 ) -> None:
     private_url = "http://10.0.0.9:11434"
     private_source = "Mazak=http://192.168.1.40:5000"
-    service = _service(
-        tmp_path,
-        setup_payload={
-            "configured": True,
-            "user_setup_complete": True,
-            "deployment_mode": "full-server",
-            "ai_enabled": True,
-            "ai_provider_mode": "connected",
-            "ai_provider_name": "Private GPU laptop",
-            "ai_profile": "workstation-strong",
-            "ai_model": "qwen2.5:7b",
-            "ollama_base_url": private_url,
-            "recorder_sources": private_source,
-            "recorder_poll_interval": "0.2",
-            "recorder_include_condition": False,
-        },
+    legacy = LegacySettingsSnapshot(
+        schema="fcp.server_setup.v3",
+        configured=True,
+        user_setup_complete=True,
+        deployment_mode="full-server",
+        ai_enabled=True,
+        ai_provider_mode="connected",
+        ai_provider_name="Private GPU laptop",
+        ai_profile="workstation-strong",
+        ai_model="qwen2.5:7b",
+        ollama_base_url=private_url,
+        recorder_sources=private_source,
+        recorder_poll_interval="0.2",
+        recorder_include_condition=False,
+        updated_at="2026-08-03T00:30:00Z",
     )
-    client = _app(service).test_client()
+    service = _service(tmp_path)
+    client = _app(service, legacy_loader=lambda: legacy).test_client()
     _create_identity(client)
 
     page = client.get("/onboarding").get_data(as_text=True)
 
-    assert "Existing installation found" in page
-    assert "Full server" in page
-    assert "Workbench access" in page
-    assert "Recorder behavior" in page
-    assert "Private connection settings remain local" in page
+    assert "Existing setup ready to migrate" in page
+    assert "Carry the existing setup forward" in page
+    assert "Migrate existing setup" in page
+    assert "Existing installation found" not in page
+    assert "Full server" not in page
+    assert "Workbench access" not in page
+    assert "Recorder behavior" not in page
+    assert "Private GPU laptop" not in page
     assert private_url not in page
     assert private_source not in page
     assert "10.0.0.9" not in page
@@ -570,6 +579,12 @@ def test_federation_overview_uses_revalidated_cfi2_context_without_leakage(
 ) -> None:
     service = _service(tmp_path)
     app = _app(service)
+    app.config.update(
+        FEDERATION_DEVICE_INSPECTION=None,
+        FEDERATION_CONTRIBUTION_CANDIDATES=(),
+        FEDERATION_CONTRIBUTION_INTENTS=(),
+        FEDERATION_AUTHORIZED_BENCHMARK_STORE=None,
+    )
     client = app.test_client()
     csrf, command_id = _create_identity(client)
     client.get("/onboarding?step=federation")

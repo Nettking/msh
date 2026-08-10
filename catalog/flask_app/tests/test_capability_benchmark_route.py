@@ -5,6 +5,7 @@ import threading
 import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -27,6 +28,7 @@ from catalog.flask_app.capability_onboarding_routes import (
 from catalog.flask_app.services.capability_benchmark_service import (
     CapabilityBenchmarkService,
 )
+from catalog.flask_app.services.capability_config_service import CapabilityConfig
 from catalog.flask_app.services.capability_inspection_service import (
     CapabilityInspectionService,
 )
@@ -100,7 +102,6 @@ def _onboarding_service(
     tmp_path: Path,
     *,
     clock,
-    setup_payload: dict[str, object] | None = None,
 ) -> CapabilityOnboardingService:
     coordinator = SessionCoordinator(
         tmp_path / "coordinator.sqlite3",
@@ -112,8 +113,6 @@ def _onboarding_service(
         coordinator_database=coordinator,
         device_name="Benchmark laptop",
         discovery_sources=(),
-        setup_loader=lambda: setup_payload
-        or {"configured": False, "user_setup_complete": False},
         clock=clock,
     )
 
@@ -124,16 +123,11 @@ def _inspection_service(
     *,
     adapters,
     clock,
-    setup_payload: dict[str, object] | None = None,
-    scan_supplier=None,
 ) -> CapabilityInspectionService:
     return CapabilityInspectionService(
         onboarding_service=onboarding,
         state_database=tmp_path / "onboarding.sqlite3",
         adapters=adapters,
-        setup_loader=lambda: setup_payload
-        or {"configured": False, "user_setup_complete": False},
-        mtconnect_scan_supplier=scan_supplier,
         inspection_ttl_seconds=900,
         clock=clock,
         system_observer=lambda: {
@@ -162,6 +156,8 @@ def _app(
     onboarding: CapabilityOnboardingService,
     inspection: CapabilityInspectionService,
     benchmarks: CapabilityBenchmarkService,
+    *,
+    config_loader=None,
 ):
     app = create_app()
     app.config.update(
@@ -170,6 +166,8 @@ def _app(
         CAPABILITY_INSPECTION_SERVICE=inspection,
         CAPABILITY_BENCHMARK_SERVICE=benchmarks,
     )
+    if config_loader is not None:
+        app.config["CAPABILITY_CONFIG_LOADER"] = config_loader
     return app
 
 
@@ -710,26 +708,27 @@ def test_default_ollama_benchmark_runs_inference_only_after_explicit_post(
         "catalog.capabilities.benchmarking.adapters.ollama._bounded_json_request",
         requester,
     )
-    setup_payload = {
-        "configured": True,
-        "user_setup_complete": True,
-        "deployment_mode": "web-workbench",
-        "ai_enabled": True,
-        "ai_model": "qwen2.5:7b",
-        "ollama_base_url": "http://ollama:11434",
-    }
-    onboarding = _onboarding_service(
-        tmp_path,
-        clock=clock,
-        setup_payload=setup_payload,
+    config = CapabilityConfig(
+        ai_provider_mode="local",
+        ai_provider_name="This computer",
+        ai_profile="workstation-strong",
+        ai_model="qwen2.5:7b",
+        ollama_base_url="http://ollama:11434",
+        recorder_sources="",
+        recorder_poll_interval="0.2",
+        recorder_include_condition=False,
+        updated_at="",
     )
+    monkeypatch.setattr(
+        "catalog.flask_app.services.capability_recovery_adapters.get_mtconnect_discovery_service",
+        lambda: SimpleNamespace(last_scan=lambda: {"state": "never", "results": []}),
+    )
+    onboarding = _onboarding_service(tmp_path, clock=clock)
     inspection = _inspection_service(
         tmp_path,
         onboarding,
         adapters=None,
         clock=clock,
-        setup_payload=setup_payload,
-        scan_supplier=lambda: {"state": "never", "results": []},
     )
     benchmarks = _benchmark_service(
         tmp_path,
@@ -737,7 +736,12 @@ def test_default_ollama_benchmark_runs_inference_only_after_explicit_post(
         inspection,
         clock=clock,
     )
-    client = _app(onboarding, inspection, benchmarks).test_client()
+    client = _app(
+        onboarding,
+        inspection,
+        benchmarks,
+        config_loader=lambda: config,
+    ).test_client()
     csrf, _command_id = _connect_and_inspect(client)
 
     assert [item[0] for item in requests] == ["GET"]

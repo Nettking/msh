@@ -43,12 +43,9 @@ def test_app_factory_owns_capability_product_handlers(tmp_path, monkeypatch) -> 
     assert not hasattr(routes_module, "status")
     assert not hasattr(routes_module, "recorder_status_snapshot")
     assert not hasattr(routes_module, "startup")
+    assert not hasattr(routes_module, "load_settings")
     assert not hasattr(app_module, "inject_server_setup")
-
-    assert any(
-        function is capability_product_routes.capability_startup_mode_gate
-        for function in app.before_request_funcs.get(None, ())
-    )
+    assert not hasattr(capability_product_routes, "capability_startup_mode_gate")
     assert any(
         function is capability_product_routes.inject_capability_product_context
         for function in app.template_context_processors.get(None, ())
@@ -66,7 +63,7 @@ def test_product_routes_can_register_without_legacy_blueprint_endpoints() -> Non
     assert rules["web.startup"] == "/startup"
 
 
-def test_product_context_reads_legacy_settings_only_for_explicit_startup(
+def test_product_context_never_reads_legacy_settings(
     monkeypatch,
 ) -> None:
     app = Flask(__name__)
@@ -77,26 +74,17 @@ def test_product_context_reads_legacy_settings_only_for_explicit_startup(
     )
     monkeypatch.setattr(
         capability_product_routes,
-        "load_settings",
-        lambda: (_ for _ in ()).throw(AssertionError("legacy read")),
-    )
-    monkeypatch.setattr(
-        capability_product_routes,
         "get_recorder_control_service",
         lambda: SimpleNamespace(status=lambda _config: {"ready": False}),
     )
 
-    with app.test_request_context("/status"):
-        context = capability_product_routes.inject_capability_product_context()
-    assert context["server_setup_settings"] is None
-
-    with app.test_request_context("/startup"):
-        try:
-            capability_product_routes.inject_capability_product_context()
-        except AssertionError as exc:
-            assert str(exc) == "legacy read"
-        else:
-            raise AssertionError("explicit /startup must retain the legacy display read")
+    for path in ("/status", "/startup"):
+        with app.test_request_context(path):
+            context = capability_product_routes.inject_capability_product_context()
+        assert context == {
+            "capability_config_error": "",
+            "server_setup_recorder_status": {"ready": False},
+        }
 
 
 def test_status_template_has_no_deployment_role_adapter() -> None:
@@ -111,22 +99,19 @@ def test_status_template_has_no_deployment_role_adapter() -> None:
     assert "recorder_visible" in template
 
 
-def test_completed_capability_state_bypasses_legacy_runtime_choice(monkeypatch) -> None:
+def test_startup_is_a_capability_onboarding_handoff() -> None:
     app = Flask(__name__)
-    app.add_url_rule("/target", endpoint="target", view_func=lambda: "ok")
-    monkeypatch.setattr(
-        capability_product_routes,
-        "_capability_flags",
-        lambda: {"completed": True, "runtime": False},
-    )
-    monkeypatch.setattr(
-        capability_product_routes,
-        "get_runtime_manager",
-        lambda: SimpleNamespace(requires_startup_choice=lambda: True),
+    app.add_url_rule(
+        "/onboarding",
+        endpoint="capability_startup_transition_web.onboarding",
+        view_func=lambda: "onboarding",
     )
 
-    with app.test_request_context("/target"):
-        assert capability_product_routes.capability_startup_mode_gate() is None
+    with app.test_request_context("/startup"):
+        response = capability_product_routes.startup()
+
+    assert response.status_code == 303
+    assert response.location == "/onboarding"
 
 
 def test_recorder_snapshot_requires_current_contribution_authority(monkeypatch) -> None:

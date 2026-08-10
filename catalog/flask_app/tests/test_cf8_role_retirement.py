@@ -241,8 +241,26 @@ def test_critical_product_surfaces_use_capability_config_directly() -> None:
         assert "deployment_mode" not in text, path
 
 
-def test_startup_compatibility_ui_and_choice_bridge_are_not_supported() -> None:
+def test_startup_compatibility_ui_and_choice_bridge_are_not_supported(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     assert not (ROOT / "catalog" / "flask_app" / "templates" / "startup.html").exists()
+
+    monkeypatch.chdir(tmp_path)
+    isolated_state = tmp_path / "federation"
+    monkeypatch.setenv(
+        "FCP_FEDERATION_NODE_STATE_DIR",
+        str(isolated_state / "device"),
+    )
+    for variable, filename in (
+        ("FCP_FEDERATION_ONBOARDING_DATABASE", "onboarding.sqlite3"),
+        ("FCP_FEDERATION_TRANSITION_DATABASE", "transition.sqlite3"),
+        ("FCP_FEDERATION_BENCHMARK_DATABASE", "benchmark.sqlite3"),
+        ("FCP_FEDERATION_CONTRIBUTION_DATABASE", "contribution.sqlite3"),
+        ("FCP_FEDERATION_COORDINATOR_DATABASE", "coordinator.sqlite3"),
+    ):
+        monkeypatch.setenv(variable, str(isolated_state / filename))
 
     app = create_app()
     app.config.update(TESTING=True)
