@@ -215,7 +215,7 @@ Federation coordinator/session creator
   -> authenticated result event
 ```
 
-The browser does not supply a repository, branch, path, executable, command, or arbitrary arguments. Each normal FCP host independently validates the exact commit, approved `Nettking/msh` `main`, clean working tree, trusted remote, ancestry, and fast-forward relationship.
+The browser does not supply a repository, branch, path, executable, command, or arbitrary arguments. Each normal FCP host independently validates the exact commit, approved source repository `main`, clean working tree, trusted remote, ancestry, and fast-forward relationship.
 
 The host-owned update agent rebuilds the Compose-managed `relay`, `flask`, and `recorder` images, preserves saved state, resumes the installation, and reports success only after the running image proves the exact target commit and required services are running.
 
