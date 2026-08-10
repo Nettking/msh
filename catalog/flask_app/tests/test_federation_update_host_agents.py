@@ -22,13 +22,26 @@ def test_windows_agent_has_fixed_safe_mutation_boundary() -> None:
     assert "Normalize-DirectoryPath" in text
     assert "Get-RequestResultFile" in text
     assert "dirty_build_context" in text
+    assert "Invoke-ExternalResult" in text
     assert "$previousErrorActionPreference = $ErrorActionPreference" in text
     assert "$ErrorActionPreference = 'Continue'" in text
     assert "$ErrorActionPreference = $previousErrorActionPreference" in text
     assert "$exit = $LASTEXITCODE" in text
+    assert "Preserve-RelayVolumeSelection" in text
+    assert "Get-ServiceRelayVolume" in text
+    assert "$env:FCP_RELAY_VOLUME_NAME" in text
+    assert "$env:FCP_DATA_DIR = $DataDirectory" in text
+    assert "$env:COMPOSE_PROJECT_NAME = 'fcp'" in text
+    assert "'compose', 'stop', 'flask'" in text
+    assert "'catalog.flask_app.services.existing_setup_resume'" in text
+    assert "$resume.ExitCode -notin @(0, 4)" in text
+    assert text.index("Preserve-RelayVolumeSelection | Out-Null") < text.index(
+        "'compose', 'build', 'relay', 'flask', 'recorder'"
+    )
     assert text.index("Move-Item -LiteralPath $RequestFile") < text.index(
         "[System.IO.File]::ReadAllText($processing)"
     )
+    assert "& docker" not in text
     assert "reset --hard" not in text
     assert "git clean" not in text
     assert "git stash" not in text
