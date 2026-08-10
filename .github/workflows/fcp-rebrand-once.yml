@@ -32,6 +32,7 @@ jobs:
 
           from pathlib import Path
           import subprocess
+          import textwrap
 
           repo_slug = "Nettking/" + bytes((109, 115, 104)).decode("ascii")
           sentinel = "__FCP_REPOSITORY_SLUG__"
@@ -72,7 +73,8 @@ jobs:
 
           Path(".github/workflows/fcp-rebrand-once.yml").unlink()
 
-          checker = '''from __future__ import annotations
+          checker = textwrap.dedent('''\
+          from __future__ import annotations
 
           from pathlib import Path
           import subprocess
@@ -84,7 +86,9 @@ jobs:
 
           def main() -> int:
               failures: list[str] = []
-              tracked = subprocess.check_output(["git", "ls-files", "-z"], text=False).split(b"\\0")
+              tracked = subprocess.check_output(
+                  ["git", "ls-files", "-z"], text=False
+              ).split(b"\\0")
               for raw in tracked:
                   if not raw:
                       continue
@@ -108,13 +112,13 @@ jobs:
 
           if __name__ == "__main__":
               sys.exit(main())
-          '''
-          checker = "\n".join(line[10:] if line.startswith("          ") else line for line in checker.splitlines()) + "\n"
+          ''')
           checker_path = Path("scripts/check_product_branding.py")
           checker_path.parent.mkdir(parents=True, exist_ok=True)
           checker_path.write_text(checker, encoding="utf-8")
 
-          workflow = '''name: Product branding boundary
+          workflow = textwrap.dedent('''\
+          name: Product branding boundary
 
           on:
             pull_request:
@@ -134,8 +138,7 @@ jobs:
                     python-version: "3.12"
                 - name: Enforce Federated Capability Platform identity
                   run: python scripts/check_product_branding.py
-          '''
-          workflow = "\n".join(line[10:] if line.startswith("          ") else line for line in workflow.splitlines()) + "\n"
+          ''')
           Path(".github/workflows/product-branding.yml").write_text(workflow, encoding="utf-8")
           PY
 
