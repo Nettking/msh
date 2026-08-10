@@ -13,15 +13,13 @@ from dataclasses import dataclass
 from urllib import request
 
 from catalog.flask_app.services.capability_config_service import (
+    AI_MODEL_CHOICES,
+    AI_PROVIDER_MODES,
     CapabilityConfig,
     CapabilityConfigError,
     default_capability_config,
     update_language_model_config,
     update_recorder_config,
-)
-from catalog.flask_app.services.server_setup_service import (
-    AI_MODEL_CHOICES,
-    AI_PROVIDER_MODES,
 )
 
 COMMAND_PROFILES: dict[str, dict[str, object]] = {
