@@ -27,6 +27,7 @@ from catalog.federation.projections import (
 
 from .capability_onboarding_routes import _CSRF_SESSION_KEY, _csrf_token
 from .services.capability_benchmark_service import get_capability_benchmark_service
+from .services.capability_onboarding_service import get_capability_onboarding_service
 from .services.federation_projection_service import (
     get_federation_projection_service,
 )
@@ -138,6 +139,33 @@ def _benchmark_item_actions(
         return {}
 
 
+def _update_authority_view() -> tuple[bool, bool]:
+    """Return whether this viewer is a member and may manage software updates.
+
+    Update state is coordinated centrally, but every member renders the same
+    Federation overview. A non-coordinator member must therefore see that its
+    updates are coordinator-managed rather than a misleading local
+    ``Not checked`` state. This helper is passive and grants no authority.
+    """
+
+    try:
+        context = get_capability_onboarding_service().authorized_context()
+        if context is None:
+            return False, False
+        session_record = context.coordinator.store.get_session(
+            context.binding.internal_session_id
+        )
+        actor = context.credentials.identity.node_id
+        if session_record is None:
+            return False, False
+        return True, session_record.created_by_node_id == actor
+    except Exception as exc:  # noqa: BLE001 - update controls fail closed
+        current_app.logger.warning(
+            "Federation update authority unavailable (%s)", type(exc).__name__
+        )
+        return False, False
+
+
 def _page_response(page: FederationPage) -> Response:
     template = (
         "federation_overview.html"
@@ -159,6 +187,20 @@ def _page_response(page: FederationPage) -> Response:
                 "Federation update status unavailable (%s)", type(exc).__name__
             )
             update_status = {"status": "unavailable", "devices": []}
+
+        is_member, can_manage_updates = _update_authority_view()
+        update_status = {
+            **update_status,
+            "can_manage": can_manage_updates,
+            "managed_by_coordinator": is_member and not can_manage_updates,
+        }
+        if is_member and not can_manage_updates:
+            update_status = {
+                **update_status,
+                "status": "managed_by_coordinator",
+                "eligible_count": 0,
+            }
+
     response = make_response(
         render_template(
             template,
