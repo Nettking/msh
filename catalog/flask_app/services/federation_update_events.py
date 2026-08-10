@@ -171,38 +171,33 @@ def inspection_from_report(
         for item in (request_id, node_id, state)
     ):
         return None
+    commits: dict[str, str | None] = {}
     for field in ("current_commit", "target_commit", "running_commit"):
         commit = value.get(field)
+        # Older host agents serialize an unknown running build as an empty
+        # string. Treat only that optional field as absent so coordinators can
+        # still classify the source-current runtime as activation_required.
+        if field == "running_commit" and commit == "":
+            commit = None
         if commit is not None and (
             not isinstance(commit, str) or not OID_RE.fullmatch(commit)
         ):
             return None
+        commits[field] = commit
     return (
         request_id,
         node_id,
         UpdateInspection(
             state=state,
-            current_commit=(
-                value.get("current_commit")
-                if isinstance(value.get("current_commit"), str)
-                else None
-            ),
-            target_commit=(
-                value.get("target_commit")
-                if isinstance(value.get("target_commit"), str)
-                else None
-            ),
+            current_commit=commits["current_commit"],
+            target_commit=commits["target_commit"],
             code=value.get("code") if isinstance(value.get("code"), str) else None,
             message=(
                 value.get("message")
                 if isinstance(value.get("message"), str)
                 else None
             ),
-            running_commit=(
-                value.get("running_commit")
-                if isinstance(value.get("running_commit"), str)
-                else None
-            ),
+            running_commit=commits["running_commit"],
         ),
     )
 
