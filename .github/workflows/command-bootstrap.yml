@@ -6,12 +6,14 @@ on:
       - ".github/workflows/command-bootstrap.yml"
       - "setup_msh.py"
       - "catalog/command_setup.py"
+      - "catalog/flask_app/app.py"
       - "catalog/flask_app/services/capability_config_service.py"
       - "catalog/flask_app/services/server_setup_service.py"
       - "catalog/mtconnect_recorder/config_bootstrap.py"
       - "termux/setup-phone.sh"
       - "termux/msh-phone.sh"
       - "catalog/flask_app/tests/test_command_setup.py"
+      - "catalog/flask_app/tests/test_capability_runtime_startup.py"
       - "catalog/flask_app/tests/test_connected_ai_provider.py"
       - "catalog/flask_app/tests/test_termux_phone_script.py"
       - "docker-compose.yml"
@@ -21,12 +23,14 @@ on:
       - ".github/workflows/command-bootstrap.yml"
       - "setup_msh.py"
       - "catalog/command_setup.py"
+      - "catalog/flask_app/app.py"
       - "catalog/flask_app/services/capability_config_service.py"
       - "catalog/flask_app/services/server_setup_service.py"
       - "catalog/mtconnect_recorder/config_bootstrap.py"
       - "termux/setup-phone.sh"
       - "termux/msh-phone.sh"
       - "catalog/flask_app/tests/test_command_setup.py"
+      - "catalog/flask_app/tests/test_capability_runtime_startup.py"
       - "catalog/flask_app/tests/test_connected_ai_provider.py"
       - "catalog/flask_app/tests/test_termux_phone_script.py"
       - "docker-compose.yml"
@@ -69,10 +73,12 @@ jobs:
           python -m compileall -q
           setup_msh.py
           catalog/command_setup.py
+          catalog/flask_app/app.py
           catalog/flask_app/services/capability_config_service.py
           catalog/flask_app/services/server_setup_service.py
           catalog/mtconnect_recorder/config_bootstrap.py
           catalog/flask_app/tests/test_command_setup.py
+          catalog/flask_app/tests/test_capability_runtime_startup.py
           catalog/flask_app/tests/test_connected_ai_provider.py
           catalog/flask_app/tests/test_termux_phone_script.py
 
@@ -80,6 +86,7 @@ jobs:
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_command_setup.py
+          catalog/flask_app/tests/test_capability_runtime_startup.py
           catalog/flask_app/tests/test_connected_ai_provider.py
           catalog/flask_app/tests/test_termux_phone_script.py
           catalog/flask_app/tests/test_recorder_config_bootstrap.py
@@ -95,7 +102,9 @@ jobs:
           python -m ruff check
           setup_msh.py
           catalog/command_setup.py
+          catalog/flask_app/app.py
           catalog/flask_app/tests/test_command_setup.py
+          catalog/flask_app/tests/test_capability_runtime_startup.py
           catalog/flask_app/tests/test_connected_ai_provider.py
           catalog/flask_app/tests/test_termux_phone_script.py
           --ignore I001,RUF022,B008,C408,PLC0206,UP035
