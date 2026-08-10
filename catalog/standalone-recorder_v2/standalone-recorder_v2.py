@@ -7,7 +7,9 @@ if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
 from catalog.mtconnect_recorder import *
+from catalog.mtconnect_recorder.upgrade_compat import ensure_recorder_upgrade_config
 
 
 if __name__ == "__main__":
+    ensure_recorder_upgrade_config()
     run()
