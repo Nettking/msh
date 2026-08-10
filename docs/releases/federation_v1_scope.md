@@ -128,7 +128,7 @@ The coordinator/session creator may explicitly run **Check for updates** and **U
 
 The v1 update boundary includes:
 
-- exact approved `Nettking/msh` `main` commit targeting;
+- exact approved source-repository `main` commit targeting;
 - per-host clean-checkout, trusted-remote, ancestry, and fast-forward validation;
 - no peer-supplied repository/branch/path/executable/command authority;
 - a separate host-owned update agent rather than Git/Docker authority inside Flask;
