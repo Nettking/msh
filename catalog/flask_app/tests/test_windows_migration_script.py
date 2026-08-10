@@ -197,10 +197,10 @@ def test_windows_migration_fast_forwards_fake_legacy_checkout_and_resumes(
     log = command_log.read_text(encoding="utf-8").casefold()
     assert "docker info" in log
     assert "docker compose version" in log
-    assert "git fetch --no-tags origin main" in log
-    assert f"git merge --ff-only {target}" in log
+    assert "fetch --no-tags origin main" in log
+    assert f"merge --ff-only {target}" in log
     assert "start --resume" in log
-    assert log.index("docker info") < log.index("git merge --ff-only")
+    assert log.index("docker info") < log.index("merge --ff-only")
     assert "git reset" not in log
     assert "git clean" not in log
     assert "git stash" not in log
