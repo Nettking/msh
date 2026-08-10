@@ -1,4 +1,4 @@
-"""Flask application factory and webapp-first runtime startup entrypoint."""
+"""Flask application factory and capability-first runtime startup entrypoint."""
 
 from __future__ import annotations
 
@@ -11,7 +11,11 @@ from catalog.capabilities.benchmarking.policy import (
 )
 from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.federation.onboarding_models import ContributionDesiredState
-from catalog.orchestrator.pipeline import get_runtime_manager, start_runtime_background
+from catalog.orchestrator.capability_startup import (
+    prepare_capability_runtime,
+    start_capability_runtime_background,
+)
+from catalog.orchestrator.pipeline import get_runtime_manager
 
 from .ai_routes import ai_web
 from .capability_benchmark_routes import capability_benchmark_web
@@ -32,9 +36,6 @@ from .provider_federation_routes import provider_federation_web
 from .routes import web
 from .server_setup_routes import server_setup_web
 from .services.capability_benchmark_service import get_capability_benchmark_service
-from .services.capability_config_migration_service import (
-    persist_capability_config_from_setup,
-)
 from .services.capability_contribution_service import (
     get_capability_contribution_service,
 )
@@ -46,10 +47,6 @@ from .services.catalog_service import ArtifactCatalog
 from .services.federation_pairing_install import install_federation_pairing
 from .services.onboarding_view_normalizer import normalize_onboarding_view_model
 from .services.run_once_capability_evidence import install_run_once_capability_evidence
-from .services.server_setup_service import (
-    load_settings,  # noqa: F401 - retained only as an old monkeypatch seam
-    ollama_status,  # noqa: F401 - retained only as an old monkeypatch seam
-)
 from .services.startup_contribution_reconcile import (
     run_startup_contribution_reconcile,
 )
@@ -57,12 +54,7 @@ from .source_routes import source_web
 
 
 def _resume_persisted_contributions_safely() -> tuple[int, int]:
-    """Reconcile saved intent only when saved capability evidence is accepted.
-
-    Returns ``(reconciled, suspended)``. Inspection and benchmarks are never run
-    here. If saved evidence is stale, enabled contributions are fenced through
-    the existing suspension path instead of being reactivated from stale input.
-    """
+    """Reconcile saved intent only when saved capability evidence is accepted."""
 
     contribution = get_capability_contribution_service()
     if not contribution.has_persisted_intents():
@@ -159,10 +151,6 @@ def create_app() -> Flask:
         ),
     )
     app.config.setdefault(
-        "CAPABILITY_ONBOARDING_SETUP_SAVER",
-        persist_capability_config_from_setup,
-    )
-    app.config.setdefault(
         "CAPABILITY_ONBOARDING_BENCHMARK_DATABASE",
         os.getenv(
             "FCP_FEDERATION_BENCHMARK_DATABASE",
@@ -201,9 +189,6 @@ def create_app() -> Flask:
             "CAPABILITY_ONBOARDING_REMOTE_PAIRING_PATH",
             remote_pairing_path,
         )
-    # The frozen snapshot/result contracts retain an expiry timestamp, while the
-    # installed product uses explicit refresh plus dependency/version invalidation.
-    # A long default still keeps newly written compatibility metadata sensible.
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS",
         int(
@@ -238,8 +223,6 @@ def create_app() -> Flask:
 
     @app.before_request
     def reconcile_persisted_contributions_from_current_evidence():
-        """Restore persisted authority once, retrying transient startup gaps."""
-
         endpoint = request.endpoint or ""
         if endpoint.startswith("static"):
             return
@@ -271,34 +254,30 @@ def create_app() -> Flask:
             )
 
     @app.before_request
-    def resolve_completed_capability_runtime_choice():
-        """Repair a stale legacy runtime choice before compatibility gates run."""
+    def prepare_completed_capability_runtime():
+        """Resolve historical runtime namespace state from capability intent only."""
 
         runtime_manager = get_runtime_manager()
         if not runtime_manager.requires_startup_choice():
             return
         try:
             flags = get_capability_startup_transition_service().capability_flags()
-        except Exception as exc:  # noqa: BLE001 - legacy gate remains fail-closed
+        except Exception as exc:  # noqa: BLE001 - startup remains fail-closed
             app.logger.info(
-                "Capability runtime request handoff unavailable (%s)",
+                "Capability runtime preparation unavailable (%s)",
                 type(exc).__name__,
             )
             return
         if not bool(flags.get("completed")) or not bool(flags.get("runtime")):
             return
-        accepted, _message = runtime_manager.choose_startup_mode(
-            "continue_existing"
-        )
-        if not accepted:
+        try:
+            prepare_capability_runtime(runtime_manager)
+        except Exception as exc:  # noqa: BLE001 - runtime startup remains isolated
             app.logger.warning(
-                "Completed capability runtime could not clear legacy startup choice"
+                "Capability runtime preparation failed (%s)",
+                type(exc).__name__,
             )
-        return
 
-    # CFI-6 owns capability-first startup and migration before CFI-5 and the
-    # retained compatibility endpoints. Capability product composition installs
-    # the supported status/startup product endpoints independently of old roles.
     app.register_blueprint(docs_web)
     app.register_blueprint(federation_web)
     app.register_blueprint(federation_pairing_web)
@@ -320,28 +299,13 @@ def create_app() -> Flask:
 
 
 def _start_runtime_from_capability_state(app: Flask) -> str:
-    """Start runtime from persisted capability state or valid legacy migration.
-
-    A fresh role-free install has no legacy setup object to pass into this seam.
-    The transition service therefore decides whether a genuinely completed legacy
-    setup exists and otherwise fails closed until capability onboarding completes.
-    """
+    """Start runtime only from completed persisted capability intent."""
 
     with app.app_context():
         flags = get_capability_startup_transition_service().capability_flags()
-    if not bool(flags.get("runtime")):
+    if not bool(flags.get("completed")) or not bool(flags.get("runtime")):
         return "disabled"
-
-    runtime_manager = get_runtime_manager()
-    if runtime_manager.requires_startup_choice():
-        if not bool(flags.get("completed")):
-            return "legacy-choice-required"
-        accepted, _message = runtime_manager.choose_startup_mode(
-            "continue_existing"
-        )
-        return "started" if accepted else "failed"
-
-    start_runtime_background()
+    start_capability_runtime_background()
     return "started"
 
 
@@ -369,22 +333,10 @@ if __name__ == "__main__":
             "immediately, runtime starts in background",
             flush=True,
         )
-    elif runtime_start_state == "legacy-choice-required":
-        print(
-            "[orchestrator] runtime progress choice remains available through "
-            "the controlled legacy fallback",
-            flush=True,
-        )
-    elif runtime_start_state == "failed":
-        print(
-            "[orchestrator] capability-first runtime continuation could not be "
-            "applied safely",
-            flush=True,
-        )
     elif runtime_start_state == "disabled":
         print(
-            "[orchestrator] runtime remains idle until capability intent enables "
-            "it or a supported legacy setup is migrated",
+            "[orchestrator] runtime remains idle until completed capability intent "
+            "enables it",
             flush=True,
         )
 
