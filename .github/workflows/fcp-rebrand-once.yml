@@ -4,19 +4,25 @@ on:
   push:
     branches:
       - agent/federated-capability-platform-rename
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: write
 
 jobs:
   rebrand:
-    if: github.event.head_commit.message != 'Complete Federated Capability Platform rename'
+    if: >-
+      (github.event_name == 'pull_request' && github.head_ref == 'agent/federated-capability-platform-rename') ||
+      (github.event_name == 'push' && github.ref_name == 'agent/federated-capability-platform-rename' && github.event.head_commit.message != 'Complete Federated Capability Platform rename')
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: agent/federated-capability-platform-rename
 
       - name: Rename product identity repository-wide
         shell: bash
@@ -24,11 +30,9 @@ jobs:
           python - <<'PY'
           from __future__ import annotations
 
-          import os
           from pathlib import Path
           import subprocess
 
-          root = Path.cwd()
           repo_slug = "Nettking/" + bytes((109, 115, 104)).decode("ascii")
           sentinel = "__FCP_REPOSITORY_SLUG__"
 
@@ -44,7 +48,6 @@ jobs:
           ).split(b"\0")
           paths = [Path(item.decode("utf-8")) for item in tracked if item]
 
-          # Move tracked files individually so Git can detect renames cleanly.
           for old in sorted(paths, key=lambda p: (len(p.parts), str(p)), reverse=True):
               new = Path(*[renamed(part) for part in old.parts])
               if new == old:
@@ -67,8 +70,6 @@ jobs:
               if updated != original:
                   path.write_text(updated, encoding="utf-8")
 
-          # The migration workflow is intentionally one-shot and must not remain
-          # in the renamed repository because it contains the retired spelling.
           Path(".github/workflows/fcp-rebrand-once.yml").unlink()
 
           checker = '''from __future__ import annotations
@@ -108,7 +109,6 @@ jobs:
           if __name__ == "__main__":
               sys.exit(main())
           '''
-          # Remove indentation introduced by the workflow block.
           checker = "\n".join(line[10:] if line.startswith("          ") else line for line in checker.splitlines()) + "\n"
           checker_path = Path("scripts/check_product_branding.py")
           checker_path.parent.mkdir(parents=True, exist_ok=True)
