@@ -216,35 +216,109 @@ function Get-RelayProbe {
     $python = @'
 import json
 import os
+import shutil
 import sqlite3
 import sys
+import tempfile
 
 path = "/state/control.sqlite3"
 node_id = sys.argv[1] if len(sys.argv) > 1 else ""
-result = {"exists": 0, "size": 0, "nodes": 0, "sessions": 0, "memberships": 0}
+result = {
+    "exists": 0,
+    "size": 0,
+    "nodes": 0,
+    "sessions": 0,
+    "memberships": 0,
+    "identity_matches": 0,
+}
+
+
+def quote_identifier(value):
+    return '"' + value.replace('"', '""') + '"'
+
+
 if os.path.isfile(path):
     result["exists"] = 1
     result["size"] = os.path.getsize(path)
     try:
-        connection = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
-        for key, table in (("nodes", "nodes"), ("sessions", "sessions")):
-            try:
-                result[key] = int(connection.execute(
-                    f"SELECT COUNT(*) FROM {table}"
-                ).fetchone()[0])
-            except sqlite3.Error:
-                pass
-        if node_id:
-            try:
-                result["memberships"] = int(connection.execute(
-                    "SELECT COUNT(*) FROM session_memberships "
-                    "WHERE node_id=? AND removed_at IS NULL",
-                    (node_id,),
-                ).fetchone()[0])
-            except sqlite3.Error:
-                pass
-        connection.close()
-    except sqlite3.Error:
+        # The Docker volume stays mounted read-only. SQLite databases that were
+        # left in WAL/journal mode can still require a writable directory for
+        # recovery/SHM bookkeeping, so copy the database and transaction sidecars
+        # into the container's disposable writable filesystem before opening it.
+        with tempfile.TemporaryDirectory(prefix="fcp-relay-probe-") as tempdir:
+            probe_path = os.path.join(tempdir, "control.sqlite3")
+            shutil.copy2(path, probe_path)
+            for suffix in ("-wal", "-journal"):
+                source = path + suffix
+                if os.path.isfile(source):
+                    shutil.copy2(source, probe_path + suffix)
+
+            connection = sqlite3.connect(probe_path)
+            tables = [
+                row[0]
+                for row in connection.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
+                )
+            ]
+            for key, table in (("nodes", "nodes"), ("sessions", "sessions")):
+                if table not in tables:
+                    continue
+                try:
+                    result[key] = int(
+                        connection.execute(
+                            f"SELECT COUNT(*) FROM {quote_identifier(table)}"
+                        ).fetchone()[0]
+                    )
+                except sqlite3.Error:
+                    pass
+
+            for table in tables:
+                try:
+                    columns = [
+                        row[1]
+                        for row in connection.execute(
+                            f"PRAGMA table_info({quote_identifier(table)})"
+                        )
+                    ]
+                except sqlite3.Error:
+                    continue
+                if node_id and "node_id" in columns:
+                    try:
+                        result["identity_matches"] += int(
+                            connection.execute(
+                                f"SELECT COUNT(*) FROM {quote_identifier(table)} WHERE node_id=?",
+                                (node_id,),
+                            ).fetchone()[0]
+                        )
+                    except sqlite3.Error:
+                        pass
+
+            if node_id and "session_memberships" in tables:
+                try:
+                    membership_columns = [
+                        row[1]
+                        for row in connection.execute(
+                            "PRAGMA table_info(session_memberships)"
+                        )
+                    ]
+                    if "node_id" in membership_columns:
+                        if "removed_at" in membership_columns:
+                            query = (
+                                "SELECT COUNT(*) FROM session_memberships "
+                                "WHERE node_id=? AND removed_at IS NULL"
+                            )
+                        else:
+                            query = (
+                                "SELECT COUNT(*) FROM session_memberships "
+                                "WHERE node_id=?"
+                            )
+                        result["memberships"] = int(
+                            connection.execute(query, (node_id,)).fetchone()[0]
+                        )
+                except sqlite3.Error:
+                    pass
+            connection.close()
+    except (OSError, sqlite3.Error):
         pass
 print(json.dumps(result, sort_keys=True))
 '@
@@ -323,6 +397,7 @@ try {
                 $probes += [pscustomobject]@{
                     volume = [string]$volume
                     memberships = [int]$probe.memberships
+                    identity_matches = [int]$probe.identity_matches
                     sessions = [int]$probe.sessions
                     nodes = [int]$probe.nodes
                     size = [long]$probe.size
@@ -336,12 +411,24 @@ try {
     if (-not [string]::IsNullOrWhiteSpace($nodeId)) {
         $memberMatches = @($probes |
             Where-Object { $_.memberships -gt 0 } |
-            Sort-Object memberships, sessions, nodes, size -Descending)
+            Sort-Object memberships, identity_matches, sessions, nodes, size -Descending)
         if ($memberMatches.Count -eq 1) {
             $selected = [string]($memberMatches[0].volume)
         }
         elseif ($memberMatches.Count -gt 1) {
             throw "Saved device identity is active in multiple relay-state volumes; refusing to guess."
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($selected) -and -not [string]::IsNullOrWhiteSpace($nodeId)) {
+        $identityMatches = @($probes |
+            Where-Object { $_.identity_matches -gt 0 } |
+            Sort-Object identity_matches, sessions, nodes, size -Descending)
+        if ($identityMatches.Count -eq 1) {
+            $selected = [string]($identityMatches[0].volume)
+        }
+        elseif ($identityMatches.Count -gt 1) {
+            throw "Saved device identity appears in multiple relay-state volumes; refusing to guess."
         }
     }
 

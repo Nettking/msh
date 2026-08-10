@@ -39,7 +39,14 @@ def test_selector_has_read_only_probe_fallback_for_ambiguous_legacy_volumes() ->
     assert '$candidates.Count -gt 1 -and $images.Count -eq 0' in script
     assert '"-v", $mount' in script
     assert '"${VolumeName}:/state:ro"' in script
+    assert "tempfile.TemporaryDirectory" in script
+    assert "shutil.copy2(path, probe_path)" in script
+    assert 'for suffix in ("-wal", "-journal")' in script
+    assert 'sqlite3.connect(probe_path)' in script
+    assert 'f"file:{path}?mode=ro"' not in script
+    assert 'result["identity_matches"]' in script
     assert "Saved device identity is active in multiple relay-state volumes" in script
+    assert "Saved device identity appears in multiple relay-state volumes" in script
     assert "Multiple populated relay-state volumes exist without a unique saved-device membership" in script
     assert "docker volume rm" not in script.casefold()
     assert "docker compose down" not in script.casefold()
@@ -73,7 +80,7 @@ def test_selector_survives_missing_current_images_and_reuses_existing_relay_volu
         "  exit /b 1\n"
         ")\n"
         "if /I \"%1\"==\"run\" (\n"
-        "  echo {\"exists\":1,\"size\":128,\"nodes\":1,\"sessions\":1,\"memberships\":0}\n"
+        "  echo {\"exists\":1,\"size\":128,\"nodes\":1,\"sessions\":1,\"memberships\":0,\"identity_matches\":0}\n"
         "  exit /b 0\n"
         ")\n"
         "exit /b 9\n",
@@ -114,7 +121,7 @@ def test_selector_survives_missing_current_images_and_reuses_existing_relay_volu
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell regression")
-def test_selector_pulls_python_probe_and_identifies_pc3_membership(
+def test_selector_pulls_python_probe_and_identifies_pc3_identity(
     tmp_path: Path,
 ) -> None:
     fake_bin = tmp_path / "bin"
@@ -155,9 +162,9 @@ def test_selector_pulls_python_probe_and_identifies_pc3_membership(
         "if /I \"%1\"==\"run\" (\n"
         "  echo %*|findstr /I /C:\"old_b_relay_state:/state:ro\" >nul\n"
         "  if not errorlevel 1 (\n"
-        "    echo {\"exists\":1,\"size\":256,\"nodes\":3,\"sessions\":1,\"memberships\":1}\n"
+        "    echo {\"exists\":1,\"size\":256,\"nodes\":3,\"sessions\":1,\"memberships\":0,\"identity_matches\":1}\n"
         "  ) else (\n"
-        "    echo {\"exists\":1,\"size\":128,\"nodes\":1,\"sessions\":1,\"memberships\":0}\n"
+        "    echo {\"exists\":1,\"size\":128,\"nodes\":0,\"sessions\":0,\"memberships\":0,\"identity_matches\":0}\n"
         "  )\n"
         "  exit /b 0\n"
         ")\n"
