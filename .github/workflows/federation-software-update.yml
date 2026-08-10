@@ -105,6 +105,9 @@ jobs:
               $_.Exception.Message -match 'external_command_failed:powershell.exe:7'
             )
           }
+          # GitHub's PowerShell step wrapper propagates a lingering native
+          # LASTEXITCODE even when the expected exception above was handled.
+          $global:LASTEXITCODE = 0
           if (-not $nonzeroRejected) {
             throw 'native_nonzero_exit_was_not_rejected'
           }
