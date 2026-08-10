@@ -30,7 +30,7 @@ Using SSH:
 
 ```bash
 cd ~
-git clone git@github.com:Nettking/msh.git
+git clone git@github.com:this repository.git
 cd fcp
 bash termux/setup-phone.sh
 ```
@@ -39,7 +39,7 @@ Using HTTPS:
 
 ```bash
 cd ~
-git clone https://github.com/Nettking/msh.git
+git clone <repository-url> fcp
 cd fcp
 bash termux/setup-phone.sh
 ```

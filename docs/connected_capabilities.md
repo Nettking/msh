@@ -17,7 +17,7 @@ The FCP device sends the repository question and retrieved repository context to
 The recommended provider is installed from the FCP repository. Only Docker and Git are required on the laptop:
 
 ```bash
-git clone https://github.com/Nettking/msh.git
+git clone <repository-url> fcp
 cd fcp
 docker compose --profile provider run --rm model-provider-install
 ```

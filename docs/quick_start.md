@@ -32,7 +32,7 @@ Inspection and benchmark results are durable device evidence. Run them when esta
 From a fresh checkout:
 
 ```cmd
-git clone https://github.com/Nettking/msh.git
+git clone <repository-url> fcp
 cd fcp
 start.cmd
 ```
@@ -104,7 +104,7 @@ After the reset, FCP verifies that authoritative setup state is empty and opens 
 From a fresh checkout:
 
 ```bash
-git clone https://github.com/Nettking/msh.git
+git clone <repository-url> fcp
 cd fcp
 bash start.sh
 ```

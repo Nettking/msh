@@ -6,7 +6,7 @@ Reviewed: **2026-08-07 Europe/Oslo**
 
 ## Repository state
 
-- Repository: `Nettking/msh`
+- Repository: `this repository`
 - Default branch: `main`
 - Documentation hierarchy established by PR #191
 - Published Federation v1 release tag: not created

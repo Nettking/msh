@@ -12,7 +12,7 @@ subsystem planned in [03_target_architecture.md](03_target_architecture.md) and
 |---|---|---|
 | `Nettking/systems-paper` | `ff098ce52f15b489b6a07d5b55c6c788d862e3be` | semantic distinctions and design-time boundary traced in `01_language_requirements.md` |
 | `Nettking/paper-repo` | `abe3fbcddee590c3f399b06f63cb329e8615977c` | Notebook-to-OSL stages and evidence retention traced in `04_notebook_to_osl_workflow.md` |
-| `Nettking/msh` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` | Flask routes, services, templates, AI runtime and responsive test conventions |
+| `this repository` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` | Flask routes, services, templates, AI runtime and responsive test conventions |
 
 The markers `paper-defined`, `existing-in-FCP`, `proposed-for-FCP` and
 `requires-research-clarification` are used as defined in

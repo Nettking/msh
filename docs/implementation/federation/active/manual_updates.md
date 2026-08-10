@@ -6,7 +6,7 @@ refresh previously requested result state, but it never fetches Git or starts a
 host mutation by itself.
 
 The update target is one immutable 40-character Git commit from approved
-`Nettking/msh` `main`. The browser supplies no repository, branch, path,
+`this repository` `main`. The browser supplies no repository, branch, path,
 executable, command, or arguments. CSRF protects browser request integrity;
 update authority is separately bound to the existing Federation session creator.
 
@@ -22,7 +22,7 @@ Every host independently verifies:
 1. the request schema, request ID, freshness, approved repository and `main`;
 2. a full exact commit object ID;
 3. that the local checkout is the expected repository root on `main`;
-4. that `origin` is canonical `Nettking/msh` on GitHub with no embedded
+4. that `origin` is canonical `this repository` on GitHub with no embedded
    credentials, query, or fragment;
 5. that the working tree is clean, including untracked files;
 6. that the target commit exists and is reachable from the freshly fetched

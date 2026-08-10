@@ -63,7 +63,7 @@ Do not repeat an unaffected physical scenario merely because the candidate SHA c
 For every machine/scenario that **does** require a new observation, use a clean checkout at the candidate commit:
 
 ```bash
-git clone https://github.com/Nettking/msh.git fcp-cf7-physical
+git clone <repository-url> fcp fcp-cf7-physical
 cd fcp-cf7-physical
 git checkout <CANDIDATE_COMMIT>
 python -m pip install --upgrade pip

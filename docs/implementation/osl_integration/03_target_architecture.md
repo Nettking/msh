@@ -5,7 +5,7 @@ explicitly marked `existing-in-FCP`.
 
 Source baselines:
 
-- `Nettking/msh`
+- `this repository`
   `f580c71f7269643a077cc7e7db8ba9bf6050bb6a`;
 - `Nettking/systems-paper`
   `ff098ce52f15b489b6a07d5b55c6c788d862e3be`;

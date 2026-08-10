@@ -74,7 +74,7 @@ updated with an explanation.
 
 | Repository | Analyzed commit SHA | Role in this plan | Initial source orientation |
 | --- | --- | --- | --- |
-| `Nettking/msh` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` | Application and implementation target | `existing-in-FCP`: current `main` already contains operator capture/review/strategy services, OSL/SysML export surfaces, local/federated storage, capability authority, AI integration, Flask UI, and Linux/Windows checks; exact guarantees still require file-level analysis. |
+| `this repository` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` | Application and implementation target | `existing-in-FCP`: current `main` already contains operator capture/review/strategy services, OSL/SysML export surfaces, local/federated storage, capability authority, AI integration, Flask UI, and Linux/Windows checks; exact guarantees still require file-level analysis. |
 | `Nettking/systems-paper` | `ff098ce52f15b489b6a07d5b55c6c788d862e3be` | OSL v0.1 representation source | `paper-defined`: repository instructions identify `sysml/osl-core.sysml` as the preliminary authoritative abstract syntax and the paper sections and validation artefacts as its semantic and evidence boundary. |
 | `Nettking/paper-repo` | `abe3fbcddee590c3f399b06f63cb329e8615977c` | Notebook-to-OSL elicitation source | `paper-defined`: repository instructions assign this paper the field-note workflow, annotation schema, candidate clarification/validation, and model-readiness criteria. |
 

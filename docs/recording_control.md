@@ -36,7 +36,7 @@ For a fresh checkout:
 
 ```cmd
 cd /d "%USERPROFILE%\Documents"
-git clone https://github.com/Nettking/msh.git
+git clone <repository-url> fcp
 cd fcp
 start.cmd
 ```

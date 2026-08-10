@@ -8,7 +8,7 @@ profile or product guarantee described here exists unless marked
 
 | Repository | Analyzed commit |
 |---|---|
-| `Nettking/msh` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` |
+| `this repository` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` |
 | `Nettking/systems-paper` | `ff098ce52f15b489b6a07d5b55c6c788d862e3be` |
 | `Nettking/paper-repo` | `abe3fbcddee590c3f399b06f63cb329e8615977c` |
 

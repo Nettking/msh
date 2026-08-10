@@ -27,7 +27,7 @@ Do not expose Flask, the Federation relay, or Ollama directly to the public inte
 Install Docker Desktop, then run:
 
 ```cmd
-git clone https://github.com/Nettking/msh.git
+git clone <repository-url> fcp
 cd fcp
 start.cmd
 ```
@@ -49,7 +49,7 @@ Windows web access is local-only by default through `127.0.0.1`. The launcher pr
 From a fresh checkout:
 
 ```bash
-git clone https://github.com/Nettking/msh.git
+git clone <repository-url> fcp
 cd fcp
 docker compose up -d --build relay ollama recorder flask
 ```
@@ -250,7 +250,7 @@ Then start the normal services. This is intended for inspection and debugging.
 A Docker-capable laptop can contribute an Ollama endpoint without hosting another Flask workbench:
 
 ```bash
-git clone https://github.com/Nettking/msh.git
+git clone <repository-url> fcp
 cd fcp
 docker compose --profile provider run --rm model-provider-install
 ```
