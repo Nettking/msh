@@ -112,6 +112,13 @@ jobs:
             throw 'native_nonzero_exit_was_not_rejected'
           }
 
+      - name: Smoke Windows activation exit handling
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File .\scripts\windows\tests\fcp_update_agent_activation_smoke.ps1
+
       - name: Parse and smoke POSIX host agent
         if: runner.os == 'Linux'
         shell: bash

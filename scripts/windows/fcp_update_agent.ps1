@@ -34,6 +34,10 @@ function Normalize-DirectoryPath([string]$Value) {
 
 $RepoRoot = Normalize-DirectoryPath $RepoRoot
 $DataDirectory = Normalize-DirectoryPath $DataDirectory
+$env:FCP_DATA_DIR = $DataDirectory
+if ([string]::IsNullOrWhiteSpace([string]$env:COMPOSE_PROJECT_NAME)) {
+    $env:COMPOSE_PROJECT_NAME = 'fcp'
+}
 $AgentScriptPath = [System.IO.Path]::GetFullPath($PSCommandPath)
 $AgentDirectory = Join-Path $DataDirectory 'federation\update-agent'
 $RequestFile = Join-Path $AgentDirectory 'request.json'
@@ -154,13 +158,13 @@ function Write-AgentResult {
     Write-AtomicJsonFile $ResultFile $json
 }
 
-function Invoke-External {
+function Invoke-ExternalResult {
     param([string]$FilePath, [string[]]$Arguments)
     # Windows PowerShell 5.1 can promote native stderr redirected with 2>&1
     # into an ErrorRecord. With the agent-wide Stop preference that turns
-    # harmless diagnostics (for example `git fetch`'s "From ...") into a
-    # terminating PowerShell error before LASTEXITCODE can be inspected.
-    # Native process success/failure is therefore decided only by its exit code.
+    # harmless progress diagnostics into terminating PowerShell errors before
+    # LASTEXITCODE can be inspected. Always capture native output under
+    # Continue and make the process exit code the only success authority.
     $previousErrorActionPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
@@ -170,11 +174,20 @@ function Invoke-External {
     finally {
         $ErrorActionPreference = $previousErrorActionPreference
     }
-    if ($exit -ne 0) {
-        $rendered = ($output | ForEach-Object { [string]$_ }) -join "`n"
-        throw "external_command_failed:${FilePath}:$exit`n$rendered"
+    return [pscustomobject]@{
+        Output = @($output | ForEach-Object { [string]$_ })
+        ExitCode = [int]$exit
     }
-    return @($output | ForEach-Object { [string]$_ })
+}
+
+function Invoke-External {
+    param([string]$FilePath, [string[]]$Arguments)
+    $result = Invoke-ExternalResult $FilePath $Arguments
+    if ($result.ExitCode -ne 0) {
+        $rendered = ($result.Output | ForEach-Object { [string]$_ }) -join "`n"
+        throw "external_command_failed:${FilePath}:$($result.ExitCode)`n$rendered"
+    }
+    return @($result.Output)
 }
 
 function Invoke-Git([string[]]$Arguments) {
@@ -219,9 +232,61 @@ function Get-RunningCommit {
     return $null
 }
 
+function Get-ServiceRelayVolume([string]$Service) {
+    try {
+        $ids = Invoke-External 'docker' @(
+            'compose', 'ps', '-a', '-q', $Service
+        )
+        $containerId = (Last-Text $ids).Trim()
+        if ([string]::IsNullOrWhiteSpace($containerId)) { return $null }
+        $raw = (Invoke-External 'docker' @('inspect', $containerId)) -join "`n"
+        if ([string]::IsNullOrWhiteSpace($raw)) { return $null }
+        $decoded = @($raw | ConvertFrom-Json)
+        if ($decoded.Count -eq 0) { return $null }
+        $mount = @($decoded[0].Mounts) |
+            Where-Object {
+                [string]$_.Type -eq 'volume' -and
+                [string]$_.Destination -eq '/var/lib/fcp-relay'
+            } |
+            Select-Object -First 1
+        if ($null -eq $mount) { return $null }
+        $name = [string]$mount.Name
+        if ([string]::IsNullOrWhiteSpace($name)) { return $null }
+        return $name
+    }
+    catch {
+        return $null
+    }
+}
+
+function Preserve-RelayVolumeSelection {
+    $mounted = @()
+    foreach ($service in @('flask', 'relay')) {
+        $value = Get-ServiceRelayVolume $service
+        if (-not [string]::IsNullOrWhiteSpace($value)) {
+            $mounted += $value
+        }
+    }
+    $mounted = @($mounted | Select-Object -Unique)
+    if ($mounted.Count -gt 1) {
+        throw 'relay_state_ambiguous'
+    }
+    if ($mounted.Count -eq 1) {
+        $env:FCP_RELAY_VOLUME_NAME = [string]$mounted[0]
+        return [string]$mounted[0]
+    }
+    $inherited = [string]$env:FCP_RELAY_VOLUME_NAME
+    if (-not [string]::IsNullOrWhiteSpace($inherited)) {
+        return $inherited
+    }
+    throw 'relay_state_unresolved'
+}
+
 function Test-Ancestor([string]$Older, [string]$Newer) {
-    & git -C $RepoRoot merge-base --is-ancestor $Older $Newer 2>$null
-    return $LASTEXITCODE -eq 0
+    $result = Invoke-ExternalResult 'git' @(
+        '-C', $RepoRoot, 'merge-base', '--is-ancestor', $Older, $Newer
+    )
+    return $result.ExitCode -eq 0
 }
 
 function Inspect-Checkout([AllowNull()][string]$RequestedTarget) {
@@ -256,9 +321,11 @@ function Inspect-Checkout([AllowNull()][string]$RequestedTarget) {
         $approvedTip
     }
     if ($target -notmatch $OidPattern) { throw 'target_unavailable' }
-    & git -C $RepoRoot cat-file -e "$target^{commit}" 2>$null
+    $targetProbe = Invoke-ExternalResult 'git' @(
+        '-C', $RepoRoot, 'cat-file', '-e', "$target^{commit}"
+    )
     if (
-        $LASTEXITCODE -ne 0 -or
+        $targetProbe.ExitCode -ne 0 -or
         -not (Test-Ancestor $target $approvedTip)
     ) {
         throw 'target_unavailable'
@@ -332,16 +399,20 @@ function Ensure-OllamaModel {
     if ($model -notmatch $ModelPattern) {
         throw 'invalid_model_identifier'
     }
-    & docker compose exec -T ollama ollama show $model *> $null
-    if ($LASTEXITCODE -eq 0) {
+    $existing = Invoke-ExternalResult 'docker' @(
+        'compose', 'exec', '-T', 'ollama', 'ollama', 'show', $model
+    )
+    if ($existing.ExitCode -eq 0) {
         return $model
     }
     Invoke-External 'docker' @(
         'compose', '--profile', 'model-install', 'run', '--rm',
         '--entrypoint', '/bin/ollama', 'ollama-pull', 'pull', $model
     ) | Out-Null
-    & docker compose exec -T ollama ollama show $model *> $null
-    if ($LASTEXITCODE -ne 0) {
+    $verified = Invoke-ExternalResult 'docker' @(
+        'compose', 'exec', '-T', 'ollama', 'ollama', 'show', $model
+    )
+    if ($verified.ExitCode -ne 0) {
         throw 'model_verification_failed'
     }
     return $model
@@ -494,6 +565,7 @@ function Process-Request {
             throw 'dirty_build_context'
         }
 
+        Preserve-RelayVolumeSelection | Out-Null
         $env:FCP_BUILD_COMMIT = $target
         Invoke-External 'docker' @(
             'compose', 'build', 'relay', 'flask', 'recorder'
@@ -502,15 +574,16 @@ function Process-Request {
             'compose', 'up', '-d', 'relay', 'ollama', 'recorder'
         ) | Out-Null
         Ensure-OllamaModel | Out-Null
-        & docker compose stop flask *> $null
-        if ($LASTEXITCODE -ne 0) {
-            throw 'flask_stop_failed'
-        }
-        & docker compose run --rm --no-deps --entrypoint python flask `
-            -m catalog.flask_app.services.existing_setup_resume
-        $resumeExit = $LASTEXITCODE
-        if ($resumeExit -notin @(0, 4)) {
-            throw "resume_failed:$resumeExit"
+        Invoke-External 'docker' @(
+            'compose', 'stop', 'flask'
+        ) | Out-Null
+        $resume = Invoke-ExternalResult 'docker' @(
+            'compose', 'run', '--rm', '--no-deps', '--entrypoint', 'python',
+            'flask', '-m',
+            'catalog.flask_app.services.existing_setup_resume'
+        )
+        if ($resume.ExitCode -notin @(0, 4)) {
+            throw "resume_failed:$($resume.ExitCode)"
         }
         Invoke-External 'docker' @(
             'compose', 'up', '-d', 'flask'
