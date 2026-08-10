@@ -348,7 +348,8 @@ def _run_transition(*, migration: bool) -> Response:
         assert command_id is not None
         service = get_capability_startup_transition_service()
         if migration:
-            legacy_settings = service.legacy_settings()
+            legacy_loader = getattr(service, "legacy_settings", None)
+            legacy_settings = legacy_loader() if callable(legacy_loader) else None
             if legacy_settings is not None:
                 persist_capability_config_from_setup(legacy_settings)
             service.migrate_legacy(
