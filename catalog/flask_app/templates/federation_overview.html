@@ -6,6 +6,7 @@
 {% block body %}
 {% set vm = federation_overview if federation_overview is defined else view_model %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/federation.css') }}">
+<script defer src="{{ url_for('static', filename='js/federation-local-time.js') }}"></script>
 
 <section class="federation-shell">
   <header class="federation-hero">
@@ -75,14 +76,20 @@
   {% set update_target = updates.target_commit|default(none) %}
   {% set update_eligible = updates.eligible_count|default(0) %}
   {% set update_devices = updates.devices|default([]) %}
+  {% set update_can_manage = updates.can_manage|default(false) %}
+  {% set update_managed = updates.managed_by_coordinator|default(false) %}
   <section class="federation-panel federation-update-panel">
     <header class="federation-panel__header">
       <div>
         <span class="federation-eyebrow">FCP software updates</span>
-        <h3>{{ (updates.status|default('not_checked')).replace('_', ' ')|title }}</h3>
+        <h3>{% if update_managed %}Managed by Federation coordinator{% else %}{{ (updates.status|default('not_checked')).replace('_', ' ')|title }}{% endif %}</h3>
+        {% if update_managed %}
+        <p>Update checks and rollouts for this device are initiated by the authoritative Federation coordinator. This page shows the latest locally retained update result when one is available.</p>
+        {% else %}
         <p>Manual only. Each target independently verifies approved <code>main</code>, fast-forwards only when safe, rebuilds FCP, restores saved Federation state, restarts services, and reports success only after the running build proves the exact target commit.</p>
+        {% endif %}
       </div>
-      {% if update_csrf %}
+      {% if update_csrf and update_can_manage %}
       <form method="post" action="{{ url_for('federation_web.check_updates') }}">
         <input type="hidden" name="_csrf_token" value="{{ update_csrf }}">
         <button class="federation-button federation-button--secondary" type="submit">Check for updates</button>
@@ -90,7 +97,11 @@
       {% endif %}
     </header>
     <dl class="federation-detail-list">
-      <div><dt>Last checked</dt><dd>{{ updates.checked_at|default('Not checked yet') }}</dd></div>
+      {% if update_managed %}
+      <div><dt>Update authority</dt><dd>Federation coordinator</dd></div>
+      {% else %}
+      <div><dt>Last checked</dt><dd>{% if updates.checked_at|default(none) %}<time datetime="{{ updates.checked_at }}" data-local-datetime>{{ updates.checked_at }}</time>{% else %}Not checked yet{% endif %}</dd></div>
+      {% endif %}
       <div><dt>Approved branch</dt><dd>{{ updates.branch|default('main') }}</dd></div>
       {% if update_target %}<div><dt>Exact target</dt><dd><code>{{ update_target[:12] }}</code></dd></div>{% endif %}
     </dl>
@@ -108,7 +119,7 @@
       {% endfor %}
     </ul>
     {% endif %}
-    {% if updates.status|default('not_checked') != 'checking' and update_eligible and update_target and update_csrf %}
+    {% if update_can_manage and updates.status|default('not_checked') != 'checking' and update_eligible and update_target and update_csrf %}
     <form method="post" action="{{ url_for('federation_web.apply_updates') }}" class="federation-update-confirmation">
       <input type="hidden" name="_csrf_token" value="{{ update_csrf }}">
       <input type="hidden" name="target_commit" value="{{ update_target }}">
@@ -116,7 +127,11 @@
       <button class="federation-button federation-button--primary" type="submit">Update all devices</button>
     </form>
     {% endif %}
+    {% if update_managed %}
+    <p class="federation-muted">This device does not hold software-update authority. It still independently validates every exact-commit request before changing its checkout or runtime.</p>
+    {% else %}
     <p class="federation-muted">CSRF protects this browser request; it is not user authentication. Federation authority selects the exact target. Every host independently revalidates repository, branch, clean checkout, commit ancestry, rebuild, restart, and running-build identity.</p>
+    {% endif %}
   </section>
 
   <div class="federation-dashboard-grid">
