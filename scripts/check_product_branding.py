@@ -12,10 +12,12 @@ ALLOWED_REPOSITORY_FILES = frozenset(
         "catalog/federation/software_update.py",
         "scripts/posix/fcp_update_agent.py",
         "scripts/windows/fcp_update_agent.ps1",
+        "scripts/windows/migrate_existing_fcp.ps1",
         "cmd/fcp-peer-sidecar/go.mod",
         "catalog/federation/tests/test_software_update.py",
         "catalog/flask_app/tests/test_federation_update_host_agents.py",
         "catalog/flask_app/tests/test_federation_update_runtime.py",
+        "catalog/flask_app/tests/test_windows_migration_script.py",
     }
 )
 
