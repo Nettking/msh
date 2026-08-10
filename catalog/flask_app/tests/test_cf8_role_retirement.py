@@ -90,7 +90,7 @@ def test_supported_legacy_fixtures_migrate_deterministically(
     config = capability_config_from_legacy(first)
     assert isinstance(config, CapabilityConfig)
     assert config.ai_model == "qwen2.5:7b"
-    assert config.recorder_sources == "Machine=http://192.168.10.30:5000/current"
+    assert config.recorder_sources == "Machine=http://192.168.10.30:5000"
     assert "deployment_mode" not in config.to_dict()
     assert "configured" not in config.to_dict()
 
@@ -241,7 +241,7 @@ def test_critical_product_surfaces_use_capability_config_directly() -> None:
         assert "deployment_mode" not in text, path
 
 
-def test_startup_compatibility_ui_and_choice_bridge_are_not_supported(tmp_path: Path) -> None:
+def test_startup_compatibility_ui_and_choice_bridge_are_not_supported() -> None:
     assert not (ROOT / "catalog" / "flask_app" / "templates" / "startup.html").exists()
 
     app = create_app()
