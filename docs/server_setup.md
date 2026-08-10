@@ -137,7 +137,7 @@ migrate.cmd
 
 The migration bootstrap:
 
-- accepts only the approved `Nettking/msh` repository and `main`;
+- accepts only the approved source repository and `main`;
 - requires a clean checkout and fast-forward relationship;
 - preflights Docker/Compose before mutating Git;
 - preserves the current data/results paths and device/Federation state;
