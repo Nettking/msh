@@ -14,7 +14,7 @@ permissions:
 jobs:
   rebrand:
     if: >-
-      (github.event_name == 'pull_request' && github.head_ref == 'agent/federated-capability-platform-rename' && github.event.pull_request.head.sha == github.sha) ||
+      (github.event_name == 'pull_request' && github.head_ref == 'agent/federated-capability-platform-rename') ||
       (github.event_name == 'push' && github.ref_name == 'agent/federated-capability-platform-rename' && github.event.head_commit.message != 'Rename product identity outside workflows')
     runs-on: ubuntu-latest
     timeout-minutes: 20
