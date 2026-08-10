@@ -43,6 +43,78 @@ python start_recorder.py \
 Use `Ctrl+C` for a clean stop. The checkpoint is already committed after each
 batch, so an abrupt restart replays only uncommitted data.
 
+## Join the Federation and publish recorded data
+
+The same launcher can run the recorder as a headless FCP device. Generate the
+normal **Pair another device** code from the Federation owner. The code begins
+with `FCP1-`, is signed, short-lived, and one-use. Pass it only on the recorder's
+first join:
+
+```bash
+python start_recorder.py \
+  Mazak=http://192.168.200.249:5000 \
+  --federation-key "FCP1-..."
+```
+
+That one command performs the headless bootstrap before recording begins:
+
+1. creates or loads the recorder's stable FCP device identity;
+2. redeems the signed pairing code and joins its Federation;
+3. persists only the public-safe reconnect binding, never the pairing code,
+   enrollment token, or invitation token;
+4. announces a `recorder` / `mtconnect` capability with source names and count,
+   but never MTConnect source URLs or credentials;
+5. starts the normal loss-aware recorder; and
+6. independently reconciles checkpoint-committed observations into a durable
+   Federation publication outbox.
+
+On later starts, omit the key. The saved device identity and trusted Federation
+binding are reused:
+
+```bash
+python start_recorder.py Mazak=http://192.168.200.249:5000
+```
+
+If the Federation has exactly one ready logical-storage group, the recorder
+selects it automatically. When several groups are available, select one by
+logical ID:
+
+```bash
+python start_recorder.py \
+  Mazak=http://192.168.200.249:5000 \
+  --storage-group telemetry
+```
+
+`--federation-key` may also be supplied once through
+`FCP_RECORDER_FEDERATION_KEY`. The launcher removes that environment value after
+bootstrap so it is not inherited by the long-running recorder. The key is never
+written into recorder configuration, status, telemetry, the publication outbox,
+or Federation messages.
+
+### Capture and Federation delivery are separate commitments
+
+Local recording remains authoritative for capture. A batch is recorded when its
+raw archive, detailed observations, compatibility JSONL, and recorder checkpoint
+commit. Federation availability is not part of that commit boundary.
+
+Only after that local checkpoint covers a batch does the publication reconciler
+create deterministic, idempotent telemetry chunks. Those chunks stay in a local
+SQLite outbox until the Federation's logical-storage authority reports a
+committed write. If the relay, authority, primary storage, or replica storage is
+offline, recording continues and the backlog retries later.
+
+The recorder does not address a physical storage provider. It sends bounded
+application messages to the Federation owner's advertised logical-storage
+authority. That authority routes the batch through the existing storage control
+plane, grant/fencing rules, acknowledgement policy, primary/replica routing, and
+authoritative manifest commit.
+
+If no ready logical-storage authority is currently available, the recorder can
+still identify, join, advertise its recorder capability, and capture locally.
+Delivery waits until storage authority appears. Use `--require-federation` only
+when you deliberately want initial Federation join/reconnect failure to stop the
+process instead of falling back to local recording.
+
 ## Docker/server mode
 
 The recorder remains available as the managed Docker Compose service:
@@ -155,6 +227,15 @@ data/source_state/mtconnect_recorder_status.json
 data/source_state/mtconnect_recorder.log
 ```
 
+Headless Federation mode additionally keeps the stable device identity,
+public-safe pairing state, and durable publication outbox under:
+
+```text
+data/federation/device/
+data/federation/onboarding/
+data/federation/recorder_publication/
+```
+
 ## Configuration
 
 | Variable | Default | Purpose |
@@ -167,6 +248,7 @@ data/source_state/mtconnect_recorder.log
 | `FCP_RECORDER_MAX_BATCHES_PER_CYCLE` | `20` | Catch-up batches per source before yielding. |
 | `FCP_RECORDER_REQUEST_TIMEOUT` | `10.0` | HTTP request timeout in seconds. |
 | `FCP_RECORDER_ONCE` | `false` | Run one catch-up cycle and exit. |
+| `FCP_RECORDER_FEDERATION_KEY` | unset | Optional first-join `FCP1-...` key; removed from the process environment after bootstrap. |
 
 Conditions are always recorded. The legacy
 `FCP_RECORDER_INCLUDE_CONDITION` setting is no longer used because excluding
