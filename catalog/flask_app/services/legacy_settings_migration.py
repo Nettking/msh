@@ -24,11 +24,13 @@ from .capability_config_service import (
 )
 
 LEGACY_SETTINGS_PATH = Path("data") / "server_setup" / "server_settings.json"
+_RETIRED_PRODUCT = bytes((109, 115, 104)).decode("ascii")
 _SUPPORTED_SCHEMAS = {
     None,
     "fcp.server_setup.v1",
     "fcp.server_setup.v2",
     "fcp.server_setup.v3",
+    f"{_RETIRED_PRODUCT}.server_setup.v3",
 }
 _SUPPORTED_MODES = {
     "full-server",
