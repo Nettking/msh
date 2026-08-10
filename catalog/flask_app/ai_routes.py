@@ -15,9 +15,13 @@ from catalog.ai.ollama_client import DEFAULT_BASE_URL, DEFAULT_MODEL
 from catalog.ai.prompts import SYSTEM_PROMPT, build_extractive_prompt, build_prompt
 from catalog.ai.rag import format_context, retrieve
 from catalog.ai.repo_index import load_or_build_chunks, repo_root_from
-from catalog.ai.runtime import AIRuntimePolicy, LanguageModelProvider, LanguageModelRuntime
-from catalog.ai.runtime_manager import ConfiguredLanguageModelRuntimeManager
+from catalog.ai.runtime import (
+    AIRuntimePolicy,
+    LanguageModelProvider,
+    LanguageModelRuntime,
+)
 from catalog.ai.runtime_contracts import AIModality, AIRuntimeError, AIRuntimeRequest
+from catalog.ai.runtime_manager import ConfiguredLanguageModelRuntimeManager
 from catalog.ai.symbols import build_symbols
 
 from .services.ai_answer_formatting_service import render_safe_markdown

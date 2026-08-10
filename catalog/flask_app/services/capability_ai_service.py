@@ -69,7 +69,7 @@ def _ollama_status_base(config: CapabilityConfig) -> dict[str, Any]:
 
 
 def response_time_assessment(
-    elapsed_ms: float | int | None,
+    elapsed_ms: float | None,
 ) -> dict[str, object]:
     if elapsed_ms is None:
         return {
@@ -107,7 +107,7 @@ def ollama_status(
         )
         with request.urlopen(req, timeout=timeout_seconds) as response:
             payload = json.loads(response.read().decode("utf-8"))
-    except Exception as exc:  # pragma: no cover - depends on local/remote Ollama
+    except Exception as exc:  # noqa: BLE001  # pragma: no cover - depends on local/remote Ollama
         return {
             **base_status,
             "running": False,
@@ -187,7 +187,7 @@ def benchmark_ollama_response_time(
             body = response.read().decode("utf-8")
         elapsed_ms = round((time.perf_counter() - started) * 1000.0)
         response_payload = json.loads(body)
-    except Exception as exc:  # pragma: no cover - depends on local/remote Ollama
+    except Exception as exc:  # noqa: BLE001  # pragma: no cover - depends on local/remote Ollama
         elapsed_ms = round((time.perf_counter() - started) * 1000.0)
         return {
             "ok": False,
@@ -232,7 +232,7 @@ def pull_ollama_model(
     try:
         with request.urlopen(req, timeout=timeout_seconds) as response:
             body = response.read().decode("utf-8")
-    except Exception as exc:  # pragma: no cover - depends on local/remote Ollama
+    except Exception as exc:  # noqa: BLE001  # pragma: no cover - depends on local/remote Ollama
         return False, f"Could not pull {config.ai_model}: {exc}"
     return True, (
         f"Ollama model is installed or updated on {ai_provider_label(config)}: "

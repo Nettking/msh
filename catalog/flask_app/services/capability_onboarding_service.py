@@ -458,7 +458,7 @@ class CapabilityOnboardingService:
     def legacy_preview(self) -> None:
         """CFI-2 never reads retired setup; CFI-6 exclusively owns migration."""
 
-        return None
+        return
 
     @staticmethod
     def _candidate_model(
