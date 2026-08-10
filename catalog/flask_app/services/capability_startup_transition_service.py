@@ -1,4 +1,4 @@
-"""CFI-6 compatibility migration and capability-first startup state."""
+"""CFI-6 explicit legacy migration and capability-first startup state."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 import sqlite3
 import threading
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass, replace
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import ClassVar
@@ -29,6 +29,12 @@ from catalog.federation.onboarding_models import (
     OnboardingModel,
 )
 
+from .capability_config_migration_service import persist_migrated_capability_config
+from .capability_config_service import (
+    CapabilityConfig,
+    CapabilityConfigError,
+    load_capability_config,
+)
 from .capability_contribution_service import (
     CapabilityContributionService,
     get_capability_contribution_service,
@@ -41,12 +47,10 @@ from .capability_onboarding_service import (
     CapabilityOnboardingService,
     get_capability_onboarding_service,
 )
-from .server_setup_service import (
-    ServerSetupError,
-    ServerSetupSettings,
-    default_settings,
-    load_settings,
-    save_settings,
+from .legacy_settings_migration import (
+    LegacySettingsMigrationError,
+    LegacySettingsSnapshot,
+    load_legacy_settings,
 )
 
 _STATE_SCHEMA_VERSION = 1
@@ -428,7 +432,7 @@ class CapabilityStartupStateStore:
 
 
 class CapabilityStartupTransitionService:
-    """Migrate legacy behavior and make capability-first startup authoritative."""
+    """Migrate old installations once, then use only capability-first state."""
 
     def __init__(
         self,
@@ -437,35 +441,39 @@ class CapabilityStartupTransitionService:
         inspection_service: CapabilityInspectionService,
         contribution_service: CapabilityContributionService,
         state_database: Path | str,
-        setup_loader: Callable[[], ServerSetupSettings] = load_settings,
-        setup_saver: Callable[[ServerSetupSettings], object] = save_settings,
+        legacy_loader: Callable[[], LegacySettingsSnapshot | None] = load_legacy_settings,
+        config_loader: Callable[[], CapabilityConfig] = load_capability_config,
+        config_migrator: Callable[[LegacySettingsSnapshot], CapabilityConfig] = persist_migrated_capability_config,
         clock: Callable[[], datetime] = _utc_now,
     ) -> None:
         self.onboarding_service = onboarding_service
         self.inspection_service = inspection_service
         self.contribution_service = contribution_service
         self.store = CapabilityStartupStateStore(state_database)
-        self._setup_loader = setup_loader
-        self._setup_saver = setup_saver
+        self._legacy_loader = legacy_loader
+        self._config_loader = config_loader
+        self._config_migrator = config_migrator
         self._clock = clock
 
     def load(self) -> CapabilityStartupState | None:
         return self.store.load()
 
-    def legacy_settings(self) -> ServerSetupSettings | None:
+    def _legacy_snapshot(self) -> LegacySettingsSnapshot | None:
         try:
-            settings = self._setup_loader()
-        except (OSError, ServerSetupError, TypeError, ValueError):
+            snapshot = self._legacy_loader()
+        except (OSError, LegacySettingsMigrationError, TypeError, ValueError):
             return None
-        if not settings.configured or not settings.user_setup_complete:
+        if snapshot is None:
             return None
-        return settings
+        if not snapshot.configured or not snapshot.user_setup_complete:
+            return None
+        return snapshot
 
     def legacy_preview(self) -> LegacySetupMigrationPreview | None:
-        settings = self.legacy_settings()
-        if settings is None:
+        snapshot = self._legacy_snapshot()
+        if snapshot is None:
             return None
-        return preview_legacy_setup(settings.to_dict(), created_at=self._clock())
+        return preview_legacy_setup(snapshot.to_dict(), created_at=self._clock())
 
     def _inspection_revision(self, device_id: str) -> int:
         snapshot = self.inspection_service.load()
@@ -505,14 +513,16 @@ class CapabilityStartupTransitionService:
         current = self.load()
         if current is not None:
             return current
-        preview = self.legacy_preview()
-        if preview is None:
+        legacy = self._legacy_snapshot()
+        if legacy is None:
             raise FederationOperationError(
                 "startup-transition-legacy-required",
                 "no completed supported legacy setup is available",
                 "legacy_setup",
             )
+        preview = preview_legacy_setup(legacy.to_dict(), created_at=self._clock())
         context = self._connected_context(request_id=request_id)
+        self._config_migrator(legacy)
         return self.store.save(
             CapabilityStartupState(
                 device_id=context.credentials.identity.node_id,
@@ -544,8 +554,6 @@ class CapabilityStartupTransitionService:
 
     @staticmethod
     def _fast_start_intents() -> dict[str, str]:
-        """Start the workbench without granting optional contribution authority."""
-
         intents = {
             key: ContributionDesiredState.ASK_LATER.value
             for key in CONTRIBUTION_KEYS
@@ -562,11 +570,7 @@ class CapabilityStartupTransitionService:
             and callable(state)
             and state(snapshot) != "current"
         )
-        if (
-            snapshot is None
-            or snapshot.device_id != device_id
-            or expired
-        ):
+        if snapshot is None or snapshot.device_id != device_id or expired:
             raise FederationOperationError(
                 "startup-transition-inspection-required",
                 "run a current device inspection before finishing onboarding",
@@ -629,8 +633,6 @@ class CapabilityStartupTransitionService:
         return intents
 
     def _completion_intents(self) -> dict[str, str]:
-        """Preserve fully reviewed choices, otherwise finish with safe defaults."""
-
         has_persisted_intents = getattr(
             type(self.contribution_service),
             "has_persisted_intents",
@@ -653,51 +655,23 @@ class CapabilityStartupTransitionService:
                 return self._fast_start_intents()
             raise
 
-    @staticmethod
-    def _compatibility_mode(intents: Mapping[str, str]) -> str:
-        recorder = intents["recorder"] == ContributionDesiredState.ENABLED.value
-        runtime = intents["runtime"] == ContributionDesiredState.ENABLED.value
-        if recorder and runtime:
-            return "full-server"
-        if recorder:
-            return "recorder-only"
-        if runtime:
-            return "web-workbench"
-        return "web-ui-only"
-
-    def _write_compatibility_settings(
-        self,
-        intents: Mapping[str, str],
-    ) -> None:
+    def _validate_technical_requirements(self, intents: Mapping[str, str]) -> None:
+        if intents["recorder"] != ContributionDesiredState.ENABLED.value:
+            return
         try:
-            settings = self._setup_loader()
-        except (OSError, ServerSetupError, TypeError, ValueError):
-            settings = default_settings(configured=False)
-        if (
-            intents["recorder"] == ContributionDesiredState.ENABLED.value
-            and not settings.recorder_sources.strip()
-        ):
+            config = self._config_loader()
+        except (OSError, CapabilityConfigError, TypeError, ValueError) as exc:
+            raise FederationOperationError(
+                "startup-transition-recorder-source-required",
+                "recorder configuration could not be loaded safely",
+                "recorder",
+            ) from exc
+        if not config.recorder_sources.strip():
             raise FederationOperationError(
                 "startup-transition-recorder-source-required",
                 "an enabled recorder requires an existing selected source",
                 "recorder",
             )
-        self._setup_saver(
-            replace(
-                settings,
-                configured=True,
-                user_setup_complete=True,
-                deployment_mode=self._compatibility_mode(intents),
-                ai_enabled=(
-                    intents["language-model"]
-                    == ContributionDesiredState.ENABLED.value
-                ),
-                updated_at=self._clock()
-                .replace(microsecond=0)
-                .isoformat()
-                .replace("+00:00", "Z"),
-            )
-        )
 
     def complete_current(self) -> CapabilityStartupState:
         current = self.load()
@@ -708,7 +682,7 @@ class CapabilityStartupTransitionService:
             context.credentials.identity.node_id
         )
         intents = self._completion_intents()
-        self._write_compatibility_settings(intents)
+        self._validate_technical_requirements(intents)
         return self.store.save(
             CapabilityStartupState(
                 device_id=context.credentials.identity.node_id,
@@ -726,38 +700,9 @@ class CapabilityStartupTransitionService:
             )
         )
 
-    def refresh_legacy(
-        self,
-        settings: ServerSetupSettings,
-    ) -> CapabilityStartupState | None:
-        current = self.load()
-        if current is None or current.source_kind != "legacy-migration":
-            return current
-        preview = preview_legacy_setup(settings.to_dict(), created_at=self._clock())
-        return self.store.save(
-            replace(
-                current,
-                contribution_intents=preview.contribution_intents,
-                source_schema=preview.source_schema,
-                source_mode=preview.source_mode,
-                source_revision=current.source_revision + 1,
-                updated_at=self._clock(),
-            )
-        )
-
-    def capability_flags(
-        self,
-        settings: ServerSetupSettings | None = None,
-    ) -> dict[str, object]:
+    def capability_flags(self) -> dict[str, object]:
         state = self.load()
-        preview = None
-        if state is None:
-            settings = settings or self.legacy_settings()
-            if settings is not None:
-                preview = preview_legacy_setup(
-                    settings.to_dict(),
-                    created_at=self._clock(),
-                )
+        preview = self.legacy_preview() if state is None else None
         intents = (
             state.contribution_intents
             if state is not None and state.completed
@@ -786,14 +731,9 @@ class CapabilityStartupTransitionService:
             "state": state,
         }
 
-    def runtime_should_start(
-        self,
-        settings: ServerSetupSettings | None = None,
-    ) -> bool:
-        settings = settings or self.legacy_settings()
-        if settings is None:
-            return False
-        return bool(self.capability_flags(settings)["runtime"])
+    def runtime_should_start(self) -> bool:
+        flags = self.capability_flags()
+        return bool(flags["completed"] and flags["runtime"])
 
     def apply_to_onboarding_view_model(
         self,
@@ -802,7 +742,7 @@ class CapabilityStartupTransitionService:
         requested_step: str | None,
     ) -> dict[str, object]:
         state = self.load()
-        preview = self.legacy_preview()
+        preview = self.legacy_preview() if state is None else None
         migration = view_model.setdefault("migration", {})
         assert isinstance(migration, dict)
         migration.update(
@@ -818,9 +758,9 @@ class CapabilityStartupTransitionService:
                 {
                     "migration_url": "/onboarding/migrate",
                     "finish_url": "/onboarding/finish",
-                    "legacy_setup_url": "/startup?legacy=1&edit=1",
                 }
             )
+            actions.pop("legacy_setup_url", None)
         finish = view_model.get("finish")
         steps = view_model.get("steps")
         completed_steps = view_model.get("completed_steps")
@@ -852,8 +792,8 @@ class CapabilityStartupTransitionService:
                     {
                         "title": "This device is ready",
                         "message": (
-                            "Capability intent now controls startup and navigation "
-                            "through the retained compatibility boundary."
+                            "Capability intent now controls startup, navigation, and "
+                            "contribution authority."
                         ),
                         "state": "connected",
                         "state_label": "Ready",
@@ -882,8 +822,8 @@ class CapabilityStartupTransitionService:
                     {
                         "title": "Carry the existing setup forward",
                         "message": (
-                            "Confirm the deterministic migration before "
-                            "capability-first startup becomes the default."
+                            "Confirm the deterministic one-way migration before "
+                            "capability-first startup becomes authoritative."
                         ),
                         "state": "pending",
                         "state_label": "Confirmation required",
@@ -951,13 +891,17 @@ def get_capability_startup_transition_service() -> CapabilityStartupTransitionSe
             "CAPABILITY_ONBOARDING_TRANSITION_DATABASE",
             current_app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
         ),
-        setup_loader=current_app.config.get(
-            "CAPABILITY_ONBOARDING_SETUP_LOADER",
-            load_settings,
+        legacy_loader=current_app.config.get(
+            "CAPABILITY_LEGACY_SETTINGS_LOADER",
+            load_legacy_settings,
         ),
-        setup_saver=current_app.config.get(
-            "CAPABILITY_ONBOARDING_SETUP_SAVER",
-            save_settings,
+        config_loader=current_app.config.get(
+            "CAPABILITY_CONFIG_LOADER",
+            load_capability_config,
+        ),
+        config_migrator=current_app.config.get(
+            "CAPABILITY_CONFIG_MIGRATOR",
+            persist_migrated_capability_config,
         ),
         clock=getattr(onboarding, "_clock", _utc_now),
     )
