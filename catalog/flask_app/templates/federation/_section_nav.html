@@ -7,5 +7,10 @@
     {% if section.key == active_key %}aria-current="page"{% endif %}
   >{{ section.label }}</a>
   {% endfor %}
+  <a
+    href="{{ url_for('federation_recorder_web.index') }}"
+    class="federation-section-nav__link{% if active_key == 'recorders' %} is-active{% endif %}"
+    {% if active_key == 'recorders' %}aria-current="page"{% endif %}
+  >Recorders</a>
 </nav>
 {%- endmacro %}
