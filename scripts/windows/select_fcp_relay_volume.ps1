@@ -110,11 +110,11 @@ function Get-RelayContainerInfo {
             }
             $running = $false
             if ($null -ne $inspection[0].State) {
-                $running = [bool]$inspection[0].State.Running
+                $running = [bool]($inspection[0].State.Running)
             }
             $values += [pscustomobject]@{
-                volume = [string]$mount.Name
-                image = [string]$inspection[0].Image
+                volume = [string]($mount.Name)
+                image = [string]($inspection[0].Image)
                 running = $running
             }
         }
@@ -135,7 +135,7 @@ function Find-ProbeImages {
     )
     foreach ($container in $RelayContainers) {
         if (-not [string]::IsNullOrWhiteSpace([string]$container.image)) {
-            $candidates += [string]$container.image
+            $candidates += [string]($container.image)
         }
     }
 
@@ -167,7 +167,7 @@ function Get-RelayCandidates {
 
     foreach ($container in $RelayContainers) {
         if (-not [string]::IsNullOrWhiteSpace([string]$container.volume)) {
-            $values += [string]$container.volume
+            $values += [string]($container.volume)
         }
     }
 
@@ -321,7 +321,7 @@ try {
             -RelayContainers $relayContainers `
             -RunningOnly $true)
         if ($runningVolumes.Count -eq 1) {
-            $selected = [string]$runningVolumes[0]
+            $selected = [string]($runningVolumes[0])
         }
         elseif ($runningVolumes.Count -gt 1) {
             throw "Multiple running relay containers use different state volumes; refusing to guess."
@@ -332,7 +332,7 @@ try {
         $mountedVolumes = @(Get-UniqueContainerVolumes `
             -RelayContainers $relayContainers)
         if ($mountedVolumes.Count -eq 1) {
-            $selected = [string]$mountedVolumes[0]
+            $selected = [string]($mountedVolumes[0])
         }
         elseif ($mountedVolumes.Count -gt 1) {
             throw "Multiple retained relay volumes are mounted by existing containers; refusing to guess."
@@ -341,10 +341,7 @@ try {
 
     if ([string]::IsNullOrWhiteSpace($selected)) {
         if ($candidates.Count -eq 1) {
-            $selected = [string]$candidates[0]
-        }
-        elseif ($candidates -contains "fcp_relay_state" -and $candidates.Count -eq 0) {
-            $selected = "fcp_relay_state"
+            $selected = [string]($candidates[0])
         }
         elseif ($candidates.Count -gt 1) {
             throw "Multiple relay-state volumes exist but none can be identified safely; refusing to guess."
