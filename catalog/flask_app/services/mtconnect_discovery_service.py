@@ -25,11 +25,12 @@ import requests
 
 from catalog.mtconnect_recorder.parsing import machine_display_name, parse_probe
 
-from .server_setup_service import (
-    SETTINGS_PATH,
-    ServerSetupError,
+from .capability_config_service import (
+    CAPABILITY_CONFIG_PATH,
+    CapabilityConfig,
+    CapabilityConfigError,
     format_recorder_sources,
-    load_settings,
+    load_capability_config,
     parse_recorder_sources,
 )
 
@@ -294,7 +295,7 @@ class MtconnectDiscoveryService:
         self,
         *,
         scan_path: Path | str = DEFAULT_SCAN_PATH,
-        settings_path: Path | str = SETTINGS_PATH,
+        config_path: Path | str = CAPABILITY_CONFIG_PATH,
         checkpoint_path: Path | str = DEFAULT_CHECKPOINT_PATH,
         probe_fetcher: ProbeFetcher | None = None,
         max_workers: int = MAX_SCAN_WORKERS,
@@ -302,7 +303,7 @@ class MtconnectDiscoveryService:
         read_timeout_seconds: float = DEFAULT_READ_TIMEOUT_SECONDS,
     ) -> None:
         self.scan_path = Path(scan_path)
-        self.settings_path = Path(settings_path)
+        self.config_path = Path(config_path)
         self.checkpoint_path = Path(checkpoint_path)
         self.probe_fetcher = probe_fetcher or _default_probe_fetcher
         self.max_workers = max(1, min(int(max_workers), MAX_SCAN_WORKERS))
@@ -474,7 +475,7 @@ class MtconnectDiscoveryService:
         payload.setdefault("results", [])
         return payload
 
-    def recommended_cidr(self, settings: object | None = None) -> str:
+    def recommended_cidr(self, config: CapabilityConfig | None = None) -> str:
         """Derive a safe /24 from scan history, config, or recorder checkpoint."""
 
         previous = self.last_scan()
@@ -485,17 +486,15 @@ class MtconnectDiscoveryService:
             except MtconnectDiscoveryError:
                 pass
 
-        if settings is None:
+        if config is None:
             try:
-                settings = load_settings(self.settings_path)
-            except ServerSetupError:
-                settings = None
-        if settings is not None:
+                config = load_capability_config(self.config_path)
+            except (CapabilityConfigError, OSError):
+                config = None
+        if config is not None:
             try:
-                configured = parse_recorder_sources(
-                    str(getattr(settings, "recorder_sources", "") or "")
-                )
-            except ServerSetupError:
+                configured = parse_recorder_sources(config.recorder_sources)
+            except CapabilityConfigError:
                 configured = {}
             for url in configured.values():
                 candidate = _private_ipv4_cidr_from_url(url)
@@ -516,16 +515,15 @@ class MtconnectDiscoveryService:
 
     def merge_selected_results(
         self,
-        settings: object,
+        config: CapabilityConfig,
         selected: Iterable[str | Mapping[str, Any]],
         *,
         scan: Mapping[str, Any] | None = None,
-    ) -> object:
+    ) -> CapabilityConfig:
         """Merge explicitly selected Agents into recorder configuration only.
 
-        The operation never grants recorder authority. It deliberately ignores
-        legacy deployment roles; capability/contribution state decides whether
-        recording may be activated.
+        The operation never grants recorder authority. Capability/contribution
+        state independently decides whether recording may be activated.
         """
 
         selected_values = list(selected)
@@ -564,10 +562,8 @@ class MtconnectDiscoveryService:
             resolved.append(result)
 
         try:
-            merged = parse_recorder_sources(
-                str(getattr(settings, "recorder_sources", "") or "")
-            )
-        except ServerSetupError as exc:
+            merged = parse_recorder_sources(config.recorder_sources)
+        except CapabilityConfigError as exc:
             raise MtconnectDiscoveryError(str(exc)) from exc
         for result in resolved:
             name = _text(result.get("source_name"))
@@ -589,28 +585,22 @@ class MtconnectDiscoveryService:
                 )
             merged[name] = base_url
 
-        try:
-            return replace(
-                settings,
-                recorder_sources=format_recorder_sources(merged),
-                updated_at=_utc_now_precise(),
-            )
-        except TypeError as exc:
-            raise MtconnectDiscoveryError(
-                "Recorder configuration must be an immutable dataclass-like "
-                "object with recorder_sources and updated_at fields."
-            ) from exc
+        return replace(
+            config,
+            recorder_sources=format_recorder_sources(merged),
+            updated_at=_utc_now_precise(),
+        )
 
     def merge_selected_sources(
         self,
-        settings: object,
+        config: CapabilityConfig,
         selected: Iterable[str | Mapping[str, Any]],
         *,
         scan: Mapping[str, Any] | None = None,
-    ) -> object:
+    ) -> CapabilityConfig:
         """Compatibility alias for recorder-configuration callers."""
 
-        return self.merge_selected_results(settings, selected, scan=scan)
+        return self.merge_selected_results(config, selected, scan=scan)
 
     def _write_scan(self, payload: Mapping[str, Any]) -> None:
         self.scan_path.parent.mkdir(parents=True, exist_ok=True)
