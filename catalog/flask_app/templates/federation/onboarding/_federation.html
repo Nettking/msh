@@ -36,11 +36,11 @@
         <section class="local-federation-action" aria-labelledby="pairing-code-heading">
           <div>
             <strong id="pairing-code-heading">Connect another FCP device</strong>
-            <span>Generate a signed one-use code. It expires after five minutes.</span>
+            <span>Generate a signed one-use code. It is valid for up to ten minutes, and you can create a new code at any time.</span>
           </div>
           <form method="post" action="{{ vm.actions.pairing_code_url|default('/onboarding/federation/pairing-code') }}">
             <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
-            <button class="federation-button federation-button--secondary" type="submit">Create pairing code</button>
+            <button class="federation-button federation-button--secondary" type="submit">{{ 'Create new pairing code' if vm.federation.pairing_code|default('') else 'Create pairing code' }}</button>
           </form>
         </section>
         {% endif %}
@@ -49,7 +49,7 @@
         <label class="federation-pairing-code">
           <span>Copy this code to the other device</span>
           <textarea readonly rows="6" spellcheck="false" data-pairing-code>{{ vm.federation.pairing_code }}</textarea>
-          <small>The code contains private one-use enrollment material. Do not post it publicly.</small>
+          <small>The code contains private one-use enrollment material. Do not post it publicly. If you create another code, each code remains independently one-use and expires after its bounded lifetime.</small>
         </label>
         {% endif %}
 
