@@ -9,6 +9,7 @@ source URLs from another device.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 import hashlib
 import json
 import os
@@ -17,7 +18,7 @@ import threading
 from datetime import datetime, timezone
 from ipaddress import IPv4Address, IPv4Network, ip_address, ip_network
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 from urllib.parse import urlsplit
 
 from catalog.federation.errors import FederationValidationError
@@ -313,9 +314,7 @@ class RecorderFederationControlWorker:
         scan_id = (
             "scan-"
             + hashlib.sha256(
-                f"{remote.binding.internal_session_id}:{revision}:{request_id}".encode(
-                    "utf-8"
-                )
+                f"{remote.binding.internal_session_id}:{revision}:{request_id}".encode()
             ).hexdigest()[:24]
         )
         config = load_capability_config(self.config_path)
