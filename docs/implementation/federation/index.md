@@ -5,36 +5,37 @@
 | Status | Active track index |
 | Audience | Federation maintainers, acceptance operators, reviewers, release owners, and implementation agents |
 | Scope | Current product direction, release closeout, acceptance, maintained technical references, and retained delivery history |
-| Authority | [Active plans](active/) define current product behavior and remaining work |
-| Entry point | [Capability-first Federation plan](active/capability_first_federation_plan.md) |
+| Authority | Current status comes from this index/current handoff; active plans retain durable product/authority decisions where not superseded by later merged work |
+| Entry point | [Current task handoff](../current_task_handoff.md) |
 | Parent | [Implementation documentation](../) |
-| Reviewed | 2026-08-07 Europe/Oslo |
+| Reviewed | 2026-08-11 Europe/Oslo |
 | Retention | Permanent track index |
 
 ## Directories
 
-- [Active](active/) — authoritative product and release-closeout plans.
+- [Active](active/) — durable product/release plans plus the current update design.
 - [Acceptance](acceptance/) — current acceptance harness, physical evidence contract, readiness guide, and machine handoff.
 - [Reference](reference/) — maintained architecture, network, protocol, and authority references.
 - [History](history/) — completed phase plans, superseded handoffs, audits, closeouts, and delivery evidence.
 
 ## Current status
 
-- Capability-first CF0-CF7 implementation baseline: merged.
+- Capability-first Federation implementation baseline: merged.
+- CF8 role-first installed-product runtime retirement: merged.
+- Verified manual Federation-wide runtime updates: merged.
+- Standalone recorder Federation bootstrap/publication and bounded remote recorder control: merged.
 - Complete physical CF7 acceptance: not accepted.
-- CF8 role-first compatibility retirement: blocked.
+- Complete Federation v1 end-to-end acceptance: false.
 - Federation v1 release tag: not created.
 
-## Authority rule
+## Authority/status rule
 
-Only active plans may define new Federation implementation order or current product behavior.
+The [Current task handoff](../current_task_handoff.md) and [implementation index](../index.md) reconcile status after later merged deliveries. Older active plans still contain durable product/authority decisions, but pre-CF8 status text such as `CF8 blocked`, old commit hashes, or old next-step sequencing is superseded by the current indexes/handoff.
 
 Acceptance procedures do not change acceptance flags. Acceptance truth comes from `catalog/federation/tests/cf7_acceptance/scenarios.json` and a separately reviewed evidence decision.
 
-Reference documents describe maintained technical behavior but cannot grant authority or override the active plan.
+Reference documents describe maintained technical behavior but cannot grant authority or override acceptance truth.
 
-The proposed [recorder-to-Federation delivery design](reference/recorder_federation_delivery.md)
-describes how local loss-aware capture can feed logical Federation storage
-without making network availability part of the recorder's commit boundary.
+The recorder-to-Federation delivery work described in the maintained reference material is now implemented through local-first checkpoint-gated publication and is complemented by the current standalone-recorder operator guide and bounded recorder-control protocol.
 
 Historical documents explain prior delivery decisions. They are non-authoritative even when they retain imperative language from the original implementation.

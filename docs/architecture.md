@@ -2,9 +2,9 @@
 
 Status: **current architecture reference**
 
-Reviewed: **2026-08-07 Europe/Oslo**
+Reviewed: **2026-08-11 Europe/Oslo**
 
-FCP is a Flask-first CNC telemetry workbench with a trusted multi-device Federation layer. Local telemetry, operator workflows, and analysis remain usable without remote providers. Federation adds authenticated device identity, membership, capability contribution, storage authority, jobs, transport, and recovery without moving those authorities into the Flask request process.
+FCP is a Flask-first CNC telemetry workbench with a trusted multi-device Federation layer. Local telemetry, operator workflows, and analysis remain usable without remote providers. Federation adds authenticated device identity, membership, capability contribution, storage authority, jobs, transport, recovery, bounded software-update intent, and bounded standalone-recorder control without turning the Flask request process into a general host administrator.
 
 ## Product model
 
@@ -20,7 +20,9 @@ A device may combine:
 - authenticated relay or transport assistance;
 - future versioned capabilities.
 
-A device is not assigned one permanent product role. Internal authority roles such as storage primary, replica, job owner, administrator, member, provider, lease holder, or artifact grantee remain explicit backend states.
+A device is not assigned one permanent product role. Internal authority states such as storage primary, replica, job owner, session creator, member, provider, lease holder, or artifact grantee remain explicit backend state.
+
+The former role-first product runtime has been retired from normal installed-product authority. Retained legacy state/readers exist only for explicit migration and compatibility boundaries.
 
 ## Required first-run composition
 
@@ -39,10 +41,11 @@ A current inspection is enough to complete setup. Benchmarks and contribution de
 ```text
 Flask product surface
   -> composition and public-safe projections
+  -> reviewed bounded action services
   -> existing domain services and authorities
   -> durable local or Federation state
 
-Device/node agent
+Device/node client
   -> persistent cryptographic identity
   -> authenticated relay/control-plane connection
   -> replay and reconnect state
@@ -53,23 +56,30 @@ Federation coordinator/control plane
   -> ordered events and revisions
   -> provider and job authority
   -> storage assignments, terms, leases, and fencing
+  -> coordinator-owned bounded update intent
 
 Capability providers
   -> recorder
   -> language model
   -> registered compute handlers
   -> storage providers
+
+Host-owned agents/processes
+  -> bounded FCP runtime activation
+  -> standalone recorder capture/control execution
 ```
 
-Flask presents product state and invokes reviewed service boundaries. It does not become the distributed coordinator, storage leader, provider authority, or job authority.
+Flask presents product state and invokes reviewed service boundaries. It does not become the distributed coordinator, storage leader, provider authority, job authority, Git/Docker authority, or arbitrary remote-command server.
 
 ## Identity, Federation, and membership
 
 `catalog/node/` owns persistent device identity and outbound Federation client behavior. `catalog/federation/` owns domain contracts and control-plane services. `catalog/relay/` provides the authenticated relay service.
 
-The current compatible product uses `federation_id` in the UI while retaining `session_id` as the internal protocol, isolation, persistence, replay, membership, job, provider, storage, and artifact boundary.
+The product uses `federation_id` in the UI while retaining `session_id` as the internal protocol, isolation, persistence, replay, membership, job, provider, storage, artifact, update-event, and recorder-control boundary.
 
 Discovery identifies candidates. Trust and membership require an existing trusted binding, explicit authorized acceptance, or signed expiring pairing material. Public device IDs and network presence never grant authority.
+
+Browser-generated `FCP1-...` pairing codes are signed, one-use, and valid for up to 10 minutes. After successful enrollment, a joining device persists its stable identity and public-safe reconnect binding rather than persisting the pairing code or enrollment/invitation tokens.
 
 ## Transport
 
@@ -81,7 +91,9 @@ The supported transport model includes:
 - relay fallback;
 - signed route and rendezvous information;
 - bounded verified resumable object transfer;
-- reconnect and replay after interruption.
+- reconnect and replay after interruption;
+- bounded application messages for recorder publication/control; and
+- ordered session events for declarative update/control intent.
 
 Correctness cannot depend on direct peer connectivity. Private internal service ports must not be exposed publicly merely to simplify transport.
 
@@ -89,7 +101,9 @@ Correctness cannot depend on direct peer connectivity. Private internal service 
 
 Inspection discovers bounded supported local facts such as configured data sources, model availability, registered handlers, storage candidates, hardware, and network seams.
 
-Benchmarks are versioned evidence with explicit run, skip, cancel, expiry, invalidation, and rerun behavior. They describe suitability or capacity only. They cannot create membership, activate a provider, assign storage, dispatch a job, or grant artifact access.
+Benchmarks are versioned evidence with explicit run, skip, cancel, invalidation, and rerun behavior. They describe suitability or capacity only. They cannot create membership, activate a provider, assign storage, dispatch a job, grant artifact access, or authorize a software update.
+
+The installed product reuses saved evidence across ordinary starts/updates unless an operator explicitly reruns it or a structural dependency/version identity changes. Elapsed wall-clock time alone does not grant or revoke authority.
 
 ## Contribution lifecycle
 
@@ -100,8 +114,8 @@ Supported contribution behavior includes:
 - independent candidates for recorder, AI, registered compute, and storage;
 - enable, disable, suspend, and reconcile operations;
 - coexistence of several capabilities on one device;
-- authenticated expiring health and capacity;
-- no unrelated authority from enabling one capability;
+- authenticated health/capacity evidence;
+- no unrelated authority from enabling one capability; and
 - no membership deletion when one contribution is disabled.
 
 ## Storage authority
@@ -116,7 +130,7 @@ Storage authority includes:
 - durable local outbox and acknowledgement policy;
 - authoritative manifests, hashes, watermarks, and missing ranges;
 - completeness-aware promotion;
-- explicit degraded state when no qualified complete candidate exists;
+- explicit degraded state when no qualified complete candidate exists; and
 - restart, catch-up, reinstatement, and returning-former-primary behavior without self-promotion.
 
 A benchmark creates a storage candidate only. It cannot assign primary or replica authority.
@@ -135,7 +149,7 @@ The current boundaries include:
 - durable job ownership;
 - duplicate suppression, timeout, retry, cancellation, and reassignment;
 - stale-worker fencing;
-- one logical committed result;
+- one logical committed result; and
 - least-privilege job-scoped artifact authorization and verified publication.
 
 FCP does not transfer arbitrary executable code to compute providers.
@@ -144,20 +158,70 @@ FCP does not transfer arbitrary executable code to compute providers.
 
 ```mermaid
 flowchart LR
-    S[MTConnect and supported sources] --> R[Recorder or source connector]
+    S[MTConnect and supported sources] --> R[Managed or standalone recorder]
+    R --> RAW[Raw/probe/detailed archive]
     R --> J[FCP-normalized JSONL]
-    R --> W[Source and recorder state]
+    R --> W[Durable recorder state/checkpoint]
     J --> C[Telemetry cache and date discovery]
     C --> F[Workflow session and filtering]
     F --> A[Analysis and playback exports]
     J --> L[Live and status projections]
     A --> U[Flask workbench]
     L --> U
-    R --> O[Authorized Federation storage outbox]
-    O --> P[Assigned logical storage route]
+    W --> O[Checkpoint-gated publication outbox]
+    O --> SA[Federation storage authority]
+    SA --> P[Assigned logical storage primary/replica]
 ```
 
-JSONL remains the local compatibility source. Recorder durability preserves raw and derived write ordering and checkpoints. Federation delivery is layered onto the existing local-first path; it must not make local recording depend on continuous remote availability.
+JSONL remains the local compatibility source. Recorder durability preserves raw/derived write ordering and checkpoints. Federation delivery is layered onto the local-first path; it must not make local recording depend on continuous remote availability.
+
+A standalone recorder may join the Federation without hosting Flask. On first configuration, `start_recorder.py` can run the existing bounded private-network scan, select discovered sources, join using the signed pairing flow, start recording, and start independent publication/control workers.
+
+## Standalone recorder control
+
+Recorder control is an explicit bounded Federation protocol, not generic remote administration.
+
+```text
+trusted Federation member
+  -> authenticated recorder-control session event
+  -> target standalone recorder worker
+  -> local request validation
+  -> bounded recorder-local scan or source-selection mutation
+  -> public-safe report event
+```
+
+The requesting device can choose the target recorder and request a scan/source change, but:
+
+- the scan executes on the recorder host;
+- the network remains constrained to validated RFC1918 IPv4 `/24` or smaller;
+- additions refer only to opaque source IDs from that recorder's latest scan;
+- arbitrary source URLs, credentials, shell text, and unrestricted network ranges are not accepted; and
+- removals change future capture without deleting historical data/checkpoints.
+
+The control worker durably tracks/report retries so a reporting failure does not require repeating a successfully applied source mutation or scan unnecessarily.
+
+## Federation-wide runtime updates
+
+Software updates are also declarative and bounded.
+
+```text
+Federation coordinator/session creator
+  -> exact approved main commit intent
+  -> authenticated session event
+  -> target Flask update-event processor
+  -> local bounded JSON handoff
+  -> host-owned update agent
+  -> fast-forward/build/restart/runtime proof
+  -> authenticated result event
+```
+
+The browser does not supply a repository, branch, path, executable, command, or arbitrary arguments. Each normal FCP host independently validates the exact commit, approved source repository `main`, clean working tree, trusted remote, ancestry, and fast-forward relationship.
+
+The host-owned update agent rebuilds the Compose-managed `relay`, `flask`, and `recorder` images, preserves saved state, resumes the installation, and reports success only after the running image proves the exact target commit and required services are running.
+
+The internal terminal state is `runtime_verified`; the UI presents it as **Updated**.
+
+A standalone recorder launched directly with `python start_recorder.py` does not host this Flask/host-agent activation pipeline and therefore requires its own host process/update administration until a dedicated standalone update path is implemented.
 
 ## Flask application
 
@@ -165,19 +229,20 @@ JSONL remains the local compatibility source. Recorder durability preserves raw 
 
 - capability-first onboarding;
 - Federation overview and detail projections;
+- explicit pairing/update/recorder-control action surfaces;
 - local monitor, status, live, playback, source, and control views;
 - knowledge capture and compatibility export;
 - documentation browser;
-- AI explanation and connected-provider behavior;
-- compatibility setup where migration still requires it.
+- AI explanation and connected-provider behavior; and
+- deterministic migration readers only where an upgraded installation still requires them.
 
-Federation pages use public-safe projections. They must not expose private endpoints, credentials, enrollment material, private keys, database paths, or unrestricted local configuration.
+Federation pages use public-safe projections. They must not expose private endpoints, credentials, enrollment material, private keys, database paths, recorder source URLs, or unrestricted local configuration.
 
 ## Local orchestration and analysis
 
 `catalog/orchestrator/` manages local runtime policy and background preparation. `catalog/runner/` owns workflow sessions, filtering, script discovery, execution, and playback export. `catalog/common/` provides shared telemetry normalization, source state, cache, metrics, and timeline utilities.
 
-These local workflow responsibilities remain separate from Federation membership, provider, job, storage, and transport authority.
+These local workflow responsibilities remain separate from Federation membership, provider, job, storage, transport, update, and recorder-control authority.
 
 ## Persistence
 
@@ -186,7 +251,9 @@ Important durable state includes:
 - device identity and trusted Federation binding;
 - coordinator membership and ordered events;
 - onboarding, inspection, benchmark, and contribution intent state;
-- recorder configuration and checkpoints;
+- capability/source configuration and recorder checkpoints;
+- standalone-recorder initial-selection/control/publication state;
+- host-update handoff/result state;
 - storage assignments, manifests, outboxes, terms, leases, and recovery records;
 - provider, job, attempt, artifact, and reconciliation state;
 - local telemetry and generated workflow results.
@@ -197,12 +264,15 @@ Normal startup preserves state. A documented fresh reset must name exactly what 
 
 Automated tests prove contracts and bounded product composition. They do not prove real MTConnect, Ollama/accelerator, multi-host network, target storage, or real-browser behavior.
 
-Complete Federation v1 acceptance remains false until the required physical evidence validates against one exact candidate commit. See [Federation acceptance documentation](implementation/federation/acceptance/).
+Complete Federation v1 acceptance remains false until the required physical evidence validates against one exact candidate commit. The machine-readable source is `catalog/federation/tests/cf7_acceptance/scenarios.json`.
 
 ## Related references
 
+- [Federation operations](federation_operations.md)
+- [Standalone recorder](standalone_recorder.md)
 - [Federated network reference](federated_session_network.md)
 - [Capability-first Federation plan](implementation/federation/active/capability_first_federation_plan.md)
+- [Detailed update design](implementation/federation/active/manual_updates.md)
 - [Federation v1 scope](releases/federation_v1_scope.md)
 - [Data contract](data_contract.md)
 - [Workflow sessions](workflow_sessions.md)

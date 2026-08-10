@@ -2,29 +2,22 @@
 
 Status: **active release-closeout plan**.
 
-Reviewed: **2026-08-06 Europe/Oslo**.
+Reviewed: **2026-08-11 Europe/Oslo**.
 
-This document governs the remaining work required to turn the merged Federation
-implementation into a stable, documented, supportable FCP Federation v1
-release.
+This document governs the remaining work required to turn the merged Federation implementation into a stable, documented, supportable FCP Federation v1 release.
 
 Use these sources together:
 
-- `docs/implementation/federation/active/capability_first_federation_plan.md` is authoritative for
-  current capability-first product behavior, compatibility, authority, and
-  acceptance sequencing;
-- `catalog/federation/tests/cf7_acceptance/scenarios.json` is authoritative for
-  recorded automated and physical acceptance claims;
-- this document is authoritative for repository cleanup, documentation,
-  release-gate, release-candidate, and publication work.
+- `docs/implementation/current_task_handoff.md` and `docs/implementation/index.md` define the current merged status and supersede pre-CF8 sequencing statements in older plans;
+- `docs/implementation/federation/active/capability_first_federation_plan.md` remains the durable capability-first product/authority reference where its status text has not been superseded;
+- `catalog/federation/tests/cf7_acceptance/scenarios.json` is authoritative for recorded acceptance claims;
+- this document is authoritative for remaining repository cleanup, documentation, release-gate, release-candidate, and publication work.
 
-Historical phase plans, completion reviews, test matrices, and agent handoffs
-provide delivery evidence. They do not override the sources above.
+Historical phase plans, completion reviews, test matrices, and agent handoffs provide delivery evidence. They do not override the current status sources above.
 
 ## Current repository state
 
-The technical Federation baseline and the capability-first product baseline are
-merged.
+The technical Federation baseline, capability-first product baseline, and CF8 retirement of the role-first installed-product runtime are merged.
 
 The supported mandatory first-run flow is:
 
@@ -36,258 +29,163 @@ Identity
   -> open Federation
 ```
 
-Benchmarks and contribution decisions are optional follow-up work. They do not
-block access to the normal FCP workbench and do not grant authority by
-themselves.
+Benchmarks and contribution decisions are optional follow-up work. They do not block access to the normal FCP workbench and do not grant authority by themselves.
+
+The post-CF8 baseline also includes:
+
+- capability-scoped runtime/configuration rather than permanent device roles;
+- verified manual Federation-wide software updates through bounded host-owned update agents;
+- conservative Windows migration onto the current launcher/update-agent path;
+- headless standalone-recorder Federation pairing;
+- checkpoint-gated recorder publication through logical-storage authority;
+- startup bounded MTConnect discovery/first-selection for the standalone recorder; and
+- bounded Federation-wide recorder scan/source control from trusted members.
 
 Current release state:
 
-- the completed Federation technical baseline through F8.7 remains valid;
-- the capability-first CF0-CF7 implementation baseline is merged;
-- the integrated `/docs` reader is implemented;
 - complete physical CF7 acceptance is **not accepted**;
-- CF8 retirement of the retained role-first compatibility path is **blocked**
-  until CF7 is accepted;
+- complete Federation v1 end-to-end acceptance remains **false**;
 - no Federation v1 release tag has been created.
 
-The earlier instructions to implement CF1, launch capability-first parallel
-waves, or replace the setup UI are historical and must not be followed.
+CF8 is no longer open work. Any old statement that CF8 is blocked or must not begin is historical sequencing, not current status.
 
 ## Objective
 
-Complete the remaining validation, cleanup, documentation, and release work
-without weakening the merged Federation authority and compatibility model.
+Complete remaining validation, acceptance reconciliation, cleanup, documentation, and release work without weakening the merged Federation authority model.
 
-The closeout remains a sequence of small, independently reviewable changes.
-Cleanup must never remove a path merely because it looks old. Every deletion
-requires dependency evidence and regression validation.
+Closeout remains a sequence of small, independently reviewable changes. Cleanup must never remove a path merely because it looks old. Every deletion requires dependency evidence and regression validation.
 
 ## Fixed decisions
 
-- The completed Federation technical baseline remains **FCP Federation v1.0**
-  through F8.7.
 - V1 is for explicitly trusted devices and providers.
-- Runtime authority and security boundaries from the completed phases remain
-  unchanged.
-- Capability-first onboarding is the supported product path.
-- The internal session boundary remains during the compatible migration.
-- UI and documentation improvements must not invent a second authority source.
+- Capability-first onboarding/runtime is the supported product path.
+- The internal session boundary remains during compatible v1 operation.
+- UI/documentation improvements must not invent a second authority source.
 - Benchmark evidence must never grant membership or contribution authority.
+- Federation software updates remain explicit/manual, exact-commit, and host-validated; they are not a generic remote shell.
+- Recorder control remains bounded to recorder-local scans and latest-scan source selection; it is not arbitrary network/URL/process authority.
+- A standalone `python start_recorder.py` process is not currently restarted by the normal Flask/Compose **Update all devices** activation path.
 - No implementation branch is deleted without separate explicit owner approval.
 - No release tag is created before exact release acceptance.
-- CF8 must not begin before evidence-backed CF7 acceptance.
 
-## Work packages
+## Completed/merged closeout work
 
-### V1-A — audit and release boundary
+The following are no longer future work:
 
-Completed deliverables:
+- capability-first onboarding and product composition;
+- deletion of confirmed dead role-first Flask/product paths;
+- retirement of the role-first installed-product runtime (CF8);
+- role-free command/Termux bootstrap composition;
+- current capability configuration store and recorder/AI technical configuration migration;
+- product rename to Federated Capability Platform (FCP);
+- verified Federation-wide runtime update implementation and Windows hardening/migration bootstrap;
+- headless standalone-recorder Federation bootstrap/publication;
+- Federation-wide standalone recorder discovery/source control;
+- integrated `/docs` reader and current documentation entry point.
 
-- repository audit;
-- v1 scope definition;
-- closeout plan;
-- post-v1 product roadmap;
-- current handoff replacement;
-- first deletion-candidate classification.
+Do not restart these implementation waves unless a concrete regression/defect is reproduced against current `main`.
 
-### V1-B — exact path-level cleanup manifest
-
-Completed deliverable: one path-level manifest covering proposed deletion,
-relocation, consolidation, archive, and defer decisions.
-
-The manifest remains useful for cleanup. Product or setup assumptions that
-conflict with the active capability-first plan are superseded by that plan.
-
-### V1-C — generated output and experiment cleanup
-
-Completed or accepted:
-
-- generated `graphify-out/` content was removed and ignored;
-- the integrated `/docs` reader was implemented and accepted;
-- the standalone Markdown viewer is a documented deletion candidate.
-
-Remaining work:
-
-- verify and remove the superseded standalone Markdown viewer in a separate,
-  bounded cleanup change;
-- classify other `new-stuff/` experiments individually;
-- preserve any experiment that still has a supported runtime, test, migration,
-  or documentation dependency.
-
-### CF0-CF7 — capability-first onboarding and Federation UI
-
-Implementation status: **merged baseline**.
-
-The complete product behavior, compatibility rules, authority boundaries, and
-remaining acceptance requirements are defined in:
-
-- `docs/implementation/federation/active/capability_first_federation_plan.md`
-
-Do not restart the old CF1-first implementation sequence.
-
-Remaining capability-first work is limited to:
-
-- resolving verified post-merge runtime, persistence, platform, privacy, or
-  compatibility defects;
-- reconciling documentation with the merged product;
-- freezing one exact acceptance candidate;
-- executing the complete physical CF7 campaign on that candidate;
-- updating acceptance claims only through a separate evidence-backed review.
-
-### CF8 — retained role-first compatibility retirement
-
-Status: **blocked**.
-
-CF8 may be planned and implemented only after complete CF7 acceptance confirms
-that the capability-first path safely covers supported fresh setup, reconnect,
-migration, restart, and contribution behavior.
-
-CF8 must remain a separately reviewed change. It must not be folded into
-cleanup, documentation reconciliation, or acceptance evidence work.
+## Remaining work packages
 
 ### V1-D — obsolete implementation cleanup
 
-Expected scope after dependency proof:
+Continue only after dependency proof. Candidate work may include:
 
-- remove duplicate old web implementation if `catalog/webapp/` has no supported
-  entry point;
-- reduce `legacy/` to explicitly justified historical/reference material;
-- remove obsolete scripts and stale documentation;
-- update AI grounding/indexing when indexed paths change;
-- remove dead tests only when equivalent product behavior remains covered.
+- remaining superseded experiments/viewers with no supported runtime/test/migration/documentation dependency;
+- obsolete scripts or stale generated artifacts;
+- archived historical material that can be moved without breaking current references; and
+- dead tests only when equivalent current behavior remains covered.
 
 Exit criteria:
 
 - one supported Flask application path;
-- no hidden duplicate behavior relied upon by setup or Compose;
+- no hidden duplicate behavior relied upon by startup, migration, Compose, Federation, or recorder operation;
 - full affected regression suites green.
 
 ### V1-E — documentation consolidation
 
-Target canonical structure:
+Current user documentation must describe the post-CF8 product directly, including:
 
-```text
-docs/
-  index.md
-  getting-started/
-  user-guides/
-  federation-v1/
-  administration/
-  troubleshooting/
-  developer/
-  reference/
-  history/
-```
-
-Required public documents include:
-
-- product overview;
-- quick start;
-- installation and capability-first onboarding;
-- Federation discovery, verification, join, reconnect, and local creation;
-- device inspection and optional benchmarks;
-- contribution management;
-- device and provider administration;
-- storage, AI, compute, and recorder guides;
-- security/trust model;
-- backup, restart, recovery, and upgrade;
-- troubleshooting;
-- compatibility/protocol reference;
-- developer architecture and test guide.
-
-Required cleanup:
-
-- keep `docs/index.md` as the canonical documentation entry point;
-- replace the oversized root README with a concise repository entry point;
-- move durable design evidence to history/decisions;
-- remove or archive superseded phase plans and handoffs after link verification;
-- mark retained history as non-current;
-- validate all links and commands.
+- normal Windows/POSIX startup and resume/reset boundaries;
+- conservative Windows migration;
+- current pairing lifetime/reissue behavior;
+- manual Federation-wide software updates and per-device success/failure semantics;
+- headless standalone-recorder first start with `python start_recorder.py FCP1-...`;
+- recorder startup scan, remote scan/source control, and local-first Federation publication;
+- distinction between Compose-managed recorder updates and independently launched standalone recorder process administration;
+- current capability-first authority boundaries and the fact that complete physical CF7 acceptance remains false.
 
 Exit criteria:
 
 - a new user can identify the correct first document;
 - current behavior is described without phase archaeology;
-- setup documentation does not instruct a new user to select a permanent device
-  role;
-- technical session terminology is kept out of ordinary onboarding guidance;
-- `/docs` exposes the canonical structure correctly.
+- no current guide instructs a new user to select a permanent device role;
+- technical session terminology is kept out of ordinary onboarding guidance where unnecessary;
+- `/docs` exposes the canonical structure correctly;
+- current implementation/acceptance indexes do not claim CF8 is still blocked.
 
 ### V1-F — permanent regression gate
 
-Deliver:
+Maintain one Federation release workflow with Linux and Windows coverage strong enough to protect:
 
-- one named Federation release workflow;
-- Linux and Windows coverage;
-- complete identity, membership/session compatibility, relay, transport,
-  storage, failover, capability, benchmark, contribution, AI, compute,
-  recorder, artifact, Flask, onboarding, migration, and compatibility matrix;
-- compile, Ruff, Compose, diff hygiene, and documentation-link checks;
-- retained focused component workflows only where they add fault isolation.
+- identity/membership/session compatibility;
+- relay/transport/storage/failover;
+- capability inspection/benchmark/contribution;
+- AI/compute/jobs/artifacts;
+- recorder capture/publication/control;
+- software update/migration boundaries;
+- Flask/onboarding/product navigation;
+- compile, Ruff, Compose, diff hygiene, and documentation-link checks.
 
-Exit criteria:
-
-- the release gate is equivalent to or stronger than the union of required
-  closeout gates;
-- completed phase names are no longer the only permanent quality signal;
-- no workflow is deleted before replacement evidence exists.
+Do not remove focused workflows until replacement evidence is equivalent or stronger.
 
 ### V1-G — release candidate acceptance
 
-Required acceptance:
+Freeze one exact candidate only after known blockers are closed. Required physical/review evidence must cover the current product, not the pre-CF8 baseline.
 
-- fresh checkout installation on Linux and Windows;
-- first-run capability-first onboarding without old state;
-- stable device identity creation;
-- existing Federation discovery and verified join;
-- safe local Federation creation when no candidate exists;
-- returning-device reconnect and restart;
-- migration from every supported old deployment mode;
-- one device contributing multiple capabilities simultaneously;
-- benchmark execution, expiry, invalidation, rerun, skip, and failure behavior;
-- storage replication and controlled failover;
-- AI contribution enable/use/disable/recovery;
-- compute contribution enable/dispatch/duplicate suppression/disable/recovery;
-- recorder plus AI on the same device;
-- safe diagnostics without secret/private endpoint leakage;
-- backup/recovery rehearsal;
-- all user commands and documentation links checked.
+At minimum validate, where applicable to the acceptance contract:
 
-Record exact hardware and network constraints. Do not overclaim unsupported
-public-internet acceptance.
+- fresh Windows and Linux installation;
+- capability-first first-run onboarding;
+- persistent identity and Federation join/reconnect;
+- safe local Federation creation;
+- migration from supported older installations;
+- one device contributing multiple capabilities;
+- benchmark/reconciliation behavior after relevant dependency changes;
+- storage replication/failover/recovery;
+- AI and registered-compute contribution lifecycles;
+- recorder + AI coexistence;
+- headless standalone-recorder pairing/startup scan/local capture/publication;
+- remote recorder scan/source control from another trusted Federation device;
+- coordinator-owned software update check/rollout where the target is an updater-capable normal FCP installation;
+- restart, disable/re-enable, revocation, fencing, and controlled rejoin;
+- mobile and desktop browser review;
+- diagnostics without secret/private endpoint/source-URL leakage;
+- backup/recovery rehearsal; and
+- all user commands/documentation links used during the campaign.
+
+A successful feature-specific live test or green CI run is useful evidence but does not independently change the acceptance manifest.
 
 ### V1-H — release publication
 
-Deliver:
+After exact candidate acceptance:
 
-- `CHANGELOG.md`;
-- release notes;
-- exact version declaration;
-- verified release commit;
-- release tag;
-- updated original Federation issue/status;
-- post-release branch-cleanup proposal presented separately.
+- finalize `CHANGELOG.md`/release notes;
+- declare exact version;
+- identify verified release commit;
+- create release tag;
+- update original Federation issue/status;
+- present post-release branch cleanup separately.
 
-Exit criteria:
-
-- the tag points to the validated commit;
-- release notes match actual scope and limitations;
-- no pending mandatory onboarding, migration, or closeout action is hidden in a
-  historical plan.
+The tag must point to the validated commit and release notes must match actual scope/limitations.
 
 ## Work-isolation policy
 
-The earlier capability-first parallel-wave instructions are historical.
-Remaining closeout work must use bounded branches and non-overlapping ownership.
-
-- scope each PR to one defect, acceptance unit, documentation reconciliation,
-  cleanup unit, or release deliverable;
-- do not combine CF7 evidence, CF8 retirement, documentation reorganization,
-  and obsolete-code deletion in one PR;
-- declare shared Flask, setup, navigation, persistence, security, and workflow
-  files before editing them;
-- do not run parallel changes that need the same shared files;
-- preserve draft-PR review and cross-platform validation before merge.
+- scope each PR to one defect, acceptance unit, documentation reconciliation, cleanup unit, or release deliverable;
+- do not combine physical acceptance evidence, broad documentation reorganization, unrelated runtime fixes, and obsolete-code deletion in one PR;
+- declare shared Flask/setup/navigation/persistence/security/update/recorder-control/workflow files before editing them;
+- preserve draft-PR review and cross-platform validation before merge;
+- do not use migration/update/recorder control as a reason to grant broader host or network authority.
 
 ## Stop conditions
 
@@ -296,30 +194,23 @@ Stop and report rather than broaden scope when:
 - discovery would require unauthenticated trust;
 - a benchmark would run arbitrary remotely supplied code;
 - a benchmark result is treated as authority;
-- migration would silently enable a contribution not previously configured;
-- a user-facing simplification would weaken membership, revocation, lease,
-  fencing, storage, job, or artifact checks;
-- two active changes need to edit the same shared integration file;
+- migration would silently enable a contribution or require destructive state guessing;
+- an update path would require peer-supplied shell/Docker/Git authority beyond the fixed approved operation;
+- recorder control would require arbitrary source URLs, credentials, shell execution, or unrestricted scanning;
+- a user-facing simplification would weaken membership, revocation, lease, fencing, storage, job, artifact, update, or recorder-control checks;
 - removing `session_id` becomes necessary for a compatible unit;
-- public documentation would require claiming behavior not demonstrated by
-  acceptance;
-- cleanup requires a new unrelated feature;
-- a test indicates lost compatibility, split brain, stale execution, or data
-  risk.
+- public documentation would require claiming behavior not demonstrated by acceptance; or
+- a test indicates lost compatibility, split brain, stale execution, data loss, or authority leakage.
 
 ## Next exact actions
 
 Proceed in this order:
 
-1. complete the bounded documentation reconciliation so current startup and
-   planning documents describe the merged capability-first product;
-2. resolve any verified post-merge runtime-parity, persisted-provider,
-   native-host translation, platform, privacy, or compatibility defects;
-3. freeze one exact release-candidate commit only after known blockers are
-   closed;
-4. execute the complete physical CF7 acceptance campaign on that commit;
-5. update acceptance claims only through a separate evidence-backed review;
-6. plan CF8 separately after CF7 is accepted;
-7. continue V1-D through V1-H as separately reviewable closeout units.
+1. complete documentation/acceptance-runbook reconciliation against the current post-CF8, update-capable, recorder-capable product;
+2. resolve any verified current-main runtime, platform, privacy, migration, update, recorder-control, or persistence defects;
+3. freeze one exact release-candidate commit after known blockers are closed;
+4. execute the complete physical CF7 acceptance campaign on that same commit;
+5. update acceptance claims only through a separate evidence-backed review; and
+6. continue V1-D/V1-F/V1-H as separate bounded closeout units and create the release tag only after acceptance.
 
-Do **not** implement CF1 again. Do **not** begin CF8 early.
+Do **not** restart CF1-CF8 implementation waves merely because older plans still describe them as future work.
