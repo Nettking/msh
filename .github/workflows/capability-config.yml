@@ -12,6 +12,7 @@ on:
       - "catalog/flask_app/services/server_setup_service.py"
       - "catalog/mtconnect_recorder/runtime.py"
       - "docker-compose.yml"
+      - "catalog/flask_app/tests/test_app_capability_config_saver.py"
       - "catalog/flask_app/tests/test_capability_config_migration_service.py"
       - "catalog/flask_app/tests/test_recorder_capability_config_runtime.py"
       - "catalog/flask_app/tests/test_post_setup_handoff.py"
@@ -29,6 +30,7 @@ on:
       - "catalog/flask_app/services/server_setup_service.py"
       - "catalog/mtconnect_recorder/runtime.py"
       - "docker-compose.yml"
+      - "catalog/flask_app/tests/test_app_capability_config_saver.py"
       - "catalog/flask_app/tests/test_capability_config_migration_service.py"
       - "catalog/flask_app/tests/test_recorder_capability_config_runtime.py"
       - "catalog/flask_app/tests/test_post_setup_handoff.py"
@@ -77,6 +79,7 @@ jobs:
           catalog/flask_app/services/capability_config_migration_service.py
           catalog/flask_app/services/capability_config_service.py
           catalog/mtconnect_recorder/runtime.py
+          catalog/flask_app/tests/test_app_capability_config_saver.py
           catalog/flask_app/tests/test_capability_config_migration_service.py
           catalog/flask_app/tests/test_recorder_capability_config_runtime.py
           catalog/flask_app/tests/test_post_setup_handoff.py
@@ -85,6 +88,7 @@ jobs:
       - name: Run capability configuration regressions
         run: >-
           python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_app_capability_config_saver.py
           catalog/flask_app/tests/test_capability_config_migration_service.py
           catalog/flask_app/tests/test_recorder_capability_config_runtime.py
           catalog/flask_app/tests/test_post_setup_handoff.py
@@ -102,6 +106,7 @@ jobs:
           catalog/flask_app/services/capability_config_migration_service.py
           catalog/flask_app/services/capability_config_service.py
           catalog/mtconnect_recorder/runtime.py
+          catalog/flask_app/tests/test_app_capability_config_saver.py
           catalog/flask_app/tests/test_capability_config_migration_service.py
           catalog/flask_app/tests/test_recorder_capability_config_runtime.py
           catalog/flask_app/tests/test_post_setup_handoff.py
