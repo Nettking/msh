@@ -17,6 +17,7 @@ from .capability_config_service import (
     CapabilityConfig,
     CapabilityConfigError,
     from_legacy_settings,
+    load_capability_config,
     save_capability_config,
 )
 from .server_setup_service import ServerSetupError, ServerSetupSettings
@@ -27,14 +28,21 @@ def persist_capability_config_from_setup(
     *,
     path: Path | str = CAPABILITY_CONFIG_PATH,
 ) -> CapabilityConfig:
-    """Project and persist technical values from a legacy-shaped settings object.
+    """Persist technical values without letting compatibility overwrite them.
 
-    The input may be an actual pre-CFI legacy setup or the synthetic object
-    produced by the retained CFI-6 compatibility seam.  In both cases only the
-    role-free ``CapabilityConfig`` projection is written.
+    If capability-first configuration already exists, it is authoritative for
+    technical parameters and is preserved verbatim. Otherwise the incoming
+    legacy-shaped settings object is projected once into ``CapabilityConfig``.
+    Neither path persists role, completion, or contribution authority fields.
     """
 
+    path = Path(path)
     try:
+        if path.exists():
+            return load_capability_config(
+                path,
+                legacy_loader=lambda: settings,
+            )
         config = from_legacy_settings(settings)
         save_capability_config(config, path)
     except (CapabilityConfigError, ServerSetupError, OSError, TypeError, ValueError) as exc:
