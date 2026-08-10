@@ -127,13 +127,14 @@ def build_command_plan(
             "--no-ai cannot be used with the language-model-provider profile."
         )
 
-    provider_mode = "local" if provider_node else str(ai_provider or "local").strip()
-    if provider_mode not in AI_PROVIDER_MODES:
-        raise CapabilityConfigError(f"Unknown AI provider: {provider_mode}")
-    if provider_node and provider_mode == "connected":
+    requested_provider_mode = str(ai_provider or "local").strip()
+    if requested_provider_mode not in AI_PROVIDER_MODES:
+        raise CapabilityConfigError(f"Unknown AI provider: {requested_provider_mode}")
+    if provider_node and requested_provider_mode == "connected":
         raise CapabilityConfigError(
             "A language-model provider must run its own local model."
         )
+    provider_mode = "local" if provider_node else requested_provider_mode
 
     config = default_capability_config()
     config = update_language_model_config(
