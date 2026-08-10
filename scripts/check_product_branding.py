@@ -5,7 +5,18 @@ import subprocess
 import sys
 
 LEGACY = bytes((109, 115, 104)).decode("ascii")
-ALLOWED_REPOSITORY = "Nettking/" + LEGACY
+REPOSITORY_SLUG = "Nettking/" + LEGACY
+ALLOWED_REPOSITORY_FILES = frozenset(
+    {
+        "catalog/federation/software_update.py",
+        "scripts/posix/fcp_update_agent.py",
+        "scripts/windows/fcp_update_agent.ps1",
+        "cmd/fcp-peer-sidecar/go.mod",
+        "catalog/federation/tests/test_software_update.py",
+        "catalog/flask_app/tests/test_federation_update_host_agents.py",
+        "catalog/flask_app/tests/test_federation_update_runtime.py",
+    }
+)
 
 
 def main() -> int:
@@ -25,7 +36,9 @@ def main() -> int:
             text = path.read_text(encoding="utf-8")
         except (UnicodeDecodeError, OSError):
             continue
-        searchable = text.replace(ALLOWED_REPOSITORY, "")
+        searchable = text
+        if path_text in ALLOWED_REPOSITORY_FILES:
+            searchable = searchable.replace(REPOSITORY_SLUG, "")
         if LEGACY in searchable.lower():
             failures.append(f"retired product spelling in file: {path_text}")
     if failures:
