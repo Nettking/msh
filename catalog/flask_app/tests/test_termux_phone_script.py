@@ -140,13 +140,16 @@ def test_stop_does_not_claim_success_while_http_responds(tmp_path: Path) -> None
     assert "stop was not confirmed" in result.stderr
 
 
-def test_phone_rebuild_preserves_custom_setup_and_defers_new_browser_setup() -> None:
+def test_phone_setup_uses_capability_config_without_creating_a_new_role() -> None:
     script = SETUP_SCRIPT.read_text(encoding="utf-8")
     phone_script = PHONE_SCRIPT.read_text(encoding="utf-8")
 
+    assert 'DATA_DIR/capabilities/config.json' in script
     assert 'DATA_DIR/server_setup/server_settings.json' in script
     assert "--migrate-legacy-phone-bootstrap" in script
-    assert "--browser-setup-pending" in script
+    assert "--profile workbench --no-ai" in script
+    assert "--browser-setup-pending" not in script
+    assert "phone setup no longer creates a device role" in script
     assert 'BUILD_SIGNATURE_FILE="$STATE_DIR/runtime-build.signature"' in script
     assert '"$(git -C "$ROOT" hash-object Dockerfile)"' in script
     assert '"$(git -C "$ROOT" hash-object requirements.txt)"' in script
