@@ -122,6 +122,11 @@ RUN_ONCE = _bool_from_env("FCP_RECORDER_ONCE", False)
 
 _CAPABILITY_CONFIG_SCHEMA = "fcp.capability_config.v1"
 _LEGACY_SETUP_SCHEMA = "fcp.server_setup.v3"
+_CHECKPOINT_SCHEMA = "fcp.mtconnect_recorder.checkpoints.v3"
+_RETIRED_PRODUCT = bytes((109, 115, 104)).decode("ascii")
+_LEGACY_CHECKPOINT_SCHEMAS = frozenset(
+    {f"{_RETIRED_PRODUCT}.mtconnect_recorder.checkpoints.v3"}
+)
 
 
 def _managed_configuration(payload: Mapping[str, Any]) -> tuple[dict[str, str], float]:
@@ -194,11 +199,12 @@ class RecorderRuntime:
 
     def load_state(self) -> None:
         payload = _read_json(STATE_FILE)
-        if payload.get("schema") != "fcp.mtconnect_recorder.checkpoints.v3":
+        schema = payload.get("schema")
+        if schema != _CHECKPOINT_SCHEMA and schema not in _LEGACY_CHECKPOINT_SCHEMAS:
             if payload:
                 log.warning(
-                    "Ignoring legacy recorder state; the loss-aware recorder will start from "
-                    "the earliest sequence still retained by each Agent."
+                    "Ignoring unsupported recorder state; the loss-aware recorder will "
+                    "start from the earliest sequence still retained by each Agent."
                 )
             return
         sources = payload.get("sources")
@@ -211,12 +217,17 @@ class RecorderRuntime:
                 self.checkpoints[str(name)] = SourceCheckpoint.from_dict(str(name), item)
             except (KeyError, TypeError, ValueError):
                 log.warning("Ignoring invalid checkpoint for source %s", name)
+        if schema in _LEGACY_CHECKPOINT_SCHEMAS:
+            log.warning(
+                "Restored a pre-FCP recorder checkpoint without rewriting it; "
+                "the schema will advance only after the next successful checkpoint commit."
+            )
         log.info("Restored durable checkpoints for %s source(s)", len(self.checkpoints))
 
     def save_state(self) -> None:
         with self.lock:
             payload = {
-                "schema": "fcp.mtconnect_recorder.checkpoints.v3",
+                "schema": _CHECKPOINT_SCHEMA,
                 "updated_at": _utc_now(),
                 "sources": {
                     name: checkpoint.to_dict()

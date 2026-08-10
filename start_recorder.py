@@ -48,6 +48,7 @@ from catalog.mtconnect_recorder.federation_control import (
     infer_private_scan_cidr,
 )
 from catalog.mtconnect_recorder.federation_node import RecorderFederationNode
+from catalog.mtconnect_recorder.upgrade_compat import ensure_recorder_upgrade_config
 
 _AUTO_CONFIG_SCHEMA = "fcp.mtconnect_recorder.autoconfig.v1"
 _CONTROL_SCHEMA = "fcp.mtconnect_recorder.control.v1"
@@ -426,6 +427,7 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--scan-port must be between 1 and 65535.")
 
     data_dir = Path(args.data_dir).resolve()
+    ensure_recorder_upgrade_config(data_directory=data_dir)
     state_dir = data_dir / "source_state"
     _config, parsed_sources = _prepare_recorder_configuration(
         parser=parser,

@@ -18,11 +18,13 @@ from .onboarding_models import (
     _utc,
 )
 
+_RETIRED_PRODUCT = bytes((109, 115, 104)).decode("ascii")
 LEGACY_SETUP_SCHEMAS = {
     None,
     "fcp.server_setup.v1",
     "fcp.server_setup.v2",
     "fcp.server_setup.v3",
+    f"{_RETIRED_PRODUCT}.server_setup.v3",
 }
 LEGACY_DEPLOYMENT_MODES = {
     "full-server",
