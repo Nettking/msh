@@ -9,10 +9,10 @@ class _Transition:
     def __init__(self, *, completed: bool, runtime: bool = True) -> None:
         self.completed = completed
         self.runtime = runtime
-        self.received_setups: list[object | None] = []
+        self.calls = 0
 
-    def capability_flags(self, setup=None) -> dict[str, bool]:
-        self.received_setups.append(setup)
+    def capability_flags(self) -> dict[str, bool]:
+        self.calls += 1
         return {
             "completed": self.completed,
             "runtime": self.runtime,
@@ -53,19 +53,18 @@ def test_completed_capability_setup_continues_existing_runtime(
         lambda: background_starts.append("started"),
     )
 
-    state = app_module._start_runtime_from_capability_state(app, object())
+    state = app_module._start_runtime_from_capability_state(app)
 
     assert state == "started"
+    assert transition.calls == 1
     assert runtime.choices == ["continue_existing"]
     assert background_starts == []
     assert runtime.requires_startup_choice() is False
 
 
-def test_completed_capability_setup_does_not_require_legacy_settings(
-    monkeypatch,
-) -> None:
+def test_runtime_handoff_has_no_legacy_setup_argument(monkeypatch) -> None:
     app = Flask(__name__)
-    transition = _Transition(completed=True)
+    transition = _Transition(completed=False, runtime=False)
     runtime = _Runtime(pending=True)
 
     monkeypatch.setattr(
@@ -75,15 +74,14 @@ def test_completed_capability_setup_does_not_require_legacy_settings(
     )
     monkeypatch.setattr(app_module, "get_runtime_manager", lambda: runtime)
 
-    state = app_module._start_runtime_from_capability_state(app, None)
+    state = app_module._start_runtime_from_capability_state(app)
 
-    assert state == "started"
-    assert transition.received_setups == [None]
-    assert runtime.choices == ["continue_existing"]
-    assert runtime.requires_startup_choice() is False
+    assert state == "disabled"
+    assert transition.calls == 1
+    assert runtime.choices == []
 
 
-def test_incomplete_legacy_setup_keeps_explicit_runtime_choice(
+def test_incomplete_legacy_preview_keeps_explicit_runtime_choice(
     monkeypatch,
 ) -> None:
     app = Flask(__name__)
@@ -97,7 +95,7 @@ def test_incomplete_legacy_setup_keeps_explicit_runtime_choice(
     )
     monkeypatch.setattr(app_module, "get_runtime_manager", lambda: runtime)
 
-    state = app_module._start_runtime_from_capability_state(app, object())
+    state = app_module._start_runtime_from_capability_state(app)
 
     assert state == "legacy-choice-required"
     assert runtime.choices == []
@@ -123,8 +121,9 @@ def test_resolved_capability_runtime_starts_existing_background_entrypoint(
         lambda: background_starts.append("started"),
     )
 
-    state = app_module._start_runtime_from_capability_state(app, object())
+    state = app_module._start_runtime_from_capability_state(app)
 
     assert state == "started"
+    assert transition.calls == 1
     assert runtime.choices == []
     assert background_starts == ["started"]
