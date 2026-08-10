@@ -5,6 +5,7 @@ import subprocess
 import sys
 
 LEGACY = bytes((109, 115, 104)).decode("ascii")
+SPACED_LEGACY = " ".join(LEGACY)
 REPOSITORY_SLUG = "Nettking/" + LEGACY
 ALLOWED_REPOSITORY_FILES = frozenset(
     {
@@ -39,7 +40,8 @@ def main() -> int:
         searchable = text
         if path_text in ALLOWED_REPOSITORY_FILES:
             searchable = searchable.replace(REPOSITORY_SLUG, "")
-        if LEGACY in searchable.lower():
+        lowered = searchable.casefold()
+        if LEGACY in lowered or SPACED_LEGACY in lowered:
             failures.append(f"retired product spelling in file: {path_text}")
     if failures:
         print("\n".join(failures))
