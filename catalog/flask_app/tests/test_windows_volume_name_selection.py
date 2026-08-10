@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import os
-from pathlib import Path
 import subprocess
+from pathlib import Path
 
 import pytest
 
@@ -40,8 +40,16 @@ def test_runtime_resolver_preserves_single_project_volume_as_array() -> None:
 def test_relay_selector_wraps_function_output_before_indexing() -> None:
     script = _relay_selector()
 
-    assert "$candidates = @(Get-RelayCandidates)" in script
+    assert "$relayContainers = @(Get-RelayContainerInfo)" in script
+    assert "$candidates = @(Get-RelayCandidates -RelayContainers $relayContainers)" in script
+    assert "$runningVolumes = @(Get-UniqueContainerVolumes" in script
+    assert "$mountedVolumes = @(Get-UniqueContainerVolumes" in script
     assert "$selected = [string]($candidates[0])" in script
+    assert "$selected = [string]($runningVolumes[0])" in script
+    assert "$selected = [string]($mountedVolumes[0])" in script
+    assert "$selected = [string]$candidates[0]" not in script
+    assert "$selected = [string]$runningVolumes[0]" not in script
+    assert "$selected = [string]$mountedVolumes[0]" not in script
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell scalar/array semantics")
