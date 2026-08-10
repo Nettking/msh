@@ -7,6 +7,7 @@ from typing import Any, Callable
 
 from flask import (
     Flask,
+    abort,
     current_app,
     jsonify,
     redirect,
@@ -201,6 +202,12 @@ def startup():
     return redirect(url_for("capability_startup_transition_web.onboarding"), code=303)
 
 
+def retired_startup_choice():
+    """Make the former runtime-choice bridge unreachable in the supported product."""
+
+    abort(404)
+
+
 def inject_capability_product_context() -> dict[str, object]:
     config, config_error = _load_product_config()
     return {
@@ -242,6 +249,8 @@ def install_capability_product_routes(app: Flask) -> None:
         endpoint="web.startup",
         view_func=startup,
     )
+    if "web.choose_startup_mode" in app.view_functions:
+        app.view_functions["web.choose_startup_mode"] = retired_startup_choice
 
 
 __all__ = [
@@ -249,6 +258,7 @@ __all__ = [
     "inject_capability_product_context",
     "install_capability_product_routes",
     "recorder_status_snapshot",
+    "retired_startup_choice",
     "startup",
     "status",
 ]
