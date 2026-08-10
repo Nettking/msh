@@ -2,59 +2,91 @@
 
 Status: **current repository handoff**
 
-Reviewed: **2026-08-07 Europe/Oslo**
+Reviewed: **2026-08-11 Europe/Oslo**
 
 ## Repository state
 
-- Repository: `this repository`
+- Repository: `Nettking/msh` (product name: Federated Capability Platform / FCP)
 - Default branch: `main`
-- Documentation hierarchy established by PR #191
-- Published Federation v1 release tag: not created
-- Capability-first Federation implementation: merged baseline
-- Complete physical CF7 acceptance: not accepted
-- CF8 role-first compatibility retirement: blocked
-- OSL integration: planning complete; production implementation not started
+- Always resolve the current `main` head directly before starting work.
+- Published Federation v1 release tag: not created.
+- Capability-first Federation implementation: merged baseline.
+- Role-first installed-product runtime retirement (CF8): merged.
+- Verified manual Federation-wide software updates: merged.
+- Standalone recorder Federation bootstrap/publication and Federation-wide recorder control: merged.
+- Complete physical CF7 acceptance: not accepted.
+- Complete Federation v1 end-to-end acceptance: false.
+- OSL integration: separate planning track; production implementation status is governed by the OSL track documents.
 
-Always start new work from the current `main` head. Do not use a commit recorded in this document as a substitute for checking the repository directly.
-
-Historical phase notes, old branch handoffs, and implementation checkpoints do not override the active documents named below.
+Historical phase notes, branch handoffs, old commit hashes, and pre-CF8 sequencing do not override this current handoff. Acceptance flags are different: only the named acceptance source and a separate evidence-backed review may change them.
 
 ## Track A: capability-first Federation
 
-Authoritative plan:
+Durable product/authority plan:
 
 - [Capability-first Federation plan](federation/active/capability_first_federation_plan.md)
 
-Release-closeout plan:
+Current operational documentation:
 
-- [Federation v1 closeout plan](federation/active/federation_v1_closeout_plan.md)
+- [Federation operations](../federation_operations.md)
+- [Standalone recorder](../standalone_recorder.md)
+- [Current architecture](../architecture.md)
+
+Detailed runtime-update design:
+
+- [Manual Federation-wide FCP updates](federation/active/manual_updates.md)
 
 Acceptance workspace:
 
 - [Federation acceptance documentation](federation/acceptance/)
 
-Current product baseline includes:
+Machine-readable acceptance truth:
 
-- stable device identity;
-- authenticated Federation discovery, verified join, pairing, reconnect, revocation, and local creation;
-- bounded device inspection and optional benchmarks;
-- independent contribution recommendation, intent, enable, disable, suspend, and reconcile behavior;
+```text
+catalog/federation/tests/cf7_acceptance/scenarios.json
+```
+
+### Current merged Federation/product baseline
+
+The installed product now includes:
+
+- stable persistent device identity;
+- authenticated Federation discovery, verified join, signed pairing, reconnect, revocation, and local creation;
 - the required first-run path `Identity -> Federation -> Inspect -> finish setup`;
-- optional benchmark and contribution work after workbench access;
-- read-only Federation product pages and public-safe projections;
-- storage, transport, provider, compute, recorder, recovery, and compatibility authority boundaries;
-- permanent Ubuntu and Windows component and product gates.
+- bounded device inspection and optional benchmark evidence;
+- independent contribution recommendation/intent/enable/disable/suspend/reconcile behavior;
+- capability-first runtime/configuration authority with the former role-first product runtime retired;
+- public-safe Federation overview/detail surfaces plus explicit reviewed mutation surfaces;
+- coordinator-owned **Check for updates** and **Update all devices** with exact-commit host validation and running-runtime proof;
+- Windows/POSIX host-owned update agents and conservative Windows legacy migration bootstrap;
+- a headless MTConnect recorder that can join a Federation using the normal `FCP1-...` pairing flow;
+- recorder-local startup network discovery with first-configuration auto-selection;
+- local-first checkpoint-gated recorder publication through Federation logical-storage authority;
+- `/federation/recorders` control from any trusted Federation device for bounded recorder-local scans and add/remove source selection;
+- storage, transport, AI/provider, compute/job/artifact, recovery, fencing, and authority boundaries;
+- permanent Ubuntu and Windows component/product/release gates.
+
+The pairing-code UX currently issues signed one-use codes valid for up to 10 minutes and permits a fresh code to be generated when another attempt is required.
+
+A successful software activation remains internally `runtime_verified`; the UI presents that terminal success as **Updated**.
+
+### Important current limitation
+
+A standalone recorder launched directly with `python start_recorder.py` is a headless Federation node but does not host the normal Flask update-event processor/host update agent. The current **Update all devices** activation path manages normal FCP installations and their Compose-managed recorder service; it does not restart an independently launched standalone recorder process.
+
+Do not document or claim automatic standalone-recorder self-update until a dedicated bounded updater exists and is accepted.
 
 ### Federation work still open
 
-1. Resolve any verified runtime-parity, persisted-provider, native-host translation, privacy, browser, restart, or multi-host defects.
-2. Freeze one exact candidate only after known blockers are closed.
-3. Execute the complete physical CF7 campaign on that same commit.
-4. Update acceptance flags only through a separate evidence-backed review.
-5. Plan and review CF8 only after CF7 is accepted.
-6. Continue documentation, release-gate, cleanup, and publication work as separate bounded PRs.
+1. Reconcile physical-acceptance instructions with the current post-CF8, update-capable, recorder-capable product baseline.
+2. Resolve any verified runtime-parity, native-host, privacy, browser, restart, multi-host, recorder-control, or update-rollout defects found on the exact candidate.
+3. Freeze one exact candidate only after known blockers are closed.
+4. Execute the complete physical CF7 campaign on that same commit.
+5. Update acceptance flags only through a separate evidence-backed review.
+6. Create a Federation v1 release tag only after the release acceptance contract is satisfied.
+7. Treat any future standalone-recorder update mechanism as a separate bounded authority/security delivery rather than extending peer control implicitly.
 
-Do not restart CF1 or earlier capability-first implementation waves. Do not begin CF8 early.
+Do **not** restart CF1-CF6 implementation waves and do **not** reintroduce role-first runtime authority to solve migration or startup defects.
 
 ## Track B: OSL integration
 
@@ -70,41 +102,21 @@ W3 end-to-end acceptance scenario:
 
 - [Notebook-to-OSL method alignment](../planned-work/method-osl-fcp-alignment.md)
 
-Current OSL reality:
-
-- source, architecture, contract, workflow, file, UI, validation, migration, and delivery analysis exists;
-- the supporting FCP analysis was pinned to an older snapshot and every integration seam must be revalidated against current `main`;
-- no accepted FCP OSL profile, human-authority policy, or compatibility policy has been merged;
-- no canonical `catalog/osl/` production package, persistence, API, UI, AI integration, migration, or current SysML v2 adapter exists;
-- W3 is a multi-delivery acceptance scenario, not permission to implement the entire workflow in one PR.
-
-### Exact next OSL delivery
-
-**D0-A is ready to start now.** It is documentation-only:
-
-1. create `docs/osl_language_profile.md`;
-2. create `docs/osl_authority_boundary.md`;
-3. create `docs/osl_compatibility_policy.md`;
-4. update `docs/agent_notes/osl_sysml_alignment.md`;
-5. obtain research/domain and security/product review;
-6. merge accepted decisions before D1-A begins.
-
-Do not add production OSL modules in D0-A.
+Federation work and OSL work remain separate review boundaries. Before beginning any OSL implementation delivery, re-read the current OSL index/roadmap rather than relying on older Federation handoff text.
 
 ## Cross-track boundaries
 
-- Do not combine Federation acceptance or runtime fixes with OSL implementation.
-- OSL review, approval, or publication grants no Federation, provider, compute, storage, job, artifact, lease, fencing, or machine authority.
+- Do not combine Federation physical acceptance/runtime fixes with OSL production implementation.
+- OSL review, approval, or publication grants no Federation, provider, compute, storage, job, artifact, lease, fencing, update, recorder-control, or machine authority.
 - Federation device identity is not a human OSL reviewer, approver, or publisher identity.
-- OSL mutation remains blocked until server-verifiable human identity, authorization, secure sessions, and CSRF protections are implemented and reviewed.
-- AI remains candidate-only in OSL and cannot sign, approve, publish, or create canonical authority.
+- AI cannot sign, approve, publish, or create canonical human authority merely because it is available as an FCP capability.
 - Existing operator records and legacy SysML exports are compatibility inputs, not proof of OSL conformance.
 
 ## Agent operating discipline
 
 1. Start from updated `main`.
 2. Scope each branch and PR to one named delivery, defect, acceptance unit, or documentation unit.
-3. Declare owned paths before editing shared Flask, setup, navigation, security, persistence, or workflow files.
+3. Declare owned paths before editing shared Flask, setup, navigation, security, persistence, update, recorder-control, or workflow files.
 4. Commit after coherent boundaries so partial work remains recoverable.
 5. Open a draft PR unless the repository owner explicitly requests another state.
 6. Distinguish automated, simulated, browser, physical, multi-host, service, and human evidence.
@@ -114,8 +126,9 @@ Do not add production OSL modules in D0-A.
 ## Resume safety
 
 - Safe to continue Federation closeout and CF7 preparation: **yes**.
-- Safe to mark physical CF7 accepted: **no**.
-- Safe to start CF8: **no**.
-- Safe to start OSL D0-A: **yes**.
-- Safe to start OSL production code: **no**, until D0-A is reviewed and merged.
-- Safe to implement W3 as one PR: **no**.
+- Safe to mark physical CF7 accepted from merged code/green CI alone: **no**.
+- Safe to treat CF8 as future/blocking work: **no; CF8 is already merged for the installed product**.
+- Safe to reintroduce role-first authority for convenience: **no**.
+- Safe to document Federation-wide updates as automatic/background updates: **no; activation remains explicit/manual**.
+- Safe to claim standalone `start_recorder.py` processes are updated by **Update all devices**: **no**.
+- Safe to begin an OSL delivery: only after checking the current OSL track documents and respecting its named prerequisite/review boundaries.
