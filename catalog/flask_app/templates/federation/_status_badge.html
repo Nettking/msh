@@ -1,7 +1,9 @@
 {% macro status_badge(state, label=None, live=False) -%}
-  {% set normalized = (state or 'unknown')|replace('_', '-') %}
+  {% set raw_state = (state or 'unknown')|replace('_', '-') %}
+  {% set normalized = 'complete' if raw_state == 'runtime-verified' else raw_state %}
+  {% set display_label = 'Updated' if raw_state == 'runtime-verified' else (label or normalized|replace('-', ' ')|title) %}
   <span class="federation-status federation-status--{{ normalized }}"{% if live %} role="status" aria-live="polite"{% endif %}>
     <span class="federation-status__dot" aria-hidden="true"></span>
-    {{ label or normalized|replace('-', ' ')|title }}
+    {{ display_label }}
   </span>
 {%- endmacro %}
