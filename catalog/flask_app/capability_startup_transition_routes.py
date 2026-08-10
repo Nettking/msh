@@ -36,9 +36,6 @@ from .capability_onboarding_routes import (
     _secure_response,
     _validate_server_bound_request,
 )
-from .services.capability_config_migration_service import (
-    persist_capability_config_from_setup,
-)
 from .services.capability_contribution_service import (
     get_capability_contribution_service,
 )
@@ -54,18 +51,16 @@ capability_startup_transition_web = Blueprint(
     __name__,
 )
 
-_LEGACY_FALLBACK_SESSION_KEY = "capability_startup_legacy_fallback"
 _ROOT_HANDOFF_SESSION_KEY = "capability_startup_root_handoff_complete"
 _BASE_FIELDS = frozenset({"_csrf_token", "command_id"})
 _SAFE_PREFIXES = ("/onboarding", "/federation", "/docs", "/static")
-_LEGACY_CONTROL_PREFIXES = (
+_TECHNICAL_CONTROL_PREFIXES = (
     "/server-setup/",
     "/status/mtconnect-",
 )
-_LEGACY_CONTROL_PATHS = frozenset(
+_TECHNICAL_CONTROL_PATHS = frozenset(
     {
         "/rescan",
-        "/startup/choose",
         "/status",
         "/status/recorder.json",
     }
@@ -145,7 +140,7 @@ def _transition_message(exc: BaseException) -> str:
         "startup-transition-recorder-source-required": (
             "Select an existing recorder data source before enabling recording."
         ),
-        "startup-transition-capability-config-failed": (
+        "capability-config-migration-failed": (
             "Technical capability configuration could not be migrated safely."
         ),
         "candidate-selection-required": (
@@ -191,7 +186,7 @@ def _degraded_view_model(view_model: dict[str, object]) -> dict[str, object]:
                 "title": "Capability-first startup needs repair",
                 "message": (
                     "The saved transition state was not trusted. Use the guided "
-                    "onboarding repair flow or the explicit legacy fallback."
+                    "capability-first onboarding repair flow."
                 ),
                 "state": "degraded",
                 "state_label": "Repair required",
@@ -199,9 +194,6 @@ def _degraded_view_model(view_model: dict[str, object]) -> dict[str, object]:
                 "next_action": None,
             }
         )
-    actions = view_model.get("actions")
-    if isinstance(actions, dict):
-        actions["legacy_setup_url"] = "/startup?legacy=1&edit=1"
     return view_model
 
 
@@ -254,15 +246,15 @@ def _render_onboarding() -> Response:
     )
 
 
-def _is_legacy_control_path() -> bool:
-    return request.path in _LEGACY_CONTROL_PATHS or request.path.startswith(
-        _LEGACY_CONTROL_PREFIXES
+def _is_technical_control_path() -> bool:
+    return request.path in _TECHNICAL_CONTROL_PATHS or request.path.startswith(
+        _TECHNICAL_CONTROL_PREFIXES
     )
 
 
 @capability_startup_transition_web.before_app_request
 def _startup_transition_gate_and_dispatch() -> Response | None:
-    """Require onboarding until complete without replacing workbench navigation."""
+    """Require capability-first onboarding until the persisted transition completes."""
 
     endpoint = request.endpoint or ""
     if endpoint.startswith("static"):
@@ -277,14 +269,7 @@ def _startup_transition_gate_and_dispatch() -> Response | None:
     if request.path.startswith(_SAFE_PREFIXES):
         return None
 
-    # Compatibility controls remain callable and keep their existing local
-    # authorization checks. CFI-6 changes setup authority, not the established
-    # workbench entry point or its deep links.
-    if _is_legacy_control_path():
-        return None
-
-    if request.path == "/startup" and request.args.get("legacy") == "1":
-        session[_LEGACY_FALLBACK_SESSION_KEY] = True
+    if _is_technical_control_path():
         return None
 
     try:
@@ -301,14 +286,12 @@ def _startup_transition_gate_and_dispatch() -> Response | None:
     if request.path == "/startup":
         if flags["completed"]:
             return redirect(url_for("web.overview"))
-        if flags["needs_migration"]:
-            return redirect(
-                url_for(
-                    "capability_startup_transition_web.onboarding",
-                    step="finish",
-                )
+        return redirect(
+            url_for(
+                "capability_startup_transition_web.onboarding",
+                step="finish" if flags["needs_migration"] else None,
             )
-        return redirect(url_for("capability_startup_transition_web.onboarding"))
+        )
 
     if flags["completed"]:
         if request.path == "/" and not session.get(_ROOT_HANDOFF_SESSION_KEY):
@@ -317,18 +300,13 @@ def _startup_transition_gate_and_dispatch() -> Response | None:
         return None
 
     if request.path == "/":
-        if flags["needs_migration"]:
-            return redirect(
-                url_for(
-                    "capability_startup_transition_web.onboarding",
-                    step="finish",
-                )
+        return redirect(
+            url_for(
+                "capability_startup_transition_web.onboarding",
+                step="finish" if flags["needs_migration"] else None,
             )
-        return redirect(url_for("capability_startup_transition_web.onboarding"))
+        )
 
-    # Existing deep links retain their own compatibility gates. Their redirects
-    # eventually reach /startup, where CFI-6 selects onboarding unless the
-    # operator explicitly requested the legacy fallback.
     return None
 
 
@@ -348,10 +326,6 @@ def _run_transition(*, migration: bool) -> Response:
         assert command_id is not None
         service = get_capability_startup_transition_service()
         if migration:
-            legacy_loader = getattr(service, "legacy_settings", None)
-            legacy_settings = legacy_loader() if callable(legacy_loader) else None
-            if legacy_settings is not None:
-                persist_capability_config_from_setup(legacy_settings)
             service.migrate_legacy(
                 request_id=f"flask-startup-migration-{command_id}"
             )
@@ -384,15 +358,15 @@ def _run_transition(*, migration: bool) -> Response:
             code=303,
         )
 
-    session.pop(_LEGACY_FALLBACK_SESSION_KEY, None)
     flash(message, "success")
-    if migration:
-        destination = url_for(
+    destination = (
+        url_for(
             "capability_startup_transition_web.onboarding",
             step="finish",
         )
-    else:
-        destination = url_for("federation_web.overview")
+        if migration
+        else url_for("federation_web.overview")
+    )
     return redirect(destination, code=303)
 
 

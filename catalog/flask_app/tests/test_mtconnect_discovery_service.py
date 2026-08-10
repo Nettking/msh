@@ -6,7 +6,11 @@ from pathlib import Path
 
 import pytest
 
-from catalog.flask_app.services.capability_config_service import CapabilityConfig
+from catalog.flask_app.services.capability_config_service import (
+    CapabilityConfig,
+    parse_recorder_sources,
+    save_capability_config,
+)
 from catalog.flask_app.services.mtconnect_discovery_service import (
     MAX_CONNECT_TIMEOUT_SECONDS,
     MAX_READ_TIMEOUT_SECONDS,
@@ -14,7 +18,6 @@ from catalog.flask_app.services.mtconnect_discovery_service import (
     MtconnectDiscoveryService,
     validate_scan_cidr,
 )
-from catalog.flask_app.services.server_setup_service import parse_recorder_sources
 
 
 def _probe_xml(
@@ -70,7 +73,7 @@ def _service(
 ) -> MtconnectDiscoveryService:
     return MtconnectDiscoveryService(
         scan_path=tmp_path / "scan.json",
-        settings_path=tmp_path / "settings.json",
+        config_path=tmp_path / "capability-config.json",
         checkpoint_path=tmp_path / "checkpoint.json",
         probe_fetcher=probe_fetcher,
         **kwargs,
@@ -209,7 +212,7 @@ def test_one_agent_with_multiple_devices_is_one_recorder_source(tmp_path) -> Non
     assert len(parse_recorder_sources(merged.recorder_sources)) == 1
 
 
-def test_recommended_cidr_prefers_scan_then_settings_then_checkpoint(
+def test_recommended_cidr_prefers_scan_then_capability_config_then_checkpoint(
     tmp_path,
 ) -> None:
     service = _service(tmp_path, lambda *_args: "")
@@ -220,10 +223,11 @@ def test_recommended_cidr_prefers_scan_then_settings_then_checkpoint(
     config = _config(
         sources="Configured=http://10.22.33.44:5000/current"
     )
+    save_capability_config(config, tmp_path / "capability-config.json")
     assert service.recommended_cidr(config) == "192.168.70.0/25"
 
     (tmp_path / "scan.json").unlink()
-    assert service.recommended_cidr(config) == "10.22.33.0/24"
+    assert service.recommended_cidr() == "10.22.33.0/24"
 
     (tmp_path / "checkpoint.json").write_text(
         json.dumps(

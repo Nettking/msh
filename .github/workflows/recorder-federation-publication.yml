@@ -89,7 +89,6 @@ jobs:
       - name: Ruff recorder publication boundary
         run: >-
           python -m ruff check
-          catalog/mtconnect_recorder/config_bootstrap.py
           catalog/standalone-recorder_v2/standalone-recorder_v2.py
           catalog/flask_app/tests/test_recorder_config_bootstrap.py
           catalog/federation/recorder_delivery.py

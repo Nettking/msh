@@ -1,10 +1,4 @@
-"""Persist technical capability configuration without reviving legacy roles.
-
-The legacy ``server_settings.json`` document is accepted only as migration input.
-Current capability-first completion uses this adapter as the retained CFI-6
-``setup_saver`` seam, so the transition service may keep its old call signature
-without persisting ``deployment_mode`` or ``ai_enabled`` as authority.
-"""
+"""Deterministic one-way migration from retired role settings to CapabilityConfig."""
 
 from __future__ import annotations
 
@@ -16,42 +10,39 @@ from .capability_config_service import (
     CAPABILITY_CONFIG_PATH,
     CapabilityConfig,
     CapabilityConfigError,
-    from_legacy_settings,
     load_capability_config,
     save_capability_config,
 )
-from .server_setup_service import ServerSetupError, ServerSetupSettings
+from .legacy_settings_migration import (
+    LegacySettingsSnapshot,
+    capability_config_from_legacy,
+)
 
 
-def persist_capability_config_from_setup(
-    settings: ServerSetupSettings,
+def persist_migrated_capability_config(
+    legacy: LegacySettingsSnapshot,
     *,
     path: Path | str = CAPABILITY_CONFIG_PATH,
 ) -> CapabilityConfig:
-    """Persist technical values without letting compatibility overwrite them.
+    """Persist technical configuration once, never writing the legacy file.
 
-    If capability-first configuration already exists, it is authoritative for
-    technical parameters and is preserved verbatim. Otherwise the incoming
-    legacy-shaped settings object is projected once into ``CapabilityConfig``.
-    Neither path persists role, completion, or contribution authority fields.
+    Existing capability configuration wins so repeating migration is idempotent and
+    cannot overwrite newer capability-first choices.
     """
 
-    path = Path(path)
+    target = Path(path)
     try:
-        if path.exists():
-            return load_capability_config(
-                path,
-                legacy_loader=lambda: settings,
-            )
-        config = from_legacy_settings(settings)
-        save_capability_config(config, path)
-    except (CapabilityConfigError, ServerSetupError, OSError, TypeError, ValueError) as exc:
+        if target.exists():
+            return load_capability_config(target)
+        config = capability_config_from_legacy(legacy)
+        save_capability_config(config, target)
+        return config
+    except (CapabilityConfigError, OSError, TypeError, ValueError) as exc:
         raise FederationOperationError(
-            "startup-transition-capability-config-failed",
-            "technical capability configuration could not be persisted safely",
-            "capability_config",
+            "capability-config-migration-failed",
+            "legacy technical configuration could not be migrated safely",
+            "configuration",
         ) from exc
-    return config
 
 
-__all__ = ["persist_capability_config_from_setup"]
+__all__ = ["persist_migrated_capability_config"]

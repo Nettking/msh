@@ -234,7 +234,6 @@ def _services(tmp_path: Path, harness: AuthorityHarness, current: list[datetime]
         coordinator_database=coordinator,
         device_name="Contribution laptop",
         discovery_sources=(),
-        setup_loader=lambda: {"configured": False, "user_setup_complete": False},
         clock=clock,
     )
     inspection_adapter = InspectionBenchmarkAdapter()
@@ -242,7 +241,6 @@ def _services(tmp_path: Path, harness: AuthorityHarness, current: list[datetime]
         onboarding_service=onboarding,
         state_database=tmp_path / "onboarding.sqlite3",
         adapters=(inspection_adapter,),
-        setup_loader=lambda: {"configured": False, "user_setup_complete": False},
         inspection_ttl_seconds=900,
         clock=clock,
         system_observer=lambda: {"cpu": {"logical_cores_band": "8-15"}},

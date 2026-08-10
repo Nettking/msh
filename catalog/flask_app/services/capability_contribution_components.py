@@ -1,11 +1,10 @@
-"""Trusted authority components used by CFI-5 contribution composition."""
+"""Trusted authority components used by capability contribution composition."""
 
 from __future__ import annotations
 
 import hashlib
 import os
 from collections.abc import Callable, Mapping
-from typing import Any
 
 from flask import current_app
 
@@ -35,39 +34,20 @@ from catalog.federation.onboarding_models import (
     ContributionPolicyState,
 )
 
+from .capability_config_service import CapabilityConfig
 from .capability_onboarding_service import CapabilityOnboardingService
 from .local_capability_candidates import local_contribution_components
 from .recorder_control_service import get_recorder_control_service
 
 
-def _payload(settings: object | None) -> dict[str, Any]:
-    if settings is None:
-        return {}
-    value = (
-        settings.to_dict()
-        if callable(getattr(settings, "to_dict", None))
-        else settings
-    )
-    return dict(value) if isinstance(value, Mapping) else {}
-
-
-def _provider_label(setup: Mapping[str, Any]) -> str:
-    """Derive a presentation label from configuration, never role authority."""
-
-    if str(setup.get("ai_provider_mode") or "local") == "connected":
-        return str(setup.get("ai_provider_name") or "Connected computer").strip()
+def _provider_label(config: CapabilityConfig) -> str:
+    if config.ai_provider_mode == "connected":
+        return config.ai_provider_name or "Connected computer"
     return "This computer"
 
 
 def _ai_runtime_node_id(federation_node_id: object) -> str:
-    """Map one authenticated opaque Federation ID to a safe local runtime ID.
-
-    Federation node IDs are Ed25519-derived base64url identifiers and may contain
-    uppercase characters. The AI runtime deliberately accepts only lowercase
-    logical identifiers. Hashing the complete public node ID preserves a stable,
-    collision-resistant binding without weakening either contract or exposing a
-    private endpoint.
-    """
+    """Map one authenticated opaque Federation ID to a safe local runtime ID."""
 
     if not isinstance(federation_node_id, str):
         raise FederationValidationError(
@@ -92,7 +72,7 @@ def _ai_runtime_node_id(federation_node_id: object) -> str:
 
 
 def default_policy(
-    setup_loader: Callable[[], object | None],
+    config_loader: Callable[[], CapabilityConfig | None],
 ) -> ContributionPolicyEvaluator:
     recorder = get_recorder_control_service()
 
@@ -104,14 +84,11 @@ def default_policy(
         if (
             candidate.capability_type == "recorder"
             and desired_state is ContributionDesiredState.ENABLED
-            and not recorder.ready(setup_loader())
+            and not recorder.ready(config_loader())
         ):
             return PolicyEvaluation(
                 ContributionPolicyState.BLOCKED,
-                (
-                    "Recorder activation requires existing configured MTConnect "
-                    "sources and the compatible recorder authority."
-                ),
+                "Recorder activation requires configured MTConnect sources.",
             )
         return None
 
@@ -121,40 +98,40 @@ def default_policy(
 def default_components(
     *,
     onboarding_service: CapabilityOnboardingService,
-    setup_loader: Callable[[], object | None],
+    config_loader: Callable[[], CapabilityConfig | None],
 ) -> tuple[tuple[object, ...], tuple[object, ...]]:
-    """Compose existing authorities plus bounded built-in candidates.
+    """Compose candidates from technical config and existing authority seams.
 
-    Built-in compute remains pending until a worker authority activates its
-    registered handler. Built-in storage may bootstrap only when this device is
-    the authenticated federation creator and no storage topology exists; joined
-    devices and established topologies remain control-plane owned.
-
-    A configured Ollama target remains visible as an AI Explainer candidate even
-    when retained compatibility setup had AI disabled. Capability-first
-    onboarding lets the operator review that service explicitly; visibility
-    never enables it.
+    Configuration makes a candidate inspectable; it never activates it. Recorder,
+    AI, compute, and storage authority continues to flow only through contribution
+    intent and the existing control-plane adapters.
     """
 
     sources: list[object] = [RecorderCandidateSource()]
     adapters: list[object] = [
         RecorderContributionAdapter(
             get_recorder_control_service(),
-            settings_provider=setup_loader,
+            settings_provider=config_loader,
         )
     ]
 
-    settings = setup_loader()
-    setup = _payload(settings)
-    model = str(
-        os.environ.get("FCP_AI_MODEL") or setup.get("ai_model") or ""
-    ).strip()
-    base_url = str(
-        os.environ.get("OLLAMA_BASE_URL") or setup.get("ollama_base_url") or ""
-    ).strip()
+    config = config_loader()
+    if config is not None:
+        model = str(os.environ.get("FCP_AI_MODEL") or config.ai_model or "").strip()
+        base_url = str(
+            os.environ.get("OLLAMA_BASE_URL") or config.ollama_base_url or ""
+        ).strip()
+    else:
+        model = str(os.environ.get("FCP_AI_MODEL") or "").strip()
+        base_url = str(os.environ.get("OLLAMA_BASE_URL") or "").strip()
+
     if model and base_url:
         service_id = "ollama-configured"
-        display_label = f"AI Explainer — {_provider_label(setup)}"
+        display_label = (
+            f"AI Explainer — {_provider_label(config)}"
+            if config is not None
+            else "AI Explainer — This computer"
+        )
         sources.append(
             AICandidateSource(
                 {
@@ -196,14 +173,13 @@ def default_components(
                     "provider_id",
                     "AI contribution lacks its logical provider identity",
                 )
-            federation_node_id = context.credentials.identity.node_id
             return OllamaLanguageModelProvider(
                 session_id=manager.session_id,
                 display_name=candidate.display_label,
                 base_url=base_url,
                 models=(model,),
                 capability_id=provider_id,
-                node_id=_ai_runtime_node_id(federation_node_id),
+                node_id=_ai_runtime_node_id(context.credentials.identity.node_id),
             )
 
         adapters.append(

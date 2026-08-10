@@ -1,0 +1,128 @@
+name: CF8 role retirement
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/cf8-role-retirement.yml"
+      - "catalog/command_setup.py"
+      - "catalog/orchestrator/capability_startup.py"
+      - "catalog/flask_app/**"
+      - "catalog/mtconnect_recorder/**"
+      - "catalog/federation/onboarding_compat.py"
+      - "setup_fcp.py"
+  push:
+    branches:
+      - main
+      - "agent/cf8-*"
+    paths:
+      - ".github/workflows/cf8-role-retirement.yml"
+      - "catalog/command_setup.py"
+      - "catalog/orchestrator/capability_startup.py"
+      - "catalog/flask_app/**"
+      - "catalog/mtconnect_recorder/**"
+      - "catalog/federation/onboarding_compat.py"
+      - "setup_fcp.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cf8-role-retirement-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  role-retirement:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+      - name: Compile CF8 runtime and migration boundary
+        run: >-
+          python -m compileall -q
+          catalog/command_setup.py
+          catalog/orchestrator/capability_startup.py
+          catalog/flask_app/app.py
+          catalog/flask_app/ai_routes.py
+          catalog/flask_app/server_setup_routes.py
+          catalog/flask_app/capability_product_routes.py
+          catalog/flask_app/capability_startup_transition_routes.py
+          catalog/flask_app/services/capability_config_service.py
+          catalog/flask_app/services/capability_ai_service.py
+          catalog/flask_app/services/capability_config_migration_service.py
+          catalog/flask_app/services/legacy_settings_migration.py
+          catalog/flask_app/services/capability_startup_transition_service.py
+          catalog/flask_app/services/capability_contribution_service.py
+          catalog/flask_app/services/capability_inspection_service.py
+          catalog/flask_app/services/capability_recovery_adapters.py
+          catalog/flask_app/services/recorder_control_service.py
+          catalog/flask_app/services/mtconnect_discovery_service.py
+          catalog/flask_app/tests/test_cf8_role_retirement.py
+      - name: Run CF8 anti-regression acceptance
+        id: cf8_acceptance
+        continue-on-error: true
+        run: >-
+          python -m pytest -o addopts= -q
+          --junitxml=cf8-acceptance.xml
+          catalog/flask_app/tests/test_cf8_role_retirement.py
+      - name: Upload CF8 acceptance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cf8-acceptance-${{ matrix.os }}
+          path: cf8-acceptance.xml
+          if-no-files-found: error
+      - name: Enforce CF8 acceptance
+        if: steps.cf8_acceptance.outcome != 'success'
+        shell: bash
+        run: exit 1
+      - name: Run affected capability-first tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_capability_config_migration_service.py
+          catalog/flask_app/tests/test_capability_startup_transition_route.py
+          catalog/flask_app/tests/test_capability_contribution_route.py
+          catalog/flask_app/tests/test_capability_inspection_route.py
+          catalog/flask_app/tests/test_mtconnect_discovery_service.py
+      - name: Ruff CF8 boundary
+        run: >-
+          python -m ruff check
+          catalog/command_setup.py
+          catalog/orchestrator/capability_startup.py
+          catalog/flask_app/app.py
+          catalog/flask_app/ai_routes.py
+          catalog/flask_app/server_setup_routes.py
+          catalog/flask_app/capability_product_routes.py
+          catalog/flask_app/services/capability_config_service.py
+          catalog/flask_app/services/capability_ai_service.py
+          catalog/flask_app/services/capability_config_migration_service.py
+          catalog/flask_app/services/legacy_settings_migration.py
+          catalog/flask_app/services/capability_startup_transition_service.py
+          catalog/flask_app/services/capability_contribution_service.py
+          catalog/flask_app/services/capability_inspection_service.py
+          catalog/flask_app/services/capability_recovery_adapters.py
+          catalog/flask_app/services/recorder_control_service.py
+          catalog/flask_app/services/mtconnect_discovery_service.py
+          catalog/flask_app/tests/test_cf8_role_retirement.py
+      - name: Diff hygiene
+        shell: bash
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git diff --check "origin/${{ github.base_ref }}...HEAD"
+          else
+            git diff --check HEAD^ HEAD
+          fi

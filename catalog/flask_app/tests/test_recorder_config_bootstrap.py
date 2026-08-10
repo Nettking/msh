@@ -1,43 +1,57 @@
 from __future__ import annotations
 
 import json
-from dataclasses import replace
 
 import pytest
 
+from catalog.flask_app.services.capability_config_migration_service import (
+    persist_migrated_capability_config,
+)
 from catalog.flask_app.services.capability_config_service import (
     CapabilityConfig,
     load_capability_config,
     save_capability_config,
 )
-from catalog.flask_app.services.server_setup_service import (
-    default_settings,
-    save_settings,
-)
-from catalog.mtconnect_recorder.config_bootstrap import (
-    ensure_recorder_capability_config,
+from catalog.flask_app.services.legacy_settings_migration import (
+    LegacySettingsMigrationError,
+    load_legacy_settings,
 )
 
 
-def test_upgrade_bootstrap_projects_legacy_technical_values_without_role(tmp_path) -> None:
+def _write_legacy(path, **overrides) -> None:
+    payload = {
+        "schema": "fcp.server_setup.v3",
+        "configured": True,
+        "user_setup_complete": True,
+        "deployment_mode": "web-ui-only",
+        "ai_enabled": False,
+        "ai_provider_mode": "local",
+        "ai_provider_name": "This computer",
+        "ai_profile": "laptop-standard",
+        "ai_model": "llama3.2:3b",
+        "ollama_base_url": "http://ollama:11434",
+        "recorder_sources": "Mazak=http://192.168.200.10:5000/current",
+        "recorder_poll_interval": "0.5",
+        "recorder_include_condition": True,
+        "updated_at": "2026-08-10T02:00:00Z",
+    }
+    payload.update(overrides)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(payload), encoding="utf-8")
+
+
+def test_explicit_upgrade_projects_legacy_technical_values_without_role(
+    tmp_path,
+) -> None:
     config_path = tmp_path / "capabilities" / "config.json"
     legacy_path = tmp_path / "server_setup" / "server_settings.json"
-    legacy = replace(
-        default_settings(configured=True),
-        deployment_mode="web-ui-only",
-        ai_enabled=False,
-        recorder_sources="Mazak=http://192.168.200.10:5000/current",
-        recorder_poll_interval="0.5",
-        recorder_include_condition=True,
-    )
-    save_settings(legacy, legacy_path)
+    _write_legacy(legacy_path)
 
-    migrated = ensure_recorder_capability_config(
-        config_path=config_path,
-        legacy_path=legacy_path,
-    )
+    legacy = load_legacy_settings(legacy_path)
+    assert legacy is not None
+    migrated = persist_migrated_capability_config(legacy, path=config_path)
 
-    assert migrated is True
+    assert migrated.recorder_sources == "Mazak=http://192.168.200.10:5000"
     payload = json.loads(config_path.read_text(encoding="utf-8"))
     assert payload["schema"] == "fcp.capability_config.v1"
     assert payload["recorder_sources"] == "Mazak=http://192.168.200.10:5000"
@@ -47,7 +61,9 @@ def test_upgrade_bootstrap_projects_legacy_technical_values_without_role(tmp_pat
     assert "ai_enabled" not in payload
 
 
-def test_upgrade_bootstrap_never_overwrites_existing_capability_config(tmp_path) -> None:
+def test_explicit_upgrade_never_overwrites_existing_capability_config(
+    tmp_path,
+) -> None:
     config_path = tmp_path / "capabilities" / "config.json"
     legacy_path = tmp_path / "server_setup" / "server_settings.json"
     current = CapabilityConfig(
@@ -62,47 +78,39 @@ def test_upgrade_bootstrap_never_overwrites_existing_capability_config(tmp_path)
         updated_at="2026-08-10T02:00:00Z",
     )
     save_capability_config(current, config_path)
-    save_settings(
-        replace(
-            default_settings(configured=True),
-            deployment_mode="recorder-only",
-            recorder_sources="Legacy=http://10.0.0.99:5000",
-        ),
+    _write_legacy(
         legacy_path,
+        deployment_mode="recorder-only",
+        recorder_sources="Legacy=http://10.0.0.99:5000",
     )
 
-    migrated = ensure_recorder_capability_config(
-        config_path=config_path,
-        legacy_path=legacy_path,
-    )
+    legacy = load_legacy_settings(legacy_path)
+    assert legacy is not None
+    migrated = persist_migrated_capability_config(legacy, path=config_path)
 
-    assert migrated is False
-    restored = load_capability_config(config_path)
-    assert restored.recorder_sources == "Current=http://10.0.0.10:5000"
-    assert restored.recorder_poll_interval == "0.75"
+    assert migrated == load_capability_config(config_path)
+    assert migrated.recorder_sources == "Current=http://10.0.0.10:5000"
+    assert migrated.recorder_poll_interval == "0.75"
 
 
-def test_upgrade_bootstrap_is_noop_without_legacy_input(tmp_path) -> None:
+def test_explicit_upgrade_is_noop_without_legacy_input(tmp_path) -> None:
     config_path = tmp_path / "capabilities" / "config.json"
 
-    migrated = ensure_recorder_capability_config(
-        config_path=config_path,
-        legacy_path=tmp_path / "missing.json",
-    )
+    legacy = load_legacy_settings(tmp_path / "missing.json")
 
-    assert migrated is False
+    assert legacy is None
     assert not config_path.exists()
 
 
-def test_upgrade_bootstrap_rejects_corrupt_legacy_input(tmp_path) -> None:
+def test_explicit_upgrade_rejects_corrupt_legacy_input(tmp_path) -> None:
     config_path = tmp_path / "capabilities" / "config.json"
     legacy_path = tmp_path / "server_settings.json"
     legacy_path.write_text("{not-json", encoding="utf-8")
 
-    with pytest.raises(RuntimeError, match="could not be migrated safely"):
-        ensure_recorder_capability_config(
-            config_path=config_path,
-            legacy_path=legacy_path,
-        )
+    with pytest.raises(
+        LegacySettingsMigrationError,
+        match="Could not read legacy server settings",
+    ):
+        load_legacy_settings(legacy_path)
 
     assert not config_path.exists()

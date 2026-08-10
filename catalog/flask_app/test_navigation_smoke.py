@@ -7,9 +7,12 @@ from catalog.flask_app import app as app_module
 from catalog.flask_app import capability_product_routes
 from catalog.flask_app import capability_startup_transition_routes as transition_routes
 from catalog.flask_app import routes as routes_module
+from catalog.flask_app import server_setup_routes as setup_routes_module
 from catalog.flask_app.app import create_app
-from catalog.flask_app.services.capability_config_service import from_legacy_settings
-from catalog.flask_app.services.server_setup_service import default_settings
+from catalog.flask_app.services.capability_config_service import (
+    CapabilityConfig,
+    default_capability_config,
+)
 
 
 class FakeRuntimeManager:
@@ -36,40 +39,30 @@ class FakeRuntimeManager:
 
 
 class FakeStartupTransition:
-    def __init__(self, settings) -> None:
-        self.settings = settings
+    def __init__(
+        self,
+        *,
+        completed: bool,
+        enabled: frozenset[str],
+    ) -> None:
+        self.completed = completed
+        self.enabled = enabled
 
     def capability_flags(self) -> dict[str, object]:
-        complete = bool(
-            self.settings.configured and self.settings.user_setup_complete
-        )
-        mode = self.settings.deployment_mode
-        recorder = complete and mode in {"full-server", "recorder-only"}
-        workbench = complete and mode not in {
-            "recorder-only",
-            "language-model-provider",
-        }
-        runtime = complete and mode in {"full-server", "web-workbench"}
-        language_model = complete and (
-            mode in {
-                "full-server",
-                "web-workbench",
-                "web-ui-only",
-                "language-model-provider",
-            }
-            and self.settings.ai_enabled
-        )
+        def is_enabled(capability: str) -> bool:
+            return self.completed and capability in self.enabled
+
         return {
-            "workbench": workbench,
-            "runtime": runtime,
-            "recorder": recorder,
-            "language_model": language_model,
+            "workbench": is_enabled("workbench"),
+            "runtime": is_enabled("runtime"),
+            "recorder": is_enabled("recorder"),
+            "language_model": is_enabled("language_model"),
             "compute": False,
             "storage": False,
-            "completed": complete,
+            "completed": self.completed,
             "needs_migration": False,
-            "source": "capability-first" if complete else "unconfigured",
-            "state": object() if complete else None,
+            "source": "capability-first" if self.completed else "unconfigured",
+            "state": object() if self.completed else None,
         }
 
 
@@ -84,24 +77,23 @@ def _patch_runtime(monkeypatch, *, requires_choice: bool = False) -> None:
     )
 
 
-def _patch_setup(monkeypatch, settings=None) -> None:
-    configured_settings = settings or default_settings(configured=True)
-
-    def load_configured_settings():
-        return configured_settings
-
-    monkeypatch.setattr(app_module, "load_settings", load_configured_settings)
-    monkeypatch.setattr(routes_module, "load_settings", load_configured_settings)
+def _patch_setup(
+    monkeypatch,
+    config: CapabilityConfig | None = None,
+    *,
+    completed: bool = True,
+    enabled: frozenset[str] = frozenset(
+        {"workbench", "runtime", "recorder", "language_model"}
+    ),
+    recorder_active: bool = False,
+) -> None:
+    configured = config or default_capability_config()
+    transition = FakeStartupTransition(completed=completed, enabled=enabled)
     monkeypatch.setattr(
-        capability_product_routes,
-        "load_settings",
-        load_configured_settings,
+        app_module,
+        "get_capability_startup_transition_service",
+        lambda: transition,
     )
-    monkeypatch.setattr(
-        "catalog.flask_app.server_setup_routes.load_settings",
-        load_configured_settings,
-    )
-    transition = FakeStartupTransition(configured_settings)
     monkeypatch.setattr(
         transition_routes,
         "get_capability_startup_transition_service",
@@ -112,19 +104,15 @@ def _patch_setup(monkeypatch, settings=None) -> None:
         "get_capability_startup_transition_service",
         lambda: transition,
     )
-    config = from_legacy_settings(configured_settings)
     monkeypatch.setattr(
         capability_product_routes,
         "_load_product_config",
-        lambda: (config, ""),
+        lambda: (configured, ""),
     )
-    # Navigation smoke uses configured recorder sources as a compact stand-in for
-    # an already ACTIVE contribution. Tests that exercise authority fencing
-    # override this seam explicitly.
     monkeypatch.setattr(
         capability_product_routes,
         "_active_recorder_contribution",
-        lambda: bool(configured_settings.recorder_sources),
+        lambda: recorder_active,
     )
 
 
@@ -148,10 +136,6 @@ def test_main_navigation_pages_load(monkeypatch, tmp_path) -> None:
         ("/", "Overview"),
         ("/guide", "How to use FCP"),
         ("/get-started", "What do you want to do first?"),
-        (
-            "/startup?legacy=1",
-            "Legacy device-role setup has been retired",
-        ),
         ("/sources/", "Sources"),
         ("/status", "Diagnostics"),
         ("/operator-strategies", "Knowledge workspace"),
@@ -188,7 +172,7 @@ def test_get_started_is_a_focused_task_handoff(monkeypatch, tmp_path) -> None:
     assert "Full workbench" in html
 
 
-def test_main_pages_include_mobile_navigation_but_compatibility_notice_does_not(
+def test_main_pages_include_mobile_navigation_and_retired_startup_redirects(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -202,13 +186,13 @@ def test_main_pages_include_mobile_navigation_but_compatibility_notice_does_not(
     _open_returning_device(client)
 
     overview = client.get("/").get_data(as_text=True)
-    notice = client.get("/startup?legacy=1").get_data(as_text=True)
+    startup_response = client.get("/startup?legacy=1")
 
     assert 'data-mobile-navigation' in overview
     assert 'aria-label="Mobile primary sections"' in overview
     assert "Rescan now" in overview
-    assert 'data-mobile-navigation' not in notice
-    assert "Legacy device-role setup has been retired" in notice
+    assert startup_response.status_code == 302
+    assert startup_response.location == "/"
 
 
 def test_knowledge_navigation_opens_a_choice_page(monkeypatch, tmp_path) -> None:
@@ -235,24 +219,26 @@ def test_knowledge_navigation_opens_a_choice_page(monkeypatch, tmp_path) -> None
     assert 'href="/osl-export"' in knowledge_html
 
 
-def test_legacy_recorder_only_setting_no_longer_scopes_product(
+def test_recorder_configuration_does_not_scope_product_navigation(
     monkeypatch,
     tmp_path,
 ) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch, requires_choice=True)
-    settings = replace(
-        default_settings(configured=True),
-        deployment_mode="recorder-only",
-        ai_enabled=False,
+    config = replace(
+        default_capability_config(),
         recorder_sources="M8015RW221N=http://192.168.200.101:5000",
     )
-    _patch_setup(monkeypatch, settings)
+    _patch_setup(monkeypatch, config)
 
     def fail_if_ollama_is_contacted(*_args, **_kwargs):
         raise AssertionError("Diagnostics must not probe Ollama implicitly.")
 
-    monkeypatch.setattr(app_module, "ollama_status", fail_if_ollama_is_contacted)
+    monkeypatch.setattr(
+        setup_routes_module,
+        "ollama_status",
+        fail_if_ollama_is_contacted,
+    )
 
     app = create_app()
     app.config.update(TESTING=True)
@@ -284,12 +270,11 @@ def test_configured_recorder_is_visible_before_runtime_choice(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch, requires_choice=True)
-    settings = replace(
-        default_settings(configured=True),
-        deployment_mode="full-server",
+    config = replace(
+        default_capability_config(),
         recorder_sources="MAZAK-001=http://192.168.200.249:5000",
     )
-    _patch_setup(monkeypatch, settings)
+    _patch_setup(monkeypatch, config)
 
     app = create_app()
     app.config.update(TESTING=True)
@@ -306,18 +291,11 @@ def test_recorder_live_status_endpoint_is_small_fresh_and_authority_scoped(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch, requires_choice=True)
-    settings = replace(
-        default_settings(configured=True),
-        deployment_mode="recorder-only",
-        ai_enabled=False,
+    config = replace(
+        default_capability_config(),
         recorder_sources="M8015RW221N=http://192.168.200.101:5000",
     )
-    _patch_setup(monkeypatch, settings)
-    monkeypatch.setattr(
-        capability_product_routes,
-        "_active_recorder_contribution",
-        lambda: True,
-    )
+    _patch_setup(monkeypatch, config, recorder_active=True)
 
     class FakeRecorder:
         calls = 0
@@ -406,16 +384,11 @@ def test_recorder_live_status_endpoint_rejects_inactive_contribution(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
-    settings = replace(
-        default_settings(configured=True),
+    config = replace(
+        default_capability_config(),
         recorder_sources="M8015RW221N=http://192.168.200.101:5000",
     )
-    _patch_setup(monkeypatch, settings)
-    monkeypatch.setattr(
-        capability_product_routes,
-        "_active_recorder_contribution",
-        lambda: False,
-    )
+    _patch_setup(monkeypatch, config, recorder_active=False)
 
     app = create_app()
     app.config.update(TESTING=True)
@@ -435,7 +408,7 @@ def test_recorder_live_status_endpoint_returns_json_when_setup_is_incomplete(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     _patch_runtime(monkeypatch)
-    _patch_setup(monkeypatch, default_settings(configured=False))
+    _patch_setup(monkeypatch, completed=False)
 
     app = create_app()
     app.config.update(TESTING=True)

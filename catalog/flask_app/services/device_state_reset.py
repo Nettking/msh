@@ -41,6 +41,8 @@ class ResolvedStatePaths:
     contribution: Path
     coordinator: Path
     remote_pairing: Path
+    capabilities: Path
+    capability_config: Path
     server_setup: Path
     server_settings: Path
 
@@ -113,6 +115,7 @@ def resolved_state_paths(
         onboarding.with_name("remote_pairing.json"),
         app_root=root,
     )
+    capabilities = (data_root / "capabilities").resolve(strict=False)
     server_setup = (data_root / "server_setup").resolve(strict=False)
 
     return ResolvedStatePaths(
@@ -126,6 +129,8 @@ def resolved_state_paths(
         contribution=contribution,
         coordinator=coordinator,
         remote_pairing=remote_pairing,
+        capabilities=capabilities,
+        capability_config=capabilities / "config.json",
         server_setup=server_setup,
         server_settings=server_setup / "server_settings.json",
     )
@@ -164,8 +169,6 @@ def planned_reset_targets(
     bounded_roots = (paths.data_root, paths.relay_root)
 
     candidates = (
-        # Remove configured locations even when an operator moved them away from
-        # the defaults while keeping them inside the mounted state roots.
         ResetTarget("device identity and node state", paths.identity, "tree"),
         ResetTarget(
             "onboarding and saved Federation binding",
@@ -177,15 +180,18 @@ def planned_reset_targets(
         ResetTarget("contribution state", paths.contribution, "sqlite"),
         ResetTarget("Federation coordinator authority", paths.coordinator, "sqlite"),
         ResetTarget("remote pairing state", paths.remote_pairing, "file"),
-        # Also remove the complete retained roots. Older deliveries used more
-        # than one filename/layout under these directories.
+        ResetTarget(
+            "all capability configuration",
+            paths.capabilities,
+            "tree",
+        ),
         ResetTarget(
             "all default and legacy Federation device state",
             paths.data_root / "federation",
             "tree",
         ),
         ResetTarget(
-            "all saved server and device setup",
+            "all retained legacy server setup",
             paths.server_setup,
             "tree",
         ),
@@ -288,7 +294,6 @@ def verify_fresh_application_state(
     from .capability_onboarding_service import FederationBindingStore
     from .capability_startup_transition_service import CapabilityStartupStateStore
     from .federation_pairing_service import RemotePairingStore
-    from .server_setup_service import load_settings
 
     paths = resolved_state_paths(
         environ=environ,
@@ -344,15 +349,10 @@ def verify_fresh_application_state(
         if remote_pairing is not None:
             problems.append("saved remote Federation pairing still exists")
 
-    try:
-        settings = load_settings(paths.server_settings)
-    except Exception as exc:  # noqa: BLE001
-        problems.append(f"saved device setup is unreadable: {type(exc).__name__}")
-    else:
-        if settings.configured or settings.user_setup_complete:
-            problems.append(
-                f"saved device setup still exists: {settings.deployment_mode}"
-            )
+    if paths.capability_config.exists():
+        problems.append("capability configuration still exists")
+    if paths.server_settings.exists():
+        problems.append("retained legacy server settings still exist")
 
     return tuple(problems)
 
@@ -378,7 +378,7 @@ def main() -> int:
                 return 1
             print(
                 "fresh verification passed: identity, onboarding, Federation, "
-                "inspection, and legacy setup are empty"
+                "inspection, capability configuration, and retained legacy setup are empty"
             )
             return 0
 
@@ -387,8 +387,8 @@ def main() -> int:
         print(f"fresh reset failed: {exc}")
         return 1
     print(
-        "fresh reset completed: configured and legacy device/Federation state "
-        "was removed"
+        "fresh reset completed: configured and retained legacy device/Federation "
+        "state was removed"
     )
     return 0
 

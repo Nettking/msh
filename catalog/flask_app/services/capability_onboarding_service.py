@@ -18,11 +18,7 @@ from catalog.federation.errors import (
     FederationOperationError,
     FederationValidationError,
 )
-from catalog.federation.onboarding_compat import (
-    LegacySetupMigrationPreview,
-    federation_id_from_session_id,
-    preview_legacy_setup,
-)
+from catalog.federation.onboarding_compat import federation_id_from_session_id
 from catalog.federation.onboarding_discovery import (
     ConfiguredFederationDiscoveryAdapter,
     FederationDiscoveryCandidate,
@@ -39,13 +35,6 @@ from catalog.node.identity import (
     IdentityStore,
     NodeCredentials,
     NodeIdentityStateError,
-)
-
-from .server_setup_service import (
-    COMMAND_ONLY_DEPLOYMENT_MODES,
-    DEPLOYMENT_MODES,
-    ServerSetupError,
-    load_settings,
 )
 
 _MAX_BINDING_BYTES = 65_536
@@ -215,8 +204,7 @@ class FederationBindingStore:
                     if (
                         current.device_id != binding.device_id
                         or current.federation_id != binding.federation_id
-                        or current.internal_session_id
-                        != binding.internal_session_id
+                        or current.internal_session_id != binding.internal_session_id
                     ):
                         raise FederationValidationError(
                             "onboarding-binding-replacement-forbidden",
@@ -286,7 +274,6 @@ class CapabilityOnboardingService:
             Iterable[FederationDiscoverySource]
             | Callable[[], Iterable[FederationDiscoverySource]]
         ) = (),
-        setup_loader: Callable[[], object] = load_settings,
         clock: Callable[[], datetime] = _utc_now,
     ) -> None:
         self.identity_store = IdentityStore(
@@ -301,7 +288,6 @@ class CapabilityOnboardingService:
             else None
         )
         self._discovery_sources = discovery_sources
-        self._setup_loader = setup_loader
         self._clock = clock
         self._lock = threading.RLock()
         self._discovery: FederationOnboardingDiscoveryService | None = None
@@ -469,26 +455,10 @@ class CapabilityOnboardingService:
             coordinator=self.coordinator,
         )
 
-    def legacy_preview(self) -> LegacySetupMigrationPreview | None:
-        try:
-            settings = self._setup_loader()
-        except ServerSetupError:
-            return None
-        payload = (
-            settings.to_dict()
-            if callable(getattr(settings, "to_dict", None))
-            else settings
-        )
-        if not isinstance(payload, dict):
-            return None
-        if not payload.get("configured") and not payload.get(
-            "user_setup_complete"
-        ):
-            return None
-        try:
-            return preview_legacy_setup(payload, created_at=self._clock())
-        except FederationValidationError:
-            return None
+    def legacy_preview(self) -> None:
+        """CFI-2 never reads retired setup; CFI-6 exclusively owns migration."""
+
+        return
 
     @staticmethod
     def _candidate_model(
@@ -516,41 +486,12 @@ class CapabilityOnboardingService:
         }
 
     @staticmethod
-    def _migration_model(
-        preview: LegacySetupMigrationPreview | None,
-    ) -> dict[str, object]:
-        if preview is None:
-            return {
-                "visible": False,
-                "source_label": "",
-                "preserved": [],
-                "warnings": [],
-            }
-        definitions = {
-            **DEPLOYMENT_MODES,
-            **COMMAND_ONLY_DEPLOYMENT_MODES,
-        }
-        source = definitions.get(preview.source_mode, {})
-        capability_labels = {
-            "workbench": "Workbench access",
-            "runtime": "Background runtime behavior",
-            "recorder": "Recorder behavior",
-            "language-model": "Language-model configuration",
-            "compute": "Compute contribution",
-            "storage": "Storage contribution",
-        }
-        preserved = [
-            capability_labels[key]
-            for key, state in preview.contribution_intents.items()
-            if state == "enabled"
-        ]
-        if preview.preserved_private_fields:
-            preserved.append("Private connection settings remain local")
+    def _migration_model(_preview: object | None) -> dict[str, object]:
         return {
-            "visible": True,
-            "source_label": source.get("label", preview.source_mode),
-            "preserved": preserved,
-            "warnings": list(preview.warnings),
+            "visible": False,
+            "source_label": "",
+            "preserved": [],
+            "warnings": [],
         }
 
     def build_view_model(
@@ -560,7 +501,7 @@ class CapabilityOnboardingService:
         saved_binding: FederationSessionBinding | None,
         connected_binding: FederationSessionBinding | None,
         candidates: tuple[FederationDiscoveryResult, ...],
-        preview: LegacySetupMigrationPreview | None,
+        preview: object | None,
         csrf_token: str,
         command_id: str,
         requested_step: str | None,
@@ -635,7 +576,7 @@ class CapabilityOnboardingService:
             {
                 "key": "finish",
                 "label": "Finish",
-                "summary": "Full CF7 remains blocked",
+                "summary": "Full capability startup remains blocked",
                 "available": False,
             },
         ]
@@ -716,9 +657,7 @@ class CapabilityOnboardingService:
                     "url": "/onboarding?step=federation",
                 },
                 "can_create_local": (
-                    identity_ready
-                    and not connected
-                    and not candidates
+                    identity_ready and not connected and not candidates
                 ),
                 "can_reconnect": saved_binding is not None and not connected,
                 "connected_label": (

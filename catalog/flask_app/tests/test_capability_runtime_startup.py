@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from threading import RLock
+
 from flask import Flask
 
 from catalog.flask_app import app as app_module
+from catalog.orchestrator import capability_startup
 
 
 class _Transition:
@@ -22,23 +25,30 @@ class _Transition:
 class _Runtime:
     def __init__(self, *, pending: bool) -> None:
         self.pending = pending
-        self.choices: list[str] = []
+        self._lock = RLock()
+        self.applied_modes: list[tuple[str, str]] = []
 
     def requires_startup_choice(self) -> bool:
         return self.pending
 
-    def choose_startup_mode(self, mode: str) -> tuple[bool, str]:
-        self.choices.append(mode)
+    def _apply_startup_mode(self, mode: str, *, source: str) -> None:
+        self.applied_modes.append((mode, source))
         self.pending = False
-        return True, "started"
 
 
-def test_completed_capability_setup_continues_existing_runtime(
-    monkeypatch,
-) -> None:
-    app = Flask(__name__)
-    transition = _Transition(completed=True)
+def test_capability_runtime_preparation_continues_existing_runtime() -> None:
     runtime = _Runtime(pending=True)
+
+    prepared = capability_startup.prepare_capability_runtime(runtime)  # type: ignore[arg-type]
+
+    assert prepared is runtime
+    assert runtime.applied_modes == [("continue_existing", "capability")]
+    assert runtime.requires_startup_choice() is False
+
+
+def test_runtime_handoff_has_no_legacy_setup_argument(monkeypatch) -> None:
+    app = Flask(__name__)
+    transition = _Transition(completed=False, runtime=False)
     background_starts: list[str] = []
 
     monkeypatch.setattr(
@@ -46,59 +56,42 @@ def test_completed_capability_setup_continues_existing_runtime(
         "get_capability_startup_transition_service",
         lambda: transition,
     )
-    monkeypatch.setattr(app_module, "get_runtime_manager", lambda: runtime)
     monkeypatch.setattr(
         app_module,
-        "start_runtime_background",
+        "start_capability_runtime_background",
         lambda: background_starts.append("started"),
     )
 
     state = app_module._start_runtime_from_capability_state(app)
 
-    assert state == "started"
+    assert state == "disabled"
     assert transition.calls == 1
-    assert runtime.choices == ["continue_existing"]
     assert background_starts == []
-    assert runtime.requires_startup_choice() is False
 
 
-def test_runtime_handoff_has_no_legacy_setup_argument(monkeypatch) -> None:
+def test_incomplete_legacy_preview_cannot_start_runtime(
+    monkeypatch,
+) -> None:
     app = Flask(__name__)
-    transition = _Transition(completed=False, runtime=False)
-    runtime = _Runtime(pending=True)
+    transition = _Transition(completed=False)
+    background_starts: list[str] = []
 
     monkeypatch.setattr(
         app_module,
         "get_capability_startup_transition_service",
         lambda: transition,
     )
-    monkeypatch.setattr(app_module, "get_runtime_manager", lambda: runtime)
+    monkeypatch.setattr(
+        app_module,
+        "start_capability_runtime_background",
+        lambda: background_starts.append("started"),
+    )
 
     state = app_module._start_runtime_from_capability_state(app)
 
     assert state == "disabled"
     assert transition.calls == 1
-    assert runtime.choices == []
-
-
-def test_incomplete_legacy_preview_keeps_explicit_runtime_choice(
-    monkeypatch,
-) -> None:
-    app = Flask(__name__)
-    transition = _Transition(completed=False)
-    runtime = _Runtime(pending=True)
-
-    monkeypatch.setattr(
-        app_module,
-        "get_capability_startup_transition_service",
-        lambda: transition,
-    )
-    monkeypatch.setattr(app_module, "get_runtime_manager", lambda: runtime)
-
-    state = app_module._start_runtime_from_capability_state(app)
-
-    assert state == "legacy-choice-required"
-    assert runtime.choices == []
+    assert background_starts == []
 
 
 def test_resolved_capability_runtime_starts_existing_background_entrypoint(
@@ -106,7 +99,6 @@ def test_resolved_capability_runtime_starts_existing_background_entrypoint(
 ) -> None:
     app = Flask(__name__)
     transition = _Transition(completed=True)
-    runtime = _Runtime(pending=False)
     background_starts: list[str] = []
 
     monkeypatch.setattr(
@@ -114,10 +106,9 @@ def test_resolved_capability_runtime_starts_existing_background_entrypoint(
         "get_capability_startup_transition_service",
         lambda: transition,
     )
-    monkeypatch.setattr(app_module, "get_runtime_manager", lambda: runtime)
     monkeypatch.setattr(
         app_module,
-        "start_runtime_background",
+        "start_capability_runtime_background",
         lambda: background_starts.append("started"),
     )
 
@@ -125,5 +116,4 @@ def test_resolved_capability_runtime_starts_existing_background_entrypoint(
 
     assert state == "started"
     assert transition.calls == 1
-    assert runtime.choices == []
     assert background_starts == ["started"]

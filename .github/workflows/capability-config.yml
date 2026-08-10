@@ -84,7 +84,6 @@ jobs:
           catalog/flask_app/server_setup_routes.py
           catalog/flask_app/services/capability_config_migration_service.py
           catalog/flask_app/services/capability_config_service.py
-          catalog/mtconnect_recorder/config_bootstrap.py
           catalog/mtconnect_recorder/runtime.py
           catalog/standalone-recorder_v2/standalone-recorder_v2.py
           catalog/flask_app/tests/test_app_capability_config_saver.py
@@ -115,7 +114,6 @@ jobs:
           catalog/flask_app/server_setup_routes.py
           catalog/flask_app/services/capability_config_migration_service.py
           catalog/flask_app/services/capability_config_service.py
-          catalog/mtconnect_recorder/config_bootstrap.py
           catalog/mtconnect_recorder/runtime.py
           catalog/standalone-recorder_v2/standalone-recorder_v2.py
           catalog/flask_app/tests/test_app_capability_config_saver.py

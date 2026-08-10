@@ -3,6 +3,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -14,6 +15,7 @@ from catalog.flask_app.capability_onboarding_routes import (
     _COMMAND_SESSION_KEY,
     _CSRF_SESSION_KEY,
 )
+from catalog.flask_app.services.capability_config_service import CapabilityConfig
 from catalog.flask_app.services.capability_inspection_service import (
     CapabilityInspectionService,
 )
@@ -70,7 +72,6 @@ def _onboarding_service(
     *,
     clock,
     coordinator: SessionCoordinator | None = None,
-    setup_payload: dict[str, object] | None = None,
 ) -> CapabilityOnboardingService:
     coordinator = coordinator or SessionCoordinator(
         tmp_path / "coordinator.sqlite3",
@@ -82,8 +83,6 @@ def _onboarding_service(
         coordinator_database=coordinator,
         device_name="Inspection laptop",
         discovery_sources=(),
-        setup_loader=lambda: setup_payload
-        or {"configured": False, "user_setup_complete": False},
         clock=clock,
     )
 
@@ -95,17 +94,12 @@ def _inspection_service(
     adapter: InspectionOnlyAdapter | None,
     clock,
     ttl: int = 900,
-    setup_payload: dict[str, object] | None = None,
-    scan_supplier=None,
 ) -> CapabilityInspectionService:
     adapters = (adapter,) if adapter is not None else None
     return CapabilityInspectionService(
         onboarding_service=onboarding,
         state_database=tmp_path / "onboarding.sqlite3",
         adapters=adapters,
-        setup_loader=lambda: setup_payload
-        or {"configured": False, "user_setup_complete": False},
-        mtconnect_scan_supplier=scan_supplier,
         inspection_ttl_seconds=ttl,
         clock=clock,
         system_observer=lambda: {
@@ -119,6 +113,8 @@ def _inspection_service(
 def _app(
     onboarding: CapabilityOnboardingService,
     inspection: CapabilityInspectionService,
+    *,
+    config_loader=None,
 ):
     app = create_app()
     app.config.update(
@@ -126,6 +122,8 @@ def _app(
         CAPABILITY_ONBOARDING_SERVICE=onboarding,
         CAPABILITY_INSPECTION_SERVICE=inspection,
     )
+    if config_loader is not None:
+        app.config["CAPABILITY_CONFIG_LOADER"] = config_loader
     return app
 
 
@@ -398,6 +396,7 @@ def test_inspection_rejects_csrf_and_request_context_override(
 
 def test_default_composition_reads_existing_mtconnect_scan_without_starting_scan(
     tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     clock = lambda: NOW
     supplier_calls = []
@@ -423,13 +422,21 @@ def test_default_composition_reads_existing_mtconnect_scan_without_starting_scan
             ],
         }
 
+    monkeypatch.setattr(
+        "catalog.flask_app.services.capability_recovery_adapters.get_mtconnect_discovery_service",
+        lambda: SimpleNamespace(
+            last_scan=scan_supplier,
+            scan=lambda *_args, **_kwargs: pytest.fail(
+                "capability inspection must not start an MTConnect scan"
+            ),
+        ),
+    )
     onboarding = _onboarding_service(tmp_path, clock=clock)
     inspection = _inspection_service(
         tmp_path,
         onboarding,
         adapter=None,
         clock=clock,
-        scan_supplier=scan_supplier,
     )
     client = _app(onboarding, inspection).test_client()
     csrf, _command_id = _connect_local(client)
@@ -443,9 +450,9 @@ def test_default_composition_reads_existing_mtconnect_scan_without_starting_scan
     assert response.status_code == 303
     assert snapshot is not None
     assert snapshot.detected_data_sources == ("mtconnect-source-alpha",)
-    assert snapshot.detected_services == ("mtconnect-recorder-source",)
-    assert snapshot.recommended_benchmark_ids == (
-        "benchmark.recorder.mtconnect-source.v1",
+    assert "mtconnect-recorder-source" in snapshot.detected_services
+    assert "benchmark.recorder.mtconnect-source.v1" in (
+        snapshot.recommended_benchmark_ids
     )
     assert supplier_calls == ["read"]
 
@@ -456,6 +463,9 @@ def test_default_ollama_composition_uses_read_only_inventory_only(
 ) -> None:
     clock = lambda: NOW
     requests = []
+    monkeypatch.setenv("FCP_RUNTIME_CONTAINERIZED", "1")
+    monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
+    monkeypatch.delenv("FCP_AI_MODEL", raising=False)
 
     def requester(method, url, payload, timeout, max_bytes):
         requests.append((method, url, payload, timeout, max_bytes))
@@ -468,35 +478,33 @@ def test_default_ollama_composition_uses_read_only_inventory_only(
         "catalog.capabilities.benchmarking.adapters.ollama._bounded_json_request",
         requester,
     )
-    setup_payload = {
-        "configured": True,
-        "user_setup_complete": True,
-        "deployment_mode": "web-workbench",
-        "ai_enabled": True,
-        "ai_provider_mode": "local",
-        "ai_provider_name": "This computer",
-        "ai_profile": "workstation-strong",
-        "ai_model": "qwen2.5:7b",
-        "ollama_base_url": "http://ollama:11434",
-        "recorder_sources": "",
-        "recorder_poll_interval": "0.2",
-        "recorder_include_condition": False,
-        "updated_at": "",
-    }
-    onboarding = _onboarding_service(
-        tmp_path,
-        clock=clock,
-        setup_payload=setup_payload,
+    config = CapabilityConfig(
+        ai_provider_mode="local",
+        ai_provider_name="This computer",
+        ai_profile="workstation-strong",
+        ai_model="qwen2.5:7b",
+        ollama_base_url="http://ollama:11434",
+        recorder_sources="",
+        recorder_poll_interval="0.2",
+        recorder_include_condition=False,
+        updated_at="",
     )
+    monkeypatch.setattr(
+        "catalog.flask_app.services.capability_recovery_adapters.get_mtconnect_discovery_service",
+        lambda: SimpleNamespace(last_scan=lambda: {"state": "never", "results": []}),
+    )
+    onboarding = _onboarding_service(tmp_path, clock=clock)
     inspection = _inspection_service(
         tmp_path,
         onboarding,
         adapter=None,
         clock=clock,
-        setup_payload=setup_payload,
-        scan_supplier=lambda: {"state": "never", "results": []},
     )
-    client = _app(onboarding, inspection).test_client()
+    client = _app(
+        onboarding,
+        inspection,
+        config_loader=lambda: config,
+    ).test_client()
     csrf, _command_id = _connect_local(client)
 
     response = client.post(

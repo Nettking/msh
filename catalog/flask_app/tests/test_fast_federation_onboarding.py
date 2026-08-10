@@ -14,7 +14,6 @@ from catalog.federation.onboarding_models import (
 from catalog.flask_app.services.capability_startup_transition_service import (
     CapabilityStartupTransitionService,
 )
-from catalog.flask_app.services.server_setup_service import default_settings
 
 NOW = datetime(2026, 8, 5, 15, 30, tzinfo=timezone.utc)
 
@@ -59,21 +58,18 @@ class ContributionsMustNotRun:
 
 
 def _service(tmp_path, *, inspection_current: bool = True):
-    saved_settings = []
     service = CapabilityStartupTransitionService(
         onboarding_service=OnboardingStub(),
         inspection_service=InspectionStub(current=inspection_current),
         contribution_service=ContributionsMustNotRun(),
         state_database=tmp_path / "onboarding.sqlite3",
-        setup_loader=lambda: default_settings(configured=False),
-        setup_saver=saved_settings.append,
         clock=lambda: NOW,
     )
-    return service, saved_settings
+    return service
 
 
 def test_fast_setup_completes_after_inspection_without_benchmarks(tmp_path) -> None:
-    service, saved_settings = _service(tmp_path)
+    service = _service(tmp_path)
 
     state = service.complete_current()
 
@@ -89,21 +85,17 @@ def test_fast_setup_completes_after_inspection_without_benchmarks(tmp_path) -> N
         assert state.contribution_intents[capability] == (
             ContributionDesiredState.ASK_LATER.value
         )
-    assert len(saved_settings) == 1
-    assert saved_settings[0].configured is True
-    assert saved_settings[0].user_setup_complete is True
-    assert saved_settings[0].deployment_mode == "web-workbench"
-    assert saved_settings[0].ai_enabled is False
+    assert state.source_kind == "capability-first"
+    assert state.source_mode is None
 
 
 def test_fast_setup_still_requires_current_inspection(tmp_path) -> None:
-    service, saved_settings = _service(tmp_path, inspection_current=False)
+    service = _service(tmp_path, inspection_current=False)
 
     with pytest.raises(FederationOperationError) as error:
         service.complete_current()
 
     assert error.value.code == "startup-transition-inspection-required"
-    assert saved_settings == []
 
 
 def test_fast_setup_templates_expose_finish_and_optional_follow_up() -> None:

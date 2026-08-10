@@ -5,20 +5,18 @@ import os
 from collections.abc import Mapping
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Protocol
+from typing import Any
 
-from .server_setup_service import ServerSetupError, parse_recorder_sources
+from .capability_config_service import (
+    CapabilityConfig,
+    CapabilityConfigError,
+    parse_recorder_sources,
+)
 
 CONTROL_PATH = Path("data") / "source_state" / "mtconnect_recorder_control.json"
 STATUS_PATH = Path("data") / "source_state" / "mtconnect_recorder_status.json"
 LOG_PATH = Path("data") / "source_state" / "mtconnect_recorder.log"
 HEARTBEAT_TIMEOUT_SECONDS = 10
-
-
-class RecorderConfiguration(Protocol):
-    """Minimal recorder configuration shape; it carries no runtime authority."""
-
-    recorder_sources: str
 
 
 class RecorderControlError(RuntimeError):
@@ -99,15 +97,13 @@ def _text(value: object) -> str:
 
 
 def _configured_sources(
-    config: RecorderConfiguration | object | None,
+    config: CapabilityConfig | None,
 ) -> dict[str, str]:
     if config is None:
         return {}
     try:
-        return parse_recorder_sources(
-            str(getattr(config, "recorder_sources", "") or "")
-        )
-    except (ServerSetupError, TypeError, ValueError):
+        return parse_recorder_sources(config.recorder_sources)
+    except (CapabilityConfigError, TypeError, ValueError):
         return {}
 
 
@@ -120,9 +116,9 @@ class RecorderControlService:
     ``STATUS_PATH``. This survives Flask restarts and avoids duplicate child
     processes when multiple web workers are used.
 
-    This service validates recorder *configuration* only. Whether a caller has
+    This service validates recorder configuration only. Whether a caller has
     authority to start recording is decided by capability/contribution state
-    before calling ``set_enabled``; legacy device roles are not authority here.
+    before calling ``set_enabled``.
     """
 
     def __init__(
@@ -137,13 +133,13 @@ class RecorderControlService:
         self.log_path = Path(log_path)
 
     @staticmethod
-    def ready(config: RecorderConfiguration | object | None) -> bool:
+    def ready(config: CapabilityConfig | None) -> bool:
         return bool(_configured_sources(config))
 
     def set_enabled(
         self,
         enabled: bool,
-        config: RecorderConfiguration | object,
+        config: CapabilityConfig,
     ) -> tuple[bool, str]:
         if enabled and not self.ready(config):
             raise RecorderControlError(
@@ -169,7 +165,7 @@ class RecorderControlService:
 
     def status(
         self,
-        config: RecorderConfiguration | object | None,
+        config: CapabilityConfig | None,
         *,
         include_diagnostics: bool = False,
     ) -> dict[str, Any]:
@@ -311,7 +307,7 @@ class RecorderControlService:
 
     def web_status(
         self,
-        config: RecorderConfiguration | object | None,
+        config: CapabilityConfig | None,
     ) -> dict[str, Any]:
         """Return the small, debug-free status contract used by live polling."""
 

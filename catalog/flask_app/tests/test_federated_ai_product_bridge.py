@@ -6,7 +6,10 @@ import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
-from catalog.ai.remote_contracts import RemoteAIInvocationRequest, RemoteAIInvocationResponse
+from catalog.ai.remote_contracts import (
+    RemoteAIInvocationRequest,
+    RemoteAIInvocationResponse,
+)
 from catalog.ai.remote_provider import RemoteLanguageModelProvider
 from catalog.ai.runtime import LanguageModelRuntime
 from catalog.ai.runtime_contracts import AIModality, AIRuntimeRequest
@@ -24,7 +27,7 @@ from catalog.flask_app.services.federated_ai_product_bridge import (
     WorkbenchRemoteProvider,
 )
 
-NOW = datetime.now(timezone.utc)
+NOW = datetime(2026, 1, 1, tzinfo=timezone.utc)
 SESSION_ID = "session-federated-ai"
 PROVIDER_NODE = "node-Provider_0123456789abcdef"
 REQUESTER_NODE = "node-Requester_0123456789abcdef"
@@ -103,6 +106,11 @@ class RecordingTransport:
             content="remote answer",
             completed_at=NOW + timedelta(milliseconds=1),
         )
+
+
+class FixedClockHealthAuthority(CachedFederatedAIHealthAuthority):
+    def now(self) -> datetime:
+        return NOW
 
 
 def runtime_request(session_id: str, suffix: str = "product-bridge") -> AIRuntimeRequest:
@@ -260,7 +268,7 @@ def test_local_and_federation_invocations_share_provider_capacity() -> None:
 
 def test_consumer_bridge_translates_workbench_request_to_federation_session() -> None:
     record = health_record()
-    authority = CachedFederatedAIHealthAuthority(
+    authority = FixedClockHealthAuthority(
         session_id=SESSION_ID,
         actor_node_id=REQUESTER_NODE,
     )

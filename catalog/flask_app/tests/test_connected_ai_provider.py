@@ -1,63 +1,64 @@
 from __future__ import annotations
 
-from dataclasses import replace
 import json
+from dataclasses import replace
 
-from flask import Flask
 import pytest
+from flask import Flask
 
 from catalog.flask_app import ai_routes, server_setup_routes
-from catalog.flask_app.services import server_setup_service
-from catalog.flask_app.services.server_setup_service import (
-    ServerSetupError,
-    ai_settings_from_form,
-    default_settings,
-    load_settings,
-    migrate_legacy_phone_bootstrap,
+from catalog.flask_app.services import capability_ai_service
+from catalog.flask_app.services.capability_ai_service import ollama_status
+from catalog.flask_app.services.capability_config_service import (
+    CapabilityConfigError,
+    default_capability_config,
+    load_capability_config,
     normalize_ollama_base_url,
-    ollama_status,
-    save_settings,
+    save_capability_config,
+    update_language_model_config,
+)
+from catalog.flask_app.services.legacy_settings_migration import (
+    capability_config_from_legacy,
+    load_legacy_settings,
 )
 
 
 def _connected_form(**overrides: str) -> dict[str, str]:
     form = {
-        "ai_enabled": "on",
         "ai_provider_mode": "connected",
         "ai_provider_name": "Laptop",
         "ollama_base_url": "http://192.168.1.50:11434/",
         "ai_profile": "workstation-strong",
-        "recorder_poll_interval": "0.2",
     }
     form.update(overrides)
     return form
 
 
-def _connected_settings():
-    return ai_settings_from_form(
+def _connected_config():
+    return update_language_model_config(
+        default_capability_config(),
         _connected_form(),
-        default_settings(configured=True),
     )
 
 
-def test_connected_provider_round_trips_through_saved_legacy_setup(tmp_path) -> None:
-    settings = _connected_settings()
+def test_connected_provider_round_trips_through_capability_config(tmp_path) -> None:
+    config = _connected_config()
 
-    assert settings.ai_provider_mode == "connected"
-    assert settings.ai_provider_name == "Laptop"
-    assert settings.ollama_base_url == "http://192.168.1.50:11434"
-    assert settings.ai_model == "qwen2.5:7b"
+    assert config.ai_provider_mode == "connected"
+    assert config.ai_provider_name == "Laptop"
+    assert config.ollama_base_url == "http://192.168.1.50:11434"
+    assert config.ai_model == "qwen2.5:7b"
 
-    path = save_settings(settings, tmp_path / "server_settings.json")
+    path = save_capability_config(config, tmp_path / "config.json")
     payload = json.loads(path.read_text(encoding="utf-8"))
-    restored = load_settings(path)
+    restored = load_capability_config(path)
 
-    assert payload["schema"] == "fcp.server_setup.v3"
-    assert payload["user_setup_complete"] is True
-    assert restored == settings
+    assert payload["schema"] == "fcp.capability_config.v1"
+    assert "user_setup_complete" not in payload
+    assert restored == config
 
 
-def test_legacy_setup_defaults_to_local_provider(tmp_path) -> None:
+def test_explicit_legacy_projection_defaults_to_local_provider(tmp_path) -> None:
     path = tmp_path / "server_settings.json"
     path.write_text(
         json.dumps(
@@ -74,59 +75,70 @@ def test_legacy_setup_defaults_to_local_provider(tmp_path) -> None:
         encoding="utf-8",
     )
 
-    settings = load_settings(path)
+    legacy = load_legacy_settings(path)
+    assert legacy is not None
+    config = capability_config_from_legacy(legacy)
 
-    assert settings.ai_provider_mode == "local"
-    assert settings.ai_provider_name == "This computer"
-    assert settings.user_setup_complete is True
+    assert config.ai_provider_mode == "local"
+    assert config.ai_provider_name == "This computer"
+    assert legacy.user_setup_complete is True
 
 
-def test_legacy_phone_defaults_become_pending_browser_setup_once(tmp_path) -> None:
+def test_legacy_phone_defaults_are_read_only_and_pending_browser_setup(
+    tmp_path,
+) -> None:
     path = tmp_path / "server_settings.json"
-    path.write_text(
-        json.dumps(
-            {
-                "schema": "fcp.server_setup.v2",
-                "configured": True,
-                "deployment_mode": "web-workbench",
-                "ai_enabled": False,
-                "ai_provider_mode": "local",
-                "ollama_base_url": "http://ollama:11434",
-                "recorder_sources": "",
-                "recorder_poll_interval": "0.2",
-                "recorder_include_condition": False,
-            }
-        ),
-        encoding="utf-8",
+    original = json.dumps(
+        {
+            "schema": "fcp.server_setup.v2",
+            "configured": True,
+            "deployment_mode": "web-workbench",
+            "ai_enabled": False,
+            "ai_provider_mode": "local",
+            "ollama_base_url": "http://ollama:11434",
+            "recorder_sources": "",
+            "recorder_poll_interval": "0.2",
+            "recorder_include_condition": False,
+        }
     )
+    path.write_text(original, encoding="utf-8")
 
-    assert migrate_legacy_phone_bootstrap(path) is True
-    migrated = load_settings(path)
-    assert migrated.configured is False
-    assert migrated.user_setup_complete is False
-    assert migrate_legacy_phone_bootstrap(path) is False
+    first = load_legacy_settings(path)
+    second = load_legacy_settings(path)
+
+    assert first is not None
+    assert first == second
+    assert first.configured is True
+    assert first.user_setup_complete is False
+    assert path.read_text(encoding="utf-8") == original
 
 
-def test_phone_bootstrap_migration_preserves_custom_provider(tmp_path) -> None:
+def test_legacy_projection_preserves_custom_provider_without_rewriting_input(
+    tmp_path,
+) -> None:
     path = tmp_path / "server_settings.json"
-    path.write_text(
-        json.dumps(
-            {
-                "schema": "fcp.server_setup.v2",
-                "configured": True,
-                "deployment_mode": "web-workbench",
-                "ai_enabled": True,
-                "ai_provider_mode": "connected",
-                "ai_provider_name": "Laptop",
-                "ollama_base_url": "http://192.168.1.50:11434",
-                "recorder_sources": "",
-            }
-        ),
-        encoding="utf-8",
+    original = json.dumps(
+        {
+            "schema": "fcp.server_setup.v2",
+            "configured": True,
+            "deployment_mode": "web-workbench",
+            "ai_enabled": True,
+            "ai_provider_mode": "connected",
+            "ai_provider_name": "Laptop",
+            "ai_profile": "workstation-strong",
+            "ollama_base_url": "http://192.168.1.50:11434",
+            "recorder_sources": "",
+        }
     )
+    path.write_text(original, encoding="utf-8")
 
-    assert migrate_legacy_phone_bootstrap(path) is False
-    assert load_settings(path).ai_provider_name == "Laptop"
+    legacy = load_legacy_settings(path)
+    assert legacy is not None
+    config = capability_config_from_legacy(legacy)
+
+    assert config.ai_provider_name == "Laptop"
+    assert config.ollama_base_url == "http://192.168.1.50:11434"
+    assert path.read_text(encoding="utf-8") == original
 
 
 @pytest.mark.parametrize(
@@ -141,39 +153,38 @@ def test_phone_bootstrap_migration_preserves_custom_provider(tmp_path) -> None:
     ],
 )
 def test_connected_provider_rejects_unsafe_or_invalid_urls(url: str) -> None:
-    with pytest.raises(ServerSetupError):
+    with pytest.raises(CapabilityConfigError):
         normalize_ollama_base_url(url)
 
 
 def test_connected_provider_requires_explicit_name_and_url() -> None:
-    with pytest.raises(ServerSetupError, match="name"):
-        ai_settings_from_form(
+    with pytest.raises(CapabilityConfigError, match="name"):
+        update_language_model_config(
+            default_capability_config(),
             _connected_form(ai_provider_name="", ollama_base_url=""),
-            default_settings(configured=True),
         )
 
 
 def test_local_provider_does_not_retain_connected_endpoint() -> None:
     previous = replace(
-        default_settings(configured=True),
+        default_capability_config(),
         ai_provider_mode="connected",
         ai_provider_name="Laptop",
         ollama_base_url="http://192.168.1.50:11434",
     )
 
-    settings = ai_settings_from_form(
+    config = update_language_model_config(
+        previous,
         {
-            "ai_enabled": "on",
             "ai_provider_mode": "local",
             "ai_provider_name": "Old laptop",
             "ollama_base_url": "http://10.0.0.8:11434",
             "ai_profile": "laptop-standard",
         },
-        previous,
     )
 
-    assert settings.ai_provider_name == "This computer"
-    assert settings.ollama_base_url == "http://ollama:11434"
+    assert config.ai_provider_name == "This computer"
+    assert config.ollama_base_url == "http://ollama:11434"
 
 
 def test_ollama_status_reports_connected_provider_and_models(monkeypatch) -> None:
@@ -194,10 +205,10 @@ def test_ollama_status_reports_connected_provider_and_models(monkeypatch) -> Non
         requested["timeout"] = timeout
         return FakeResponse()
 
-    monkeypatch.setattr(server_setup_service.request, "urlopen", fake_urlopen)
-    settings = _connected_settings()
+    monkeypatch.setattr(capability_ai_service.request, "urlopen", fake_urlopen)
+    config = _connected_config()
 
-    status = ollama_status(settings, timeout_seconds=3.0)
+    status = ollama_status(config, timeout_seconds=3.0)
 
     assert requested == {"url": "http://192.168.1.50:11434/api/tags", "timeout": 3.0}
     assert status["running"] is True
@@ -216,21 +227,21 @@ def test_connection_endpoint_uses_unsaved_connected_provider(monkeypatch) -> Non
     captured = {}
     monkeypatch.setattr(
         server_setup_routes,
-        "load_settings",
-        lambda: default_settings(configured=True),
+        "load_capability_config",
+        default_capability_config,
     )
 
-    def fake_status(settings, timeout_seconds):
-        captured["settings"] = settings
+    def fake_status(config, timeout_seconds):
+        captured["config"] = config
         captured["timeout"] = timeout_seconds
         return {
             "running": True,
             "provider": {
                 "capability": "language-model",
                 "protocol": "ollama",
-                "mode": settings.ai_provider_mode,
-                "name": settings.ai_provider_name,
-                "base_url": settings.ollama_base_url,
+                "mode": config.ai_provider_mode,
+                "name": config.ai_provider_name,
+                "base_url": config.ollama_base_url,
             },
             "models": ["qwen2.5:7b"],
             "installed_by_model": {"qwen2.5:7b": True},
@@ -252,19 +263,23 @@ def test_connection_endpoint_uses_unsaved_connected_provider(monkeypatch) -> Non
 
     assert response.status_code == 200
     assert response.get_json()["ok"] is True
-    assert captured["settings"].ollama_base_url == "http://192.168.1.50:11434"
-    assert captured["settings"].ai_provider_name == "Laptop"
+    assert captured["config"].ollama_base_url == "http://192.168.1.50:11434"
+    assert captured["config"].ai_provider_name == "Laptop"
     assert captured["timeout"] == 3.0
 
 
-def test_ai_defaults_and_chat_use_saved_connected_provider(monkeypatch, tmp_path) -> None:
-    settings = _connected_settings()
-    monkeypatch.setattr(ai_routes, "load_settings", lambda: settings)
+def test_configured_connected_provider_is_not_runtime_authority(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    config = _connected_config()
+    monkeypatch.setattr(ai_routes, "load_capability_config", lambda: config)
+    monkeypatch.setattr(ai_routes, "_active_capability_defaults", lambda: None)
 
     assert ai_routes._ai_defaults() == (
         "qwen2.5:7b",
         "http://192.168.1.50:11434",
-        "Laptop",
+        "No active AI contribution (Laptop configured)",
     )
 
     class FakeChunk:
@@ -273,28 +288,24 @@ def test_ai_defaults_and_chat_use_saved_connected_provider(monkeypatch, tmp_path
         def source_label(self) -> str:
             return "README.md:1-2"
 
-    captured = {}
     monkeypatch.setattr(ai_routes, "repo_root_from", lambda: tmp_path)
     monkeypatch.setattr(ai_routes, "load_or_build_chunks", lambda _root: [])
     monkeypatch.setattr(ai_routes, "build_symbols", lambda _root: {})
-    monkeypatch.setattr(ai_routes, "retrieve", lambda *_args, **_kwargs: [FakeChunk()])
-    monkeypatch.setattr(ai_routes, "format_context", lambda _chunks: "retrieved context")
-    monkeypatch.setattr(ai_routes, "build_prompt", lambda *_args, **_kwargs: "prompt")
-
-    def fake_chat(**kwargs):
-        captured.update(kwargs)
-        return "grounded answer"
-
-    monkeypatch.setattr(ai_routes, "chat", fake_chat)
+    monkeypatch.setattr(
+        ai_routes,
+        "retrieve",
+        lambda *_args, **_kwargs: [FakeChunk()],
+    )
+    monkeypatch.setattr(ai_routes, "format_context", lambda _chunks: "context")
+    monkeypatch.setattr(ai_routes, "_build_ai_runtime", lambda **_kwargs: None)
 
     result = ai_routes._answer_question(
         "How does FCP work?",
-        model="qwen2.5:7b",
-        base_url="http://192.168.1.50:11434",
+        model=config.ai_model,
+        base_url=config.ollama_base_url,
         dry_run=False,
         extractive=False,
     )
 
-    assert result["error"] == ""
-    assert captured["model"] == "qwen2.5:7b"
-    assert captured["base_url"] == "http://192.168.1.50:11434"
+    assert result["error_code"] == "no-active-ai-provider"
+    assert "No active AI contribution" in result["error"]

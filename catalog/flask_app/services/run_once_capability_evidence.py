@@ -37,10 +37,10 @@ from .capability_benchmark_service import (
     BenchmarkPlanItem,
     CapabilityBenchmarkService,
 )
+from .capability_config_service import load_capability_config
 from .capability_contribution_service import CapabilityContributionService
 from .capability_inspection_service import CapabilityInspectionService
 from .capability_onboarding_service import get_capability_onboarding_service
-from .server_setup_service import load_settings
 
 
 class RunOnceCapabilityInspectionService(CapabilityInspectionService):
@@ -59,8 +59,6 @@ class RunOnceCapabilityBenchmarkService(CapabilityBenchmarkService):
         self,
         snapshot: DeviceInspectionSnapshot,
     ) -> tuple[BenchmarkResult, ...]:
-        """Return latest results that still match current definitions/dependencies."""
-
         plan = self.plan(snapshot)
         latest = self._latest_results(
             self.list_results(),
@@ -124,17 +122,11 @@ class RunOnceCapabilityBenchmarkService(CapabilityBenchmarkService):
                 state = result.state.value
                 state_label = self._recommendation_label(result)
                 summaries = {
-                    BenchmarkState.PASSED: (
-                        "The bounded local check completed successfully."
-                    ),
-                    BenchmarkState.FAILED: (
-                        "The bounded local check did not support activation."
-                    ),
+                    BenchmarkState.PASSED: "The bounded local check completed successfully.",
+                    BenchmarkState.FAILED: "The bounded local check did not support activation.",
                     BenchmarkState.SKIPPED: "The runner skipped this check safely.",
                     BenchmarkState.CANCELLED: "The benchmark was cancelled safely.",
-                    BenchmarkState.EXPIRED: (
-                        "The saved result requires explicit review."
-                    ),
+                    BenchmarkState.EXPIRED: "The saved result requires explicit review.",
                 }
                 summary = summaries[result.state]
                 diagnostic = result.diagnostics[0] if result.diagnostics else None
@@ -268,8 +260,6 @@ class RunOnceCapabilityContributionService(CapabilityContributionService):
     def reconcile(self) -> tuple[ContributionIntent, ...]:
         if not self.has_persisted_intents():
             return ()
-        # Reconciliation may reactivate existing explicit intent, so it must use
-        # the same definition/dependency review gate as an operator enable action.
         self._authorized_snapshot(require_benchmark_review=True)
         return self._service_for_reconciliation().reconcile()
 
@@ -287,10 +277,6 @@ def _install_services_for_context(app: Flask) -> None:
             onboarding_service=onboarding,
             state_database=app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
             adapters=app.config.get("CAPABILITY_ONBOARDING_INSPECTION_ADAPTERS"),
-            setup_loader=getattr(onboarding, "_setup_loader", load_settings),
-            mtconnect_scan_supplier=app.config.get(
-                "CAPABILITY_ONBOARDING_MTCONNECT_SCAN_SUPPLIER"
-            ),
             inspection_ttl_seconds=int(
                 app.config.get("CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS", 900)
             ),
@@ -328,9 +314,9 @@ def _install_services_for_context(app: Flask) -> None:
             ),
             sources=app.config.get("CAPABILITY_ONBOARDING_CONTRIBUTION_SOURCES"),
             adapters=app.config.get("CAPABILITY_ONBOARDING_CONTRIBUTION_ADAPTERS"),
-            setup_loader=app.config.get(
-                "CAPABILITY_ONBOARDING_SETUP_LOADER",
-                load_settings,
+            config_loader=app.config.get(
+                "CAPABILITY_CONFIG_LOADER",
+                load_capability_config,
             ),
             clock=onboarding._clock,
             candidate_ttl_seconds=int(
@@ -348,8 +334,6 @@ def install_run_once_capability_evidence(app: Flask) -> None:
             return
         _install_services_for_context(app)
 
-    # Keep a strong reference both through the signal and the app extension so
-    # the lazy installer has the same lifetime as the Flask application.
     appcontext_pushed.connect(install_on_context, sender=app, weak=False)
     app.extensions["run_once_capability_evidence_installer"] = install_on_context
 

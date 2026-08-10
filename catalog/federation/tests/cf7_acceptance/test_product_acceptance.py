@@ -29,6 +29,9 @@ from catalog.flask_app.capability_onboarding_routes import (
 from catalog.flask_app.services.capability_benchmark_service import (
     CapabilityBenchmarkService,
 )
+from catalog.flask_app.services.capability_config_service import (
+    default_capability_config,
+)
 from catalog.flask_app.services.capability_contribution_service import (
     CapabilityContributionService,
 )
@@ -41,7 +44,6 @@ from catalog.flask_app.services.capability_onboarding_service import (
 from catalog.flask_app.services.capability_startup_transition_service import (
     CapabilityStartupTransitionService,
 )
-from catalog.flask_app.services.server_setup_service import default_settings
 from catalog.flask_app.tests.test_capability_contribution_route import (
     AI_ID,
     BENCHMARK_ID,
@@ -91,7 +93,6 @@ def _build_stack(
         coordinator_database=coordinator,
         device_name=f"Acceptance {root.name}",
         discovery_sources=discovery_sources,
-        setup_loader=lambda: {"configured": False, "user_setup_complete": False},
         clock=clock,
     )
     adapter = InspectionBenchmarkAdapter()
@@ -99,7 +100,6 @@ def _build_stack(
         onboarding_service=onboarding,
         state_database=root / "onboarding.sqlite3",
         adapters=(adapter,),
-        setup_loader=lambda: {"configured": False, "user_setup_complete": False},
         inspection_ttl_seconds=900,
         clock=clock,
         system_observer=lambda: {
@@ -124,21 +124,17 @@ def _build_stack(
     )
     settings = settings or [
         replace(
-            default_settings(configured=False),
+            default_capability_config(),
             recorder_sources=PRIVATE_RECORDER_SOURCE,
         )
     ]
-
-    def save_settings(value) -> None:
-        settings[0] = value
 
     transition = CapabilityStartupTransitionService(
         onboarding_service=onboarding,
         inspection_service=inspection,
         contribution_service=contributions,
         state_database=root / "onboarding.sqlite3",
-        setup_loader=lambda: settings[0],
-        setup_saver=save_settings,
+        config_loader=lambda: settings[0],
         clock=clock,
     )
     app = create_app()
@@ -186,6 +182,7 @@ def _create_identity(client) -> tuple[str, str]:
 
 def _connect_local(client) -> tuple[str, str]:
     csrf, command_id = _create_identity(client)
+    client.get("/onboarding?step=federation")
     response = client.post(
         "/onboarding/federation",
         data={
@@ -203,6 +200,7 @@ def _join_candidate(
     candidate: FederationDiscoveryCandidate,
 ) -> tuple[str, str]:
     csrf, command_id = _create_identity(client)
+    client.get("/onboarding?step=federation")
     response = client.post(
         "/onboarding/federation",
         data={
@@ -371,8 +369,7 @@ def test_fresh_product_flow_finishes_restarts_and_reruns_expired_evidence(
     assert state.contribution_intents["language-model"] == "enabled"
     assert state.contribution_intents["compute"] == "disabled"
     assert state.contribution_intents["storage"] == "ask-later"
-    assert stack.settings[0].deployment_mode == "full-server"
-    assert stack.settings[0].ai_enabled is True
+    assert stack.settings[0].recorder_sources == PRIVATE_RECORDER_SOURCE
 
     federation = client.get("/federation")
     assert federation.status_code == 200

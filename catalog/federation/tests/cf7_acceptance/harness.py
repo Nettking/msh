@@ -149,13 +149,14 @@ class ManagedProcess:
 def python_marker_process(marker: Path) -> ProcessSpec:
     """Return a deterministic child process that publishes its PID then waits."""
 
+    interpreter = getattr(sys, "_base_executable", None) or sys.executable
     script = (
         "import os, sys, time; "
         "from pathlib import Path; "
         "Path(sys.argv[1]).write_text(str(os.getpid()), encoding='utf-8'); "
         "time.sleep(60)"
     )
-    return ProcessSpec((sys.executable, "-c", script, str(marker)))
+    return ProcessSpec((interpreter, "-c", script, str(marker)))
 
 
 def wait_until(

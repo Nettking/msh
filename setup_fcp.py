@@ -22,17 +22,11 @@ from catalog.command_setup import (
     pull_connected_model,
 )
 from catalog.flask_app.services.capability_config_service import (
+    AI_MODEL_CHOICES,
+    AI_PROVIDER_MODES,
     CAPABILITY_CONFIG_PATH,
     CapabilityConfigError,
     save_capability_config,
-)
-from catalog.flask_app.services.server_setup_service import (
-    AI_MODEL_CHOICES,
-    AI_PROVIDER_MODES,
-    migrate_legacy_phone_bootstrap,
-)
-from catalog.mtconnect_recorder.config_bootstrap import (
-    ensure_recorder_capability_config,
 )
 
 ENV_PATH = Path(".env")
@@ -345,34 +339,11 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help=argparse.SUPPRESS,
     )
-    parser.add_argument(
-        "--migrate-legacy-phone-bootstrap",
-        action="store_true",
-        help=(
-            "Retire untouched old phone defaults and project their technical "
-            "configuration into capability config without granting authority."
-        ),
-    )
     return parser.parse_args()
 
 
 def main() -> int:
     args = parse_args()
-    if args.migrate_legacy_phone_bootstrap:
-        changed = migrate_legacy_phone_bootstrap()
-        try:
-            projected = ensure_recorder_capability_config()
-        except RuntimeError as exc:
-            raise SystemExit(str(exc)) from exc
-        print(
-            "Retired untouched legacy phone setup metadata."
-            if changed
-            else "Existing legacy setup metadata was preserved."
-        )
-        if projected:
-            print(f"Projected technical configuration into {CAPABILITY_CONFIG_PATH}.")
-        return 0
-
     if args.profile:
         plan = _plan_from_args(args)
         web_bind = args.web_bind
