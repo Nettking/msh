@@ -5,9 +5,9 @@ startup completion, deployment roles, contribution intent, or operational
 authority.  Capability-first state remains the source of truth for whether a
 recorder or language-model contribution is enabled.
 
-The legacy ``server_settings.json`` file is accepted as migration input and may
-be updated as a compatibility mirror for older readers.  Mirror writes preserve
-all legacy role/authority fields.
+The legacy ``server_settings.json`` file is accepted only as migration input when
+no capability configuration has been persisted yet. Current configuration writes
+never mirror values back into the legacy role document.
 """
 
 from __future__ import annotations
@@ -24,14 +24,12 @@ from .server_setup_service import (
     AI_PROVIDER_MODES,
     DEFAULT_AI_PROVIDER_MODE,
     DEFAULT_OLLAMA_BASE_URL,
-    SETTINGS_PATH,
     ServerSetupError,
     ServerSetupSettings,
     default_settings,
     load_settings,
     normalize_ollama_base_url,
     normalize_recorder_sources,
-    save_settings,
 )
 
 CAPABILITY_CONFIG_PATH = Path("data") / "capabilities" / "config.json"
@@ -360,33 +358,6 @@ def compatibility_settings(
     )
 
 
-def mirror_legacy_capability_config(
-    config: CapabilityConfig,
-    *,
-    legacy_path: Path | str = SETTINGS_PATH,
-) -> Path:
-    """Mirror parameters for old readers without changing role or authority."""
-
-    legacy_path = Path(legacy_path)
-    try:
-        current = load_settings(legacy_path)
-    except (OSError, ServerSetupError, TypeError, ValueError):
-        current = default_settings(configured=False)
-    mirrored = replace(
-        current,
-        ai_provider_mode=config.ai_provider_mode,
-        ai_provider_name=config.ai_provider_name,
-        ai_profile=config.ai_profile,
-        ai_model=config.ai_model,
-        ollama_base_url=config.ollama_base_url,
-        recorder_sources=config.recorder_sources,
-        recorder_poll_interval=config.recorder_poll_interval,
-        recorder_include_condition=config.recorder_include_condition,
-        updated_at=config.updated_at or _utc_now(),
-    )
-    return save_settings(mirrored, legacy_path)
-
-
 __all__ = [
     "CAPABILITY_CONFIG_PATH",
     "CAPABILITY_CONFIG_SCHEMA",
@@ -396,7 +367,6 @@ __all__ = [
     "default_capability_config",
     "from_legacy_settings",
     "load_capability_config",
-    "mirror_legacy_capability_config",
     "save_capability_config",
     "update_language_model_config",
     "update_recorder_config",
