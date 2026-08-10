@@ -1,0 +1,113 @@
+name: Command bootstrap boundary
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/command-bootstrap.yml"
+      - "setup_msh.py"
+      - "catalog/command_setup.py"
+      - "catalog/flask_app/services/capability_config_service.py"
+      - "catalog/flask_app/services/server_setup_service.py"
+      - "catalog/mtconnect_recorder/config_bootstrap.py"
+      - "termux/setup-phone.sh"
+      - "termux/msh-phone.sh"
+      - "catalog/flask_app/tests/test_command_setup.py"
+      - "catalog/flask_app/tests/test_connected_ai_provider.py"
+      - "catalog/flask_app/tests/test_termux_phone_script.py"
+      - "docker-compose.yml"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/command-bootstrap.yml"
+      - "setup_msh.py"
+      - "catalog/command_setup.py"
+      - "catalog/flask_app/services/capability_config_service.py"
+      - "catalog/flask_app/services/server_setup_service.py"
+      - "catalog/mtconnect_recorder/config_bootstrap.py"
+      - "termux/setup-phone.sh"
+      - "termux/msh-phone.sh"
+      - "catalog/flask_app/tests/test_command_setup.py"
+      - "catalog/flask_app/tests/test_connected_ai_provider.py"
+      - "catalog/flask_app/tests/test_termux_phone_script.py"
+      - "docker-compose.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: command-bootstrap-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  command-bootstrap:
+    name: command-bootstrap (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest ruff
+
+      - name: Compile command bootstrap boundary
+        run: >-
+          python -m compileall -q
+          setup_msh.py
+          catalog/command_setup.py
+          catalog/flask_app/services/capability_config_service.py
+          catalog/flask_app/services/server_setup_service.py
+          catalog/mtconnect_recorder/config_bootstrap.py
+          catalog/flask_app/tests/test_command_setup.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/flask_app/tests/test_termux_phone_script.py
+
+      - name: Run command and Termux regressions
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_command_setup.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/flask_app/tests/test_termux_phone_script.py
+          catalog/flask_app/tests/test_recorder_config_bootstrap.py
+
+      - name: Validate Termux shell syntax
+        shell: bash
+        run: |
+          bash -n termux/setup-phone.sh
+          bash -n termux/msh-phone.sh
+
+      - name: Ruff command bootstrap boundary
+        run: >-
+          python -m ruff check
+          setup_msh.py
+          catalog/command_setup.py
+          catalog/flask_app/tests/test_command_setup.py
+          catalog/flask_app/tests/test_connected_ai_provider.py
+          catalog/flask_app/tests/test_termux_phone_script.py
+          --ignore I001,RUF022,B008,C408,PLC0206,UP035
+
+      - name: Validate Compose configuration
+        run: docker compose config
+
+      - name: Diff hygiene
+        shell: bash
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            git diff --check "origin/${{ github.base_ref }}...HEAD"
+          else
+            git diff --check HEAD^ HEAD
+          fi
