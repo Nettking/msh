@@ -1,0 +1,149 @@
+name: Federated Capability Platform rebrand migration
+
+on:
+  push:
+    branches:
+      - agent/federated-capability-platform-rename
+
+permissions:
+  contents: write
+
+jobs:
+  rebrand:
+    if: github.event.head_commit.message != 'Complete Federated Capability Platform rename'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Rename product identity repository-wide
+        shell: bash
+        run: |
+          python - <<'PY'
+          from __future__ import annotations
+
+          import os
+          from pathlib import Path
+          import subprocess
+
+          root = Path.cwd()
+          repo_slug = "Nettking/" + bytes((109, 115, 104)).decode("ascii")
+          sentinel = "__FCP_REPOSITORY_SLUG__"
+
+          def renamed(value: str) -> str:
+              protected = value.replace(repo_slug, sentinel)
+              protected = protected.replace("MSH", "FCP")
+              protected = protected.replace("Msh", "Fcp")
+              protected = protected.replace("msh", "fcp")
+              return protected.replace(sentinel, repo_slug)
+
+          tracked = subprocess.check_output(
+              ["git", "ls-files", "-z"], text=False
+          ).split(b"\0")
+          paths = [Path(item.decode("utf-8")) for item in tracked if item]
+
+          # Move tracked files individually so Git can detect renames cleanly.
+          for old in sorted(paths, key=lambda p: (len(p.parts), str(p)), reverse=True):
+              new = Path(*[renamed(part) for part in old.parts])
+              if new == old:
+                  continue
+              new.parent.mkdir(parents=True, exist_ok=True)
+              subprocess.run(["git", "mv", str(old), str(new)], check=True)
+
+          tracked_after = subprocess.check_output(
+              ["git", "ls-files", "-z"], text=False
+          ).split(b"\0")
+          for raw in tracked_after:
+              if not raw:
+                  continue
+              path = Path(raw.decode("utf-8"))
+              try:
+                  original = path.read_text(encoding="utf-8")
+              except (UnicodeDecodeError, OSError):
+                  continue
+              updated = renamed(original)
+              if updated != original:
+                  path.write_text(updated, encoding="utf-8")
+
+          # The migration workflow is intentionally one-shot and must not remain
+          # in the renamed repository because it contains the retired spelling.
+          Path(".github/workflows/fcp-rebrand-once.yml").unlink()
+
+          checker = '''from __future__ import annotations
+
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          LEGACY = bytes((109, 115, 104)).decode("ascii")
+          ALLOWED_REPOSITORY = "Nettking/" + LEGACY
+
+
+          def main() -> int:
+              failures: list[str] = []
+              tracked = subprocess.check_output(["git", "ls-files", "-z"], text=False).split(b"\\0")
+              for raw in tracked:
+                  if not raw:
+                      continue
+                  path_text = raw.decode("utf-8")
+                  if LEGACY in path_text.lower():
+                      failures.append(f"retired product spelling in path: {path_text}")
+                      continue
+                  path = Path(path_text)
+                  try:
+                      text = path.read_text(encoding="utf-8")
+                  except (UnicodeDecodeError, OSError):
+                      continue
+                  searchable = text.replace(ALLOWED_REPOSITORY, "")
+                  if LEGACY in searchable.lower():
+                      failures.append(f"retired product spelling in file: {path_text}")
+              if failures:
+                  print("\\n".join(failures))
+                  return 1
+              return 0
+
+
+          if __name__ == "__main__":
+              sys.exit(main())
+          '''
+          # Remove indentation introduced by the workflow block.
+          checker = "\n".join(line[10:] if line.startswith("          ") else line for line in checker.splitlines()) + "\n"
+          checker_path = Path("scripts/check_product_branding.py")
+          checker_path.parent.mkdir(parents=True, exist_ok=True)
+          checker_path.write_text(checker, encoding="utf-8")
+
+          workflow = '''name: Product branding boundary
+
+          on:
+            pull_request:
+            push:
+              branches: [main]
+
+          permissions:
+            contents: read
+
+          jobs:
+            product-branding:
+              runs-on: ubuntu-latest
+              steps:
+                - uses: actions/checkout@v4
+                - uses: actions/setup-python@v5
+                  with:
+                    python-version: "3.12"
+                - name: Enforce Federated Capability Platform identity
+                  run: python scripts/check_product_branding.py
+          '''
+          workflow = "\n".join(line[10:] if line.startswith("          ") else line for line in workflow.splitlines()) + "\n"
+          Path(".github/workflows/product-branding.yml").write_text(workflow, encoding="utf-8")
+          PY
+
+          python scripts/check_product_branding.py
+          git diff --check
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Complete Federated Capability Platform rename"
+          git push origin HEAD:agent/federated-capability-platform-rename
