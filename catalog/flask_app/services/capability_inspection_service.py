@@ -10,7 +10,6 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlsplit
 
 from flask import current_app
 
@@ -22,9 +21,6 @@ from catalog.capabilities.benchmarking import (
     STORAGE_BENCHMARK_ID,
     BenchmarkRegistry,
     DeviceInspector,
-    MtconnectSourceAdapter,
-    OllamaBenchmarkAdapter,
-    OllamaProbeTarget,
     register_concrete_adapters,
 )
 from catalog.federation.errors import (
@@ -37,8 +33,7 @@ from .capability_onboarding_service import (
     CapabilityOnboardingService,
     get_capability_onboarding_service,
 )
-from .mtconnect_discovery_service import get_mtconnect_discovery_service
-from .server_setup_service import ServerSetupError, load_settings
+from .capability_recovery_adapters import fresh_capability_inspection_adapters
 
 _MAX_SNAPSHOT_BYTES = 262_144
 _SERVICE_EXTENSION_KEY = "capability_inspection_service"
@@ -252,8 +247,6 @@ class CapabilityInspectionService:
         onboarding_service: CapabilityOnboardingService,
         state_database: Path | str,
         adapters: Iterable[object] | Callable[[], Iterable[object]] | None = None,
-        setup_loader: Callable[[], object] = load_settings,
-        mtconnect_scan_supplier: Callable[[], Mapping[str, Any]] | None = None,
         inspection_ttl_seconds: int = 900,
         clock: Callable[[], datetime] = _utc_now,
         system_observer: Callable[[], Mapping[str, Any]] | None = None,
@@ -263,11 +256,6 @@ class CapabilityInspectionService:
         self.onboarding_service = onboarding_service
         self.store = InspectionSnapshotStore(state_database)
         self._configured_adapters = adapters
-        self._setup_loader = setup_loader
-        self._scan_supplier = (
-            mtconnect_scan_supplier
-            or get_mtconnect_discovery_service().last_scan
-        )
         self._inspection_ttl_seconds = int(inspection_ttl_seconds)
         self._clock = clock
         self._system_observer = system_observer
@@ -285,50 +273,17 @@ class CapabilityInspectionService:
             )
         return value.astimezone(timezone.utc)
 
-    def _setup_payload(self) -> dict[str, Any]:
-        try:
-            settings = self._setup_loader()
-        except ServerSetupError:
-            return {}
-        payload = (
-            settings.to_dict()
-            if callable(getattr(settings, "to_dict", None))
-            else settings
-        )
-        return dict(payload) if isinstance(payload, Mapping) else {}
-
     def _default_adapters(self) -> tuple[object, ...]:
-        adapters: list[object] = [MtconnectSourceAdapter(self._scan_supplier)]
-        warnings: list[str] = []
-        payload = self._setup_payload()
-        if payload.get("configured") and payload.get("ai_enabled"):
-            base_url = str(payload.get("ollama_base_url") or "").strip()
-            model = str(payload.get("ai_model") or "").strip()
-            try:
-                parsed = urlsplit(base_url)
-                expected_host = (parsed.hostname or "").casefold()
-                target = OllamaProbeTarget(
-                    service_id="ollama-configured",
-                    display_label="Configured Ollama service",
-                    base_url=base_url,
-                    model=model,
-                )
-                adapters.append(
-                    OllamaBenchmarkAdapter(
-                        (target,),
-                        trusted_host_predicate=(
-                            lambda host, expected=expected_host: (
-                                bool(expected)
-                                and host.casefold() == expected
-                            )
-                        ),
-                    )
-                )
-            except (TypeError, ValueError):
-                warnings.append(
-                    "Configured language-model service could not be prepared for inspection"
-                )
-        self._composition_warnings = tuple(warnings)
+        """Compose read-only evidence from CapabilityConfig-backed adapters."""
+
+        try:
+            adapters = fresh_capability_inspection_adapters()
+        except Exception as exc:  # noqa: BLE001 - inspection composition fails closed
+            self._composition_warnings = (
+                f"Capability inspection adapters unavailable: {type(exc).__name__}",
+            )
+            return ()
+        self._composition_warnings = ()
         return tuple(adapters)
 
     def _adapters(self) -> tuple[object, ...]:
@@ -678,10 +633,6 @@ def get_capability_inspection_service() -> CapabilityInspectionService:
         ],
         adapters=current_app.config.get(
             "CAPABILITY_ONBOARDING_INSPECTION_ADAPTERS"
-        ),
-        setup_loader=getattr(onboarding, "_setup_loader", load_settings),
-        mtconnect_scan_supplier=current_app.config.get(
-            "CAPABILITY_ONBOARDING_MTCONNECT_SCAN_SUPPLIER"
         ),
         inspection_ttl_seconds=int(
             current_app.config.get(
