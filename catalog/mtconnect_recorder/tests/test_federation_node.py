@@ -111,11 +111,19 @@ def test_start_recorder_parser_accepts_first_join_and_storage_arguments() -> Non
         ]
     )
 
-    assert args.sources == ["Mazak=http://127.0.0.1:5000"]
+    assert args.inputs == ["Mazak=http://127.0.0.1:5000"]
     assert args.federation_key == "FCP1-test-key"
     assert args.device_name == "Machine recorder"
     assert args.storage_group == "telemetry"
     assert args.require_federation is True
+
+
+def test_start_recorder_parser_accepts_pairing_key_as_only_input() -> None:
+    args = build_parser().parse_args(["FCP1-test-key"])
+
+    assert args.inputs == ["FCP1-test-key"]
+    assert args.federation_key is None
+    assert args.storage_group is None
 
 
 def test_start_recorder_parser_remains_backward_compatible_local_only() -> None:
