@@ -9,12 +9,15 @@ on:
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
       - "catalog/federation/recorder_storage_relay.py"
+      - "catalog/federation/onboarding_compat.py"
       - "catalog/federation/tests/test_recorder_control_events.py"
       - "catalog/federation/tests/test_recorder_publication.py"
       - "catalog/federation/tests/test_recorder_storage_relay.py"
       - "catalog/flask_app/app.py"
       - "catalog/flask_app/federation_pairing_routes.py"
       - "catalog/flask_app/federation_recorder_routes.py"
+      - "catalog/flask_app/services/capability_config_migration_service.py"
+      - "catalog/flask_app/services/legacy_settings_migration.py"
       - "catalog/flask_app/services/federation_pairing_install.py"
       - "catalog/flask_app/services/federation_recorder_control_service.py"
       - "catalog/flask_app/services/recorder_federation_publication_install.py"
@@ -41,12 +44,15 @@ on:
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
       - "catalog/federation/recorder_storage_relay.py"
+      - "catalog/federation/onboarding_compat.py"
       - "catalog/federation/tests/test_recorder_control_events.py"
       - "catalog/federation/tests/test_recorder_publication.py"
       - "catalog/federation/tests/test_recorder_storage_relay.py"
       - "catalog/flask_app/app.py"
       - "catalog/flask_app/federation_pairing_routes.py"
       - "catalog/flask_app/federation_recorder_routes.py"
+      - "catalog/flask_app/services/capability_config_migration_service.py"
+      - "catalog/flask_app/services/legacy_settings_migration.py"
       - "catalog/flask_app/services/federation_pairing_install.py"
       - "catalog/flask_app/services/federation_recorder_control_service.py"
       - "catalog/flask_app/services/recorder_federation_publication_install.py"
@@ -106,6 +112,7 @@ jobs:
           catalog/mtconnect_recorder
           catalog/node/storage_failover.py
           catalog/standalone-recorder_v2/standalone-recorder_v2.py
+          catalog/federation/onboarding_compat.py
           catalog/federation/recorder_control_events.py
           catalog/federation/recorder_delivery.py
           catalog/federation/recorder_publication.py
@@ -113,6 +120,8 @@ jobs:
           catalog/flask_app/app.py
           catalog/flask_app/federation_pairing_routes.py
           catalog/flask_app/federation_recorder_routes.py
+          catalog/flask_app/services/capability_config_migration_service.py
+          catalog/flask_app/services/legacy_settings_migration.py
           catalog/flask_app/services/federation_pairing_install.py
           catalog/flask_app/services/federation_recorder_control_service.py
           catalog/flask_app/services/recorder_federation_publication_install.py
@@ -131,6 +140,7 @@ jobs:
           catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
+          catalog/mtconnect_recorder/tests/test_upgrade_compat.py
           catalog/flask_app/tests/test_federation_recorder_control_service.py
           catalog/flask_app/tests/test_recorder_federation_publication_install.py
 
@@ -138,13 +148,19 @@ jobs:
         run: >-
           python -m ruff check
           start_recorder.py
+          catalog/federation/onboarding_compat.py
           catalog/federation/recorder_control_events.py
           catalog/federation/tests/test_recorder_control_events.py
+          catalog/flask_app/services/capability_config_migration_service.py
+          catalog/flask_app/services/legacy_settings_migration.py
           catalog/mtconnect_recorder/federation_control.py
           catalog/mtconnect_recorder/federation_node.py
+          catalog/mtconnect_recorder/runtime.py
+          catalog/mtconnect_recorder/upgrade_compat.py
           catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
+          catalog/mtconnect_recorder/tests/test_upgrade_compat.py
           catalog/node/storage_failover.py
           catalog/standalone-recorder_v2/standalone-recorder_v2.py
           catalog/flask_app/app.py
