@@ -47,8 +47,7 @@ from .services.federation_pairing_install import install_federation_pairing
 from .services.onboarding_view_normalizer import normalize_onboarding_view_model
 from .services.run_once_capability_evidence import install_run_once_capability_evidence
 from .services.server_setup_service import (
-    ServerSetupError,
-    load_settings,
+    load_settings,  # noqa: F401 - retained only as an old monkeypatch seam
     ollama_status,  # noqa: F401 - retained only as an old monkeypatch seam
 )
 from .services.startup_contribution_reconcile import (
@@ -320,19 +319,16 @@ def create_app() -> Flask:
     return app
 
 
-def _start_runtime_from_capability_state(
-    app: Flask,
-    setup: object | None = None,
-) -> str:
-    """Start runtime without reviving the retired legacy startup prompt.
+def _start_runtime_from_capability_state(app: Flask) -> str:
+    """Start runtime from persisted capability state or valid legacy migration.
 
-    A completed capability-first transition already made the safe startup choice:
-    preserve existing sessions and continue processing. Older installations that
-    have not completed that transition retain the explicit legacy choice.
+    A fresh role-free install has no legacy setup object to pass into this seam.
+    The transition service therefore decides whether a genuinely completed legacy
+    setup exists and otherwise fails closed until capability onboarding completes.
     """
 
     with app.app_context():
-        flags = get_capability_startup_transition_service().capability_flags(setup)
+        flags = get_capability_startup_transition_service().capability_flags()
     if not bool(flags.get("runtime")):
         return "disabled"
 
@@ -355,19 +351,10 @@ if __name__ == "__main__":
     port = int(os.getenv("FLASK_RUN_PORT", "5000"))
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
 
-    setup = None
-    try:
-        setup = load_settings()
-    except ServerSetupError as exc:
-        print(
-            f"[orchestrator] setup needs attention before runtime starts: {exc}",
-            flush=True,
-        )
-
     runtime_start_state = "disabled"
     if os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1":
         try:
-            runtime_start_state = _start_runtime_from_capability_state(app, setup)
+            runtime_start_state = _start_runtime_from_capability_state(app)
         except Exception as exc:  # noqa: BLE001 - corrupt state must fail closed
             runtime_start_state = "repair"
             print(
@@ -394,20 +381,10 @@ if __name__ == "__main__":
             "applied safely",
             flush=True,
         )
-    elif (
-        setup is None
-        or not getattr(setup, "configured", False)
-        or not getattr(setup, "user_setup_complete", False)
-    ):
+    elif runtime_start_state == "disabled":
         print(
-            "[orchestrator] capability-first onboarding required at /onboarding; "
-            "runtime will remain idle",
-            flush=True,
-        )
-    elif runtime_start_state != "repair":
-        print(
-            "[orchestrator] runtime disabled by capability intent, environment, "
-            "or repair state",
+            "[orchestrator] runtime remains idle until capability intent enables "
+            "it or a supported legacy setup is migrated",
             flush=True,
         )
 

@@ -224,12 +224,14 @@ main() {
         --work-dir /app
     )
 
-    printf '\n== Configuring the MSH phone profile ==\n'
-    if [[ -f "$DATA_DIR/server_setup/server_settings.json" ]]; then
+    printf '\n== Configuring MSH phone technical parameters ==\n'
+    if [[ -f "$DATA_DIR/capabilities/config.json" ]]; then
+        echo "Existing capability technical configuration was preserved."
+    elif [[ -f "$DATA_DIR/server_setup/server_settings.json" ]]; then
         "${phone_login[@]}" "$CONTAINER" -- python setup_msh.py --migrate-legacy-phone-bootstrap
     else
         "${phone_login[@]}" "$CONTAINER" -- python setup_msh.py \
-            --mode web-workbench --no-ai --browser-setup-pending \
+            --profile workbench --no-ai \
             --web-bind 0.0.0.0 --web-port "$PORT"
     fi
 
@@ -254,6 +256,7 @@ main() {
     printf '\n== MSH phone setup is ready ==\n'
     echo "Persistent data:    $DATA_DIR"
     echo "Persistent results: $RESULTS_DIR"
+    echo "Capability choices are completed in the MSH onboarding UI; phone setup no longer creates a device role."
     if [[ "$restart_after_setup" == "true" ]]; then
         echo "MSH was updated and restarted at $URL"
     else
