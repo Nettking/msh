@@ -11,18 +11,19 @@ from catalog.federation.onboarding_models import (
     ContributionDesiredState,
 )
 from catalog.flask_app import server_setup_routes
+from catalog.flask_app.services.capability_config_migration_service import (
+    persist_capability_config_from_setup,
+)
 from catalog.flask_app.services.capability_config_service import (
     CAPABILITY_CONFIG_PATH,
     CapabilityConfig,
     from_legacy_settings,
     load_capability_config,
-    mirror_legacy_capability_config,
     save_capability_config,
 )
 from catalog.flask_app.services.server_setup_service import (
     SETTINGS_PATH,
     default_settings,
-    load_settings,
     save_settings,
 )
 
@@ -85,8 +86,11 @@ def test_capability_config_projection_drops_role_and_authority(tmp_path) -> None
     assert restored.recorder_sources == config.recorder_sources
 
 
-def test_legacy_mirror_preserves_role_and_authority(tmp_path) -> None:
-    legacy_path = tmp_path / "server_settings.json"
+def test_capability_config_persistence_leaves_legacy_document_unchanged(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
     original = replace(
         default_settings(configured=True),
         deployment_mode="recorder-only",
@@ -94,7 +98,8 @@ def test_legacy_mirror_preserves_role_and_authority(tmp_path) -> None:
         ai_provider_mode="local",
         recorder_sources="",
     )
-    save_settings(original, legacy_path)
+    save_settings(original, SETTINGS_PATH)
+    original_payload = SETTINGS_PATH.read_text(encoding="utf-8")
     config = CapabilityConfig(
         ai_provider_mode="connected",
         ai_provider_name="Laptop",
@@ -107,21 +112,54 @@ def test_legacy_mirror_preserves_role_and_authority(tmp_path) -> None:
         updated_at="2026-08-09T14:45:00Z",
     )
 
-    mirror_legacy_capability_config(config, legacy_path=legacy_path)
-    mirrored = load_settings(legacy_path)
+    save_capability_config(config)
 
-    assert mirrored.configured is True
-    assert mirrored.user_setup_complete is True
-    assert mirrored.deployment_mode == "recorder-only"
-    assert mirrored.ai_enabled is False
-    assert mirrored.ai_provider_name == "Laptop"
-    assert mirrored.ai_model == "qwen2.5:7b"
-    assert mirrored.recorder_sources == "Mazak=http://192.168.200.10:5000"
-    assert mirrored.recorder_poll_interval == "0.5"
-    assert mirrored.recorder_include_condition is True
+    assert SETTINGS_PATH.read_text(encoding="utf-8") == original_payload
+    saved = load_capability_config()
+    assert saved.ai_provider_name == "Laptop"
+    assert saved.recorder_sources == "Mazak=http://192.168.200.10:5000"
 
 
-def test_language_model_config_route_cannot_change_legacy_authority(
+def test_capability_finish_adapter_writes_only_role_free_configuration(
+    tmp_path,
+    monkeypatch,
+) -> None:
+    monkeypatch.chdir(tmp_path)
+    original = replace(
+        default_settings(configured=True),
+        deployment_mode="web-ui-only",
+        ai_enabled=False,
+        recorder_sources="",
+    )
+    save_settings(original, SETTINGS_PATH)
+    original_payload = SETTINGS_PATH.read_text(encoding="utf-8")
+    synthetic_completion = replace(
+        original,
+        deployment_mode="full-server",
+        ai_enabled=True,
+        ai_provider_mode="connected",
+        ai_provider_name="Laptop",
+        ai_profile="workstation-strong",
+        ai_model="qwen2.5:7b",
+        ollama_base_url="http://192.168.1.50:11434",
+        recorder_sources="Mazak=http://192.168.200.10:5000/current",
+        recorder_poll_interval="0.5",
+        recorder_include_condition=True,
+    )
+
+    persisted = persist_capability_config_from_setup(synthetic_completion)
+
+    assert SETTINGS_PATH.read_text(encoding="utf-8") == original_payload
+    assert persisted.recorder_sources == "Mazak=http://192.168.200.10:5000"
+    payload = json.loads(CAPABILITY_CONFIG_PATH.read_text(encoding="utf-8"))
+    assert payload["schema"] == "msh.capability_config.v1"
+    assert payload["ai_provider_name"] == "Laptop"
+    assert payload["recorder_sources"] == "Mazak=http://192.168.200.10:5000"
+    assert "deployment_mode" not in payload
+    assert "ai_enabled" not in payload
+
+
+def test_language_model_config_route_cannot_change_legacy_document(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -132,6 +170,7 @@ def test_language_model_config_route_cannot_change_legacy_authority(
         ai_enabled=False,
     )
     save_settings(original, SETTINGS_PATH)
+    original_payload = SETTINGS_PATH.read_text(encoding="utf-8")
 
     response = client.post(
         "/capabilities/config/language-model",
@@ -153,15 +192,10 @@ def test_language_model_config_route_cannot_change_legacy_authority(
     payload = json.loads(CAPABILITY_CONFIG_PATH.read_text(encoding="utf-8"))
     assert "deployment_mode" not in payload
     assert "ai_enabled" not in payload
-
-    mirrored = load_settings(SETTINGS_PATH)
-    assert mirrored.deployment_mode == "recorder-only"
-    assert mirrored.ai_enabled is False
-    assert mirrored.ai_provider_name == "Laptop"
-    assert mirrored.ai_model == "qwen2.5:7b"
+    assert SETTINGS_PATH.read_text(encoding="utf-8") == original_payload
 
 
-def test_recorder_config_route_persists_parameters_without_enabling_capability(
+def test_recorder_config_route_persists_parameters_without_legacy_write(
     tmp_path,
     monkeypatch,
 ) -> None:
@@ -172,6 +206,7 @@ def test_recorder_config_route_persists_parameters_without_enabling_capability(
         ai_enabled=True,
     )
     save_settings(original, SETTINGS_PATH)
+    original_payload = SETTINGS_PATH.read_text(encoding="utf-8")
 
     response = client.post(
         "/capabilities/config/recorder",
@@ -191,13 +226,10 @@ def test_recorder_config_route_persists_parameters_without_enabling_capability(
     )
     payload = json.loads(CAPABILITY_CONFIG_PATH.read_text(encoding="utf-8"))
     assert "deployment_mode" not in payload
-
-    mirrored = load_settings(SETTINGS_PATH)
-    assert mirrored.deployment_mode == "web-workbench"
-    assert mirrored.ai_enabled is True
-    assert mirrored.recorder_sources == "Mazak=http://192.168.200.10:5000"
-    assert mirrored.recorder_poll_interval == "0.5"
-    assert mirrored.recorder_include_condition is True
+    assert payload["recorder_sources"] == "Mazak=http://192.168.200.10:5000"
+    assert payload["recorder_poll_interval"] == "0.5"
+    assert payload["recorder_include_condition"] is True
+    assert SETTINGS_PATH.read_text(encoding="utf-8") == original_payload
 
 
 def test_completed_recorder_control_uses_current_contribution_activation(

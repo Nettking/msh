@@ -90,10 +90,13 @@ CONTROL_FILE = Path(
         "data/source_state/mtconnect_recorder_control.json",
     )
 )
-SETTINGS_FILE = Path(
+CONFIG_FILE = Path(
     os.getenv(
-        "MSH_RECORDER_SETTINGS_FILE",
-        "data/server_setup/server_settings.json",
+        "MSH_RECORDER_CONFIG_FILE",
+        os.getenv(
+            "MSH_RECORDER_SETTINGS_FILE",
+            "data/capabilities/config.json",
+        ),
     )
 )
 STATUS_FILE = Path(
@@ -116,6 +119,29 @@ STATUS_INTERVAL = _float_from_env("MSH_RECORDER_STATUS_INTERVAL", 1.0)
 BACKOFF_INITIAL = _float_from_env("MSH_RECORDER_BACKOFF_INITIAL", 0.5)
 BACKOFF_MAX = _float_from_env("MSH_RECORDER_BACKOFF_MAX", 8.0)
 RUN_ONCE = _bool_from_env("MSH_RECORDER_ONCE", False)
+
+_CAPABILITY_CONFIG_SCHEMA = "msh.capability_config.v1"
+_LEGACY_SETUP_SCHEMA = "msh.server_setup.v3"
+
+
+def _managed_configuration(payload: Mapping[str, Any]) -> tuple[dict[str, str], float]:
+    """Read recorder parameters without deriving authority from a device role.
+
+    ``msh.server_setup.v3`` is accepted only as an explicit backward-compatible
+    technical input when an older deployment still points the recorder at that
+    file. ``deployment_mode`` and ``ai_enabled`` are deliberately ignored.
+    """
+
+    if not payload:
+        return {}, 0.2
+    schema = str(payload.get("schema") or "")
+    if schema not in {_CAPABILITY_CONFIG_SCHEMA, _LEGACY_SETUP_SCHEMA}:
+        raise ValueError("Unsupported managed recorder configuration schema.")
+    sources_text = str(payload.get("recorder_sources") or "").strip()
+    sources = _parse_sources_text(sources_text) if sources_text else {}
+    poll_interval = float(payload.get("recorder_poll_interval") or 0.2)
+    return sources, poll_interval
+
 
 LOG_FILE.parent.mkdir(parents=True, exist_ok=True)
 log = logging.getLogger("recorder")
@@ -255,14 +281,10 @@ class RecorderRuntime:
         try:
             if MANAGED_MODE:
                 control = _read_json(CONTROL_FILE)
-                settings = _read_json(SETTINGS_FILE)
+                config = _read_json(CONFIG_FILE)
                 enabled = bool(control.get("enabled", False))
-                role = str(settings.get("deployment_mode") or "")
-                sources_text = str(settings.get("recorder_sources") or "").strip()
-                role_ready = role in {"full-server", "recorder-only"}
-                sources = _parse_sources_text(sources_text) if sources_text else {}
-                configuration_ready = bool(role_ready and sources)
-                poll_interval = float(settings.get("recorder_poll_interval") or 0.2)
+                sources, poll_interval = _managed_configuration(config)
+                configuration_ready = bool(sources)
             else:
                 enabled = True
                 sources = _sources_from_environment()
@@ -317,7 +339,7 @@ class RecorderRuntime:
                 self.message = "Recorder service is healthy and waiting. Recording is off."
             elif not self.configuration_ready:
                 self.state = "error"
-                self.message = "Recording is enabled, but recorder role or sources are not configured."
+                self.message = "Recording is enabled, but recorder sources are not configured."
                 self.last_error = self.message
             else:
                 self.state = "recording"
@@ -814,7 +836,7 @@ class RecorderRuntime:
         log.info("Batch size: %s", BATCH_SIZE)
         if MANAGED_MODE:
             log.info("Control file: %s", CONTROL_FILE)
-            log.info("Setup file: %s", SETTINGS_FILE)
+            log.info("Capability config file: %s", CONFIG_FILE)
 
         try:
             while not self.stop_event.is_set():

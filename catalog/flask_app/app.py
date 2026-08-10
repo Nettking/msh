@@ -32,6 +32,9 @@ from .provider_federation_routes import provider_federation_web
 from .routes import web
 from .server_setup_routes import server_setup_web
 from .services.capability_benchmark_service import get_capability_benchmark_service
+from .services.capability_config_migration_service import (
+    persist_capability_config_from_setup,
+)
 from .services.capability_contribution_service import (
     get_capability_contribution_service,
 )
@@ -155,6 +158,10 @@ def create_app() -> Flask:
             "MSH_FEDERATION_TRANSITION_DATABASE",
             app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
         ),
+    )
+    app.config.setdefault(
+        "CAPABILITY_ONBOARDING_SETUP_SAVER",
+        persist_capability_config_from_setup,
     )
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_BENCHMARK_DATABASE",

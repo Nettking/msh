@@ -27,7 +27,6 @@ from .services.capability_config_service import (
     CapabilityConfigError,
     compatibility_settings,
     load_capability_config,
-    mirror_legacy_capability_config,
     save_capability_config,
     update_language_model_config,
     update_recorder_config,
@@ -190,10 +189,9 @@ def _recorder_authorized() -> bool:
 
 
 def _persist_capability_config(config) -> None:
+    """Persist technical configuration without touching legacy role state."""
+
     save_capability_config(config)
-    # Temporary one-way mirror for old runtime readers. This function never
-    # changes deployment_mode, configured/user_setup_complete, or ai_enabled.
-    mirror_legacy_capability_config(config)
 
 
 def _settings_for_ai_form():

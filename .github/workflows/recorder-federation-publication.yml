@@ -9,8 +9,10 @@ on:
       - "catalog/federation/tests/test_recorder_publication.py"
       - "catalog/flask_app/services/federation_pairing_install.py"
       - "catalog/flask_app/services/recorder_federation_publication_install.py"
+      - "catalog/flask_app/tests/test_recorder_config_bootstrap.py"
       - "catalog/flask_app/tests/test_recorder_federation_publication_install.py"
       - "catalog/mtconnect_recorder/**"
+      - "catalog/standalone-recorder_v2/standalone-recorder_v2.py"
       - "catalog/standalone-recorder_v2/tests/test_lossless_recorder.py"
       - "requirements.txt"
       - "constraints-phase2.txt"
@@ -23,8 +25,10 @@ on:
       - "catalog/federation/tests/test_recorder_publication.py"
       - "catalog/flask_app/services/federation_pairing_install.py"
       - "catalog/flask_app/services/recorder_federation_publication_install.py"
+      - "catalog/flask_app/tests/test_recorder_config_bootstrap.py"
       - "catalog/flask_app/tests/test_recorder_federation_publication_install.py"
       - "catalog/mtconnect_recorder/**"
+      - "catalog/standalone-recorder_v2/standalone-recorder_v2.py"
       - "catalog/standalone-recorder_v2/tests/test_lossless_recorder.py"
       - "requirements.txt"
       - "constraints-phase2.txt"
@@ -67,14 +71,17 @@ jobs:
         run: >-
           python -m compileall -q
           catalog/mtconnect_recorder
+          catalog/standalone-recorder_v2/standalone-recorder_v2.py
           catalog/federation/recorder_delivery.py
           catalog/federation/recorder_publication.py
           catalog/flask_app/services/federation_pairing_install.py
           catalog/flask_app/services/recorder_federation_publication_install.py
+          catalog/flask_app/tests/test_recorder_config_bootstrap.py
 
       - name: Recorder capture and Federation publication regressions
         run: >-
           python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_recorder_config_bootstrap.py
           catalog/standalone-recorder_v2/tests/test_lossless_recorder.py
           catalog/federation/tests/test_recorder_publication.py
           catalog/flask_app/tests/test_recorder_federation_publication_install.py
@@ -82,6 +89,9 @@ jobs:
       - name: Ruff recorder publication boundary
         run: >-
           python -m ruff check
+          catalog/mtconnect_recorder/config_bootstrap.py
+          catalog/standalone-recorder_v2/standalone-recorder_v2.py
+          catalog/flask_app/tests/test_recorder_config_bootstrap.py
           catalog/federation/recorder_delivery.py
           catalog/federation/recorder_publication.py
           catalog/federation/tests/test_recorder_publication.py
