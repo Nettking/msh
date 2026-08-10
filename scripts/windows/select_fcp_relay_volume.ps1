@@ -12,6 +12,40 @@ if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
     $PSNativeCommandUseErrorActionPreference = $false
 }
 
+function Invoke-Docker {
+    param([string[]]$Arguments = @())
+
+    $previousPreference = $ErrorActionPreference
+    $hasNativePreference = Test-Path variable:PSNativeCommandUseErrorActionPreference
+    if ($hasNativePreference) {
+        $previousNativePreference = $PSNativeCommandUseErrorActionPreference
+    }
+    try {
+        # Windows PowerShell 5.1 can promote native stderr to a terminating
+        # PowerShell error while ErrorActionPreference is Stop. Docker writes
+        # ordinary lookup failures (for example a missing local image) to
+        # stderr, so treat the native exit code as authoritative instead.
+        $ErrorActionPreference = "Continue"
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $false
+        }
+        $global:LASTEXITCODE = 0
+        $output = @(& docker @Arguments 2>&1)
+        $exitCode = [int]$LASTEXITCODE
+    }
+    finally {
+        if ($hasNativePreference) {
+            $PSNativeCommandUseErrorActionPreference = $previousNativePreference
+        }
+        $ErrorActionPreference = $previousPreference
+    }
+
+    return [pscustomobject]@{
+        ExitCode = $exitCode
+        Output = @($output | ForEach-Object { [string]$_ })
+    }
+}
+
 function Write-Selection {
     param([Parameter(Mandatory = $true)][string]$VolumeName)
 
@@ -38,35 +72,26 @@ function Get-SavedNodeId {
     }
 }
 
-function Find-ProbeImage {
-    foreach ($image in @("fcp-relay:latest", "fcp-flask:latest", "fcp-recorder:latest")) {
-        & docker image inspect $image *> $null
-        if ($LASTEXITCODE -eq 0) {
-            return $image
-        }
+function Get-RelayContainerInfo {
+    $result = Invoke-Docker -Arguments @(
+        "ps", "-a",
+        "--filter", "label=com.docker.compose.service=relay",
+        "--format", "{{.ID}}"
+    )
+    if ($result.ExitCode -ne 0) {
+        return @()
     }
-    return ""
-}
 
-function Get-RelayCandidates {
     $values = @()
-    $values += @(
-        & docker volume ls --format "{{.Name}}" 2>$null
-    ) | Where-Object {
-        -not [string]::IsNullOrWhiteSpace($_) -and (
-            $_ -eq "fcp_relay_state" -or
-            $_ -match "(^|_)relay_state$"
-        )
-    }
-
-    $relayContainers = @(
-        & docker ps -a `
-            --filter "label=com.docker.compose.service=relay" `
-            --format "{{.ID}}" 2>$null
-    ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
-    foreach ($containerId in $relayContainers) {
-        $raw = (& docker inspect $containerId 2>$null) -join "`n"
-        if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+    $containerIds = @($result.Output |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    foreach ($containerId in $containerIds) {
+        $inspectionResult = Invoke-Docker -Arguments @("inspect", $containerId)
+        if ($inspectionResult.ExitCode -ne 0) {
+            continue
+        }
+        $raw = ($inspectionResult.Output -join "`n")
+        if ([string]::IsNullOrWhiteSpace($raw)) {
             continue
         }
         try {
@@ -80,12 +105,69 @@ function Get-RelayCandidates {
                     [string]$_.Type -eq "volume"
                 } |
                 Select-Object -First 1
-            if ($null -ne $mount -and -not [string]::IsNullOrWhiteSpace([string]$mount.Name)) {
-                $values += [string]$mount.Name
+            if ($null -eq $mount -or [string]::IsNullOrWhiteSpace([string]$mount.Name)) {
+                continue
+            }
+            $running = $false
+            if ($null -ne $inspection[0].State) {
+                $running = [bool]$inspection[0].State.Running
+            }
+            $values += [pscustomobject]@{
+                volume = [string]$mount.Name
+                image = [string]$inspection[0].Image
+                running = $running
             }
         }
         catch {
             continue
+        }
+    }
+    return @($values)
+}
+
+function Find-ProbeImages {
+    param([object[]]$RelayContainers = @())
+
+    $candidates = @(
+        "fcp-relay:latest",
+        "fcp-flask:latest",
+        "fcp-recorder:latest"
+    )
+    foreach ($container in $RelayContainers) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$container.image)) {
+            $candidates += [string]$container.image
+        }
+    }
+
+    $available = @()
+    foreach ($image in @($candidates | Select-Object -Unique)) {
+        $inspection = Invoke-Docker -Arguments @("image", "inspect", $image)
+        if ($inspection.ExitCode -eq 0) {
+            $available += $image
+        }
+    }
+    return @($available | Select-Object -Unique)
+}
+
+function Get-RelayCandidates {
+    param([object[]]$RelayContainers = @())
+
+    $values = @()
+    $volumeResult = Invoke-Docker -Arguments @(
+        "volume", "ls", "--format", "{{.Name}}"
+    )
+    if ($volumeResult.ExitCode -eq 0) {
+        $values += @($volumeResult.Output) | Where-Object {
+            -not [string]::IsNullOrWhiteSpace($_) -and (
+                $_ -eq "fcp_relay_state" -or
+                $_ -match "(^|_)relay_state$"
+            )
+        }
+    }
+
+    foreach ($container in $RelayContainers) {
+        if (-not [string]::IsNullOrWhiteSpace([string]$container.volume)) {
+            $values += [string]$container.volume
         }
     }
 
@@ -152,8 +234,12 @@ print(json.dumps(result, sort_keys=True))
         "-c", $launcher,
         $NodeId
     )
-    $raw = (& docker @arguments 2>&1) -join "`n"
-    if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($raw)) {
+    $result = Invoke-Docker -Arguments $arguments
+    if ($result.ExitCode -ne 0) {
+        return $null
+    }
+    $raw = ($result.Output -join "`n")
+    if ([string]::IsNullOrWhiteSpace($raw)) {
         return $null
     }
     try {
@@ -164,14 +250,31 @@ print(json.dumps(result, sort_keys=True))
     }
 }
 
+function Get-UniqueContainerVolumes {
+    param(
+        [object[]]$RelayContainers,
+        [bool]$RunningOnly = $false
+    )
+
+    $items = @($RelayContainers)
+    if ($RunningOnly) {
+        $items = @($items | Where-Object { $_.running })
+    }
+    return @($items |
+        ForEach-Object { [string]$_.volume } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+        Select-Object -Unique)
+}
+
 try {
     $nodeId = Get-SavedNodeId
-    $candidates = @(Get-RelayCandidates)
-    $image = Find-ProbeImage
+    $relayContainers = @(Get-RelayContainerInfo)
+    $candidates = @(Get-RelayCandidates -RelayContainers $relayContainers)
+    $images = @(Find-ProbeImages -RelayContainers $relayContainers)
     $probes = @()
 
-    if (-not [string]::IsNullOrWhiteSpace($image)) {
-        foreach ($volume in $candidates) {
+    foreach ($volume in $candidates) {
+        foreach ($image in $images) {
             $probe = Get-RelayProbe `
                 -VolumeName $volume `
                 -ProbeImage $image `
@@ -184,6 +287,7 @@ try {
                     nodes = [int]$probe.nodes
                     size = [long]$probe.size
                 }
+                break
             }
         }
     }
@@ -209,12 +313,41 @@ try {
         }
     }
 
+    # A legacy installation may not have any of the current fcp-* image tags.
+    # In that case the volume mounted by the existing relay container is a
+    # stronger preservation signal than blindly preferring fcp_relay_state.
     if ([string]::IsNullOrWhiteSpace($selected)) {
-        if ($candidates -contains "fcp_relay_state") {
+        $runningVolumes = @(Get-UniqueContainerVolumes `
+            -RelayContainers $relayContainers `
+            -RunningOnly $true)
+        if ($runningVolumes.Count -eq 1) {
+            $selected = [string]$runningVolumes[0]
+        }
+        elseif ($runningVolumes.Count -gt 1) {
+            throw "Multiple running relay containers use different state volumes; refusing to guess."
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($selected)) {
+        $mountedVolumes = @(Get-UniqueContainerVolumes `
+            -RelayContainers $relayContainers)
+        if ($mountedVolumes.Count -eq 1) {
+            $selected = [string]$mountedVolumes[0]
+        }
+        elseif ($mountedVolumes.Count -gt 1) {
+            throw "Multiple retained relay volumes are mounted by existing containers; refusing to guess."
+        }
+    }
+
+    if ([string]::IsNullOrWhiteSpace($selected)) {
+        if ($candidates.Count -eq 1) {
+            $selected = [string]$candidates[0]
+        }
+        elseif ($candidates -contains "fcp_relay_state" -and $candidates.Count -eq 0) {
             $selected = "fcp_relay_state"
         }
-        elseif ($candidates.Count -gt 0) {
-            $selected = [string]($candidates[0])
+        elseif ($candidates.Count -gt 1) {
+            throw "Multiple relay-state volumes exist but none can be identified safely; refusing to guess."
         }
         else {
             $selected = "fcp_relay_state"
