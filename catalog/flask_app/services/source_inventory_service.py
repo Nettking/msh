@@ -62,7 +62,7 @@ class SourceInventoryService:
             raise SourceInventoryError(f"Could not read source inventory: {self.inventory_path}") from exc
         if not isinstance(payload, dict):
             raise SourceInventoryError(f"Source inventory has unexpected shape: {self.inventory_path}")
-        payload.setdefault("schema", "msh.source_inventory.v1")
+        payload.setdefault("schema", "fcp.source_inventory.v1")
         payload.setdefault("machines", [])
         payload.setdefault("vibration_sensors", [])
         payload.setdefault("updated_at", "")
@@ -161,7 +161,7 @@ class SourceInventoryService:
 
     def _write(self, inventory: dict[str, Any]) -> None:
         inventory = dict(inventory)
-        inventory["schema"] = "msh.source_inventory.v1"
+        inventory["schema"] = "fcp.source_inventory.v1"
         inventory["updated_at"] = _now_utc()
         inventory.setdefault("machines", [])
         inventory.setdefault("vibration_sensors", [])
@@ -175,7 +175,7 @@ class SourceInventoryService:
 
 def _empty_inventory() -> dict[str, Any]:
     return {
-        "schema": "msh.source_inventory.v1",
+        "schema": "fcp.source_inventory.v1",
         "updated_at": "",
         "machines": [],
         "vibration_sensors": [],

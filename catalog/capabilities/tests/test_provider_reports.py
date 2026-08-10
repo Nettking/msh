@@ -78,7 +78,7 @@ def test_f72_003_unknown_report_protocol_major_is_rejected() -> None:
 
 def test_f72_004_unknown_report_schema_major_is_rejected() -> None:
     value = _report().to_dict()
-    value["schema"] = "msh.capability-provider-report.v2"
+    value["schema"] = "fcp.capability-provider-report.v2"
 
     with pytest.raises(ProtocolCompatibilityError) as exc_info:
         ProviderResourceReport.from_dict(value)
@@ -166,7 +166,7 @@ def test_f72_031_selection_policy_round_trip_ignores_additive_fields() -> None:
 
 def test_f72_032_selection_policy_schema_major_is_fail_closed() -> None:
     value = ProviderSelectionPolicy().to_dict()
-    value["schema"] = "msh.capability-selection-policy.v2"
+    value["schema"] = "fcp.capability-selection-policy.v2"
 
     with pytest.raises(ProtocolCompatibilityError) as exc_info:
         ProviderSelectionPolicy.from_dict(value)

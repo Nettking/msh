@@ -134,7 +134,7 @@ def announce_and_approve(
         node_id=provider.identity.node_id,
         session_id=SESSION_ID,
         type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         protocol_version="1.0",
         status=CapabilityStatus.READY,
         properties={
@@ -183,7 +183,7 @@ def publish_health(
         node_id=provider.identity.node_id,
         session_id=SESSION_ID,
         capability_type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         protocol_version="1.0",
         status=status,
         report_revision=revision,

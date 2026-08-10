@@ -31,7 +31,7 @@ def dataset(
 ) -> DatasetManifest:
     return DatasetManifest(
         dataset_id=dataset_id,
-        schema_name="msh.telemetry",
+        schema_name="fcp.telemetry",
         schema_version=1,
         required=True,
         source_id=source_id,
@@ -55,7 +55,7 @@ def item(
         idempotency_key=idempotency_key,
         content_hash=content_hash,
         size_bytes=128,
-        schema_name="msh.telemetry",
+        schema_name="fcp.telemetry",
         schema_version=1,
         source_id="recorder-a",
         first_sequence=0,
@@ -87,7 +87,7 @@ def test_e0_manifest_round_trip_is_canonical_and_additive() -> None:
     # F0-017/F0-018: JSON round trip and additive same-schema fields.
     audio = DatasetManifest(
         dataset_id="audio",
-        schema_name="msh.audio",
+        schema_name="fcp.audio",
         schema_version=2,
         required=False,
         source_id=None,
@@ -137,7 +137,7 @@ def test_e0_manifest_detects_corruption_and_unknown_schema_major() -> None:
     assert corrupted.value.code == "manifest-hash-mismatch"
 
     encoded = manifest().to_dict()
-    encoded["schema"] = "msh.storage_manifest.v2"
+    encoded["schema"] = "fcp.storage_manifest.v2"
     with pytest.raises(ProtocolCompatibilityError) as incompatible:
         AuthoritativeStorageManifest.from_dict(encoded)
     assert incompatible.value.code == "unsupported-schema"
@@ -193,7 +193,7 @@ def test_e0_inclusive_ranges_and_empty_dataset_are_unambiguous() -> None:
     assert SequenceRange(5, 5).to_dict() == {"start": 5, "end": 5}
     empty = DatasetManifest(
         dataset_id="knowledge",
-        schema_name="msh.knowledge",
+        schema_name="fcp.knowledge",
         schema_version=1,
         required=True,
         source_id=None,

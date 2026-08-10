@@ -53,7 +53,7 @@ f52/evidence-former-primary.json
 The F5.2 report must contain:
 
 ```json
-{"schema": "msh.storage_physical_failover_report.v1", "passed": true}
+{"schema": "fcp.storage_physical_failover_report.v1", "passed": true}
 ```
 
 The retained evidence must still show:
@@ -87,7 +87,7 @@ ownership sequence is:
 5. stop the coordinator again before separate probe or authority-capture
    commands.
 
-Do not set `MSH_ENROLLMENT_TOKEN` or `MSH_SESSION_INVITATION` during F5.3.
+Do not set `FCP_ENROLLMENT_TOKEN` or `FCP_SESSION_INVITATION` during F5.3.
 Machine B, Machine C, and the authority must use their retained identities and
 session memberships. Never place tokens, passwords, private keys, TLS keys, or
 state directories in the evidence folder.
@@ -181,7 +181,7 @@ The command first runs F4.1 catch-up while Machine B remains unassigned. It:
 1. locates the published F5.2 failover;
 2. binds the repair to Machine C's active grant and the retained F5.2 manifest;
 3. requests an authenticated report from Machine B;
-4. reads only missing batches from Machine C through `msh-storage-v1`;
+4. reads only missing batches from Machine C through `fcp-storage-v1`;
 5. writes them through the coordinator-authorized recovery route;
 6. verifies every immutable batch identity and content hash;
 7. persists a fresh synchronized final report.
@@ -198,7 +198,7 @@ It then runs F4.2 reinstatement. It:
 The public output must contain:
 
 ```json
-{"schema": "msh.storage_physical_recovery_operation.v1", "status": "completed"}
+{"schema": "fcp.storage_physical_recovery_operation.v1", "status": "completed"}
 ```
 
 `retryable` or `operator-attention` is not a passing F5.3 result. Re-run the same
@@ -395,7 +395,7 @@ python -m catalog.node.storage_recovery_drill verify \
 F5.3 passes only when:
 
 ```json
-{"schema": "msh.storage_physical_recovery_report.v1", "passed": true}
+{"schema": "fcp.storage_physical_recovery_report.v1", "passed": true}
 ```
 
 The verifier fails closed for a foreign F5.2 baseline, incomplete catch-up,

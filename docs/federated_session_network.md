@@ -1,4 +1,4 @@
-# Federated MSH network reference
+# Federated FCP network reference
 
 Status: **current technical reference**
 
@@ -8,13 +8,13 @@ This document describes the merged trusted Federation network. It is not a futur
 
 ## Scope
 
-The Federation connects independently persisted MSH devices across approved private networks or authenticated transport. A device may contribute several capabilities while preserving explicit membership, provider, storage, job, artifact, lease, term, and fencing authorities.
+The Federation connects independently persisted FCP devices across approved private networks or authenticated transport. A device may contribute several capabilities while preserving explicit membership, provider, storage, job, artifact, lease, term, and fencing authorities.
 
 Federation v1 is not public anonymous infrastructure. It assumes explicitly trusted devices and providers.
 
 ## Core terminology
 
-- **Device/node** — one MSH installation with a persistent cryptographic identity.
+- **Device/node** — one FCP installation with a persistent cryptographic identity.
 - **Federation** — the user-facing trusted collaboration boundary.
 - **Session** — the retained internal protocol and isolation boundary corresponding to one Federation during the compatible migration.
 - **Capability** — a supported service such as recorder, language model, registered compute, or storage.
@@ -118,7 +118,7 @@ AI and compute do not use storage primary/replica semantics.
 
 - AI providers expose authenticated logical model service routes.
 - Compute providers expose only explicitly registered local handlers.
-- MSH does not deliver arbitrary executable code to workers.
+- FCP does not deliver arbitrary executable code to workers.
 - Jobs use versioned requirements, ownership, attempts, heartbeat, retry, timeout, cancellation, stale-worker fencing, duplicate suppression, and one logical committed result.
 - Artifact access is least-privilege and bound to the authorized job or publication action.
 

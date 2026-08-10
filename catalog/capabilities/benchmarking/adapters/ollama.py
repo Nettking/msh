@@ -197,7 +197,7 @@ class OllamaBenchmarkAdapter:
     definition = BenchmarkDefinition(
         benchmark_id=OLLAMA_BENCHMARK_ID,
         capability_type="language-model",
-        capability_protocol="msh-language-model",
+        capability_protocol="fcp-language-model",
         implementation_version="1.1.0",
         max_duration_seconds=120,
         max_parallelism=1,

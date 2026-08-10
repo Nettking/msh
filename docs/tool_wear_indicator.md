@@ -1,6 +1,6 @@
 # Tool wear indication from synchronized condition-monitoring data
 
-This document describes the first MSH approach for using synchronized condition-monitoring data as an early indicator of possible tool wear.
+This document describes the first FCP approach for using synchronized condition-monitoring data as an early indicator of possible tool wear.
 
 The method is deliberately framed as **indication**, not confirmed detection. It turns Observer Phoenix trend measurements and other normalized scalar signals into candidate events that should be reviewed against process context, tool-change logs, operator notes, and quality measurements.
 
@@ -8,13 +8,13 @@ The method is deliberately framed as **indication**, not confirmed detection. It
 
 Tool wear often appears indirectly before it is measured directly. Depending on the process and sensor placement, wear can coincide with changes in vibration, load, process levels, alarm frequency, or signal variance.
 
-The Observer Phoenix integration adds synchronized scalar trend measurements to MSH. Once normalized to JSONL, those signals can be compared against recent baselines for the same machine, measurement point, and channel.
+The Observer Phoenix integration adds synchronized scalar trend measurements to FCP. Once normalized to JSONL, those signals can be compared against recent baselines for the same machine, measurement point, and channel.
 
 ## Pipeline position
 
 ```text
 Observer Phoenix trend measurements
-  -> MSH-normalized JSONL
+  -> FCP-normalized JSONL
   -> tool_wear_indicator.py
   -> candidate wear events CSV
   -> operator/research review
@@ -43,7 +43,7 @@ This avoids comparing unrelated sensors, channels, or machines.
 
 ## Scoring method
 
-For each signal group, MSH computes:
+For each signal group, FCP computes:
 
 - rolling baseline mean from previous samples.
 - rolling baseline standard deviation from previous samples.

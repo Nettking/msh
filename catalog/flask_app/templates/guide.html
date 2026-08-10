@@ -3,8 +3,8 @@
 <section class="guide-hero">
   <div class="guide-hero__copy">
     <span class="guide-kicker">Start here</span>
-    <h2>How to use MSH</h2>
-    <p>MSH helps you monitor machine behaviour and turn operator experience into structured knowledge. Use the guide when you are unsure what to click next.</p>
+    <h2>How to use FCP</h2>
+    <p>FCP helps you monitor machine behaviour and turn operator experience into structured knowledge. Use the guide when you are unsure what to click next.</p>
   </div>
   <div class="guide-hero__actions">
     <a class="button-link button-link--primary" href="{{ url_for('operator_strategy_web.capture') }}">Capture a statement</a>
@@ -67,7 +67,7 @@
     <article class="guide-step"><span class="guide-step__number">1</span><div><h4>Choose the computer role</h4><p>Use Web workbench for most analysis and field-review work. Use Full server when this computer should analyze and record data. Use Recorder station for dedicated data capture with setup and diagnostics pages.</p><a href="{{ url_for('web.startup') }}">Open Setup</a></div></article>
     <article class="guide-step"><span class="guide-step__number">2</span><div><h4>Choose AI only if it helps</h4><p>The AI explainer is optional. Ollama can run here or be contributed by a connected computer. Enable it when you want help understanding the repo, data flow, or app pages. It is not required for monitoring, capture, MTConnect tests, or SysML export.</p><a href="{{ url_for('web.startup', edit='1', step='ai') }}">Open Connections</a></div></article>
     <article class="guide-step"><span class="guide-step__number">3</span><div><h4>Find machines only for recorder roles</h4><p>If this computer records from MTConnect, use the network scan in Setup's Recorder step and select the stable identities read from the machine data. For workbench-only machine connection tests, use System → Sources instead.</p><a href="{{ url_for('web.startup', edit='1', step='recorder') }}">Open recorder setup</a></div></article>
-    <article class="guide-step"><span class="guide-step__number">4</span><div><h4>Continue vs Start clean</h4><p>Choose Continue when you want to reuse existing runtime/session progress. Choose Start clean when the runtime state looks wrong or you want MSH to rebuild its working state. Existing files stay on disk.</p><a href="{{ url_for('web.status') }}">Check Diagnostics</a></div></article>
+    <article class="guide-step"><span class="guide-step__number">4</span><div><h4>Continue vs Start clean</h4><p>Choose Continue when you want to reuse existing runtime/session progress. Choose Start clean when the runtime state looks wrong or you want FCP to rebuild its working state. Existing files stay on disk.</p><a href="{{ url_for('web.status') }}">Check Diagnostics</a></div></article>
   </div>
 </section>
 
@@ -111,8 +111,8 @@
     <details><summary>I want help choosing setup options.</summary><p>Go to <a href="{{ url_for('web.guide') }}#setup-guide">System → Guide → Setup guide</a>. It explains computer role, AI, recorder sources, Continue, and Start clean.</p></details>
     <details><summary>I want to turn notes into strategy fields.</summary><p>Go to <a href="{{ url_for('operator_strategy_web.review') }}">Knowledge → Review Notes</a>, open a note, and fill in the fields you can justify.</p></details>
     <details><summary>I want to add machines, MTConnect URLs, or vibration sensors.</summary><p>Go to <a href="{{ url_for('source_web.index') }}">System → Sources</a>. Add the machine first, then add MTConnect URL, VPN/network test target, and any vibration sensors.</p></details>
-    <details><summary>I want to test MTConnect or VPN/network reachability.</summary><p>Go to <a href="{{ url_for('source_web.index') }}">System → Sources</a>. Use <strong>Test MTConnect</strong> to check the adapter endpoint and <strong>Test VPN/network</strong> to check whether MSH can reach the configured machine-network host from the server/container.</p></details>
-    <details><summary>I want to know if MSH is ready or why data is missing.</summary><p>Start with <a href="{{ url_for('web.overview') }}">Monitor → Overview</a>. If something looks wrong, use <a href="{{ url_for('web.status') }}">System → Diagnostics</a>.</p></details>
+    <details><summary>I want to test MTConnect or VPN/network reachability.</summary><p>Go to <a href="{{ url_for('source_web.index') }}">System → Sources</a>. Use <strong>Test MTConnect</strong> to check the adapter endpoint and <strong>Test VPN/network</strong> to check whether FCP can reach the configured machine-network host from the server/container.</p></details>
+    <details><summary>I want to know if FCP is ready or why data is missing.</summary><p>Start with <a href="{{ url_for('web.overview') }}">Monitor → Overview</a>. If something looks wrong, use <a href="{{ url_for('web.status') }}">System → Diagnostics</a>.</p></details>
   </div>
 </section>
 {% endblock %}

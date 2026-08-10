@@ -130,7 +130,7 @@ def test_filesystem_provider_migrates_legacy_index_without_losing_identity(
 
     assert identity is not None
     assert identity.dataset_id == request.dataset_id
-    assert identity.dataset_schema_name == "msh.storage.dataset.opaque"
+    assert identity.dataset_schema_name == "fcp.storage.dataset.opaque"
     assert identity.dataset_schema_version == 1
     assert provider.read(
         session_id=request.authority.session_id,
@@ -199,7 +199,7 @@ def test_idempotency_identity_cannot_change_dataset_schema(tmp_path):
         content_hash=original.content_hash,
         content=original.content,
         created_at=original.created_at,
-        dataset_schema_name="msh.telemetry.observations",
+        dataset_schema_name="fcp.telemetry.observations",
         dataset_schema_version=2,
     )
     response = LocalStorageService(provider).dispatch(_envelope(changed))

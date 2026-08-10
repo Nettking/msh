@@ -76,58 +76,58 @@ class MtconnectClient:
         )
 
 
-DATA_DIR = Path(os.getenv("MSH_RECORDER_DATA_DIR", "data"))
+DATA_DIR = Path(os.getenv("FCP_RECORDER_DATA_DIR", "data"))
 STATE_FILE = Path(
     os.getenv(
-        "MSH_RECORDER_STATE_FILE",
+        "FCP_RECORDER_STATE_FILE",
         "data/source_state/mtconnect_recorder_state.json",
     )
 )
-MANAGED_MODE = _bool_from_env("MSH_RECORDER_MANAGED", False)
+MANAGED_MODE = _bool_from_env("FCP_RECORDER_MANAGED", False)
 CONTROL_FILE = Path(
     os.getenv(
-        "MSH_RECORDER_CONTROL_FILE",
+        "FCP_RECORDER_CONTROL_FILE",
         "data/source_state/mtconnect_recorder_control.json",
     )
 )
 CONFIG_FILE = Path(
     os.getenv(
-        "MSH_RECORDER_CONFIG_FILE",
+        "FCP_RECORDER_CONFIG_FILE",
         os.getenv(
-            "MSH_RECORDER_SETTINGS_FILE",
+            "FCP_RECORDER_SETTINGS_FILE",
             "data/capabilities/config.json",
         ),
     )
 )
 STATUS_FILE = Path(
     os.getenv(
-        "MSH_RECORDER_STATUS_FILE",
+        "FCP_RECORDER_STATUS_FILE",
         "data/source_state/mtconnect_recorder_status.json",
     )
 )
 LOG_FILE = Path(
     os.getenv(
-        "MSH_RECORDER_LOG_FILE",
+        "FCP_RECORDER_LOG_FILE",
         "data/source_state/mtconnect_recorder.log",
     )
 )
-REQUEST_TIMEOUT = _float_from_env("MSH_RECORDER_REQUEST_TIMEOUT", 10.0)
-BATCH_SIZE = max(1, _int_from_env("MSH_RECORDER_BATCH_SIZE", 1000))
-MAX_BATCHES_PER_CYCLE = max(1, _int_from_env("MSH_RECORDER_MAX_BATCHES_PER_CYCLE", 20))
-CONFIG_REFRESH_INTERVAL = _float_from_env("MSH_RECORDER_CONFIG_REFRESH_INTERVAL", 1.0)
-STATUS_INTERVAL = _float_from_env("MSH_RECORDER_STATUS_INTERVAL", 1.0)
-BACKOFF_INITIAL = _float_from_env("MSH_RECORDER_BACKOFF_INITIAL", 0.5)
-BACKOFF_MAX = _float_from_env("MSH_RECORDER_BACKOFF_MAX", 8.0)
-RUN_ONCE = _bool_from_env("MSH_RECORDER_ONCE", False)
+REQUEST_TIMEOUT = _float_from_env("FCP_RECORDER_REQUEST_TIMEOUT", 10.0)
+BATCH_SIZE = max(1, _int_from_env("FCP_RECORDER_BATCH_SIZE", 1000))
+MAX_BATCHES_PER_CYCLE = max(1, _int_from_env("FCP_RECORDER_MAX_BATCHES_PER_CYCLE", 20))
+CONFIG_REFRESH_INTERVAL = _float_from_env("FCP_RECORDER_CONFIG_REFRESH_INTERVAL", 1.0)
+STATUS_INTERVAL = _float_from_env("FCP_RECORDER_STATUS_INTERVAL", 1.0)
+BACKOFF_INITIAL = _float_from_env("FCP_RECORDER_BACKOFF_INITIAL", 0.5)
+BACKOFF_MAX = _float_from_env("FCP_RECORDER_BACKOFF_MAX", 8.0)
+RUN_ONCE = _bool_from_env("FCP_RECORDER_ONCE", False)
 
-_CAPABILITY_CONFIG_SCHEMA = "msh.capability_config.v1"
-_LEGACY_SETUP_SCHEMA = "msh.server_setup.v3"
+_CAPABILITY_CONFIG_SCHEMA = "fcp.capability_config.v1"
+_LEGACY_SETUP_SCHEMA = "fcp.server_setup.v3"
 
 
 def _managed_configuration(payload: Mapping[str, Any]) -> tuple[dict[str, str], float]:
     """Read recorder parameters without deriving authority from a device role.
 
-    ``msh.server_setup.v3`` is accepted only as an explicit backward-compatible
+    ``fcp.server_setup.v3`` is accepted only as an explicit backward-compatible
     technical input when an older deployment still points the recorder at that
     file. ``deployment_mode`` and ``ai_enabled`` are deliberately ignored.
     """
@@ -178,7 +178,7 @@ class RecorderRuntime:
         self.backoff: dict[str, float] = {}
         self.enabled = not MANAGED_MODE
         self.configuration_ready = not MANAGED_MODE
-        self.poll_interval = _float_from_env("MSH_RECORDER_POLL_INTERVAL", 0.2)
+        self.poll_interval = _float_from_env("FCP_RECORDER_POLL_INTERVAL", 0.2)
         self.observations_written = 0
         self.raw_batches_written = 0
         self.gaps_detected = 0
@@ -194,7 +194,7 @@ class RecorderRuntime:
 
     def load_state(self) -> None:
         payload = _read_json(STATE_FILE)
-        if payload.get("schema") != "msh.mtconnect_recorder.checkpoints.v3":
+        if payload.get("schema") != "fcp.mtconnect_recorder.checkpoints.v3":
             if payload:
                 log.warning(
                     "Ignoring legacy recorder state; the loss-aware recorder will start from "
@@ -216,7 +216,7 @@ class RecorderRuntime:
     def save_state(self) -> None:
         with self.lock:
             payload = {
-                "schema": "msh.mtconnect_recorder.checkpoints.v3",
+                "schema": "fcp.mtconnect_recorder.checkpoints.v3",
                 "updated_at": _utc_now(),
                 "sources": {
                     name: checkpoint.to_dict()
@@ -289,7 +289,7 @@ class RecorderRuntime:
                 enabled = True
                 sources = _sources_from_environment()
                 configuration_ready = bool(sources)
-                poll_interval = _float_from_env("MSH_RECORDER_POLL_INTERVAL", 0.2)
+                poll_interval = _float_from_env("FCP_RECORDER_POLL_INTERVAL", 0.2)
         except (ValueError, TypeError, json.JSONDecodeError) as exc:
             with self.lock:
                 self.configuration_ready = False
@@ -795,7 +795,7 @@ class RecorderRuntime:
         self.last_status_write = now
         with self.lock:
             payload = {
-                "schema": "msh.mtconnect_recorder.status.v2",
+                "schema": "fcp.mtconnect_recorder.status.v2",
                 "heartbeat_at": _utc_now(),
                 "managed": MANAGED_MODE,
                 "enabled": self.enabled,

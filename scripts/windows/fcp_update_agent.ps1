@@ -14,8 +14,8 @@ Set-StrictMode -Version Latest
 
 $ApprovedRepository = 'Nettking/msh'
 $ApprovedBranch = 'main'
-$RequestSchema = 'msh.host-update-request.v1'
-$ResultSchema = 'msh.host-update-result.v1'
+$RequestSchema = 'fcp.host-update-request.v1'
+$ResultSchema = 'fcp.host-update-result.v1'
 $MaxBytes = 8192
 $OidPattern = '^[0-9a-f]{40}$'
 $RequestIdPattern = '^[A-Za-z0-9._:-]{1,128}$'
@@ -104,7 +104,7 @@ function Start-ReplacementAgent {
     }
 }
 
-$mutexName = 'Global\MSHUpdateAgent-' + (Get-PathHash $RepoRoot)
+$mutexName = 'Global\FCPUpdateAgent-' + (Get-PathHash $RepoRoot)
 $createdNew = $false
 $mutex = [System.Threading.Mutex]::new($true, $mutexName, [ref]$createdNew)
 if (-not $createdNew) {
@@ -196,7 +196,7 @@ function Get-RunningCommit {
     try {
         $output = Invoke-External 'docker' @(
             'compose', 'exec', '-T', 'flask', 'python', '-c',
-            "import os; print(os.environ.get('MSH_BUILD_COMMIT',''))"
+            "import os; print(os.environ.get('FCP_BUILD_COMMIT',''))"
         )
         $value = (Last-Text $output).Trim().ToLowerInvariant()
         if ($value -match $OidPattern) { return $value }
@@ -281,7 +281,7 @@ function Wait-RuntimeVerified([string]$Target) {
         try {
             $commitOutput = Invoke-External 'docker' @(
                 'compose', 'exec', '-T', 'flask', 'python', '-c',
-                "import os; print(os.environ.get('MSH_BUILD_COMMIT',''))"
+                "import os; print(os.environ.get('FCP_BUILD_COMMIT',''))"
             )
             $running = (Last-Text $commitOutput).Trim().ToLowerInvariant()
             if ($running -eq $Target) {
@@ -314,7 +314,7 @@ function Ensure-OllamaModel {
     $probe = Invoke-External 'docker' @(
         'compose', 'run', '--rm', '--no-deps', '--entrypoint', 'python',
         'flask', '-c',
-        "import os; print(os.environ.get('MSH_AI_MODEL') or 'llama3.2:3b')"
+        "import os; print(os.environ.get('FCP_AI_MODEL') or 'llama3.2:3b')"
     )
     $model = (Last-Text $probe).Trim()
     if ($model -notmatch $ModelPattern) {
@@ -482,7 +482,7 @@ function Process-Request {
             throw 'dirty_build_context'
         }
 
-        $env:MSH_BUILD_COMMIT = $target
+        $env:FCP_BUILD_COMMIT = $target
         Invoke-External 'docker' @(
             'compose', 'build', 'relay', 'flask', 'recorder'
         ) | Out-Null
@@ -512,7 +512,7 @@ function Process-Request {
             -TargetCommit $target `
             -RunningCommit $running `
             -Code 'updated' `
-            -Message 'MSH source, images, services, required model, and running commit were updated and verified.'
+            -Message 'FCP source, images, services, required model, and running commit were updated and verified.'
         return $true
     }
     catch {
@@ -545,7 +545,7 @@ function Process-Request {
             -RunningCommit $running `
             -Code 'host_update_failed' `
             -Message 'The host update agent stopped safely before it could verify the requested runtime.'
-        Write-Warning "MSH update request failed: $($_.Exception.Message)"
+        Write-Warning "FCP update request failed: $($_.Exception.Message)"
         return $true
     }
     finally {

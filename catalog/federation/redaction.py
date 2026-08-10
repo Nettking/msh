@@ -24,8 +24,8 @@ SECRET_FIELD_NAMES: Final = frozenset(
     }
 )
 SECRET_TEXT_PREFIXES: Final = (
-    "msh_enroll_",
-    "msh_join_",
+    "fcp_enroll_",
+    "fcp_join_",
     "bearer ",
     "-----begin private key-----",
     "-----begin encrypted private key-----",
@@ -73,7 +73,7 @@ _WINDOWS_LOCATION = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]")
 
 
 def is_secret_text(value: object) -> bool:
-    """Recognize MSH credentials and common private credential encodings."""
+    """Recognize FCP credentials and common private credential encodings."""
 
     return isinstance(value, str) and any(
         marker in value.casefold() for marker in SECRET_TEXT_PREFIXES

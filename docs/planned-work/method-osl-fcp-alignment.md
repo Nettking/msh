@@ -1,12 +1,12 @@
-# W3 acceptance scenario: Notebook-to-OSL in MSH
+# W3 acceptance scenario: Notebook-to-OSL in FCP
 
-Programme plan: `Nettking/phd-research/plans/method-osl-msh-alignment.md`  
-Workstream: W3  
-Status: **acceptance scenario; implementation is governed by the OSL execution plan**  
-Date opened: 2026-08-02  
+Programme plan: `Nettking/phd-research/plans/method-osl-fcp-alignment.md`
+Workstream: W3
+Status: **acceptance scenario; implementation is governed by the OSL execution plan**
+Date opened: 2026-08-02
 Reconciled: 2026-08-06
 
-Authoritative MSH implementation sequence:
+Authoritative FCP implementation sequence:
 `docs/implementation/osl_integration/10_phased_implementation_roadmap.md`.
 
 This file defines the end-to-end behavior W3 must eventually demonstrate. It is
@@ -19,15 +19,15 @@ Demonstrate one intuitive, traceable path from an unchanged operator source to a
 versioned OSL representation and, when the declared adapter is supported, a
 conformant SysML v2 projection.
 
-MSH must consume rather than redefine:
+FCP must consume rather than redefine:
 
 1. the Notebook-to-OSL method owned by `paper-repo`; and
-2. the OSL language/profile owned by `systems-paper` and the accepted MSH
+2. the OSL language/profile owned by `systems-paper` and the accepted FCP
    compatibility profile.
 
 ## Problem demonstrated by the scenario
 
-The legacy MSH path is not sufficient evidence of OSL conformance:
+The legacy FCP path is not sufficient evidence of OSL conformance:
 
 - `captured -> structured -> reusable` does not preserve explicit clarification,
   validation, review, approval, or publication evidence;
@@ -223,7 +223,7 @@ the supported product path and the evidence demonstrates that:
 - excerpt and derived content have exact provenance;
 - provisional incompleteness remains explicit;
 - candidate and selected actions remain distinct;
-- the stored canonical revision conforms to the accepted MSH profile contract;
+- the stored canonical revision conforms to the accepted FCP profile contract;
 - deterministic validation produces no unexpected findings for the supported
   scenario;
 - human review/model-readiness evidence is exact and cannot be forged by the
@@ -236,7 +236,7 @@ the supported product path and the evidence demonstrates that:
   conformance environment with no unexpected diagnostics;
 - migration does not inflate legacy claims;
 - the trace manifest records source, record/schema, method, profile, validator,
-  review, exporter, output, and exact MSH versions;
+  review, exporter, output, and exact FCP versions;
 - focused and permanent tests pass on Ubuntu and Windows;
 - retained evidence distinguishes fixtures, automated tests, real browser/tool
   observations, and human review;
@@ -249,8 +249,8 @@ The final W3 evidence must report:
 
 - exact W1 method contract and W2/OSL profile versions;
 - exact source repository commits;
-- MSH schema, contract, validator, migration, and exporter versions;
-- exact MSH commit and supported deployment topology;
+- FCP schema, contract, validator, migration, and exporter versions;
+- exact FCP commit and supported deployment topology;
 - conformance environment and diagnostics;
 - retained example and trace manifest;
 - unsupported method, profile, UI, migration, and export features;

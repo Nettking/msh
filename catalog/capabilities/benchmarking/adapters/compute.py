@@ -26,7 +26,7 @@ class RegisteredComputeHandlerAdapter:
     definition = BenchmarkDefinition(
         benchmark_id=COMPUTE_BENCHMARK_ID,
         capability_type="compute",
-        capability_protocol="msh-compute-handler",
+        capability_protocol="fcp-compute-handler",
         implementation_version="1.0.0",
         max_duration_seconds=2,
         max_parallelism=4,

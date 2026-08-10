@@ -1,4 +1,4 @@
-"""Pure domain contracts for federated MSH sessions."""
+"""Pure domain contracts for federated FCP sessions."""
 
 from .acknowledgement import (
     AcknowledgementMode,

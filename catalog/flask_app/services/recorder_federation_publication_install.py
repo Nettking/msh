@@ -256,7 +256,7 @@ class RecorderFederationPublicationMonitor:
             self._stop.clear()
             self._thread = threading.Thread(
                 target=self._run,
-                name="msh-recorder-federation-publication",
+                name="fcp-recorder-federation-publication",
                 daemon=True,
             )
             self._thread.start()
@@ -286,38 +286,38 @@ def install_recorder_federation_publication(
 
     app.config.setdefault(
         "RECORDER_FEDERATION_PUBLICATION_ENABLED",
-        _env_bool("MSH_RECORDER_FEDERATION_ENABLED", False),
+        _env_bool("FCP_RECORDER_FEDERATION_ENABLED", False),
     )
     app.config.setdefault(
         "RECORDER_FEDERATION_STORAGE_GROUP_ID",
-        os.getenv("MSH_RECORDER_FEDERATION_STORAGE_GROUP", ""),
+        os.getenv("FCP_RECORDER_FEDERATION_STORAGE_GROUP", ""),
     )
     app.config.setdefault("RECORDER_FEDERATION_STORAGE_CLIENT_FACTORY", None)
     app.config.setdefault(
         "RECORDER_FEDERATION_DATA_DIRECTORY",
-        os.getenv("MSH_RECORDER_DATA_DIR", "data"),
+        os.getenv("FCP_RECORDER_DATA_DIR", "data"),
     )
     app.config.setdefault(
         "RECORDER_FEDERATION_CHECKPOINT_FILE",
         os.getenv(
-            "MSH_RECORDER_STATE_FILE",
+            "FCP_RECORDER_STATE_FILE",
             "data/source_state/mtconnect_recorder_state.json",
         ),
     )
     app.config.setdefault(
         "RECORDER_FEDERATION_OUTBOX_DATABASE",
         os.getenv(
-            "MSH_RECORDER_FEDERATION_OUTBOX_DATABASE",
+            "FCP_RECORDER_FEDERATION_OUTBOX_DATABASE",
             "data/federation/recorder_publication/outbox.sqlite3",
         ),
     )
     app.config.setdefault(
         "RECORDER_FEDERATION_POLL_INTERVAL_SECONDS",
-        float(os.getenv("MSH_RECORDER_FEDERATION_POLL_INTERVAL", "0.2")),
+        float(os.getenv("FCP_RECORDER_FEDERATION_POLL_INTERVAL", "0.2")),
     )
     app.config.setdefault(
         "RECORDER_FEDERATION_DELIVERY_LIMIT",
-        int(os.getenv("MSH_RECORDER_FEDERATION_DELIVERY_LIMIT", "100")),
+        int(os.getenv("FCP_RECORDER_FEDERATION_DELIVERY_LIMIT", "100")),
     )
 
     monitor = RecorderFederationPublicationMonitor(app, onboarding_service)

@@ -30,7 +30,7 @@ from pathlib import Path
 import pandas as pd
 
 # Environment-specific input folder containing JSONL telemetry files.
-DATA_DIR = Path(r"C:\wsl\msh\data")
+DATA_DIR = Path(r"C:\wsl\fcp\data")
 
 # Output CSV for contiguous intervention-state episodes.
 STATE_OUTPUT = Path("intervention_states.csv")

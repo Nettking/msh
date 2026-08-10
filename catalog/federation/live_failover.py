@@ -41,9 +41,9 @@ from .selection import select_storage_promotion_candidate
 from .storage_protocol import BatchIngestRequest
 
 STORAGE_CONTROL_REFRESH_MESSAGE = "refresh-request"
-STORAGE_FAILOVER_RELAY_KIND = "msh-storage-failover-v1"
-LIVE_FAILOVER_SCHEMA = "msh.live_storage_failover.v1"
-LIVE_FAILOVER_RESULT_SCHEMA = "msh.live_storage_failover_result.v1"
+STORAGE_FAILOVER_RELAY_KIND = "fcp-storage-failover-v1"
+LIVE_FAILOVER_SCHEMA = "fcp.live_storage_failover.v1"
+LIVE_FAILOVER_RESULT_SCHEMA = "fcp.live_storage_failover_result.v1"
 
 
 def _now() -> datetime:
@@ -611,7 +611,7 @@ class StorageControlRelayChannel:
             return
         self._receiver_task = asyncio.create_task(
             self._receiver_loop(),
-            name=f"msh-storage-control-channel-{self.client.node_id}",
+            name=f"fcp-storage-control-channel-{self.client.node_id}",
         )
 
     async def close(self) -> None:

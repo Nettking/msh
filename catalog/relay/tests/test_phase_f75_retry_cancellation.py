@@ -57,7 +57,7 @@ class ResultHandler:
         reference = ArtifactReference(
             reference_id="output-relay-f75",
             session_id=self.session_id,
-            schema_name="msh.synthetic-output.v1",
+            schema_name="fcp.synthetic-output.v1",
             media_type="application/json",
             content_hash="sha256:" + "b" * 64,
             size_bytes=256,
@@ -137,7 +137,7 @@ def _job(session_id: str, job_id: str) -> JobContract:
         idempotency_key=f"{session_id}:request-{job_id}",
         capability=CapabilityRequirement(
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             requirements={"operation": "echo", "modalities": ["json"]},
         ),
@@ -150,7 +150,7 @@ def _job(session_id: str, job_id: str) -> JobContract:
                     else "output-relay-cancel"
                 ),
                 session_id=session_id,
-                schema_name="msh.synthetic-output.v1",
+                schema_name="fcp.synthetic-output.v1",
                 media_type="application/json",
             ),
         ),
@@ -182,7 +182,7 @@ def _registration(
         node_id=node_id,
         provider_id=provider_id,
         capability_type="synthetic-compute",
-        protocol="msh-synthetic",
+        protocol="fcp-synthetic",
         protocol_version="1.0",
         attributes={"operation": "echo", "modalities": ["json"]},
     )
@@ -200,7 +200,7 @@ def _report(
         node_id=node_id,
         session_id=session_id,
         capability_type="synthetic-compute",
-        protocol="msh-synthetic",
+        protocol="fcp-synthetic",
         protocol_version="1.0",
         status=ProviderStatus.READY,
         report_revision=1,

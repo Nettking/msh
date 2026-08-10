@@ -61,7 +61,7 @@ def evaluate_storage_promotion_candidate(
             provider_id=assessment.provider_id,
             assessment=assessment,
             report=StorageReplicaReport(
-                schema="msh.storage_replica_report.v1",
+                schema="fcp.storage_replica_report.v1",
                 protocol_version="1.0",
                 session_id=assessment.session_id,
                 group_id=assessment.group_id,

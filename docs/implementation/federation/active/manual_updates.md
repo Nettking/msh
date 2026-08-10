@@ -1,4 +1,4 @@
-# Manual Federation-wide MSH updates
+# Manual Federation-wide FCP updates
 
 The Federation overview exposes two explicit coordinator-only POST operations:
 **Check for updates** and **Update all devices**. GET remains passive. It may
@@ -6,7 +6,7 @@ refresh previously requested result state, but it never fetches Git or starts a
 host mutation by itself.
 
 The update target is one immutable 40-character Git commit from approved
-`Nettking/msh` `main`. The browser supplies no repository, branch, path,
+`this repository` `main`. The browser supplies no repository, branch, path,
 executable, command, or arguments. CSRF protects browser request integrity;
 update authority is separately bound to the existing Federation session creator.
 
@@ -14,7 +14,7 @@ update authority is separately bound to the existing Federation session creator.
 
 Flask deliberately does **not** receive Git, Docker, shell, or general host
 execution authority. Its only local mutation capability is an atomic, bounded
-JSON handoff under the existing bind-mounted MSH data directory. A separately
+JSON handoff under the existing bind-mounted FCP data directory. A separately
 owned host update agent validates that request again before doing anything.
 
 Every host independently verifies:
@@ -22,7 +22,7 @@ Every host independently verifies:
 1. the request schema, request ID, freshness, approved repository and `main`;
 2. a full exact commit object ID;
 3. that the local checkout is the expected repository root on `main`;
-4. that `origin` is canonical `Nettking/msh` on GitHub with no embedded
+4. that `origin` is canonical `this repository` on GitHub with no embedded
    credentials, query, or fragment;
 5. that the working tree is clean, including untracked files;
 6. that the target commit exists and is reachable from the freshly fetched
@@ -69,7 +69,7 @@ checkout/data directory and uses only locally fixed Git/Docker commands.
 For an eligible target it:
 
 1. revalidates Git and fast-forwards if needed;
-2. exports the exact target as `MSH_BUILD_COMMIT`;
+2. exports the exact target as `FCP_BUILD_COMMIT`;
 3. rebuilds the `relay`, `flask`, and `recorder` images;
 4. starts/restarts the background services;
 5. reads the required Ollama model from the newly built Flask image and verifies
@@ -80,7 +80,7 @@ For an eligible target it:
 9. checks the Federation HTTP surface from inside the container; and
 10. requires `relay`, `recorder`, and `flask` to be running.
 
-Docker images receive `MSH_BUILD_COMMIT` as a build argument and bake it into the
+Docker images receive `FCP_BUILD_COMMIT` as a build argument and bake it into the
 image environment and label. Runtime success therefore cannot be inferred from
 host `HEAD` alone.
 
@@ -117,13 +117,13 @@ and press **Update all devices**.
 
 Federation-wide runtime updates require the host-owned update agent and the
 update-event processor to already exist on each participating device. A device
-running an MSH version from before this capability was introduced cannot use a
+running an FCP version from before this capability was introduced cannot use a
 remote update message to install the capability that would be needed to process
 that message.
 
 Such legacy devices need one normal manual update to an updater-capable `main`
 commit and one start through the supported launcher (`start.cmd` or
 `bash start.sh`). After that bootstrap, future approved `main` updates can use
-the Federation flow. This transition is deliberate: MSH does not grant legacy
+the Federation flow. This transition is deliberate: FCP does not grant legacy
 Flask containers a new shell/Docker escape hatch merely to bootstrap the first
 remote update.

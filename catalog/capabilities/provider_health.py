@@ -36,12 +36,12 @@ from .provider_reports import (
     protocol_version_parts,
 )
 
-PROVIDER_HEALTH_PROTOCOL = "msh-provider-health-sync"
+PROVIDER_HEALTH_PROTOCOL = "fcp-provider-health-sync"
 PROVIDER_HEALTH_PROTOCOL_VERSION = "1.0"
 PROVIDER_HEALTH_PROTOCOL_MAJOR = 1
-PROVIDER_HEALTH_RECORD_SCHEMA = "msh.provider-health-record.v1"
-PROVIDER_HEALTH_OBSERVATION_SCHEMA = "msh.provider-health-observation.v1"
-PROVIDER_HEALTH_AUDIT_SCHEMA = "msh.provider-health-audit.v1"
+PROVIDER_HEALTH_RECORD_SCHEMA = "fcp.provider-health-record.v1"
+PROVIDER_HEALTH_OBSERVATION_SCHEMA = "fcp.provider-health-observation.v1"
+PROVIDER_HEALTH_AUDIT_SCHEMA = "fcp.provider-health-audit.v1"
 PROVIDER_HEALTH_STORE_SCHEMA_VERSION = 1
 MAX_HEALTH_AUDIT_READ = 10_000
 MAX_TEXT_BYTES = 512

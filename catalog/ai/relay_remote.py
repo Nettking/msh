@@ -32,7 +32,7 @@ from .runtime_contracts import (
     _logical_id,
 )
 
-RELAY_REMOTE_AI_KIND = "msh-remote-ai-invocation-v1"
+RELAY_REMOTE_AI_KIND = "fcp-remote-ai-invocation-v1"
 MAX_PENDING_REMOTE_AI_INVOCATIONS = 128
 MAX_REMOTE_AI_REPLAY_ENTRIES = 1_024
 
@@ -423,7 +423,7 @@ class RelayRemoteAIEndpoint:
         if self._reader_task is None:
             self._reader_task = asyncio.create_task(
                 self._reader_loop(),
-                name=f"msh-remote-ai-relay-{self.relay_client.node_id}",
+                name=f"fcp-remote-ai-relay-{self.relay_client.node_id}",
             )
 
     async def close(self) -> None:

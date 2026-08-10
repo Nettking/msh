@@ -134,7 +134,7 @@ class ArtifactCatalog:
                     self._scan_in_progress = False
                 self._scan_lock.release()
 
-        threading.Thread(target=_worker, name="msh-artifact-catalog-rescan", daemon=True).start()
+        threading.Thread(target=_worker, name="fcp-artifact-catalog-rescan", daemon=True).start()
         return True
 
     def _scan_root_signature(self) -> ScanRootSignature:

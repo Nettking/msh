@@ -39,7 +39,7 @@ def test_upgrade_bootstrap_projects_legacy_technical_values_without_role(tmp_pat
 
     assert migrated is True
     payload = json.loads(config_path.read_text(encoding="utf-8"))
-    assert payload["schema"] == "msh.capability_config.v1"
+    assert payload["schema"] == "fcp.capability_config.v1"
     assert payload["recorder_sources"] == "Mazak=http://192.168.200.10:5000"
     assert payload["recorder_poll_interval"] == "0.5"
     assert payload["recorder_include_condition"] is True

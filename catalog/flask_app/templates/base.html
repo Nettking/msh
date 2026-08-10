@@ -7,7 +7,7 @@
     {% set document_capability_complete = document_capabilities.completed|default(false) %}
     {% set legacy_document_recorder_only = server_setup_settings and server_setup_settings.configured and server_setup_settings.user_setup_complete and server_setup_settings.deployment_mode == 'recorder-only' %}
     {% set document_recorder_only = (document_capability_complete and document_capabilities.recorder|default(false) and not document_capabilities.workbench|default(false)) or (not document_capability_complete and legacy_document_recorder_only) %}
-    <title>{{ 'MSH Recorder' if document_recorder_only else 'MSH Webapp' }}</title>
+    <title>{{ 'FCP Recorder' if document_recorder_only else 'FCP Webapp' }}</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/global-refresh.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/setup.css') }}">
@@ -110,9 +110,9 @@
     {% if setup_focus %}
     <header class="setup-shell-header" style="flex-wrap: wrap;">
       <div class="setup-shell-header__identity">
-        <span class="setup-shell-header__mark" aria-hidden="true">MSH</span>
+        <span class="setup-shell-header__mark" aria-hidden="true">FCP</span>
         <div>
-          <strong>{{ 'MSH ready' if endpoint == 'web.get_started' else 'Device setup' }}</strong>
+          <strong>{{ 'FCP ready' if endpoint == 'web.get_started' else 'Device setup' }}</strong>
           <span>{{ 'Choose your first task' if endpoint == 'web.get_started' else 'One step at a time' }}</span>
         </div>
       </div>
@@ -137,13 +137,13 @@
       {% elif setup_is_configured and not setup_runtime_pending %}
       <a class="setup-shell-header__exit" href="{{ url_for('web.status') if recorder_only else (next_path or url_for('web.overview')) }}">{{ 'Recorder status' if recorder_only else 'Exit setup' }}</a>
       {% else %}
-      <span class="setup-shell-header__state">{{ 'Start MSH' if setup_is_configured else 'First-time setup' }}</span>
+      <span class="setup-shell-header__state">{{ 'Start FCP' if setup_is_configured else 'First-time setup' }}</span>
       {% endif %}
     </header>
     {% else %}
     <header class="site-header site-header--grouped {% if recorder_only %}site-header--recorder{% endif %}">
       <div class="site-header__identity">
-        <h1>{{ 'MSH Recorder station' if recorder_only else 'MSH Webapp' }}</h1>
+        <h1>{{ 'FCP Recorder station' if recorder_only else 'FCP Webapp' }}</h1>
         <p>{{ 'MTConnect data capture' if recorder_only else 'Operator support and strategy capture' }}</p>
       </div>
       <nav class="site-nav site-nav--primary" aria-label="Primary sections">

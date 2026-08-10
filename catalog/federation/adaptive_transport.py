@@ -9,8 +9,8 @@ from typing import Any, Protocol
 
 from .storage_protocol import StorageRequestEnvelope, StorageResponseEnvelope
 
-ADAPTIVE_TRANSPORT_STATUS_SCHEMA = "msh.adaptive_storage_transport.status.v1"
-DIRECT_CONTINUITY_STATUS_SCHEMA = "msh.direct_continuity.status.v1"
+ADAPTIVE_TRANSPORT_STATUS_SCHEMA = "fcp.adaptive_storage_transport.status.v1"
+DIRECT_CONTINUITY_STATUS_SCHEMA = "fcp.direct_continuity.status.v1"
 
 
 class StorageRequestTransport(Protocol):

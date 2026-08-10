@@ -52,7 +52,7 @@ def test_connected_provider_round_trips_through_saved_legacy_setup(tmp_path) -> 
     payload = json.loads(path.read_text(encoding="utf-8"))
     restored = load_settings(path)
 
-    assert payload["schema"] == "msh.server_setup.v3"
+    assert payload["schema"] == "fcp.server_setup.v3"
     assert payload["user_setup_complete"] is True
     assert restored == settings
 
@@ -62,7 +62,7 @@ def test_legacy_setup_defaults_to_local_provider(tmp_path) -> None:
     path.write_text(
         json.dumps(
             {
-                "schema": "msh.server_setup.v1",
+                "schema": "fcp.server_setup.v1",
                 "configured": True,
                 "deployment_mode": "web-workbench",
                 "ai_enabled": True,
@@ -86,7 +86,7 @@ def test_legacy_phone_defaults_become_pending_browser_setup_once(tmp_path) -> No
     path.write_text(
         json.dumps(
             {
-                "schema": "msh.server_setup.v2",
+                "schema": "fcp.server_setup.v2",
                 "configured": True,
                 "deployment_mode": "web-workbench",
                 "ai_enabled": False,
@@ -112,7 +112,7 @@ def test_phone_bootstrap_migration_preserves_custom_provider(tmp_path) -> None:
     path.write_text(
         json.dumps(
             {
-                "schema": "msh.server_setup.v2",
+                "schema": "fcp.server_setup.v2",
                 "configured": True,
                 "deployment_mode": "web-workbench",
                 "ai_enabled": True,
@@ -288,7 +288,7 @@ def test_ai_defaults_and_chat_use_saved_connected_provider(monkeypatch, tmp_path
     monkeypatch.setattr(ai_routes, "chat", fake_chat)
 
     result = ai_routes._answer_question(
-        "How does MSH work?",
+        "How does FCP work?",
         model="qwen2.5:7b",
         base_url="http://192.168.1.50:11434",
         dry_run=False,

@@ -48,7 +48,7 @@ batch, so an abrupt restart replays only uncommitted data.
 The recorder remains available as the managed Docker Compose service:
 
 ```bash
-python setup_msh.py
+python setup_fcp.py
 
 docker compose up -d --build
 ```
@@ -71,7 +71,7 @@ For every configured source, the recorder:
 4. validates sequence continuity;
 5. atomically stores the original XML and its manifest;
 6. atomically stores the complete observation NDJSON batch;
-7. atomically stores the MSH-compatible wide JSONL batch;
+7. atomically stores the FCP-compatible wide JSONL batch;
 8. advances the checkpoint only after all durable writes succeed.
 
 If the process stops after raw XML is stored but before the checkpoint is
@@ -81,9 +81,9 @@ duplicate records.
 
 ## Output
 
-### MSH-compatible telemetry JSONL
+### FCP-compatible telemetry JSONL
 
-The regular MSH scan path receives one wide state snapshot for every MTConnect
+The regular FCP scan path receives one wide state snapshot for every MTConnect
 sequence:
 
 ```text
@@ -92,7 +92,7 @@ data/sources/mtconnect_recorder/jsonl/
 ```
 
 Each observation updates its named signal and carries forward the latest known
-values for that machine. Existing MSH consumers therefore continue to see
+values for that machine. Existing FCP consumers therefore continue to see
 columns such as `Srpm`, `execution`, and `Xabs`, while every source sequence is
 still represented. The carried state is persisted in the durable checkpoint so
 it survives normal restarts. It is reset after an Agent restart or an
@@ -159,17 +159,17 @@ data/source_state/mtconnect_recorder.log
 
 | Variable | Default | Purpose |
 | --- | --- | --- |
-| `MSH_RECORDER_SOURCES` | built-in lab sources | `Name=http://agent;Other=http://agent` |
-| `MSH_RECORDER_DATA_DIR` | `data` | Root data directory. |
-| `MSH_RECORDER_STATE_FILE` | `data/source_state/mtconnect_recorder_state.json` | Durable committed checkpoint. |
-| `MSH_RECORDER_POLL_INTERVAL` | `0.2` | Delay between catch-up cycles. |
-| `MSH_RECORDER_BATCH_SIZE` | `1000` | Maximum observations requested per `/sample` call. |
-| `MSH_RECORDER_MAX_BATCHES_PER_CYCLE` | `20` | Catch-up batches per source before yielding. |
-| `MSH_RECORDER_REQUEST_TIMEOUT` | `10.0` | HTTP request timeout in seconds. |
-| `MSH_RECORDER_ONCE` | `false` | Run one catch-up cycle and exit. |
+| `FCP_RECORDER_SOURCES` | built-in lab sources | `Name=http://agent;Other=http://agent` |
+| `FCP_RECORDER_DATA_DIR` | `data` | Root data directory. |
+| `FCP_RECORDER_STATE_FILE` | `data/source_state/mtconnect_recorder_state.json` | Durable committed checkpoint. |
+| `FCP_RECORDER_POLL_INTERVAL` | `0.2` | Delay between catch-up cycles. |
+| `FCP_RECORDER_BATCH_SIZE` | `1000` | Maximum observations requested per `/sample` call. |
+| `FCP_RECORDER_MAX_BATCHES_PER_CYCLE` | `20` | Catch-up batches per source before yielding. |
+| `FCP_RECORDER_REQUEST_TIMEOUT` | `10.0` | HTTP request timeout in seconds. |
+| `FCP_RECORDER_ONCE` | `false` | Run one catch-up cycle and exit. |
 
 Conditions are always recorded. The legacy
-`MSH_RECORDER_INCLUDE_CONDITION` setting is no longer used because excluding
+`FCP_RECORDER_INCLUDE_CONDITION` setting is no longer used because excluding
 Conditions would make the recorder intentionally lossy.
 
 ## Operational requirement
@@ -177,4 +177,4 @@ Conditions would make the recorder intentionally lossy.
 The MTConnect Agent in the provided example reports `bufferSize="4096"`.
 Recorder downtime must remain shorter than the time required for the Agent to
 produce 4096 observations, or the Agent buffer must be increased. When this
-limit is exceeded, MSH records the exact unrecoverable sequence gap.
+limit is exceeded, FCP records the exact unrecoverable sequence gap.

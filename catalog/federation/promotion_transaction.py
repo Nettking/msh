@@ -10,7 +10,7 @@ from typing import Any, Self
 
 from .errors import FederationValidationError
 
-PROMOTION_TRANSACTION_SCHEMA = "msh.storage_promotion_transaction.v1"
+PROMOTION_TRANSACTION_SCHEMA = "fcp.storage_promotion_transaction.v1"
 PROMOTION_TRANSACTION_STAGES = (
     "pending",
     "validated",

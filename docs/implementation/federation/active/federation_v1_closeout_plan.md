@@ -5,7 +5,7 @@ Status: **active release-closeout plan**.
 Reviewed: **2026-08-06 Europe/Oslo**.
 
 This document governs the remaining work required to turn the merged Federation
-implementation into a stable, documented, supportable MSH Federation v1
+implementation into a stable, documented, supportable FCP Federation v1
 release.
 
 Use these sources together:
@@ -37,7 +37,7 @@ Identity
 ```
 
 Benchmarks and contribution decisions are optional follow-up work. They do not
-block access to the normal MSH workbench and do not grant authority by
+block access to the normal FCP workbench and do not grant authority by
 themselves.
 
 Current release state:
@@ -64,7 +64,7 @@ requires dependency evidence and regression validation.
 
 ## Fixed decisions
 
-- The completed Federation technical baseline remains **MSH Federation v1.0**
+- The completed Federation technical baseline remains **FCP Federation v1.0**
   through F8.7.
 - V1 is for explicitly trusted devices and providers.
 - Runtime authority and security boundaries from the completed phases remain

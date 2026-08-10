@@ -86,7 +86,7 @@ def _manifest(*, revision: int = 0, term: int = 7) -> AuthoritativeStorageManife
 
 def _report(manifest: AuthoritativeStorageManifest, *, provider_id: str, datasets: tuple[DatasetManifest, ...] | None = None, committed_hashes: tuple[str, ...] | None = None, manifest_hash: str | None = None, revision: int = 1, manifest_revision: int | None = None, integrity_verified: bool = True, synchronization_state: str = "synchronized", eligible: bool = True, reasons: tuple[str, ...] = ("eligible",)) -> StorageReplicaReport:
     return StorageReplicaReport(
-        schema="msh.storage_replica_report.v1",
+        schema="fcp.storage_replica_report.v1",
         protocol_version="1.0",
         session_id=manifest.session_id,
         group_id=manifest.group_id,

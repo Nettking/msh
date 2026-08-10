@@ -18,7 +18,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 DEFAULT_RECORDS_PATH = Path("data") / "operator_strategy_records" / "operator_strategies.json"
 DEFAULT_TIMEZONE = "Europe/Oslo"
-SCHEMA_VERSION = "msh.operator_strategy_records.v3"
+SCHEMA_VERSION = "fcp.operator_strategy_records.v3"
 
 
 class OperatorStrategyError(RuntimeError):

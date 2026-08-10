@@ -39,7 +39,7 @@ class TrustedFederatedLanguageModelRuntime(LanguageModelRuntime):
         *,
         status: ProviderStatus = ProviderStatus.READY,
     ) -> None:
-        """Accept derived MSH node identities only for F8.2-backed providers."""
+        """Accept derived FCP node identities only for F8.2-backed providers."""
 
         if not callable(getattr(provider, "resource_report", None)):
             super().register(provider, status=status)

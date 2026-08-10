@@ -79,7 +79,7 @@ def _recommend(rows: list[dict[str, Any]]) -> dict[str, Any]:
             "recommended_profile": "",
             "recommended_model": "",
             "recommended_label": "Disable local AI",
-            "message": "This computer does not appear suitable for local MSH AI. Even Edge small (smollm2:360m) was too slow. On old Raspberry Pi-class hardware, disable AI or run the AI service on a stronger computer.",
+            "message": "This computer does not appear suitable for local FCP AI. Even Edge small (smollm2:360m) was too slow. On old Raspberry Pi-class hardware, disable AI or run the AI service on a stronger computer.",
         }
 
     if edge and edge.get("tested") and not edge.get("result", {}).get("ok"):

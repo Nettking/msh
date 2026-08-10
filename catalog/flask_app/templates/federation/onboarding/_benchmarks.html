@@ -52,7 +52,7 @@
         {% else %}
         <div class="federation-empty-state" role="status">
           <h4>{{ vm.benchmark_summary.label }}</h4>
-          <p>Inspection did not find a configured Ollama model, MTConnect source, registered compute handler, or storage candidate that MSH can check.</p>
+          <p>Inspection did not find a configured Ollama model, MTConnect source, registered compute handler, or storage candidate that FCP can check.</p>
           <a class="federation-button federation-button--secondary" href="{{ vm.benchmark_summary.get('setup_url', '/startup') }}">Configure this device</a>
         </div>
         {% endif %}

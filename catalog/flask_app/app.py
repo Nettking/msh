@@ -104,57 +104,57 @@ def _resume_persisted_contributions_safely() -> tuple[int, int]:
 
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
-    app.config["SECRET_KEY"] = os.getenv("MSH_FLASK_SECRET", "msh-dev")
+    app.config["SECRET_KEY"] = os.getenv("FCP_FLASK_SECRET", "fcp-dev")
     if app.config.get("MAX_CONTENT_LENGTH") is None:
         app.config["MAX_CONTENT_LENGTH"] = int(
-            os.getenv("MSH_UPLOAD_MAX_REQUEST_BYTES", str(1100 * 1024 * 1024))
+            os.getenv("FCP_UPLOAD_MAX_REQUEST_BYTES", str(1100 * 1024 * 1024))
         )
     app.config.setdefault(
         "DATA_UPLOAD_DATABASE",
-        os.getenv("MSH_DATA_UPLOAD_DATABASE", "data/imports/uploads.sqlite3"),
+        os.getenv("FCP_DATA_UPLOAD_DATABASE", "data/imports/uploads.sqlite3"),
     )
     app.config.setdefault(
         "DATA_UPLOAD_STAGING_DIRECTORY",
-        os.getenv("MSH_DATA_UPLOAD_STAGING_DIR", "data/imports/staging"),
+        os.getenv("FCP_DATA_UPLOAD_STAGING_DIR", "data/imports/staging"),
     )
     app.config.setdefault(
         "DATA_UPLOAD_PUBLISHED_DIRECTORY",
-        os.getenv("MSH_DATA_UPLOAD_PUBLISHED_DIR", "data/uploads"),
+        os.getenv("FCP_DATA_UPLOAD_PUBLISHED_DIR", "data/uploads"),
     )
     app.config.setdefault(
         "DATA_UPLOAD_MAX_FILES",
-        int(os.getenv("MSH_DATA_UPLOAD_MAX_FILES", "50")),
+        int(os.getenv("FCP_DATA_UPLOAD_MAX_FILES", "50")),
     )
     app.config.setdefault(
         "DATA_UPLOAD_MAX_FILE_BYTES",
-        int(os.getenv("MSH_DATA_UPLOAD_MAX_FILE_BYTES", str(512 * 1024 * 1024))),
+        int(os.getenv("FCP_DATA_UPLOAD_MAX_FILE_BYTES", str(512 * 1024 * 1024))),
     )
     app.config.setdefault(
         "DATA_UPLOAD_MAX_TOTAL_BYTES",
-        int(os.getenv("MSH_DATA_UPLOAD_MAX_TOTAL_BYTES", str(1024 * 1024 * 1024))),
+        int(os.getenv("FCP_DATA_UPLOAD_MAX_TOTAL_BYTES", str(1024 * 1024 * 1024))),
     )
     app.config.setdefault(
         "DATA_UPLOAD_MAX_LINE_BYTES",
-        int(os.getenv("MSH_DATA_UPLOAD_MAX_LINE_BYTES", str(4 * 1024 * 1024))),
+        int(os.getenv("FCP_DATA_UPLOAD_MAX_LINE_BYTES", str(4 * 1024 * 1024))),
     )
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_IDENTITY_DIRECTORY",
         os.getenv(
-            "MSH_FEDERATION_NODE_STATE_DIR",
+            "FCP_FEDERATION_NODE_STATE_DIR",
             "data/federation/device",
         ),
     )
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_STATE_DATABASE",
         os.getenv(
-            "MSH_FEDERATION_ONBOARDING_DATABASE",
+            "FCP_FEDERATION_ONBOARDING_DATABASE",
             "data/federation/onboarding/onboarding.sqlite3",
         ),
     )
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_TRANSITION_DATABASE",
         os.getenv(
-            "MSH_FEDERATION_TRANSITION_DATABASE",
+            "FCP_FEDERATION_TRANSITION_DATABASE",
             app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
         ),
     )
@@ -165,27 +165,27 @@ def create_app() -> Flask:
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_BENCHMARK_DATABASE",
         os.getenv(
-            "MSH_FEDERATION_BENCHMARK_DATABASE",
+            "FCP_FEDERATION_BENCHMARK_DATABASE",
             app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
         ),
     )
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_CONTRIBUTION_DATABASE",
         os.getenv(
-            "MSH_FEDERATION_CONTRIBUTION_DATABASE",
+            "FCP_FEDERATION_CONTRIBUTION_DATABASE",
             app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"],
         ),
     )
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_COORDINATOR_DATABASE",
         os.getenv(
-            "MSH_FEDERATION_COORDINATOR_DATABASE",
+            "FCP_FEDERATION_COORDINATOR_DATABASE",
             "data/federation/relay/control.sqlite3",
         ),
     )
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_DEVICE_NAME",
-        os.getenv("MSH_DEVICE_NAME", "This MSH device"),
+        os.getenv("FCP_DEVICE_NAME", "This FCP device"),
     )
     app.config.setdefault("CAPABILITY_ONBOARDING_DISCOVERY_SOURCES", ())
     app.config.setdefault("CAPABILITY_ONBOARDING_INSPECTION_ADAPTERS", None)
@@ -193,9 +193,9 @@ def create_app() -> Flask:
     app.config.setdefault("CAPABILITY_ONBOARDING_CONTRIBUTION_ADAPTERS", None)
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_PAIRING_RELAY_URL",
-        os.getenv("MSH_PAIRING_RELAY_URL", ""),
+        os.getenv("FCP_PAIRING_RELAY_URL", ""),
     )
-    remote_pairing_path = os.getenv("MSH_FEDERATION_REMOTE_PAIRING_PATH", "")
+    remote_pairing_path = os.getenv("FCP_FEDERATION_REMOTE_PAIRING_PATH", "")
     if remote_pairing_path:
         app.config.setdefault(
             "CAPABILITY_ONBOARDING_REMOTE_PAIRING_PATH",
@@ -208,14 +208,14 @@ def create_app() -> Flask:
         "CAPABILITY_ONBOARDING_INSPECTION_TTL_SECONDS",
         int(
             os.getenv(
-                "MSH_INSPECTION_TTL_SECONDS",
+                "FCP_INSPECTION_TTL_SECONDS",
                 str(DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS),
             )
         ),
     )
     app.config.setdefault(
         "CAPABILITY_ONBOARDING_CONTRIBUTION_TTL_SECONDS",
-        int(os.getenv("MSH_CONTRIBUTION_TTL_SECONDS", "900")),
+        int(os.getenv("FCP_CONTRIBUTION_TTL_SECONDS", "900")),
     )
     app.jinja_env.globals["normalize_onboarding_view_model"] = (
         normalize_onboarding_view_model
@@ -352,7 +352,7 @@ if __name__ == "__main__":
     debug = os.getenv("FLASK_DEBUG", "0") == "1"
 
     runtime_start_state = "disabled"
-    if os.getenv("MSH_SKIP_ORCHESTRATION", "0") != "1":
+    if os.getenv("FCP_SKIP_ORCHESTRATION", "0") != "1":
         try:
             runtime_start_state = _start_runtime_from_capability_state(app)
         except Exception as exc:  # noqa: BLE001 - corrupt state must fail closed

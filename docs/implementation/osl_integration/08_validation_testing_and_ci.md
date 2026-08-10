@@ -2,17 +2,17 @@
 
 ## Status and analyzed baseline
 
-This is a `proposed-for-MSH` implementation plan. No test, fixture, workflow,
+This is a `proposed-for-FCP` implementation plan. No test, fixture, workflow,
 profile or product guarantee described here exists unless marked
-`existing-in-MSH`.
+`existing-in-FCP`.
 
 | Repository | Analyzed commit |
 |---|---|
-| `Nettking/msh` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` |
+| `this repository` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` |
 | `Nettking/systems-paper` | `ff098ce52f15b489b6a07d5b55c6c788d862e3be` |
 | `Nettking/paper-repo` | `abe3fbcddee590c3f399b06f63cb329e8615977c` |
 
-The markers `paper-defined`, `existing-in-MSH`, `proposed-for-MSH` and
+The markers `paper-defined`, `existing-in-FCP`, `proposed-for-FCP` and
 `requires-research-clarification` follow
 [00_scope_and_sources.md](00_scope_and_sources.md).
 
@@ -30,41 +30,41 @@ The markers `paper-defined`, `existing-in-MSH`, `proposed-for-MSH` and
   or operational validity.
 - `paper-defined`: `evaluation/osl-final-reassessment.md:58-92` reports eight
   isolated negative witnesses; they do not exhaust every rule or relation
-  combination. MSH therefore needs independent positive/negative product tests.
+  combination. FCP therefore needs independent positive/negative product tests.
 - `paper-defined`: Notebook-to-OSL requires low-friction raw capture, context,
   traceability, preserved uncertainty and human validation before
   model-ready treatment (`paper-repo/.../03_research_design.tex:29-44`,
   `04_method.tex:43-80`, `05_annotation_schema.tex:27-51`).
-- `requires-research-clarification`: neither paper defines final MSH approval,
+- `requires-research-clarification`: neither paper defines final FCP approval,
   publication, operational authority, canonical JSON or repository migrations.
-- `proposed-for-MSH`: passing tests establishes conformance to the selected,
-  source-pinned MSH profile and explicit product invariants only. Test names and
+- `proposed-for-FCP`: passing tests establishes conformance to the selected,
+  source-pinned FCP profile and explicit product invariants only. Test names and
   reports must not call content true, safe, executable, operationally validated
   or approved without the separate exact lifecycle records.
 
-## Existing MSH test and CI baseline
+## Existing FCP test and CI baseline
 
-- `existing-in-MSH`: `pytest.ini` discovers `catalog/**/test_*.py`;
+- `existing-in-FCP`: `pytest.ini` discovers `catalog/**/test_*.py`;
   `requirements-dev.txt` includes pytest and Ruff.
-- `existing-in-MSH`: current suites use `tmp_path`, `monkeypatch`, Flask
+- `existing-in-FCP`: current suites use `tmp_path`, `monkeypatch`, Flask
   `test_client`, malformed inputs, frozen contract round trips,
   revision/idempotency, recovery and focused race tests.
-- `existing-in-MSH`: `catalog/flask_app/test_operator_strategy_service.py:8-16,
+- `existing-in-FCP`: `catalog/flask_app/test_operator_strategy_service.py:8-16,
   35-56,76-92` preserves the raw statement but also copies it into `decision`
   and can mark a note `reusable`. These are legacy behavior tests, not OSL
   contract evidence.
-- `existing-in-MSH`: `test_operator_strategy_lifecycle.py:16-55` chains note
+- `existing-in-FCP`: `test_operator_strategy_lifecycle.py:16-55` chains note
   reuse, support cards, export and recommender output without semantic review,
   approval or authority separation.
-- `existing-in-MSH`: `test_osl_sysml_export.py:13-60` asserts string fragments
+- `existing-in-FCP`: `test_osl_sysml_export.py:13-60` asserts string fragments
   and freezes legacy/collapsed evidence syntax. Keep it as compatibility
   coverage; do not rename it canonical conformance.
-- `existing-in-MSH`: workflows such as
+- `existing-in-FCP`: workflows such as
   `.github/workflows/phase-f77-ai-runtime-integration.yml:39-99` and
   `cfi1-federation-overview.yml:37-85` demonstrate Python 3.12 on Ubuntu and
   Windows, constrained installs, focused pytest, Ruff, compilation and diff
   hygiene.
-- `existing-in-MSH`: no permanent workflow selects operator-strategy/OSL-adjacent
+- `existing-in-FCP`: no permanent workflow selects operator-strategy/OSL-adjacent
   tests. `docs/ci-lint-baseline.md:3-7` says current workflow-local lint
   exclusions are debt, not precedent for new files.
 
@@ -263,7 +263,7 @@ Required permanent cases:
 - parse failure creates diagnostics and no repository write;
 - imported `approved`/`published`/actor data cannot set local lifecycle.
 
-Round trip proves fidelity to the selected MSH codec. It does not prove that the
+Round trip proves fidelity to the selected FCP codec. It does not prove that the
 papers define JSON/YAML, that content is semantically valid, or that SysML v2 is
 equivalent. YAML remains deferred. SysML conformance has its own adapter tests.
 
@@ -280,7 +280,7 @@ The validator is pure, deterministic, offline and resource bounded. Assert:
 - it never infers factual truth, accepted evidence, human review, safety or
   operational validity;
 - structurally-complete/domain-reviewed paper maturity remains separate from
-  MSH Approved/Published.
+  FCP Approved/Published.
 
 Test the `paper-defined` distinctions directly:
 
@@ -305,7 +305,7 @@ Permanent negative tests prove:
 - capture cannot create candidate, draft, review, approval or publication;
 - candidate generation cannot create a canonical revision;
 - validation cannot submit review;
-- paper domain review cannot create MSH approval;
+- paper domain review cannot create FCP approval;
 - approval cannot publish without a separate authorized command/policy;
 - publication cannot activate or execute;
 - import/export cannot alter lifecycle;
@@ -395,7 +395,7 @@ Expected behavior:
   available when AI is disabled or fails.
 
 `paper-defined`: paper-repo assigns interpretation and validation to humans and
-does not evaluate AI. All AI behavior here is `proposed-for-MSH` with mandatory
+does not evaluate AI. All AI behavior here is `proposed-for-FCP` with mandatory
 human control.
 
 ## Repository and storage adapter tests
@@ -443,7 +443,7 @@ Assert application behavior and semantic labels rather than template internals:
 - narrow viewport stacks panes, wraps IDs/findings, retains primary actions and
   uses no hover-only control.
 
-`requires-research-clarification`: MSH has no current browser automation/a11y
+`requires-research-clarification`: FCP has no current browser automation/a11y
 dependency. Initial permanent gates use Flask/semantic HTML/static CSS contract
 tests. A later pinned browser and automated a11y engine supplements, never
 replaces, server authorization/leakage tests.
@@ -469,7 +469,7 @@ SysML v2 export coverage:
   expected consequence;
 - unsupported semantics fail with diagnostics rather than fallback text;
 - exporter failure cannot change revision/publication;
-- a pinned supported parser/profile accepts output before MSH calls the adapter
+- a pinned supported parser/profile accepts output before FCP calls the adapter
   supported.
 
 SysML import/full round trip is `requires-research-clarification` and deferred
@@ -562,7 +562,7 @@ the aggregate requirement remains reliable.
 - pushes to `main` and optional manual dispatch;
 - `permissions: contents: read`;
 - concurrency with cancel-in-progress;
-- Python/dependencies constrained consistently with current MSH workflows;
+- Python/dependencies constrained consistently with current FCP workflows;
 - explicit timeouts, no `continue-on-error`;
 - no live AI, remote source, federation, database server or machine connection.
 
@@ -651,18 +651,18 @@ endpoints, unrestricted databases or generated operator content.
 
 ## Decisions fixed by this plan
 
-- `proposed-for-MSH`: tests target a source-pinned bounded profile, not an
+- `proposed-for-FCP`: tests target a source-pinned bounded profile, not an
   unqualified OSL standard claim.
-- `proposed-for-MSH`: every enabled semantic rule has positive and isolated
+- `proposed-for-FCP`: every enabled semantic rule has positive and isolated
   negative evidence.
-- `proposed-for-MSH`: validator failure/incompleteness is never pass.
-- `proposed-for-MSH`: authority, leakage, provenance and recovery negatives are
+- `proposed-for-FCP`: validator failure/incompleteness is never pass.
+- `proposed-for-FCP`: authority, leakage, provenance and recovery negatives are
   permanent gates, not optional security follow-up.
-- `proposed-for-MSH`: canonical bytes/hashes and SQLite/migration behavior run on
+- `proposed-for-FCP`: canonical bytes/hashes and SQLite/migration behavior run on
   Linux and Windows.
-- `proposed-for-MSH`: existing legacy operator/export tests remain labelled
+- `proposed-for-FCP`: existing legacy operator/export tests remain labelled
   legacy until explicit migration.
-- `proposed-for-MSH`: one stable `osl-required` check protects the branch while
+- `proposed-for-FCP`: one stable `osl-required` check protects the branch while
   internal jobs may evolve.
 
 ## Open decisions

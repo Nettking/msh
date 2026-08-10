@@ -10,7 +10,7 @@ Phase 4 completeness-aware automatic failover into Phase 3.
 
 ## Sequence
 
-- **D0:** freeze the versioned `msh-storage-v1` application protocol.
+- **D0:** freeze the versioned `fcp-storage-v1` application protocol.
 - **D1:** local provider-neutral dispatch and filesystem conformance.
 - **D2:** local PostgreSQL provider and transactional conformance.
 - **D3:** storage capability registration and coordinator assignments.
@@ -31,7 +31,7 @@ Flask, Docker, or database behavior.
 
 ### Protocol identity
 
-- Protocol: `msh-storage-v1`
+- Protocol: `fcp-storage-v1`
 - Current version: `1.0`
 - Unknown major versions are rejected.
 - Additive optional fields are tolerated within major version 1.

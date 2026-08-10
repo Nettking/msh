@@ -1,4 +1,4 @@
-"""Tiny private Ollama API client for MSH language-model providers."""
+"""Tiny private Ollama API client for FCP language-model providers."""
 
 from __future__ import annotations
 
@@ -6,7 +6,7 @@ import json
 import os
 from urllib import error, request
 
-DEFAULT_MODEL = os.environ.get("MSH_AI_MODEL", "qwen2.5-coder:7b")
+DEFAULT_MODEL = os.environ.get("FCP_AI_MODEL", "qwen2.5-coder:7b")
 DEFAULT_BASE_URL = os.environ.get("OLLAMA_BASE_URL", "http://localhost:11434")
 
 

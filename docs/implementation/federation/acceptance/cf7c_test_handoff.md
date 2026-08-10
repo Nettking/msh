@@ -7,7 +7,7 @@ Use this page only after one exact candidate commit is frozen and all required p
 ## Machine assignments
 
 - `local-ai`: local Windows GPU/Ollama machine.
-- `cnc-recorder`: MSH-network machine connected to both CNC MTConnect Agents.
+- `cnc-recorder`: FCP-network machine connected to both CNC MTConnect Agents.
 - `school-control`: Høgskolen i Østfold control, registered-compute, and storage-candidate machine.
 
 At least one of the latter two machines must be a physical Linux host.

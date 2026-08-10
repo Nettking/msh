@@ -43,8 +43,8 @@ from .verified_chunk_transfer import (
     VerifiedChunkTransferEndpoint,
 )
 
-DURABLE_INCOMING_SCHEMA = "msh.object_transfer.durable.incoming.v1"
-DURABLE_OUTGOING_SCHEMA = "msh.object_transfer.durable.outgoing.v1"
+DURABLE_INCOMING_SCHEMA = "fcp.object_transfer.durable.incoming.v1"
+DURABLE_OUTGOING_SCHEMA = "fcp.object_transfer.durable.outgoing.v1"
 DURABLE_STATE_VERSION = 1
 DEFAULT_ABANDONED_TRANSFER_AGE_SECONDS = 24 * 60 * 60
 MAX_DURABLE_TRANSFERS = 4096
@@ -146,7 +146,7 @@ def _public_key_text(public_key: X25519PublicKey) -> str:
 
 
 def _receipt_from_dict(value: Any) -> VerifiedObjectTransfer:
-    if not isinstance(value, dict) or value.get("schema") != "msh.object_transfer.receipt.v1":
+    if not isinstance(value, dict) or value.get("schema") != "fcp.object_transfer.receipt.v1":
         raise FederationValidationError(
             "invalid-durable-transfer-receipt",
             "receipt",

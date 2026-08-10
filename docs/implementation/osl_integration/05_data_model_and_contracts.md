@@ -1,7 +1,7 @@
 # Planned OSL data model and contracts
 
 Status: conceptual and wire-contract plan; all examples are
-`proposed-for-MSH` and **not implemented contracts**.
+`proposed-for-FCP` and **not implemented contracts**.
 
 Analyzed baselines:
 
@@ -9,7 +9,7 @@ Analyzed baselines:
   `ff098ce52f15b489b6a07d5b55c6c788d862e3be`;
 - `paper-repo`
   `abe3fbcddee590c3f399b06f63cb329e8615977c`;
-- `msh` `f580c71f7269643a077cc7e7db8ba9bf6050bb6a`.
+- `fcp` `f580c71f7269643a077cc7e7db8ba9bf6050bb6a`.
 
 This document fixes semantic responsibilities and invariants. Proposed names are
 working names until phase 1 freezes the profile and contracts. A field is not
@@ -21,31 +21,31 @@ required merely because it appears in an example below.
    must preserve typed nodes, typed relation usages, identity, path membership,
    cardinality, gaps, evidence targeting, review, alternatives, conflicts,
    composition, and traces. A flat JSON object is insufficient.
-2. `proposed-for-MSH` source artefacts, excerpts, fragment revisions, validation
+2. `proposed-for-FCP` source artefacts, excerpts, fragment revisions, validation
    results, reviews, approvals, publications, provenance events, and exports are
    immutable after commit.
-3. `proposed-for-MSH` stable logical identity and immutable revision identity are
+3. `proposed-for-FCP` stable logical identity and immutable revision identity are
    separate.
-4. `proposed-for-MSH` language/profile version, product contract/codec version,
+4. `proposed-for-FCP` language/profile version, product contract/codec version,
    source-paper commit, and producer version are separate.
-5. `proposed-for-MSH` every derived claim can identify its source excerpt(s),
+5. `proposed-for-FCP` every derived claim can identify its source excerpt(s),
    generator/editor, and uncertainty. Missing provenance is a finding, never
    silently fabricated.
 6. `paper-defined` Decision, candidate response, selected response, and
    OperatorAction remain distinct.
-7. `proposed-for-MSH` Recommendation, approval, authorized action, action
+7. `proposed-for-FCP` Recommendation, approval, authorized action, action
    occurrence, expected outcome, and observed outcome/feedback are separate
    objects outside paper-defined selection semantics.
 8. `paper-defined` evidence dimensions are independent and evidence is not
    proof.
-9. `proposed-for-MSH` workflow state, OSL maturity, reviewer disposition,
+9. `proposed-for-FCP` workflow state, OSL maturity, reviewer disposition,
    validation status, evidence review, and confidentiality are orthogonal.
-10. `proposed-for-MSH` client/UI fields never establish actor identity, role,
+10. `proposed-for-FCP` client/UI fields never establish actor identity, role,
     approval, or authority; those come from authenticated server context.
-11. `proposed-for-MSH` unknown required major versions fail closed. Permitted
+11. `proposed-for-FCP` unknown required major versions fail closed. Permitted
     unknown extensions are preserved losslessly and never interpreted as core
     semantics.
-12. `proposed-for-MSH` no initial contract contains executable code, tool calls,
+12. `proposed-for-FCP` no initial contract contains executable code, tool calls,
     shell commands, machine addresses, or operational authority.
 
 ## Shared identity and revision envelope
@@ -55,18 +55,18 @@ tentative; semantic responsibilities are fixed.
 
 | Conceptual field | Cardinality | Rationale/classification |
 | --- | --- | --- |
-| Contract/codec identifier | exactly one | `proposed-for-MSH` fail-closed wire/storage decoding; distinct from OSL language. |
-| Object kind | exactly one | `proposed-for-MSH` bounded discriminator; never dynamic class/module name. |
-| Logical ID | exactly one | `proposed-for-MSH` stable identity across revisions. |
-| Immutable revision ID | exactly one for versioned objects | `proposed-for-MSH` target for review, approval, trace, and export. |
-| Aggregate sequence/revision | exactly one where commands mutate aggregate history | `proposed-for-MSH` optimistic concurrency and ordered events. |
-| Parent/base revision | zero or one for linear edit; explicit multiple parents only if later merge is designed | `proposed-for-MSH` lineage; the papers do not define merge semantics. |
-| Supersedes references | zero or more | `proposed-for-MSH` non-destructive lifecycle lineage. |
-| Created time | exactly one UTC instant | Existing MSH convention; source-local time can be separate. |
-| Created actor/tool | exactly one attributed principal or tool-run reference | `paper-defined` assessor/originator and method traceability; `proposed-for-MSH` server-bound identity. |
-| Content hash | exactly one for immutable content | `proposed-for-MSH` bind validation, review, approval, publication, and export. |
-| Classification/access-policy reference | exactly one for sensitive aggregates | `paper-defined` confidentiality concern; `proposed-for-MSH` orthogonal policy. |
-| Extensions | zero or more namespaced values | `proposed-for-MSH` forwards compatibility under profile policy. |
+| Contract/codec identifier | exactly one | `proposed-for-FCP` fail-closed wire/storage decoding; distinct from OSL language. |
+| Object kind | exactly one | `proposed-for-FCP` bounded discriminator; never dynamic class/module name. |
+| Logical ID | exactly one | `proposed-for-FCP` stable identity across revisions. |
+| Immutable revision ID | exactly one for versioned objects | `proposed-for-FCP` target for review, approval, trace, and export. |
+| Aggregate sequence/revision | exactly one where commands mutate aggregate history | `proposed-for-FCP` optimistic concurrency and ordered events. |
+| Parent/base revision | zero or one for linear edit; explicit multiple parents only if later merge is designed | `proposed-for-FCP` lineage; the papers do not define merge semantics. |
+| Supersedes references | zero or more | `proposed-for-FCP` non-destructive lifecycle lineage. |
+| Created time | exactly one UTC instant | Existing FCP convention; source-local time can be separate. |
+| Created actor/tool | exactly one attributed principal or tool-run reference | `paper-defined` assessor/originator and method traceability; `proposed-for-FCP` server-bound identity. |
+| Content hash | exactly one for immutable content | `proposed-for-FCP` bind validation, review, approval, publication, and export. |
+| Classification/access-policy reference | exactly one for sensitive aggregates | `paper-defined` confidentiality concern; `proposed-for-FCP` orthogonal policy. |
+| Extensions | zero or more namespaced values | `proposed-for-FCP` forwards compatibility under profile policy. |
 
 IDs should be opaque application identifiers. Display names and SysML qualified
 names are labels, never identity. Hash algorithm and canonical byte rules are
@@ -79,7 +79,7 @@ part of the contract/codec version.
 `paper-defined` basis: method phase 1 requires focus, roles, consent, and
 confidentiality (`paper-repo` `04_method.tex` lines 35--37).
 
-`proposed-for-MSH` responsibilities:
+`proposed-for-FCP` responsibilities:
 
 | Concept | Requiredness | Notes |
 | --- | --- | --- |
@@ -102,17 +102,17 @@ available after interpretation.
 
 | Concept | Cardinality | Rationale |
 | --- | --- | --- |
-| Source logical/revision ID | 1 | `proposed-for-MSH` immutable identity/lineage. |
+| Source logical/revision ID | 1 | `proposed-for-FCP` immutable identity/lineage. |
 | Capture session/policy revision | 1 | `paper-defined` session trace; exact policy binding is product hardening. |
-| Original content storage reference | 1 | `proposed-for-MSH` bytes remain unchanged and access-controlled. |
-| Content hash, size, media type, encoding | 1 each where applicable | `proposed-for-MSH` integrity and bounded decoding. |
+| Original content storage reference | 1 | `proposed-for-FCP` bytes remain unchanged and access-controlled. |
+| Content hash, size, media type, encoding | 1 each where applicable | `proposed-for-FCP` integrity and bounded decoding. |
 | Client capture time and server receipt time | 0..1 and 1 | Separate observed source time from durable receipt. |
 | Setting/task phase | 0..1 each | `paper-defined` context preservation. |
 | Speaker/source role | 0..1 | Not an authenticated reviewer identity. |
 | External artefact reference | 0..* | `paper-defined` optional capture context; typed as planned external reference. |
 | Capture fidelity/confidence | 0..1 plus basis | Confidence that capture is accurate, not truth of content. |
-| Classification/consent reference | 1 | `paper-defined` confidentiality; `proposed-for-MSH` server policy. |
-| Capture channel/tool | 1 | `proposed-for-MSH` manual/import/OCR/transcription provenance. |
+| Classification/consent reference | 1 | `paper-defined` confidentiality; `proposed-for-FCP` server policy. |
+| Capture channel/tool | 1 | `proposed-for-FCP` manual/import/OCR/transcription provenance. |
 | Correction/supersession relation | 0..* | New source revision/annotation; never overwrite original. |
 
 Source content is not a Decision, Observation, evidence fact, recommendation, or
@@ -121,7 +121,7 @@ OSL fragment by itself.
 ### SourceExcerpt
 
 `requires-research-clarification`: the papers do not define segmentation or
-selector syntax. `proposed-for-MSH` requires:
+selector syntax. `proposed-for-FCP` requires:
 
 | Concept | Cardinality | Notes |
 | --- | --- | --- |
@@ -153,7 +153,7 @@ Representation-neutral upstream decision:
 - actor/run/time and superseded prior decision.
 
 `paper-defined` note selection categories appear in `04_method.tex` lines 47--49.
-`proposed-for-MSH` not-selected content remains retained under source policy.
+`proposed-for-FCP` not-selected content remains retained under source policy.
 
 ### CandidateExtraction
 
@@ -183,7 +183,7 @@ The Notebook-to-OSL schema uses a broad `condition`, while OSL has `Context`,
 `ApplicabilityCriterion`, `SelectionCriterion`, continuation/escalation/
 verification criteria, and `ActionCondition` relations.
 
-`proposed-for-MSH`:
+`proposed-for-FCP`:
 
 - keep `ConditionClaim` only in the upstream candidate layer;
 - require the modeller to classify it into a paper-defined canonical type/
@@ -198,7 +198,7 @@ verification criteria, and `ActionCondition` relations.
 `paper-defined` systems-paper defines `OperatorStrategy` containing `1..*`
 `StrategyPath` values. `paper-repo` calls its unit an operator-strategy fragment.
 
-`proposed-for-MSH` aggregate decision:
+`proposed-for-FCP` aggregate decision:
 
 - a `StrategyFragmentRevision` is the product/version envelope for one
   `OperatorStrategy` graph with one or more related paths;
@@ -212,14 +212,14 @@ Conceptual contents:
 | Concept | Cardinality | Source/rationale |
 | --- | --- | --- |
 | Shared identity/revision envelope | 1 | Product versioning and provenance. |
-| Language profile + systems-paper SHA | 1 | `proposed-for-MSH` source-pinned semantics. |
+| Language profile + systems-paper SHA | 1 | `proposed-for-FCP` source-pinned semantics. |
 | `OperatorStrategy` root ID/label | 1 | `paper-defined` container. |
 | `StrategyPath` records | 1..* | `paper-defined` WF1. |
 | Typed semantic elements | 1..* as required | Paper-defined element inventory. |
 | Typed relation usages | 0..* subject to WF rules | Paper-defined connected semantics. |
 | Path memberships/ownership | explicit | Needed for WF15 and stable graph reconstruction. |
 | OSL maturity assessment | derived/persisted result reference | Never an uncontrolled user string. |
-| Product lifecycle | one current aggregate state plus event history | `proposed-for-MSH` separate from maturity. |
+| Product lifecycle | one current aggregate state plus event history | `proposed-for-FCP` separate from maturity. |
 | Validation result references | 0..* | Exact revision/hash. |
 | Candidate/source derivation references | 1..* for notebook-derived content | `paper-defined` method traceability. |
 | Extension values | 0..* | Namespaced, versioned, policy-controlled. |
@@ -229,7 +229,7 @@ compute/storage grant, or implied recommendation policy.
 
 ### Common SemanticElement envelope
 
-`proposed-for-MSH` all canonical nodes share:
+`proposed-for-FCP` all canonical nodes share:
 
 - immutable element ID;
 - paper-defined element kind;
@@ -310,7 +310,7 @@ successful.
 
 ### RecommendationCandidate
 
-`proposed-for-MSH` product/downstream object, not part of the paper-defined OSL
+`proposed-for-FCP` product/downstream object, not part of the paper-defined OSL
 core:
 
 - exact source fragment revision and Decision/Action relation reference;
@@ -341,7 +341,7 @@ occurred.
 
 ### ObservedOutcome / FeedbackRecord
 
-`proposed-for-MSH` separate post-use/evidence contract:
+`proposed-for-FCP` separate post-use/evidence contract:
 
 - feedback ID and source artefact/excerpt;
 - exact related fragment revision, action claim/occurrence if known, expected
@@ -387,7 +387,7 @@ versioned/justified separately.
 - refinement only;
 - unknown.
 
-`proposed-for-MSH` gap fields include immutable ID, kind, statement, impact,
+`proposed-for-FCP` gap fields include immutable ID, kind, statement, impact,
 target element/relation/path commitment, origin, source, and resolution
 reference. Resolving a gap creates a new fragment revision; history remains.
 
@@ -424,7 +424,7 @@ an external or cross-version reference.
 
 ### EvidenceReference
 
-`proposed-for-MSH` durable bridge between an OSL `Evidence` element/qualification
+`proposed-for-FCP` durable bridge between an OSL `Evidence` element/qualification
 and source material:
 
 - evidence reference ID;
@@ -462,7 +462,7 @@ accepted in new canonical contracts.
 date, disposition, note, and path link
 (`sysml/osl-core.sysml` lines 145--151 and 673--676).
 
-`proposed-for-MSH` richer contract:
+`proposed-for-FCP` richer contract:
 
 | Concept | Cardinality | Notes |
 | --- | --- | --- |
@@ -481,7 +481,7 @@ revision; this decision remains bound to the old content.
 
 ### Approval
 
-`proposed-for-MSH`, not paper-defined:
+`proposed-for-FCP`, not paper-defined:
 
 - approval ID;
 - exact fragment revision/profile/content hash;
@@ -492,11 +492,11 @@ revision; this decision remains bound to the old content.
 - revocation/invalidated-by reference where governance requires.
 
 Approval cannot be created by AI, import, serializer, validator, UI-provided
-signer text, domain review alone, or current MSH `reusable` status.
+signer text, domain review alone, or current FCP `reusable` status.
 
 ### PublicationRecord
 
-`proposed-for-MSH`:
+`proposed-for-FCP`:
 
 - exact approval and fragment revision/hash;
 - publisher principal/scope and audience;
@@ -508,7 +508,7 @@ Publication has no activation/execution field.
 
 ### LifecycleState and TransitionEvent
 
-`proposed-for-MSH` states:
+`proposed-for-FCP` states:
 
 - `draft`;
 - `in_review`;
@@ -543,7 +543,7 @@ rationale, uncertainty, responsible actor, and downstream candidate
 (`03_research_design.tex` lines 31--40;
 `04_method.tex` lines 74--76).
 
-`proposed-for-MSH` provenance is an append-only directed acyclic derivation
+`proposed-for-FCP` provenance is an append-only directed acyclic derivation
 graph, distinct from the OSL reasoning graph:
 
 ### Provenance entity kinds
@@ -597,7 +597,7 @@ be serialized as OSL reasoning edges.
 `target_uri` (`sysml/osl-core.sysml` lines 215--232) and both path- and
 element-level trace relations.
 
-`proposed-for-MSH` contract:
+`proposed-for-FCP` contract:
 
 | Concept | Cardinality | Notes |
 | --- | --- | --- |
@@ -614,7 +614,7 @@ or authorized. Import/export never dereferences external URIs automatically.
 
 ## ValidationResult
 
-`proposed-for-MSH` immutable deterministic contract:
+`proposed-for-FCP` immutable deterministic contract:
 
 - validation result ID;
 - exact fragment revision/profile/content hash;
@@ -654,7 +654,7 @@ never trusted local lifecycle.
 
 ### LegacyOperatorRecordMapping
 
-`existing-in-MSH` fields map conservatively:
+`existing-in-FCP` fields map conservatively:
 
 | Legacy value | Planned result |
 | --- | --- |
@@ -707,7 +707,7 @@ Names and version identifiers intentionally use `-plan`.
 
 ~~~json
 {
-  "contract": "msh.osl.source-artefact.v1-plan",
+  "contract": "fcp.osl.source-artefact.v1-plan",
   "status": "planned-not-implemented",
   "source_id": "src_01",
   "source_revision_id": "srcrev_01",
@@ -748,10 +748,10 @@ serialization**. It illustrates semantic separation, not final field names.
 
 ~~~json
 {
-  "contract": "msh.osl.fragment-revision.v1-plan",
+  "contract": "fcp.osl.fragment-revision.v1-plan",
   "status": "planned-not-implemented",
   "language_profile": {
-    "id": "msh-osl-research-profile-plan",
+    "id": "fcp-osl-research-profile-plan",
     "systems_paper_commit": "ff098ce52f15b489b6a07d5b55c6c788d862e3be"
   },
   "fragment_id": "fragment_01",
@@ -816,11 +816,11 @@ The following is a **planned example, not an implemented contract**.
 ~~~json
 {
   "validation_result": {
-    "contract": "msh.osl.validation-result.v1-plan",
+    "contract": "fcp.osl.validation-result.v1-plan",
     "status": "fail",
     "fragment_revision_id": "fragmentrev_01",
     "fragment_content_hash": "<fragment-content-hash>",
-    "language_profile": "msh-osl-research-profile-plan",
+    "language_profile": "fcp-osl-research-profile-plan",
     "validator_version": "plan",
     "findings": [
       {
@@ -833,7 +833,7 @@ The following is a **planned example, not an implemented contract**.
     ]
   },
   "reviewer_decision": {
-    "contract": "msh.osl.reviewer-decision.v1-plan",
+    "contract": "fcp.osl.reviewer-decision.v1-plan",
     "status": "planned-not-implemented",
     "fragment_revision_id": "fragmentrev_01",
     "fragment_content_hash": "<fragment-content-hash>",

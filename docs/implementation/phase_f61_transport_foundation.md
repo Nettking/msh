@@ -25,7 +25,7 @@ All production storage operations still use the existing authenticated relay pat
 - explicit direct-transport diagnostic states: `disabled`, `connecting`, `ready`, and `unavailable`;
 - deterministic, public transport decisions and counters;
 - a hard F6.1 invariant that every request is sent through relay, even if diagnostics report that direct reachability is ready;
-- a signed, ciphertext-only `msh.peer_stream.frame.v1` contract for F6.2 and later;
+- a signed, ciphertext-only `fcp.peer_stream.frame.v1` contract for F6.2 and later;
 - session, source, target, stream, request, key, sequence, length, hash, nonce, protocol, and cipher-suite binding;
 - connection-local fail-closed verification for identity mismatch, signature failure, replay, sequence gaps, stream exhaustion, and encryption-key reuse across streams.
 
@@ -77,7 +77,7 @@ signature
 The supported F6.1 contract is:
 
 ```text
-schema: msh.peer_stream.frame.v1
+schema: fcp.peer_stream.frame.v1
 protocol: 1.x
 key agreement: ephemeral X25519
 key derivation: HKDF-SHA256 with session/node/stream context

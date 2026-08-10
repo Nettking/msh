@@ -28,10 +28,10 @@ class OslExportService:
 
 def _records_to_sysml(records: list[dict[str, Any]]) -> str:
     lines = [
-        "// Generated from MSH Operator Notes",
+        "// Generated from FCP Operator Notes",
         "// Method: coded CNC strategy statement -> OSL keywords -> SysML artefact.",
         "// Keyword style follows systems-paper/sysml/osl-core.sysml and cnc-chatter-keywords-example.sysml.",
-        "package MSH_OperatorStrategies {",
+        "package FCP_OperatorStrategies {",
         "",
         "  import OSLCore::*;",
         "  import OSLMetadata::*;",

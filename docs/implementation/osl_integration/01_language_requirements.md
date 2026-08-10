@@ -7,9 +7,9 @@ Analyzed source: `Nettking/systems-paper` at commit
 `ff098ce52f15b489b6a07d5b55c6c788d862e3be`. Line references in this document
 refer to that immutable snapshot.
 
-This document extracts the OSL language boundary before it is mapped onto MSH.
+This document extracts the OSL language boundary before it is mapped onto FCP.
 It deliberately distinguishes the research language, its current SysML v2
-realization, and additions that MSH would need for durable product use.
+realization, and additions that FCP would need for durable product use.
 
 ## Classification and source precedence
 
@@ -29,7 +29,7 @@ The marker meanings are defined in `00_scope_and_sources.md`. In this document:
 5. `paper-defined` examples, projections, corpus tables, and validation
    manifests demonstrate or test selected behavior; they do not override the
    abstract syntax.
-6. `requires-research-clarification`: where those sources disagree, MSH must not
+6. `requires-research-clarification`: where those sources disagree, FCP must not
    invent a merged normative rule. It must select and name a compatibility
    profile, retain the source commit, and record the deviation.
 
@@ -65,7 +65,7 @@ stable external compatibility promise.
   causal proof, operational correctness, safety assurance, stakeholder
   agreement, or automatic Digital Twin implementation
   (`evaluation/osl-semantic-contract.md` section 13, lines 468--489).
-- `proposed-for-MSH`: every user-visible conformance result must repeat the
+- `proposed-for-FCP`: every user-visible conformance result must repeat the
   relevant boundary: structural/semantic conformance is not evidence truth,
   domain approval, operational validation, or execution permission.
 
@@ -110,7 +110,7 @@ establish a reasoning route (`evaluation/osl-semantic-contract.md` lines 54--75)
 
 ### Decision, response, recommendation, and result
 
-These distinctions are non-negotiable for MSH:
+These distinctions are non-negotiable for FCP:
 
 - `paper-defined`: `DecisionOption` connects a decision to a considered
   candidate action; `ActionSelection` connects it to a represented selected
@@ -123,17 +123,17 @@ These distinctions are non-negotiable for MSH:
   recommendation authority (`sysml/osl-core.sysml` lines 215--232).
 - `paper-defined`: the consequence types are prospective design-time
   requirements. The language contains no actual-result or feedback-event type.
-- `proposed-for-MSH`: a product recommendation, human approval, authorized
+- `proposed-for-FCP`: a product recommendation, human approval, authorized
   operational action, recorded action occurrence, and observed result must be
   separate contracts outside the OSL path's descriptive selection relation.
-- `proposed-for-MSH`: actual outcome/feedback may later become new, explicitly
+- `proposed-for-FCP`: actual outcome/feedback may later become new, explicitly
   sourced evidence for a new fragment revision. It must never rewrite the
   earlier expected consequence.
 
 ## Relation semantics
 
 The core defines typed relations with named, cardinality-one ends. A canonical
-MSH model must preserve relation identity, type, direction/roles, and endpoints;
+FCP model must preserve relation identity, type, direction/roles, and endpoints;
 flattening them into fields loses language meaning.
 
 | Relation family | Representative definitions | `paper-defined` requirement | Core lines |
@@ -158,7 +158,7 @@ conflicts (`evaluation/osl-semantic-contract.md` section 7, lines 290--331).
 
 ## Semantic well-formedness
 
-The first MSH profile must assign durable rule identifiers matching these
+The first FCP profile must assign durable rule identifiers matching these
 commitments rather than treating parser acceptance as sufficient.
 
 | Rule | `paper-defined` commitment | Planned enforcement |
@@ -200,11 +200,11 @@ manuscript summary in `tex/sections/osl_core_definition.tex` lines 91--103.
   bounded profile, while several negative witnesses, target matrices, and
   composition semantics remain partial
   (`evaluation/osl-final-reassessment.md` lines 60--92).
-- `proposed-for-MSH`: a `ValidationResult` is immutable and includes language
+- `proposed-for-FCP`: a `ValidationResult` is immutable and includes language
   profile/version, validator name/version, rule ID, severity, message, affected
   element/relation IDs, input revision/hash, timestamp, and deterministic
   result hash.
-- `proposed-for-MSH`: validation has at least syntax/contract, reference,
+- `proposed-for-FCP`: validation has at least syntax/contract, reference,
   structural, semantic, lifecycle-precondition, and export-compatibility
   categories. Only the first four can contribute to OSL structural maturity.
   None verifies evidence truth or grants approval.
@@ -226,7 +226,7 @@ manuscript summary in `tex/sections/osl_core_definition.tex` lines 91--103.
 Sources: `evaluation/osl-semantic-contract.md` lines 219--257 and
 `sysml/osl-core.sysml` lines 25--173.
 
-Consequences for MSH:
+Consequences for FCP:
 
 - `paper-defined`: the dimensions can coexist. An inferred, document-backed,
   engineer-reviewed hypothesis may remain disputed by an operator.
@@ -241,10 +241,10 @@ Consequences for MSH:
 - `requires-research-clarification`: the core's `source_refs`, `assessor_ref`,
   and `scope_note` are free strings; they do not define immutable evidence
   identity or chain of custody.
-- `proposed-for-MSH`: source artefacts are immutable. Evidence references use a
+- `proposed-for-FCP`: source artefacts are immutable. Evidence references use a
   stable artefact/revision ID, excerpt/span and content hash where applicable,
   capture actor/time, classification/consent scope, and provenance events.
-- `proposed-for-MSH`: an AI output uses `source_kind=model_output` and carries
+- `proposed-for-FCP`: an AI output uses `source_kind=model_output` and carries
   model/run/prompt/input/output hashes. It cannot set evidence review to
   `accepted` or convert a claim into verified fact.
 
@@ -278,7 +278,7 @@ The following are all `requires-research-clarification`:
 
 ### Product requirement
 
-`proposed-for-MSH`:
+`proposed-for-FCP`:
 
 - allocate opaque, immutable IDs for source artefacts, excerpts, fragments,
   fragment revisions, contained nodes, relation usages, reviews, approvals,
@@ -297,19 +297,19 @@ label. The paper defines no machine-readable language-version registry,
 compatibility policy, migration algorithm, canonical serialization version, or
 extension negotiation.
 
-`proposed-for-MSH` requirements:
+`proposed-for-FCP` requirements:
 
 1. Freeze the first supported profile to the analyzed systems-paper commit.
 2. Record four distinct values:
 
    - OSL language/profile identifier;
    - systems-paper source commit;
-   - canonical MSH contract/serialization version;
+   - canonical FCP contract/serialization version;
    - producer and validator implementation versions.
 
 3. Give the profile a provisional internal identifier until the research owner
    approves a public version string. Do not imply that paper label `v0.1-alpha`
-   already guarantees MSH compatibility.
+   already guarantees FCP compatibility.
 4. Reject unknown major profiles for validation or publication. Permit
    read-only inspection and lossless quarantine where safe.
 5. Preserve recognized and policy-allowed unknown extensions during
@@ -321,7 +321,7 @@ extension negotiation.
 
 The first profile must state whether it implements the whole aspirational
 semantic contract or the bounded implemented v0.1 profile. The current evidence
-supports only the latter plus explicitly documented MSH extensions.
+supports only the latter plus explicitly documented FCP extensions.
 
 ## Maturity and lifecycle
 
@@ -335,9 +335,9 @@ supports only the latter plus explicitly documented MSH extensions.
 
 Source: `evaluation/osl-semantic-contract.md` section 6, lines 259--288.
 
-### MSH workflow lifecycle is separate
+### FCP workflow lifecycle is separate
 
-`proposed-for-MSH` lifecycle states such as `extracted_candidate`, `draft`,
+`proposed-for-FCP` lifecycle states such as `extracted_candidate`, `draft`,
 `in_review`, `reviewed`, `approved`, `published`, `rejected`, `deprecated`, and
 `superseded` are product workflow states, not paper-defined OSL constructs.
 They are orthogonal to language maturity:
@@ -370,11 +370,11 @@ Operational binding must not be added as a path-maturity value.
 - `requires-research-clarification`: the workflow table says “reviewed or
   validated OSL model,” while its caption narrows validation to review of
   represented meaning (`tex/sections/osl_workflow_roles.tex` lines 14--22).
-  MSH must avoid an unqualified `validated` state.
-- `proposed-for-MSH`: review and approval are two explicit human commands with
+  FCP must avoid an unqualified `validated` state.
+- `proposed-for-FCP`: review and approval are two explicit human commands with
   authenticated actor, role/scope, target revision, decision/disposition,
   rationale, timestamp, and unresolved issues. AI cannot issue either.
-- `proposed-for-MSH`: OSL approval can authorize publication of represented
+- `proposed-for-FCP`: OSL approval can authorize publication of represented
   knowledge only. It never grants storage leadership/write authority, compute
   authority, artifact access, machine-control authority, or permission to
   perform an `OperatorAction`.
@@ -391,7 +391,7 @@ Operational binding must not be added as a path-maturity value.
 | Reasoning-path, alternative-comparison, decision-review views | `paper-defined` source-bound semantic projections | Secondary views; cannot redefine or copy canonical semantics. |
 | Pilot tree rendering | `paper-defined` debugging/renderability evidence | Not a communication-usability or semantic guarantee. |
 | JSON validation manifests | `paper-defined` test configuration | Not OSL serialization. |
-| JSON/YAML canonical codec in MSH | `proposed-for-MSH` product adapter | Must preserve the graph, version, IDs, provenance, and extensions; schema alone is not OSL. |
+| JSON/YAML canonical codec in FCP | `proposed-for-FCP` product adapter | Must preserve the graph, version, IDs, provenance, and extensions; schema alone is not OSL. |
 
 Sources: `tex/sections/osl_workflow_roles.tex` lines 27--39,
 `tex/sections/osl_capabilities.tex` lines 1--17, and
@@ -399,15 +399,15 @@ Sources: `tex/sections/osl_workflow_roles.tex` lines 27--39,
 
 `requires-research-clarification`: the repository contains no current
 `OSLPathRecord` definition, canonical JSON/YAML mapping, ordering rules,
-language-version field, or round-trip contract. MSH must not treat paper
+language-version field, or round-trip contract. FCP must not treat paper
 examples or test-manifest JSON as such a contract.
 
 ## Known inconsistencies and bounded research debt
 
 | ID | Classification | Conflict or missing definition | Planning treatment |
 | --- | --- | --- | --- |
-| LQ-01 | `requires-research-clarification` | The semantic contract is wider than the implemented research profile (`evaluation/osl-final-reassessment.md` lines 14--16, 60--72). | Name and freeze a bounded MSH profile; list every intentional extension/deviation. |
-| LQ-02 | `requires-research-clarification` | Core retains legacy `EvidenceStatus`, `ContextConstraint`, `ExpectedEffect`, `ExplicitIncompleteness`, `ReviewedPathContent`, and `ReviewedStrategyPath` (core lines 105--121, 303--310, 417--424, 878--916, 1029--1047). | Never make these canonical MSH types; import only through a compatibility adapter with warnings. |
+| LQ-01 | `requires-research-clarification` | The semantic contract is wider than the implemented research profile (`evaluation/osl-final-reassessment.md` lines 14--16, 60--72). | Name and freeze a bounded FCP profile; list every intentional extension/deviation. |
+| LQ-02 | `requires-research-clarification` | Core retains legacy `EvidenceStatus`, `ContextConstraint`, `ExpectedEffect`, `ExplicitIncompleteness`, `ReviewedPathContent`, and `ReviewedStrategyPath` (core lines 105--121, 303--310, 417--424, 878--916, 1029--1047). | Never make these canonical FCP types; import only through a compatibility adapter with warnings. |
 | LQ-03 | `requires-research-clarification` | Some instructions/planning artefacts refer to WF1--WF7 and `ModelStatus.validated`, while current core/manuscript use WF1--WF15 and maturity types. | Use current contract/core/reassessment; record older forms as migration-only. |
 | LQ-04 | `requires-research-clarification` | `sysml/traceability-mapping.md` and `evaluation/osl-requirements-traceability.md` retain old reviewed/evidence/effect terms, older view counts, and suite counts. | Do not source product enums from those stale rows; cite them only where reconciled. |
 | LQ-05 | `requires-research-clarification` | Contract says a situation label alone is incomplete applicability; WF2/native core require only exactly one situation. | Validator warning in first profile; do not invent a mandatory relation until clarified. |
@@ -415,16 +415,16 @@ examples or test-manifest JSON as such a contract.
 | LQ-07 | `requires-research-clarification` | Arbitrary relation qualification, context-to-consequence, several rationale targets, and element-scoped review dispositions are incomplete. | Represent supported target types explicitly and fail/warn on unsupported claims; do not claim generic coverage. |
 | LQ-08 | `requires-research-clarification` | Composition has path-level provenance/participation notes but no element-to-element mapping or conflict-resolution policy. | Call it provenance-bearing composition only; no merge operation. |
 | LQ-09 | `requires-research-clarification` | Confidence basis and quantitative confidence are not implemented. | First contract preserves qualitative value plus separate optional basis/extension; no ungrounded conversion. |
-| LQ-10 | `requires-research-clarification` | Identity, versioning, immutable revisions, canonical serialization, compatibility, and deprecation are undefined. | Add explicitly versioned MSH product contracts without labeling them paper-defined. |
-| LQ-11 | `requires-research-clarification` | Current connectivity validation is undirected and negative-witness coverage is incomplete. | Preserve endpoint semantics and add MSH-native positive/negative tests; do not claim causal validation. |
+| LQ-10 | `requires-research-clarification` | Identity, versioning, immutable revisions, canonical serialization, compatibility, and deprecation are undefined. | Add explicitly versioned FCP product contracts without labeling them paper-defined. |
+| LQ-11 | `requires-research-clarification` | Current connectivity validation is undirected and negative-witness coverage is incomplete. | Preserve endpoint semantics and add FCP-native positive/negative tests; do not claim causal validation. |
 | LQ-12 | `requires-research-clarification` | Core defines more granular trace types than the keyword layer exposes. | Canonical model uses core relation types; SysML adapter emits only supported faithful forms or diagnostics. |
 
-## Paper-to-MSH traceability matrix
+## Paper-to-FCP traceability matrix
 
-Every component in the final column is `proposed-for-MSH`. The matrix allocates
+Every component in the final column is `proposed-for-FCP`. The matrix allocates
 responsibility; it does not assert that those components exist.
 
-| Requirement | Paper evidence | Planned MSH component responsibility | Verification evidence to require |
+| Requirement | Paper evidence | Planned FCP component responsibility | Verification evidence to require |
 | --- | --- | --- | --- |
 | R1 situations | `tex/sections/research_gap.tex` lines 31--35; core lines 929--936 | OSL domain model, applicability query, semantic validator | Exactly-one-situation contract tests; missing/duplicate negative cases |
 | R2 observations and triggers | `research_gap.tex` R2; contract lines 87--93 | Separate node types, `TriggerBasis` relation, capture mapping | Round trip preserves type; no implicit observation-to-trigger conversion |
@@ -446,18 +446,18 @@ responsibility; it does not assert that those components exist.
 
 A future first language-core delivery is acceptable only when it can show:
 
-- `proposed-for-MSH` a named, source-pinned language profile and registry entry;
-- `proposed-for-MSH` separate typed identities for Decision and OperatorAction,
+- `proposed-for-FCP` a named, source-pinned language profile and registry entry;
+- `proposed-for-FCP` separate typed identities for Decision and OperatorAction,
   candidate and selected response relations, evidence, review, and consequences;
-- `proposed-for-MSH` lossless model/codec round trips with version and provenance;
-- `proposed-for-MSH` deterministic findings for the selected WF1--WF15 profile;
-- `proposed-for-MSH` explicit representation of unsupported/deferred paper
+- `proposed-for-FCP` lossless model/codec round trips with version and provenance;
+- `proposed-for-FCP` deterministic findings for the selected WF1--WF15 profile;
+- `proposed-for-FCP` explicit representation of unsupported/deferred paper
   semantics instead of silent weakening;
-- `proposed-for-MSH` no lifecycle transition, AI adapter, serializer, projection,
+- `proposed-for-FCP` no lifecycle transition, AI adapter, serializer, projection,
   or SysML adapter with approval or operational authority;
-- `proposed-for-MSH` no production binding, recommender activation, or execution
+- `proposed-for-FCP` no production binding, recommender activation, or execution
   surface.
 
-The concrete MSH mapping, file placement, and delivery sequence are specified in
+The concrete FCP mapping, file placement, and delivery sequence are specified in
 the remaining plan documents. This document remains the language-semantics
 baseline against which those later proposals must be checked.

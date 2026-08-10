@@ -16,7 +16,7 @@ def _runtime_resolver() -> str:
         _repository_root()
         / "scripts"
         / "windows"
-        / "resolve_msh_web_port.ps1"
+        / "resolve_fcp_web_port.ps1"
     ).read_text(encoding="utf-8")
 
 
@@ -25,7 +25,7 @@ def _relay_selector() -> str:
         _repository_root()
         / "scripts"
         / "windows"
-        / "select_msh_relay_volume.ps1"
+        / "select_fcp_relay_volume.ps1"
     ).read_text(encoding="utf-8")
 
 
@@ -47,9 +47,9 @@ def test_relay_selector_wraps_function_output_before_indexing() -> None:
 @pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell scalar/array semantics")
 def test_windows_powershell_keeps_complete_single_volume_name() -> None:
     command = (
-        "$values = @(@('msh_ollama_models') | Where-Object { $_ }); "
+        "$values = @(@('fcp_ollama_models') | Where-Object { $_ }); "
         "$selected = [string]($values[0]); "
-        "if ($selected -ne 'msh_ollama_models') { "
+        "if ($selected -ne 'fcp_ollama_models') { "
         "Write-Error \"Selected '$selected'\"; exit 1 }; "
         "Write-Output $selected"
     )
@@ -61,4 +61,4 @@ def test_windows_powershell_keeps_complete_single_volume_name() -> None:
     )
 
     assert completed.returncode == 0, completed.stderr or completed.stdout
-    assert completed.stdout.strip() == "msh_ollama_models"
+    assert completed.stdout.strip() == "fcp_ollama_models"

@@ -22,7 +22,7 @@ from .lifecycle_contracts import (
 )
 from .lifecycle_worker import CancellableCapabilityWorker
 
-RELAY_LIFECYCLE_KIND = "msh-capability-lifecycle-v1"
+RELAY_LIFECYCLE_KIND = "fcp-capability-lifecycle-v1"
 MAX_PENDING_LIFECYCLE_REQUESTS = 128
 MAX_PENDING_HEARTBEATS = 256
 
@@ -116,7 +116,7 @@ class RelayLifecycleEndpoint:
         if self._reader_task is None:
             self._reader_task = asyncio.create_task(
                 self._reader_loop(),
-                name=f"msh-lifecycle-relay-{self.relay_client.node_id}",
+                name=f"fcp-lifecycle-relay-{self.relay_client.node_id}",
             )
 
     async def close(self) -> None:

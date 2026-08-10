@@ -6,7 +6,7 @@ from benchmark evidence:
 * compute exposes one explicitly registered, read-only local handler descriptor;
   selecting it remains pending until an existing worker/control-plane authority
   activates that handler;
-* storage exposes the host-mounted MSH data area through a bounded temporary
+* storage exposes the host-mounted FCP data area through a bounded temporary
   write/read/cleanup probe. When the authenticated device created the federation
   and no storage topology exists yet, an explicit Enable choice may register and
   assign this provider through the existing durable storage control plane.
@@ -59,11 +59,11 @@ from catalog.federation.storage_protocol import (
 )
 
 _EXTENSION_KEY = "capability_local_candidate_bundle"
-_COMPUTE_HANDLER_ID = "msh-system-summary"
-_STORAGE_PROVIDER_ID = "msh-local-data-storage"
-_STORAGE_GROUP_ID = "msh-local-storage"
+_COMPUTE_HANDLER_ID = "fcp-system-summary"
+_STORAGE_PROVIDER_ID = "fcp-local-data-storage"
+_STORAGE_GROUP_ID = "fcp-local-storage"
 _STORAGE_FINGERPRINT = "sha256:" + hashlib.sha256(
-    b"msh-local-data-storage-candidate-v1"
+    b"fcp-local-data-storage-candidate-v1"
 ).hexdigest()
 
 
@@ -148,7 +148,7 @@ class PendingComputeContributionAdapter:
 
 
 class _LocalStorageProbe:
-    """Bounded temporary storage probe under the mounted MSH data directory."""
+    """Bounded temporary storage probe under the mounted FCP data directory."""
 
     def __init__(self, root: Path) -> None:
         self.root = root
@@ -395,7 +395,7 @@ def _build_bundle() -> LocalCandidateBundle:
     descriptor = LocalComputeHandlerDescriptor(
         handler_id=_COMPUTE_HANDLER_ID,
         capability_type="system-summary",
-        protocol="msh-compute-handler",
+        protocol="fcp-compute-handler",
         protocol_version="1.0",
         attributes={
             "operation": "system-summary",
@@ -408,7 +408,7 @@ def _build_bundle() -> LocalCandidateBundle:
     storage_probe = _LocalStorageProbe(_probe_root())
     storage_target = StorageCandidateTarget(
         candidate_id=_STORAGE_PROVIDER_ID,
-        display_label="Local MSH data storage",
+        display_label="Local FCP data storage",
         candidate_fingerprint=_STORAGE_FINGERPRINT,
         write_probe=storage_probe.write,
         read_probe=storage_probe.read,
@@ -417,8 +417,8 @@ def _build_bundle() -> LocalCandidateBundle:
     )
     storage_spec = StorageCandidateSpec(
         provider_id=_STORAGE_PROVIDER_ID,
-        protocol="msh-storage-candidate",
-        display_label="Local MSH data storage",
+        protocol="fcp-storage-candidate",
+        display_label="Local FCP data storage",
         capacity_envelope={
             "kind": "host-mounted-local-data",
             "scope": "candidate-only",

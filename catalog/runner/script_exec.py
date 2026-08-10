@@ -121,9 +121,9 @@ def _execute_script_for_session_core(
 
     script_to_run = run_dir / script.script_path
     runtime_env = {
-        "MSH_SESSION_ID": session_dir.name,
-        "MSH_SESSION_DIR": str(session_dir.resolve()),
-        "MSH_RUN_DIR": str(run_dir.resolve()),
+        "FCP_SESSION_ID": session_dir.name,
+        "FCP_SESSION_DIR": str(session_dir.resolve()),
+        "FCP_RUN_DIR": str(run_dir.resolve()),
     }
     started = perf_counter()
     if capture_output:

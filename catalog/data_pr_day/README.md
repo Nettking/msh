@@ -11,7 +11,7 @@
 - Writes canonical machine/day summary CSV to:
   `results/workflows/<session>/analyses/data_pr_day/machine_day_summary.csv`
   with at least columns: `date`, `machine`, `value`.
-  Session location is resolved from runtime session context (`MSH_SESSION_DIR`) or
+  Session location is resolved from runtime session context (`FCP_SESSION_DIR`) or
   inferred from the current workflow run path.
 - Outputs the canonical summary CSV only.
 

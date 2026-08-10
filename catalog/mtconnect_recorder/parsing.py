@@ -255,7 +255,7 @@ def parse_streams(
         )
 
         record: dict[str, Any] = {
-            "schema": "msh.mtconnect.observation.v2",
+            "schema": "fcp.mtconnect.observation.v2",
             "source": "mtconnect_recorder",
             "source_name": source_name,
             "source_record_id": source_record_id,

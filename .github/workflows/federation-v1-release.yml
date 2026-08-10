@@ -6,7 +6,7 @@ on:
       - ".github/workflows/**"
       - "README.md"
       - "catalog/**"
-      - "cmd/msh-peer-sidecar/**"
+      - "cmd/fcp-peer-sidecar/**"
       - "constraints-phase2.txt"
       - "docker-compose.yml"
       - "docs/**"
@@ -20,7 +20,7 @@ on:
       - ".github/workflows/**"
       - "README.md"
       - "catalog/**"
-      - "cmd/msh-peer-sidecar/**"
+      - "cmd/fcp-peer-sidecar/**"
       - "constraints-phase2.txt"
       - "docker-compose.yml"
       - "docs/**"
@@ -59,7 +59,7 @@ jobs:
 
       - uses: actions/setup-go@v5
         with:
-          go-version-file: "cmd/msh-peer-sidecar/go.mod"
+          go-version-file: "cmd/fcp-peer-sidecar/go.mod"
           cache: false
 
       - name: Install release dependencies
@@ -190,7 +190,7 @@ jobs:
           catalog/federation/tests/test_phase_e78_former_primary_completion.py
 
       - name: Go direct peer sidecar tests
-        working-directory: cmd/msh-peer-sidecar
+        working-directory: cmd/fcp-peer-sidecar
         run: |
           go mod tidy
           go test ./...
@@ -264,18 +264,18 @@ jobs:
       postgres:
         image: postgres:16-alpine
         env:
-          POSTGRES_USER: msh
-          POSTGRES_PASSWORD: msh
-          POSTGRES_DB: msh_test
+          POSTGRES_USER: fcp
+          POSTGRES_PASSWORD: fcp
+          POSTGRES_DB: fcp_test
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U msh -d msh_test"
+          --health-cmd "pg_isready -U fcp -d fcp_test"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
     env:
-      MSH_TEST_POSTGRES_DSN: postgresql://msh:msh@127.0.0.1:5432/msh_test
+      FCP_TEST_POSTGRES_DSN: postgresql://fcp:fcp@127.0.0.1:5432/fcp_test
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

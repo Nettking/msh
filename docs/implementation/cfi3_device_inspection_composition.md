@@ -49,7 +49,7 @@ The following remain unchanged and return the existing safe `409` response:
 
 ## Persistence and refresh boundary
 
-CFI-3 stores one canonical `msh.onboarding.device-inspection.v1` object in the existing onboarding SQLite database.
+CFI-3 stores one canonical `fcp.onboarding.device-inspection.v1` object in the existing onboarding SQLite database.
 
 The store enforces:
 
@@ -66,9 +66,9 @@ The snapshot contains evidence only. It stores no internal session binding, enro
 
 Inspection is not a startup or build step. A saved snapshot is reused across normal starts and `start.cmd --resume`; those paths call `load()` and never `run()`. A new revision is created only by the explicit inspection action.
 
-The frozen snapshot contract retains `expires_at`, and the base `CapabilityInspectionService` retains strict TTL evaluation for isolated CF2/CFI contract tests. The installed MSH product composes `RunOnceCapabilityInspectionService`, which treats a valid device-bound saved snapshot as current regardless of elapsed wall-clock time. This product policy applies equally to snapshots written by older releases with the historical short TTL; upgrade does not require a migration rewrite or one final inspection rerun.
+The frozen snapshot contract retains `expires_at`, and the base `CapabilityInspectionService` retains strict TTL evaluation for isolated CF2/CFI contract tests. The installed FCP product composes `RunOnceCapabilityInspectionService`, which treats a valid device-bound saved snapshot as current regardless of elapsed wall-clock time. This product policy applies equally to snapshots written by older releases with the historical short TTL; upgrade does not require a migration rewrite or one final inspection rerun.
 
-The operator can still explicitly use **Inspect again** after a relevant hardware, service, provider, or local capability configuration change. MSH does not silently infer such a change from elapsed time, and normal startup/update never performs the inspection automatically.
+The operator can still explicitly use **Inspect again** after a relevant hardware, service, provider, or local capability configuration change. FCP does not silently infer such a change from elapsed time, and normal startup/update never performs the inspection automatically.
 
 `expires_at` remains immutable historical/compatibility metadata. The installed product does not extend or rewrite an old snapshot to make it appear newer.
 

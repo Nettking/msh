@@ -1,6 +1,6 @@
 # Operator knowledge capture
 
-MSH includes a knowledge-capture flow for recording operator statements during field work and structuring them later.
+FCP includes a knowledge-capture flow for recording operator statements during field work and structuring them later.
 
 The current pages are:
 
@@ -42,7 +42,7 @@ The records are stored as JSON under:
 data/operator_strategy_records/operator_strategies.json
 ```
 
-This is deliberately not JSONL. MSH recursively scans `data/**/*.jsonl` as telemetry, so strategy notes must not be written as `.jsonl` under `data/`.
+This is deliberately not JSONL. FCP recursively scans `data/**/*.jsonl` as telemetry, so strategy notes must not be written as `.jsonl` under `data/`.
 
 ## Time model
 
@@ -129,7 +129,7 @@ coded CNC strategy statement
 
 The exporter should stay aligned with `Nettking/systems-paper/sysml/osl-core.sysml` and the keyword-style SysML example. See `docs/agent_notes/osl_sysml_alignment.md` before changing the exporter.
 
-## Intended MSH field workflow
+## Intended FCP field workflow
 
 1. Open Knowledge -> Capture during the site visit.
 2. Save one raw statement without analysing it.

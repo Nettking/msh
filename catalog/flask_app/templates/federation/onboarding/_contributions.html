@@ -33,7 +33,7 @@
         <div class="federation-empty-state" role="status">
           <h4>{{ contribution_summary.label }}</h4>
           {% if contribution_summary.state == 'complete' %}
-          <p>This device has no configured service to contribute. It can still use MSH as a workbench and join the federation.</p>
+          <p>This device has no configured service to contribute. It can still use FCP as a workbench and join the federation.</p>
           {% else %}
           <p>Configure an Ollama model, MTConnect source, registered compute handler, or storage candidate before enabling a contribution.</p>
           <a class="federation-button federation-button--secondary" href="/startup">Configure this device</a>

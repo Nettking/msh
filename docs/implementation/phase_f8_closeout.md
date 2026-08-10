@@ -71,7 +71,7 @@ F8 is fail-closed and preserves these separations:
 
 ## Compatibility impact
 
-F8 is additive to the existing local MSH workbench. Local Flask routes, recorder durability, JSONL compatibility outputs, the logical Storage API, private Ollama setup, and existing connected-model configuration remain supported.
+F8 is additive to the existing local FCP workbench. Local Flask routes, recorder durability, JSONL compatibility outputs, the logical Storage API, private Ollama setup, and existing connected-model configuration remain supported.
 
 The configured local model may coexist with trusted session-bound remote providers. Provider choice is made per request from explicit capability requirements and current safe resource state, not from a global active-provider flag.
 

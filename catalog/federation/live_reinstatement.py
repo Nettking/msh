@@ -33,8 +33,8 @@ from .live_failover import (
 from .phase_d_control import PhaseDControlPlane
 from .reporting import StorageReplicaAssessment, StorageReplicaReport
 
-LIVE_REINSTATEMENT_SCHEMA = "msh.live_storage_reinstatement.v1"
-LIVE_REINSTATEMENT_RESULT_SCHEMA = "msh.live_storage_reinstatement_result.v1"
+LIVE_REINSTATEMENT_SCHEMA = "fcp.live_storage_reinstatement.v1"
+LIVE_REINSTATEMENT_RESULT_SCHEMA = "fcp.live_storage_reinstatement_result.v1"
 
 _STATE_PLANNED = "planned"
 _STATE_ASSIGNED = "assigned"

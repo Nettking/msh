@@ -17,7 +17,7 @@ def _app(docs_root: Path) -> Flask:
     )
     app.config.update(
         TESTING=True,
-        MSH_DOCS_ROOT=str(docs_root),
+        FCP_DOCS_ROOT=str(docs_root),
     )
     app.register_blueprint(docs_web)
     return app
@@ -28,7 +28,7 @@ def test_docs_index_keeps_real_tree_behind_development_navigation(tmp_path: Path
     guide = tmp_path / "getting-started"
     guide.mkdir()
     (guide / "setup.md").write_text(
-        "# Install MSH on a Laptop\n\nSetup details.",
+        "# Install FCP on a Laptop\n\nSetup details.",
         encoding="utf-8",
     )
     app = _app(tmp_path)
@@ -37,10 +37,10 @@ def test_docs_index_keeps_real_tree_behind_development_navigation(tmp_path: Path
     body = response.get_data(as_text=True)
 
     assert response.status_code == 200
-    assert "MSH Documentation" in body
+    assert "FCP Documentation" in body
     assert "Development &amp; all files" in body
     assert "Getting Started" in body
-    assert "Install MSH on a Laptop" in body
+    assert "Install FCP on a Laptop" in body
     assert "/docs/getting-started/setup.md" in body
     assert "2 Markdown files" not in body
 

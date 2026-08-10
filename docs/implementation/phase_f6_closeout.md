@@ -39,7 +39,7 @@ This closeout consolidates the automated evidence, records the architectural exi
 | `F5-003 Relay fails while direct survives` | F6.3 proves that an established direct data path remains usable during control interruption and exposes unavailable control functions. |
 | `F5-004 Chunk verification` | F6.4.1 and F6.4.2 reject corrupt chunks, retransmit with fresh authenticated frames, and publish only after final size and SHA-256 verification. |
 | `F5-005 Resumable transfer` | F6.5 resumes from the receiver's durable verified cursor after sender, receiver, or machine restart and never publishes a partial object. |
-| Circuit-v2 carriage | F6.6.1 proves an explicit reservation and opaque MSH packet transfer over a libp2p connection reported as `Limited`, with bounded relay resources. |
+| Circuit-v2 carriage | F6.6.1 proves an explicit reservation and opaque FCP packet transfer over a libp2p connection reported as `Limited`, with bounded relay resources. |
 | Session route exchange | F6.6.2 proves that only enrolled members of the same session can publish and resolve signed routes, with expiry and generation rollback protection. |
 
 The closeout workflow runs the complete F6 Python matrix and Go/libp2p sidecar tests on Linux and Windows. It compiles and lints every F6 Python boundary, verifies Go module-lock stability, builds the sidecar, and checks diff hygiene.
@@ -82,12 +82,12 @@ This decision also does not weaken any security or authority acceptance criterio
 
 ## Operational-hardening acceptance run
 
-A later deployment gate should use at least two persisted MSH node states on unrelated networks and an internet-reachable relay/rendezvous service. It should capture deterministic evidence that:
+A later deployment gate should use at least two persisted FCP node states on unrelated networks and an internet-reachable relay/rendezvous service. It should capture deterministic evidence that:
 
 1. both nodes enroll in the same session without exposing database or Flask ports;
 2. signed routes are visible only to active members of the same session;
 3. a direct encrypted route is preferred when available;
-4. circuit-v2 carries the same opaque MSH packet when a direct path is unavailable;
+4. circuit-v2 carries the same opaque FCP packet when a direct path is unavailable;
 5. DCUtR attempts an upgrade when the network permits it;
 6. security, identity, signature, protocol or ciphertext failure does not downgrade;
 7. relay/control interruption does not create storage authority or silent continuity claims;

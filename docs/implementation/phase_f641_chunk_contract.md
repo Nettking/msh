@@ -18,9 +18,9 @@ capability scheduling.
 The implementation adds three versioned public objects:
 
 ```text
-msh.object_transfer.manifest.v1
-msh.object_transfer.chunk.v1
-msh.object_transfer.receipt.v1
+fcp.object_transfer.manifest.v1
+fcp.object_transfer.chunk.v1
+fcp.object_transfer.receipt.v1
 ```
 
 The manifest binds:

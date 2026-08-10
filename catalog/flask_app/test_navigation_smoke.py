@@ -146,7 +146,7 @@ def test_main_navigation_pages_load(monkeypatch, tmp_path) -> None:
 
     pages = [
         ("/", "Overview"),
-        ("/guide", "How to use MSH"),
+        ("/guide", "How to use FCP"),
         ("/get-started", "What do you want to do first?"),
         (
             "/startup?legacy=1",
@@ -325,7 +325,7 @@ def test_recorder_live_status_endpoint_is_small_fresh_and_authority_scoped(
         def web_status(self, _config):
             self.calls += 1
             return {
-                "schema": "msh.recorder.web_status.v1",
+                "schema": "fcp.recorder.web_status.v1",
                 "generated_at": "2026-07-28T12:45:10Z",
                 "poll_after_ms": 2000,
                 "ready": True,

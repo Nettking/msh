@@ -4,14 +4,14 @@ on:
   pull_request:
     paths:
       - ".github/workflows/command-bootstrap.yml"
-      - "setup_msh.py"
+      - "setup_fcp.py"
       - "catalog/command_setup.py"
       - "catalog/flask_app/app.py"
       - "catalog/flask_app/services/capability_config_service.py"
       - "catalog/flask_app/services/server_setup_service.py"
       - "catalog/mtconnect_recorder/config_bootstrap.py"
       - "termux/setup-phone.sh"
-      - "termux/msh-phone.sh"
+      - "termux/fcp-phone.sh"
       - "catalog/flask_app/tests/test_command_setup.py"
       - "catalog/flask_app/tests/test_capability_runtime_startup.py"
       - "catalog/flask_app/tests/test_connected_ai_provider.py"
@@ -21,14 +21,14 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/command-bootstrap.yml"
-      - "setup_msh.py"
+      - "setup_fcp.py"
       - "catalog/command_setup.py"
       - "catalog/flask_app/app.py"
       - "catalog/flask_app/services/capability_config_service.py"
       - "catalog/flask_app/services/server_setup_service.py"
       - "catalog/mtconnect_recorder/config_bootstrap.py"
       - "termux/setup-phone.sh"
-      - "termux/msh-phone.sh"
+      - "termux/fcp-phone.sh"
       - "catalog/flask_app/tests/test_command_setup.py"
       - "catalog/flask_app/tests/test_capability_runtime_startup.py"
       - "catalog/flask_app/tests/test_connected_ai_provider.py"
@@ -71,7 +71,7 @@ jobs:
       - name: Compile command bootstrap boundary
         run: >-
           python -m compileall -q
-          setup_msh.py
+          setup_fcp.py
           catalog/command_setup.py
           catalog/flask_app/app.py
           catalog/flask_app/services/capability_config_service.py
@@ -102,12 +102,12 @@ jobs:
         shell: bash
         run: |
           bash -n termux/setup-phone.sh
-          bash -n termux/msh-phone.sh
+          bash -n termux/fcp-phone.sh
 
       - name: Ruff command bootstrap boundary
         run: >-
           python -m ruff check
-          setup_msh.py
+          setup_fcp.py
           catalog/command_setup.py
           catalog/flask_app/app.py
           catalog/flask_app/tests/test_command_setup.py

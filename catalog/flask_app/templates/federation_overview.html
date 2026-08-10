@@ -78,9 +78,9 @@
   <section class="federation-panel federation-update-panel">
     <header class="federation-panel__header">
       <div>
-        <span class="federation-eyebrow">MSH software updates</span>
+        <span class="federation-eyebrow">FCP software updates</span>
         <h3>{{ (updates.status|default('not_checked')).replace('_', ' ')|title }}</h3>
-        <p>Manual only. Each target independently verifies approved <code>main</code>, fast-forwards only when safe, rebuilds MSH, restores saved Federation state, restarts services, and reports success only after the running build proves the exact target commit.</p>
+        <p>Manual only. Each target independently verifies approved <code>main</code>, fast-forwards only when safe, rebuilds FCP, restores saved Federation state, restarts services, and reports success only after the running build proves the exact target commit.</p>
       </div>
       {% if update_csrf %}
       <form method="post" action="{{ url_for('federation_web.check_updates') }}">

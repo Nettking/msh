@@ -1,4 +1,4 @@
-"""Start the MSH MTConnect recorder with one command.
+"""Start the FCP MTConnect recorder with one command.
 
 Examples:
     python start_recorder.py Mazak=http://192.168.200.249:5000
@@ -30,7 +30,7 @@ def _source(value: str) -> tuple[str, str]:
 
 def build_parser() -> ArgumentParser:
     parser = ArgumentParser(
-        description="Start the loss-aware MSH MTConnect recorder.",
+        description="Start the loss-aware FCP MTConnect recorder.",
     )
     parser.add_argument(
         "sources",
@@ -92,19 +92,19 @@ def main(argv: list[str] | None = None) -> int:
     state_dir = data_dir / "source_state"
     os.environ.update(
         {
-            "MSH_RECORDER_MANAGED": "false",
-            "MSH_RECORDER_SOURCES": ";".join(
+            "FCP_RECORDER_MANAGED": "false",
+            "FCP_RECORDER_SOURCES": ";".join(
                 f"{name}={url}" for name, url in parsed_sources
             ),
-            "MSH_RECORDER_DATA_DIR": str(data_dir),
-            "MSH_RECORDER_STATE_FILE": str(state_dir / "mtconnect_recorder_state.json"),
-            "MSH_RECORDER_STATUS_FILE": str(state_dir / "mtconnect_recorder_status.json"),
-            "MSH_RECORDER_LOG_FILE": str(state_dir / "mtconnect_recorder.log"),
-            "MSH_RECORDER_POLL_INTERVAL": str(args.poll_interval),
-            "MSH_RECORDER_BATCH_SIZE": str(args.batch_size),
-            "MSH_RECORDER_MAX_BATCHES_PER_CYCLE": str(args.max_batches_per_cycle),
-            "MSH_RECORDER_REQUEST_TIMEOUT": str(args.timeout),
-            "MSH_RECORDER_ONCE": "true" if args.once else "false",
+            "FCP_RECORDER_DATA_DIR": str(data_dir),
+            "FCP_RECORDER_STATE_FILE": str(state_dir / "mtconnect_recorder_state.json"),
+            "FCP_RECORDER_STATUS_FILE": str(state_dir / "mtconnect_recorder_status.json"),
+            "FCP_RECORDER_LOG_FILE": str(state_dir / "mtconnect_recorder.log"),
+            "FCP_RECORDER_POLL_INTERVAL": str(args.poll_interval),
+            "FCP_RECORDER_BATCH_SIZE": str(args.batch_size),
+            "FCP_RECORDER_MAX_BATCHES_PER_CYCLE": str(args.max_batches_per_cycle),
+            "FCP_RECORDER_REQUEST_TIMEOUT": str(args.timeout),
+            "FCP_RECORDER_ONCE": "true" if args.once else "false",
         }
     )
 

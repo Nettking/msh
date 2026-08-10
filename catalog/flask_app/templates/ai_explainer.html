@@ -49,7 +49,7 @@
     <div>
       <span class="ai-chat__eyebrow">Read-only repository assistant</span>
       <h2>AI Explainer</h2>
-      <p>Ask a question about how MSH works.</p>
+      <p>Ask a question about how FCP works.</p>
     </div>
     <div class="ai-chat__connection">
       <span class="ai-chat__connection-dot" aria-hidden="true"></span>
@@ -62,16 +62,16 @@
 
   <div class="ai-chat__transcript" data-ai-transcript aria-live="polite" aria-label="Conversation">
     <article class="ai-message ai-message--assistant">
-      <div class="ai-message__role">MSH</div>
+      <div class="ai-message__role">FCP</div>
       <div class="ai-message__bubble">
         <div class="ai-answer">
-          <p>I can explain architecture, data flow, setup, routes, and implementation details from the MSH repository.</p>
+          <p>I can explain architecture, data flow, setup, routes, and implementation details from the FCP repository.</p>
         </div>
         {% if not question and not answer and not context and not error %}
         <div class="ai-chat-suggestions" aria-label="Suggested questions">
-          <button type="button" data-ai-suggestion="How does data flow through MSH?">How does data flow?</button>
+          <button type="button" data-ai-suggestion="How does data flow through FCP?">How does data flow?</button>
           <button type="button" data-ai-suggestion="How is the connected language model configured?">How is AI connected?</button>
-          <button type="button" data-ai-suggestion="What can this device do in MSH?">What can this device do?</button>
+          <button type="button" data-ai-suggestion="What can this device do in FCP?">What can this device do?</button>
         </div>
         {% endif %}
       </div>
@@ -86,7 +86,7 @@
 
     {% if answer or context or error %}
     <article class="ai-message ai-message--assistant {% if error %}ai-message--error{% endif %}">
-      <div class="ai-message__role">MSH</div>
+      <div class="ai-message__role">FCP</div>
       <div class="ai-message__bubble">
         {% if error %}
         <div class="ai-answer"><p>{{ error }}</p></div>
@@ -110,7 +110,7 @@
         name="question"
         rows="2"
         required
-        placeholder="Ask how MSH works…"
+        placeholder="Ask how FCP works…"
         data-ai-question
       >{% if error and question %}{{ question }}{% endif %}</textarea>
       <button class="button-primary ai-chat-composer__send" type="submit" data-ai-send>

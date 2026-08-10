@@ -54,7 +54,7 @@ def main() -> None:
     ]
     for example in examples:
         notes.add_from_form(example)
-    print("Seeded MSH operator support demo data.")
+    print("Seeded FCP operator support demo data.")
 
 
 if __name__ == "__main__":

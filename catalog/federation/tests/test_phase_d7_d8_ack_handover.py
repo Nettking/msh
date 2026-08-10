@@ -15,13 +15,13 @@ def _snapshot() -> StorageControlPlaneSnapshot:
     snapshot = StorageControlPlaneSnapshot("session-a")
     snapshot.providers = {
         "primary": StorageProviderRegistration(
-            "session-a", "primary", "node-p", "msh-storage-v1", "1.0", True, "ready"
+            "session-a", "primary", "node-p", "fcp-storage-v1", "1.0", True, "ready"
         ),
         "replica-a": StorageProviderRegistration(
-            "session-a", "replica-a", "node-a", "msh-storage-v1", "1.0", True, "ready"
+            "session-a", "replica-a", "node-a", "fcp-storage-v1", "1.0", True, "ready"
         ),
         "replica-b": StorageProviderRegistration(
-            "session-a", "replica-b", "node-b", "msh-storage-v1", "1.0", True, "ready"
+            "session-a", "replica-b", "node-b", "fcp-storage-v1", "1.0", True, "ready"
         ),
     }
     snapshot.groups["reports"] = StorageGroupAssignment(

@@ -23,8 +23,8 @@ IMPACT_MAP_PATH = Path(__file__).with_name("physical_impact_map.json")
 IMPACT_MAP_REPOSITORY_PATH = (
     "catalog/federation/tests/cf7_acceptance/physical_impact_map.json"
 )
-IMPACT_MAP_SCHEMA = "msh.cf7.physical-impact-map.v1"
-PLAN_SCHEMA = "msh.cf7.physical-revalidation-plan.v1"
+IMPACT_MAP_SCHEMA = "fcp.cf7.physical-impact-map.v1"
+PLAN_SCHEMA = "fcp.cf7.physical-revalidation-plan.v1"
 
 
 class PhysicalRevalidationError(ValueError):

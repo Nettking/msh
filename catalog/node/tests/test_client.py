@@ -267,13 +267,13 @@ def test_coordinator_status_restarts_changed_snapshot_and_aggregates_pages(
         calls: list[dict[str, Any]] = []
         responses: list[dict[str, Any] | RelayRemoteError] = [
             {
-                "schema": "msh.coordinator_status.v1",
+                "schema": "fcp.coordinator_status.v1",
                 "coordinator_id": "coordinator",
                 "sessions": [{"session_id": "stale-session"}],
                 "nodes": [],
                 "capabilities": [],
                 "pagination": {
-                    "schema": "msh.coordinator_status.pagination.v1",
+                    "schema": "fcp.coordinator_status.pagination.v1",
                     "page_start": 0,
                     "item_count": 1,
                     "total_items": 2,
@@ -286,13 +286,13 @@ def test_coordinator_status_restarts_changed_snapshot_and_aggregates_pages(
                 "membership changed between pages",
             ),
             {
-                "schema": "msh.coordinator_status.v1",
+                "schema": "fcp.coordinator_status.v1",
                 "coordinator_id": "coordinator",
                 "sessions": [{"session_id": "current-session"}],
                 "nodes": [],
                 "capabilities": [],
                 "pagination": {
-                    "schema": "msh.coordinator_status.pagination.v1",
+                    "schema": "fcp.coordinator_status.pagination.v1",
                     "page_start": 0,
                     "item_count": 1,
                     "total_items": 2,
@@ -301,13 +301,13 @@ def test_coordinator_status_restarts_changed_snapshot_and_aggregates_pages(
                 },
             },
             {
-                "schema": "msh.coordinator_status.v1",
+                "schema": "fcp.coordinator_status.v1",
                 "coordinator_id": "coordinator",
                 "sessions": [],
                 "nodes": [{"node_id": "current-node"}],
                 "capabilities": [],
                 "pagination": {
-                    "schema": "msh.coordinator_status.pagination.v1",
+                    "schema": "fcp.coordinator_status.pagination.v1",
                     "page_start": 1,
                     "item_count": 1,
                     "total_items": 2,
@@ -340,7 +340,7 @@ def test_coordinator_status_restarts_changed_snapshot_and_aggregates_pages(
             {"cursor": "current-cursor"},
         ]
         assert status == {
-            "schema": "msh.coordinator_status.v1",
+            "schema": "fcp.coordinator_status.v1",
             "coordinator_id": "coordinator",
             "sessions": [{"session_id": "current-session"}],
             "nodes": [{"node_id": "current-node"}],

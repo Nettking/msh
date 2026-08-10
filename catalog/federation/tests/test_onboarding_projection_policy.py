@@ -12,9 +12,9 @@ def test_active_contribution_projects_persisted_allowed_policy() -> None:
         candidate_id="candidate-storage",
         device_id="node-local",
         capability_type="storage",
-        capability_protocol="msh-storage-candidate",
-        display_label="Local MSH data storage",
-        capacity_envelope={"provider_id": "msh-local-data-storage"},
+        capability_protocol="fcp-storage-candidate",
+        display_label="Local FCP data storage",
+        capacity_envelope={"provider_id": "fcp-local-data-storage"},
         missing_prerequisites=(),
         policy_state="approval-required",
     )

@@ -1,4 +1,4 @@
-"""Compatibility entry point for the active MSH MTConnect recorder."""
+"""Compatibility entry point for the active FCP MTConnect recorder."""
 from pathlib import Path
 import sys
 

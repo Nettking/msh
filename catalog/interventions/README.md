@@ -7,7 +7,7 @@
 `catalog/interventions/interventions.py`
 
 ## Behavior observed via static code inspection
-- Reads from `DATA_DIR = Path(r"C:\wsl\msh\data")` (hardcoded absolute path).
+- Reads from `DATA_DIR = Path(r"C:\wsl\fcp\data")` (hardcoded absolute path).
 - Writes `intervention_states.csv` and `override_changes.csv` in current working directory.
 
 ## Runtime/path assumptions (not runtime-tested)

@@ -3,13 +3,13 @@
           <div>
             <span class="onboarding-panel__step">Step 1 of 6</span>
             <h3 id="identity-heading">Identify this device</h3>
-            <p>MSH uses one stable identity for this installation so it can reconnect safely later.</p>
+            <p>FCP uses one stable identity for this installation so it can reconnect safely later.</p>
           </div>
           {{ status_badge(vm.device.identity_state, vm.device.identity_state_label) }}
         </header>
 
         <div class="identity-card">
-          <div class="identity-card__mark" aria-hidden="true">MSH</div>
+          <div class="identity-card__mark" aria-hidden="true">FCP</div>
           <div>
             <span>Device name</span>
             <strong>{{ vm.device.label }}</strong>

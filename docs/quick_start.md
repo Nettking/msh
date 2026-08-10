@@ -1,11 +1,11 @@
 # Quick start
 
-Status: **current user guide**  
+Status: **current user guide**
 Reviewed: **2026-08-09**
 
-This guide describes the normal supported way to start MSH and complete capability-first onboarding.
+This guide describes the normal supported way to start FCP and complete capability-first onboarding.
 
-An MSH device is not assigned one permanent product role during first setup. The required first-run flow is:
+An FCP device is not assigned one permanent product role during first setup. The required first-run flow is:
 
 ```text
 Identity
@@ -32,8 +32,8 @@ Inspection and benchmark results are durable device evidence. Run them when esta
 From a fresh checkout:
 
 ```cmd
-git clone https://github.com/Nettking/msh.git
-cd msh
+git clone <repository-url> fcp
+cd fcp
 start.cmd
 ```
 
@@ -44,9 +44,9 @@ The launcher builds and starts the current core services:
 - Flask workbench;
 - managed recorder.
 
-It also checks that the configured Ollama model is installed and downloads it when necessary. Existing identity, Federation, inspection, benchmark, recorder, model, and data state are preserved during normal starts. The launcher bakes the exact Git commit into the MSH runtime images and starts the bounded host-owned update agent used by **Federation → Update all devices**.
+It also checks that the configured Ollama model is installed and downloads it when necessary. Existing identity, Federation, inspection, benchmark, recorder, model, and data state are preserved during normal starts. The launcher bakes the exact Git commit into the FCP runtime images and starts the bounded host-owned update agent used by **Federation → Update all devices**.
 
-The web interface is limited to the local MSH computer by default. Open:
+The web interface is limited to the local FCP computer by default. Open:
 
 ```text
 http://localhost:5000
@@ -97,19 +97,19 @@ It preserves:
 - Docker images;
 - downloaded Ollama models.
 
-After the reset, MSH verifies that authoritative setup state is empty and opens capability-first onboarding.
+After the reset, FCP verifies that authoritative setup state is empty and opens capability-first onboarding.
 
 ## Linux or macOS: supported launcher
 
 From a fresh checkout:
 
 ```bash
-git clone https://github.com/Nettking/msh.git
-cd msh
+git clone <repository-url> fcp
+cd fcp
 bash start.sh
 ```
 
-The POSIX launcher starts the same default core services, verifies the configured Ollama model, bakes the exact Git commit into the MSH images, and starts the single-instance host update agent. Normal starts preserve device, Federation, inspection, benchmark, recorder, model, and data state.
+The POSIX launcher starts the same default core services, verifies the configured Ollama model, bakes the exact Git commit into the FCP images, and starts the single-instance host update agent. Normal starts preserve device, Federation, inspection, benchmark, recorder, model, and data state.
 
 To reconnect an existing saved Federation before opening the workbench:
 
@@ -123,23 +123,23 @@ Then open:
 http://localhost:5000/onboarding
 ```
 
-Inspection and benchmark execution remain explicit browser actions. Python 3 is required on the host only for the bounded update agent; MSH application dependencies still run in Docker.
+Inspection and benchmark execution remain explicit browser actions. Python 3 is required on the host only for the bounded update agent; FCP application dependencies still run in Docker.
 
 ### Manual Compose startup
 
 Direct Compose remains useful for development and troubleshooting:
 
 ```bash
-export MSH_BUILD_COMMIT="$(git rev-parse --verify HEAD^{commit})"
+export FCP_BUILD_COMMIT="$(git rev-parse --verify HEAD^{commit})"
 docker compose up -d --build relay ollama recorder flask
 ```
 
 However, **Federation → Update all devices** requires the host-owned update agent. If you deliberately bypass `start.sh`, run the agent separately from the same checkout and data directory:
 
 ```bash
-python3 scripts/posix/msh_update_agent.py \
+python3 scripts/posix/fcp_update_agent.py \
   --repo-root "$PWD" \
-  --data-directory "${MSH_DATA_DIR:-$PWD/data}"
+  --data-directory "${FCP_DATA_DIR:-$PWD/data}"
 ```
 
 The agent accepts only the bounded local handoff contract. It does not expose a network endpoint or accept arbitrary commands from Federation messages.
@@ -148,7 +148,7 @@ The agent accepts only the bounded local handoff contract. It does not expose a 
 
 The mandatory setup is intentionally short:
 
-1. **Identity** — create or load the stable identity for this MSH device.
+1. **Identity** — create or load the stable identity for this FCP device.
 2. **Federation** — reconnect, join, or create the user-facing Federation through an authenticated path.
 3. **Inspect** — inspect the device's supported local capabilities and persist that evidence.
 4. **Finish setup** — enable the normal workbench without granting optional contribution authority.
@@ -178,21 +178,21 @@ The installed product uses run-once capability evidence. Explicit **Inspect agai
 From Windows Command Prompt:
 
 ```cmd
-set MSH_WEB_BIND=0.0.0.0
+set FCP_WEB_BIND=0.0.0.0
 start.cmd
 ```
 
 From PowerShell:
 
 ```powershell
-$env:MSH_WEB_BIND = "0.0.0.0"
+$env:FCP_WEB_BIND = "0.0.0.0"
 .\start.cmd
 ```
 
 From Linux/macOS:
 
 ```bash
-export MSH_WEB_BIND=0.0.0.0
+export FCP_WEB_BIND=0.0.0.0
 bash start.sh
 ```
 
@@ -202,13 +202,13 @@ Then open:
 http://<server-ip>:5000
 ```
 
-Use the reachable LAN or VPN address when pairing another physical MSH device so the pairing material can advertise a reachable relay address. Do not expose Flask, the relay, or Ollama directly to the public internet.
+Use the reachable LAN or VPN address when pairing another physical FCP device so the pairing material can advertise a reachable relay address. Do not expose Flask, the relay, or Ollama directly to the public internet.
 
 See [Server setup](server_setup.md) for network, deployment, recorder, and provider details.
 
 ## Advanced deployment profiles
 
-`setup_msh.py` and Compose profiles remain available for advanced or compatibility deployments such as a headless model provider, a recorder-only station, or a one-shot preparation job. They are not the normal first-run product flow and do not define a permanent device identity or grant capability authority.
+`setup_fcp.py` and Compose profiles remain available for advanced or compatibility deployments such as a headless model provider, a recorder-only station, or a one-shot preparation job. They are not the normal first-run product flow and do not define a permanent device identity or grant capability authority.
 
 See [Server setup](server_setup.md) before selecting a non-default deployment shape.
 
@@ -239,9 +239,9 @@ Useful environment variables include:
 - `FLASK_RUN_HOST` — defaults to `0.0.0.0` for direct Flask startup.
 - `FLASK_RUN_PORT` — defaults to `5000`.
 - `FLASK_DEBUG=1` — enables Flask debug mode.
-- `MSH_FLASK_SECRET` — Flask secret key.
-- `MSH_SKIP_ORCHESTRATION=1` — starts Flask without the background runtime.
-- `MSH_SCAN_DIRS` — comma-separated artifact scan roots.
-- `MSH_AI_MODEL` — selected Ollama model.
+- `FCP_FLASK_SECRET` — Flask secret key.
+- `FCP_SKIP_ORCHESTRATION=1` — starts Flask without the background runtime.
+- `FCP_SCAN_DIRS` — comma-separated artifact scan roots.
+- `FCP_AI_MODEL` — selected Ollama model.
 
 Direct Flask startup does not provide the host-owned Docker activation boundary required by Federation-wide software updates.

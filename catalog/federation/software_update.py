@@ -1,4 +1,4 @@
-"""Safe, narrowly-scoped MSH Git update primitives.
+"""Safe, narrowly-scoped FCP Git update primitives.
 
 This module intentionally contains no transport or shell-command facility.  A
 peer may name an approved commit, but repository, remote, branch and executable
@@ -99,9 +99,9 @@ class GitUpdateAdapter:
         messages = {
             "git_unavailable": "Git is not available on this device.",
             "git_timeout": "The approved Git operation timed out.",
-            "unsupported_checkout": "This is not a supported MSH Git checkout.",
+            "unsupported_checkout": "This is not a supported FCP Git checkout.",
             "unapproved_remote": (
-                "The checkout is not connected to the approved MSH source."
+                "The checkout is not connected to the approved FCP source."
             ),
             "remote_unavailable": "The approved Git source could not be reached.",
             "dirty": "Local changes must be reviewed before updating.",
@@ -243,7 +243,7 @@ class GitUpdateAdapter:
             target,
             "runtime_not_updated",
             (
-                "The source checkout was fast-forwarded. The running MSH "
+                "The source checkout was fast-forwarded. The running FCP "
                 "installation was not rebuilt, reinstalled, or restarted."
             ),
             request_id=request_id,

@@ -39,7 +39,7 @@ from .models import (
 from .redaction import redact_secrets
 
 SCHEMA_VERSION = 1
-COORDINATOR_ID = "msh-relay-coordinator"
+COORDINATOR_ID = "fcp-relay-coordinator"
 MAX_EVENT_PAYLOAD_BYTES = 48_000
 MAX_AUDIT_DETAILS_BYTES = 8_192
 MAX_AUDIT_ROWS = 100_000
@@ -48,7 +48,7 @@ DEFAULT_AUDIT_READ_LIMIT = 1_000
 MAX_REPLAY_EVENTS = 10_000
 MAX_TOKEN_TTL_SECONDS = 7 * 24 * 60 * 60
 MAX_TOKEN_USES = 100
-STATUS_PAGE_SCHEMA = "msh.coordinator_status.pagination.v1"
+STATUS_PAGE_SCHEMA = "fcp.coordinator_status.pagination.v1"
 STATUS_PAGE_MAX_BYTES = 60_000
 STATUS_PAGE_MAX_ITEMS = 64
 STATUS_CURSOR_MAX_BYTES = 512
@@ -604,7 +604,7 @@ class CoordinatorStore:
     ) -> dict[str, Any]:
         _validate_token_bounds(ttl_seconds, max_uses)
         token_id = f"enroll-{self._id_factory()}"
-        raw_token = f"msh_enroll_{self._token_factory(32)}"
+        raw_token = f"fcp_enroll_{self._token_factory(32)}"
         expires_at = now + timedelta(seconds=ttl_seconds)
         with self.transaction() as database:
             database.execute(
@@ -1312,7 +1312,7 @@ class CoordinatorStore:
                     "an invitation from this request has already been used",
                     "request_id",
                 )
-            raw_token = f"msh_join_{self._token_factory(32)}"
+            raw_token = f"fcp_join_{self._token_factory(32)}"
             expires_at = now + timedelta(seconds=ttl_seconds)
             if existing is None:
                 invitation_id = f"invite-{self._id_factory()}"
@@ -2623,7 +2623,7 @@ class CoordinatorStore:
                 )
 
         page: dict[str, Any] = {
-            "schema": "msh.coordinator_status.v1",
+            "schema": "fcp.coordinator_status.v1",
             "coordinator_id": self.coordinator_id,
             "sessions": [],
             "nodes": [],

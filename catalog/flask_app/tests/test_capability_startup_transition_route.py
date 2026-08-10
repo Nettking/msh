@@ -404,7 +404,7 @@ def test_runtime_flags_and_finish_action_come_from_capability_state(
         "finish": {"state": "blocked"},
         "migration": {},
         "actions": {},
-        "storage_key": "msh.onboarding.device.cfi5",
+        "storage_key": "fcp.onboarding.device.cfi5",
     }
     fresh.apply_to_onboarding_view_model(
         view_model,

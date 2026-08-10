@@ -1,19 +1,19 @@
 # MTConnect recording control
 
-MSH runs the MTConnect recorder as an independent Docker service. The service is
-normally alive but idle. Recording is turned on and off from the MSH startup UI.
+FCP runs the MTConnect recorder as an independent Docker service. The service is
+normally alive but idle. Recording is turned on and off from the FCP startup UI.
 
 This is separate from the runtime session choice:
 
 - **Resume session / Start new session** controls analysis and playback progress.
 - **Start recording / Stop recording** controls collection from MTConnect sources.
 
-## Start MSH
+## Start FCP
 
-On the Windows MSH machine, update and start from Command Prompt:
+On the Windows FCP machine, update and start from Command Prompt:
 
 ```cmd
-cd /d C:\path\to\msh
+cd /d C:\path\to\fcp
 git pull --ff-only origin main
 start.cmd
 ```
@@ -26,9 +26,9 @@ http://localhost:5000/startup
 
 The launcher waits until the page answers before opening it and binds the web
 port to `127.0.0.1` by default. This keeps recorder setup and private-network
-scan controls on the MSH machine.
+scan controls on the FCP machine.
 
-Do not run `setup_msh.py` for an ordinary restart. Browser-managed settings are
+Do not run `setup_fcp.py` for an ordinary restart. Browser-managed settings are
 already stored under `data\` and rerunning command setup could replace them.
 The recorder container starts in standby mode until recording is enabled.
 
@@ -36,8 +36,8 @@ For a fresh checkout:
 
 ```cmd
 cd /d "%USERPROFILE%\Documents"
-git clone https://github.com/Nettking/msh.git
-cd msh
+git clone <repository-url> fcp
+cd fcp
 start.cmd
 ```
 
@@ -64,7 +64,7 @@ generic name `Mazak`.
 ## Turn recording on
 
 1. Open `http://localhost:5000/status`. A configured Recorder station is sent
-   here automatically when `start.cmd` opens MSH.
+   here automatically when `start.cmd` opens FCP.
 2. Confirm at least one recorder source is configured, for example:
 
    ```text
@@ -177,7 +177,7 @@ Expected result: HTTP `200` and MTConnect XML.
 
 Click **Stop recording**. The worker flushes buffered rows and returns to standby.
 The Docker service remains alive so it can be enabled again without restarting
-MSH.
+FCP.
 
 ## Architecture
 

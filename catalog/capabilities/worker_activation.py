@@ -43,8 +43,8 @@ from .provider_health import (
 )
 from .provider_reports import ProviderStatus
 
-COMPUTE_HANDLER_DESCRIPTOR_SCHEMA = "msh.compute-handler-descriptor.v1"
-COMPUTE_HANDLER_ACTIVATION_SCHEMA = "msh.compute-handler-activation.v1"
+COMPUTE_HANDLER_DESCRIPTOR_SCHEMA = "fcp.compute-handler-descriptor.v1"
+COMPUTE_HANDLER_ACTIVATION_SCHEMA = "fcp.compute-handler-activation.v1"
 COMPUTE_HANDLER_ACTIVATION_KIND = "local-handler"
 MAX_LOCAL_COMPUTE_HANDLERS = 128
 MAX_COMPUTE_HANDLER_ATTRIBUTES_BYTES = 32_768

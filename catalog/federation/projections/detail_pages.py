@@ -243,7 +243,7 @@ class DetailProjectionMixin:
                             "Device",
                             device_labels.get(
                                 capability.node_id,
-                                "Trusted MSH device",
+                                "Trusted FCP device",
                             ),
                         ),
                         ("Source", "Federation authority"),

@@ -70,7 +70,7 @@ def test_capability_config_projection_drops_role_and_authority(tmp_path) -> None
     path = save_capability_config(config, tmp_path / "capability-config.json")
     payload = json.loads(path.read_text(encoding="utf-8"))
 
-    assert payload["schema"] == "msh.capability_config.v1"
+    assert payload["schema"] == "fcp.capability_config.v1"
     assert payload["ai_provider_name"] == "Laptop"
     assert payload["recorder_sources"] == "Mazak=http://192.168.200.10:5000"
     assert "deployment_mode" not in payload
@@ -152,7 +152,7 @@ def test_capability_finish_adapter_writes_only_role_free_configuration(
     assert SETTINGS_PATH.read_text(encoding="utf-8") == original_payload
     assert persisted.recorder_sources == "Mazak=http://192.168.200.10:5000"
     payload = json.loads(CAPABILITY_CONFIG_PATH.read_text(encoding="utf-8"))
-    assert payload["schema"] == "msh.capability_config.v1"
+    assert payload["schema"] == "fcp.capability_config.v1"
     assert payload["ai_provider_name"] == "Laptop"
     assert payload["recorder_sources"] == "Mazak=http://192.168.200.10:5000"
     assert "deployment_mode" not in payload

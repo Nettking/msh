@@ -60,7 +60,7 @@ def test_empty_optional_surfaces_are_not_false_degraded_states() -> None:
         devices=(
             DeviceRecord(
                 "node-local",
-                "This MSH device",
+                "This FCP device",
                 "connected",
                 None,
                 0,
@@ -107,7 +107,7 @@ def test_capability_first_device_alignment_does_not_override_shared_authority() 
         candidate_id="candidate-ai",
         device_id="node-local",
         capability_type="language-model",
-        protocol="msh-ai",
+        protocol="fcp-ai",
         label="Local language model",
         capacity={},
         missing_prerequisites=(),
@@ -120,7 +120,7 @@ def test_capability_first_device_alignment_does_not_override_shared_authority() 
         candidate_id="candidate-storage",
         device_id="node-local",
         capability_type="storage",
-        protocol="msh-storage",
+        protocol="fcp-storage",
         label="Local storage",
         capacity={},
         missing_prerequisites=(),
@@ -146,7 +146,7 @@ def test_capability_first_device_alignment_does_not_override_shared_authority() 
                 capability_id="candidate-ai",
                 node_id="node-local",
                 capability_type="language-model",
-                protocol="msh-ai",
+                protocol="fcp-ai",
                 protocol_version="1.0",
                 enrollment_state="approved",
                 health_state="current",
@@ -164,7 +164,7 @@ def test_capability_first_device_alignment_does_not_override_shared_authority() 
                 capability_id="remote-compute",
                 node_id="node-remote",
                 capability_type="compute",
-                protocol="msh-compute",
+                protocol="fcp-compute",
                 protocol_version="1.0",
                 enrollment_state="approved",
                 health_state="current",
@@ -187,8 +187,8 @@ def test_capability_first_device_alignment_does_not_override_shared_authority() 
         state="active",
         revision=2,
         devices=(
-            DeviceRecord("node-local", "This MSH device", "unknown", None, 0),
-            DeviceRecord("node-remote", "This MSH device", "offline", NOW, 0),
+            DeviceRecord("node-local", "This FCP device", "unknown", None, 0),
+            DeviceRecord("node-remote", "This FCP device", "offline", NOW, 0),
         ),
     )
 
@@ -199,10 +199,10 @@ def test_capability_first_device_alignment_does_not_override_shared_authority() 
     ).snapshot()
     by_id = {device.node_id: device for device in snapshot.devices}
 
-    assert by_id["node-local"].label == "This MSH device"
+    assert by_id["node-local"].label == "This FCP device"
     assert by_id["node-local"].state == "unknown"
     assert by_id["node-local"].capability_count == 0
-    assert by_id["node-remote"].label == "Trusted MSH device"
+    assert by_id["node-remote"].label == "Trusted FCP device"
     assert by_id["node-remote"].state == "offline"
     assert by_id["node-remote"].capability_count == 0
     assert federation.devices[0].state == "unknown"
@@ -225,15 +225,15 @@ def test_services_page_includes_remote_authorized_capability_metadata() -> None:
         state="active",
         revision=4,
         devices=(
-            DeviceRecord("node-local", "This MSH device", "connected", NOW, 0),
-            DeviceRecord("node-remote", "Trusted MSH device", "connected", NOW, 1),
+            DeviceRecord("node-local", "This FCP device", "connected", NOW, 0),
+            DeviceRecord("node-remote", "Trusted FCP device", "connected", NOW, 1),
         ),
         capabilities=(
             FederatedCapabilityRecord(
                 "candidate-remote-ai",
                 "node-remote",
                 "language-model",
-                "msh-ai",
+                "fcp-ai",
                 "1.0",
                 "disabled",
                 NOW,
@@ -256,10 +256,10 @@ def test_services_page_includes_remote_authorized_capability_metadata() -> None:
 
     remote = next(item for item in payload["items"] if item["key"] == "candidate-remote-ai")
     assert remote["label"] == "Language Model"
-    assert remote["detail"] == "msh-ai 1.0"
+    assert remote["detail"] == "fcp-ai 1.0"
     assert remote["state_label"] == "Disabled"
     assert {item["label"]: item["value"] for item in remote["details"]} == {
-        "Device": "Trusted MSH device",
+        "Device": "Trusted FCP device",
         "Source": "Federation authority",
     }
 
@@ -284,7 +284,7 @@ def test_production_composition_reads_live_cfi_services(
                 "nodes": [
                     {
                         "node_id": "node-local",
-                        "display_name": "This MSH device",
+                        "display_name": "This FCP device",
                         "connection_state": "connected",
                     }
                 ],
@@ -294,7 +294,7 @@ def test_production_composition_reads_live_cfi_services(
                         "capability_id": "candidate-ai",
                         "node_id": "node-local",
                         "type": "language-model",
-                        "protocol": "msh-ai",
+                        "protocol": "fcp-ai",
                         "protocol_version": "1.0",
                         "status": "ready",
                         "last_heartbeat": NOW.isoformat(),
@@ -359,7 +359,7 @@ def test_production_composition_reads_live_cfi_services(
         candidate_id="candidate-ai",
         device_id="node-local",
         capability_type="language-model",
-        capability_protocol="msh-ai",
+        capability_protocol="fcp-ai",
         display_label="Configured language model",
         capacity_envelope={},
         missing_prerequisites=(),

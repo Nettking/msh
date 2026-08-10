@@ -27,7 +27,7 @@ The pairing code was signed by the host device identity and carried existing one
 
 Pairing codes:
 
-- use the `MSH1-` format;
+- use the `FCP1-` format;
 - expire after five minutes by default;
 - are bounded in size;
 - are signed and verified before use;

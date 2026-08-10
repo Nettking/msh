@@ -70,7 +70,7 @@ Identity
 A current device inspection is sufficient to finish setup.
 
 Benchmarks and optional contribution decisions are available as follow-up work.
-They do not block access to the normal MSH workbench.
+They do not block access to the normal FCP workbench.
 
 Fast completion:
 
@@ -98,20 +98,20 @@ The acceptance manifest still correctly records:
 
 ## Product objective
 
-Every MSH installation is one persistent device.
+Every FCP installation is one persistent device.
 
 A device may contribute several independent capabilities simultaneously. The
-user must not be forced to choose one permanent technical role before MSH has
+user must not be forced to choose one permanent technical role before FCP has
 identified the device and connected it to a Federation.
 
 The supported product model is:
 
 ```text
-Start MSH
+Start FCP
   -> create or load stable device identity
   -> discover, join, reconnect to, or create a Federation
   -> inspect local supported capabilities
-  -> open the normal MSH workbench
+  -> open the normal FCP workbench
   -> optionally run or rerun bounded benchmarks
   -> optionally enable, disable, suspend, or reconcile contributions
   -> publish authenticated health and capacity through existing authority paths
@@ -205,9 +205,9 @@ In particular:
 
 ## Current persisted model
 
-Capability-first startup uses a versioned local `msh.onboarding.v1` document.
+Capability-first startup uses a versioned local `fcp.onboarding.v1` document.
 
-It records only the compatible startup state needed to reopen MSH safely:
+It records only the compatible startup state needed to reopen FCP safely:
 
 - stable device ID;
 - public Federation ID;
@@ -266,7 +266,7 @@ compatibility path until CF8 is accepted.
 
 ### Step 1 — Identity
 
-MSH creates or reopens the stable Ed25519 device identity.
+FCP creates or reopens the stable Ed25519 device identity.
 
 Identity creation grants no Federation membership or contribution authority.
 
@@ -285,7 +285,7 @@ repaired; it must not be silently replaced.
 
 ### Step 3 — Inspect
 
-MSH performs one bounded local inspection and persists a device-bound snapshot.
+FCP performs one bounded local inspection and persists a device-bound snapshot.
 
 Inspection may include:
 
@@ -752,7 +752,7 @@ The following instructions from older revisions of this plan are obsolete:
 - “merge CF1 before creating Wave 1 branches”;
 - treating the six-stage onboarding architecture as six mandatory first-run
   screens;
-- requiring benchmark or contribution review before the user can open MSH;
+- requiring benchmark or contribution review before the user can open FCP;
 - describing PRs #175 through #179 as the current unmerged implementation
   stack.
 

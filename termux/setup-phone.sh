@@ -2,14 +2,14 @@
 set -Eeuo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-CONTAINER="${MSH_PHONE_CONTAINER:-msh-phone}"
-IMAGE="${MSH_PHONE_IMAGE:-msh-phone:latest}"
-STATE_DIR="${MSH_PHONE_STATE:-$HOME/msh-phone-state}"
+CONTAINER="${FCP_PHONE_CONTAINER:-fcp-phone}"
+IMAGE="${FCP_PHONE_IMAGE:-fcp-phone:latest}"
+STATE_DIR="${FCP_PHONE_STATE:-$HOME/fcp-phone-state}"
 DATA_DIR="$STATE_DIR/data"
 RESULTS_DIR="$STATE_DIR/results"
 BUILD_SIGNATURE_FILE="$STATE_DIR/runtime-build.signature"
 DEMO_READY_FILE="$STATE_DIR/demo-data.checked"
-PORT="${MSH_PHONE_PORT:-5000}"
+PORT="${FCP_PHONE_PORT:-5000}"
 URL="http://127.0.0.1:$PORT"
 FORCE_REBUILD=false
 UPDATE_MODE=false
@@ -19,7 +19,7 @@ usage() {
     cat <<'USAGE'
 Usage: bash termux/setup-phone.sh [--update | --rebuild]
 
-With an existing compatible MSH container, setup reuses the installed Python
+With an existing compatible FCP container, setup reuses the installed Python
 environment. --rebuild forces a clean environment rebuild.
 USAGE
 }
@@ -39,7 +39,7 @@ http_ready() {
 
 runtime_signature() {
     printf '%s\n' \
-        "msh-phone-runtime-v2" \
+        "fcp-phone-runtime-v2" \
         "$(git -C "$ROOT" hash-object Dockerfile)" \
         "$(git -C "$ROOT" hash-object requirements.txt)"
 }
@@ -85,7 +85,7 @@ container_runtime_ready() {
     proot-distro login \
         --bind "$ROOT:/app" \
         --work-dir /app \
-        --env "MSH_EXPECTED_PYTHON=$expected_python" \
+        --env "FCP_EXPECTED_PYTHON=$expected_python" \
         "$CONTAINER" -- python -c '
 from importlib import metadata
 from pathlib import Path
@@ -94,7 +94,7 @@ import re
 import subprocess
 import sys
 
-expected = os.environ["MSH_EXPECTED_PYTHON"]
+expected = os.environ["FCP_EXPECTED_PYTHON"]
 actual = f"{sys.version_info.major}.{sys.version_info.minor}"
 if actual != expected:
     raise SystemExit(f"Python {actual} does not match required {expected}.")
@@ -131,7 +131,7 @@ select_build_mode() {
         return
     fi
     if ! container_exists; then
-        REBUILD_REASON="The MSH Linux environment is not installed yet."
+        REBUILD_REASON="The FCP Linux environment is not installed yet."
         return
     fi
     if [[ -f "$BUILD_SIGNATURE_FILE" ]] && ! runtime_signature_matches; then
@@ -182,7 +182,7 @@ main() {
 
     ensure_termux_prerequisites
     mkdir -p "$DATA_DIR" "$RESULTS_DIR"
-    if [[ "${MSH_PHONE_RESTART_AFTER_SETUP:-false}" == "true" ]]; then
+    if [[ "${FCP_PHONE_RESTART_AFTER_SETUP:-false}" == "true" ]]; then
         restart_after_setup=true
     fi
     if container_exists && http_ready; then
@@ -192,11 +192,11 @@ main() {
 
     select_build_mode
     if [[ "$currently_running" == "true" ]]; then
-        MSH_PHONE_STOP_QUIET=1 bash "$ROOT/termux/msh-phone.sh" stop
+        FCP_PHONE_STOP_QUIET=1 bash "$ROOT/termux/fcp-phone.sh" stop
     fi
 
     if [[ -n "$REBUILD_REASON" ]]; then
-        printf '\n== Building the MSH Linux environment ==\n'
+        printf '\n== Building the FCP Linux environment ==\n'
         echo "$REBUILD_REASON"
         if ! proot-distro build --help >/dev/null 2>&1; then
             fail "This proot-distro version does not support Dockerfile builds. Run 'pkg upgrade -y' and retry."
@@ -212,7 +212,7 @@ main() {
         proot-distro login --work-dir /app "$CONTAINER" -- mkdir -p /app/data /app/results
         write_runtime_signature
     else
-        printf '\n== Fast MSH update ==\n'
+        printf '\n== Fast FCP update ==\n'
         echo "Runtime dependencies are unchanged; reusing the installed Linux environment."
     fi
 
@@ -224,13 +224,13 @@ main() {
         --work-dir /app
     )
 
-    printf '\n== Configuring MSH phone technical parameters ==\n'
+    printf '\n== Configuring FCP phone technical parameters ==\n'
     if [[ -f "$DATA_DIR/capabilities/config.json" ]]; then
         echo "Existing capability technical configuration was preserved."
     elif [[ -f "$DATA_DIR/server_setup/server_settings.json" ]]; then
-        "${phone_login[@]}" "$CONTAINER" -- python setup_msh.py --migrate-legacy-phone-bootstrap
+        "${phone_login[@]}" "$CONTAINER" -- python setup_fcp.py --migrate-legacy-phone-bootstrap
     else
-        "${phone_login[@]}" "$CONTAINER" -- python setup_msh.py \
+        "${phone_login[@]}" "$CONTAINER" -- python setup_fcp.py \
             --profile workbench --no-ai \
             --web-bind 0.0.0.0 --web-port "$PORT"
     fi
@@ -247,22 +247,22 @@ main() {
         touch "$DEMO_READY_FILE"
     fi
 
-    chmod +x "$ROOT/termux/msh-phone.sh"
+    chmod +x "$ROOT/termux/fcp-phone.sh"
 
     if [[ "$restart_after_setup" == "true" ]]; then
-        bash "$ROOT/termux/msh-phone.sh" start
+        bash "$ROOT/termux/fcp-phone.sh" start
     fi
 
-    printf '\n== MSH phone setup is ready ==\n'
+    printf '\n== FCP phone setup is ready ==\n'
     echo "Persistent data:    $DATA_DIR"
     echo "Persistent results: $RESULTS_DIR"
-    echo "Capability choices are completed in the MSH onboarding UI; phone setup no longer creates a device role."
+    echo "Capability choices are completed in the FCP onboarding UI; phone setup no longer creates a device role."
     if [[ "$restart_after_setup" == "true" ]]; then
-        echo "MSH was updated and restarted at $URL"
+        echo "FCP was updated and restarted at $URL"
     else
         echo
-        echo "Start MSH:"
-        echo "  bash termux/msh-phone.sh start"
+        echo "Start FCP:"
+        echo "  bash termux/fcp-phone.sh start"
         echo
         echo "Then open:"
         echo "  $URL"

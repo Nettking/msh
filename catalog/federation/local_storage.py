@@ -1,4 +1,4 @@
-"""Local D1 storage service and filesystem provider for ``msh-storage-v1``.
+"""Local D1 storage service and filesystem provider for ``fcp-storage-v1``.
 
 The implementation is deliberately in-process.  It proves provider conformance,
 immutable ingest, atomic publication, and durable idempotency without networking,
@@ -95,7 +95,7 @@ class FilesystemBatchStorageProvider:
                     group_id TEXT NOT NULL,
                     dataset_id TEXT NOT NULL,
                     dataset_schema_name TEXT NOT NULL
-                        DEFAULT 'msh.storage.dataset.opaque',
+                        DEFAULT 'fcp.storage.dataset.opaque',
                     dataset_schema_version INTEGER NOT NULL DEFAULT 1
                         CHECK(dataset_schema_version > 0),
                     batch_id TEXT NOT NULL,
@@ -118,7 +118,7 @@ class FilesystemBatchStorageProvider:
                 connection.execute(
                     """ALTER TABLE committed_batches
                        ADD COLUMN dataset_schema_name TEXT NOT NULL
-                       DEFAULT 'msh.storage.dataset.opaque'"""
+                       DEFAULT 'fcp.storage.dataset.opaque'"""
                 )
             if "dataset_schema_version" not in columns:
                 connection.execute(

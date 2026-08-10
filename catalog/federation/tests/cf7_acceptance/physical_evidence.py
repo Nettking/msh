@@ -23,7 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
-SCHEMA = "msh.cf7.physical-evidence.v2"
+SCHEMA = "fcp.cf7.physical-evidence.v2"
 MAX_DOCUMENT_BYTES = 262_144
 MAX_TEXT_LENGTH = 512
 

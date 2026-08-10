@@ -271,7 +271,7 @@ A recorder addresses the session storage group, not a physical IP. A leadership 
 
 ### F3-010 Provider heterogeneity
 
-A filesystem provider and PostgreSQL provider exchange the same versioned MSH batch contract without leaking backend-specific details to the recorder.
+A filesystem provider and PostgreSQL provider exchange the same versioned FCP batch contract without leaking backend-specific details to the recorder.
 
 ## Phase 4: completeness-aware failover tests
 

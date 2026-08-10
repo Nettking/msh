@@ -171,7 +171,7 @@ def test_command_event_rejects_expired_or_unapproved_input() -> None:
 
     modified = dict(payload)
     modified["expires_at"] = (now + timedelta(minutes=1)).isoformat()
-    modified["repository"] = "attacker/msh"
+    modified["repository"] = "attacker/fcp"
     with pytest.raises(ValueError, match="unapproved_source"):
         validate_command_payload(modified)
 

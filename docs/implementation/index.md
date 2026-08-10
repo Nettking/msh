@@ -7,7 +7,7 @@
 | Scope | Current implementation tracks, acceptance work, maintained references, release closeout, and retained delivery history |
 | Authority | This index classifies tracks; each track index identifies its authoritative plan and acceptance source |
 | Entry point | [Current task handoff](current_task_handoff.md) |
-| Parent | [MSH documentation](../index.md) |
+| Parent | [FCP documentation](../index.md) |
 | Reviewed | 2026-08-07 Europe/Oslo |
 | Retention | Permanent while implementation planning remains in this repository |
 

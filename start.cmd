@@ -1,21 +1,21 @@
 @echo off
 setlocal EnableExtensions
-title MSH
+title FCP
 
 cd /d "%~dp0"
 
-set "MSH_FRESH_INSTALL=0"
-set "MSH_RESUME_EXISTING=0"
-set "MSH_RESUME_EXIT=0"
+set "FCP_FRESH_INSTALL=0"
+set "FCP_RESUME_EXISTING=0"
+set "FCP_RESUME_EXIT=0"
 if "%~1"=="" goto :arguments_ready
 if /I "%~1"=="--fresh" (
     if not "%~2"=="" goto :usage_error
-    set "MSH_FRESH_INSTALL=1"
+    set "FCP_FRESH_INSTALL=1"
     goto :arguments_ready
 )
 if /I "%~1"=="--resume" (
     if not "%~2"=="" goto :usage_error
-    set "MSH_RESUME_EXISTING=1"
+    set "FCP_RESUME_EXISTING=1"
     goto :arguments_ready
 )
 if /I "%~1"=="--help" goto :show_help
@@ -23,22 +23,22 @@ if /I "%~1"=="/?" goto :show_help
 goto :usage_error
 
 :arguments_ready
-if not defined MSH_WEB_BIND set "MSH_WEB_BIND=127.0.0.1"
-if not defined COMPOSE_PROJECT_NAME set "COMPOSE_PROJECT_NAME=msh"
-set "MSH_WEB_PORT_EXPLICIT=1"
-if not defined MSH_WEB_PORT (
-    set "MSH_WEB_PORT=5000"
-    set "MSH_WEB_PORT_EXPLICIT=0"
+if not defined FCP_WEB_BIND set "FCP_WEB_BIND=127.0.0.1"
+if not defined COMPOSE_PROJECT_NAME set "COMPOSE_PROJECT_NAME=fcp"
+set "FCP_WEB_PORT_EXPLICIT=1"
+if not defined FCP_WEB_PORT (
+    set "FCP_WEB_PORT=5000"
+    set "FCP_WEB_PORT_EXPLICIT=0"
 )
-set "MSH_DATA_DIR_DEFAULTED=0"
-if not defined MSH_DATA_DIR (
-    for %%I in ("%~dp0data") do set "MSH_DATA_DIR=%%~fI"
-    set "MSH_DATA_DIR_DEFAULTED=1"
+set "FCP_DATA_DIR_DEFAULTED=0"
+if not defined FCP_DATA_DIR (
+    for %%I in ("%~dp0data") do set "FCP_DATA_DIR=%%~fI"
+    set "FCP_DATA_DIR_DEFAULTED=1"
 )
-set "MSH_RESULTS_DIR_DEFAULTED=0"
-if not defined MSH_RESULTS_DIR (
-    for %%I in ("%~dp0results") do set "MSH_RESULTS_DIR=%%~fI"
-    set "MSH_RESULTS_DIR_DEFAULTED=1"
+set "FCP_RESULTS_DIR_DEFAULTED=0"
+if not defined FCP_RESULTS_DIR (
+    for %%I in ("%~dp0results") do set "FCP_RESULTS_DIR=%%~fI"
+    set "FCP_RESULTS_DIR_DEFAULTED=1"
 )
 
 where docker >nul 2>&1
@@ -60,12 +60,12 @@ if errorlevel 1 (
 call :resolve_runtime_state
 if errorlevel 1 (
     echo.
-    echo MSH could not resolve its existing runtime state safely.
+    echo FCP could not resolve its existing runtime state safely.
     pause
     exit /b 1
 )
 
-if "%MSH_FRESH_INSTALL%"=="1" (
+if "%FCP_FRESH_INSTALL%"=="1" (
     call :reset_device_state
     if errorlevel 1 exit /b 1
 )
@@ -73,7 +73,7 @@ if "%MSH_FRESH_INSTALL%"=="1" (
 call :resolve_build_commit
 if errorlevel 1 (
     echo.
-    echo MSH could not determine an immutable build commit from this checkout.
+    echo FCP could not determine an immutable build commit from this checkout.
     pause
     exit /b 1
 )
@@ -81,29 +81,29 @@ if errorlevel 1 (
 call :start_update_agent
 if errorlevel 1 (
     echo.
-    echo The MSH host update agent could not be started safely.
+    echo The FCP host update agent could not be started safely.
     pause
     exit /b 1
 )
 
-echo Building the current MSH services from %MSH_BUILD_COMMIT%...
+echo Building the current FCP services from %FCP_BUILD_COMMIT%...
 docker compose build relay flask recorder
 if errorlevel 1 (
     echo.
-    echo MSH images could not be built. Review the Docker error above.
+    echo FCP images could not be built. Review the Docker error above.
     pause
     exit /b 1
 )
 
 echo.
-echo Starting the MSH background services...
+echo Starting the FCP background services...
 echo   - Federation relay
 echo   - Ollama service
 echo   - Managed recorder
 docker compose up -d relay ollama recorder
 if errorlevel 1 (
     echo.
-    echo MSH background services could not be started. Review the Docker error above.
+    echo FCP background services could not be started. Review the Docker error above.
     pause
     exit /b 1
 )
@@ -111,22 +111,22 @@ if errorlevel 1 (
 call :ensure_ollama_model
 if errorlevel 1 (
     echo.
-    echo MSH background services remain running, but the webapp will not be opened with a missing benchmark model.
+    echo FCP background services remain running, but the webapp will not be opened with a missing benchmark model.
     echo Correct the network or Ollama error above, then run start.cmd again.
     pause
     exit /b 1
 )
 
-if "%MSH_RESUME_EXISTING%"=="1" (
+if "%FCP_RESUME_EXISTING%"=="1" (
     call :run_existing_setup_resume
-    set "MSH_RESUME_EXIT=%ERRORLEVEL%"
+    set "FCP_RESUME_EXIT=%ERRORLEVEL%"
 )
 
-echo Starting the Flask workbench on %MSH_WEB_BIND%:%MSH_WEB_PORT%...
+echo Starting the Flask workbench on %FCP_WEB_BIND%:%FCP_WEB_PORT%...
 docker compose up -d flask
 if errorlevel 1 (
     echo.
-    echo The MSH webapp could not be started. Review the Docker error above.
+    echo The FCP webapp could not be started. Review the Docker error above.
     pause
     exit /b 1
 )
@@ -135,30 +135,30 @@ echo.
 docker compose ps relay ollama flask recorder
 echo.
 
-set "MSH_WEB_PORT_RESOLVED="
-for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$lines = @(docker compose port flask 5000); if ($LASTEXITCODE -ne 0 -or $lines.Count -eq 0) { exit 1 }; $binding = [string]$lines[0]; if ($binding -match ':(\d+)$') { $Matches[1] } else { exit 1 }"`) do set "MSH_WEB_PORT_RESOLVED=%%P"
-if not defined MSH_WEB_PORT_RESOLVED (
+set "FCP_WEB_PORT_RESOLVED="
+for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$lines = @(docker compose port flask 5000); if ($LASTEXITCODE -ne 0 -or $lines.Count -eq 0) { exit 1 }; $binding = [string]$lines[0]; if ($binding -match ':(\d+)$') { $Matches[1] } else { exit 1 }"`) do set "FCP_WEB_PORT_RESOLVED=%%P"
+if not defined FCP_WEB_PORT_RESOLVED (
     echo Could not determine the published Flask port.
     docker compose ps flask
     pause
     exit /b 1
 )
-set "MSH_WEB_CLIENT_HOST=%MSH_WEB_BIND%"
-if "%MSH_WEB_CLIENT_HOST%"=="0.0.0.0" set "MSH_WEB_CLIENT_HOST=127.0.0.1"
-set "MSH_BASE_URL=http://%MSH_WEB_CLIENT_HOST%:%MSH_WEB_PORT_RESOLVED%"
-set "MSH_ONBOARDING_URL=%MSH_BASE_URL%/onboarding"
-set "MSH_OPEN_URL=%MSH_BASE_URL%"
-if "%MSH_FRESH_INSTALL%"=="1" (
-    set "MSH_ONBOARDING_URL=%MSH_BASE_URL%/onboarding?fresh=1&reset=%RANDOM%%RANDOM%"
-    set "MSH_OPEN_URL=%MSH_ONBOARDING_URL%"
+set "FCP_WEB_CLIENT_HOST=%FCP_WEB_BIND%"
+if "%FCP_WEB_CLIENT_HOST%"=="0.0.0.0" set "FCP_WEB_CLIENT_HOST=127.0.0.1"
+set "FCP_BASE_URL=http://%FCP_WEB_CLIENT_HOST%:%FCP_WEB_PORT_RESOLVED%"
+set "FCP_ONBOARDING_URL=%FCP_BASE_URL%/onboarding"
+set "FCP_OPEN_URL=%FCP_BASE_URL%"
+if "%FCP_FRESH_INSTALL%"=="1" (
+    set "FCP_ONBOARDING_URL=%FCP_BASE_URL%/onboarding?fresh=1&reset=%RANDOM%%RANDOM%"
+    set "FCP_OPEN_URL=%FCP_ONBOARDING_URL%"
 )
 
-if "%MSH_FRESH_INSTALL%"=="1" (
+if "%FCP_FRESH_INSTALL%"=="1" (
     echo Verifying fresh state inside the started Flask container...
     docker compose exec -T flask python -m catalog.flask_app.services.device_state_reset --verify-fresh
     if errorlevel 1 (
         echo.
-        echo MSH started, but its authoritative setup state is not fresh.
+        echo FCP started, but its authoritative setup state is not fresh.
         echo The browser will not be opened because old identity or Federation state remains.
         echo Review the specific verification failure above.
         pause
@@ -166,11 +166,11 @@ if "%MSH_FRESH_INSTALL%"=="1" (
     )
 )
 
-echo Waiting for the MSH webapp...
-powershell -NoProfile -Command "$deadline = (Get-Date).AddSeconds(90); do { try { $response = Invoke-WebRequest -UseBasicParsing -Uri '%MSH_BASE_URL%/onboarding' -TimeoutSec 2; if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) { exit 0 } } catch {}; Start-Sleep -Seconds 1 } while ((Get-Date) -lt $deadline); exit 1"
+echo Waiting for the FCP webapp...
+powershell -NoProfile -Command "$deadline = (Get-Date).AddSeconds(90); do { try { $response = Invoke-WebRequest -UseBasicParsing -Uri '%FCP_BASE_URL%/onboarding' -TimeoutSec 2; if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) { exit 0 } } catch {}; Start-Sleep -Seconds 1 } while ((Get-Date) -lt $deadline); exit 1"
 if errorlevel 1 (
     echo.
-    echo The containers started, but MSH did not become ready.
+    echo The containers started, but FCP did not become ready.
     echo Recent Flask log:
     docker compose logs --tail 60 flask
     echo.
@@ -180,131 +180,131 @@ if errorlevel 1 (
     exit /b 1
 )
 
-if not "%MSH_RESUME_EXISTING%"=="1" goto :resume_complete
-if "%MSH_RESUME_EXIT%"=="0" goto :resume_success
-if "%MSH_RESUME_EXIT%"=="4" goto :resume_partial
-if "%MSH_RESUME_EXIT%"=="2" goto :resume_missing
+if not "%FCP_RESUME_EXISTING%"=="1" goto :resume_complete
+if "%FCP_RESUME_EXIT%"=="0" goto :resume_success
+if "%FCP_RESUME_EXIT%"=="4" goto :resume_partial
+if "%FCP_RESUME_EXIT%"=="2" goto :resume_missing
 goto :resume_failed
 
 :resume_success
-set "MSH_OPEN_URL=%MSH_BASE_URL%/federation"
+set "FCP_OPEN_URL=%FCP_BASE_URL%/federation"
 echo Existing identity, Federation membership, saved capability evidence, and contribution intent are ready.
 goto :resume_complete
 
 :resume_partial
-set "MSH_OPEN_URL=%MSH_BASE_URL%/federation"
+set "FCP_OPEN_URL=%FCP_BASE_URL%/federation"
 echo Existing setup reconnected, but saved capability evidence needs explicit review.
 echo Federation will open without rerunning inspection or benchmarks.
 goto :resume_complete
 
 :resume_failed
-set "MSH_OPEN_URL=%MSH_BASE_URL%/onboarding?repair=1"
+set "FCP_OPEN_URL=%FCP_BASE_URL%/onboarding?repair=1"
 echo Existing setup could not be resumed safely.
 echo The guided repair page will open. No identity or Federation was replaced.
 goto :resume_complete
 
 :resume_missing
-set "MSH_OPEN_URL=%MSH_ONBOARDING_URL%"
+set "FCP_OPEN_URL=%FCP_ONBOARDING_URL%"
 echo No saved device identity and Federation membership were found.
 echo First-time onboarding is required on this machine.
 goto :resume_complete
 
 :resume_complete
 echo.
-echo MSH is running:        %MSH_BASE_URL%
-echo Onboarding:            "%MSH_ONBOARDING_URL%"
-echo Federation:            %MSH_BASE_URL%/federation
-echo Recorder status:       %MSH_BASE_URL%/status
-echo Documentation:         %MSH_BASE_URL%/docs
-echo Device data:           %MSH_DATA_DIR%
-echo Federation state:      %MSH_RELAY_VOLUME_NAME%
-echo Running build commit:  %MSH_BUILD_COMMIT%
+echo FCP is running:        %FCP_BASE_URL%
+echo Onboarding:            "%FCP_ONBOARDING_URL%"
+echo Federation:            %FCP_BASE_URL%/federation
+echo Recorder status:       %FCP_BASE_URL%/status
+echo Documentation:         %FCP_BASE_URL%/docs
+echo Device data:           %FCP_DATA_DIR%
+echo Federation state:      %FCP_RELAY_VOLUME_NAME%
+echo Running build commit:  %FCP_BUILD_COMMIT%
 echo.
-echo Web access is limited to this MSH machine by default.
-echo To pair another device, open MSH using this machine's LAN or VPN address.
+echo Web access is limited to this FCP machine by default.
+echo To pair another device, open FCP using this machine's LAN or VPN address.
 echo Setup, Federation identity, pairing state, recording state, checkpoints,
 echo downloaded Ollama models, and recorded data are preserved between normal starts.
 echo.
 
-start "" "%MSH_OPEN_URL%"
+start "" "%FCP_OPEN_URL%"
 exit /b 0
 
 :resolve_build_commit
-set "MSH_BUILD_COMMIT="
-for /f "usebackq delims=" %%C in (`git rev-parse --verify HEAD^^{commit} 2^>nul`) do set "MSH_BUILD_COMMIT=%%C"
-if not defined MSH_BUILD_COMMIT exit /b 1
-powershell -NoProfile -Command "if ('%MSH_BUILD_COMMIT%' -match '^[0-9a-fA-F]{40}$') { exit 0 } else { exit 1 }"
+set "FCP_BUILD_COMMIT="
+for /f "usebackq delims=" %%C in (`git rev-parse --verify HEAD^^{commit} 2^>nul`) do set "FCP_BUILD_COMMIT=%%C"
+if not defined FCP_BUILD_COMMIT exit /b 1
+powershell -NoProfile -Command "if ('%FCP_BUILD_COMMIT%' -match '^[0-9a-fA-F]{40}$') { exit 0 } else { exit 1 }"
 if errorlevel 1 (
-    set "MSH_BUILD_COMMIT="
+    set "FCP_BUILD_COMMIT="
     exit /b 1
 )
 powershell -NoProfile -Command "$status = @(git status --porcelain=v1 --untracked-files=all 2>$null); if ($LASTEXITCODE -eq 0 -and $status.Count -eq 0) { exit 0 } else { exit 1 }"
 if errorlevel 1 (
-    echo MSH refuses to label a build from a checkout with local changes.
-    set "MSH_BUILD_COMMIT="
+    echo FCP refuses to label a build from a checkout with local changes.
+    set "FCP_BUILD_COMMIT="
     exit /b 1
 )
-for /f "usebackq delims=" %%C in (`powershell -NoProfile -Command "'%MSH_BUILD_COMMIT%'.ToLowerInvariant()"`) do set "MSH_BUILD_COMMIT=%%C"
+for /f "usebackq delims=" %%C in (`powershell -NoProfile -Command "'%FCP_BUILD_COMMIT%'.ToLowerInvariant()"`) do set "FCP_BUILD_COMMIT=%%C"
 exit /b 0
 
 :start_update_agent
-if not exist "%~dp0scripts\windows\msh_update_agent.ps1" exit /b 1
+if not exist "%~dp0scripts\windows\fcp_update_agent.ps1" exit /b 1
 where powershell >nul 2>&1
 if errorlevel 1 exit /b 1
-start "MSH Update Agent" /b powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0scripts\windows\msh_update_agent.ps1" -RepoRoot "%~dp0" -DataDirectory "%MSH_DATA_DIR%" >nul 2>&1
+start "FCP Update Agent" /b powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_update_agent.ps1" -RepoRoot "%~dp0" -DataDirectory "%FCP_DATA_DIR%" >nul 2>&1
 if errorlevel 1 exit /b 1
 exit /b 0
 
 :resolve_runtime_state
-set "MSH_RUNTIME_FILE=%TEMP%\msh-runtime-%RANDOM%-%RANDOM%.txt"
-if exist "%MSH_RUNTIME_FILE%" del /q "%MSH_RUNTIME_FILE%" >nul 2>&1
-if "%MSH_WEB_PORT_EXPLICIT%"=="1" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% -OutputFile "%MSH_RUNTIME_FILE%"
+set "FCP_RUNTIME_FILE=%TEMP%\fcp-runtime-%RANDOM%-%RANDOM%.txt"
+if exist "%FCP_RUNTIME_FILE%" del /q "%FCP_RUNTIME_FILE%" >nul 2>&1
+if "%FCP_WEB_PORT_EXPLICIT%"=="1" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_fcp_web_port.ps1" -BindAddress "%FCP_WEB_BIND%" -PreferredPort %FCP_WEB_PORT% -OutputFile "%FCP_RUNTIME_FILE%"
 ) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_msh_web_port.ps1" -BindAddress "%MSH_WEB_BIND%" -PreferredPort %MSH_WEB_PORT% -OutputFile "%MSH_RUNTIME_FILE%" -AllowFallback
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\resolve_fcp_web_port.ps1" -BindAddress "%FCP_WEB_BIND%" -PreferredPort %FCP_WEB_PORT% -OutputFile "%FCP_RUNTIME_FILE%" -AllowFallback
 )
-set "MSH_RUNTIME_EXIT=%ERRORLEVEL%"
-if not "%MSH_RUNTIME_EXIT%"=="0" (
-    echo Runtime-state resolver exited with code %MSH_RUNTIME_EXIT%.
-    if exist "%MSH_RUNTIME_FILE%" type "%MSH_RUNTIME_FILE%"
-    if exist "%MSH_RUNTIME_FILE%" del /q "%MSH_RUNTIME_FILE%" >nul 2>&1
-    exit /b %MSH_RUNTIME_EXIT%
+set "FCP_RUNTIME_EXIT=%ERRORLEVEL%"
+if not "%FCP_RUNTIME_EXIT%"=="0" (
+    echo Runtime-state resolver exited with code %FCP_RUNTIME_EXIT%.
+    if exist "%FCP_RUNTIME_FILE%" type "%FCP_RUNTIME_FILE%"
+    if exist "%FCP_RUNTIME_FILE%" del /q "%FCP_RUNTIME_FILE%" >nul 2>&1
+    exit /b %FCP_RUNTIME_EXIT%
 )
-if not exist "%MSH_RUNTIME_FILE%" (
+if not exist "%FCP_RUNTIME_FILE%" (
     echo Runtime-state resolver did not create its output file.
     exit /b 1
 )
-for /f "usebackq tokens=1,* delims==" %%A in ("%MSH_RUNTIME_FILE%") do (
-    if /I "%%A"=="MSH_WEB_PORT" set "MSH_WEB_PORT=%%B"
-    if /I "%%A"=="MSH_RELAY_VOLUME_NAME" set "MSH_RELAY_VOLUME_NAME=%%B"
-    if /I "%%A"=="MSH_OLLAMA_VOLUME_NAME" set "MSH_OLLAMA_VOLUME_NAME=%%B"
-    if /I "%%A"=="MSH_MODEL_PROVIDER_VOLUME_NAME" set "MSH_MODEL_PROVIDER_VOLUME_NAME=%%B"
-    if /I "%%A"=="MSH_DATA_DIR" set "MSH_DATA_DIR=%%B"
-    if /I "%%A"=="MSH_RESULTS_DIR" set "MSH_RESULTS_DIR=%%B"
+for /f "usebackq tokens=1,* delims==" %%A in ("%FCP_RUNTIME_FILE%") do (
+    if /I "%%A"=="FCP_WEB_PORT" set "FCP_WEB_PORT=%%B"
+    if /I "%%A"=="FCP_RELAY_VOLUME_NAME" set "FCP_RELAY_VOLUME_NAME=%%B"
+    if /I "%%A"=="FCP_OLLAMA_VOLUME_NAME" set "FCP_OLLAMA_VOLUME_NAME=%%B"
+    if /I "%%A"=="FCP_MODEL_PROVIDER_VOLUME_NAME" set "FCP_MODEL_PROVIDER_VOLUME_NAME=%%B"
+    if /I "%%A"=="FCP_DATA_DIR" set "FCP_DATA_DIR=%%B"
+    if /I "%%A"=="FCP_RESULTS_DIR" set "FCP_RESULTS_DIR=%%B"
 )
-if not defined MSH_WEB_PORT echo Runtime-state resolver omitted MSH_WEB_PORT.
-if not defined MSH_RELAY_VOLUME_NAME echo Runtime-state resolver omitted MSH_RELAY_VOLUME_NAME.
-if not defined MSH_OLLAMA_VOLUME_NAME echo Runtime-state resolver omitted MSH_OLLAMA_VOLUME_NAME.
-if not defined MSH_MODEL_PROVIDER_VOLUME_NAME echo Runtime-state resolver omitted MSH_MODEL_PROVIDER_VOLUME_NAME.
-if not defined MSH_DATA_DIR echo Runtime-state resolver omitted MSH_DATA_DIR.
-if not defined MSH_RESULTS_DIR echo Runtime-state resolver omitted MSH_RESULTS_DIR.
-if not defined MSH_WEB_PORT goto :runtime_state_invalid
-if not defined MSH_RELAY_VOLUME_NAME goto :runtime_state_invalid
-if not defined MSH_OLLAMA_VOLUME_NAME goto :runtime_state_invalid
-if not defined MSH_MODEL_PROVIDER_VOLUME_NAME goto :runtime_state_invalid
-if not defined MSH_DATA_DIR goto :runtime_state_invalid
-if not defined MSH_RESULTS_DIR goto :runtime_state_invalid
-if exist "%MSH_RUNTIME_FILE%" del /q "%MSH_RUNTIME_FILE%" >nul 2>&1
-echo MSH web port reserved: %MSH_WEB_BIND%:%MSH_WEB_PORT%
-echo MSH device data:       %MSH_DATA_DIR%
-echo MSH Federation state:  %MSH_RELAY_VOLUME_NAME%
+if not defined FCP_WEB_PORT echo Runtime-state resolver omitted FCP_WEB_PORT.
+if not defined FCP_RELAY_VOLUME_NAME echo Runtime-state resolver omitted FCP_RELAY_VOLUME_NAME.
+if not defined FCP_OLLAMA_VOLUME_NAME echo Runtime-state resolver omitted FCP_OLLAMA_VOLUME_NAME.
+if not defined FCP_MODEL_PROVIDER_VOLUME_NAME echo Runtime-state resolver omitted FCP_MODEL_PROVIDER_VOLUME_NAME.
+if not defined FCP_DATA_DIR echo Runtime-state resolver omitted FCP_DATA_DIR.
+if not defined FCP_RESULTS_DIR echo Runtime-state resolver omitted FCP_RESULTS_DIR.
+if not defined FCP_WEB_PORT goto :runtime_state_invalid
+if not defined FCP_RELAY_VOLUME_NAME goto :runtime_state_invalid
+if not defined FCP_OLLAMA_VOLUME_NAME goto :runtime_state_invalid
+if not defined FCP_MODEL_PROVIDER_VOLUME_NAME goto :runtime_state_invalid
+if not defined FCP_DATA_DIR goto :runtime_state_invalid
+if not defined FCP_RESULTS_DIR goto :runtime_state_invalid
+if exist "%FCP_RUNTIME_FILE%" del /q "%FCP_RUNTIME_FILE%" >nul 2>&1
+echo FCP web port reserved: %FCP_WEB_BIND%:%FCP_WEB_PORT%
+echo FCP device data:       %FCP_DATA_DIR%
+echo FCP Federation state:  %FCP_RELAY_VOLUME_NAME%
 echo.
 exit /b 0
 
 :runtime_state_invalid
 echo Resolver output was:
-type "%MSH_RUNTIME_FILE%"
-if exist "%MSH_RUNTIME_FILE%" del /q "%MSH_RUNTIME_FILE%" >nul 2>&1
+type "%FCP_RUNTIME_FILE%"
+if exist "%FCP_RUNTIME_FILE%" del /q "%FCP_RUNTIME_FILE%" >nul 2>&1
 exit /b 1
 
 :run_existing_setup_resume
@@ -319,41 +319,41 @@ docker compose run --rm --no-deps --entrypoint python flask -m catalog.flask_app
 exit /b %ERRORLEVEL%
 
 :ensure_ollama_model
-set "MSH_AI_MODEL_RESOLVED="
-for /f "usebackq delims=" %%M in (`docker compose run --rm --no-deps --entrypoint python flask -c "import os; print(os.environ.get('MSH_AI_MODEL') or 'llama3.2:3b')"`) do set "MSH_AI_MODEL_RESOLVED=%%M"
-if not defined MSH_AI_MODEL_RESOLVED set "MSH_AI_MODEL_RESOLVED=llama3.2:3b"
+set "FCP_AI_MODEL_RESOLVED="
+for /f "usebackq delims=" %%M in (`docker compose run --rm --no-deps --entrypoint python flask -c "import os; print(os.environ.get('FCP_AI_MODEL') or 'llama3.2:3b')"`) do set "FCP_AI_MODEL_RESOLVED=%%M"
+if not defined FCP_AI_MODEL_RESOLVED set "FCP_AI_MODEL_RESOLVED=llama3.2:3b"
 
-echo Ensuring Ollama benchmark model is installed: %MSH_AI_MODEL_RESOLVED%
-docker compose exec -T ollama ollama show "%MSH_AI_MODEL_RESOLVED%" >nul 2>&1
+echo Ensuring Ollama benchmark model is installed: %FCP_AI_MODEL_RESOLVED%
+docker compose exec -T ollama ollama show "%FCP_AI_MODEL_RESOLVED%" >nul 2>&1
 if not errorlevel 1 (
     echo Ollama benchmark model is ready.
     echo.
     exit /b 0
 )
 
-set "MSH_MODEL_ATTEMPT=1"
+set "FCP_MODEL_ATTEMPT=1"
 :pull_ollama_model
-echo Pulling %MSH_AI_MODEL_RESOLVED% ^(attempt %MSH_MODEL_ATTEMPT% of 3^) ...
-docker compose --profile model-install run --rm --entrypoint /bin/ollama ollama-pull pull "%MSH_AI_MODEL_RESOLVED%"
-set "MSH_MODEL_PULL_EXIT=%ERRORLEVEL%"
+echo Pulling %FCP_AI_MODEL_RESOLVED% ^(attempt %FCP_MODEL_ATTEMPT% of 3^) ...
+docker compose --profile model-install run --rm --entrypoint /bin/ollama ollama-pull pull "%FCP_AI_MODEL_RESOLVED%"
+set "FCP_MODEL_PULL_EXIT=%ERRORLEVEL%"
 
-docker compose exec -T ollama ollama show "%MSH_AI_MODEL_RESOLVED%" >nul 2>&1
+docker compose exec -T ollama ollama show "%FCP_AI_MODEL_RESOLVED%" >nul 2>&1
 if not errorlevel 1 (
     echo Ollama benchmark model is installed and verified.
     echo.
     exit /b 0
 )
 
-if %MSH_MODEL_ATTEMPT% GEQ 3 (
+if %FCP_MODEL_ATTEMPT% GEQ 3 (
     echo.
-    echo ERROR: Ollama does not contain the required model: %MSH_AI_MODEL_RESOLVED%
-    if not "%MSH_MODEL_PULL_EXIT%"=="0" echo The final pull command exited with code %MSH_MODEL_PULL_EXIT%.
+    echo ERROR: Ollama does not contain the required model: %FCP_AI_MODEL_RESOLVED%
+    if not "%FCP_MODEL_PULL_EXIT%"=="0" echo The final pull command exited with code %FCP_MODEL_PULL_EXIT%.
     echo Installed Ollama models:
     docker compose exec -T ollama ollama list
     exit /b 1
 )
 
-set /a MSH_MODEL_ATTEMPT+=1
+set /a FCP_MODEL_ATTEMPT+=1
 powershell -NoProfile -Command "Start-Sleep -Seconds 3"
 goto :pull_ollama_model
 
@@ -361,7 +361,7 @@ goto :pull_ollama_model
 echo.
 echo FRESH DEVICE INSTALL
 echo This permanently removes this checkout's:
-echo   - MSH device identity and keys
+echo   - FCP device identity and keys
 echo   - Federation membership, pairing, onboarding, inspection, and benchmark state
 echo   - current and retained legacy Federation state layouts
 echo   - all local Federation relay authority state
@@ -371,18 +371,18 @@ echo.
 echo It preserves recorded telemetry, source configuration, recorder checkpoints,
 echo analysis results, Docker images, and downloaded Ollama models.
 echo.
-set "MSH_RESET_CONFIRM="
-set /p "MSH_RESET_CONFIRM=Type RESET to continue: "
-if /I not "%MSH_RESET_CONFIRM%"=="RESET" (
+set "FCP_RESET_CONFIRM="
+set /p "FCP_RESET_CONFIRM=Type RESET to continue: "
+if /I not "%FCP_RESET_CONFIRM%"=="RESET" (
     echo Fresh install cancelled. No state was removed.
     exit /b 2
 )
 
 echo.
-echo Stopping MSH before resetting device and Federation state...
+echo Stopping FCP before resetting device and Federation state...
 docker compose down --remove-orphans
 if errorlevel 1 (
-    echo MSH containers could not be stopped safely. Nothing else was removed.
+    echo FCP containers could not be stopped safely. Nothing else was removed.
     pause
     exit /b 1
 )
@@ -397,15 +397,15 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Fresh device reset completed. MSH will now start and verify empty state.
+echo Fresh device reset completed. FCP will now start and verify empty state.
 echo.
 exit /b 0
 
 :show_help
 echo Usage:
-echo   start.cmd            Start MSH and preserve all existing state.
-echo   start.cmd --resume   Reconnect, reuse saved capability evidence, then start MSH.
-echo   start.cmd --fresh    Reset device/Federation setup, verify it, then start MSH.
+echo   start.cmd            Start FCP and preserve all existing state.
+echo   start.cmd --resume   Reconnect, reuse saved capability evidence, then start FCP.
+echo   start.cmd --fresh    Reset device/Federation setup, verify it, then start FCP.
 echo.
 echo Normal and resume modes preserve identity, Federation membership, recordings,
 echo source configuration, recorder checkpoints, results, and downloaded models.

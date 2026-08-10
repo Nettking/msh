@@ -45,8 +45,8 @@ from .storage_deployment import (
     ThreeMachineDeployment,
 )
 
-EVIDENCE_SCHEMA = "msh.storage_physical_failover_evidence.v1"
-REPORT_SCHEMA = "msh.storage_physical_failover_report.v1"
+EVIDENCE_SCHEMA = "fcp.storage_physical_failover_evidence.v1"
+REPORT_SCHEMA = "fcp.storage_physical_failover_report.v1"
 _ALLOWED_STALE_REJECTIONS = {
     StorageErrorCode.NOT_PRIMARY.value,
     StorageErrorCode.STALE_TERM.value,
@@ -216,7 +216,7 @@ def validate_f51_baseline(
             "F5.1 evidence must contain the authoritative manifest identity",
         )
     return {
-        "schema": "msh.storage_physical_failover_baseline.v1",
+        "schema": "fcp.storage_physical_failover_baseline.v1",
         "deployment_id": deployment.deployment_id,
         "session_id": deployment.session_id,
         "group_id": deployment.group_id,

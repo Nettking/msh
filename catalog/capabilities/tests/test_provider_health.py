@@ -147,7 +147,7 @@ def announcement(
         node_id=node.identity.node_id,
         session_id=SESSION_ID,
         type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         protocol_version=protocol_version,
         status=status,
         properties={
@@ -206,7 +206,7 @@ def report(
         node_id=provider.identity.node_id,
         session_id=SESSION_ID,
         capability_type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         protocol_version=protocol_version,
         status=status,
         report_revision=revision,
@@ -772,7 +772,7 @@ def test_observations_are_safe_versioned_and_deterministic(tmp_path: Path) -> No
     assert ProviderHealthRecord.from_dict(accepted.to_dict()) == accepted
 
     incompatible = accepted.to_dict()
-    incompatible["schema"] = "msh.provider-health-record.v2"
+    incompatible["schema"] = "fcp.provider-health-record.v2"
     with pytest.raises(ProtocolCompatibilityError) as schema_rejected:
         ProviderHealthRecord.from_dict(incompatible)
     assert schema_rejected.value.code == "unsupported-schema-major"

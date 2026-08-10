@@ -26,7 +26,7 @@ from typing import Any
 
 from catalog.common.time_utils import parse_iso_timestamp
 
-_INCOMPLETE_IMPORT_MARKER = ".msh-importing"
+_INCOMPLETE_IMPORT_MARKER = ".fcp-importing"
 
 
 def _inside_incomplete_import(file_path: Path, root: Path) -> bool:
@@ -61,7 +61,7 @@ def iter_jsonl_files(data_dir: Path | str, *, recursive: bool = True) -> Iterato
     Notes
     -----
     Only files matching ``*.jsonl`` are yielded. Non-file matches and files in
-    upload directories carrying ``.msh-importing`` are ignored.
+    upload directories carrying ``.fcp-importing`` are ignored.
     """
     root = Path(data_dir)
     pattern = "*.jsonl"

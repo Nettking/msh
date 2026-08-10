@@ -3,7 +3,7 @@
 This module is executed inside the Flask Compose service for ``start.cmd --fresh``.
 It resolves the same environment-configurable paths as the Flask app, removes both
 current and retained legacy state layouts, and refuses to delete outside the
-mounted MSH data and relay-state roots.
+mounted FCP data and relay-state roots.
 """
 
 from __future__ import annotations
@@ -63,7 +63,7 @@ def resolved_state_paths(
     *,
     environ: Mapping[str, str] | None = None,
     app_root: Path | str | None = None,
-    relay_root: Path | str = "/var/lib/msh-relay",
+    relay_root: Path | str = "/var/lib/fcp-relay",
 ) -> ResolvedStatePaths:
     values = os.environ if environ is None else environ
     root = Path.cwd() if app_root is None else Path(app_root)
@@ -73,43 +73,43 @@ def resolved_state_paths(
 
     identity = _configured_path(
         values,
-        "MSH_FEDERATION_NODE_STATE_DIR",
+        "FCP_FEDERATION_NODE_STATE_DIR",
         data_root / "federation" / "device",
         app_root=root,
     )
     onboarding = _configured_path(
         values,
-        "MSH_FEDERATION_ONBOARDING_DATABASE",
+        "FCP_FEDERATION_ONBOARDING_DATABASE",
         data_root / "federation" / "onboarding" / "onboarding.sqlite3",
         app_root=root,
     )
     transition = _configured_path(
         values,
-        "MSH_FEDERATION_TRANSITION_DATABASE",
+        "FCP_FEDERATION_TRANSITION_DATABASE",
         onboarding,
         app_root=root,
     )
     benchmark = _configured_path(
         values,
-        "MSH_FEDERATION_BENCHMARK_DATABASE",
+        "FCP_FEDERATION_BENCHMARK_DATABASE",
         onboarding,
         app_root=root,
     )
     contribution = _configured_path(
         values,
-        "MSH_FEDERATION_CONTRIBUTION_DATABASE",
+        "FCP_FEDERATION_CONTRIBUTION_DATABASE",
         onboarding,
         app_root=root,
     )
     coordinator = _configured_path(
         values,
-        "MSH_FEDERATION_COORDINATOR_DATABASE",
+        "FCP_FEDERATION_COORDINATOR_DATABASE",
         relay / "control.sqlite3",
         app_root=root,
     )
     remote_pairing = _configured_path(
         values,
-        "MSH_FEDERATION_REMOTE_PAIRING_PATH",
+        "FCP_FEDERATION_REMOTE_PAIRING_PATH",
         onboarding.with_name("remote_pairing.json"),
         app_root=root,
     )
@@ -152,7 +152,7 @@ def planned_reset_targets(
     *,
     environ: Mapping[str, str] | None = None,
     app_root: Path | str | None = None,
-    relay_root: Path | str = "/var/lib/msh-relay",
+    relay_root: Path | str = "/var/lib/fcp-relay",
 ) -> tuple[ResetTarget, ...]:
     """Resolve current configured paths plus complete retained state roots."""
 
@@ -254,7 +254,7 @@ def reset_device_state(
     *,
     environ: Mapping[str, str] | None = None,
     app_root: Path | str | None = None,
-    relay_root: Path | str = "/var/lib/msh-relay",
+    relay_root: Path | str = "/var/lib/fcp-relay",
 ) -> tuple[Path, ...]:
     """Remove all configured and retained device/Federation state."""
 
@@ -278,7 +278,7 @@ def verify_fresh_application_state(
     *,
     environ: Mapping[str, str] | None = None,
     app_root: Path | str | None = None,
-    relay_root: Path | str = "/var/lib/msh-relay",
+    relay_root: Path | str = "/var/lib/fcp-relay",
 ) -> tuple[str, ...]:
     """Verify the user-visible state sources used by the started Flask app."""
 

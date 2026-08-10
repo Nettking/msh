@@ -41,18 +41,18 @@ def _int_env(name: str, default: int) -> int:
 @dataclass(frozen=True)
 class AgentConfig:
     ollama_base_url: str = os.environ.get(
-        "MSH_GOAL_AGENT_OLLAMA_URL",
+        "FCP_GOAL_AGENT_OLLAMA_URL",
         os.environ.get("OLLAMA_BASE_URL", "http://192.168.10.172:11434"),
     ).rstrip("/")
-    model: str = os.environ.get("MSH_GOAL_AGENT_MODEL", "qwen3-vl:8b-instruct")
-    request_timeout_seconds: int = _int_env("MSH_GOAL_AGENT_TIMEOUT_SECONDS", 600)
-    max_actions_per_task: int = _int_env("MSH_GOAL_AGENT_MAX_ACTIONS_PER_TASK", 14)
-    screenshot_max_width: int = _int_env("MSH_GOAL_AGENT_SCREENSHOT_MAX_WIDTH", 1280)
-    dry_run: bool = _bool_env("MSH_GOAL_AGENT_DRY_RUN", False)
-    confirm_each_task: bool = _bool_env("MSH_GOAL_AGENT_CONFIRM_EACH_TASK", True)
-    confirm_each_action: bool = _bool_env("MSH_GOAL_AGENT_CONFIRM_EACH_ACTION", False)
+    model: str = os.environ.get("FCP_GOAL_AGENT_MODEL", "qwen3-vl:8b-instruct")
+    request_timeout_seconds: int = _int_env("FCP_GOAL_AGENT_TIMEOUT_SECONDS", 600)
+    max_actions_per_task: int = _int_env("FCP_GOAL_AGENT_MAX_ACTIONS_PER_TASK", 14)
+    screenshot_max_width: int = _int_env("FCP_GOAL_AGENT_SCREENSHOT_MAX_WIDTH", 1280)
+    dry_run: bool = _bool_env("FCP_GOAL_AGENT_DRY_RUN", False)
+    confirm_each_task: bool = _bool_env("FCP_GOAL_AGENT_CONFIRM_EACH_TASK", True)
+    confirm_each_action: bool = _bool_env("FCP_GOAL_AGENT_CONFIRM_EACH_ACTION", False)
     allow_public_side_effects: bool = _bool_env(
-        "MSH_GOAL_AGENT_ALLOW_PUBLIC_SIDE_EFFECTS",
+        "FCP_GOAL_AGENT_ALLOW_PUBLIC_SIDE_EFFECTS",
         False,
     )
     output_root: Path = Path(__file__).resolve().parent / "goal_agent_output"
@@ -667,7 +667,7 @@ class GoalAgent:
         print(f"Log and screenshots: {self.logger.run_dir}")
 
     def interactive_loop(self) -> None:
-        print("MSH Goal Agent")
+        print("FCP Goal Agent")
         print("==============")
         print("Describe a goal. The agent will propose tasks, then ask before doing them.")
         print("Emergency stop: move the mouse to the upper-left corner.\n")

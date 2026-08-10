@@ -21,7 +21,7 @@ def _definition(version: str = "1.0.0") -> BenchmarkDefinition:
     return BenchmarkDefinition(
         benchmark_id="benchmark.persisted",
         capability_type="storage",
-        capability_protocol="msh.storage.v1",
+        capability_protocol="fcp.storage.v1",
         implementation_version=version,
         max_duration_seconds=1,
         max_parallelism=1,

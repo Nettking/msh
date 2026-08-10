@@ -19,7 +19,7 @@ from typing import Any, Self
 from .errors import FederationValidationError, ProtocolCompatibilityError
 from .models import CommitState
 
-MANIFEST_SCHEMA = "msh.authoritative_storage_manifest.v1"
+MANIFEST_SCHEMA = "fcp.authoritative_storage_manifest.v1"
 _SHA256_PATTERN = re.compile(r"sha256:[0-9a-f]{64}")
 
 

@@ -159,7 +159,7 @@ def test_ollama_failure_and_skip_are_safe(tmp_path: Any) -> None:
 
 def _mtconnect_scan() -> dict[str, Any]:
     return {
-        "schema": "msh.mtconnect.network_scan.v1",
+        "schema": "fcp.mtconnect.network_scan.v1",
         "state": "complete",
         "finished_at": "2026-08-02T20:00:00Z",
         "results": [

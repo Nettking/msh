@@ -7,11 +7,11 @@ an external compatibility promise or make a paper example canonical.
 
 | Repository | Analyzed commit |
 |---|---|
-| `Nettking/msh` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` |
+| `this repository` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` |
 | `Nettking/systems-paper` | `ff098ce52f15b489b6a07d5b55c6c788d862e3be` |
 | `Nettking/paper-repo` | `abe3fbcddee590c3f399b06f63cb329e8615977c` |
 
-The markers `paper-defined`, `existing-in-MSH`, `proposed-for-MSH` and
+The markers `paper-defined`, `existing-in-FCP`, `proposed-for-FCP` and
 `requires-research-clarification` follow
 [00_scope_and_sources.md](00_scope_and_sources.md).
 
@@ -42,11 +42,11 @@ silently transfers approval or grants operational authority.
   one possible downstream representation
   (`03_research_design.tex:89-93`); the illustrative case syntax is not final
   (`06_illustrative_case.tex:49-52`).
-- `existing-in-MSH`: `data/operator_strategy_records/operator_strategies.json`
-  uses outer schema `msh.operator_strategy_records.v3` and mutable, permissively
+- `existing-in-FCP`: `data/operator_strategy_records/operator_strategies.json`
+  uses outer schema `fcp.operator_strategy_records.v3` and mutable, permissively
   normalized flat records
   (`catalog/flask_app/services/operator_strategy_service.py:19-95,233-303`).
-- `existing-in-MSH`: `catalog/flask_app/services/osl_export_service.py:10-139`
+- `existing-in-FCP`: `catalog/flask_app/services/osl_export_service.py:10-139`
   overwrites one generated file and has no language/profile version,
   provenance, semantic validation, extension policy, export history or round
   trip. It also invents/defaults semantics and is not a migration source of
@@ -56,10 +56,10 @@ silently transfers approval or grants operational authority.
 
 | Axis | First planned working value | Meaning and compatibility boundary |
 |---|---|---|
-| language/profile | `msh.osl.profile.systems-paper-bounded.v1-plan` | `proposed-for-MSH` internal bounded profile; not a claim of OSL 1.0 |
+| language/profile | `fcp.osl.profile.systems-paper-bounded.v1-plan` | `proposed-for-FCP` internal bounded profile; not a claim of OSL 1.0 |
 | research label | `OSL v0.1-alpha` | `paper-defined` label only; no product stability implication |
 | research source | systems-paper SHA `ff098ce...` | exact semantic evidence baseline |
-| canonical contract/codec | `msh.osl.graph.v1-plan` | `proposed-for-MSH` JSON/wire representation, not language semantics |
+| canonical contract/codec | `fcp.osl.graph.v1-plan` | `proposed-for-FCP` JSON/wire representation, not language semantics |
 | repository schema | monotonically numbered OSL SQLite schema | physical persistence only |
 | producer/validator | implementation name/version/ruleset hash | reproducibility and diagnostics |
 | export representation | format/profile/adapter version | JSON bundle, SysML v2 or future projection; never whole language |
@@ -69,14 +69,14 @@ The `-plan` suffixes mean these are planned identifiers, not implemented or
 accepted contracts. `requires-research-clarification`: the research/product
 owners must approve any public-facing OSL version name.
 
-`proposed-for-MSH`: the first registry descriptor in
+`proposed-for-FCP`: the first registry descriptor in
 `catalog/osl/profiles/research_v0_1.py` implements only the bounded research
 profile supported by the analyzed core/reassessment, selected WF1-WF15
-interpretations and explicit MSH envelope extensions. It must not claim every
+interpretations and explicit FCP envelope extensions. It must not claim every
 aspirational semantic-contract concept.
 
 Revision identity, content hashes, product lifecycle, approval/publication,
-access policy, provenance storage and idempotency are `proposed-for-MSH` product
+access policy, provenance storage and idempotency are `proposed-for-FCP` product
 contracts. They must not be documented as `paper-defined` OSL semantics.
 
 ## Introducing the first supported version
@@ -198,7 +198,7 @@ remain historical records for the old hash. Lossy/ambiguous conversion stops at
 quarantine/draft and requires a human mapping decision. Same command/source/
 target/migrator/fingerprint replays the same result.
 
-## Existing MSH operator records
+## Existing FCP operator records
 
 ### Preserve the legacy source first
 
@@ -238,7 +238,7 @@ the conflict.
 | captured/structured/other legacy status | preserved source metadata only |
 | generated SysML/recommender artefact | historical derived artefact at most; never canonical graph or evidence truth |
 
-This conservatism is required because current MSH can copy raw text into
+This conservatism is required because current FCP can copy raw text into
 `decision`, infer action type, overwrite structure/outcome, mark reusable
 without semantic review and delete source
 (`operator_strategy_service.py:119-251,329-368`).
@@ -272,7 +272,7 @@ truth and incompatible lifecycle semantics.
 illustrative (`paper-repo/.../06_illustrative_case.tex:1-8`). `paper.yaml:50-61`
 still requires empirical material and operator/domain validation.
 
-`proposed-for-MSH` compatibility treatment:
+`proposed-for-FCP` compatibility treatment:
 
 - paper examples are test fixtures, never production seed strategies;
 - every fixture records repo, commit, path/line range, synthetic/sanitized
@@ -380,7 +380,7 @@ Each export record includes:
 - timestamp outside canonical content where determinism requires it.
 
 Canonical JSON specifies UTF-8, LF, key ordering, numeric/date/Unicode rules,
-duplicate rejection and hash input. These are `proposed-for-MSH` codec rules,
+duplicate rejection and hash input. These are `proposed-for-FCP` codec rules,
 not paper semantics.
 
 The same revision/profile/exporter/options yields byte-identical deterministic
@@ -468,7 +468,7 @@ compatibility responsibilities are owned as follows:
 | `catalog/osl/import_service.py` | bounded dry-run, profile dispatch, quarantine/draft disposition and registered mapping coordination |
 | `catalog/osl/export_service.py` | exact-revision export and immutable ExportRecord |
 | `catalog/osl/exporters/sysml_v2.py` | deterministic, diagnostic export-only adapter |
-| `catalog/osl/legacy/operator_note_v3.py` | conservative current MSH record mapping |
+| `catalog/osl/legacy/operator_note_v3.py` | conservative current FCP record mapping |
 | `catalog/osl/legacy/paper_examples.py` | source-pinned approved fixture mappings only |
 | `catalog/osl/legacy/migration_report.py` | batch disposition/finding/id-map/report contracts |
 | `catalog/osl/cli.py` | offline inventory, backup, dry-run, commit, verify and report commands |
@@ -504,7 +504,7 @@ Fixture roots:
   derived excerpt, conflicting statuses and illustrative syntax, all sanitized;
 - `.../systems_paper_ff098ce/`: bounded positive/negative profile fixtures and
   source-pinned exports;
-- `.../msh_operator_records_v3/`: list/object/missing/collision/malformed legacy
+- `.../fcp_operator_records_v3/`: list/object/missing/collision/malformed legacy
   fixtures;
 - `.../repository_schema_v*/`: database fixtures for each retained schema.
 
@@ -516,21 +516,21 @@ schema fixture, malformed bounds and no executable payload.
 
 ## Decisions fixed by this plan
 
-- `proposed-for-MSH`: first support is a source-pinned bounded MSH profile, not
+- `proposed-for-FCP`: first support is a source-pinned bounded FCP profile, not
   an unqualified stable OSL v0.1 claim.
-- `proposed-for-MSH`: profile, source commit, codec, schema, producer, validator,
+- `proposed-for-FCP`: profile, source commit, codec, schema, producer, validator,
   exporter and API versions remain distinct.
-- `proposed-for-MSH`: conversion creates immutable target plus report/provenance.
-- `proposed-for-MSH`: legacy MSH/paper values import as source, candidates,
+- `proposed-for-FCP`: conversion creates immutable target plus report/provenance.
+- `proposed-for-FCP`: legacy FCP/paper values import as source, candidates,
   metadata and findings only.
-- `proposed-for-MSH`: no external status, reusable flag or approval transfers to
+- `proposed-for-FCP`: no external status, reusable flag or approval transfers to
   local review/approval/publication.
-- `proposed-for-MSH`: no dual-write cutover and no source overwrite.
-- `proposed-for-MSH`: canonical JSON first; SysML export-only; YAML/SysML import
+- `proposed-for-FCP`: no dual-write cutover and no source overwrite.
+- `proposed-for-FCP`: canonical JSON first; SysML export-only; YAML/SysML import
   deferred.
-- `proposed-for-MSH`: unknown major/required semantics fail closed; safe bytes
+- `proposed-for-FCP`: unknown major/required semantics fail closed; safe bytes
   may be quarantined.
-- `proposed-for-MSH`: exports are immutable versioned projections; rollback
+- `proposed-for-FCP`: exports are immutable versioned projections; rollback
   selects preserved history instead of erasing it.
 
 ## Open research and product decisions
@@ -559,7 +559,7 @@ schema fixture, malformed bounds and no executable payload.
 2. every persisted object identifies applicable profile/codec/revision/hash and
    producer where relevant;
 3. legacy import is dry-runnable, atomic, replay-safe and auditable;
-4. original MSH/paper evidence remains byte/hash-identical;
+4. original FCP/paper evidence remains byte/hash-identical;
 5. ambiguous values become findings, not invented semantics;
 6. migration copies no review, approval, publication or authority;
 7. unknown profiles/extensions follow the explicit fail/preserve matrix;

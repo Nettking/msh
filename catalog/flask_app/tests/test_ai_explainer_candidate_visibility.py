@@ -31,7 +31,7 @@ def _inspection() -> DeviceInspectionSnapshot:
         architecture="x86_64",
         resource_observations={},
         detected_services=("ollama-configured",),
-        registered_handlers=("msh-system-summary",),
+        registered_handlers=("fcp-system-summary",),
         detected_data_sources=(),
         recommended_benchmark_ids=("benchmark.ai.ollama-inference.v1",),
         warnings=(),
@@ -55,7 +55,7 @@ def _legacy_setup() -> dict[str, object]:
 def test_legacy_ai_disabled_does_not_hide_configured_ai_explainer(
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv("MSH_AI_MODEL", "llama3.2:3b")
+    monkeypatch.setenv("FCP_AI_MODEL", "llama3.2:3b")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama:11434")
 
     app = Flask(__name__)
@@ -88,7 +88,7 @@ def test_legacy_ai_disabled_does_not_hide_configured_ai_explainer(
 def test_ai_explainer_enable_maps_opaque_federation_identity_to_runtime_id(
     monkeypatch,
 ) -> None:
-    monkeypatch.setenv("MSH_AI_MODEL", "llama3.2:3b")
+    monkeypatch.setenv("FCP_AI_MODEL", "llama3.2:3b")
     monkeypatch.setenv("OLLAMA_BASE_URL", "http://ollama:11434")
 
     opaque_node_id = "node-AbC_DEf-0123456789abcdefghijklmnopqrstuvwxyz"
@@ -184,7 +184,7 @@ def test_active_capability_provider_replaces_stale_default_runtime(
             idempotency_key="request-active-provider",
             model="llama3.2:3b",
             modality=AIModality.TEXT,
-            prompt="Explain MSH",
+            prompt="Explain FCP",
             system_prompt="Answer from context.",
             timeout_seconds=5,
         )
@@ -283,12 +283,12 @@ def test_completed_capability_first_ai_never_falls_back_to_legacy_provider(
 def test_ai_explainer_prompts_satisfy_runtime_text_contract() -> None:
     prompts = (
         build_prompt(
-            "How does data flow through MSH?",
+            "How does data flow through FCP?",
             "Visible repository context.",
             ["catalog/example.py"],
         ),
         build_extractive_prompt(
-            "How does data flow through MSH?",
+            "How does data flow through FCP?",
             "Visible repository context.",
             ["catalog/example.py"],
         ),

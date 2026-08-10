@@ -80,12 +80,12 @@ def test_f641_manifest_rejects_inconsistent_chunk_count() -> None:
 
 def test_f641_manifest_and_chunk_reject_unknown_protocol_schema() -> None:
     manifest_value = _manifest().to_dict()
-    manifest_value["schema"] = "msh.object_transfer.manifest.v2"
+    manifest_value["schema"] = "fcp.object_transfer.manifest.v2"
     with pytest.raises(ProtocolCompatibilityError):
         ObjectTransferManifest.from_dict(manifest_value)
 
     chunk_value = _chunks(_manifest(), b"abcdefghij")[0].to_dict()
-    chunk_value["schema"] = "msh.object_transfer.chunk.v2"
+    chunk_value["schema"] = "fcp.object_transfer.chunk.v2"
     with pytest.raises(ProtocolCompatibilityError):
         ObjectTransferChunk.from_dict(chunk_value)
 

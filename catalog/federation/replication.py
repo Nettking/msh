@@ -20,7 +20,7 @@ from .storage_protocol import (
     StorageResponseEnvelope,
 )
 
-REPLICATION_SCHEMA = "msh.storage_replication.v1"
+REPLICATION_SCHEMA = "fcp.storage_replication.v1"
 PHASE_D_SERVICE_REPLICATION_OWNER = "phase-d-storage-service"
 
 

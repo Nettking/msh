@@ -19,7 +19,7 @@
 
 <section class="section-block section-block--actions">
   <h3>Add machine</h3>
-  <p>For MTConnect machines, add the base adapter URL. Example: <code>http://192.168.10.20:5000</code>. MSH will test the <code>/current</code> endpoint automatically.</p>
+  <p>For MTConnect machines, add the base adapter URL. Example: <code>http://192.168.10.20:5000</code>. FCP will test the <code>/current</code> endpoint automatically.</p>
   <form method="post" action="{{ url_for('source_web.add_machine') }}" class="control-form control-card source-inline-form">
     <label><span>Machine name</span><input type="text" name="name" placeholder="Mazak i500" required></label>
     <label><span>Machine type</span><input type="text" name="machine_type" placeholder="CNC machining centre"></label>
@@ -34,7 +34,7 @@
 
 <section class="section-block">
   <h3>Configured machines</h3>
-  <p class="inline-note">Use <strong>Test MTConnect</strong> to check the adapter endpoint. Use <strong>Test VPN/network</strong> to check whether MSH can open a TCP connection to the machine network.</p>
+  <p class="inline-note">Use <strong>Test MTConnect</strong> to check the adapter endpoint. Use <strong>Test VPN/network</strong> to check whether FCP can open a TCP connection to the machine network.</p>
   {% if inventory.machines %}
   <div class="table-scroll">
     <table>

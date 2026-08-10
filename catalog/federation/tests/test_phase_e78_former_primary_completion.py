@@ -65,7 +65,7 @@ def _final_report(
 ) -> StorageReplicaReport:
     manifest = runtime.control.manifest(SESSION_ID, GROUP_ID)
     return StorageReplicaReport(
-        schema="msh.storage_replica_report.v1",
+        schema="fcp.storage_replica_report.v1",
         protocol_version="1.0",
         session_id=SESSION_ID,
         group_id=GROUP_ID,

@@ -9,7 +9,7 @@ from typing import Any
 
 from .errors import FederationValidationError
 
-PROMOTION_FINALIZATION_SCHEMA = "msh.storage_promotion_finalization.v1"
+PROMOTION_FINALIZATION_SCHEMA = "fcp.storage_promotion_finalization.v1"
 
 
 def _text(value: Any, field: str) -> str:

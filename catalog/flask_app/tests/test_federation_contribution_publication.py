@@ -47,9 +47,9 @@ def test_all_local_candidates_are_shared_as_metadata_without_granting_readiness(
         session_id="session-a",
         node_id="node-a",
         candidates=(
-            _candidate("candidate-ai", "language-model", "msh-ai"),
-            _candidate("candidate-compute", "compute", "msh-compute-handler"),
-            _candidate("candidate-storage", "storage", "msh-storage-candidate"),
+            _candidate("candidate-ai", "language-model", "fcp-ai"),
+            _candidate("candidate-compute", "compute", "fcp-compute-handler"),
+            _candidate("candidate-storage", "storage", "fcp-storage-candidate"),
         ),
         intents=(
             _intent("candidate-ai", "active", 3),
@@ -74,7 +74,7 @@ def test_all_local_candidates_are_shared_as_metadata_without_granting_readiness(
 
 
 def test_matching_shared_metadata_is_not_reannounced() -> None:
-    candidate = _candidate("candidate-ai", "language-model", "msh-ai")
+    candidate = _candidate("candidate-ai", "language-model", "fcp-ai")
     intent = _intent("candidate-ai", "active", 3)
     initial = plan_contribution_publications(
         session_id="session-a",
@@ -123,7 +123,7 @@ def test_missing_previously_published_candidate_fails_closed() -> None:
                     "capability_id": "candidate-ai",
                     "node_id": "node-a",
                     "type": "language-model",
-                    "protocol": "msh-ai",
+                    "protocol": "fcp-ai",
                     "protocol_version": "1.0",
                     "status": "ready",
                     "properties": {
@@ -136,7 +136,7 @@ def test_missing_previously_published_candidate_fails_closed() -> None:
                     "capability_id": "unrelated-provider",
                     "node_id": "node-a",
                     "type": "compute",
-                    "protocol": "msh-compute",
+                    "protocol": "fcp-compute",
                     "protocol_version": "1.0",
                     "status": "ready",
                     "properties": {},

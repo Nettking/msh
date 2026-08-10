@@ -34,7 +34,7 @@ def _job(
         idempotency_key=f"{session_id}:request-{job_id}",
         capability=CapabilityRequirement(
             capability_type="compute-worker",
-            protocol="msh-compute",
+            protocol="fcp-compute",
             protocol_version="1.0",
             requirements={"handler": "allowlisted-test-handler"},
         ),
@@ -42,7 +42,7 @@ def _job(
             ArtifactReference(
                 reference_id=f"{job_id}-input",
                 session_id=session_id,
-                schema_name="msh.compute-input.v1",
+                schema_name="fcp.compute-input.v1",
                 media_type="application/json",
                 content_hash="sha256:" + "b" * 64,
                 size_bytes=64,
@@ -52,7 +52,7 @@ def _job(
             ArtifactReference(
                 reference_id=f"{job_id}-output",
                 session_id=session_id,
-                schema_name="msh.compute-output.v1",
+                schema_name="fcp.compute-output.v1",
                 media_type="application/json",
             ),
         ),

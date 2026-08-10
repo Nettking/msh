@@ -109,7 +109,7 @@ def test_benchmark_detail_offers_explicit_bounded_rerun(monkeypatch) -> None:
 
     service = FakeBenchmarkService()
     projection = {
-        "schema": "msh.federation-product-view.v1",
+        "schema": "fcp.federation-product-view.v1",
         "page": "benchmarks",
         "active_section": "benchmarks",
         "title": "Benchmarks",

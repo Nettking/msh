@@ -1,5 +1,5 @@
 {
-  "schema": "msh.cf7.physical-topology.v1",
+  "schema": "fcp.cf7.physical-topology.v1",
   "candidate_commit": "REPLACE_WITH_FROZEN_40_CHARACTER_SHA",
   "machines": {
     "local-ai": {
@@ -8,7 +8,7 @@
         "language-model",
         "desktop-browser"
       ],
-      "private_configuration": "Set MSH_CF7_OLLAMA_URL and MSH_CF7_OLLAMA_MODEL locally. Do not write endpoint values here."
+      "private_configuration": "Set FCP_CF7_OLLAMA_URL and FCP_CF7_OLLAMA_MODEL locally. Do not write endpoint values here."
     },
     "cnc-recorder": {
       "os_family": "linux",
@@ -16,7 +16,7 @@
         "recorder",
         "mtconnect"
       ],
-      "private_configuration": "Set MSH_CF7_MTCONNECT_ENDPOINTS locally as a JSON alias-to-endpoint object for both CNC machines."
+      "private_configuration": "Set FCP_CF7_MTCONNECT_ENDPOINTS locally as a JSON alias-to-endpoint object for both CNC machines."
     },
     "school-control": {
       "os_family": "windows",
@@ -26,7 +26,7 @@
         "storage-candidate",
         "mobile-browser"
       ],
-      "private_configuration": "Set MSH_CF7_PEERS locally as a JSON alias-to-host:port object for the other two machines."
+      "private_configuration": "Set FCP_CF7_PEERS locally as a JSON alias-to-host:port object for the other two machines."
     }
   },
   "rules": [

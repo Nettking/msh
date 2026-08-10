@@ -201,7 +201,7 @@ class CancellableCapabilityWorker(CapabilityWorker):
             return replay.validate_for(request)
         task = asyncio.create_task(
             self.handler.execute(request.job),
-            name=f"msh-capability-{request.job.job_id}-{request.attempt_id}",
+            name=f"fcp-capability-{request.job.job_id}-{request.attempt_id}",
         )
         key = self._dispatch_key(request)
         self._active[key] = task

@@ -299,7 +299,7 @@ def _request() -> BatchIngestRequest:
         content_hash=BatchIngestRequest.calculate_content_hash(content),
         content=content,
         created_at=NOW,
-        dataset_schema_name="msh.telemetry.observations",
+        dataset_schema_name="fcp.telemetry.observations",
         dataset_schema_version=3,
     )
 
@@ -354,7 +354,7 @@ def test_primary_policy_publishes_manifest_and_duplicate_keeps_revision(
     assert first.result["manifest_revision"] == manifest.revision == 1
     assert first.result["manifest_hash"] == manifest.manifest_hash
     assert tuple(item.item_id for item in manifest.items) == ("batch-1",)
-    assert manifest.datasets[0].schema_name == "msh.telemetry.observations"
+    assert manifest.datasets[0].schema_name == "fcp.telemetry.observations"
     assert manifest.datasets[0].schema_version == 3
     assert manifest.items[0].acknowledged_provider_ids == (PRIMARY_ID,)
     assert runtime.outbox.pending() == ()
@@ -1000,7 +1000,7 @@ def test_acknowledgement_store_migrates_legacy_rows_fail_closed(
 
     assert status is not None
     assert status.dataset_id == "legacy-unknown-dataset"
-    assert status.dataset_schema_name == "msh.storage.dataset.opaque"
+    assert status.dataset_schema_name == "fcp.storage.dataset.opaque"
     assert status.dataset_schema_version == 1
     with pytest.raises(FederationValidationError) as error:
         store.prepare(

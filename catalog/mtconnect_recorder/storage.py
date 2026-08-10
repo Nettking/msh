@@ -51,7 +51,7 @@ class DurableRecorderStore:
         )
         _write_bytes_atomic(path, gzip.compress(xml_text.encode("utf-8"), mtime=0))
         manifest = {
-            "schema": "msh.mtconnect.probe_manifest.v1",
+            "schema": "fcp.mtconnect.probe_manifest.v1",
             "source_name": source_name,
             "agent_instance_id": instance_id,
             "probe_sha256": probe.sha256,
@@ -95,7 +95,7 @@ class DurableRecorderStore:
 
         manifest_path = raw_path.with_suffix(".manifest.json")
         raw_manifest = {
-            "schema": "msh.mtconnect.raw_batch_manifest.v1",
+            "schema": "fcp.mtconnect.raw_batch_manifest.v1",
             "source_name": source_name,
             "agent_instance_id": batch.header.instance_id,
             "requested_from": requested_from,
@@ -137,7 +137,7 @@ class DurableRecorderStore:
         source_name: str,
         batch: ParsedBatch,
     ) -> Path:
-        """Store complete normalized observations outside MSH's wide JSONL scan."""
+        """Store complete normalized observations outside FCP's wide JSONL scan."""
 
         day, base_name = self._batch_location(source_name=source_name, batch=batch)
         path = (
@@ -176,11 +176,11 @@ class DurableRecorderStore:
         batch: ParsedBatch,
         initial_values: Mapping[str, Mapping[str, Any]] | None = None,
     ) -> tuple[Path, dict[str, dict[str, Any]]]:
-        """Write MSH-compatible wide snapshots while retaining every sequence.
+        """Write FCP-compatible wide snapshots while retaining every sequence.
 
         The detailed observation representation is stored separately as NDJSON.
         This JSONL view carries forward each machine's latest known signal values,
-        so existing MSH live, playback, cache, and analysis paths continue to see
+        so existing FCP live, playback, cache, and analysis paths continue to see
         columns such as ``Srpm``, ``execution``, and ``Xabs``.
         """
 
@@ -203,7 +203,7 @@ class DurableRecorderStore:
             state[self._signal_key(record)] = self._signal_value(record)
             snapshots.append(
                 {
-                    "schema": "msh.mtconnect.snapshot.v2",
+                    "schema": "fcp.mtconnect.snapshot.v2",
                     "source": "mtconnect_recorder",
                     "source_name": source_name,
                     "source_record_id": f"snapshot:{record.get('source_record_id')}",
@@ -241,7 +241,7 @@ class DurableRecorderStore:
         initial_values: Mapping[str, Mapping[str, Any]] | None = None,
     ) -> StoredBatch:
         # The write order is intentional: immutable raw -> detailed normalized
-        # observations -> MSH-compatible snapshots -> caller commits checkpoint.
+        # observations -> FCP-compatible snapshots -> caller commits checkpoint.
         raw = self.store_raw_batch(
             source_name=source_name,
             requested_from=requested_from,
@@ -278,7 +278,7 @@ class DurableRecorderStore:
             return refs
         for manifest_path in root.rglob("*.manifest.json"):
             payload = _read_json(manifest_path)
-            if payload.get("schema") != "msh.mtconnect.raw_batch_manifest.v1":
+            if payload.get("schema") != "fcp.mtconnect.raw_batch_manifest.v1":
                 continue
             try:
                 raw_path = Path(str(payload["raw_file"]))
@@ -351,7 +351,7 @@ class DurableRecorderStore:
             / f"gap-{missing_from}-{missing_to}.json"
         )
         payload = {
-            "schema": "msh.mtconnect.gap.v1",
+            "schema": "fcp.mtconnect.gap.v1",
             "source": "mtconnect_recorder",
             "source_name": source_name,
             "agent_instance_id": instance_id,
@@ -374,7 +374,7 @@ class DurableRecorderStore:
         payload: Mapping[str, Any],
     ) -> Path:
         event_payload = {
-            "schema": "msh.mtconnect.recorder_event.v1",
+            "schema": "fcp.mtconnect.recorder_event.v1",
             "source": "mtconnect_recorder",
             "source_name": source_name,
             "event_type": event_type,

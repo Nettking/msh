@@ -1,4 +1,4 @@
-# MSH knowledge-oriented navigation
+# FCP knowledge-oriented navigation
 
 The app should not expose every implementation page in the main menu. The menu should guide the user through the real knowledge flow.
 
@@ -71,7 +71,7 @@ Purpose:
 
 ```text
 Guide       = how to use the app.
-Setup       = how this MSH instance should run.
+Setup       = how this FCP instance should run.
 Sources     = machines, sensors, MTConnect endpoints, Observer Phoenix, and connection tests.
 Diagnostics = why the runtime/data pipeline is or is not ready.
 ```
@@ -83,7 +83,7 @@ Test MTConnect    = HTTP test from Flask server/container to the machine adapter
 Test VPN/network  = TCP reachability test from Flask server/container to the machine network target.
 ```
 
-The VPN/network test does not prove that the VPN client is connected at the OS level. It proves whether MSH can reach the configured machine-network host from where the app is running.
+The VPN/network test does not prove that the VPN client is connected at the OS level. It proves whether FCP can reach the configured machine-network host from where the app is running.
 
 Detailed/advanced pages should be reachable from cards on these pages, not dumped into the main menu.
 
@@ -97,7 +97,7 @@ Every main page should answer three questions:
 
 ## In-app documentation
 
-MSH should include a user-facing guide page inside the app. This is different from repo documentation:
+FCP should include a user-facing guide page inside the app. This is different from repo documentation:
 
 - Repo docs explain design decisions for developers/researchers.
 - The in-app guide explains what the operator or researcher should click next.

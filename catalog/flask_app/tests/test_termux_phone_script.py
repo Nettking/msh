@@ -5,7 +5,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
-PHONE_SCRIPT = REPO_ROOT / "termux" / "msh-phone.sh"
+PHONE_SCRIPT = REPO_ROOT / "termux" / "fcp-phone.sh"
 SETUP_SCRIPT = REPO_ROOT / "termux" / "setup-phone.sh"
 
 
@@ -21,7 +21,7 @@ def _phone_environment(tmp_path: Path, marker: Path) -> dict[str, str]:
         fake_bin / "proot-distro",
         """#!/usr/bin/env bash
 if [[ "${1:-}" == "list" ]]; then
-    printf '%s\\n' 'msh-phone'
+    printf '%s\\n' 'fcp-phone'
     exit 0
 fi
 exit 1
@@ -42,10 +42,10 @@ exit 1
         **os.environ,
         "PATH": f"{fake_bin}{os.pathsep}{os.environ['PATH']}",
         "FAKE_HTTP_MARKER": str(marker),
-        "MSH_PHONE_STATE": str(state_dir),
-        "MSH_PHONE_PROC_ROOT": str(proc_root),
-        "MSH_PHONE_STOP_WAIT_SECONDS": "2",
-        "MSH_PHONE_KILL_WAIT_SECONDS": "0",
+        "FCP_PHONE_STATE": str(state_dir),
+        "FCP_PHONE_PROC_ROOT": str(proc_root),
+        "FCP_PHONE_STOP_WAIT_SECONDS": "2",
+        "FCP_PHONE_KILL_WAIT_SECONDS": "0",
     }
 
 
@@ -59,7 +59,7 @@ def _setup_environment(tmp_path: Path) -> tuple[dict[str, str], Path, Path]:
         """#!/usr/bin/env bash
 printf '%s\n' "$*" >> "$FAKE_PROOT_LOG"
 if [[ "${1:-}" == "list" ]]; then
-    printf '%s\n' 'msh-phone'
+    printf '%s\n' 'fcp-phone'
 fi
 exit 0
 """,
@@ -87,7 +87,7 @@ exit 0
         "PREFIX": "/data/data/com.termux/files/usr",
         "FAKE_PROOT_LOG": str(proot_log),
         "FAKE_PKG_LOG": str(pkg_log),
-        "MSH_PHONE_STATE": str(state_dir),
+        "FCP_PHONE_STATE": str(state_dir),
     }
     return environment, proot_log, pkg_log
 
@@ -95,11 +95,11 @@ exit 0
 def test_stop_finds_a_session_started_before_pid_tracking(tmp_path: Path) -> None:
     marker = tmp_path / "http-ready"
     environment = _phone_environment(tmp_path, marker)
-    proc_root = Path(environment["MSH_PHONE_PROC_ROOT"])
+    proc_root = Path(environment["FCP_PHONE_PROC_ROOT"])
     process_dir = proc_root / "321"
     process_dir.mkdir()
     (process_dir / "cmdline").write_bytes(
-        b"proot\0--rootfs=/tmp/containers/msh-phone/rootfs\0python\0"
+        b"proot\0--rootfs=/tmp/containers/fcp-phone/rootfs\0python\0"
     )
 
     shell_program = f"""
@@ -126,7 +126,7 @@ def test_stop_does_not_claim_success_while_http_responds(tmp_path: Path) -> None
     marker = tmp_path / "http-ready"
     marker.touch()
     environment = _phone_environment(tmp_path, marker)
-    environment["MSH_PHONE_STOP_WAIT_SECONDS"] = "0"
+    environment["FCP_PHONE_STOP_WAIT_SECONDS"] = "0"
 
     result = subprocess.run(
         ["bash", str(PHONE_SCRIPT), "stop"],
@@ -138,7 +138,7 @@ def test_stop_does_not_claim_success_while_http_responds(tmp_path: Path) -> None
     )
 
     assert result.returncode == 1
-    assert "MSH stopped." not in result.stdout
+    assert "FCP stopped." not in result.stdout
     assert "stop was not confirmed" in result.stderr
 
 
@@ -178,12 +178,12 @@ def test_existing_compatible_container_uses_fast_setup_without_pkg_or_build(tmp_
     commands = proot_log.read_text(encoding="utf-8")
     assert "\nbuild " not in f"\n{commands}"
     assert '--bind ' + str(REPO_ROOT) + ":/app" in commands
-    assert (Path(environment["MSH_PHONE_STATE"]) / "runtime-build.signature").is_file()
+    assert (Path(environment["FCP_PHONE_STATE"]) / "runtime-build.signature").is_file()
 
 
 def test_changed_runtime_signature_triggers_rebuild_without_pkg_refresh(tmp_path: Path) -> None:
     environment, proot_log, pkg_log = _setup_environment(tmp_path)
-    signature_path = Path(environment["MSH_PHONE_STATE"]) / "runtime-build.signature"
+    signature_path = Path(environment["FCP_PHONE_STATE"]) / "runtime-build.signature"
     signature_path.write_text("old-runtime\n", encoding="utf-8")
 
     result = subprocess.run(
@@ -198,8 +198,8 @@ def test_changed_runtime_signature_triggers_rebuild_without_pkg_refresh(tmp_path
     assert result.returncode == 0, result.stderr
     assert "Dockerfile or requirements.txt changed" in result.stdout
     commands = proot_log.read_text(encoding="utf-8")
-    assert "remove msh-phone" in commands
-    assert "build -t msh-phone:latest --install-as msh-phone" in commands
+    assert "remove fcp-phone" in commands
+    assert "build -t fcp-phone:latest --install-as fcp-phone" in commands
     assert not pkg_log.exists()
     assert signature_path.read_text(encoding="utf-8") != "old-runtime\n"
 
@@ -214,7 +214,7 @@ http_ready() {{ return 0; }}
 stop_server() {{ echo stop; }}
 start_server() {{ echo restart-after-failure; }}
 git() {{ echo "git $*"; return 0; }}
-bash() {{ echo "setup restart=${{MSH_PHONE_RESTART_AFTER_SETUP:-false}} $*"; }}
+bash() {{ echo "setup restart=${{FCP_PHONE_RESTART_AFTER_SETUP:-false}} $*"; }}
 main update
 """
 

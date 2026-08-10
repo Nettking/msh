@@ -1,11 +1,11 @@
-"""Browser-managed server setup for one-command MSH startup.
+"""Browser-managed server setup for one-command FCP startup.
 
 The intent is that a fresh checkout can be started with one command:
 
     docker compose up -d --build
 
 Then /startup is used to choose the local role and AI model. Command-driven setup
-is still supported by setup_msh.py for scripted deployments.
+is still supported by setup_fcp.py for scripted deployments.
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ from catalog.mtconnect_recorder.model import (
 SETTINGS_PATH = Path("data") / "server_setup" / "server_settings.json"
 DEFAULT_OLLAMA_BASE_URL = "http://ollama:11434"
 DEFAULT_AI_PROVIDER_MODE = "local"
-AI_BENCHMARK_PROMPT = "Reply with exactly: MSH_OK"
+AI_BENCHMARK_PROMPT = "Reply with exactly: FCP_OK"
 AI_RESPONSE_TIME_BANDS: list[dict[str, object]] = [
     {
         "key": "fast",
@@ -58,7 +58,7 @@ AI_RESPONSE_TIME_BANDS: list[dict[str, object]] = [
 DEPLOYMENT_MODES: dict[str, dict[str, str]] = {
     "full-server": {
         "label": "Full server",
-        "description": "Web workbench plus MTConnect recorder settings for a complete MSH station.",
+        "description": "Web workbench plus MTConnect recorder settings for a complete FCP station.",
         "runtime": "enabled",
     },
     "web-workbench": {
@@ -112,7 +112,7 @@ RECORDER_DEPLOYMENT_MODES = frozenset(
 COMMAND_ONLY_DEPLOYMENT_MODES: dict[str, dict[str, str]] = {
     "language-model-provider": {
         "label": "Language-model provider",
-        "description": "Headless MSH node that contributes an Ollama model to another MSH device.",
+        "description": "Headless FCP node that contributes an Ollama model to another FCP device.",
         "runtime": "disabled",
     },
 }
@@ -138,7 +138,7 @@ AI_MODEL_CHOICES: dict[str, dict[str, str]] = {
 AI_PROVIDER_MODES: dict[str, dict[str, str]] = {
     "local": {
         "label": "This computer",
-        "description": "Use the Ollama service running alongside MSH.",
+        "description": "Use the Ollama service running alongside FCP.",
     },
     "connected": {
         "label": "Connected computer",
@@ -380,7 +380,7 @@ def normalize_recorder_sources(value: str) -> str:
 def save_settings(settings: ServerSetupSettings, path: Path | str = SETTINGS_PATH) -> Path:
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    payload = {"schema": "msh.server_setup.v3", **settings.to_dict()}
+    payload = {"schema": "fcp.server_setup.v3", **settings.to_dict()}
     path.write_text(json.dumps(payload, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     return path
 
@@ -421,7 +421,7 @@ def migrate_legacy_phone_bootstrap(path: Path | str = SETTINGS_PATH) -> bool:
 
     payload.update(
         {
-            "schema": "msh.server_setup.v3",
+            "schema": "fcp.server_setup.v3",
             "configured": False,
             "user_setup_complete": False,
             "updated_at": utc_now(),
@@ -464,27 +464,27 @@ def compose_profiles_for(settings: ServerSetupSettings) -> str:
 def env_lines_for(settings: ServerSetupSettings) -> list[str]:
     skip = "0" if runtime_should_start(settings) else "1"
     lines = [
-        f"MSH_DEPLOYMENT_MODE={settings.deployment_mode}",
+        f"FCP_DEPLOYMENT_MODE={settings.deployment_mode}",
         f"COMPOSE_PROFILES={compose_profiles_for(settings)}",
-        f"MSH_SKIP_ORCHESTRATION={skip}",
-        "MSH_SCAN_DIRS=results,data",
-        f"MSH_AI_PROFILE={settings.ai_profile}",
-        f"MSH_AI_MODEL={settings.ai_model}",
+        f"FCP_SKIP_ORCHESTRATION={skip}",
+        "FCP_SCAN_DIRS=results,data",
+        f"FCP_AI_PROFILE={settings.ai_profile}",
+        f"FCP_AI_MODEL={settings.ai_model}",
         f"OLLAMA_BASE_URL={settings.ollama_base_url}",
-        f"MSH_RECORDER_SOURCES={settings.recorder_sources}",
-        "MSH_RECORDER_DATA_DIR=data",
-        "MSH_RECORDER_STATE_FILE=data/source_state/mtconnect_recorder_state.json",
-        f"MSH_RECORDER_POLL_INTERVAL={settings.recorder_poll_interval}",
-        "MSH_RECORDER_FLUSH_INTERVAL=1.0",
-        "MSH_RECORDER_REQUEST_TIMEOUT=1.0",
-        f"MSH_RECORDER_INCLUDE_CONDITION={'true' if settings.recorder_include_condition else 'false'}",
+        f"FCP_RECORDER_SOURCES={settings.recorder_sources}",
+        "FCP_RECORDER_DATA_DIR=data",
+        "FCP_RECORDER_STATE_FILE=data/source_state/mtconnect_recorder_state.json",
+        f"FCP_RECORDER_POLL_INTERVAL={settings.recorder_poll_interval}",
+        "FCP_RECORDER_FLUSH_INTERVAL=1.0",
+        "FCP_RECORDER_REQUEST_TIMEOUT=1.0",
+        f"FCP_RECORDER_INCLUDE_CONDITION={'true' if settings.recorder_include_condition else 'false'}",
     ]
     if settings.deployment_mode == "language-model-provider":
         lines.extend(
             [
-                "MSH_PROVIDER_BIND=0.0.0.0",
-                "MSH_PROVIDER_PORT=11434",
-                f"MSH_PROVIDER_MODEL={settings.ai_model}",
+                "FCP_PROVIDER_BIND=0.0.0.0",
+                "FCP_PROVIDER_PORT=11434",
+                f"FCP_PROVIDER_MODEL={settings.ai_model}",
             ]
         )
     return lines
@@ -623,7 +623,7 @@ def benchmark_ollama_response_time(
             "messages": [
                 {
                     "role": "system",
-                    "content": "You are a startup response-time check. Reply with exactly MSH_OK.",
+                    "content": "You are a startup response-time check. Reply with exactly FCP_OK.",
                 },
                 {"role": "user", "content": AI_BENCHMARK_PROMPT},
             ],

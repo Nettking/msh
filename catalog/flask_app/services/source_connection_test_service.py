@@ -23,7 +23,7 @@ class SourceConnectionTestService:
     """Connection checks for machine-side data sources.
 
     The tests run from the Flask server/container. That is intentional: the
-    relevant question is whether MSH can reach the machine network, not whether
+    relevant question is whether FCP can reach the machine network, not whether
     the user's browser can reach it.
     """
 
@@ -52,7 +52,7 @@ class SourceConnectionTestService:
                 "Add an MTConnect URL for this machine before testing.",
                 str(machine.get("name") or machine_id),
             )
-        request = Request(url, headers={"User-Agent": "MSH-connection-test/1.0"})
+        request = Request(url, headers={"User-Agent": "FCP-connection-test/1.0"})
         try:
             with self.urlopen_func(request, timeout=self.timeout_seconds) as response:
                 status = getattr(response, "status", None) or getattr(response, "code", None) or response.getcode()
@@ -66,9 +66,9 @@ class SourceConnectionTestService:
                 str(exc),
             )
         except (URLError, TimeoutError, OSError) as exc:
-            return ConnectionTestResult(False, "MTConnect test failed", "MSH could not reach the MTConnect endpoint.", url, str(exc))
+            return ConnectionTestResult(False, "MTConnect test failed", "FCP could not reach the MTConnect endpoint.", url, str(exc))
         detail = f"HTTP {status}. Received {len(sample or b'')} byte(s)."
-        return ConnectionTestResult(True, "MTConnect reachable", "MSH reached the MTConnect endpoint from the server/container.", url, detail)
+        return ConnectionTestResult(True, "MTConnect reachable", "FCP reached the MTConnect endpoint from the server/container.", url, detail)
 
     def test_vpn_network(self, machine_id: str) -> ConnectionTestResult:
         machine = self._machine(machine_id)
@@ -92,14 +92,14 @@ class SourceConnectionTestService:
             return ConnectionTestResult(
                 False,
                 "VPN/network test failed",
-                "MSH could not open a TCP connection to the configured machine-network host.",
+                "FCP could not open a TCP connection to the configured machine-network host.",
                 target,
                 str(exc),
             )
         return ConnectionTestResult(
             True,
             "VPN/network reachable",
-            "MSH can open a TCP connection to the configured machine-network host. This indicates the machine network/VPN path is reachable from the server/container.",
+            "FCP can open a TCP connection to the configured machine-network host. This indicates the machine network/VPN path is reachable from the server/container.",
             target,
         )
 

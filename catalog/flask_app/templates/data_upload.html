@@ -4,7 +4,7 @@
   <div>
     <span class="eyebrow">Data</span>
     <h2>Upload JSONL data</h2>
-    <p>Add several files at once. MSH validates every JSON object, stores the complete batch in SQLite, and only then makes it available to the analysis runtime.</p>
+    <p>Add several files at once. FCP validates every JSON object, stores the complete batch in SQLite, and only then makes it available to the analysis runtime.</p>
   </div>
   <a class="button-link" href="{{ url_for('web.status') }}">Open diagnostics</a>
 </section>
@@ -113,7 +113,7 @@
     <div class="data-upload-analysis-ready">
       <div>
         <strong>All data is stored and ready</strong>
-        <p>Start the existing MSH background workflow when you are ready.</p>
+        <p>Start the existing FCP background workflow when you are ready.</p>
       </div>
       <form method="post" action="{{ url_for('data_upload_web.analyze', batch_id=selected_batch.batch_id) }}">
         <input type="hidden" name="_csrf_token" value="{{ data_upload_csrf_token }}">
@@ -122,7 +122,7 @@
     </div>
     {% endif %}
   {% else %}
-  <p class="inline-note" data-upload-live-message>MSH is processing this batch in the background. This page updates automatically.</p>
+  <p class="inline-note" data-upload-live-message>FCP is processing this batch in the background. This page updates automatically.</p>
   {% endif %}
 
   <details class="data-upload-files">

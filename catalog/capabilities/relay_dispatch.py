@@ -16,7 +16,7 @@ from .dispatch import (
     DispatchState,
 )
 
-RELAY_DISPATCH_KIND = "msh-capability-dispatch-v1"
+RELAY_DISPATCH_KIND = "fcp-capability-dispatch-v1"
 MAX_PENDING_DISPATCHES = 128
 
 
@@ -158,7 +158,7 @@ class RelayDispatchEndpoint:
         if self._reader_task is None:
             self._reader_task = asyncio.create_task(
                 self._reader_loop(),
-                name=f"msh-dispatch-relay-{self.relay_client.node_id}",
+                name=f"fcp-dispatch-relay-{self.relay_client.node_id}",
             )
 
     async def close(self) -> None:

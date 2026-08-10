@@ -48,7 +48,7 @@ def test_optional_local_ollama_check_uses_runtime_reachable_endpoint(
 ) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.delenv("OLLAMA_BASE_URL", raising=False)
-    monkeypatch.delenv("MSH_AI_MODEL", raising=False)
+    monkeypatch.delenv("FCP_AI_MODEL", raising=False)
     monkeypatch.setattr(
         capability_recovery_adapters,
         "_running_in_container",

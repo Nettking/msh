@@ -53,8 +53,8 @@ def test_default_local_compute_and_storage_are_benchmarkable_and_selectable(
         )
         snapshot = inspector.inspect(device_id="device-local", revision=1)
 
-        assert snapshot.registered_handlers == ("msh-system-summary",)
-        assert "msh-local-data-storage" in snapshot.detected_services
+        assert snapshot.registered_handlers == ("fcp-system-summary",)
+        assert "fcp-local-data-storage" in snapshot.detected_services
         assert "benchmark.compute.registered-handler.v1" in (
             snapshot.recommended_benchmark_ids
         )
@@ -67,9 +67,9 @@ def test_default_local_compute_and_storage_are_benchmarkable_and_selectable(
         runner = BenchmarkRunner(registry, store, now=lambda: NOW)
         for adapter in adapters:
             target = (
-                "msh-system-summary"
+                "fcp-system-summary"
                 if adapter.definition.capability_type == "compute"
-                else "msh-local-data-storage"
+                else "fcp-local-data-storage"
             )
             result = runner.run(
                 BenchmarkRunRequest(
@@ -130,7 +130,7 @@ def _storage_candidate():
         capability_type="storage",
         capacity_envelope={
             "authority": "candidate-only",
-            "provider_id": "msh-local-data-storage",
+            "provider_id": "fcp-local-data-storage",
         },
     )
 
@@ -177,7 +177,7 @@ def test_federation_creator_bootstraps_initial_local_storage_assignment(
     assert first.authority_confirmed is True
     assert second.activation_state is ContributionActivationState.ACTIVE
     assert repeated.revision == revision
-    provider = snapshot.providers["msh-local-data-storage"]
+    provider = snapshot.providers["fcp-local-data-storage"]
     assert provider.node_id == credentials.identity.node_id
     assert provider.protocol == STORAGE_PROTOCOL
     assert provider.protocol_version == STORAGE_PROTOCOL_VERSION
@@ -185,8 +185,8 @@ def test_federation_creator_bootstraps_initial_local_storage_assignment(
     assert provider.status == "ready"
     assert provider.assignable is True
     assert (
-        snapshot.groups["msh-local-storage"].primary_provider_id
-        == "msh-local-data-storage"
+        snapshot.groups["fcp-local-storage"].primary_provider_id
+        == "fcp-local-data-storage"
     )
 
 

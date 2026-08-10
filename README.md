@@ -1,8 +1,8 @@
-# MSH
+# Federated Capability Platform (FCP)
 
-MSH is a Flask-first CNC telemetry workbench with capability-first Federation support. One installation represents one persistent device. A device may use the workbench and independently contribute recording, language-model, registered-compute, or storage-candidate capabilities without being assigned one permanent product role.
+**Federated Capability Platform (FCP)** is a Flask-first CNC telemetry workbench with capability-first Federation support. One installation represents one persistent device. A device may use the workbench and independently contribute recording, language-model, registered-compute, or storage-candidate capabilities without being assigned one permanent product role.
 
-## Start MSH
+## Start Federated Capability Platform
 
 ### Windows
 

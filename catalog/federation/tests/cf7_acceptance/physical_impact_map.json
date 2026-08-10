@@ -1,5 +1,5 @@
 {
-  "schema": "msh.cf7.physical-impact-map.v1",
+  "schema": "fcp.cf7.physical-impact-map.v1",
   "all_scenarios": [
     "physical.fresh-windows-checkout",
     "physical.fresh-linux-checkout",

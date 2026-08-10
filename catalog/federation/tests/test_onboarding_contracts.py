@@ -83,7 +83,7 @@ def candidate(**changes: object) -> ContributionCandidate:
         "candidate_id": "candidate-1",
         "device_id": "node-1",
         "capability_type": "language-model",
-        "capability_protocol": "msh-ai-v1",
+        "capability_protocol": "fcp-ai-v1",
         "display_label": "Local language model",
         "inspection_revision": 2,
         "benchmark_run_ids": ("run-1",),
@@ -102,7 +102,7 @@ def candidate(**changes: object) -> ContributionCandidate:
 
 def legacy_payload(mode: str, **changes: object) -> dict[str, object]:
     values: dict[str, object] = {
-        "schema": "msh.server_setup.v3",
+        "schema": "fcp.server_setup.v3",
         "configured": True,
         "user_setup_complete": True,
         "deployment_mode": mode,
@@ -153,7 +153,7 @@ def test_contract_round_trips_are_canonical_and_accept_additive_fields() -> None
         BenchmarkDefinition(
             benchmark_id="ai-response-v1",
             capability_type="language-model",
-            capability_protocol="msh-ai-v1",
+            capability_protocol="fcp-ai-v1",
             implementation_version="1.0.0",
             max_duration_seconds=30,
             max_parallelism=1,
@@ -186,7 +186,7 @@ def test_contract_round_trips_are_canonical_and_accept_additive_fields() -> None
 
 def test_unsupported_schema_major_fails_closed() -> None:
     payload = discovery().to_dict()
-    payload["schema"] = "msh.onboarding.discovery-result.v2"
+    payload["schema"] = "fcp.onboarding.discovery-result.v2"
 
     with pytest.raises(ProtocolCompatibilityError) as error:
         FederationDiscoveryResult.from_dict(payload)
@@ -197,7 +197,7 @@ def test_unsupported_schema_major_fails_closed() -> None:
 @pytest.mark.parametrize(
     ("field", "value", "code"),
     [
-        ("federation_label", "msh_join_secret", "secret-metadata"),
+        ("federation_label", "fcp_join_secret", "secret-metadata"),
         (
             "transport_kind",
             "http://192.168.1.9:9000",
@@ -268,7 +268,7 @@ def test_inspection_and_metrics_reject_private_or_secret_content() -> None:
     assert error.value.code == "nonpublic-metadata"
 
     with pytest.raises(FederationValidationError) as error:
-        benchmark_result(metrics={"api_token": "msh_enroll_secret"})
+        benchmark_result(metrics={"api_token": "fcp_enroll_secret"})
     assert error.value.code == "secret-metadata"
 
 
@@ -417,7 +417,7 @@ def test_preview_is_read_only_and_deterministic() -> None:
     ("changes", "code"),
     [
         (
-            {"schema": "msh.server_setup.v99"},
+            {"schema": "fcp.server_setup.v99"},
             "unsupported-legacy-schema",
         ),
         (

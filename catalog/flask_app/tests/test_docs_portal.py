@@ -10,7 +10,7 @@ from catalog.flask_app.docs_routes import docs_web
 def _app(docs_root: Path) -> Flask:
     app = Flask(__name__, template_folder="../templates", static_folder="../static")
     app.config["TESTING"] = True
-    app.config["MSH_DOCS_ROOT"] = str(docs_root)
+    app.config["FCP_DOCS_ROOT"] = str(docs_root)
     app.register_blueprint(docs_web)
     return app
 
@@ -29,7 +29,7 @@ def test_docs_home_starts_from_current_product_tasks_not_only_onboarding(
     _write_doc(tmp_path, "one_command_setup.md", "# One-command setup\n")
     _write_doc(tmp_path, "troubleshooting.md", "# Troubleshooting\n")
     _write_doc(tmp_path, "architecture.md", "# Architecture\n")
-    _write_doc(tmp_path, "getting_started.md", "# Getting started with MSH\n")
+    _write_doc(tmp_path, "getting_started.md", "# Getting started with FCP\n")
     _write_doc(tmp_path, "connected_capabilities.md", "# Connected capabilities\n")
     _write_doc(tmp_path, "source_synchronization.md", "# Source synchronization\n")
     _write_doc(tmp_path, "operator_strategy_capture.md", "# Knowledge capture\n")
@@ -42,7 +42,7 @@ def test_docs_home_starts_from_current_product_tasks_not_only_onboarding(
 
     assert response.status_code == 200
     assert "Current product guide" in html
-    assert "MSH documentation" in html
+    assert "FCP documentation" in html
     assert "monitor machine data" in html
     assert "What do you want to do?" in html
     assert "New installation or device?" in html
@@ -52,15 +52,15 @@ def test_docs_home_starts_from_current_product_tasks_not_only_onboarding(
     assert 'href="/docs/operator_guide.md">Operator guide</a>' in html
     assert 'href="/docs/quick_start.md">Quick start</a>' in html
     assert 'href="/docs/troubleshooting.md">Troubleshooting</a>' in html
-    assert 'href="/docs/architecture.md">How MSH works</a>' in html
+    assert 'href="/docs/architecture.md">How FCP works</a>' in html
 
     assert "Work with machine data" in html
     assert "Capture operator knowledge" in html
     assert "Connect devices and capabilities" in html
     assert "Configure sources and data" in html
 
-    assert "Get started with MSH" not in html
-    assert "Install MSH, create or join a Federation" not in html
+    assert "Get started with FCP" not in html
+    assert "Install FCP, create or join a Federation" not in html
     assert "Build confidence before you build complexity." not in html
     assert "documents available" not in html
     assert "Markdown files" not in html
@@ -80,7 +80,7 @@ def test_docs_document_keeps_curated_navigation_and_toc(tmp_path: Path) -> None:
     _write_doc(
         tmp_path,
         "quick_start.md",
-        "# Quick start\n\n## First run\n\nStart MSH.\n\n## Next step\n\nOpen onboarding.\n",
+        "# Quick start\n\n## First run\n\nStart FCP.\n\n## Next step\n\nOpen onboarding.\n",
     )
 
     response = _app(tmp_path).test_client().get("/docs/quick_start.md")
@@ -92,9 +92,9 @@ def test_docs_document_keeps_curated_navigation_and_toc(tmp_path: Path) -> None:
     assert "Next step" in html
     assert "On this page" in html
     assert "Start here" in html
-    assert "Use MSH" in html
-    assert "Understand MSH" in html
-    assert "MSH concepts" in html
+    assert "Use FCP" in html
+    assert "Understand FCP" in html
+    assert "FCP concepts" in html
     assert "Development &amp; all files" in html
     assert 'class="docs-nav-link is-active"' in html
     assert 'aria-current="page"' in html

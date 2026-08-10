@@ -52,7 +52,7 @@ def _job(
             ArtifactReference(
                 reference_id=f"{job_id}-input",
                 session_id=session_id,
-                schema_name="msh.prompt.v1",
+                schema_name="fcp.prompt.v1",
                 media_type="application/json",
                 content_hash=_sha256("a"),
                 size_bytes=128,
@@ -62,7 +62,7 @@ def _job(
             ArtifactReference(
                 reference_id=f"{job_id}-output",
                 session_id=session_id,
-                schema_name="msh.ai-response.v1",
+                schema_name="fcp.ai-response.v1",
                 media_type="application/json",
             ),
         ),

@@ -32,7 +32,7 @@ def worker(tmp_path: Path, provider_id: str, revision: int) -> CapabilityWorker:
             node_id=NODE_ID,
             provider_id=provider_id,
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             attributes={"operation": "echo", "revision": revision},
         ),

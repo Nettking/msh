@@ -3,7 +3,7 @@
 The helpers in this module deliberately store synchronization state as JSON files
 under ``data/source_state``. They do not ingest data themselves. Source-specific
 connectors, such as the Observer Phoenix exporter, use this module to keep simple
-high-water marks without coupling the rest of MSH to one vendor API.
+high-water marks without coupling the rest of FCP to one vendor API.
 """
 
 from __future__ import annotations
@@ -53,7 +53,7 @@ def utc_now() -> datetime:
 def parse_utc(value: datetime | str) -> datetime:
     """Parse a UTC timestamp and return a timezone-aware datetime.
 
-    The source APIs used by MSH commonly return ISO 8601 strings either with a
+    The source APIs used by FCP commonly return ISO 8601 strings either with a
     trailing ``Z`` or with no timezone marker while documenting UTC semantics.
     Naive values are therefore interpreted as UTC.
     """

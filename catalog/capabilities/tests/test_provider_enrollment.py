@@ -105,7 +105,7 @@ def announcement(
         node_id=node_id,
         session_id="session-f8",
         type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         protocol_version=protocol_version,
         status=status,
         properties={
@@ -568,7 +568,7 @@ def test_contract_versions_and_reason_redaction_fail_closed(
     )
 
     unsupported = requested.to_dict()
-    unsupported["schema"] = "msh.provider-enrollment.v2"
+    unsupported["schema"] = "fcp.provider-enrollment.v2"
     with pytest.raises(ProtocolCompatibilityError) as schema:
         ProviderEnrollmentRecord.from_dict(unsupported)
     assert schema.value.code == "unsupported-schema-major"
@@ -596,7 +596,7 @@ def test_contract_versions_and_reason_redaction_fail_closed(
             node_id=provider.identity.node_id,
             session_id="session-f8",
             type="language-model",
-            protocol="msh-language-model",
+            protocol="fcp-language-model",
             protocol_version="1.0",
             status=CapabilityStatus.READY,
             properties={"api_token": "super-secret-value"},

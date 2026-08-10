@@ -42,7 +42,7 @@ catalog/federation/tests/cf7_acceptance/physical_impact_map.json
 catalog/federation/tests/cf7_acceptance/physical_revalidation.py
 ```
 
-Schema `msh.cf7.physical-evidence.v2` replaces the original all-or-nothing single-observation model. The final document still targets one exact candidate commit in `commit_sha`, but each environment and each physical scenario also records:
+Schema `fcp.cf7.physical-evidence.v2` replaces the original all-or-nothing single-observation model. The final document still targets one exact candidate commit in `commit_sha`, but each environment and each physical scenario also records:
 
 - `provenance: observed` or `provenance: carried-forward`;
 - `observed_commit`: the exact commit where the physical observation was actually made;
@@ -142,8 +142,8 @@ When a fresh-checkout environment requires a rerun, use the candidate commit on 
 ### Linux
 
 ```bash
-git clone <repository> msh-cf7-acceptance
-cd msh-cf7-acceptance
+git clone <repository> fcp-cf7-acceptance
+cd fcp-cf7-acceptance
 git checkout <exact-commit-sha>
 git status --short
 python -m pip install --upgrade pip
@@ -157,8 +157,8 @@ docker compose config
 ### Windows PowerShell
 
 ```powershell
-git clone <repository> msh-cf7-acceptance
-Set-Location msh-cf7-acceptance
+git clone <repository> fcp-cf7-acceptance
+Set-Location fcp-cf7-acceptance
 git checkout <exact-commit-sha>
 git status --short
 python -m pip install --upgrade pip

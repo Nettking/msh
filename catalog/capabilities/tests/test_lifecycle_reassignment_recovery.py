@@ -27,7 +27,7 @@ def _job() -> JobContract:
         idempotency_key="session-reassign-restart:request",
         capability=CapabilityRequirement(
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             requirements={"operation": "echo"},
         ),
@@ -55,7 +55,7 @@ def _report(provider_id: str, node_id: str) -> ProviderResourceReport:
         node_id=node_id,
         session_id="session-reassign-restart",
         capability_type="synthetic-compute",
-        protocol="msh-synthetic",
+        protocol="fcp-synthetic",
         protocol_version="1.0",
         status=ProviderStatus.READY,
         report_revision=1,

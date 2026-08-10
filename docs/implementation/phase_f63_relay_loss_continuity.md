@@ -40,7 +40,7 @@ inferred from a failed storage operation and it does not alter authority.
 
 ## Continuity status
 
-`msh.direct_continuity.status.v1` reports only logical availability and stable
+`fcp.direct_continuity.status.v1` reports only logical availability and stable
 limitation codes. It contains no peer ID, IP address, multiaddress, credentials,
 or backend location.
 

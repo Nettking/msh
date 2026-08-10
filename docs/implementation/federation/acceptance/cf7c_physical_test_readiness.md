@@ -11,7 +11,7 @@ Use the three available machines as follows:
 | Profile | Physical machine | Primary roles |
 | --- | --- | --- |
 | `local-ai` | Local Windows machine with the NVIDIA GPU and Ollama | language-model contribution and desktop browser |
-| `cnc-recorder` | Machine on the MSH network with access to both CNC MTConnect Agents | recorder contribution and two real MTConnect sources |
+| `cnc-recorder` | Machine on the FCP network with access to both CNC MTConnect Agents | recorder contribution and two real MTConnect sources |
 | `school-control` | Machine at Høgskolen i Østfold | control node, registered compute seam and storage candidate |
 
 At least one of `cnc-recorder` and `school-control` must be a physical Linux host. WSL may support preparation but does not replace required physical Linux evidence.
@@ -63,8 +63,8 @@ Do not repeat an unaffected physical scenario merely because the candidate SHA c
 For every machine/scenario that **does** require a new observation, use a clean checkout at the candidate commit:
 
 ```bash
-git clone https://github.com/Nettking/msh.git msh-cf7-physical
-cd msh-cf7-physical
+git clone <repository-url> fcp fcp-cf7-physical
+cd fcp-cf7-physical
 git checkout <CANDIDATE_COMMIT>
 python -m pip install --upgrade pip
 python -m pip install -r requirements.txt -c constraints-phase2.txt
@@ -79,8 +79,8 @@ When an AI/GPU-related scenario requires a rerun:
 
 ```powershell
 ollama pull llama3.2:3b
-$env:MSH_CF7_OLLAMA_URL = "http://<PRIVATE_OLLAMA_HOST>:11434"
-$env:MSH_CF7_OLLAMA_MODEL = "llama3.2:3b"
+$env:FCP_CF7_OLLAMA_URL = "http://<PRIVATE_OLLAMA_HOST>:11434"
+$env:FCP_CF7_OLLAMA_MODEL = "llama3.2:3b"
 $commit = (git rev-parse HEAD).Trim()
 .\ops\cf7_prepare_windows.ps1 `
   -Machine local-ai `
@@ -98,7 +98,7 @@ When recorder/MTConnect-related scenarios require a rerun, configure the physica
 Linux example:
 
 ```bash
-export MSH_CF7_MTCONNECT_ENDPOINTS='{
+export FCP_CF7_MTCONNECT_ENDPOINTS='{
   "cnc-one":"http://<PRIVATE_AGENT_ONE>:5000",
   "cnc-two":"http://<PRIVATE_AGENT_TWO>:5000"
 }'
@@ -109,7 +109,7 @@ bash ops/cf7_prepare_linux.sh cnc-recorder "$commit" Martin all
 Windows example:
 
 ```powershell
-$env:MSH_CF7_MTCONNECT_ENDPOINTS = '{
+$env:FCP_CF7_MTCONNECT_ENDPOINTS = '{
   "cnc-one":"http://<PRIVATE_AGENT_ONE>:5000",
   "cnc-two":"http://<PRIVATE_AGENT_TWO>:5000"
 }'
@@ -130,7 +130,7 @@ When multi-device/compute/storage scenarios require a rerun:
 Linux example:
 
 ```bash
-export MSH_CF7_PEERS='{
+export FCP_CF7_PEERS='{
   "local-ai":"<PRIVATE_AI_HOST>:11434",
   "cnc-recorder":"<PRIVATE_RECORDER_HOST>:5000"
 }'
@@ -141,7 +141,7 @@ bash ops/cf7_prepare_linux.sh school-control "$commit" Martin all
 Windows example:
 
 ```powershell
-$env:MSH_CF7_PEERS = '{
+$env:FCP_CF7_PEERS = '{
   "local-ai":"<PRIVATE_AI_HOST>:11434",
   "cnc-recorder":"<PRIVATE_RECORDER_HOST>:5000"
 }'

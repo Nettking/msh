@@ -26,7 +26,7 @@ def _definition(*, prerequisites: tuple[str, ...] = ()) -> BenchmarkDefinition:
     return BenchmarkDefinition(
         benchmark_id="benchmark.local",
         capability_type="compute",
-        capability_protocol="msh.compute.v1",
+        capability_protocol="fcp.compute.v1",
         implementation_version="1.0.0",
         max_duration_seconds=2,
         max_parallelism=1,
@@ -169,7 +169,7 @@ def test_missing_prerequisite_skips_without_invoking_probe(tmp_path) -> None:
 def test_probe_failures_and_private_diagnostics_are_redacted(tmp_path) -> None:
     def probe(context: BenchmarkExecutionContext) -> BenchmarkObservation:
         raise RuntimeError(
-            "request to http://127.0.0.1:11434 failed with Bearer msh_join_secret"
+            "request to http://127.0.0.1:11434 failed with Bearer fcp_join_secret"
         )
 
     registry = BenchmarkRegistry()
@@ -182,7 +182,7 @@ def test_probe_failures_and_private_diagnostics_are_redacted(tmp_path) -> None:
     assert result.state == BenchmarkState.FAILED
     assert result.diagnostics == ("RuntimeError: [redacted]",)
     assert "127.0.0.1" not in serialized
-    assert "msh_join_secret" not in serialized
+    assert "fcp_join_secret" not in serialized
     assert "http://" not in serialized
 
 

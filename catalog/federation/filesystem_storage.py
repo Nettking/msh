@@ -198,7 +198,7 @@ class FilesystemRecorderStorageProvider:
                    "last_sequence": last, "next_sequence": next_sequence,
                    "observation_count": count, "raw_sha256": digest}
         return self.outbox.prepare(session_id=session_id, destination_id=destination_id,
-                                   schema_id="msh.recorder.delivery.v1", payload=payload,
+                                   schema_id="fcp.recorder.delivery.v1", payload=payload,
                                    idempotency_key=identity,
                                    content_hash=f"sha256:{digest}", now=now)
 

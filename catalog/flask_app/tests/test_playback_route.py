@@ -339,7 +339,7 @@ def test_playback_prefers_active_namespace_artifact_for_duplicate_machine_day(tm
 def test_playback_route_uses_async_catalog_refresh_when_timeline_export_appears(tmp_path: Path, monkeypatch) -> None:
     results_root = tmp_path / "results"
     results_root.mkdir()
-    monkeypatch.setenv("MSH_SCAN_DIRS", str(results_root))
+    monkeypatch.setenv("FCP_SCAN_DIRS", str(results_root))
 
     catalog = ArtifactCatalog()
     assert catalog.ensure_scanned().artifacts == []

@@ -51,7 +51,7 @@ def _positive_bound(value: int, field_name: str, *, maximum: int) -> int:
 def _discovery_id(*, federation_fingerprint: str, internal_session_id: str) -> str:
     digest = hashlib.sha256(
         (
-            "msh-onboarding-discovery-v1\0"
+            "fcp-onboarding-discovery-v1\0"
             + federation_fingerprint
             + "\0"
             + internal_session_id

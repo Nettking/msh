@@ -88,7 +88,7 @@ class _AuthorizedCoordinator:
                     occurred_at=NOW - timedelta(minutes=2),
                     payload={
                         "node_id": "node-owner",
-                        "invitation": "msh_join_private",
+                        "invitation": "fcp_join_private",
                     },
                 ),
                 SimpleNamespace(
@@ -114,7 +114,7 @@ class _AuthorizedSurface(ProviderOperatorSurface):
             capability_id="provider-ai",
             node_id="node-ai",
             capability_type="language-model",
-            protocol="msh-ai",
+            protocol="fcp-ai",
             protocol_version="1.0",
             discovered=True,
             announcement_status="ready",
@@ -202,7 +202,7 @@ class _StorageStore:
                 SimpleNamespace(
                     provider_id="storage-one",
                     node_id="node-owner",
-                    protocol="msh-storage",
+                    protocol="fcp-storage",
                     protocol_version="1.0",
                     status="ready",
                     authorized=True,
@@ -309,7 +309,7 @@ def test_authorized_composition_uses_only_server_bound_context() -> None:
             architecture="x86-64",
             resource_observations={
                 "cpu": {"logical_cores_band": "8-15"},
-                "local_path": "/var/lib/msh/private",
+                "local_path": "/var/lib/fcp/private",
             },
             detected_services=("ollama", "http://127.0.0.1:11434"),
             registered_handlers=("image-analysis",),
@@ -374,7 +374,7 @@ def test_rendered_overview_contains_no_private_or_fencing_material() -> None:
         "https://private",
         "127.0.0.1",
         "bearer ",
-        "msh_join_",
+        "fcp_join_",
         "c:\\private",
         "/var/lib/",
         "lease-secret",
@@ -394,8 +394,8 @@ def test_update_panel_describes_verified_running_installation_update() -> None:
 
     page = app.test_client().get("/federation").get_data(as_text=True)
 
-    assert "MSH software updates" in page
+    assert "FCP software updates" in page
     assert "Update all devices" not in page  # hidden before an eligible check
-    assert "rebuilds MSH" in page
+    assert "rebuilds FCP" in page
     assert "running build proves the exact target commit" in page
     assert "does not rebuild, reinstall, restart" not in page

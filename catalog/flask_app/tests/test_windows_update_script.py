@@ -32,17 +32,17 @@ def test_update_cmd_selects_relay_state_outside_parse_time_block() -> None:
 
     assert "call :select_relay_volume" in script
     assert ":select_relay_volume" in script
-    assert 'set "MSH_RELAY_SELECTION_FILE=%TEMP%' in script
-    assert '-OutputFile "%MSH_RELAY_SELECTION_FILE%"' in script
+    assert 'set "FCP_RELAY_SELECTION_FILE=%TEMP%' in script
+    assert '-OutputFile "%FCP_RELAY_SELECTION_FILE%"' in script
     assert "setlocal EnableDelayedExpansion" not in script
-    assert "!MSH_RELAY_SELECTION_FILE!" not in script
+    assert "!FCP_RELAY_SELECTION_FILE!" not in script
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows batch execution regression")
 def test_update_cmd_passes_nonempty_relay_selection_output_file(
     tmp_path: Path,
 ) -> None:
-    root = tmp_path / "msh update fixture"
+    root = tmp_path / "fcp update fixture"
     remote = tmp_path / "fixture remote.git"
     scripts = root / "scripts" / "windows"
     temp_dir = root / "temp files"
@@ -57,7 +57,7 @@ def test_update_cmd_passes_nonempty_relay_selection_output_file(
         "exit /b 0\n",
         encoding="utf-8",
     )
-    (scripts / "select_msh_relay_volume.ps1").write_text(
+    (scripts / "select_fcp_relay_volume.ps1").write_text(
         "[CmdletBinding()]\n"
         "param(\n"
         "    [Parameter(Mandatory = $true)]\n"
@@ -75,7 +75,7 @@ def test_update_cmd_passes_nonempty_relay_selection_output_file(
         "[System.IO.Directory]::CreateDirectory($parent) | Out-Null\n"
         "$encoding = New-Object System.Text.UTF8Encoding($false)\n"
         "[System.IO.File]::WriteAllText(\n"
-        '    $OutputFile, "msh_relay_state", $encoding\n'
+        '    $OutputFile, "fcp_relay_state", $encoding\n'
         ")\n"
         "exit 0\n",
         encoding="utf-8",
@@ -92,7 +92,7 @@ def test_update_cmd_passes_nonempty_relay_selection_output_file(
     _git("push", "-u", "origin", "main", cwd=root)
 
     env = os.environ.copy()
-    env.pop("MSH_RELAY_VOLUME_NAME", None)
+    env.pop("FCP_RELAY_VOLUME_NAME", None)
     env["TEMP"] = str(temp_dir)
     env["TMP"] = str(temp_dir)
 
@@ -108,7 +108,7 @@ def test_update_cmd_passes_nonempty_relay_selection_output_file(
     output = completed.stdout + completed.stderr
 
     assert completed.returncode == 0, output
-    assert "Federation state selected: msh_relay_state" in output
+    assert "Federation state selected: fcp_relay_state" in output
     assert "START_RESUME_OK" in output
     assert "EMPTY_OUTPUT_FILE" not in output
     assert "Cannot bind argument to parameter 'OutputFile'" not in output

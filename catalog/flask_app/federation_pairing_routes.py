@@ -58,7 +58,7 @@ def _require_csrf() -> None:
 def _relay_url() -> str:
     configured = str(
         current_app.config.get("CAPABILITY_ONBOARDING_PAIRING_RELAY_URL")
-        or os.getenv("MSH_PAIRING_RELAY_URL", "")
+        or os.getenv("FCP_PAIRING_RELAY_URL", "")
     ).strip()
     if configured:
         return configured
@@ -67,11 +67,11 @@ def _relay_url() -> str:
     if host.casefold() in {"localhost", "127.0.0.1", "::1"}:
         raise FederationOperationError(
             "pairing-lan-address-required",
-            "open MSH using the LAN or VPN address that the other machine can reach, then generate the code again",
+            "open FCP using the LAN or VPN address that the other machine can reach, then generate the code again",
             "relay_url",
         )
     formatted_host = f"[{host}]" if ":" in host else host
-    port = int(os.getenv("MSH_RELAY_PORT", "8765"))
+    port = int(os.getenv("FCP_RELAY_PORT", "8765"))
     return f"ws://{formatted_host}:{port}"
 
 
@@ -99,7 +99,7 @@ def create_pairing_code():
                 "the pairing code could not be created",
             )
         flash(
-            "Pairing code created. Copy it to the other MSH device within five minutes.",
+            "Pairing code created. Copy it to the other FCP device within five minutes.",
             "success",
         )
     except FederationOperationError as exc:
@@ -124,7 +124,7 @@ def pair_device():
         if not code:
             raise FederationOperationError(
                 "pairing-code-required",
-                "paste the pairing code from the other MSH device",
+                "paste the pairing code from the other FCP device",
                 "pairing_code",
             )
         _pairing_service().redeem_pairing_code(code)

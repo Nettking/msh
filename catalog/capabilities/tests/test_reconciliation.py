@@ -236,7 +236,7 @@ def compute_descriptor() -> LocalComputeHandlerDescriptor:
     return LocalComputeHandlerDescriptor(
         handler_id="restart-handler",
         capability_type="synthetic-compute",
-        protocol="msh-synthetic",
+        protocol="fcp-synthetic",
         protocol_version="1.0",
         attributes={"operation": "echo", "modalities": ["json"]},
     )
@@ -256,7 +256,7 @@ def publish_ai(
         node_id=provider.identity.node_id,
         session_id=SESSION_ID,
         capability_type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         protocol_version="1.0",
         status=ProviderStatus.READY,
         report_revision=revision,
@@ -342,7 +342,7 @@ def prepare_authority(
         provider=ai_provider,
         capability_id=AI_CAPABILITY,
         capability_type="language-model",
-        protocol="msh-language-model",
+        protocol="fcp-language-model",
         properties={"models": ["small"], "modalities": ["text"]},
     )
     announce_and_approve(

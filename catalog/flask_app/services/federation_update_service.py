@@ -1,4 +1,4 @@
-"""Manual-only orchestration for verified Federation MSH software updates."""
+"""Manual-only orchestration for verified Federation FCP software updates."""
 
 from __future__ import annotations
 
@@ -33,8 +33,8 @@ from .federation_update_events import (
 )
 from .federation_update_handoff import HostUpdateHandoff
 
-SCHEMA = "msh.federation-update.v2"
-LEGACY_SCHEMA = "msh.federation-update.v1"
+SCHEMA = "fcp.federation-update.v2"
+LEGACY_SCHEMA = "fcp.federation-update.v1"
 CHECK_FRESHNESS = timedelta(minutes=10)
 CHECK_REPORT_WINDOW = timedelta(seconds=45)
 APPLY_REPORT_WINDOW = timedelta(minutes=20)
@@ -159,7 +159,7 @@ class FederationUpdateService:
                 result.current_commit,
                 result.target_commit,
                 "runtime_outdated",
-                "The source is current, but the running MSH build is not verified at the target commit.",
+                "The source is current, but the running FCP build is not verified at the target commit.",
                 result.running_commit,
                 result.request_id,
             )
@@ -684,7 +684,7 @@ class FederationUpdateService:
                     **current,
                     "state": "activation_queued",
                     "code": "host_activation_queued",
-                    "message": "The local host agent will rebuild, restart, and verify this MSH device last.",
+                    "message": "The local host agent will rebuild, restart, and verify this FCP device last.",
                 }
 
             value: dict[str, object] = {

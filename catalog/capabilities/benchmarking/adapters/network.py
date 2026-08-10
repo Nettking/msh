@@ -92,7 +92,7 @@ class AuthenticatedNetworkPathAdapter:
     definition = BenchmarkDefinition(
         benchmark_id=NETWORK_BENCHMARK_ID,
         capability_type="network-path",
-        capability_protocol="msh-authenticated-path",
+        capability_protocol="fcp-authenticated-path",
         implementation_version="1.0.0",
         max_duration_seconds=10,
         max_parallelism=2,
@@ -156,7 +156,7 @@ class AuthenticatedNetworkPathAdapter:
                     "Authenticated network path changed before benchmark execution",
                 ),
             )
-        payload = b"msh-cf2b-authenticated-path"[: target.payload_bytes]
+        payload = b"fcp-cf2b-authenticated-path"[: target.payload_bytes]
         if len(payload) < target.payload_bytes:
             payload = (payload * ((target.payload_bytes // len(payload)) + 1))[
                 : target.payload_bytes

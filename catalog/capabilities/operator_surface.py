@@ -39,8 +39,8 @@ from .provider_health import (
     ProviderHealthState,
 )
 
-PROVIDER_OPERATOR_VIEW_SCHEMA = "msh.provider-operator-view.v1"
-PROVIDER_OPERATOR_SNAPSHOT_SCHEMA = "msh.provider-operator-snapshot.v1"
+PROVIDER_OPERATOR_VIEW_SCHEMA = "fcp.provider-operator-view.v1"
+PROVIDER_OPERATOR_SNAPSHOT_SCHEMA = "fcp.provider-operator-snapshot.v1"
 MAX_OPERATOR_REASON_BYTES = 128
 MAX_OPERATOR_COMMAND_ID_BYTES = 256
 

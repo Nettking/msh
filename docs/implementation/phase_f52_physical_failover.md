@@ -48,7 +48,7 @@ copy Machine B's state to Machine C or vice versa.
 The baseline report must contain:
 
 ```json
-{"schema": "msh.storage_three_machine_report.v1", "passed": true}
+{"schema": "fcp.storage_three_machine_report.v1", "passed": true}
 ```
 
 The baseline authority evidence must still show:
@@ -79,7 +79,7 @@ credentials, TLS private keys, or state directories in the evidence folder.
 
 ## 1. Validate the retained baseline on Machine A
 
-Use the same MSH commit on all three machines. Then run:
+Use the same FCP commit on all three machines. Then run:
 
 ```bash
 python -m catalog.node.storage_failover_drill validate-baseline \
@@ -332,7 +332,7 @@ python -m catalog.node.storage_failover_drill verify \
 F5.2 passes only when:
 
 ```json
-{"schema": "msh.storage_physical_failover_report.v1", "passed": true}
+{"schema": "fcp.storage_physical_failover_report.v1", "passed": true}
 ```
 
 The verifier fails closed for foreign deployment IDs, unchanged term or fencing

@@ -63,13 +63,13 @@ CommitState:
 
 ## Node identity
 
-Schema: `msh.node.v1`
+Schema: `fcp.node.v1`
 
 Required fields:
 
 ```json
 {
-  "schema": "msh.node.v1",
+  "schema": "fcp.node.v1",
   "node_id": "node-opaque-id",
   "display_name": "Recorder laptop",
   "public_key": "base64-or-armored-public-key",
@@ -87,11 +87,11 @@ Invariants:
 
 ## Session
 
-Schema: `msh.session.v1`
+Schema: `fcp.session.v1`
 
 ```json
 {
-  "schema": "msh.session.v1",
+  "schema": "fcp.session.v1",
   "session_id": "session-cnc-2026-07-28",
   "display_name": "Mazak tool-wear experiment",
   "state": "active",
@@ -111,16 +111,16 @@ Invariants:
 
 ## Capability announcement
 
-Schema: `msh.capability.v1`
+Schema: `fcp.capability.v1`
 
 ```json
 {
-  "schema": "msh.capability.v1",
+  "schema": "fcp.capability.v1",
   "capability_id": "storage-node-b-main",
   "node_id": "node-storage-b",
   "session_id": "session-cnc-2026-07-28",
   "type": "storage",
-  "protocol": "msh-storage-v1",
+  "protocol": "fcp-storage-v1",
   "protocol_version": "1.0",
   "status": "ready",
   "properties": {
@@ -143,11 +143,11 @@ Invariants:
 
 ## Session event
 
-Schema: `msh.session_event.v1`
+Schema: `fcp.session_event.v1`
 
 ```json
 {
-  "schema": "msh.session_event.v1",
+  "schema": "fcp.session_event.v1",
   "session_id": "session-cnc-2026-07-28",
   "revision": 219,
   "event_id": "event-opaque-id",
@@ -173,12 +173,12 @@ Invariants:
 
 ## Dataset coverage
 
-Schema: embedded in `msh.storage_manifest.v1` and storage-node reports.
+Schema: embedded in `fcp.storage_manifest.v1` and storage-node reports.
 
 ```json
 {
   "dataset_id": "mazak-telemetry",
-  "schema_name": "msh.mtconnect.snapshot",
+  "schema_name": "fcp.mtconnect.snapshot",
   "schema_version": 2,
   "required": true,
   "committed_revision": 1842,
@@ -200,11 +200,11 @@ Invariants:
 
 ## Authoritative storage manifest
 
-Schema: `msh.storage_manifest.v1`
+Schema: `fcp.storage_manifest.v1`
 
 ```json
 {
-  "schema": "msh.storage_manifest.v1",
+  "schema": "fcp.storage_manifest.v1",
   "session_id": "session-cnc-2026-07-28",
   "group_id": "storage-main",
   "revision": 1842,
@@ -212,7 +212,7 @@ Schema: `msh.storage_manifest.v1`
   "datasets": {
     "mazak-telemetry": {
       "dataset_id": "mazak-telemetry",
-      "schema_name": "msh.mtconnect.snapshot",
+      "schema_name": "fcp.mtconnect.snapshot",
       "schema_version": 2,
       "required": true,
       "committed_revision": 1842,
@@ -238,11 +238,11 @@ Invariants:
 
 ## Storage batch
 
-Schema: `msh.storage_batch.v1`
+Schema: `fcp.storage_batch.v1`
 
 ```json
 {
-  "schema": "msh.storage_batch.v1",
+  "schema": "fcp.storage_batch.v1",
   "session_id": "session-cnc-2026-07-28",
   "group_id": "storage-main",
   "dataset_id": "mazak-telemetry",
@@ -266,11 +266,11 @@ Invariants:
 
 ## Storage-node state report
 
-Schema: `msh.storage_node_state.v1`
+Schema: `fcp.storage_node_state.v1`
 
 ```json
 {
-  "schema": "msh.storage_node_state.v1",
+  "schema": "fcp.storage_node_state.v1",
   "session_id": "session-cnc-2026-07-28",
   "group_id": "storage-main",
   "node_id": "node-storage-b",
@@ -296,11 +296,11 @@ Invariants:
 
 ## Leadership grant
 
-Schema: `msh.leadership_grant.v1`
+Schema: `fcp.leadership_grant.v1`
 
 ```json
 {
-  "schema": "msh.leadership_grant.v1",
+  "schema": "fcp.leadership_grant.v1",
   "session_id": "session-cnc-2026-07-28",
   "group_id": "storage-main",
   "node_id": "node-storage-b",

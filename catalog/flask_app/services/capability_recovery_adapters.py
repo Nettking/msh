@@ -25,7 +25,7 @@ _NATIVE_LOCAL_OLLAMA_URL = "http://127.0.0.1:11434"
 def _running_in_container() -> bool:
     """Return whether the supported Flask runtime is running in a container."""
 
-    explicit = str(os.environ.get("MSH_RUNTIME_CONTAINERIZED") or "").strip().lower()
+    explicit = str(os.environ.get("FCP_RUNTIME_CONTAINERIZED") or "").strip().lower()
     if explicit in {"1", "true", "yes", "on"}:
         return True
     if explicit in {"0", "false", "no", "off"}:
@@ -88,7 +88,7 @@ def fresh_capability_inspection_adapters() -> tuple[object, ...]:
 
     base_url = _runtime_ollama_base_url(payload)
     model = str(
-        os.environ.get("MSH_AI_MODEL") or payload.get("ai_model") or ""
+        os.environ.get("FCP_AI_MODEL") or payload.get("ai_model") or ""
     ).strip()
     if not base_url or not model:
         return tuple(adapters)

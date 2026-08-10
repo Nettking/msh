@@ -1,7 +1,7 @@
 """Installed product composition for explicit, run-once capability evidence.
 
 The frozen CF2/CF4 kernels retain temporal expiry semantics for isolated contract
-and safety tests. The installed MSH product treats inspection and benchmark work
+and safety tests. The installed FCP product treats inspection and benchmark work
 as explicit operator evidence: age alone never forces a rerun. Structural
 invalidation remains fail-closed through benchmark identity, implementation
 version, and dependency fingerprints.

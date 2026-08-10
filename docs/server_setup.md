@@ -1,14 +1,14 @@
 # Server setup and deployment
 
-Status: **current administrator guide**  
+Status: **current administrator guide**
 Reviewed: **2026-08-07**
 
-MSH is designed to run as a persistent device that may host several independent capabilities. The normal product setup does not assign the device one permanent role.
+FCP is designed to run as a persistent device that may host several independent capabilities. The normal product setup does not assign the device one permanent role.
 
 The supported default deployment starts:
 
 ```text
-MSH device
+FCP device
   -> Federation relay
   -> Flask workbench and runtime
   -> managed recorder
@@ -27,8 +27,8 @@ Do not expose Flask, the Federation relay, or Ollama directly to the public inte
 Install Docker Desktop, then run:
 
 ```cmd
-git clone https://github.com/Nettking/msh.git
-cd msh
+git clone <repository-url> fcp
+cd fcp
 start.cmd
 ```
 
@@ -49,8 +49,8 @@ Windows web access is local-only by default through `127.0.0.1`. The launcher pr
 From a fresh checkout:
 
 ```bash
-git clone https://github.com/Nettking/msh.git
-cd msh
+git clone <repository-url> fcp
+cd fcp
 docker compose up -d --build relay ollama recorder flask
 ```
 
@@ -80,7 +80,7 @@ Identity
 
 The steps have these boundaries:
 
-1. **Identity** creates or loads the stable identity of this MSH device.
+1. **Identity** creates or loads the stable identity of this FCP device.
 2. **Federation** reconnects, joins, or creates a Federation through an authenticated path.
 3. **Inspect** records and persists the device's supported local capabilities.
 4. **Finish setup** opens the normal workbench after accepted inspection evidence exists.
@@ -117,7 +117,7 @@ The long-running Flask app owns the single automatic contribution reconciliation
 
 `update.cmd` performs a fast-forward update and then invokes this resume path.
 
-The underlying frozen inspection and benchmark contracts still contain finite `expires_at` metadata, and the strict low-level evaluator remains available for contract and safety tests. The installed MSH product uses run-once composition: age alone is not an automatic refresh trigger, including for evidence written by older releases with a short TTL. Old evidence is not rewritten to appear newer. Explicit refresh remains available from the product surface.
+The underlying frozen inspection and benchmark contracts still contain finite `expires_at` metadata, and the strict low-level evaluator remains available for contract and safety tests. The installed FCP product uses run-once composition: age alone is not an automatic refresh trigger, including for evidence written by older releases with a short TTL. Old evidence is not rewritten to appear newer. Explicit refresh remains available from the product surface.
 
 On Linux/macOS, ordinary `docker compose up -d` preserves the same mounted directories and named volumes. Inspection and benchmark reruns remain explicit actions from the product surface.
 
@@ -151,10 +151,10 @@ Do not manually delete only part of the Federation state. Partial deletion can l
 `start.cmd` defaults to:
 
 ```text
-MSH_WEB_BIND=127.0.0.1
+FCP_WEB_BIND=127.0.0.1
 ```
 
-This is the safest normal setting when only the MSH computer needs the browser UI.
+This is the safest normal setting when only the FCP computer needs the browser UI.
 
 ### Trusted LAN or VPN access
 
@@ -163,21 +163,21 @@ To allow another trusted computer to reach Flask, set the bind address before st
 Windows Command Prompt:
 
 ```cmd
-set MSH_WEB_BIND=0.0.0.0
+set FCP_WEB_BIND=0.0.0.0
 start.cmd
 ```
 
 PowerShell:
 
 ```powershell
-$env:MSH_WEB_BIND = "0.0.0.0"
+$env:FCP_WEB_BIND = "0.0.0.0"
 .\start.cmd
 ```
 
 Linux/macOS `.env`:
 
 ```text
-MSH_WEB_BIND=0.0.0.0
+FCP_WEB_BIND=0.0.0.0
 ```
 
 Then open:
@@ -198,7 +198,7 @@ or on Windows:
 ipconfig
 ```
 
-When pairing another physical device, open MSH using the reachable LAN or VPN address. Opening through `localhost` cannot advertise a relay address reachable from the other device.
+When pairing another physical device, open FCP using the reachable LAN or VPN address. Opening through `localhost` cannot advertise a relay address reachable from the other device.
 
 If access fails, verify:
 
@@ -223,7 +223,7 @@ The default Compose deployment persists:
 
 `.env` is local and ignored by git.
 
-Use configured `MSH_DATA_DIR`, `MSH_RESULTS_DIR`, and volume-name variables when the deployment must store state outside the repository defaults.
+Use configured `FCP_DATA_DIR`, `FCP_RESULTS_DIR`, and volume-name variables when the deployment must store state outside the repository defaults.
 
 ## Advanced deployment shapes
 
@@ -240,7 +240,7 @@ docker compose up -d --build relay ollama recorder flask
 Set:
 
 ```text
-MSH_SKIP_ORCHESTRATION=1
+FCP_SKIP_ORCHESTRATION=1
 ```
 
 Then start the normal services. This is intended for inspection and debugging.
@@ -250,12 +250,12 @@ Then start the normal services. This is intended for inspection and debugging.
 A Docker-capable laptop can contribute an Ollama endpoint without hosting another Flask workbench:
 
 ```bash
-git clone https://github.com/Nettking/msh.git
-cd msh
+git clone <repository-url> fcp
+cd fcp
 docker compose --profile provider run --rm model-provider-install
 ```
 
-This starts `model-provider` and installs `MSH_PROVIDER_MODEL`, which defaults to `smollm2:360m`, in the persistent `model_provider_models` volume.
+This starts `model-provider` and installs `FCP_PROVIDER_MODEL`, which defaults to `smollm2:360m`, in the persistent `model_provider_models` volume.
 
 Subsequent starts do not need to reinstall the model:
 
@@ -277,7 +277,7 @@ docker compose --profile provider down
 
 Port `11434` is published for the provider profile. Restrict it to a trusted LAN or VPN.
 
-See [Connected capabilities](connected_capabilities.md) for the authenticated MSH-side connection and contribution flow.
+See [Connected capabilities](connected_capabilities.md) for the authenticated FCP-side connection and contribution flow.
 
 ### One-shot preparation
 
@@ -293,7 +293,7 @@ docker compose --profile observer-sync run --rm observer-sync
 
 ### Compatibility setup helper
 
-`setup_msh.py` can still write `.env` values and prepare specialized deployment selections. Use it only when the default capability-first deployment is not appropriate.
+`setup_fcp.py` can still write `.env` values and prepare specialized deployment selections. Use it only when the default capability-first deployment is not appropriate.
 
 Running the helper does not replace capability-first browser onboarding, establish Federation membership, or grant contribution authority.
 
@@ -302,7 +302,7 @@ Running the helper does not replace capability-first browser onboarding, establi
 The default local model is selected through:
 
 ```text
-MSH_AI_MODEL=llama3.2:3b
+FCP_AI_MODEL=llama3.2:3b
 OLLAMA_BASE_URL=http://ollama:11434
 ```
 
@@ -332,7 +332,7 @@ IG500=http://192.168.200.251:5000/current;VTC=http://192.168.200.252:5000/curren
 The equivalent environment value is:
 
 ```text
-MSH_RECORDER_SOURCES=IG500=http://192.168.200.251:5000/current;VTC=http://192.168.200.252:5000/current
+FCP_RECORDER_SOURCES=IG500=http://192.168.200.251:5000/current;VTC=http://192.168.200.252:5000/current
 ```
 
 The recorder state is stored at:

@@ -46,7 +46,7 @@ def _job(
         idempotency_key=f"session-races:{job_id}",
         capability=CapabilityRequirement(
             capability_type="synthetic-compute",
-            protocol="msh-synthetic",
+            protocol="fcp-synthetic",
             protocol_version="1.0",
             requirements={"operation": "echo"},
         ),
@@ -55,7 +55,7 @@ def _job(
             ArtifactReference(
                 reference_id=f"output-{job_id}",
                 session_id="session-races",
-                schema_name="msh.synthetic-output.v1",
+                schema_name="fcp.synthetic-output.v1",
                 media_type="application/json",
             ),
         ),
@@ -219,7 +219,7 @@ def test_terminal_worker_event_at_lease_expiry_is_stale(
     result_reference = ArtifactReference(
         reference_id="output-job-expired-result",
         session_id="session-races",
-        schema_name="msh.synthetic-output.v1",
+        schema_name="fcp.synthetic-output.v1",
         media_type="application/json",
         content_hash="sha256:" + "c" * 64,
         size_bytes=64,

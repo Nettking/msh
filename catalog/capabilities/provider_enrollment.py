@@ -35,11 +35,11 @@ from catalog.federation.redaction import (
 
 from .provider_reports import protocol_version_parts
 
-PROVIDER_ENROLLMENT_PROTOCOL = "msh-provider-enrollment"
+PROVIDER_ENROLLMENT_PROTOCOL = "fcp-provider-enrollment"
 PROVIDER_ENROLLMENT_PROTOCOL_VERSION = "1.0"
 PROVIDER_ENROLLMENT_PROTOCOL_MAJOR = 1
-PROVIDER_ENROLLMENT_SCHEMA = "msh.provider-enrollment.v1"
-PROVIDER_ENROLLMENT_AUDIT_SCHEMA = "msh.provider-enrollment-audit.v1"
+PROVIDER_ENROLLMENT_SCHEMA = "fcp.provider-enrollment.v1"
+PROVIDER_ENROLLMENT_AUDIT_SCHEMA = "fcp.provider-enrollment-audit.v1"
 PROVIDER_ENROLLMENT_STORE_SCHEMA_VERSION = 1
 MAX_ENROLLMENT_AUDIT_READ = 10_000
 MAX_TEXT_BYTES = 512

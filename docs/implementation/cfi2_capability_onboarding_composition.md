@@ -70,7 +70,7 @@ It does not create enrollment tokens, invitations, sessions, or memberships.
 The device identity continues to use `IdentityStore`.
 
 CFI-2 adds one transactional SQLite onboarding database containing one canonical
-`msh.onboarding.federation-binding.v1` object. It stores:
+`fcp.onboarding.federation-binding.v1` object. It stores:
 
 - public federation ID;
 - private internal session binding;
@@ -96,7 +96,7 @@ not overwritten by page rendering.
 
 The Flask and relay containers mount the same existing `relay_state` volume.
 Flask receives the canonical coordinator database path
-`/var/lib/msh-relay/control.sqlite3`, which is already used by the relay.
+`/var/lib/fcp-relay/control.sqlite3`, which is already used by the relay.
 
 This permits the onboarding adapter to call the existing authority directly
 without creating a parallel coordinator database. Native execution defaults to

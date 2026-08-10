@@ -81,7 +81,7 @@ class StorageCandidateAdapter:
     definition = BenchmarkDefinition(
         benchmark_id=STORAGE_BENCHMARK_ID,
         capability_type="storage",
-        capability_protocol="msh-storage-candidate",
+        capability_protocol="fcp-storage-candidate",
         implementation_version="1.0.0",
         max_duration_seconds=10,
         max_parallelism=1,

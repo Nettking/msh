@@ -145,7 +145,7 @@ def test_rendered_storage_config_is_secret_free_and_strict(tmp_path: Path) -> No
 
     assert config.provider_id == "provider-b"
     assert config.session_id == "session-1"
-    assert value["schema"] == "msh.storage_node_config.v1"
+    assert value["schema"] == "fcp.storage_node_config.v1"
     assert not any(
         marker in key.lower()
         for key in value

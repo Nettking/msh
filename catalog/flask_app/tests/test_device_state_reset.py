@@ -70,13 +70,13 @@ def test_reset_follows_configured_and_legacy_paths_and_preserves_operational_dat
         _write(path, "preserve")
 
     environ = {
-        "MSH_FEDERATION_NODE_STATE_DIR": str(identity),
-        "MSH_FEDERATION_ONBOARDING_DATABASE": str(onboarding),
-        "MSH_FEDERATION_TRANSITION_DATABASE": str(transition),
-        "MSH_FEDERATION_BENCHMARK_DATABASE": str(benchmark),
-        "MSH_FEDERATION_CONTRIBUTION_DATABASE": str(contribution),
-        "MSH_FEDERATION_COORDINATOR_DATABASE": str(coordinator),
-        "MSH_FEDERATION_REMOTE_PAIRING_PATH": str(remote_pairing),
+        "FCP_FEDERATION_NODE_STATE_DIR": str(identity),
+        "FCP_FEDERATION_ONBOARDING_DATABASE": str(onboarding),
+        "FCP_FEDERATION_TRANSITION_DATABASE": str(transition),
+        "FCP_FEDERATION_BENCHMARK_DATABASE": str(benchmark),
+        "FCP_FEDERATION_CONTRIBUTION_DATABASE": str(contribution),
+        "FCP_FEDERATION_COORDINATOR_DATABASE": str(coordinator),
+        "FCP_FEDERATION_REMOTE_PAIRING_PATH": str(remote_pairing),
     }
 
     removed = reset_device_state(
@@ -123,7 +123,7 @@ def test_reset_rejects_configured_paths_outside_bounded_mounts(
 
     with pytest.raises(RuntimeError, match="Refusing to remove"):
         planned_reset_targets(
-            environ={"MSH_FEDERATION_NODE_STATE_DIR": str(outside)},
+            environ={"FCP_FEDERATION_NODE_STATE_DIR": str(outside)},
             app_root=app_root,
             relay_root=relay_root,
         )

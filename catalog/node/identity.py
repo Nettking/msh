@@ -36,8 +36,8 @@ PRIVATE_KEY_FILENAME: Final = "identity.pem"
 PUBLIC_IDENTITY_FILENAME: Final = "identity.json"
 IDENTITY_LOCK_FILENAME: Final = ".identity.lock"
 PUBLIC_KEY_PREFIX: Final = "ed25519:"
-WINDOWS_DPAPI_PREFIX: Final = b"MSH-DPAPI-v1\x00"
-WINDOWS_DPAPI_ENTROPY: Final = b"MSH federated node identity v1"
+WINDOWS_DPAPI_PREFIX: Final = b"FCP-DPAPI-v1\x00"
+WINDOWS_DPAPI_ENTROPY: Final = b"FCP federated node identity v1"
 MAX_PRIVATE_KEY_BYTES: Final = 16_384
 MAX_PUBLIC_METADATA_BYTES: Final = 65_536
 DEFAULT_IDENTITY_LOCK_TIMEOUT_SECONDS: Final = 10.0
@@ -363,7 +363,7 @@ def _windows_dpapi_transform(value: bytes, *, protect: bool) -> bytes:
         operation.restype = wintypes.BOOL
         result = operation(
             ctypes.byref(input_blob),
-            ctypes.c_wchar_p("MSH federated node identity"),
+            ctypes.c_wchar_p("FCP federated node identity"),
             ctypes.byref(entropy_blob),
             None,
             None,
@@ -613,7 +613,7 @@ class IdentityStore:
             raise NodeIdentityStateError(
                 "malformed-public-identity",
                 exc.field,
-                "public identity metadata does not satisfy msh.node.v1",
+                "public identity metadata does not satisfy fcp.node.v1",
             ) from exc
         _, stored_raw_public = _decode_public_key(identity.public_key)
         actual_raw_public = loaded_key.public_key().public_bytes(

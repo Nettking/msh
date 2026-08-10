@@ -24,7 +24,7 @@ from catalog.flask_app.services.server_setup_service import (
 )
 
 LEGACY_RECORDER_SETTINGS_PATH = Path(
-    os.getenv("MSH_RECORDER_LEGACY_SETTINGS_FILE", str(SETTINGS_PATH))
+    os.getenv("FCP_RECORDER_LEGACY_SETTINGS_FILE", str(SETTINGS_PATH))
 )
 
 

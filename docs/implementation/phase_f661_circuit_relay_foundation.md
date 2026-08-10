@@ -25,7 +25,7 @@ Relay client and relay service roles cannot be combined in one process. Static b
 A relay service can be started with an internet-reachable listen address:
 
 ```text
-msh-peer-sidecar \
+fcp-peer-sidecar \
   --listen /ip4/0.0.0.0/tcp/4001 \
   --relay-service
 ```
@@ -33,7 +33,7 @@ msh-peer-sidecar \
 A node can use one or more known relay candidates:
 
 ```text
-msh-peer-sidecar \
+fcp-peer-sidecar \
   --listen /ip4/0.0.0.0/tcp/0 \
   --relay /dns4/relay.example.org/tcp/4001/p2p/<relay-peer-id>
 ```
@@ -52,7 +52,7 @@ Relay-client mode enables:
 - DCUtR hole punching for attempted upgrade from a relayed connection to a direct connection;
 - identify-based address observations required by reachability and hole-punching mechanisms.
 
-A relay address is a transport route only. Existing MSH application encryption, signed stream openings, enrolled node identities, replay checks and storage authority validation remain unchanged.
+A relay address is a transport route only. Existing FCP application encryption, signed stream openings, enrolled node identities, replay checks and storage authority validation remain unchanged.
 
 ## Bounded relay service
 
@@ -84,7 +84,7 @@ relay_service_enabled
 private_reachability_forced
 ```
 
-The Python client continues to consume `peer_id` and `listen_addrs`; additive fields do not change the existing packet-channel contract. Public MSH transport status still must not expose peer IDs, multiaddresses or backend locations.
+The Python client continues to consume `peer_id` and `listen_addrs`; additive fields do not change the existing packet-channel contract. Public FCP transport status still must not expose peer IDs, multiaddresses or backend locations.
 
 ## Acceptance coverage
 
@@ -94,7 +94,7 @@ The focused Go tests prove:
 2. target peer identity must still match the supplied multiaddress;
 3. a bounded relay service accepts an explicit circuit-v2 reservation from a private test client;
 4. a second relay-capable client can dial the reserved peer through a constructed circuit-v2 route;
-5. the existing opaque MSH wire message crosses a connection reported by libp2p as `Limited`, proving circuit-v2 carriage rather than a direct socket;
+5. the existing opaque FCP wire message crosses a connection reported by libp2p as `Limited`, proving circuit-v2 carriage rather than a direct socket;
 6. the reservation returns the configured circuit duration and data limits;
 7. relay-client readiness reports static AutoRelay, hole-punching and reachability configuration accurately;
 8. malformed, duplicate, conflicting or circuit-containing relay bootstrap configuration fails closed;

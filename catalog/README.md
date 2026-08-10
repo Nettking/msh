@@ -1,6 +1,6 @@
 # Script catalog and analysis workflow
 
-`catalog/` contains the analysis scripts, source connectors, and shared helpers used by the Flask-first MSH workflow. This page is intentionally focused on script discovery, script categories, and how analysis outputs fit into a workflow session. Runtime architecture and operator procedures live in the main `docs/` directory; use this page as the canonical script catalog.
+`catalog/` contains the analysis scripts, source connectors, and shared helpers used by the Flask-first FCP workflow. This page is intentionally focused on script discovery, script categories, and how analysis outputs fit into a workflow session. Runtime architecture and operator procedures live in the main `docs/` directory; use this page as the canonical script catalog.
 
 ## How scripts are discovered
 
@@ -53,7 +53,7 @@ Source connectors prepare input data and should not be treated as one-shot analy
 
 | Folder | Role |
 | --- | --- |
-| `observer_phoenix` | Synchronize SKF Observer Phoenix trend measurements into MSH-normalized JSONL. |
+| `observer_phoenix` | Synchronize SKF Observer Phoenix trend measurements into FCP-normalized JSONL. |
 
 Run source connectors directly from the command line, then rebuild the telemetry analytics cache when the synchronized data should be visible through cache-aware paths.
 
@@ -73,13 +73,13 @@ Hidden tools may still be useful, but they should be operated from their own REA
 
 ## Script execution model
 
-When a script runs for a workflow session, MSH creates an isolated workspace under:
+When a script runs for a workflow session, FCP creates an isolated workspace under:
 
 ```text
 results/workflows/<session-id>/runs/<script>/<timestamp>/
 ```
 
-The repository `catalog/` tree is copied into that workspace. Workflow session-filtered data is linked or copied into the workspace as `data/`. Environment variables such as `MSH_SESSION_ID`, `MSH_SESSION_DIR`, and `MSH_RUN_DIR` identify the active workflow session and run directory.
+The repository `catalog/` tree is copied into that workspace. Workflow session-filtered data is linked or copied into the workspace as `data/`. Environment variables such as `FCP_SESSION_ID`, `FCP_SESSION_DIR`, and `FCP_RUN_DIR` identify the active workflow session and run directory.
 
 Scripts should write outputs inside their run workspace unless they intentionally use documented shared paths. Script status, exit code, output path, duration, and last-run time are tracked in `session_state.json`.
 

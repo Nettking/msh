@@ -197,7 +197,7 @@ class LiveStorageNodeAgent:
             await self.storage.endpoint.start()
             self._control_task = asyncio.create_task(
                 self._control_loop(),
-                name=f"msh-storage-control-{self.node_id}",
+                name=f"fcp-storage-control-{self.node_id}",
             )
             if latest is None:
                 self.control_waiting_event.set()
@@ -223,7 +223,7 @@ class LiveStorageNodeAgent:
             await self.client.announce_capability(self.storage.capability())
             self._connection_task = asyncio.create_task(
                 self._connection_watch_loop(),
-                name=f"msh-storage-connection-watch-{self.node_id}",
+                name=f"fcp-storage-connection-watch-{self.node_id}",
             )
         except BaseException:
             await self.close(error_code="storage-control-bootstrap-failed")

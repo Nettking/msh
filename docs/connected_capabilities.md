@@ -1,33 +1,33 @@
 # Connected capabilities
 
-MSH can keep the web workbench on one device and use a capability contributed by another device. The first supported shared capability is an Ollama language-model provider. Phase F7 adds a logical runtime that can keep several trusted language-model providers registered in the same session and select per request by explicit model, modality, availability, exclusion, and capacity policy.
+FCP can keep the web workbench on one device and use a capability contributed by another device. The first supported shared capability is an Ollama language-model provider. Phase F7 adds a logical runtime that can keep several trusted language-model providers registered in the same session and select per request by explicit model, modality, availability, exclusion, and capacity policy.
 
 The common phone setup remains:
 
 ```text
 Android phone                         Laptop
-MSH webapp + repository context  ->  Ollama API + language model
+FCP webapp + repository context  ->  Ollama API + language model
 http://127.0.0.1:5000                http://<laptop-ip>:11434
 ```
 
-The MSH device sends the repository question and retrieved repository context to the selected provider. Raw telemetry remains excluded from the AI context by default.
+The FCP device sends the repository question and retrieved repository context to the selected provider. Raw telemetry remains excluded from the AI context by default.
 
-## Install the MSH provider on the laptop
+## Install the FCP provider on the laptop
 
-The recommended provider is installed from the MSH repository. Only Docker and Git are required on the laptop:
+The recommended provider is installed from the FCP repository. Only Docker and Git are required on the laptop:
 
 ```bash
-git clone https://github.com/Nettking/msh.git
-cd msh
+git clone <repository-url> fcp
+cd fcp
 docker compose --profile provider run --rm model-provider-install
 ```
 
-The first run pulls the Ollama container and the default `edge-small` model (`smollm2:360m`). It starts a headless MSH provider on port `11434`; it does not start a second Flask workbench. The model remains in the persistent `model_provider_models` Docker volume, so ordinary restarts and repository updates do not download it again.
+The first run pulls the Ollama container and the default `edge-small` model (`smollm2:360m`). It starts a headless FCP provider on port `11434`; it does not start a second Flask workbench. The model remains in the persistent `model_provider_models` Docker volume, so ordinary restarts and repository updates do not download it again.
 
 An equivalent setup-helper command is:
 
 ```bash
-python setup_msh.py --mode language-model-provider --ai-profile edge-small --start --pull-model
+python setup_fcp.py --mode language-model-provider --ai-profile edge-small --start --pull-model
 ```
 
 Verify or control the provider from the laptop:
@@ -48,9 +48,9 @@ curl http://192.168.1.50:11434/api/tags
 
 The response should be JSON containing a `models` list.
 
-## Connect MSH to the laptop
+## Connect FCP to the laptop
 
-In MSH:
+In FCP:
 
 1. Open the mobile menu and select **System -> Connections**.
 2. Enable the AI explainer.
@@ -60,7 +60,7 @@ In MSH:
 6. Select **Test provider connection**.
 7. Continue to the model step, select **Edge small**, then save.
 
-The connection test reads `/api/tags` from the provider and updates the model readiness shown in setup. AI Explainer then uses the saved provider immediately; changing the configured connection does not require rebuilding MSH.
+The connection test reads `/api/tags` from the provider and updates the model readiness shown in setup. AI Explainer then uses the saved provider immediately; changing the configured connection does not require rebuilding FCP.
 
 ## Logical provider runtime
 
@@ -86,7 +86,7 @@ The AI page and JSON response may show a safe provider label, logical capability
 
 A language-model provider is an inference capability only. Registration or selection does not grant storage read, storage write, leadership, database access, artifact access, session administration, or permission to execute shell commands.
 
-Repository context supplied to AI remains selected by the MSH application. Protected job inputs and artifacts require their own short-lived, job-scoped authorization. Cross-session provider registration and cross-session requests fail closed.
+Repository context supplied to AI remains selected by the FCP application. Protected job inputs and artifacts require their own short-lived, job-scoped authorization. Cross-session provider registration and cross-session requests fail closed.
 
 Ollama must remain private. Do not publish port `11434` to the internet or treat provider status as proof that the endpoint is authenticated. Use a trusted LAN, VPN, or a separately approved authenticated transport.
 
@@ -98,11 +98,11 @@ The F7.7 AI queue is bounded but process-local rather than a durable distributed
 
 ## Troubleshooting
 
-If the MSH connection test fails:
+If the FCP connection test fails:
 
 - confirm both devices are on the same trusted LAN or VPN;
 - confirm the URL uses the laptop's address, not `localhost` or `127.0.0.1`;
-- run `curl http://<laptop-ip>:11434/api/tags` from the MSH device;
+- run `curl http://<laptop-ip>:11434/api/tags` from the FCP device;
 - run `docker compose --profile provider ps model-provider` on the laptop;
 - check the laptop's private-network firewall rule for TCP `11434`;
 - avoid guest Wi-Fi/client-isolation networks, which prevent devices from reaching each other.

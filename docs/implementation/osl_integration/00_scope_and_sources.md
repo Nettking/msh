@@ -4,7 +4,7 @@ Status: planning scope established; implementation has not started.
 
 This document fixes the evidence baseline, authority boundary, and production
 order for a docs-only implementation plan. It is useful independently as the
-scope contract for later planning and does not define an implemented MSH
+scope contract for later planning and does not define an implemented FCP
 contract.
 
 ## Classification markers
@@ -13,10 +13,10 @@ The plan uses these markers whenever a statement could otherwise blur research,
 current software, or a product proposal:
 
 - `paper-defined`: stated by an analyzed paper or one of its authoritative
-  supporting artefacts. This does not by itself make the statement an MSH
+  supporting artefacts. This does not by itself make the statement an FCP
   product guarantee.
-- `existing-in-MSH`: verified in the analyzed MSH source tree at the SHA below.
-- `proposed-for-MSH`: a design or delivery recommendation made by this plan,
+- `existing-in-FCP`: verified in the analyzed FCP source tree at the SHA below.
+- `proposed-for-FCP`: a design or delivery recommendation made by this plan,
   not current behavior.
 - `requires-research-clarification`: ambiguous, inconsistent, unevaluated, or
   outside the papers' demonstrated claims; it must not silently become a
@@ -25,7 +25,7 @@ current software, or a product proposal:
 ## Goal
 
 Produce a source-traceable, phased implementation plan for making OSL a real,
-versioned language capability in MSH and for supporting the Notebook-to-OSL
+versioned language capability in FCP and for supporting the Notebook-to-OSL
 elicitation workflow. The plan must preserve the separation between evidence,
 interpretation, recommendation, human approval, authorized action, and
 observed outcome.
@@ -40,9 +40,9 @@ than as the whole language or its primary contribution.
 - Extract the normative and non-normative OSL requirements from
   `systems-paper`, including abstract syntax, relations, well-formedness,
   lifecycle, review meaning, provenance, uncertainty, and representations.
-- Map relevant MSH capture, storage, provenance, AI, authorization, Flask/UI,
+- Map relevant FCP capture, storage, provenance, AI, authorization, Flask/UI,
   federation, capability, event, audit, import/export, test, and CI behavior.
-- Translate the Notebook-to-OSL method in `paper-repo` into an explicit MSH
+- Translate the Notebook-to-OSL method in `paper-repo` into an explicit FCP
   candidate workflow while preserving unchanged source material.
 - Define target components, contracts, file locations, boundaries, migrations,
   user journeys, validation, tests, and small implementation phases.
@@ -74,7 +74,7 @@ updated with an explanation.
 
 | Repository | Analyzed commit SHA | Role in this plan | Initial source orientation |
 | --- | --- | --- | --- |
-| `Nettking/msh` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` | Application and implementation target | `existing-in-MSH`: current `main` already contains operator capture/review/strategy services, OSL/SysML export surfaces, local/federated storage, capability authority, AI integration, Flask UI, and Linux/Windows checks; exact guarantees still require file-level analysis. |
+| `this repository` | `f580c71f7269643a077cc7e7db8ba9bf6050bb6a` | Application and implementation target | `existing-in-FCP`: current `main` already contains operator capture/review/strategy services, OSL/SysML export surfaces, local/federated storage, capability authority, AI integration, Flask UI, and Linux/Windows checks; exact guarantees still require file-level analysis. |
 | `Nettking/systems-paper` | `ff098ce52f15b489b6a07d5b55c6c788d862e3be` | OSL v0.1 representation source | `paper-defined`: repository instructions identify `sysml/osl-core.sysml` as the preliminary authoritative abstract syntax and the paper sections and validation artefacts as its semantic and evidence boundary. |
 | `Nettking/paper-repo` | `abe3fbcddee590c3f399b06f63cb329e8615977c` | Notebook-to-OSL elicitation source | `paper-defined`: repository instructions assign this paper the field-note workflow, annotation schema, candidate clarification/validation, and model-readiness criteria. |
 
@@ -91,10 +91,10 @@ citations and may refine the preliminary observations without changing the SHA.
 - `paper-defined`: OSL v0.1 is design-time and preliminary. Domain review of
   represented meaning is not operational validation, safety assurance, or
   recommender performance evidence.
-- `existing-in-MSH`: similarly named capture, strategy, lifecycle, export, AI,
+- `existing-in-FCP`: similarly named capture, strategy, lifecycle, export, AI,
   storage, capability, and federation functions already exist. Name overlap
   does not establish semantic conformance to either paper.
-- `proposed-for-MSH`: generated candidates remain non-canonical until explicit
+- `proposed-for-FCP`: generated candidates remain non-canonical until explicit
   human review and approval; approval still does not grant operational,
   compute, storage, or execution authority.
 - `requires-research-clarification`: any operational binding, executable OSL
@@ -135,7 +135,7 @@ The exact section-level map will be recorded in the following documents.
   `concept-brief.md`, `knowledge-base.md`, `outline.md`, and manuscript sections
   `03_research_design.tex` through `07_discussion.tex`, especially
   `04_method.tex`, `05_annotation_schema.tex`, and `06_illustrative_case.tex`.
-- `msh`: repository and architecture docs; operator capture, review, strategy,
+- `fcp`: repository and architecture docs; operator capture, review, strategy,
   lifecycle, and OSL export routes/services/templates/tests; storage and data
   contracts; AI routes/services; capability and federation authority code;
   event/audit paths; import/export code; and `.github/workflows`.
@@ -146,7 +146,7 @@ Each document is completed and committed before the next begins.
 
 1. `00_scope_and_sources.md` — this scope contract and SHA baseline.
 2. `01_language_requirements.md` — OSL language core and traceability matrix.
-3. `02_current_msh_architecture.md` — verified reusable and incompatible MSH
+3. `02_current_fcp_architecture.md` — verified reusable and incompatible FCP
    surfaces.
 4. `03_target_architecture.md` — component boundaries, authority, and read/write
    flows.
@@ -168,11 +168,11 @@ Each document is completed and committed before the next begins.
   different terms or strength of obligation.
 - The Notebook-to-OSL paper may demonstrate a research method without defining
   production lifecycle, authorization, or storage requirements.
-- Existing MSH operator-strategy names may conceal materially different domain
+- Existing FCP operator-strategy names may conceal materially different domain
   semantics or lifecycle states.
 - Existing mutable files or projections may not preserve immutable evidence,
   version lineage, and reviewer attribution.
-- MSH federation and capability authority could be accidentally confused with
+- FCP federation and capability authority could be accidentally confused with
   OSL approval; the plan must fence these concepts explicitly.
 - A serializer-first design could make SysML v2 or JSON accidental sources of
   truth and lose language semantics.
@@ -187,21 +187,21 @@ Each document is completed and committed before the next begins.
   rules are normative when paper prose, `osl-core.sysml`, semantic projections,
   examples, or evaluation tables disagree?
 - `requires-research-clarification`: Is OSL v0.1 the first supported external
-  language identifier, or should MSH distinguish paper artefact version from
+  language identifier, or should FCP distinguish paper artefact version from
   its own compatibility profile?
 - `requires-research-clarification`: What exact act changes a candidate from the
   elicitation method into an OSL source fragment, and whose review is required?
 - `requires-research-clarification`: Does "validated" mean only content
   commitments plus intended domain review in every paper artefact, and should
-  MSH avoid that overloaded label in favor of distinct structural and review
+  FCP avoid that overloaded label in favor of distinct structural and review
   states?
 - `requires-research-clarification`: Are fragment identity, composition,
   supersession, and version compatibility defined strongly enough for durable
   product contracts?
-- `requires-research-clarification`: Which existing MSH records are genuine
+- `requires-research-clarification`: Which existing FCP records are genuine
   evidence candidates versus operational telemetry or UI projections that must
   remain only externally referenced?
-- `requires-research-clarification`: Is publication an MSH-local canonical state,
+- `requires-research-clarification`: Is publication an FCP-local canonical state,
   a federation-visible projection, or a future governance concern?
 - `requires-research-clarification`: Should SysML v2 import be supported in the
   first compatibility profile, or export only until round-trip semantics are

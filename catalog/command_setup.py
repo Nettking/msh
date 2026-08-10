@@ -1,4 +1,4 @@
-"""Role-free command deployment planning for scripted MSH installs.
+"""Role-free command deployment planning for scripted FCP installs.
 
 Command profiles are local process-composition choices. They are deliberately
 separate from capability onboarding and contribution authority. Technical AI and
@@ -27,7 +27,7 @@ from catalog.flask_app.services.server_setup_service import (
 COMMAND_PROFILES: dict[str, dict[str, object]] = {
     "workbench": {
         "label": "Workbench",
-        "description": "Start the normal MSH product; capability intent decides optional contributions.",
+        "description": "Start the normal FCP product; capability intent decides optional contributions.",
         "skip_orchestration": False,
     },
     "web-only": {
@@ -179,26 +179,26 @@ def env_lines_for_plan(plan: CommandDeploymentPlan) -> list[str]:
     config = plan.config
     lines = [
         f"COMPOSE_PROFILES={plan.compose_profile}",
-        f"MSH_SKIP_ORCHESTRATION={'1' if plan.skip_orchestration else '0'}",
-        "MSH_SCAN_DIRS=results,data",
-        f"MSH_AI_PROFILE={config.ai_profile}",
-        f"MSH_AI_MODEL={config.ai_model}",
+        f"FCP_SKIP_ORCHESTRATION={'1' if plan.skip_orchestration else '0'}",
+        "FCP_SCAN_DIRS=results,data",
+        f"FCP_AI_PROFILE={config.ai_profile}",
+        f"FCP_AI_MODEL={config.ai_model}",
         f"OLLAMA_BASE_URL={config.ollama_base_url}",
-        f"MSH_RECORDER_SOURCES={config.recorder_sources}",
-        "MSH_RECORDER_DATA_DIR=data",
-        "MSH_RECORDER_STATE_FILE=data/source_state/mtconnect_recorder_state.json",
-        f"MSH_RECORDER_POLL_INTERVAL={config.recorder_poll_interval}",
-        "MSH_RECORDER_FLUSH_INTERVAL=1.0",
-        "MSH_RECORDER_REQUEST_TIMEOUT=1.0",
-        "MSH_RECORDER_INCLUDE_CONDITION="
+        f"FCP_RECORDER_SOURCES={config.recorder_sources}",
+        "FCP_RECORDER_DATA_DIR=data",
+        "FCP_RECORDER_STATE_FILE=data/source_state/mtconnect_recorder_state.json",
+        f"FCP_RECORDER_POLL_INTERVAL={config.recorder_poll_interval}",
+        "FCP_RECORDER_FLUSH_INTERVAL=1.0",
+        "FCP_RECORDER_REQUEST_TIMEOUT=1.0",
+        "FCP_RECORDER_INCLUDE_CONDITION="
         + ("true" if config.recorder_include_condition else "false"),
     ]
     if plan.provider_node:
         lines.extend(
             [
-                "MSH_PROVIDER_BIND=0.0.0.0",
-                "MSH_PROVIDER_PORT=11434",
-                f"MSH_PROVIDER_MODEL={config.ai_model}",
+                "FCP_PROVIDER_BIND=0.0.0.0",
+                "FCP_PROVIDER_PORT=11434",
+                f"FCP_PROVIDER_MODEL={config.ai_model}",
             ]
         )
     return lines

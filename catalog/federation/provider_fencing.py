@@ -12,8 +12,8 @@ from typing import Any
 
 from .errors import FederationValidationError
 
-PROVIDER_FENCE_SCHEMA = "msh.storage_provider_fence.v1"
-PROVIDER_GRANT_SCHEMA = "msh.storage_provider_authority_grant.v1"
+PROVIDER_FENCE_SCHEMA = "fcp.storage_provider_fence.v1"
+PROVIDER_GRANT_SCHEMA = "fcp.storage_provider_authority_grant.v1"
 
 
 def _text(value: Any, field: str) -> str:

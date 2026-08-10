@@ -173,7 +173,7 @@ def test_recorder_snapshot_uses_capability_config_when_authorized(monkeypatch) -
     class Recorder:
         def web_status(self, supplied):
             seen["config"] = supplied
-            return {"schema": "msh.recorder.web_status.v1", "state": "recording"}
+            return {"schema": "fcp.recorder.web_status.v1", "state": "recording"}
 
     monkeypatch.setattr(
         capability_product_routes,

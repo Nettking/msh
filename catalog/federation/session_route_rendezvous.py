@@ -14,7 +14,7 @@ from .direct_peer import DirectPeerDescriptor
 from .errors import FederationValidationError, ProtocolCompatibilityError
 from .peer_stream import validate_peer_public_text
 
-SESSION_ROUTE_DESCRIPTOR_SCHEMA = "msh.session_route.descriptor.v1"
+SESSION_ROUTE_DESCRIPTOR_SCHEMA = "fcp.session_route.descriptor.v1"
 SESSION_ROUTE_PROTOCOL_VERSION = "1.0"
 SESSION_ROUTE_PROTOCOL_MAJOR = 1
 MIN_ROUTE_TTL_SECONDS = 5

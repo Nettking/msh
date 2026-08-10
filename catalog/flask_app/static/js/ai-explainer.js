@@ -18,7 +18,7 @@
 
     const roleLabel = document.createElement("div");
     roleLabel.className = "ai-message__role";
-    roleLabel.textContent = role === "user" ? "You" : "MSH";
+    roleLabel.textContent = role === "user" ? "You" : "FCP";
 
     const bubble = document.createElement("div");
     bubble.className = "ai-message__bubble";
@@ -38,7 +38,7 @@
   const appendPendingMessage = () => {
     const { message, bubble } = createMessage("assistant", "ai-message--pending");
     message.setAttribute("role", "status");
-    message.setAttribute("aria-label", `MSH is working with ${provider}`);
+    message.setAttribute("aria-label", `FCP is working with ${provider}`);
 
     const thinking = document.createElement("div");
     thinking.className = "ai-thinking";

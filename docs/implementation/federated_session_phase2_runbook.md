@@ -1,11 +1,11 @@
 # Phase 2 relay-first session runbook
 
 This runbook operates the Phase 2 federated-session control plane and two node
-agents. The relay is an independent process; Flask remains the local MSH
+agents. The relay is an independent process; Flask remains the local FCP
 workbench and is not the distributed coordinator.
 
 The relay feature is opt-in. Ordinary `docker compose up` behavior is unchanged,
-and a local MSH installation remains usable when no relay is running.
+and a local FCP installation remains usable when no relay is running.
 
 ## Transport and identity choices
 
@@ -51,7 +51,7 @@ The effective service command is:
 
 ```bash
 python -m catalog.relay.service serve \
-  --database /var/lib/msh-relay/control.sqlite3 \
+  --database /var/lib/fcp-relay/control.sqlite3 \
   --host 0.0.0.0 \
   --port 8765 \
   --unsafe-development-plaintext
@@ -170,7 +170,7 @@ Compose, run the administration command against the same relay volume:
 ```bash
 docker compose --profile relay run --rm --no-deps relay \
   python -m catalog.relay.service create-enrollment-token \
-  --database /var/lib/msh-relay/control.sqlite3 \
+  --database /var/lib/fcp-relay/control.sqlite3 \
   --ttl-seconds 900 \
   --max-uses 1
 ```
@@ -386,7 +386,7 @@ Revoke by stable node ID and record a reason:
 ```bash
 docker compose --profile relay run --rm --no-deps relay \
   python -m catalog.relay.service revoke-node \
-  --database /var/lib/msh-relay/control.sqlite3 \
+  --database /var/lib/fcp-relay/control.sqlite3 \
   --node-id NODE_B_ID \
   --reason "Phase 2 revocation test"
 ```
@@ -404,7 +404,7 @@ Inspect the redacted audit view:
 ```bash
 docker compose --profile relay run --rm --no-deps relay \
   python -m catalog.relay.service audit-status \
-  --database /var/lib/msh-relay/control.sqlite3 \
+  --database /var/lib/fcp-relay/control.sqlite3 \
   --node-id NODE_B_ID
 ```
 
@@ -418,7 +418,7 @@ complete authorized snapshot before reconciling durable memberships.
 
 ## Stop the relay
 
-Stop the opt-in service without changing the default MSH services:
+Stop the opt-in service without changing the default FCP services:
 
 ```bash
 docker compose --profile relay stop relay
@@ -438,7 +438,7 @@ membership, event, and audit state is explicitly intended.
 
 This deployment does not implement PR D through PR G features:
 
-- no `msh-storage-v1`, PostgreSQL provider, recorder-batch replication,
+- no `fcp-storage-v1`, PostgreSQL provider, recorder-batch replication,
   primary/replica assignment, storage acknowledgement policy, or storage
   fencing writes from PR D;
 - no completeness manifests, replica repair, automatic promotion, or storage

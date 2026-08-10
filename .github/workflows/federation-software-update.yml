@@ -64,7 +64,7 @@ jobs:
           $tokens = $null
           $errors = $null
           [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path 'scripts/windows/msh_update_agent.ps1'),
+            (Resolve-Path 'scripts/windows/fcp_update_agent.ps1'),
             [ref]$tokens,
             [ref]$errors
           ) | Out-Null
@@ -72,8 +72,8 @@ jobs:
             $errors | Format-List | Out-String | Write-Error
             exit 1
           }
-          $state = Join-Path $env:RUNNER_TEMP 'msh-update-agent-smoke'
-          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\msh_update_agent.ps1 `
+          $state = Join-Path $env:RUNNER_TEMP 'fcp-update-agent-smoke'
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\fcp_update_agent.ps1 `
             -RepoRoot (Resolve-Path '.').Path `
             -DataDirectory $state `
             -Once
@@ -84,7 +84,7 @@ jobs:
         shell: bash
         run: |
           bash -n start.sh
-          python scripts/posix/msh_update_agent.py \
+          python scripts/posix/fcp_update_agent.py \
             --repo-root "$PWD" \
-            --data-directory "$RUNNER_TEMP/msh-update-agent-smoke" \
+            --data-directory "$RUNNER_TEMP/fcp-update-agent-smoke" \
             --once

@@ -118,7 +118,7 @@ def _write_checkpoint(
     path.write_text(
         json.dumps(
             {
-                "schema": "msh.mtconnect_recorder.checkpoints.v3",
+                "schema": "fcp.mtconnect_recorder.checkpoints.v3",
                 "updated_at": "2026-08-09T03:00:04Z",
                 "sources": {"Mazak": checkpoint.to_dict()},
             },
@@ -198,7 +198,7 @@ def test_reconcile_publishes_detailed_observations_and_keeps_local_jsonl(tmp_pat
     assert payload["dataset_schema_name"] == RECORDER_DATASET_SCHEMA_NAME
     assert payload["dataset_schema_version"] == 1
     content = payload["content"]
-    assert content["schema"] == "msh.mtconnect.observations.v1"
+    assert content["schema"] == "fcp.mtconnect.observations.v1"
     assert [row["sequence"] for row in content["observations"]] == [10, 11, 12]
     assert content["observations"][0]["data_item_id"] == "xp"
     assert "Xabs" not in content["observations"][0]
@@ -408,7 +408,7 @@ def test_large_committed_batch_is_split_at_observation_boundaries(tmp_path):
     manifest_path.write_text(
         json.dumps(
             {
-                "schema": "msh.mtconnect.raw_batch_manifest.v1",
+                "schema": "fcp.mtconnect.raw_batch_manifest.v1",
                 "source_name": source,
                 "agent_instance_id": instance,
                 "requested_from": 1,

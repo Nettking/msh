@@ -43,20 +43,20 @@ class OperatorConfirmationService:
 
     def _load(self) -> dict[str, Any]:
         if not self.path.exists():
-            return {"schema": "msh.operator_confirmations.v1", "updated_at": "", "confirmations": []}
+            return {"schema": "fcp.operator_confirmations.v1", "updated_at": "", "confirmations": []}
         try:
             payload = json.loads(self.path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            return {"schema": "msh.operator_confirmations.v1", "updated_at": "", "confirmations": []}
+            return {"schema": "fcp.operator_confirmations.v1", "updated_at": "", "confirmations": []}
         if not isinstance(payload, dict):
-            return {"schema": "msh.operator_confirmations.v1", "updated_at": "", "confirmations": []}
+            return {"schema": "fcp.operator_confirmations.v1", "updated_at": "", "confirmations": []}
         payload.setdefault("confirmations", [])
         payload["confirmations"] = [item for item in payload["confirmations"] if isinstance(item, dict)]
         return payload
 
     def _write(self, payload: dict[str, Any]) -> None:
         payload = dict(payload)
-        payload["schema"] = "msh.operator_confirmations.v1"
+        payload["schema"] = "fcp.operator_confirmations.v1"
         payload["updated_at"] = _now_utc()
         self.path.parent.mkdir(parents=True, exist_ok=True)
         tmp = self.path.with_suffix(self.path.suffix + ".tmp")

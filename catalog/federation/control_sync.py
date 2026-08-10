@@ -23,9 +23,9 @@ from .errors import FederationValidationError
 from .phase_d_control import PhaseDControlPlane
 from .storage_control_plane import StorageProviderRegistration
 
-STORAGE_CONTROL_PLAN_SCHEMA = "msh.storage_control_plan.v1"
-STORAGE_CONTROL_RELAY_KIND = "msh-storage-control-v1"
-STORAGE_CONTROL_RESULT_SCHEMA = "msh.storage_control_apply_result.v1"
+STORAGE_CONTROL_PLAN_SCHEMA = "fcp.storage_control_plan.v1"
+STORAGE_CONTROL_RELAY_KIND = "fcp-storage-control-v1"
+STORAGE_CONTROL_RESULT_SCHEMA = "fcp.storage_control_apply_result.v1"
 
 
 def _text(value: Any, field: str) -> str:

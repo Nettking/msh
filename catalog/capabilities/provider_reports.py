@@ -18,11 +18,11 @@ from catalog.federation.redaction import (
     contains_secret_material,
 )
 
-PROVIDER_REPORT_PROTOCOL = "msh-capability-provider-report"
+PROVIDER_REPORT_PROTOCOL = "fcp-capability-provider-report"
 PROVIDER_REPORT_PROTOCOL_VERSION = "1.0"
 PROVIDER_REPORT_PROTOCOL_MAJOR = 1
-PROVIDER_REPORT_SCHEMA = "msh.capability-provider-report.v1"
-SELECTION_POLICY_SCHEMA = "msh.capability-selection-policy.v1"
+PROVIDER_REPORT_SCHEMA = "fcp.capability-provider-report.v1"
+SELECTION_POLICY_SCHEMA = "fcp.capability-selection-policy.v1"
 MAX_PROVIDER_REPORT_BYTES = 131_072
 MAX_TEXT_BYTES = 512
 MAX_REPORT_TTL_SECONDS = 3_600
@@ -30,7 +30,7 @@ MAX_CONCURRENT_JOBS = 1_000_000
 MAX_QUEUE_DEPTH = 1_000_000
 UTILIZATION_SCALE = 1_000
 
-_SCHEMA_RE = re.compile(r"^(?P<name>msh\.[a-z0-9.-]+)\.v(?P<major>[0-9]+)$")
+_SCHEMA_RE = re.compile(r"^(?P<name>fcp\.[a-z0-9.-]+)\.v(?P<major>[0-9]+)$")
 
 
 class ProviderStatus(str, Enum):

@@ -44,7 +44,7 @@ class Inventory:
                 Descriptor(
                     "safe-handler",
                     "synthetic-compute",
-                    "msh-synthetic",
+                    "fcp-synthetic",
                     "1.0",
                     "sha256:" + "a" * 64,
                 )
@@ -119,7 +119,7 @@ def test_candidates_use_inspection_and_benchmark_only_as_evidence() -> None:
             StorageCandidateSource(
                 {
                     "storage-local": StorageCandidateSpec(
-                        "storage-local", "msh-storage", "Local storage", {}
+                        "storage-local", "fcp-storage", "Local storage", {}
                     )
                 }
             ),

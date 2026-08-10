@@ -6,7 +6,7 @@ Reviewed: **2026-08-07 Europe/Oslo**
 
 ## Repository state
 
-- Repository: `Nettking/msh`
+- Repository: `this repository`
 - Default branch: `main`
 - Documentation hierarchy established by PR #191
 - Published Federation v1 release tag: not created
@@ -68,13 +68,13 @@ Authoritative execution plan:
 
 W3 end-to-end acceptance scenario:
 
-- [Notebook-to-OSL method alignment](../planned-work/method-osl-msh-alignment.md)
+- [Notebook-to-OSL method alignment](../planned-work/method-osl-fcp-alignment.md)
 
 Current OSL reality:
 
 - source, architecture, contract, workflow, file, UI, validation, migration, and delivery analysis exists;
-- the supporting MSH analysis was pinned to an older snapshot and every integration seam must be revalidated against current `main`;
-- no accepted MSH OSL profile, human-authority policy, or compatibility policy has been merged;
+- the supporting FCP analysis was pinned to an older snapshot and every integration seam must be revalidated against current `main`;
+- no accepted FCP OSL profile, human-authority policy, or compatibility policy has been merged;
 - no canonical `catalog/osl/` production package, persistence, API, UI, AI integration, migration, or current SysML v2 adapter exists;
 - W3 is a multi-delivery acceptance scenario, not permission to implement the entire workflow in one PR.
 

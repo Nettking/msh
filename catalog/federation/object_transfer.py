@@ -15,9 +15,9 @@ from .errors import (
     ProtocolCompatibilityError,
 )
 
-OBJECT_TRANSFER_MANIFEST_SCHEMA = "msh.object_transfer.manifest.v1"
-OBJECT_TRANSFER_CHUNK_SCHEMA = "msh.object_transfer.chunk.v1"
-OBJECT_TRANSFER_RECEIPT_SCHEMA = "msh.object_transfer.receipt.v1"
+OBJECT_TRANSFER_MANIFEST_SCHEMA = "fcp.object_transfer.manifest.v1"
+OBJECT_TRANSFER_CHUNK_SCHEMA = "fcp.object_transfer.chunk.v1"
+OBJECT_TRANSFER_RECEIPT_SCHEMA = "fcp.object_transfer.receipt.v1"
 OBJECT_TRANSFER_PROTOCOL_VERSION = "1.0"
 OBJECT_TRANSFER_PROTOCOL_MAJOR = 1
 

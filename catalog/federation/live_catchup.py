@@ -39,9 +39,9 @@ from .storage_protocol import (
     WriteAuthority,
 )
 
-LIVE_CATCHUP_KIND = "msh-storage-catchup-v1"
-LIVE_CATCHUP_SCHEMA = "msh.live_storage_catchup.v1"
-LIVE_CATCHUP_RESULT_SCHEMA = "msh.live_storage_catchup_result.v1"
+LIVE_CATCHUP_KIND = "fcp-storage-catchup-v1"
+LIVE_CATCHUP_SCHEMA = "fcp.live_storage_catchup.v1"
+LIVE_CATCHUP_RESULT_SCHEMA = "fcp.live_storage_catchup_result.v1"
 
 _STATE_PLANNED = "planned"
 _STATE_TRANSFERRING = "transferring"

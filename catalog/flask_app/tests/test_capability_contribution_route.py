@@ -58,7 +58,7 @@ class InspectionBenchmarkAdapter:
     definition = BenchmarkDefinition(
         benchmark_id=BENCHMARK_ID,
         capability_type="language-model",
-        capability_protocol="msh-language-model",
+        capability_protocol="fcp-language-model",
         implementation_version="1.0.0",
         max_duration_seconds=2,
         max_parallelism=1,
@@ -99,7 +99,7 @@ class InspectionBenchmarkAdapter:
 class Descriptor:
     handler_id: str = HANDLER_ID
     capability_type: str = "synthetic-compute"
-    protocol: str = "msh-synthetic"
+    protocol: str = "fcp-synthetic"
     protocol_version: str = "1.0"
     descriptor_fingerprint: str = "sha256:" + "c" * 64
 
@@ -152,7 +152,7 @@ class AuthorityHarness:
                 {
                     AI_ID: AICandidateSpec(
                         service_id=AI_ID,
-                        protocol="msh-language-model",
+                        protocol="fcp-language-model",
                         display_label="Local AI",
                         capacity_envelope={"model": "fixture-model"},
                     )
@@ -163,7 +163,7 @@ class AuthorityHarness:
                 {
                     STORAGE_ID: StorageCandidateSpec(
                         provider_id=STORAGE_ID,
-                        protocol="msh-storage",
+                        protocol="fcp-storage",
                         display_label="Local storage",
                         capacity_envelope={"capacity_band": "small"},
                     )

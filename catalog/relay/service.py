@@ -434,10 +434,10 @@ class RelayServer:
             raise RelayConfigurationError("relay did not create a listening socket")
         self._bound_port = int(sockets[0].getsockname()[1])
         self._sweep_task = asyncio.create_task(
-            self._stale_sweep_loop(), name="msh-relay-stale-sweep"
+            self._stale_sweep_loop(), name="fcp-relay-stale-sweep"
         )
         LOGGER.info(
-            "MSH relay listening with %s transport on %s:%d",
+            "FCP relay listening with %s transport on %s:%d",
             "TLS" if self.is_tls else "loopback plaintext",
             self.host,
             self.bound_port,
@@ -474,7 +474,7 @@ class RelayServer:
         await server.wait_closed()
         self._server = None
         self._bound_port = None
-        LOGGER.info("MSH relay stopped")
+        LOGGER.info("FCP relay stopped")
 
     async def serve_forever(self) -> None:
         await self.start()
@@ -902,7 +902,7 @@ class RelayServer:
             queue=asyncio.Queue(maxsize=self.outbound_queue_size),
         )
         record.writer_task = asyncio.create_task(
-            self._writer(record), name=f"msh-relay-writer-{node_id}"
+            self._writer(record), name=f"fcp-relay-writer-{node_id}"
         )
         async with self._connections_lock:
             previous = self._connections.get(node_id)
@@ -1793,7 +1793,7 @@ class RelayServer:
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="python -m catalog.relay.service",
-        description="MSH relay-first Phase 2 control-plane service",
+        description="FCP relay-first Phase 2 control-plane service",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
@@ -1968,7 +1968,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(
                 json.dumps(
                     {
-                        "schema": "msh.relay.audit_status.v1",
+                        "schema": "fcp.relay.audit_status.v1",
                         "entries": _redact_secret_fields(visible_entries),
                     },
                     ensure_ascii=False,

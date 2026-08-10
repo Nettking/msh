@@ -109,7 +109,7 @@ def test_existing_ai_answer_uses_multi_provider_logical_runtime(
     )
 
     result = ai_routes._answer_question(
-        "How does MSH work?",
+        "How does FCP work?",
         model="model-large",
         base_url="http://private-provider:11434",
         provider_name="Configured provider",

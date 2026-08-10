@@ -137,7 +137,7 @@ def _intents(value: object) -> dict[str, str]:
 class CapabilityStartupState(OnboardingModel):
     """Local startup intent. It is not a grant or runtime authority record."""
 
-    SCHEMA: ClassVar[str] = "msh.onboarding.v1"
+    SCHEMA: ClassVar[str] = "fcp.onboarding.v1"
 
     device_id: str
     federation_id: str
@@ -860,8 +860,8 @@ class CapabilityStartupTransitionService:
                         "transition_action": None,
                         "next_action": {
                             "title": "Setup complete",
-                            "message": "Continue to MSH when you are ready.",
-                            "label": "Continue to MSH",
+                            "message": "Continue to FCP when you are ready.",
+                            "label": "Continue to FCP",
                             "url": "/",
                         },
                     }
@@ -930,7 +930,7 @@ class CapabilityStartupTransitionService:
         elif isinstance(finish, dict):
             finish["transition_action"] = None
         view_model["storage_key"] = str(
-            view_model.get("storage_key") or "msh.onboarding.pending"
+            view_model.get("storage_key") or "fcp.onboarding.pending"
         ).replace(".cfi5", ".cfi6")
         return view_model
 

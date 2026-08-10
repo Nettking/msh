@@ -1,5 +1,5 @@
 {
-  "schema": "msh.cf7.physical-evidence.v2",
+  "schema": "fcp.cf7.physical-evidence.v2",
   "commit_sha": "0000000000000000000000000000000000000000",
   "executed_at": "1970-01-01T00:00:00Z",
   "operator": "REPLACE WITH OPERATOR NAME",

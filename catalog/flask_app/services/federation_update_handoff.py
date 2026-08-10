@@ -1,7 +1,7 @@
 """Bounded file handoff from the Flask container to the host update agent.
 
 The Flask process never receives shell, Git, Docker, or host filesystem authority.
-It may only write one declarative request into the existing bind-mounted MSH data
+It may only write one declarative request into the existing bind-mounted FCP data
 folder and read the agent's bounded result. The host agent independently
 revalidates every security-sensitive field before mutating the checkout/runtime.
 """
@@ -25,8 +25,8 @@ from catalog.federation.software_update import (
     UpdateInspection,
 )
 
-REQUEST_SCHEMA = "msh.host-update-request.v1"
-RESULT_SCHEMA = "msh.host-update-result.v1"
+REQUEST_SCHEMA = "fcp.host-update-request.v1"
+RESULT_SCHEMA = "fcp.host-update-result.v1"
 MAX_HANDOFF_BYTES = 8192
 ACTIVATION_GRACE_SECONDS = 2
 HOST_REQUEST_TTL_SECONDS = 120

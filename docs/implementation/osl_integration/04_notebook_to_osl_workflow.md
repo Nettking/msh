@@ -1,4 +1,4 @@
-# Notebook-to-OSL workflow in MSH
+# Notebook-to-OSL workflow in FCP
 
 Status: source-traceable product workflow proposal; no workflow state or service
 is implemented by this document.
@@ -9,7 +9,7 @@ Primary method source: `Nettking/paper-repo` at commit
 Language boundary source: `Nettking/systems-paper` at commit
 `ff098ce52f15b489b6a07d5b55c6c788d862e3be`.
 
-MSH baseline: `f580c71f7269643a077cc7e7db8ba9bf6050bb6a`.
+FCP baseline: `f580c71f7269643a077cc7e7db8ba9bf6050bb6a`.
 
 ## What the paper establishes
 
@@ -18,7 +18,7 @@ paper. The repository labels the paper `drafting` and the manuscript a
 `strengthened-first-draft`; empirical material and operator/domain-expert
 validation remain future work (`papers/notebook-to-osl/paper.yaml` lines 1--3
 and 50--61). These are method requirements and research proposals, not
-empirically validated MSH guarantees.
+empirically validated FCP guarantees.
 
 ### Six design requirements
 
@@ -78,20 +78,20 @@ interpretation, validation outcome, and candidate model fragment
 - No role for AI in segmentation, classification, annotation, clarification,
   review, or transformation.
 
-Every product mechanism below is therefore `proposed-for-MSH` unless explicitly
+Every product mechanism below is therefore `proposed-for-FCP` unless explicitly
 marked otherwise.
 
 ## Required orthogonal state dimensions
 
 The paper's status lists mix transformation stage, review outcome, and
-confidentiality. MSH must not implement one overloaded enum.
+confidentiality. FCP must not implement one overloaded enum.
 
 | Dimension | Proposed values | Meaning |
 | --- | --- | --- |
 | Capture session | `draft`, `open`, `closed`, `restricted` | Whether scoped capture may occur; not fragment status. |
 | Source artefact | `captured`, `sealed`, `quarantined`, `access_restricted` | Integrity/access state of original material; bytes remain immutable. |
 | Extraction | `unassessed`, `selected`, `not_selected`, `extracted_candidate`, `discarded_candidate` | Relevance/derivation stage; none is canonical OSL. |
-| Fragment workflow | `draft`, `in_review`, `reviewed`, `approved`, `published`, `rejected`, `deprecated`, `superseded` | MSH product lifecycle over immutable revisions. |
+| Fragment workflow | `draft`, `in_review`, `reviewed`, `approved`, `published`, `rejected`, `deprecated`, `superseded` | FCP product lifecycle over immutable revisions. |
 | OSL maturity | provisional, structurally complete, domain reviewed | `paper-defined` systems-paper language maturity, evaluated separately. |
 | Reviewer disposition | `accepted`, `corrected`, `narrowed`, `rejected`, `disputed`, `pending` | Human decision over an exact scope/revision. |
 | Confidentiality | deployment-approved taxonomy, including a sensitive/restricted class | Orthogonal access/export constraint; not a lifecycle state. |
@@ -116,7 +116,7 @@ approval,” with the exact predicate/profile.
 | AI candidate generator | Suggest excerpts, classifications, fields, questions, and candidate structure. | Candidate-only; no canonical writes, review, approval, evidence verification, publication, or execution. |
 | System/repository | Enforce immutability, revision, idempotency, referential integrity, and event append. | Does not decide domain truth or user permission. |
 
-## End-to-end MSH workflow
+## End-to-end FCP workflow
 
 ### Step 0: establish capture scope, roles, consent, and confidentiality
 
@@ -183,7 +183,7 @@ approval,” with the exact predicate/profile.
 - **Paper basis:** `paper-defined` raw capture must remain available because
   later interpretation may change (`05_annotation_schema.tex` lines 27--50;
   `07_discussion.tex` lines 4--8). Cryptographic immutability is
-  `proposed-for-MSH` hardening.
+  `proposed-for-FCP` hardening.
 - **Primary actor:** system transaction following an authorized capture; human
   can inspect but not alter bytes.
 - **Input:** captured content, metadata, session/policy revision, command ID.
@@ -332,7 +332,7 @@ approval,” with the exact predicate/profile.
   author a provisional model with gaps before domain review
   (`systems-paper/tex/sections/osl_workflow_roles.tex` lines 14--18).
   `paper-repo` expects review before model-ready treatment. The combined
-  product behavior below is `proposed-for-MSH`.
+  product behavior below is `proposed-for-FCP`.
 - **Primary actor:** OSL modeller/annotator.
 - **Input:** selected candidate claims, explicit element/relation types, source/
   evidence references, language profile, gaps, and optional base revision.
@@ -426,7 +426,7 @@ bounded” as an approval bypass.
 ### Step 10: product approval
 
 - **Paper boundary:** product approval is not defined by either paper.
-  `proposed-for-MSH` adds it so domain review cannot silently become publication
+  `proposed-for-FCP` adds it so domain review cannot silently become publication
   or authority.
 - **Primary actor:** authenticated approver with configured scope and separation
   of duties.
@@ -455,7 +455,7 @@ bounded” as an approval bypass.
 ### Step 11: publish a design-time fragment or export projection
 
 - **Paper boundary:** the papers do not define publication or activation.
-  `proposed-for-MSH` supports publication only. Runtime activation is a non-goal.
+  `proposed-for-FCP` supports publication only. Runtime activation is a non-goal.
 - **Primary actor:** authenticated publisher; automated retry may complete the
   same already-authorized idempotent command.
 - **Input:** exact approved revision/hash, audience/site scope, publication
@@ -488,7 +488,7 @@ revision, evidence, and authority boundaries.
 ### Step 12: record feedback, revise, supersede, or deprecate
 
 - **Paper boundary:** post-candidate feedback/lifecycle is not defined in
-  `paper-repo`. `proposed-for-MSH` adds a durable loop.
+  `paper-repo`. `proposed-for-FCP` adds a durable loop.
 - **Primary actor:** operator/researcher records source/feedback; modeller
   revises; reviewer/approver/publisher govern later transitions.
 - **Input:** published revision reference, new source artefact/excerpt,
@@ -520,7 +520,7 @@ revision, evidence, and authority boundaries.
 
 These issues remain visible requirements, not silent implementation choices.
 
-| ID | `requires-research-clarification` | Evidence | Conservative MSH treatment |
+| ID | `requires-research-clarification` | Evidence | Conservative FCP treatment |
 | --- | --- | --- | --- |
 | WQ-01 | Validation order conflicts. | `outline.md` lines 35--42 creates OSL candidates before review; `04_method.tex` lines 70--76 reviews before model-ready transformation. | Allow non-canonical extracted candidate/provisional draft before review; forbid approved/model-ready/published treatment before human review. |
 | WQ-02 | Illustrative case emits OSL despite an unresolved validation need. | `06_illustrative_case.tex` lines 42 and 49--65. | Treat case as a draft fixture only; unresolved needs remain gaps and block approval per policy. |
@@ -540,7 +540,7 @@ These issues remain visible requirements, not silent implementation choices.
 ## AI authority contract for the workflow
 
 `paper-defined`: the paper assigns interpretation and validation to humans and
-does not evaluate AI. Therefore all AI behavior is `proposed-for-MSH` and must
+does not evaluate AI. Therefore all AI behavior is `proposed-for-FCP` and must
 meet these invariants:
 
 - AI may suggest source segments, relevance categories, field values,

@@ -9,7 +9,7 @@ from catalog.common.telemetry_cache import default_cache_dir, rebuild_cache
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Rebuild the MSH telemetry Parquet cache from raw JSONL files.")
+    parser = argparse.ArgumentParser(description="Rebuild the FCP telemetry Parquet cache from raw JSONL files.")
     parser.add_argument("--data-dir", default="data", help="Directory to scan recursively for raw *.jsonl telemetry files.")
     parser.add_argument("--cache-dir", default=None, help="Output directory for partitioned Parquet cache files.")
     return parser.parse_args()

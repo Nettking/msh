@@ -12,8 +12,8 @@ def test_only_canonical_approved_remote_is_accepted() -> None:
     assert approved("git@github.com:Nettking/msh.git")
     assert approved("ssh://git@github.com/Nettking/msh")
     assert not approved("https://token@github.com/Nettking/msh.git")
-    assert not approved("https://github.com/attacker/msh.git")
-    assert not approved("file:///tmp/msh")
+    assert not approved("https://github.com/attacker/fcp.git")
+    assert not approved("file:///tmp/fcp")
 
 
 class _Runner:

@@ -4,7 +4,7 @@ Status: **current user guide**
 
 Reviewed: **2026-08-07**
 
-This guide describes normal operation after MSH starts. It does not assign the device one permanent server role.
+This guide describes normal operation after FCP starts. It does not assign the device one permanent server role.
 
 ## First use
 
@@ -75,11 +75,11 @@ Compatibility settings do not define the device’s product identity and do not 
 
 ## Recommended operator workflow
 
-1. Start MSH using `start.cmd` or the documented Compose command.
+1. Start FCP using `start.cmd` or the documented Compose command.
 2. Complete Identity, Federation, and Inspect when onboarding is incomplete.
 3. Open Federation Overview and confirm the expected device and connection state.
 4. Configure supported machine sources under System -> Sources.
-5. Test MTConnect and network reachability from the MSH runtime.
+5. Test MTConnect and network reachability from the FCP runtime.
 6. Enable recording explicitly only after the intended sources are verified.
 7. Use Monitor -> Live or Playback to inspect telemetry.
 8. Run optional benchmarks only when suitability or capacity evidence is needed.
@@ -102,7 +102,7 @@ A base adapter address may be normalized to the supported MTConnect endpoint, fo
 
 ### Network test
 
-The network test opens a bounded TCP connection from the MSH runtime to the configured host and port. It proves application-level reachability, not the operating system’s VPN state and not Federation trust.
+The network test opens a bounded TCP connection from the FCP runtime to the configured host and port. It proves application-level reachability, not the operating system’s VPN state and not Federation trust.
 
 ## Recording
 

@@ -22,7 +22,7 @@ on:
       - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
       - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
       - "catalog/relay/tests/test_phase_f662_route_rendezvous.py"
-      - "cmd/msh-peer-sidecar/**"
+      - "cmd/fcp-peer-sidecar/**"
       - "docs/federated_session_network.md"
       - "docs/implementation/federation/history/handoffs/federated_session_agent_handoff.md"
       - "docs/implementation/federated_session_test_matrix.md"
@@ -58,7 +58,7 @@ on:
       - "catalog/node/tests/test_phase_f642_verified_chunk_transfer.py"
       - "catalog/node/tests/test_phase_f65_resumable_chunk_transfer.py"
       - "catalog/relay/tests/test_phase_f662_route_rendezvous.py"
-      - "cmd/msh-peer-sidecar/**"
+      - "cmd/fcp-peer-sidecar/**"
       - "docs/federated_session_network.md"
       - "docs/implementation/federation/history/handoffs/federated_session_agent_handoff.md"
       - "docs/implementation/federated_session_test_matrix.md"
@@ -98,7 +98,7 @@ jobs:
           cache: pip
       - uses: actions/setup-go@v5
         with:
-          go-version-file: "cmd/msh-peer-sidecar/go.mod"
+          go-version-file: "cmd/fcp-peer-sidecar/go.mod"
           cache: false
       - name: Install dependencies
         run: |
@@ -106,7 +106,7 @@ jobs:
           python -m pip install -r requirements.txt -c constraints-phase2.txt
           python -m pip install pytest ruff
       - name: Verify Go node-agent boundary
-        working-directory: cmd/msh-peer-sidecar
+        working-directory: cmd/fcp-peer-sidecar
         run: |
           go mod tidy
           git diff --exit-code -- go.mod go.sum

@@ -15,7 +15,7 @@ def _candidate() -> SimpleNamespace:
         capability_type="storage",
         capacity_envelope={
             "authority": "candidate-only",
-            "provider_id": "msh-local-data-storage",
+            "provider_id": "fcp-local-data-storage",
         },
     )
 

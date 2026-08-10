@@ -172,7 +172,7 @@ def test_web_status_excludes_debug_paths_and_log_tail(tmp_path) -> None:
 
     payload = service.web_status(_config())
 
-    assert payload["schema"] == "msh.recorder.web_status.v1"
+    assert payload["schema"] == "fcp.recorder.web_status.v1"
     assert payload["poll_after_ms"] == 2000
     assert payload["sources"][0]["source_name"] == "IG500"
     assert "control_path" not in payload

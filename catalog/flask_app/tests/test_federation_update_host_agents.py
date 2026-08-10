@@ -6,7 +6,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_windows_agent_has_fixed_safe_mutation_boundary() -> None:
-    text = (ROOT / "scripts/windows/msh_update_agent.ps1").read_text(
+    text = (ROOT / "scripts/windows/fcp_update_agent.ps1").read_text(
         encoding="utf-8"
     )
 
@@ -14,7 +14,7 @@ def test_windows_agent_has_fixed_safe_mutation_boundary() -> None:
     assert "$ApprovedBranch = 'main'" in text
     assert "merge', '--ff-only'" in text
     assert "'compose', 'build', 'relay', 'flask', 'recorder'" in text
-    assert "MSH_BUILD_COMMIT" in text
+    assert "FCP_BUILD_COMMIT" in text
     assert "runtime_verified" in text
     assert "Ensure-OllamaModel" in text
     assert "Start-ReplacementAgent" in text
@@ -37,12 +37,12 @@ def test_windows_agent_has_fixed_safe_mutation_boundary() -> None:
 
 
 def test_posix_agent_never_executes_peer_supplied_process_shape() -> None:
-    text = (ROOT / "scripts/posix/msh_update_agent.py").read_text(encoding="utf-8")
+    text = (ROOT / "scripts/posix/fcp_update_agent.py").read_text(encoding="utf-8")
 
     assert 'APPROVED_REPOSITORY = "Nettking/msh"' in text
     assert 'APPROVED_BRANCH = "main"' in text
     assert 'git(root, "merge", "--ff-only", target)' in text
-    assert 'env["MSH_BUILD_COMMIT"] = target' in text
+    assert 'env["FCP_BUILD_COMMIT"] = target' in text
     assert 'state="runtime_verified"' in text
     assert "ensure_ollama_model(root, env)" in text
     assert "os.execv(" in text
@@ -66,12 +66,12 @@ def test_supported_launchers_start_agent_and_embed_build_commit() -> None:
     windows = (ROOT / "start.cmd").read_text(encoding="utf-8")
     posix = (ROOT / "start.sh").read_text(encoding="utf-8")
 
-    assert "msh_update_agent.ps1" in windows
-    assert "MSH_BUILD_COMMIT" in windows
+    assert "fcp_update_agent.ps1" in windows
+    assert "FCP_BUILD_COMMIT" in windows
     assert "docker compose build relay flask recorder" in windows
     assert "git status --porcelain=v1 --untracked-files=all" in windows
-    assert "msh_update_agent.py" in posix
-    assert "MSH_BUILD_COMMIT" in posix
+    assert "fcp_update_agent.py" in posix
+    assert "FCP_BUILD_COMMIT" in posix
     assert "docker compose build relay flask recorder" in posix
     assert "git status --porcelain=v1 --untracked-files=all" in posix
 
@@ -82,7 +82,7 @@ def test_runtime_images_bake_build_identity() -> None:
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
 
     for text in (dockerfile, cli):
-        assert "ARG MSH_BUILD_COMMIT=unknown" in text
-        assert "MSH_BUILD_COMMIT=${MSH_BUILD_COMMIT}" in text
-        assert "no.msh.build_commit=${MSH_BUILD_COMMIT}" in text
-    assert compose.count("MSH_BUILD_COMMIT: ${MSH_BUILD_COMMIT:-unknown}") >= 3
+        assert "ARG FCP_BUILD_COMMIT=unknown" in text
+        assert "FCP_BUILD_COMMIT=${FCP_BUILD_COMMIT}" in text
+        assert "no.fcp.build_commit=${FCP_BUILD_COMMIT}" in text
+    assert compose.count("FCP_BUILD_COMMIT: ${FCP_BUILD_COMMIT:-unknown}") >= 3

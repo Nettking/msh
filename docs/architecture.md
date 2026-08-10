@@ -1,14 +1,14 @@
-# MSH architecture
+# FCP architecture
 
 Status: **current architecture reference**
 
 Reviewed: **2026-08-07 Europe/Oslo**
 
-MSH is a Flask-first CNC telemetry workbench with a trusted multi-device Federation layer. Local telemetry, operator workflows, and analysis remain usable without remote providers. Federation adds authenticated device identity, membership, capability contribution, storage authority, jobs, transport, and recovery without moving those authorities into the Flask request process.
+FCP is a Flask-first CNC telemetry workbench with a trusted multi-device Federation layer. Local telemetry, operator workflows, and analysis remain usable without remote providers. Federation adds authenticated device identity, membership, capability contribution, storage authority, jobs, transport, and recovery without moving those authorities into the Flask request process.
 
 ## Product model
 
-One installation is one persistent MSH device.
+One installation is one persistent FCP device.
 
 A device may combine:
 
@@ -138,14 +138,14 @@ The current boundaries include:
 - one logical committed result;
 - least-privilege job-scoped artifact authorization and verified publication.
 
-MSH does not transfer arbitrary executable code to compute providers.
+FCP does not transfer arbitrary executable code to compute providers.
 
 ## Recorder and telemetry data flow
 
 ```mermaid
 flowchart LR
     S[MTConnect and supported sources] --> R[Recorder or source connector]
-    R --> J[MSH-normalized JSONL]
+    R --> J[FCP-normalized JSONL]
     R --> W[Source and recorder state]
     J --> C[Telemetry cache and date discovery]
     C --> F[Workflow session and filtering]

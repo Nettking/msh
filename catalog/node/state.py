@@ -1091,7 +1091,7 @@ class NodeState:
                 "persisted capability is invalid",
             ) from exc
         return {
-            "schema": "msh.node_status.v1",
+            "schema": "fcp.node_status.v1",
             "node_id": runtime["node_id"],
             "enrollment_state": runtime["enrollment_state"],
             "connection_state": runtime["connection_state"],
