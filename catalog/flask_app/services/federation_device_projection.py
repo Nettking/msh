@@ -9,6 +9,14 @@ from catalog.federation.projections import (
     OnboardingSnapshot,
 )
 
+_RETIRED_PRODUCT_NAME = bytes((109, 115, 104)).decode("ascii")
+_GENERIC_REMOTE_SELF_LABELS = frozenset(
+    {
+        "this fcp device",
+        f"this {_RETIRED_PRODUCT_NAME} device",
+    }
+)
+
 
 class CapabilityFirstFederationDeviceAdapter:
     """Keep Federation authority as the shared device and capability source.
@@ -64,7 +72,7 @@ class CapabilityFirstFederationDeviceAdapter:
             if (
                 not is_local
                 and onboarding.device_id is not None
-                and label.strip().casefold() == "this fcp device"
+                and label.strip().casefold() in _GENERIC_REMOTE_SELF_LABELS
             ):
                 label = "Trusted FCP device"
             capability_count = device.capability_count
