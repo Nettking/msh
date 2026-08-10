@@ -394,3 +394,44 @@ def test_report_payload_is_bounded_to_safe_update_fields() -> None:
         "message",
         "reported_at",
     }
+
+
+def test_report_parser_accepts_legacy_empty_running_commit_as_unknown() -> None:
+    payload = report_payload(
+        request_id="check-legacy",
+        node_id=NODE,
+        result=UpdateInspection(
+            "up_to_date",
+            TARGET,
+            TARGET,
+            running_commit=TARGET,
+        ),
+    )
+    payload["running_commit"] = ""
+
+    parsed = events.inspection_from_report(payload)
+
+    assert parsed is not None
+    request_id, node_id, result = parsed
+    assert request_id == "check-legacy"
+    assert node_id == NODE
+    assert result.state == "up_to_date"
+    assert result.current_commit == TARGET
+    assert result.target_commit == TARGET
+    assert result.running_commit is None
+
+
+def test_report_parser_rejects_nonempty_invalid_running_commit() -> None:
+    payload = report_payload(
+        request_id="check-invalid",
+        node_id=NODE,
+        result=UpdateInspection(
+            "up_to_date",
+            TARGET,
+            TARGET,
+            running_commit=TARGET,
+        ),
+    )
+    payload["running_commit"] = "main"
+
+    assert events.inspection_from_report(payload) is None
