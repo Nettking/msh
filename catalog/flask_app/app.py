@@ -29,6 +29,7 @@ from .capability_startup_transition_routes import (
 from .data_upload_routes import data_upload_web
 from .docs_routes import docs_web
 from .federation_pairing_routes import federation_pairing_web
+from .federation_recorder_routes import federation_recorder_web
 from .federation_routes import federation_web
 from .operator_strategy_routes import operator_strategy_web
 from .operator_support_routes import operator_support_web
@@ -281,6 +282,7 @@ def create_app() -> Flask:
     app.register_blueprint(docs_web)
     app.register_blueprint(federation_web)
     app.register_blueprint(federation_pairing_web)
+    app.register_blueprint(federation_recorder_web)
     app.register_blueprint(capability_startup_transition_web)
     app.register_blueprint(capability_contribution_web)
     app.register_blueprint(capability_benchmark_web)
