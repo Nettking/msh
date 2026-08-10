@@ -6,8 +6,8 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
-from catalog.mtconnect_recorder import *  # noqa: E402,F401,F403
-from catalog.mtconnect_recorder.config_bootstrap import (  # noqa: E402
+from catalog.mtconnect_recorder import *
+from catalog.mtconnect_recorder.config_bootstrap import (
     ensure_recorder_capability_config,
 )
 
