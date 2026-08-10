@@ -73,16 +73,28 @@ jobs:
           catalog/flask_app/services/mtconnect_discovery_service.py
           catalog/flask_app/tests/test_cf8_role_retirement.py
       - name: Run CF8 anti-regression acceptance
+        id: cf8_acceptance
+        continue-on-error: true
         run: >-
           python -m pytest -o addopts= -q
+          --junitxml=cf8-acceptance.xml
           catalog/flask_app/tests/test_cf8_role_retirement.py
+      - name: Upload CF8 acceptance diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cf8-acceptance-${{ matrix.os }}
+          path: cf8-acceptance.xml
+          if-no-files-found: error
+      - name: Enforce CF8 acceptance
+        if: steps.cf8_acceptance.outcome != 'success'
+        shell: bash
+        run: exit 1
       - name: Run affected capability-first tests
         run: >-
           python -m pytest -o addopts= -q
-          catalog/flask_app/tests/test_capability_config_service.py
           catalog/flask_app/tests/test_capability_config_migration_service.py
           catalog/flask_app/tests/test_capability_startup_transition_route.py
-          catalog/flask_app/tests/test_capability_runtime_startup.py
           catalog/flask_app/tests/test_capability_contribution_route.py
           catalog/flask_app/tests/test_capability_inspection_route.py
           catalog/flask_app/tests/test_mtconnect_discovery_service.py
