@@ -36,6 +36,7 @@ jobs:
           catalog/flask_app/tests/test_federation_update_runtime.py
           catalog/flask_app/tests/test_federation_update_orchestration.py
           catalog/flask_app/tests/test_federation_update_host_agents.py
+          catalog/flask_app/tests/test_windows_migration_script.py
       - name: Run update contract tests
         run: >-
           python -m pytest -o addopts= -q
@@ -43,6 +44,7 @@ jobs:
           catalog/flask_app/tests/test_federation_update_runtime.py
           catalog/flask_app/tests/test_federation_update_orchestration.py
           catalog/flask_app/tests/test_federation_update_host_agents.py
+          catalog/flask_app/tests/test_windows_migration_script.py
       - name: Ruff update Python
         # TRY004: malformed event fields intentionally use the same ValueError
         # contract as the rest of the bounded protocol validator.
@@ -56,6 +58,7 @@ jobs:
           catalog/flask_app/tests/test_federation_update_runtime.py
           catalog/flask_app/tests/test_federation_update_orchestration.py
           catalog/flask_app/tests/test_federation_update_host_agents.py
+          catalog/flask_app/tests/test_windows_migration_script.py
 
       - name: Parse and smoke Windows host agent
         if: runner.os == 'Windows'
