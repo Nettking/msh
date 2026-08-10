@@ -1,8 +1,8 @@
 """Read-only parser for supported role-first installation upgrades.
 
 This module is the only product-side boundary allowed to understand the retired
-``server_settings.json`` shape.  It never writes the legacy file and none of its
-values grant runtime or contribution authority.  The parsed snapshot exists only
+``server_settings.json`` shape. It never writes the legacy file and none of its
+values grant runtime or contribution authority. The parsed snapshot exists only
 long enough to produce a deterministic capability-first migration preview and
 technical ``CapabilityConfig``.
 """
@@ -88,13 +88,33 @@ def _boolean(payload: dict[str, Any], key: str, default: bool) -> bool:
     return value
 
 
+def _untouched_phone_bootstrap(payload: dict[str, Any]) -> bool:
+    """Recognize the historical auto-written phone default without mutating it."""
+
+    if "user_setup_complete" in payload:
+        return False
+    return (
+        bool(payload.get("configured"))
+        and payload.get("deployment_mode") == "web-workbench"
+        and not bool(payload.get("ai_enabled"))
+        and str(payload.get("ai_provider_mode") or "local") == "local"
+        and str(payload.get("ollama_base_url") or DEFAULT_OLLAMA_BASE_URL)
+        == DEFAULT_OLLAMA_BASE_URL
+        and not str(payload.get("recorder_sources") or "").strip()
+        and str(payload.get("recorder_poll_interval") or "0.2") == "0.2"
+        and not bool(payload.get("recorder_include_condition"))
+    )
+
+
 def load_legacy_settings(
     path: Path | str = LEGACY_SETTINGS_PATH,
 ) -> LegacySettingsSnapshot | None:
-    """Read one supported legacy file without mutating it or supplying defaults.
+    """Read one supported legacy file without mutating it.
 
-    A missing file means there is no migration input.  Malformed or unsupported
+    A missing file means there is no migration input. Malformed or unsupported
     input fails explicitly so migration cannot silently reinterpret authority.
+    Historical phone defaults that were written before the user saw setup are
+    deterministically treated as incomplete rather than as an accepted role.
     """
 
     path = Path(path)
@@ -124,6 +144,9 @@ def load_legacy_settings(
         "user_setup_complete",
         configured,
     )
+    if _untouched_phone_bootstrap(payload):
+        user_setup_complete = False
+
     ai_enabled = _boolean(payload, "ai_enabled", True)
     provider_mode = str(
         payload.get("ai_provider_mode") or DEFAULT_AI_PROVIDER_MODE
