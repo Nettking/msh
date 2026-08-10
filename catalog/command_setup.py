@@ -223,7 +223,7 @@ def pull_connected_model(
     try:
         with request.urlopen(req, timeout=timeout_seconds) as response:
             body = response.read().decode("utf-8")
-    except Exception as exc:  # pragma: no cover - depends on remote Ollama runtime
+    except (OSError, TimeoutError) as exc:  # pragma: no cover - remote runtime
         return False, f"Could not pull {config.ai_model}: {exc}"
     provider_name = config.ai_provider_name or "Connected computer"
     return True, (
