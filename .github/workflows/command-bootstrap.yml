@@ -82,16 +82,23 @@ jobs:
           catalog/flask_app/tests/test_connected_ai_provider.py
           catalog/flask_app/tests/test_termux_phone_script.py
 
-      - name: Run command and Termux regressions
+      - name: Run cross-platform command and runtime regressions
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_command_setup.py
           catalog/flask_app/tests/test_capability_runtime_startup.py
           catalog/flask_app/tests/test_connected_ai_provider.py
-          catalog/flask_app/tests/test_termux_phone_script.py
           catalog/flask_app/tests/test_recorder_config_bootstrap.py
+          catalog/flask_app/tests/test_termux_phone_script.py::test_phone_setup_uses_capability_config_without_creating_a_new_role
+
+      - name: Run Termux execution regressions
+        if: runner.os == 'Linux'
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_termux_phone_script.py
 
       - name: Validate Termux shell syntax
+        if: runner.os == 'Linux'
         shell: bash
         run: |
           bash -n termux/setup-phone.sh
