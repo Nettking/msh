@@ -118,6 +118,45 @@ def test_device_service_count_uses_ready_shared_capabilities_only() -> None:
     assert federation.devices[1].capability_count == 3
 
 
+def test_retired_remote_self_label_is_normalized_for_current_viewer() -> None:
+    retired_name = bytes((109, 115, 104)).decode("ascii").upper()
+    federation = FederationAuthoritySnapshot(
+        available=True,
+        reason_code="current",
+        label="Shared Federation",
+        state="active",
+        revision=8,
+        devices=(
+            DeviceRecord("node-local", "This FCP device", "connected", NOW, 1),
+            DeviceRecord(
+                "node-remote",
+                f"This {retired_name} device",
+                "connected",
+                NOW,
+                1,
+            ),
+        ),
+    )
+    onboarding = OnboardingSnapshot(
+        available=True,
+        reason_code="current",
+        federation_id="federation-local",
+        connection_state="connected",
+        trusted=True,
+        device_id="node-local",
+    )
+
+    snapshot = CapabilityFirstFederationDeviceAdapter(
+        _StaticAdapter(federation),
+        _StaticAdapter(onboarding),
+        _StaticAdapter(object()),
+    ).snapshot()
+
+    by_id = {device.node_id: device for device in snapshot.devices}
+    assert by_id["node-local"].label == "This FCP device"
+    assert by_id["node-remote"].label == "Trusted FCP device"
+
+
 def test_device_service_count_keeps_aggregate_for_legacy_snapshot() -> None:
     federation = FederationAuthoritySnapshot(
         available=True,
