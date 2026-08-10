@@ -24,7 +24,6 @@ from catalog.flask_app.services.capability_config_service import (
 from catalog.flask_app.services.server_setup_service import (
     SETTINGS_PATH,
     default_settings,
-    load_settings,
     save_settings,
 )
 
