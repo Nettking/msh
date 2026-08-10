@@ -36,6 +36,9 @@ from .capability_onboarding_routes import (
     _secure_response,
     _validate_server_bound_request,
 )
+from .services.capability_config_migration_service import (
+    persist_capability_config_from_setup,
+)
 from .services.capability_contribution_service import (
     get_capability_contribution_service,
 )
@@ -141,6 +144,9 @@ def _transition_message(exc: BaseException) -> str:
         ),
         "startup-transition-recorder-source-required": (
             "Select an existing recorder data source before enabling recording."
+        ),
+        "startup-transition-capability-config-failed": (
+            "Technical capability configuration could not be migrated safely."
         ),
         "candidate-selection-required": (
             "A federation was discovered. Choose and verify it before migrating."
@@ -342,6 +348,9 @@ def _run_transition(*, migration: bool) -> Response:
         assert command_id is not None
         service = get_capability_startup_transition_service()
         if migration:
+            legacy_settings = service.legacy_settings()
+            if legacy_settings is not None:
+                persist_capability_config_from_setup(legacy_settings)
             service.migrate_legacy(
                 request_id=f"flask-startup-migration-{command_id}"
             )
