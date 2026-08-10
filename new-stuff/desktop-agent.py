@@ -397,7 +397,7 @@ class SpeechWorker:
         replacements = {
             "Ollama": "Oh llama",
             "GitHub": "Git Hub",
-            "FCP": "M S H",
+            "FCP": "F C P",
             "LLM": "language model",
             "API": "A P I",
             "JSON": "J son",

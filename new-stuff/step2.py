@@ -272,7 +272,7 @@ class Speaker:
             return
 
         cleaned = " ".join(message.split())
-        cleaned = cleaned.replace("FCP", "M S H")
+        cleaned = cleaned.replace("FCP", "F C P")
         cleaned = cleaned.replace("GitHub", "Git Hub")
         cleaned = cleaned.replace("Ollama", "Oh llama")
 
@@ -302,7 +302,7 @@ def wait_for_fcp(session: requests.Session) -> None:
     deadline = time.monotonic() + SERVER_STARTUP_TIMEOUT_SECONDS
     ready_url = urljoin(FCP_BASE_URL, FCP_READY_PATH)
 
-    speak("Waiting for the M S H web application to become ready.")
+    speak("Waiting for the F C P web application to become ready.")
 
     last_error = "No response received."
 
@@ -320,7 +320,7 @@ def wait_for_fcp(session: requests.Session) -> None:
                     f"status={response.status_code}, "
                     f"url={response.url}"
                 )
-                speak("The M S H web application is responding.")
+                speak("The F C P web application is responding.")
                 return
 
             last_error = f"HTTP {response.status_code}"
@@ -498,7 +498,7 @@ def complete_first_time_setup(
     )
 
     speak(
-        "M S H requires first-time device setup. "
+        "F C P requires first-time device setup. "
         "Saving the configured web workbench settings."
     )
     log(
@@ -542,7 +542,7 @@ def choose_runtime_start(
     )
 
     speak(
-        "M S H requires a runtime choice. "
+        "F C P requires a runtime choice. "
         f"I am {spoken_mode}."
     )
     log(
@@ -638,7 +638,7 @@ def prepare_fcp_access(session: requests.Session) -> None:
             )
             speak(
                 "Setup and runtime selection are complete. "
-                "The protected M S H pages are now accessible."
+                "The protected F C P pages are now accessible."
             )
             return
 
@@ -678,7 +678,7 @@ def prepare_fcp_access(session: requests.Session) -> None:
             if accessible:
                 speak(
                     "Device setup is complete and the protected "
-                    "M S H pages are accessible."
+                    "F C P pages are accessible."
                 )
                 return
 
@@ -722,7 +722,7 @@ def prepare_fcp_access(session: requests.Session) -> None:
             if accessible:
                 speak(
                     "The runtime choice was accepted. "
-                    "The protected M S H pages are accessible."
+                    "The protected F C P pages are accessible."
                 )
                 return
 
@@ -919,7 +919,7 @@ def focus_and_maximize_browser() -> None:
 def open_default_browser(url: str) -> None:
     """Open the default Windows browser, focus it, and maximize it."""
 
-    speak("Opening the M S H page walkthrough in the default browser.")
+    speak("Opening the F C P page walkthrough in the default browser.")
     log(f"Opening default browser: {url}")
 
     if DRY_RUN:
@@ -1072,7 +1072,7 @@ def verify_browser_protected_access() -> None:
         )
 
     speak(
-        "The browser session can access the protected M S H pages."
+        "The browser session can access the protected F C P pages."
     )
 
 def safe_filename(value: str) -> str:
@@ -1446,7 +1446,7 @@ def main() -> None:
 
         speak(
             "Starting step two. "
-            "I will complete M S H setup when required, choose the "
+            "I will complete F C P setup when required, choose the "
             "configured runtime mode, and then inspect the pages without "
             "clicking their controls."
         )
