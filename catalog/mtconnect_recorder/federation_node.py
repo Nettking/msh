@@ -277,8 +277,8 @@ class RecorderFederationNode:
         self._start_publication(saved)
         return self.snapshot()
 
-    def _announce(self, state: RemotePairingState) -> None:
-        announcement = CapabilityAnnouncement(
+    def _announcement(self, state: RemotePairingState) -> CapabilityAnnouncement:
+        return CapabilityAnnouncement(
             capability_id="recorder-local",
             node_id=state.binding.device_id,
             session_id=state.binding.internal_session_id,
@@ -295,9 +295,18 @@ class RecorderFederationNode:
             },
             announced_at=datetime.now(timezone.utc),
         )
+
+    def _announce(self, state: RemotePairingState) -> None:
         self.runtime.announce_capability(
             state,
-            announcement,
+            self._announcement(state),
+            request_id=f"recorder-capability-{uuid.uuid4().hex}",
+        )
+
+    async def _announce_connected(self, state: RemotePairingState) -> None:
+        await self.runtime._announce_capability(
+            state,
+            self._announcement(state),
             request_id=f"recorder-capability-{uuid.uuid4().hex}",
         )
 
@@ -372,7 +381,7 @@ class RecorderFederationNode:
                         authority_node_id = None
                         group_id = None
                         active_client_id = id(client)
-                        self._announce(state)
+                        await self._announce_connected(state)
 
                     status = await client.coordinator_status()
                     selected = select_storage_authority(
