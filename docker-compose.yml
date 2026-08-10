@@ -101,7 +101,7 @@ services:
       - MSH_RECORDER_DATA_DIR=data
       - MSH_RECORDER_STATE_FILE=data/source_state/mtconnect_recorder_state.json
       - MSH_RECORDER_CONTROL_FILE=data/source_state/mtconnect_recorder_control.json
-      - MSH_RECORDER_SETTINGS_FILE=data/server_setup/server_settings.json
+      - MSH_RECORDER_CONFIG_FILE=data/capabilities/config.json
       - MSH_RECORDER_STATUS_FILE=data/source_state/mtconnect_recorder_status.json
       - MSH_RECORDER_LOG_FILE=data/source_state/mtconnect_recorder.log
       - MSH_RECORDER_REQUEST_TIMEOUT=${MSH_RECORDER_REQUEST_TIMEOUT:-10.0}
