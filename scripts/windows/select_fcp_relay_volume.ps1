@@ -12,6 +12,8 @@ if (Test-Path variable:PSNativeCommandUseErrorActionPreference) {
     $PSNativeCommandUseErrorActionPreference = $false
 }
 
+$FallbackProbeImage = "python:3.12-slim"
+
 function Invoke-Docker {
     param([string[]]$Arguments = @())
 
@@ -131,7 +133,8 @@ function Find-ProbeImages {
     $candidates = @(
         "fcp-relay:latest",
         "fcp-flask:latest",
-        "fcp-recorder:latest"
+        "fcp-recorder:latest",
+        $FallbackProbeImage
     )
     foreach ($container in $RelayContainers) {
         if (-not [string]::IsNullOrWhiteSpace([string]$container.image)) {
@@ -147,6 +150,33 @@ function Find-ProbeImages {
         }
     }
     return @($available | Select-Object -Unique)
+}
+
+function Ensure-FallbackProbeImage {
+    $inspection = Invoke-Docker -Arguments @("image", "inspect", $FallbackProbeImage)
+    if ($inspection.ExitCode -eq 0) {
+        return
+    }
+
+    Write-Host (
+        "No local Python-capable probe image is available; pulling {0} to inspect retained Federation volumes read-only..." -f
+        $FallbackProbeImage
+    )
+    $pull = Invoke-Docker -Arguments @("pull", $FallbackProbeImage)
+    if ($pull.ExitCode -ne 0) {
+        $detail = @($pull.Output |
+            Where-Object { -not [string]::IsNullOrWhiteSpace($_) } |
+            Select-Object -Last 8) -join [Environment]::NewLine
+        if ([string]::IsNullOrWhiteSpace($detail)) {
+            throw "Could not obtain the approved Python probe image; refusing to guess between retained relay-state volumes."
+        }
+        throw "Could not obtain the approved Python probe image; refusing to guess between retained relay-state volumes:`n$detail"
+    }
+
+    $verified = Invoke-Docker -Arguments @("image", "inspect", $FallbackProbeImage)
+    if ($verified.ExitCode -ne 0) {
+        throw "Docker reported a successful probe-image pull, but the image is still unavailable."
+    }
 }
 
 function Get-RelayCandidates {
@@ -271,8 +301,18 @@ try {
     $relayContainers = @(Get-RelayContainerInfo)
     $candidates = @(Get-RelayCandidates -RelayContainers $relayContainers)
     $images = @(Find-ProbeImages -RelayContainers $relayContainers)
-    $probes = @()
 
+    # Some legacy installations have retained relay-state volumes after their
+    # old containers/images have disappeared. If there are multiple candidates,
+    # obtain the same Python base image used by Dockerfile.cli and mount each
+    # candidate read-only so the saved node membership can identify the right
+    # state. Pulling an image does not create, remove, or modify Docker volumes.
+    if ($candidates.Count -gt 1 -and $images.Count -eq 0) {
+        Ensure-FallbackProbeImage
+        $images = @(Find-ProbeImages -RelayContainers $relayContainers)
+    }
+
+    $probes = @()
     foreach ($volume in $candidates) {
         foreach ($image in $images) {
             $probe = Get-RelayProbe `
@@ -294,22 +334,26 @@ try {
 
     $selected = ""
     if (-not [string]::IsNullOrWhiteSpace($nodeId)) {
-        $memberMatch = @($probes |
+        $memberMatches = @($probes |
             Where-Object { $_.memberships -gt 0 } |
-            Sort-Object memberships, sessions, nodes, size -Descending |
-            Select-Object -First 1)
-        if ($memberMatch.Count -gt 0) {
-            $selected = [string]($memberMatch[0].volume)
+            Sort-Object memberships, sessions, nodes, size -Descending)
+        if ($memberMatches.Count -eq 1) {
+            $selected = [string]($memberMatches[0].volume)
+        }
+        elseif ($memberMatches.Count -gt 1) {
+            throw "Saved device identity is active in multiple relay-state volumes; refusing to guess."
         }
     }
 
     if ([string]::IsNullOrWhiteSpace($selected)) {
         $populated = @($probes |
             Where-Object { $_.sessions -gt 0 -or $_.nodes -gt 0 } |
-            Sort-Object sessions, nodes, size -Descending |
-            Select-Object -First 1)
-        if ($populated.Count -gt 0) {
+            Sort-Object sessions, nodes, size -Descending)
+        if ($populated.Count -eq 1) {
             $selected = [string]($populated[0].volume)
+        }
+        elseif ($populated.Count -gt 1) {
+            throw "Multiple populated relay-state volumes exist without a unique saved-device membership; refusing to guess."
         }
     }
 
