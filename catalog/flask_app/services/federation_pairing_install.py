@@ -23,7 +23,6 @@ from .recorder_federation_publication_install import (
     install_recorder_federation_publication,
 )
 from .resilient_pairing_runtime import ResilientPairingRelayRuntime
-from .server_setup_service import load_settings
 
 _RECONNECT_EXTENSION_KEY = "federation_saved_membership_reconnect"
 _UPDATE_PROCESSOR_EXTENSION_KEY = "federation_update_event_monitor"
@@ -94,10 +93,6 @@ def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
         discovery_sources=app.config.get(
             "CAPABILITY_ONBOARDING_DISCOVERY_SOURCES",
             (),
-        ),
-        setup_loader=app.config.get(
-            "CAPABILITY_ONBOARDING_SETUP_LOADER",
-            load_settings,
         ),
         remote_store=RemotePairingStore(remote_path),
         relay_runtime=runtime,
