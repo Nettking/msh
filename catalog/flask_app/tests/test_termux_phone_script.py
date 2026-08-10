@@ -115,6 +115,7 @@ signal_phone_sessions TERM
         capture_output=True,
         text=True,
         timeout=5,
+        check=False,
     )
 
     assert result.returncode == 0, result.stderr
@@ -133,6 +134,7 @@ def test_stop_does_not_claim_success_while_http_responds(tmp_path: Path) -> None
         capture_output=True,
         text=True,
         timeout=5,
+        check=False,
     )
 
     assert result.returncode == 1
@@ -166,6 +168,7 @@ def test_existing_compatible_container_uses_fast_setup_without_pkg_or_build(tmp_
         capture_output=True,
         text=True,
         timeout=10,
+        check=False,
     )
 
     assert result.returncode == 0, result.stderr
@@ -189,6 +192,7 @@ def test_changed_runtime_signature_triggers_rebuild_without_pkg_refresh(tmp_path
         capture_output=True,
         text=True,
         timeout=10,
+        check=False,
     )
 
     assert result.returncode == 0, result.stderr
@@ -220,6 +224,7 @@ main update
         capture_output=True,
         text=True,
         timeout=5,
+        check=False,
     )
 
     assert result.returncode == 0, result.stderr
