@@ -1,9 +1,4 @@
-"""Capability-first Flask product entrypoints.
-
-Supported product requests are driven by capability configuration and current
-contribution authority. Legacy ``ServerSetupSettings`` is read only for the
-explicit read-only ``/startup`` compatibility notice.
-"""
+"""Capability-first Flask product entrypoints."""
 
 from __future__ import annotations
 
@@ -12,12 +7,10 @@ from typing import Any, Callable
 
 from flask import (
     Flask,
-    Response,
     current_app,
     jsonify,
     redirect,
     render_template,
-    request,
     url_for,
 )
 
@@ -40,28 +33,9 @@ from .services.capability_contribution_service import (
 )
 from .services.operator_scope_service import get_operator_scope_service
 from .services.recorder_control_service import get_recorder_control_service
-from .services.server_setup_service import ServerSetupError, load_settings
-
-_ALLOWED_RUNTIME_CHOICE_ENDPOINTS = frozenset(
-    {
-        "web.startup",
-        "web.choose_startup_mode",
-        "web.status",
-        "web.recorder_status_snapshot",
-        "web.rescan",
-        "web.guide",
-        "server_setup_web.scan_mtconnect_network",
-        "server_setup_web.save_discovered_mtconnect_sources",
-        "ai_web.ai_page",
-        "ai_web.ai_ask",
-    }
-)
-_SAFE_PREFIXES = ("/onboarding", "/federation", "/docs", "/static")
 
 
 def get_capability_startup_transition_service():
-    """Delegate to CFI-6 dynamically so all overrides share one authority seam."""
-
     return transition_routes.get_capability_startup_transition_service()
 
 
@@ -88,7 +62,7 @@ def _load_product_config() -> tuple[CapabilityConfig, str]:
 
 
 def _active_recorder_contribution() -> bool:
-    """Project current CF4/CFI-5 authority without consulting legacy roles."""
+    """Project current contribution authority without consulting legacy roles."""
 
     flags = _capability_flags()
     if not bool(flags.get("completed")):
@@ -124,24 +98,6 @@ def _telemetry_cache_status_model() -> dict[str, object]:
         "manifest_source_file_count": status.manifest_source_file_count,
         "last_rebuild_time": status.manifest_generated_at,
     }
-
-
-def capability_startup_mode_gate() -> Response | None:
-    """Retain the runtime-choice guard without device-role decisions."""
-
-    endpoint = request.endpoint or ""
-    if endpoint.startswith("static") or request.path.startswith(_SAFE_PREFIXES):
-        return None
-    if endpoint in _ALLOWED_RUNTIME_CHOICE_ENDPOINTS:
-        return None
-
-    flags = _capability_flags()
-    if bool(flags.get("completed")):
-        return None
-    if get_runtime_manager().requires_startup_choice():
-        next_path = request.full_path if request.query_string else request.path
-        return redirect(url_for("web.startup", next=next_path))
-    return None
 
 
 def status() -> str:
@@ -239,33 +195,16 @@ def recorder_status_snapshot():
     return _no_store_json(get_recorder_control_service().web_status(config))
 
 
-def startup() -> str:
-    """Render only the explicit read-only legacy compatibility notice."""
+def startup():
+    """Backward URL handoff only; the compatibility startup UI no longer exists."""
 
-    next_path = request.args.get("next", "/")
-    startup_state = get_runtime_manager().startup_decision_snapshot()
-    return render_template(
-        "startup.html",
-        startup_state=startup_state,
-        next_path=next_path,
-    )
+    return redirect(url_for("capability_startup_transition_web.onboarding"), code=303)
 
 
 def inject_capability_product_context() -> dict[str, object]:
-    """Expose technical recorder state and an explicit legacy startup display."""
-
     config, config_error = _load_product_config()
-    legacy_settings = None
-    legacy_error = ""
-    if request.path == "/startup":
-        try:
-            legacy_settings = load_settings()
-        except (OSError, ServerSetupError, TypeError, ValueError) as exc:
-            legacy_error = str(exc)
-
     return {
-        "server_setup_settings": legacy_settings,
-        "server_setup_error": legacy_error or config_error,
+        "capability_config_error": config_error,
         "server_setup_recorder_status": get_recorder_control_service().status(config),
     }
 
@@ -277,8 +216,6 @@ def _bind_product_route(
     endpoint: str,
     view_func: Callable[..., object],
 ) -> None:
-    """Own a stable endpoint whether or not an older blueprint defined it."""
-
     if endpoint in app.view_functions:
         app.view_functions[endpoint] = view_func
         return
@@ -286,9 +223,6 @@ def _bind_product_route(
 
 
 def install_capability_product_routes(app: Flask) -> None:
-    """Install capability-first product gates, context, and stable endpoints."""
-
-    app.before_request(capability_startup_mode_gate)
     app.context_processor(inject_capability_product_context)
     _bind_product_route(
         app,
@@ -311,7 +245,6 @@ def install_capability_product_routes(app: Flask) -> None:
 
 
 __all__ = [
-    "capability_startup_mode_gate",
     "get_capability_startup_transition_service",
     "inject_capability_product_context",
     "install_capability_product_routes",
