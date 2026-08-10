@@ -35,6 +35,11 @@ from .capability_benchmark_service import (
     CapabilityBenchmarkService,
     get_capability_benchmark_service,
 )
+from .capability_config_service import (
+    CapabilityConfig,
+    CapabilityConfigError,
+    load_capability_config,
+)
 from .capability_contribution_components import (
     default_components,
     default_policy,
@@ -47,7 +52,6 @@ from .capability_onboarding_service import (
     CapabilityOnboardingService,
     get_capability_onboarding_service,
 )
-from .server_setup_service import ServerSetupError, load_settings
 
 _SERVICE_EXTENSION_KEY = "capability_contribution_service"
 _MAX_IDENTIFIER_BYTES = 512
@@ -99,7 +103,7 @@ class CapabilityContributionService:
         state_database: Path | str,
         sources: Iterable[object] | Callable[[], Iterable[object]] | None = None,
         adapters: Sequence[object] | Callable[[], Sequence[object]] | None = None,
-        setup_loader: Callable[[], object] = load_settings,
+        config_loader: Callable[[], CapabilityConfig] = load_capability_config,
         clock: Callable[[], datetime] = _utc_now,
         candidate_ttl_seconds: int = 900,
     ) -> None:
@@ -111,17 +115,17 @@ class CapabilityContributionService:
         self.state_database = Path(state_database)
         self._configured_sources = sources
         self._configured_adapters = adapters
-        self._setup_loader = setup_loader
+        self._config_loader = config_loader
         self._clock = clock
         self._candidate_ttl_seconds = int(candidate_ttl_seconds)
         self._lock = threading.RLock()
         self._store_instance: SQLiteContributionIntentStore | None = None
         self._service_instance: ContributionService | None = None
 
-    def _setup(self) -> object | None:
+    def _config(self) -> CapabilityConfig | None:
         try:
-            return self._setup_loader()
-        except (OSError, ServerSetupError, TypeError, ValueError):
+            return self._config_loader()
+        except (OSError, CapabilityConfigError, TypeError, ValueError):
             return None
 
     @staticmethod
@@ -146,7 +150,7 @@ class CapabilityContributionService:
         if self._configured_sources is None and self._configured_adapters is None:
             return default_components(
                 onboarding_service=self.onboarding_service,
-                setup_loader=self._setup,
+                config_loader=self._config,
             )
         if self._configured_sources is None or self._configured_adapters is None:
             raise FederationValidationError(
@@ -175,7 +179,7 @@ class CapabilityContributionService:
             "CAPABILITY_ONBOARDING_CONTRIBUTION_POLICY"
         )
         if configured is None:
-            return default_policy(self._setup)
+            return default_policy(self._config)
         if not isinstance(configured, ContributionPolicyEvaluator):
             raise FederationValidationError(
                 "invalid-contribution-policy",
@@ -724,9 +728,9 @@ def get_capability_contribution_service() -> CapabilityContributionService:
         adapters=current_app.config.get(
             "CAPABILITY_ONBOARDING_CONTRIBUTION_ADAPTERS"
         ),
-        setup_loader=current_app.config.get(
-            "CAPABILITY_ONBOARDING_SETUP_LOADER",
-            load_settings,
+        config_loader=current_app.config.get(
+            "CAPABILITY_CONFIG_LOADER",
+            load_capability_config,
         ),
         clock=getattr(onboarding, "_clock", _utc_now),
         candidate_ttl_seconds=int(
