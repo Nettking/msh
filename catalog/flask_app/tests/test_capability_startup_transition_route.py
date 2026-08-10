@@ -19,18 +19,24 @@ from catalog.federation.onboarding_models import (
 from catalog.flask_app import app as app_module
 from catalog.flask_app import capability_startup_transition_routes as transition_routes
 from catalog.flask_app import routes as routes_module
-from catalog.flask_app import server_setup_routes
 from catalog.flask_app.app import create_app
 from catalog.flask_app.capability_onboarding_routes import (
     _COMMAND_SESSION_KEY,
     _CSRF_SESSION_KEY,
+)
+from catalog.flask_app.services.capability_config_service import (
+    CapabilityConfig,
+    default_capability_config,
 )
 from catalog.flask_app.services.capability_startup_transition_service import (
     CapabilityStartupState,
     CapabilityStartupStateStore,
     CapabilityStartupTransitionService,
 )
-from catalog.flask_app.services.server_setup_service import default_settings
+from catalog.flask_app.services.legacy_settings_migration import (
+    LegacySettingsSnapshot,
+    capability_config_from_legacy,
+)
 
 NOW = datetime(2026, 8, 3, 11, 30, tzinfo=timezone.utc)
 DEVICE_ID = "node-transition-device"
@@ -201,14 +207,22 @@ def _state(**changes) -> CapabilityStartupState:
     return CapabilityStartupState(**values)
 
 
-def _settings(mode: str, *, ai_enabled: bool = True):
-    return replace(
-        default_settings(configured=True),
+def _legacy(mode: str, *, ai_enabled: bool = True) -> LegacySettingsSnapshot:
+    return LegacySettingsSnapshot(
+        schema="fcp.server_setup.v3",
+        configured=True,
+        user_setup_complete=True,
         deployment_mode=mode,
         ai_enabled=ai_enabled,
-        ai_model="fixture-model:1",
+        ai_provider_mode="connected",
+        ai_provider_name="Fixture provider",
+        ai_profile="laptop-standard",
+        ai_model="llama3.2:3b",
         ollama_base_url="http://10.20.30.40:11434",
-        recorder_sources="Machine=http://10.20.30.50:5000",
+        recorder_sources="Machine=http://10.20.30.50:5000/current",
+        recorder_poll_interval="0.2",
+        recorder_include_condition=False,
+        updated_at="2026-08-03T11:30:00Z",
     )
 
 
@@ -218,17 +232,25 @@ def _service(
     onboarding=None,
     inspection=None,
     contribution=None,
-    settings=None,
-    saved_settings=None,
+    legacy=None,
+    config: CapabilityConfig | None = None,
+    migrated_configs: list[CapabilityConfig] | None = None,
 ):
-    saved_settings = [] if saved_settings is None else saved_settings
+    migrated_configs = [] if migrated_configs is None else migrated_configs
+
+    def migrate(snapshot: LegacySettingsSnapshot) -> CapabilityConfig:
+        migrated = capability_config_from_legacy(snapshot)
+        migrated_configs.append(migrated)
+        return migrated
+
     return CapabilityStartupTransitionService(
         onboarding_service=onboarding or FakeOnboarding(),
         inspection_service=inspection or FakeInspection(),
         contribution_service=contribution or FakeContribution(),
         state_database=tmp_path / "onboarding.sqlite3",
-        setup_loader=lambda: settings or default_settings(configured=False),
-        setup_saver=saved_settings.append,
+        legacy_loader=lambda: legacy,
+        config_loader=lambda: config or default_capability_config(),
+        config_migrator=migrate,
         clock=lambda: NOW,
     )
 
@@ -254,7 +276,7 @@ def test_all_legacy_modes_migrate_without_compute_storage_or_private_values(
     mode: str,
     enabled: set[str],
 ) -> None:
-    service = _service(tmp_path, settings=_settings(mode))
+    service = _service(tmp_path, legacy=_legacy(mode))
 
     first = service.migrate_legacy(request_id="migration-command")
     second = service.migrate_legacy(request_id="ignored-command")
@@ -270,7 +292,7 @@ def test_all_legacy_modes_migrate_without_compute_storage_or_private_values(
     assert first.source_mode == mode
     assert second == first
     persisted = (tmp_path / "onboarding.sqlite3").read_bytes()
-    for private in (b"10.20.30.40", b"10.20.30.50", b"fixture-model"):
+    for private in (b"10.20.30.40", b"10.20.30.50", b"llama3.2"):
         assert private not in persisted
 
 
@@ -288,7 +310,7 @@ def test_migration_fences_ambiguous_discovery_and_broken_saved_binding(
     service = _service(
         tmp_path / "ambiguous",
         onboarding=ambiguous,
-        settings=_settings("web-workbench"),
+        legacy=_legacy("web-workbench"),
     )
     with pytest.raises(FederationOperationError) as selection:
         service.migrate_legacy(request_id="ambiguous")
@@ -299,7 +321,7 @@ def test_migration_fences_ambiguous_discovery_and_broken_saved_binding(
     service = _service(
         tmp_path / "broken",
         onboarding=broken,
-        settings=_settings("web-workbench"),
+        legacy=_legacy("web-workbench"),
     )
     with pytest.raises(FederationOperationError) as repair:
         service.migrate_legacy(request_id="repair")
@@ -311,16 +333,20 @@ def test_migration_creates_local_federation_only_when_none_exists(
     tmp_path: Path,
 ) -> None:
     onboarding = FakeOnboarding(connected=False)
+    migrated: list[CapabilityConfig] = []
     service = _service(
         tmp_path,
         onboarding=onboarding,
-        settings=_settings("web-ui-only"),
+        legacy=_legacy("web-ui-only"),
+        migrated_configs=migrated,
     )
 
     state = service.migrate_legacy(request_id="local-create")
 
     assert state.completed
     assert onboarding.connect_calls == ["local-create"]
+    assert len(migrated) == 1
+    assert migrated[0].ai_model == "llama3.2:3b"
 
 
 def test_store_rejects_binding_replacement_and_corrupt_state(
@@ -345,10 +371,10 @@ def test_store_rejects_binding_replacement_and_corrupt_state(
     assert corrupt.value.code == "malformed-startup-transition"
 
 
-def test_capability_finish_persists_intent_and_compatibility_settings(
+def test_capability_finish_does_not_write_legacy_compatibility_settings(
     tmp_path: Path,
 ) -> None:
-    saved_settings: list[object] = []
+    migrated: list[CapabilityConfig] = []
     contribution = FakeContribution(
         {
             "ai": ("language-model", ContributionDesiredState.ENABLED),
@@ -359,7 +385,7 @@ def test_capability_finish_persists_intent_and_compatibility_settings(
         tmp_path,
         inspection=FakeInspection(4),
         contribution=contribution,
-        saved_settings=saved_settings,
+        migrated_configs=migrated,
     )
 
     state = service.complete_current()
@@ -373,14 +399,13 @@ def test_capability_finish_persists_intent_and_compatibility_settings(
         "compute": "ask-later",
         "storage": "ask-later",
     }
-    assert saved_settings[0].deployment_mode == "web-workbench"
-    assert saved_settings[0].ai_enabled is False
+    assert migrated == []
 
 
 def test_runtime_flags_and_finish_action_come_from_capability_state(
     tmp_path: Path,
 ) -> None:
-    service = _service(tmp_path, settings=_settings("full-server"))
+    service = _service(tmp_path, legacy=_legacy("full-server"))
     service.store.save(
         _state(
             contribution_intents={
@@ -433,21 +458,8 @@ def _route_app(monkeypatch, tmp_path: Path, transition):
     tmp_path.mkdir(parents=True, exist_ok=True)
     monkeypatch.chdir(tmp_path)
     manager = FakeRuntimeManager()
-    settings = replace(
-        default_settings(configured=True),
-        deployment_mode="web-workbench",
-        ai_enabled=False,
-    )
     monkeypatch.setattr(app_module, "get_runtime_manager", lambda: manager)
     monkeypatch.setattr(routes_module, "get_runtime_manager", lambda: manager)
-    monkeypatch.setattr(
-        server_setup_routes,
-        "get_runtime_manager",
-        lambda: manager,
-    )
-    monkeypatch.setattr(app_module, "load_settings", lambda: settings)
-    monkeypatch.setattr(routes_module, "load_settings", lambda: settings)
-    monkeypatch.setattr(server_setup_routes, "load_settings", lambda: settings)
     monkeypatch.setattr(
         transition_routes,
         "get_capability_startup_transition_service",
@@ -473,7 +485,7 @@ def test_cfi6_registration_and_startup_routing(monkeypatch, tmp_path) -> None:
     assert response.location == "/onboarding?step=finish"
 
 
-def test_completed_setup_preserves_workbench_and_explicit_legacy_fallback(
+def test_completed_setup_preserves_workbench_and_retires_legacy_fallback(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -490,12 +502,15 @@ def test_completed_setup_preserves_workbench_and_explicit_legacy_fallback(
     assert workbench.location is None
     assert client.get("/data-upload/").status_code == 200
     assert client.get("/startup").location == "/"
+    assert client.post("/startup/choose", data={"mode": "continue_existing"}).status_code == 404
 
     legacy = FakeTransitionRouteService(_flags(needs_migration=True))
     app = _route_app(monkeypatch, tmp_path / "fallback", legacy)
     client = app.test_client()
     assert client.get("/startup").location == "/onboarding?step=finish"
-    assert client.get("/startup?legacy=1&edit=1").status_code == 200
+    legacy_surface = client.get("/startup?legacy=1&edit=1")
+    assert legacy_surface.status_code in {302, 303}
+    assert legacy_surface.location == "/onboarding?step=finish"
 
 
 def test_transition_posts_require_csrf_command_and_server_owned_context(
