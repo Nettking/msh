@@ -10,7 +10,9 @@ on:
       - "catalog/flask_app/templates/federation_overview.html"
       - "catalog/flask_app/templates/federation/**"
       - "catalog/flask_app/static/css/federation.css"
+      - "catalog/flask_app/static/js/federation-local-time.js"
       - "catalog/flask_app/tests/test_federation_overview_route.py"
+      - "catalog/flask_app/tests/test_federation_update_status_ui.py"
       - "catalog/flask_app/tests/test_federation_detail_routes.py"
       - "catalog/flask_app/tests/test_federation_projection_consistency.py"
       - "catalog/federation/tests/test_federation_review_services_navigation.py"
@@ -28,7 +30,9 @@ on:
       - "catalog/flask_app/templates/federation_overview.html"
       - "catalog/flask_app/templates/federation/**"
       - "catalog/flask_app/static/css/federation.css"
+      - "catalog/flask_app/static/js/federation-local-time.js"
       - "catalog/flask_app/tests/test_federation_overview_route.py"
+      - "catalog/flask_app/tests/test_federation_update_status_ui.py"
       - "catalog/flask_app/tests/test_federation_detail_routes.py"
       - "catalog/flask_app/tests/test_federation_projection_consistency.py"
       - "catalog/federation/tests/test_federation_review_services_navigation.py"
@@ -68,6 +72,7 @@ jobs:
           catalog/flask_app/federation_routes.py
           catalog/flask_app/services/federation_projection_service.py
           catalog/flask_app/tests/test_federation_overview_route.py
+          catalog/flask_app/tests/test_federation_update_status_ui.py
           catalog/flask_app/tests/test_federation_detail_routes.py
           catalog/flask_app/tests/test_federation_projection_consistency.py
           catalog/federation/tests/test_federation_review_services_navigation.py
@@ -75,6 +80,7 @@ jobs:
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_federation_overview_route.py
+          catalog/flask_app/tests/test_federation_update_status_ui.py
           catalog/flask_app/tests/test_federation_detail_routes.py
           catalog/flask_app/tests/test_federation_projection_consistency.py
           catalog/flask_app/tests/test_cf5_ui_shell.py
@@ -89,6 +95,7 @@ jobs:
           catalog/flask_app/federation_routes.py
           catalog/flask_app/services/federation_projection_service.py
           catalog/flask_app/tests/test_federation_overview_route.py
+          catalog/flask_app/tests/test_federation_update_status_ui.py
           catalog/flask_app/tests/test_federation_detail_routes.py
           catalog/flask_app/tests/test_federation_projection_consistency.py
           catalog/federation/tests/test_federation_review_services_navigation.py
