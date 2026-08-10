@@ -15,6 +15,7 @@ This change makes `data/server_setup/server_settings.json` a migration/bootstrap
 - CFI-6 may still read a completed legacy setup to produce a deterministic migration preview.
 - The managed recorder accepts an explicitly configured `msh.server_setup.v3` document as a temporary technical fallback, but reads only recorder sources and poll interval from it; legacy role/AI authority fields are ignored.
 - `setup_msh.py`, legacy phone bootstrap migration, the read-only legacy startup notice, and `/startup/choose` remain for a later retirement boundary.
+- The core `CapabilityStartupTransitionService` still supports an injected legacy-shaped saver for isolated compatibility tests; the product app explicitly installs the role-free capability-config saver.
 
 ## Safety property
 
