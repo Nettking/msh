@@ -5,13 +5,24 @@ on:
     paths:
       - ".github/workflows/recorder-federation-publication.yml"
       - "start_recorder.py"
+      - "catalog/federation/recorder_control_events.py"
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
       - "catalog/federation/recorder_storage_relay.py"
+      - "catalog/federation/tests/test_recorder_control_events.py"
       - "catalog/federation/tests/test_recorder_publication.py"
       - "catalog/federation/tests/test_recorder_storage_relay.py"
+      - "catalog/flask_app/app.py"
+      - "catalog/flask_app/federation_pairing_routes.py"
+      - "catalog/flask_app/federation_recorder_routes.py"
       - "catalog/flask_app/services/federation_pairing_install.py"
+      - "catalog/flask_app/services/federation_recorder_control_service.py"
       - "catalog/flask_app/services/recorder_federation_publication_install.py"
+      - "catalog/flask_app/templates/federation/_section_nav.html"
+      - "catalog/flask_app/templates/federation/onboarding/_federation.html"
+      - "catalog/flask_app/templates/federation_recorders.html"
+      - "catalog/flask_app/tests/test_federation_pairing_service.py"
+      - "catalog/flask_app/tests/test_federation_recorder_control_service.py"
       - "catalog/flask_app/tests/test_recorder_config_bootstrap.py"
       - "catalog/flask_app/tests/test_recorder_federation_publication_install.py"
       - "catalog/mtconnect_recorder/**"
@@ -26,13 +37,24 @@ on:
     paths:
       - ".github/workflows/recorder-federation-publication.yml"
       - "start_recorder.py"
+      - "catalog/federation/recorder_control_events.py"
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
       - "catalog/federation/recorder_storage_relay.py"
+      - "catalog/federation/tests/test_recorder_control_events.py"
       - "catalog/federation/tests/test_recorder_publication.py"
       - "catalog/federation/tests/test_recorder_storage_relay.py"
+      - "catalog/flask_app/app.py"
+      - "catalog/flask_app/federation_pairing_routes.py"
+      - "catalog/flask_app/federation_recorder_routes.py"
       - "catalog/flask_app/services/federation_pairing_install.py"
+      - "catalog/flask_app/services/federation_recorder_control_service.py"
       - "catalog/flask_app/services/recorder_federation_publication_install.py"
+      - "catalog/flask_app/templates/federation/_section_nav.html"
+      - "catalog/flask_app/templates/federation/onboarding/_federation.html"
+      - "catalog/flask_app/templates/federation_recorders.html"
+      - "catalog/flask_app/tests/test_federation_pairing_service.py"
+      - "catalog/flask_app/tests/test_federation_recorder_control_service.py"
       - "catalog/flask_app/tests/test_recorder_config_bootstrap.py"
       - "catalog/flask_app/tests/test_recorder_federation_publication_install.py"
       - "catalog/mtconnect_recorder/**"
@@ -84,31 +106,53 @@ jobs:
           catalog/mtconnect_recorder
           catalog/node/storage_failover.py
           catalog/standalone-recorder_v2/standalone-recorder_v2.py
+          catalog/federation/recorder_control_events.py
           catalog/federation/recorder_delivery.py
           catalog/federation/recorder_publication.py
           catalog/federation/recorder_storage_relay.py
+          catalog/flask_app/app.py
+          catalog/flask_app/federation_pairing_routes.py
+          catalog/flask_app/federation_recorder_routes.py
           catalog/flask_app/services/federation_pairing_install.py
+          catalog/flask_app/services/federation_recorder_control_service.py
           catalog/flask_app/services/recorder_federation_publication_install.py
+          catalog/flask_app/tests/test_federation_pairing_service.py
           catalog/flask_app/tests/test_recorder_config_bootstrap.py
 
       - name: Recorder capture and Federation publication regressions
         run: >-
           python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_federation_pairing_service.py
           catalog/flask_app/tests/test_recorder_config_bootstrap.py
           catalog/standalone-recorder_v2/tests/test_lossless_recorder.py
+          catalog/federation/tests/test_recorder_control_events.py
           catalog/federation/tests/test_recorder_publication.py
           catalog/federation/tests/test_recorder_storage_relay.py
+          catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
+          catalog/mtconnect_recorder/tests/test_start_recorder.py
+          catalog/flask_app/tests/test_federation_recorder_control_service.py
           catalog/flask_app/tests/test_recorder_federation_publication_install.py
 
       - name: Ruff recorder publication boundary
         run: >-
           python -m ruff check
           start_recorder.py
+          catalog/federation/recorder_control_events.py
+          catalog/federation/tests/test_recorder_control_events.py
+          catalog/mtconnect_recorder/federation_control.py
           catalog/mtconnect_recorder/federation_node.py
+          catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
+          catalog/mtconnect_recorder/tests/test_start_recorder.py
           catalog/node/storage_failover.py
           catalog/standalone-recorder_v2/standalone-recorder_v2.py
+          catalog/flask_app/app.py
+          catalog/flask_app/federation_pairing_routes.py
+          catalog/flask_app/federation_recorder_routes.py
+          catalog/flask_app/services/federation_recorder_control_service.py
+          catalog/flask_app/tests/test_federation_pairing_service.py
+          catalog/flask_app/tests/test_federation_recorder_control_service.py
           catalog/flask_app/tests/test_recorder_config_bootstrap.py
           catalog/federation/recorder_delivery.py
           catalog/federation/recorder_publication.py

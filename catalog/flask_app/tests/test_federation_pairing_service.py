@@ -19,6 +19,7 @@ from catalog.flask_app import federation_pairing_routes
 from catalog.flask_app.app import create_app
 from catalog.flask_app.capability_onboarding_routes import _CSRF_SESSION_KEY
 from catalog.flask_app.services.federation_pairing_service import (
+    MAX_PAIRING_TTL_SECONDS,
     PAIRING_CODE_PREFIX,
     PairingCodeCodec,
     RemotePairingState,
@@ -146,11 +147,11 @@ def test_pairing_code_route_accepts_the_onboarding_csrf_token(
         TESTING=True,
         CAPABILITY_ONBOARDING_PAIRING_RELAY_URL="ws://192.168.10.10:8765",
     )
-    calls: list[str] = []
+    calls: list[tuple[str, int]] = []
 
     class PairingServiceStub:
-        def create_pairing_code(self, *, relay_url: str) -> str:
-            calls.append(relay_url)
+        def create_pairing_code(self, *, relay_url: str, ttl_seconds: int) -> str:
+            calls.append((relay_url, ttl_seconds))
             return "FCP1-test-code"
 
     monkeypatch.setattr(
@@ -173,8 +174,11 @@ def test_pairing_code_route_accepts_the_onboarding_csrf_token(
     assert response.status_code == 200
     with client.session_transaction() as browser:
         flashes = tuple(browser.get("_flashes", ()))
-    assert calls == ["ws://192.168.10.10:8765"], flashes
+    assert calls == [
+        ("ws://192.168.10.10:8765", MAX_PAIRING_TTL_SECONDS)
+    ], flashes
     assert "Pairing code created" in response.get_data(as_text=True)
+    assert "ten minutes" in response.get_data(as_text=True)
 
 
 def test_fresh_install_registers_ollama_check_before_legacy_setup(

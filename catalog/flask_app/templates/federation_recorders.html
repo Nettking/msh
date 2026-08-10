@@ -1,0 +1,156 @@
+{% extends 'base.html' %}
+{% from 'federation/_status_badge.html' import status_badge %}
+{% from 'federation/_section_nav.html' import section_nav %}
+{% block body %}
+{% set vm = recorder_control %}
+<link rel="stylesheet" href="{{ url_for('static', filename='css/federation.css') }}">
+
+<section class="federation-shell">
+  <header class="federation-hero">
+    <div>
+      <span class="federation-eyebrow">Federation</span>
+      <h2>{{ vm.title }}</h2>
+      <p>{{ vm.intro }}</p>
+    </div>
+  </header>
+
+  {{ section_nav(vm.sections, vm.active_section) }}
+
+  {% if vm.degraded|default(false) %}
+  <section class="federation-degraded" role="alert">
+    <div>
+      <span class="federation-eyebrow">Unavailable</span>
+      <h3>Recorder control is not available</h3>
+      <p>Reconnect this device to the Federation and reload the page.</p>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if vm.recorders %}
+    {% for recorder in vm.recorders %}
+    <section class="federation-panel" id="recorder-{{ loop.index }}">
+      <header class="federation-panel__header">
+        <div>
+          <span class="federation-eyebrow">Standalone recorder</span>
+          <h3>{{ recorder.label }}</h3>
+          <p>Scans execute on this recorder host. Remote requests never provide shell commands or arbitrary source URLs.</p>
+        </div>
+        {{ status_badge('connected' if recorder.connected else 'unavailable', 'Connected' if recorder.connected else 'Offline') }}
+      </header>
+
+      <div class="federation-dashboard-grid">
+        <section>
+          <h4>Recorded sources</h4>
+          {% if recorder.source_names %}
+          <ul class="federation-list">
+            {% for source_name in recorder.source_names %}
+            <li><strong>{{ source_name }}</strong></li>
+            {% endfor %}
+          </ul>
+          {% else %}
+          <p class="federation-muted">No MTConnect sources are configured. Recording remains on standby until a source is added.</p>
+          {% endif %}
+        </section>
+
+        <section>
+          <h4>Scan recorder network</h4>
+          <p class="federation-muted">Leave the CIDR empty to let the recorder infer its private /24. An explicit scan is restricted to RFC1918 IPv4 and at most 256 addresses.</p>
+          <form method="post" action="{{ url_for('federation_recorder_web.scan', target_node_id=recorder.node_id) }}">
+            <input type="hidden" name="_csrf_token" value="{{ federation_csrf_token }}">
+            <label>
+              <span>Private CIDR (optional)</span>
+              <input type="text" name="cidr" maxlength="64" placeholder="Auto-detect, or 192.168.1.0/24" autocomplete="off" spellcheck="false">
+            </label>
+            <label>
+              <span>MTConnect port</span>
+              <input type="number" name="port" min="1" max="65535" value="5000" required>
+            </label>
+            <button class="federation-button federation-button--secondary" type="submit"{% if not recorder.connected or recorder.scan_pending %} disabled{% endif %}>
+              {{ 'Scan requested…' if recorder.scan_pending else 'Scan network' }}
+            </button>
+          </form>
+        </section>
+      </div>
+
+      {% set scan = recorder.latest_scan %}
+      {% if scan %}
+      <section class="federation-technical-details" open>
+        <h4>Latest recorder scan</h4>
+        <p>
+          {{ scan.message|default('') }}
+          {% if scan.cidr|default('') %}<span> Network: <code>{{ scan.cidr }}</code></span>{% endif %}
+        </p>
+        {% if scan.state == 'error' %}
+          {{ status_badge('failed', 'Scan failed') }}
+        {% else %}
+          {{ status_badge('complete', 'Scan complete') }}
+        {% endif %}
+
+        <form method="post" action="{{ url_for('federation_recorder_web.sources', target_node_id=recorder.node_id) }}" class="federation-candidate-form">
+          <input type="hidden" name="_csrf_token" value="{{ federation_csrf_token }}">
+          <input type="hidden" name="scan_id" value="{{ scan.scan_id|default('') }}">
+
+          {% if scan.results %}
+          <fieldset>
+            <legend>Add discovered MTConnect machines</legend>
+            <div class="federation-candidate-grid">
+              {% for result in scan.results %}
+              <label class="federation-candidate">
+                <input type="checkbox" name="add_source_id" value="{{ result.source_id }}" {% if result.source_name in recorder.source_names %}disabled{% endif %}>
+                <span class="federation-candidate__main">
+                  <strong>{{ result.display_name }}</strong>
+                  <small>{{ result.source_name }} · {{ result.machine_count }} machine{{ '' if result.machine_count == 1 else 's' }}</small>
+                </span>
+                {% if result.source_name in recorder.source_names %}{{ status_badge('active', 'Already recording') }}{% endif %}
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+          {% else %}
+          <p class="federation-muted">No MTConnect Agents were found in the latest scan.</p>
+          {% endif %}
+
+          {% if recorder.source_names %}
+          <fieldset>
+            <legend>Remove recorded sources</legend>
+            <div class="federation-candidate-grid">
+              {% for source_name in recorder.source_names %}
+              <label class="federation-candidate">
+                <input type="checkbox" name="remove_source_name" value="{{ source_name }}">
+                <span class="federation-candidate__main"><strong>{{ source_name }}</strong><small>Stop recording this source; previously captured data and checkpoints are retained.</small></span>
+              </label>
+              {% endfor %}
+            </div>
+          </fieldset>
+          {% endif %}
+
+          {% if scan.results or recorder.source_names %}
+          <button class="federation-button federation-button--primary" type="submit"{% if not recorder.connected or recorder.source_change_pending %} disabled{% endif %}>
+            {{ 'Change requested…' if recorder.source_change_pending else 'Apply source changes' }}
+          </button>
+          {% endif %}
+        </form>
+      </section>
+      {% endif %}
+
+      {% set source_report = recorder.latest_source_change %}
+      {% if source_report %}
+      <p class="federation-muted">
+        Last source change: {{ source_report.message|default('') }}
+        {% if source_report.state == 'error' %}{{ status_badge('failed', 'Rejected') }}{% else %}{{ status_badge('complete', 'Applied') }}{% endif %}
+      </p>
+      {% endif %}
+    </section>
+    {% endfor %}
+  {% elif not vm.degraded|default(false) %}
+  <section class="federation-panel">
+    <h3>No standalone recorder is connected</h3>
+    <p class="federation-muted">Start a standalone recorder with its Federation pairing code. Once it advertises its recorder capability, it can be scanned and configured from any trusted Federation device.</p>
+  </section>
+  {% endif %}
+
+  <footer class="federation-footer-help">
+    <span>Recorder control is Federation-scoped and auditable. Source additions are restricted to results discovered by the recorder itself.</span>
+  </footer>
+</section>
+{% endblock %}

@@ -22,6 +22,7 @@ from catalog.federation.errors import FederationOperationError
 from .capability_onboarding_routes import _CSRF_SESSION_KEY
 from .services.capability_onboarding_service import get_capability_onboarding_service
 from .services.federation_pairing_service import (
+    MAX_PAIRING_TTL_SECONDS,
     PairingAwareCapabilityOnboardingService,
 )
 
@@ -92,14 +93,17 @@ def _dispatch_before_legacy_setup_gate() -> Response | None:
 def create_pairing_code():
     try:
         _require_csrf()
-        code = _pairing_service().create_pairing_code(relay_url=_relay_url())
+        code = _pairing_service().create_pairing_code(
+            relay_url=_relay_url(),
+            ttl_seconds=MAX_PAIRING_TTL_SECONDS,
+        )
         if not code:
             raise FederationOperationError(
                 "pairing-code-unavailable",
                 "the pairing code could not be created",
             )
         flash(
-            "Pairing code created. Copy it to the other FCP device within five minutes.",
+            "Pairing code created. It is one-use, valid for up to ten minutes, and you can create a new code at any time.",
             "success",
         )
     except FederationOperationError as exc:
