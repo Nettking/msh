@@ -22,6 +22,10 @@ def test_windows_agent_has_fixed_safe_mutation_boundary() -> None:
     assert "Normalize-DirectoryPath" in text
     assert "Get-RequestResultFile" in text
     assert "dirty_build_context" in text
+    assert "$previousErrorActionPreference = $ErrorActionPreference" in text
+    assert "$ErrorActionPreference = 'Continue'" in text
+    assert "$ErrorActionPreference = $previousErrorActionPreference" in text
+    assert "$exit = $LASTEXITCODE" in text
     assert text.index("Move-Item -LiteralPath $RequestFile") < text.index(
         "[System.IO.File]::ReadAllText($processing)"
     )
