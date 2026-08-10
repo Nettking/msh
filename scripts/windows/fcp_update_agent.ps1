@@ -156,8 +156,20 @@ function Write-AgentResult {
 
 function Invoke-External {
     param([string]$FilePath, [string[]]$Arguments)
-    $output = & $FilePath @Arguments 2>&1
-    $exit = $LASTEXITCODE
+    # Windows PowerShell 5.1 can promote native stderr redirected with 2>&1
+    # into an ErrorRecord. With the agent-wide Stop preference that turns
+    # harmless diagnostics (for example `git fetch`'s "From ...") into a
+    # terminating PowerShell error before LASTEXITCODE can be inspected.
+    # Native process success/failure is therefore decided only by its exit code.
+    $previousErrorActionPreference = $ErrorActionPreference
+    try {
+        $ErrorActionPreference = 'Continue'
+        $output = & $FilePath @Arguments 2>&1
+        $exit = $LASTEXITCODE
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
     if ($exit -ne 0) {
         $rendered = ($output | ForEach-Object { [string]$_ }) -join "`n"
         throw "external_command_failed:${FilePath}:$exit`n$rendered"
