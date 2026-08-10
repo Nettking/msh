@@ -1,7 +1,7 @@
 # Server setup and deployment
 
 Status: **current administrator guide**
-Reviewed: **2026-08-07**
+Reviewed: **2026-08-11**
 
 FCP is designed to run as a persistent device that may host several independent capabilities. The normal product setup does not assign the device one permanent role.
 
@@ -13,12 +13,13 @@ FCP device
   -> Flask workbench and runtime
   -> managed recorder
   -> Ollama service
+  -> bounded host update agent
   -> persistent data, results, model, and Federation state
 ```
 
 A browser on the same computer, or on another trusted LAN/VPN device when explicitly enabled, connects to the Flask workbench.
 
-Do not expose Flask, the Federation relay, or Ollama directly to the public internet. Use a trusted private network, VPN, or an authenticated HTTPS reverse proxy.
+Do not expose Flask, the Federation relay, Ollama, or recorder control directly to the public internet. Use a trusted private network, VPN, or an authenticated HTTPS reverse proxy.
 
 ## Normal first installation
 
@@ -36,10 +37,12 @@ start.cmd
 
 - verifies that Docker is available and running;
 - resolves safe host paths, ports, and persistent volume names;
-- builds the relay, Flask, and recorder images;
-- starts the relay, Ollama, recorder, and Flask services;
+- resolves the exact clean Git commit and bakes it into runtime images;
+- builds the relay, Flask, and managed recorder images;
+- starts relay, Ollama, recorder, and Flask;
 - installs the configured Ollama model when it is missing;
-- preserves existing device, capability-evidence, and data state;
+- preserves existing device, capability-evidence, recorder, model, and data state;
+- starts one bounded host-owned update agent; and
 - opens the workbench after readiness checks pass.
 
 Windows web access is local-only by default through `127.0.0.1`. The launcher prints the resolved URL and may select a different host port if `5000` is occupied.
@@ -51,20 +54,19 @@ From a fresh checkout:
 ```bash
 git clone <repository-url> fcp
 cd fcp
+bash start.sh
+```
+
+The POSIX launcher provides the same normal product composition, exact-build provenance, model verification, persistent state handling, and bounded host update agent.
+
+Direct Compose remains available for development/troubleshooting:
+
+```bash
+export FCP_BUILD_COMMIT="$(git rev-parse --verify HEAD^{commit})"
 docker compose up -d --build relay ollama recorder flask
 ```
 
-Install the configured model when it is not already present:
-
-```bash
-docker compose --profile model-install run --rm ollama-pull
-```
-
-Open:
-
-```text
-http://localhost:5000/onboarding
-```
+If you bypass `start.sh`, Federation-wide updates will not have their normal host-owned activation boundary unless you start the update agent separately.
 
 ## Capability-first browser setup
 
@@ -84,13 +86,21 @@ The steps have these boundaries:
 2. **Federation** reconnects, joins, or creates a Federation through an authenticated path.
 3. **Inspect** records and persists the device's supported local capabilities.
 4. **Finish setup** opens the normal workbench after accepted inspection evidence exists.
-5. **Federation** provides the read-only overview and entry points for optional follow-up work.
+5. **Federation** provides the product overview and reviewed action surfaces for optional follow-up work.
 
 Benchmarks and contribution decisions are optional after setup. Completing onboarding does not automatically grant recorder, language-model, compute, or storage contribution authority.
 
-Inspection and benchmark execution are explicit evidence-collection actions. The installed product reuses valid persisted evidence across ordinary starts and updates regardless of legacy time-only expiry metadata. Operators may explicitly run **Inspect again** or **Run again** after a relevant hardware, provider, model, service, or configuration change. Benchmark definition/version or declared dependency changes still require a new benchmark before that evidence can support contribution reconciliation.
+The installed product is capability-first. The former role-first runtime path is retired from normal operation. Retained legacy setup state, command aliases, and migration readers exist only where an upgraded installation still needs deterministic migration input; they do not define current product authority.
 
-The older role-first settings carrier remains in the repository for compatibility until its separately reviewed retirement work is accepted. It is not the canonical user-facing onboarding model.
+## Pairing another physical device
+
+Generate a signed `FCP1-...` code from the current Federation. Browser-generated codes are one-use and valid for up to 10 minutes. A new code can be generated whenever another attempt is required.
+
+Before generating the code, access the issuing FCP installation through a LAN/VPN address that the joining machine can reach. A `localhost` relay address is not reachable from another physical device.
+
+After pairing, the joining installation persists a stable identity and public-safe reconnect binding. The pairing code itself is not a persistent credential.
+
+See [Federation operations](federation_operations.md).
 
 ## Starting an existing device
 
@@ -100,7 +110,7 @@ A normal start preserves all existing state:
 start.cmd
 ```
 
-On Windows, use the explicit resume operation after an update when startup should reconnect the saved Federation and verify that persisted capability evidence is available before opening the workbench:
+On Windows, use the explicit resume operation after an update or migration when startup should reconnect the saved Federation and verify persisted capability evidence before opening the workbench:
 
 ```cmd
 start.cmd --resume
@@ -110,16 +120,34 @@ The resume operation is evidence-preserving:
 
 - it retains the existing identity and Federation;
 - it loads the saved inspection snapshot rather than running inspection;
-- it loads saved benchmark results rather than executing benchmark probes;
-- it does not change contribution authority in the one-shot resume process.
+- it loads saved benchmark results rather than executing benchmark probes; and
+- it leaves contribution authority to the long-running capability-first runtime reconciliation path.
 
-The long-running Flask app owns the single automatic contribution reconciliation. Persisted intent is reconciled only when the saved inspection is device-bound and the saved benchmark review still matches current benchmark identity, implementation version, and declared dependency inputs. If those structural inputs changed, enabled contribution intent is suspended through the existing fencing path rather than reactivated from stale evidence. Elapsed wall-clock time by itself does not trigger inspection, benchmarking, or contribution suspension.
+`update.cmd` performs a safe approved-main fast-forward and then invokes this resume behavior.
 
-`update.cmd` performs a fast-forward update and then invokes this resume path.
+Normal product composition treats inspection and benchmark evidence as run-once evidence until a relevant structural dependency changes or an operator explicitly reruns it. Old evidence is not rewritten to appear newer merely because time passed.
 
-The underlying frozen inspection and benchmark contracts still contain finite `expires_at` metadata, and the strict low-level evaluator remains available for contract and safety tests. The installed FCP product uses run-once composition: age alone is not an automatic refresh trigger, including for evidence written by older releases with a short TTL. Old evidence is not rewritten to appear newer. Explicit refresh remains available from the product surface.
+## Migrate an older Windows installation
 
-On Linux/macOS, ordinary `docker compose up -d` preserves the same mounted directories and named volumes. Inspection and benchmark reruns remain explicit actions from the product surface.
+Use the one-shot migration entry point when an older Windows checkout predates the current launcher/update-agent and retained-volume selection logic:
+
+```cmd
+migrate.cmd
+```
+
+The migration bootstrap:
+
+- accepts only the approved `Nettking/msh` repository and `main`;
+- requires a clean checkout and fast-forward relationship;
+- preflights Docker/Compose before mutating Git;
+- preserves the current data/results paths and device/Federation state;
+- identifies the retained relay-state volume conservatively, using read-only inspection and the saved device identity when necessary;
+- refuses to guess when multiple retained volumes remain ambiguous;
+- uses only `git merge --ff-only` for source mutation;
+- normalizes the supported Compose project and starts `start.cmd --resume`; and
+- installs/starts the current host update agent for future Federation-wide rollouts.
+
+It does not use `git reset`, `git clean`, stash, rebase, branch switching, `down -v`, or state deletion.
 
 ## Fresh-device reset
 
@@ -131,7 +159,7 @@ start.cmd --fresh
 
 The launcher shows the exact reset boundary and requires typing `RESET`.
 
-It removes device identity, Federation membership and pairing state, onboarding progress, inspection and benchmark state, local relay authority state, and retained legacy setup choices.
+It removes device identity, Federation membership and pairing state, onboarding progress, inspection and benchmark state, local relay authority state, and retained migration/setup state tied to the replaced device identity.
 
 It intentionally preserves:
 
@@ -144,11 +172,25 @@ It intentionally preserves:
 
 Do not manually delete only part of the Federation state. Partial deletion can leave contradictory identity, membership, or authority records.
 
+## Federation-wide software updates
+
+The Federation coordinator/session creator can run **Check for updates** and then explicitly choose **Update all devices**.
+
+The normal update path is manual. Each normal FCP installation's host update agent independently validates the exact approved commit, clean working tree, approved repository/branch, and fast-forward relationship before changing source or Docker runtime.
+
+For an eligible FCP device, activation rebuilds `relay`, `flask`, and the Compose-managed `recorder`, resumes the saved installation, and reports success only after the running build commit matches the target and the required services are running.
+
+The UI displays that successful `runtime_verified` state as **Updated** with a green indicator.
+
+A standalone recorder launched directly with `python start_recorder.py` is not a host update agent and is not restarted by the normal Compose runtime activation. Administer that standalone checkout/process explicitly until a dedicated standalone-recorder update path exists.
+
+See [Federation operations](federation_operations.md) for failure semantics and bootstrap requirements.
+
 ## Network access
 
-### Local-only Windows default
+### Local-only default
 
-`start.cmd` defaults to:
+The supported launchers default Flask to:
 
 ```text
 FCP_WEB_BIND=127.0.0.1
@@ -174,10 +216,11 @@ $env:FCP_WEB_BIND = "0.0.0.0"
 .\start.cmd
 ```
 
-Linux/macOS `.env`:
+Linux/macOS:
 
-```text
-FCP_WEB_BIND=0.0.0.0
+```bash
+export FCP_WEB_BIND=0.0.0.0
+bash start.sh
 ```
 
 Then open:
@@ -186,48 +229,88 @@ Then open:
 http://<server-ip>:5000
 ```
 
-Find the address with:
-
-```bash
-hostname -I
-```
-
-or on Windows:
-
-```powershell
-ipconfig
-```
-
-When pairing another physical device, open FCP using the reachable LAN or VPN address. Opening through `localhost` cannot advertise a relay address reachable from the other device.
+Find the address with `hostname -I` on Linux or `ipconfig` on Windows.
 
 If access fails, verify:
 
 - both devices are on the same trusted LAN or VPN;
 - Docker is running;
 - the `flask` and `relay` services are healthy;
-- the selected host port is allowed by the firewall;
-- the URL uses the port printed by `start.cmd` when a fallback port was selected.
+- the selected host port is allowed by the firewall; and
+- the URL uses the port printed by the launcher when a fallback port was selected.
 
 ## Persistent state
 
-The default Compose deployment persists:
+The default deployment persists:
 
 | State | Default location |
 | --- | --- |
-| Recorded/imported data, device state, onboarding state, recorder settings | `data/` |
+| Recorded/imported data, capability/source config, recorder checkpoints, device and pairing state | `data/` |
 | Workflow and analysis results | `results/` |
-| Federation coordinator authority database | `relay_state` Docker volume |
-| Local Ollama models | `ollama_models` Docker volume |
-| Headless provider models | `model_provider_models` Docker volume |
+| Federation coordinator authority database | retained relay-state Docker volume |
+| Local Ollama models | Ollama model Docker volume |
+| Headless provider models | model-provider Docker volume |
 | Optional environment configuration | `.env` |
 
 `.env` is local and ignored by git.
 
 Use configured `FCP_DATA_DIR`, `FCP_RESULTS_DIR`, and volume-name variables when the deployment must store state outside the repository defaults.
 
+## Standalone MTConnect recorder
+
+The standalone recorder is the simplest way to place loss-aware capture on a machine that does not need another Flask workbench.
+
+### First join and automatic discovery
+
+Generate a normal `FCP1-...` pairing code and run:
+
+```bash
+python start_recorder.py FCP1-...
+```
+
+On first configuration the launcher attempts the existing bounded private-network MTConnect scan, auto-selects discovered sources, creates/reuses a stable recorder identity, joins the Federation, starts recording, and starts independent publication/control workers.
+
+After successful pairing, later starts can be:
+
+```bash
+python start_recorder.py
+```
+
+The source selection persists. A deliberately emptied source set is not automatically repopulated on restart.
+
+Use an explicit scan network when needed:
+
+```bash
+python start_recorder.py FCP1-... --scan-cidr 192.168.200.0/24
+```
+
+or explicit sources for a controlled deployment:
+
+```bash
+python start_recorder.py Mazak=http://192.168.200.249:5000
+```
+
+### Remote recorder administration
+
+From any trusted FCP device in the same Federation, open:
+
+```text
+/federation/recorders
+```
+
+Select a connected standalone recorder to request a bounded scan or add/remove sources.
+
+The scan executes on the recorder host. Remote additions can select only opaque source IDs returned by the recorder's latest local scan; they cannot inject arbitrary URLs or credentials. Source removals affect future capture and do not delete existing telemetry/checkpoints.
+
+### Local-first publication
+
+Recorder capture commits locally before Federation delivery. Checkpoint-committed data is reconciled into a durable publication outbox and sent through the Federation owner's logical-storage authority. Relay/storage outages do not block MTConnect polling; the backlog retries later.
+
+See [Standalone recorder](standalone_recorder.md) and [`catalog/standalone-recorder_v2/README.md`](../catalog/standalone-recorder_v2/README.md).
+
 ## Advanced deployment shapes
 
-The following shapes remain useful for administration, development, and compatibility work. They are service selections, not permanent device identities, and they do not by themselves grant Federation authority.
+The following shapes remain useful for administration and development. They are local process selections, not permanent product identities and not contribution authority.
 
 ### Default multi-capability device
 
@@ -247,37 +330,14 @@ Then start the normal services. This is intended for inspection and debugging.
 
 ### Headless language-model provider
 
-A Docker-capable laptop can contribute an Ollama endpoint without hosting another Flask workbench:
+A Docker-capable laptop can provision a separate Ollama endpoint:
 
 ```bash
-git clone <repository-url> fcp
-cd fcp
 docker compose --profile provider run --rm model-provider-install
-```
-
-This starts `model-provider` and installs `FCP_PROVIDER_MODEL`, which defaults to `smollm2:360m`, in the persistent `model_provider_models` volume.
-
-Subsequent starts do not need to reinstall the model:
-
-```bash
 docker compose --profile provider up -d model-provider
 ```
 
-Verify:
-
-```bash
-docker compose --profile provider ps model-provider
-```
-
-Stop:
-
-```bash
-docker compose --profile provider down
-```
-
-Port `11434` is published for the provider profile. Restrict it to a trusted LAN or VPN.
-
-See [Connected capabilities](connected_capabilities.md) for the authenticated FCP-side connection and contribution flow.
+Port `11434` is published for the provider profile. Restrict it to a trusted LAN or VPN. The process selection alone does not grant Federation contribution authority.
 
 ### One-shot preparation
 
@@ -291,11 +351,9 @@ docker compose --profile prep run --rm prep
 docker compose --profile observer-sync run --rm observer-sync
 ```
 
-### Compatibility setup helper
+### Command/bootstrap compatibility aliases
 
-`setup_fcp.py` can still write `.env` values and prepare specialized deployment selections. Use it only when the default capability-first deployment is not appropriate.
-
-Running the helper does not replace capability-first browser onboarding, establish Federation membership, or grant contribution authority.
+`setup_fcp.py` may still accept older deployment-mode spellings for compatibility. They normalize to role-free command profiles that select local processes only. They do not persist a permanent device role and cannot enable recorder, AI, compute, storage, job, or artifact authority.
 
 ## Ollama configuration
 
@@ -315,42 +373,32 @@ docker compose --profile model-install run --rm ollama-pull
 
 The local Ollama service and the headless provider use separate persistent model volumes.
 
-## Recorder configuration
+## Managed recorder configuration
 
-The managed recorder polls configured MTConnect `/current` endpoints and writes normalized JSONL under:
+The Compose-managed recorder shares the current capability configuration and writes normalized JSONL under the recorder data tree. Recorder configuration and recorder contribution authority remain separate.
 
-```text
-data/sources/mtconnect_recorder/jsonl/<machine>/<YYYY-MM-DD>.jsonl
-```
-
-Recorder source configuration uses entries such as:
+The recorder state is stored under:
 
 ```text
-IG500=http://192.168.200.251:5000/current;VTC=http://192.168.200.252:5000/current
+data/source_state/
 ```
 
-The equivalent environment value is:
+and preserves sequence tracking across normal restarts.
 
-```text
-FCP_RECORDER_SOURCES=IG500=http://192.168.200.251:5000/current;VTC=http://192.168.200.252:5000/current
-```
-
-The recorder state is stored at:
-
-```text
-data/source_state/mtconnect_recorder_state.json
-```
-
-This preserves sequence tracking across restarts.
-
-Use the bounded private-subnet scan in the recorder UI when discovering MTConnect Agents. The scan requests `/probe` only within the configured private range and proposes stable source keys from MTConnect identity data.
+The managed recorder is rebuilt/restarted when its containing normal FCP device completes a verified Federation software update.
 
 ## Common commands
 
-Start or update the default services:
+Start the supported product:
+
+```cmd
+start.cmd
+```
+
+or:
 
 ```bash
-docker compose up -d --build relay ollama recorder flask
+bash start.sh
 ```
 
 Inspect service state:
@@ -365,28 +413,25 @@ View logs:
 docker compose logs -f
 ```
 
-Restart services:
-
-```bash
-docker compose restart
-```
-
 Stop containers while preserving mounted data and named volumes:
 
 ```bash
 docker compose down
 ```
 
-Update the checkout and rebuild:
+On Windows, perform a supported local update with:
 
-```bash
-git pull
-docker compose up -d --build relay ollama recorder flask
+```cmd
+update.cmd
 ```
+
+For a multi-device Federation, prefer the coordinator-owned **Check for updates** -> **Update all devices** flow once every participating normal FCP device has the current update agent.
 
 ## Related documentation
 
 - [Quick start](quick_start.md)
+- [Federation operations](federation_operations.md)
+- [Standalone recorder](standalone_recorder.md)
 - [Connected capabilities](connected_capabilities.md)
 - [Troubleshooting](troubleshooting.md)
 - [Federated session network](federated_session_network.md)
