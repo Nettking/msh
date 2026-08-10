@@ -14,12 +14,13 @@ available for explicit deployments.
 from __future__ import annotations
 
 from argparse import ArgumentParser, Namespace
+from collections.abc import Mapping
 import json
 import os
 from pathlib import Path
 import runpy
 import sys
-from typing import Any, Mapping
+from typing import Any
 from urllib.parse import urlsplit
 
 from catalog.federation.errors import (
