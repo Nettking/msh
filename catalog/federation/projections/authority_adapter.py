@@ -160,13 +160,11 @@ class FederationAuthorityAdapter:
                         creator_node_id = event_actor
                         break
 
+            # First fold membership only. Naming is resolved in a second pass so
+            # every reader starts from the same final current-member set.
             member_ids = {self._actor_node_id}
             if isinstance(creator_node_id, str) and creator_node_id:
-                # The session creator is a member by construction, but unlike a
-                # joining peer it does not necessarily have a node.joined event.
-                # Remote viewers must still include it in their shared member view.
                 member_ids.add(creator_node_id)
-            device_names: dict[str, str] = {}
             for event in events:
                 event_type = _value(event, "event_type")
                 payload = _value(event, "payload", {})
@@ -177,21 +175,55 @@ class FederationAuthorityAdapter:
                     member_ids.add(node_id)
                 elif event_type in {"node.left", "node.revoked"}:
                     member_ids.discard(node_id)
-                elif event_type == DEVICE_NAME_EVENT:
-                    event_actor = _value(event, "actor_node_id")
-                    # A member may name itself. The Federation creator may name
-                    # any member. Everyone else is ignored even if they append a
-                    # similarly shaped event directly through the relay protocol.
-                    if event_actor != node_id and event_actor != creator_node_id:
-                        continue
-                    try:
-                        device_names[node_id] = validate_device_name(
-                            _value(payload, "display_name")
-                        )
-                    except FederationValidationError:
-                        continue
 
             raw_status = self._authorized_status()
+
+            # Seed effective labels from public node metadata. Naming events are
+            # then replayed strictly in authoritative revision order. If two
+            # members concurrently claim the same case-insensitive name, the
+            # earlier accepted revision wins and the later claim is inert. This
+            # gives every trusted reader the same unique result without adding
+            # naming authority to the generic relay event API.
+            effective_labels: dict[str, str] = {}
+            for candidate in _sequence(_value(raw_status, "nodes", ())):
+                raw_node_id = _value(candidate, "node_id", _value(candidate, "id"))
+                if not isinstance(raw_node_id, str) or raw_node_id not in member_ids:
+                    continue
+                node_id = _public_text(raw_node_id, "unknown-device")
+                effective_labels[raw_node_id] = _public_text(
+                    _value(candidate, "display_name", _value(candidate, "label", node_id)),
+                    node_id,
+                )
+
+            device_names: dict[str, str] = {}
+            for event in events:
+                if _value(event, "event_type") != DEVICE_NAME_EVENT:
+                    continue
+                payload = _value(event, "payload", {})
+                node_id = _value(payload, "node_id")
+                if not isinstance(node_id, str) or node_id not in member_ids:
+                    continue
+                event_actor = _value(event, "actor_node_id")
+                # A member may name itself. The Federation creator may name any
+                # current member. Everyone else is ignored even if they append a
+                # similarly shaped event directly through the relay protocol.
+                if event_actor != node_id and event_actor != creator_node_id:
+                    continue
+                try:
+                    display_name = validate_device_name(
+                        _value(payload, "display_name")
+                    )
+                except FederationValidationError:
+                    continue
+                folded = display_name.casefold()
+                if any(
+                    other_node_id != node_id and other_label.casefold() == folded
+                    for other_node_id, other_label in effective_labels.items()
+                ):
+                    continue
+                device_names[node_id] = display_name
+                effective_labels[node_id] = display_name
+
             devices = self._devices(raw_status, member_ids, device_names)
             capabilities = self._capabilities(raw_status, member_ids)
             activity = tuple(
