@@ -244,13 +244,15 @@ def test_local_availability_is_read_only_until_surface_is_opened(
                 coordinator=coordinator,
             )
 
-    onboarding_db = tmp_path / "onboarding" / "onboarding.sqlite3"
-    enrollment_db = onboarding_db.parent / "provider_enrollment.sqlite3"
-    health_db = onboarding_db.parent / "provider_health.sqlite3"
+    coordinator_db = Path(coordinator.store.database)
+    enrollment_db = coordinator_db.with_name("provider_enrollment.sqlite3")
+    health_db = coordinator_db.with_name("provider_health.sqlite3")
     app = Flask(__name__)
     app.config.update(
         CAPABILITY_ONBOARDING_SERVICE=Onboarding(),
-        CAPABILITY_ONBOARDING_STATE_DATABASE=onboarding_db,
+        CAPABILITY_ONBOARDING_STATE_DATABASE=(
+            tmp_path / "onboarding" / "onboarding.sqlite3"
+        ),
     )
 
     with app.app_context():
@@ -260,6 +262,8 @@ def test_local_availability_is_read_only_until_surface_is_opened(
         surface = get_local_provider_operator_surface()
 
     assert isinstance(surface, CapabilityFirstProviderOperatorSurface)
+    assert Path(surface.enrollment.store.database) == enrollment_db
+    assert Path(surface.health.store.database) == health_db
     assert enrollment_db.exists()
     assert health_db.exists()
 
