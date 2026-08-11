@@ -11,6 +11,11 @@ services:
       - FCP_SCAN_DIRS=${FCP_SCAN_DIRS:-results,data}
       - FCP_SKIP_ORCHESTRATION=${FCP_SKIP_ORCHESTRATION:-0}
       - FCP_FLASK_SECRET=${FCP_FLASK_SECRET:-fcp-dev}
+      - FCP_PASSWORD_SALT=${FCP_PASSWORD_SALT:-}
+      - FCP_AUTH_DATABASE=${FCP_AUTH_DATABASE:-/app/data/auth/users.sqlite3}
+      - FCP_AUTH_SECRET_DIR=${FCP_AUTH_SECRET_DIR:-/app/data/auth}
+      - FCP_HTTPS=${FCP_HTTPS:-0}
+      - FCP_DEVELOPMENT=${FCP_DEVELOPMENT:-0}
       - FCP_AI_MODEL=${FCP_AI_MODEL:-llama3.2:3b}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
       - FCP_DEVICE_NAME=${FCP_DEVICE_NAME:-This FCP device}
