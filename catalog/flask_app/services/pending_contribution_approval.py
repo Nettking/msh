@@ -1,13 +1,13 @@
 """Leader-only product composition for capability-first pending contributions.
 
 Capability-first contribution announcements use ``REGISTERING`` while the local
-member waits for an existing runtime/control-plane authority.  Core F8.1 provider
+member waits for an existing runtime/control-plane authority. Core F8.1 provider
 enrollment historically accepted only ``READY`` announcements, which made the
 leader UI unable to record an explicit approval for those pending candidates.
 
 This module keeps the F8.1 authority model and durability intact while adding one
 narrow product rule: the session creator may approve an already-requested
-``REGISTERING`` capability.  The resulting enrollment is APPROVED but remains
+``REGISTERING`` capability. The resulting enrollment is APPROVED but remains
 ineligible for resource binding until the member later advertises ``READY``.
 
 No storage assignment, compute activation, provider endpoint, executable, or
@@ -19,7 +19,6 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 from flask import Flask, current_app
 
@@ -39,7 +38,10 @@ from catalog.capabilities.provider_health import (
     SQLiteProviderHealthStore,
 )
 from catalog.federation.coordinator import SessionCoordinator
-from catalog.federation.errors import FederationOperationError, FederationValidationError
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.federation.models import CapabilityStatus
 
 _EXTENSION_KEY = "capability_first_provider_operator_surface"
@@ -234,6 +236,15 @@ def get_local_provider_operator_surface(
         return configured
 
     onboarding = selected.config.get("CAPABILITY_ONBOARDING_SERVICE")
+    remote_store = getattr(onboarding, "remote_store", None)
+    remote_loader = getattr(remote_store, "load", None)
+    if callable(remote_loader):
+        try:
+            if remote_loader() is not None:
+                return None
+        except Exception:  # noqa: BLE001 - availability fails closed
+            return None
+
     context_loader = getattr(onboarding, "authorized_context", None)
     if not callable(context_loader):
         return None
@@ -299,6 +310,7 @@ def get_local_provider_operator_surface(
         clock=clock,
     )
     selected.extensions[_EXTENSION_KEY] = (cache_key, surface)
+    selected.config["PROVIDER_OPERATOR_SURFACE"] = surface
     return surface
 
 
