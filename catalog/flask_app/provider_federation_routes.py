@@ -30,6 +30,7 @@ from catalog.federation.errors import (
 
 from .services.pending_contribution_approval import (
     get_local_provider_operator_surface,
+    local_provider_operator_available,
 )
 
 provider_federation_web = Blueprint(
@@ -54,7 +55,7 @@ def _surface() -> ProviderOperatorSurface | None:
 @provider_federation_web.app_context_processor
 def _provider_operator_availability() -> dict[str, bool]:
     try:
-        available = _surface() is not None
+        available = local_provider_operator_available()
     except Exception:  # noqa: BLE001 - navigation must fail closed
         available = False
     return {"provider_operator_available": available}
