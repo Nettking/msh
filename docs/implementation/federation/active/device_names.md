@@ -32,6 +32,8 @@ The creator identity must be recoverable from authoritative session history as w
 
 Every trusted member may edit its own name from Federation **This device**. The leader may additionally edit member names from Federation **Devices**, including while the target device is offline. Names are case-insensitively unique inside one Federation and generic labels such as `This FCP device` and `Trusted FCP device` are reserved.
 
+Concurrent claims are resolved deterministically from authoritative event order. If two current members race to claim the same case-insensitive name, the earlier accepted Federation revision keeps the name and the later claim is inert in projection. The writer verifies the post-append projection and reports the losing claim as `duplicate-device-name` rather than returning false success. This keeps every trusted reader on the same unique naming state without turning the generic relay event API into a separate naming authority.
+
 The latest authorized name follows the stable node ID across trusted projections and should be used anywhere an operator needs to identify a computer, including:
 
 - This device, Devices, and Federation overview;
@@ -44,7 +46,7 @@ The underlying `node_id` remains available where technical identity is useful.
 
 ## Remote publication
 
-A locally hosted Federation creator writes through the coordinator directly. A remotely paired member publishes its own naming event through its already-authenticated outbound relay client using the existing bounded `event.append` protocol. The web application does not expose a general remote coordinator mutation facade: this path is limited to the validated self-name event.
+A locally hosted Federation creator writes through the coordinator directly. A remotely paired member publishes its own naming event through the pairing runtime's existing bounded `append_session_event(...)` operation, which verifies the bound Federation session before using the authenticated outbound relay client and the existing `event.append` protocol. The web application does not access private relay-client fields and does not expose a general remote coordinator mutation facade.
 
 The read side replays authoritative session history, so a name written by the leader or by the device itself is visible to every trusted member after normal Federation refresh/replay. Naming does not depend on the target being online after the event has been persisted.
 
@@ -62,6 +64,7 @@ Names are bounded public metadata. They reject control characters, credentials/s
 6. A leader-authored name remains visible on remotely paired members even when their coordinator status omits the creator field.
 7. A self-authored naming event is accepted only for the authenticated actor's own `node_id`.
 8. A third-party spoofed naming event cannot rename another member.
-9. Names are unique within a Federation and do not alter node identity.
-10. Software Updates uses the Federation name so an offline/error row identifies the affected computer immediately.
-11. Services, provider approvals, and storage ownership use the same resolved name rather than inventing independent labels.
+9. Names are unique within a Federation and concurrent duplicate claims resolve deterministically by authoritative revision order.
+10. A remotely paired member publishes through the bounded pairing-runtime API rather than private runtime/client internals.
+11. Software Updates uses the Federation name so an offline/error row identifies the affected computer immediately.
+12. Services, provider approvals, and storage ownership use the same resolved name rather than inventing independent labels.
