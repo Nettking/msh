@@ -80,11 +80,10 @@
     });
   }
 
-  // Chart.js caches resolved scale options, so changing the defaults alone
-  // leaves an existing chart on its old palette. Write the colours into the
-  // raw config (chart.config.options) and update. Never write through
-  // chart.options: in v4 that is a resolving proxy and assigning to it
-  // recurses until the stack blows.
+  // Chart.js caches resolved options, so changing defaults alone can leave an
+  // existing chart on its old palette. Write colours into raw config and update.
+  // Never write through chart.options: in v4 that is a resolving proxy and
+  // assigning to it recurses until the stack blows.
   function refreshExistingCharts() {
     var Chart = window.Chart;
     if (typeof Chart.getChart !== "function") {
@@ -108,6 +107,14 @@
           scale.title.color = Chart.defaults.color;
         }
       });
+      if (Chart.defaults.plugins && Chart.defaults.plugins.tooltip) {
+        options.plugins = options.plugins || {};
+        options.plugins.tooltip = options.plugins.tooltip || {};
+        options.plugins.tooltip.backgroundColor = Chart.defaults.plugins.tooltip.backgroundColor;
+        options.plugins.tooltip.titleColor = Chart.defaults.plugins.tooltip.titleColor;
+        options.plugins.tooltip.bodyColor = Chart.defaults.plugins.tooltip.bodyColor;
+        options.plugins.tooltip.footerColor = Chart.defaults.plugins.tooltip.footerColor;
+      }
       refreshSeries(chart);
       chart.config.options = options;
       chart.update("none");
