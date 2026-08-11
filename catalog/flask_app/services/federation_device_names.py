@@ -9,16 +9,12 @@ or storage authority.
 from __future__ import annotations
 
 import uuid
-from dataclasses import replace
-
-from flask import current_app
 
 from catalog.federation.errors import (
     AuthorizationError,
     FederationOperationError,
     FederationValidationError,
 )
-from catalog.federation.projections import FederationAuthoritySnapshot
 from catalog.federation.projections.authority_adapter import FederationAuthorityAdapter
 from catalog.federation.redaction import is_nonpublic_location_text, is_secret_text
 
@@ -76,88 +72,6 @@ def _validated_name(value: object) -> str:
     return name
 
 
-def _event_aliases(
-    coordinator: object,
-    *,
-    session_id: str,
-    actor_node_id: str,
-) -> dict[str, str]:
-    aliases: dict[str, str] = {}
-    last_revision = 0
-    for _ in range(100):
-        page, current_revision = coordinator.replay_page(
-            session_id=session_id,
-            actor_node_id=actor_node_id,
-            last_applied_revision=last_revision,
-            limit=1000,
-        )
-        for event in page:
-            last_revision = int(event.revision)
-            if event.event_type != DEVICE_NAME_EVENT:
-                continue
-            payload = event.payload
-            if not isinstance(payload, dict):
-                continue
-            node_id = payload.get("node_id")
-            display_name = payload.get("display_name")
-            if not isinstance(node_id, str) or not isinstance(display_name, str):
-                continue
-            try:
-                aliases[node_id] = _validated_name(display_name)
-            except FederationValidationError:
-                # Historical/malformed metadata never changes authority or blocks
-                # the rest of the Federation projection.
-                continue
-        if not page or last_revision >= current_revision:
-            break
-    return aliases
-
-
-class FederationDeviceNameAdapter:
-    """Overlay durable Federation-scoped names on a read-only authority snapshot."""
-
-    def __init__(
-        self,
-        authority: object,
-        coordinator: object,
-        *,
-        session_id: str,
-        actor_node_id: str,
-    ) -> None:
-        self._authority = authority
-        self._coordinator = coordinator
-        self._session_id = session_id
-        self._actor_node_id = actor_node_id
-
-    def snapshot(self) -> FederationAuthoritySnapshot:
-        snapshot = self._authority.snapshot()
-        if not isinstance(snapshot, FederationAuthoritySnapshot) or not snapshot.available:
-            return snapshot
-        try:
-            aliases = _event_aliases(
-                self._coordinator,
-                session_id=self._session_id,
-                actor_node_id=self._actor_node_id,
-            )
-        except Exception:  # noqa: BLE001 - naming projection fails open to base labels
-            return snapshot
-        devices = tuple(
-            replace(device, label=aliases.get(device.node_id, device.label))
-            for device in snapshot.devices
-        )
-        activity = tuple(
-            replace(
-                event,
-                title="Device renamed",
-                message="A Federation-scoped device name was changed.",
-            )
-            if event.event_type == DEVICE_NAME_EVENT
-            else event
-            for event in snapshot.activity
-        )
-        return replace(snapshot, devices=devices, activity=activity)
-
-
 class FederationDeviceNamingService:
     """Append explicit leader-owned device-name decisions to Federation history."""
 
@@ -184,16 +98,10 @@ class FederationDeviceNamingService:
         context, actor = self._context()
         name = _validated_name(display_name)
         session_id = context.binding.internal_session_id
-        base = FederationAuthorityAdapter(
+        snapshot = FederationAuthorityAdapter(
             context.coordinator,
             actor_node_id=actor,
             internal_session_id=session_id,
-        )
-        snapshot = FederationDeviceNameAdapter(
-            base,
-            context.coordinator,
-            session_id=session_id,
-            actor_node_id=actor,
         ).snapshot()
         if not snapshot.available:
             raise FederationOperationError(
@@ -247,13 +155,11 @@ def local_device_naming_available() -> bool:
             and session.created_by_node_id == context.credentials.identity.node_id
         )
     except Exception:  # noqa: BLE001 - controls fail closed
-        current_app.logger.warning("Federation device naming authority unavailable")
         return False
 
 
 __all__ = [
     "DEVICE_NAME_EVENT",
-    "FederationDeviceNameAdapter",
     "FederationDeviceNamingService",
     "local_device_naming_available",
 ]
