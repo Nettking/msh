@@ -14,7 +14,7 @@
   gap: 4px;
   padding: 10px 12px;
   border-bottom: 1px solid var(--border);
-  background: #f8fbff;
+  background: var(--surface-muted);
 }
 
 .setup-wizard-nav button {
@@ -28,7 +28,7 @@
   border: 0;
   border-radius: 12px;
   background: transparent;
-  color: #64748b;
+  color: var(--text-subtle);
   padding: 6px 3px;
   font-weight: 800;
 }
@@ -38,10 +38,10 @@
   place-items: center;
   width: 26px;
   height: 26px;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-strong);
   border-radius: 999px;
-  background: #ffffff;
-  color: #475569;
+  background: var(--surface);
+  color: var(--text-muted);
   font-size: 0.78rem;
 }
 
@@ -54,14 +54,14 @@
 }
 
 .setup-wizard-nav button.is-active {
-  background: #eaf2ff;
-  color: #1e3a8a;
+  background: var(--accent-soft);
+  color: var(--accent-text);
 }
 
 .setup-wizard-nav button.is-active strong {
-  border-color: #0f172a;
-  background: #0f172a;
-  color: #ffffff;
+  border-color: var(--brand-solid);
+  background: var(--brand-solid);
+  color: var(--on-solid);
 }
 
 .setup-wizard-nav button[hidden] {
@@ -83,9 +83,9 @@
 
 .setup-review-card,
 .setup-recorder-disabled {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-strong);
   border-radius: 16px;
-  background: #f8fbff;
+  background: var(--surface-muted);
   padding: 16px;
 }
 
@@ -97,7 +97,7 @@
 
 .setup-review-card span {
   display: block;
-  color: #64748b;
+  color: var(--text-subtle);
   font-size: 0.78rem;
   font-weight: 800;
   letter-spacing: 0.04em;
@@ -106,21 +106,21 @@
 
 .setup-review-card strong {
   display: block;
-  color: #0f172a;
+  color: var(--text);
   font-size: 1.2rem;
   line-height: 1.2;
 }
 
 .setup-review-card p {
   margin: 0;
-  color: #334155;
+  color: var(--text-muted);
 }
 
 .setup-review-card code {
   display: inline-block;
   max-width: 100%;
   overflow-wrap: anywhere;
-  color: #334155;
+  color: var(--text-muted);
 }
 
 .setup-recorder-fields {
@@ -149,7 +149,7 @@
   border: 1px solid var(--border);
   border-radius: 10px;
   padding: 9px 10px;
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .setup-discovery-results {
@@ -164,9 +164,9 @@
 .setup-discovery-save-note {
   margin: 0;
   padding: 10px 12px;
-  border-left: 4px solid #2563eb;
-  background: #eff6ff;
-  color: #1e3a8a;
+  border-left: 4px solid var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-text);
   font-weight: 750;
 }
 
@@ -180,13 +180,13 @@
 
 .setup-runtime-panel {
   border-top: 1px solid var(--border);
-  background: #fbfdff;
+  background: var(--surface-muted);
 }
 
 .setup-choice-card__tag--missing {
-  background: #fff7ed;
-  color: #9a3412;
-  border-color: #fed7aa;
+  background: var(--warning-soft);
+  color: var(--warning);
+  border-color: var(--warning-border);
 }
 
 .setup-model-install-tag {

@@ -4,9 +4,22 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{{ document_title }} · FCP Docs</title>
+    <meta name="color-scheme" content="light dark">
+    <script>
+      // Applied before first paint so a stored dark choice never flashes light.
+      (function () {
+        try {
+          var stored = window.localStorage.getItem('fcp-theme');
+          if (stored === 'dark' || stored === 'light') {
+            document.documentElement.setAttribute('data-theme', stored);
+          }
+        } catch (error) {}
+      })();
+    </script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/docs.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/docs-home.css') }}">
     <script defer src="{{ url_for('static', filename='js/docs-navigation.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/theme-toggle.js') }}"></script>
   </head>
   <body class="docs-body">
     {% macro render_tree(node, depth=0) -%}
@@ -63,7 +76,14 @@
               <small>User guide &amp; reference</small>
             </span>
           </a>
-          <a class="docs-back" href="/">Back to FCP</a>
+          <div class="docs-sidebar__header-actions">
+            <a class="docs-back" href="/">Back to FCP</a>
+            <button class="theme-toggle theme-toggle--docs" type="button" data-theme-toggle aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode">
+              <svg class="theme-toggle__icon theme-toggle__icon--light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 13.4A8.5 8.5 0 1 1 10.6 3.5a6.8 6.8 0 0 0 9.9 9.9Z"/></svg>
+              <svg class="theme-toggle__icon theme-toggle__icon--dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.4 19.6 6 18M18 6l1.6-1.6"/></svg>
+              <span class="theme-toggle__label" data-theme-toggle-label>Dark mode</span>
+            </button>
+          </div>
         </header>
 
         <nav class="docs-sidebar__navigation" aria-label="Documentation">
