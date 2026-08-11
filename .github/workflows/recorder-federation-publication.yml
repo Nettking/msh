@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/recorder-federation-publication.yml"
+      - "docker-compose.yml"
       - "start_recorder.py"
       - "catalog/federation/recorder_control_events.py"
       - "catalog/federation/recorder_delivery.py"
@@ -39,6 +40,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/recorder-federation-publication.yml"
+      - "docker-compose.yml"
       - "start_recorder.py"
       - "catalog/federation/recorder_control_events.py"
       - "catalog/federation/recorder_delivery.py"
@@ -139,6 +141,7 @@ jobs:
           catalog/federation/tests/test_recorder_storage_relay.py
           catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
+          catalog/mtconnect_recorder/tests/test_managed_service.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
           catalog/mtconnect_recorder/tests/test_upgrade_compat.py
           catalog/flask_app/tests/test_federation_recorder_control_service.py
@@ -155,10 +158,12 @@ jobs:
           catalog/flask_app/services/legacy_settings_migration.py
           catalog/mtconnect_recorder/federation_control.py
           catalog/mtconnect_recorder/federation_node.py
+          catalog/mtconnect_recorder/managed_service.py
           catalog/mtconnect_recorder/runtime.py
           catalog/mtconnect_recorder/upgrade_compat.py
           catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
+          catalog/mtconnect_recorder/tests/test_managed_service.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
           catalog/mtconnect_recorder/tests/test_upgrade_compat.py
           catalog/node/storage_failover.py

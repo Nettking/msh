@@ -95,7 +95,7 @@ services:
       dockerfile: Dockerfile
       args:
         FCP_BUILD_COMMIT: ${FCP_BUILD_COMMIT:-unknown}
-    entrypoint: ["python", "catalog/standalone-recorder_v2/standalone-recorder_v2.py"]
+    entrypoint: ["python", "-m", "catalog.mtconnect_recorder.managed_service"]
     environment:
       - FCP_RECORDER_MANAGED=true
       - FCP_RECORDER_DATA_DIR=data
@@ -109,6 +109,10 @@ services:
       - FCP_RECORDER_MAX_BATCHES_PER_CYCLE=${FCP_RECORDER_MAX_BATCHES_PER_CYCLE:-20}
       - FCP_RECORDER_CONFIG_REFRESH_INTERVAL=${FCP_RECORDER_CONFIG_REFRESH_INTERVAL:-1.0}
       - FCP_RECORDER_STATUS_INTERVAL=${FCP_RECORDER_STATUS_INTERVAL:-1.0}
+      - FCP_RECORDER_DEVICE_NAME=${FCP_RECORDER_DEVICE_NAME:-FCP MTConnect recorder}
+      - FCP_RECORDER_FEDERATION_TIMEOUT=${FCP_RECORDER_FEDERATION_TIMEOUT:-15.0}
+      - FCP_RECORDER_FEDERATION_POLL_SECONDS=${FCP_RECORDER_FEDERATION_POLL_SECONDS:-2.0}
+      - FCP_RECORDER_STORAGE_GROUP=${FCP_RECORDER_STORAGE_GROUP:-}
     volumes:
       - type: bind
         source: ${FCP_DATA_DIR:-./data}
