@@ -7,7 +7,6 @@ from typing import Any
 
 from flask import (
     Blueprint,
-    current_app,
     flash,
     jsonify,
     redirect,
@@ -28,6 +27,11 @@ from catalog.federation.errors import (
     ProtocolCompatibilityError,
 )
 
+from .services.pending_contribution_approval import (
+    get_local_provider_operator_surface,
+    local_provider_operator_available,
+)
+
 provider_federation_web = Blueprint(
     "provider_federation_web",
     __name__,
@@ -35,14 +39,23 @@ provider_federation_web = Blueprint(
     template_folder="templates",
 )
 
-_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
 _CSRF_SESSION_KEY = "provider_federation_csrf_token"
 _FORBIDDEN_CONTEXT_FIELDS = frozenset({"actor_node_id", "session_id"})
 
 
 def _surface() -> ProviderOperatorSurface | None:
-    value = current_app.config.get(_SURFACE_CONFIG_KEY)
-    return value if isinstance(value, ProviderOperatorSurface) else None
+    # The factory also upgrades an already-configured generic F8.5 leader surface
+    # while retaining its exact coordinator/authority stores and runtime binders.
+    return get_local_provider_operator_surface()
+
+
+@provider_federation_web.app_context_processor
+def _provider_operator_availability() -> dict[str, bool]:
+    try:
+        available = local_provider_operator_available()
+    except Exception:  # noqa: BLE001 - navigation must fail closed
+        available = False
+    return {"provider_operator_available": available}
 
 
 def _csrf_token() -> str:

@@ -1,8 +1,9 @@
 {% extends 'base.html' %}
 {% block body %}
 <section class="page-intro">
-  <h2>Provider federation</h2>
-  <p>Review trusted provider decisions, live health, and activation eligibility without exposing connection or implementation details.</p>
+  <h2>Contribution approvals</h2>
+  <p>Provider federation authority for reviewing pending contribution enrollment without exposing connection or implementation details.</p>
+  <p><a href="/federation/services">Back to Federation services</a></p>
 </section>
 
 {% if operator_error %}
@@ -24,7 +25,7 @@
     <h3>{{ operator_view.session_id }}</h3>
     <p class="overview-decision__summary">
       {% if operator_view.is_owner %}
-      This node is the session owner and may manage provider enrollment using revision-fenced commands.
+      This node is the Federation leader and may review provider enrollment using revision-fenced commands.
       {% else %}
       This node is a session member. Provider state is read-only.
       {% endif %}
@@ -32,7 +33,7 @@
   </div>
   <div class="overview-decision__facts">
     <span class="status-badge {% if operator_view.is_owner %}status-ready{% else %}status-waiting{% endif %}">
-      {{ 'Owner controls' if operator_view.is_owner else 'Read only' }}
+      {{ 'Leader controls' if operator_view.is_owner else 'Read only' }}
     </span>
     <ul>
       <li>{{ operator_view.providers|length }} provider record(s).</li>
@@ -44,8 +45,8 @@
 
 <section class="section-block section-block--primary">
   <header>
-    <h3>Providers</h3>
-    <p>Only safe logical identity, decision, health, capacity, and compatibility fields are shown.</p>
+    <h3>Pending and enrolled contributions</h3>
+    <p>Registering means the member has requested a contribution but has not obtained runtime/control-plane authority. Leader approval records the decision; it does not fabricate storage, compute, or execution authority.</p>
   </header>
 
   <div class="info-grid">
@@ -57,7 +58,13 @@
           <h4>{{ provider.capability_id }}</h4>
         </div>
         <span class="status-badge {% if provider.activation_state.value == 'eligible' %}status-ready{% elif provider.activation_state.value == 'incompatible' %}status-error{% else %}status-waiting{% endif %}">
+          {% if provider.enrollment_state == 'approved' and provider.announcement_status == 'registering' %}
+          Approved · waiting for runtime
+          {% elif provider.announcement_status == 'registering' and provider.enrollment_state in ['not-requested', 'pending'] %}
+          Pending approval
+          {% else %}
           {{ provider.activation_state.value.replace('-', ' ')|title }}
+          {% endif %}
         </span>
       </header>
 
@@ -86,7 +93,15 @@
           {% if action.value != 'request' %}<input type="hidden" name="expected_revision" value="{{ provider.enrollment_revision }}">{% endif %}
           {% if action.value == 'suspend' %}<input type="hidden" name="reason_code" value="operator-suspended">{% endif %}
           {% if action.value == 'revoke' %}<input type="hidden" name="reason_code" value="operator-revoked">{% endif %}
-          <button type="submit" class="{% if action.value == 'approve' %}button-primary{% endif %}">{{ action.value|title }}</button>
+          <button type="submit" class="{% if action.value == 'approve' %}button-primary{% endif %}">
+            {% if action.value == 'request' %}
+            Review
+            {% elif action.value == 'revoke' and provider.enrollment_state == 'pending' %}
+            Reject
+            {% else %}
+            {{ action.value|title }}
+            {% endif %}
+          </button>
         </form>
         {% endfor %}
       </div>

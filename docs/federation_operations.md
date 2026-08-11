@@ -4,7 +4,7 @@ Status: **current operator/administrator guide**
 
 Reviewed: **2026-08-11**
 
-This guide covers the operational Federation actions that intentionally mutate trusted distributed state: pairing another device, checking for software updates, and rolling an approved update across the Federation.
+This guide covers the operational Federation actions that intentionally mutate trusted distributed state: pairing another device, reviewing pending contribution enrollment, checking for software updates, and rolling an approved update across the Federation.
 
 These actions are deliberately narrower than general remote administration. FCP does not expose a Federation shell, arbitrary process execution, peer-selected Git repositories, or unrestricted host configuration.
 
@@ -35,6 +35,33 @@ After successful pairing, the joining device persists its stable device identity
 When another physical machine must connect, open the issuing FCP installation through a LAN or VPN address reachable by the joining machine before generating the code. A code created while the product is only reachable as `localhost` cannot make that loopback address reachable from a different computer.
 
 Do not expose the Flask workbench, relay, Ollama, or recorder control surface directly to the public internet.
+
+## Review pending contributions
+
+A member may explicitly enable a supported local contribution while its runtime/control-plane authority is not yet active. The member then publishes the candidate to the Federation as **Registering** rather than silently granting itself authority.
+
+On the Federation creator/session-owner device, open:
+
+```text
+/provider-federation
+```
+
+The leader can create the durable review record and then explicitly approve, suspend, reject/revoke, or reconcile the candidate through the existing provider-enrollment authority. Other members do not receive those mutation controls.
+
+Approval and activation are deliberately separate:
+
+- approving a `REGISTERING` candidate records the leader's explicit decision;
+- the approved record remains ineligible for resource binding until the announcing member provides the existing `READY` runtime evidence;
+- storage approval does not create a storage primary/replica assignment or invent a storage-provider runtime;
+- compute approval does not start a worker or transfer executable code;
+- AI approval grants no storage or compute authority; and
+- recorder control stays on the separate bounded recorder-control path.
+
+For a newly visible candidate, **Request** first creates the durable revision-fenced enrollment record. **Approve** then records the leader decision. A pending record can be rejected through **Revoke**; the product retains the audit trail instead of deleting the candidate history.
+
+If an already-authoritative local storage provider also appears as a candidate-only row on the Storage page, that is a projection error: candidate decision IDs and storage provider IDs are separate identity domains. The Storage page should suppress the candidate-only duplicate when its explicit provider identity is already represented by storage-control-plane state.
+
+See [the active pending-contribution approval contract](implementation/federation/active/pending_contribution_approval.md) for the authority and acceptance boundary.
 
 ## Check for software updates
 
@@ -144,4 +171,5 @@ See also:
 - [Server setup](server_setup.md)
 - [Standalone recorder](standalone_recorder.md)
 - [Troubleshooting](troubleshooting.md)
+- [Pending-contribution approval contract](implementation/federation/active/pending_contribution_approval.md)
 - [Detailed update security design](implementation/federation/active/manual_updates.md)

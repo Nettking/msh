@@ -7,6 +7,13 @@
     {% if section.key == active_key %}aria-current="page"{% endif %}
   >{{ section.label }}</a>
   {% endfor %}
+  {% if provider_operator_available|default(false) %}
+  <a
+    href="{{ url_for('provider_federation_web.index') }}"
+    class="federation-section-nav__link{% if active_key == 'approvals' %} is-active{% endif %}"
+    {% if active_key == 'approvals' %}aria-current="page"{% endif %}
+  >Approvals</a>
+  {% endif %}
   <a
     href="{{ url_for('federation_recorder_web.index') }}"
     class="federation-section-nav__link{% if active_key == 'recorders' %} is-active{% endif %}"

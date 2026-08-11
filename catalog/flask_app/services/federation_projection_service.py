@@ -34,6 +34,7 @@ from .capability_onboarding_service import (
     get_capability_onboarding_service,
 )
 from .federation_device_projection import CapabilityFirstFederationDeviceAdapter
+from .read_only_storage_authority import ReadOnlyStorageAuthorityStore
 from .upload_analysis_job_service import get_upload_analysis_job_service
 
 _OPERATOR_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
@@ -159,15 +160,28 @@ def _contribution_state() -> tuple[tuple[object, ...], tuple[object, ...], bool]
         return (), (), True
 
 
-def _storage_adapter(internal_session_id: str) -> object:
-    store = current_app.config.get(_STORAGE_STORE_CONFIG_KEY)
-    if store is None:
-        return _StaticSnapshotAdapter(
-            StorageAuthoritySnapshot(True, "not-configured")
+def _storage_adapter(internal_session_id: str, coordinator: object) -> object:
+    if _STORAGE_STORE_CONFIG_KEY in current_app.config:
+        store = current_app.config.get(_STORAGE_STORE_CONFIG_KEY)
+        if store is None:
+            return _StaticSnapshotAdapter(
+                StorageAuthoritySnapshot(True, "not-configured")
+            )
+        return StorageAuthorityAdapter(
+            store,
+            internal_session_id=internal_session_id,
         )
-    return StorageAuthorityAdapter(
-        store,
-        internal_session_id=internal_session_id,
+
+    coordinator_store = getattr(coordinator, "store", None)
+    database = getattr(coordinator_store, "database", None)
+    if isinstance(database, (str, bytes)) and database:
+        return StorageAuthorityAdapter(
+            ReadOnlyStorageAuthorityStore(database),
+            internal_session_id=internal_session_id,
+        )
+
+    return _StaticSnapshotAdapter(
+        StorageAuthoritySnapshot(True, "not-configured")
     )
 
 
@@ -190,12 +204,12 @@ def _job_adapter(internal_session_id: str) -> object:
 def get_federation_projection_service() -> FederationProjectionService:
     """Build product projections from server-bound read-only authorities.
 
-    The existing provider operator surface remains the preferred authorization
-    boundary. Otherwise the durable capability-first identity and trusted
-    binding are revalidated against the existing ``SessionCoordinator``. The
-    inspection, benchmark and contribution projections read the same CFI-3,
-    CFI-4 and CFI-5 services used by onboarding. Browser parameters are never
-    accepted as actor, session, endpoint or authority context.
+    A provider operator surface is consumed only when it has already been
+    explicitly composed. Normal Federation GETs never initialize provider
+    enrollment/health authority as a side effect. Otherwise the durable
+    capability-first identity and trusted binding are revalidated against the
+    existing coordinator. Browser parameters are never accepted as actor,
+    session, endpoint or authority context.
     """
 
     surface = current_app.config.get(_OPERATOR_SURFACE_CONFIG_KEY)
@@ -274,7 +288,7 @@ def get_federation_projection_service() -> FederationProjectionService:
                 onboarding_adapter,
                 provider_adapter,
             ),
-            storage=_storage_adapter(internal_session_id),
+            storage=_storage_adapter(internal_session_id, coordinator),
             jobs=_job_adapter(internal_session_id),
         )
         return FederationProjectionService(adapters)
