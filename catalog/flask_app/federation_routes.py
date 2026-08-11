@@ -18,6 +18,11 @@ from flask import (
     url_for,
 )
 
+from catalog.federation.errors import (
+    AuthorizationError,
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.federation.projections import (
     FederationPage,
     FederationProjectionService,
@@ -28,6 +33,10 @@ from catalog.federation.projections import (
 from .capability_onboarding_routes import _CSRF_SESSION_KEY, _csrf_token
 from .services.capability_benchmark_service import get_capability_benchmark_service
 from .services.capability_onboarding_service import get_capability_onboarding_service
+from .services.federation_device_names import (
+    FederationDeviceNamingService,
+    local_device_naming_available,
+)
 from .services.federation_projection_service import (
     get_federation_projection_service,
 )
@@ -140,13 +149,7 @@ def _benchmark_item_actions(
 
 
 def _update_authority_view() -> tuple[bool, bool]:
-    """Return whether this viewer is a member and may manage software updates.
-
-    Update state is coordinated centrally, but every member renders the same
-    Federation overview. A non-coordinator member must therefore see that its
-    updates are coordinator-managed rather than a misleading local
-    ``Not checked`` state. This helper is passive and grants no authority.
-    """
+    """Return whether this viewer is a member and may manage software updates."""
 
     try:
         context = get_capability_onboarding_service().authorized_context()
@@ -178,6 +181,11 @@ def _page_response(page: FederationPage) -> Response:
         if page is FederationPage.BENCHMARKS
         else {}
     )
+    device_naming_available = (
+        local_device_naming_available()
+        if page is FederationPage.DEVICES
+        else False
+    )
     update_status = None
     if page is FederationPage.OVERVIEW:
         try:
@@ -207,9 +215,12 @@ def _page_response(page: FederationPage) -> Response:
             federation_overview=projection,
             federation_page=projection,
             federation_item_actions=item_actions,
+            federation_device_naming_available=device_naming_available,
             federation_csrf_token=(
                 _csrf_token()
-                if item_actions or page is FederationPage.OVERVIEW
+                if item_actions
+                or page is FederationPage.OVERVIEW
+                or device_naming_available
                 else None
             ),
             federation_update=update_status,
@@ -254,6 +265,32 @@ def _require_update_csrf() -> None:
         or not hmac.compare_digest(expected, supplied)
     ):
         abort(403)
+
+
+@federation_web.post("/federation/devices/name")
+def rename_device() -> Response:
+    _require_update_csrf()
+    target_node_id = str(request.form.get("target_node_id") or "")
+    display_name = request.form.get("display_name")
+    try:
+        name = FederationDeviceNamingService().rename(
+            target_node_id=target_node_id,
+            display_name=display_name,
+        )
+        flash(f"Federation device name saved as {name}.", "success")
+    except AuthorizationError:
+        flash("Only the Federation leader can assign device names.", "error")
+    except FederationValidationError as exc:
+        code = getattr(exc, "code", "invalid-device-name")
+        flash(code.replace("-", " ").capitalize(), "error")
+    except FederationOperationError:
+        flash("The selected Federation device could not be renamed.", "error")
+    except Exception as exc:  # noqa: BLE001 - diagnostics remain server-side
+        current_app.logger.warning(
+            "Federation device rename failed (%s)", type(exc).__name__
+        )
+        flash("The Federation device name could not be saved safely.", "error")
+    return redirect(url_for("federation_web.detail", page_name="devices"), code=303)
 
 
 @federation_web.post("/federation/updates/check")
