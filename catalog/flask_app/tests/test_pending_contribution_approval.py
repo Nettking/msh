@@ -18,6 +18,7 @@ from catalog.flask_app.services.pending_contribution_approval import (
     CapabilityFirstProviderEnrollmentService,
     CapabilityFirstProviderOperatorSurface,
     get_local_provider_operator_surface,
+    local_provider_operator_available,
 )
 from catalog.node.identity import IdentityStore
 
@@ -228,6 +229,41 @@ def test_approved_registering_candidate_becomes_eligible_only_after_ready_reconc
     ) == (reconciled,)
 
 
+def test_local_availability_is_read_only_until_surface_is_opened(
+    tmp_path: Path,
+) -> None:
+    coordinator, _service, owner, _member, current = _environment(tmp_path)
+
+    class Onboarding:
+        _clock = staticmethod(lambda: current[0])
+
+        def authorized_context(self):
+            return SimpleNamespace(
+                credentials=owner,
+                binding=SimpleNamespace(internal_session_id=SESSION),
+                coordinator=coordinator,
+            )
+
+    onboarding_db = tmp_path / "onboarding" / "onboarding.sqlite3"
+    enrollment_db = onboarding_db.parent / "provider_enrollment.sqlite3"
+    health_db = onboarding_db.parent / "provider_health.sqlite3"
+    app = Flask(__name__)
+    app.config.update(
+        CAPABILITY_ONBOARDING_SERVICE=Onboarding(),
+        CAPABILITY_ONBOARDING_STATE_DATABASE=onboarding_db,
+    )
+
+    with app.app_context():
+        assert local_provider_operator_available() is True
+        assert not enrollment_db.exists()
+        assert not health_db.exists()
+        surface = get_local_provider_operator_surface()
+
+    assert isinstance(surface, CapabilityFirstProviderOperatorSurface)
+    assert enrollment_db.exists()
+    assert health_db.exists()
+
+
 def test_local_surface_factory_binds_only_the_real_session_creator(
     tmp_path: Path,
 ) -> None:
@@ -252,6 +288,7 @@ def test_local_surface_factory_binds_only_the_real_session_creator(
     )
 
     with app.app_context():
+        assert local_provider_operator_available() is True
         first = get_local_provider_operator_surface()
         second = get_local_provider_operator_surface()
 
@@ -268,6 +305,7 @@ def test_remote_read_only_context_does_not_gain_leader_approval_authority(
 
     class Onboarding:
         _clock = staticmethod(lambda: current[0])
+        remote_store = SimpleNamespace(load=lambda: object())
 
         def authorized_context(self):
             return SimpleNamespace(
@@ -285,4 +323,5 @@ def test_remote_read_only_context_does_not_gain_leader_approval_authority(
     )
 
     with app.app_context():
+        assert local_provider_operator_available() is False
         assert get_local_provider_operator_surface() is None
