@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign in · FCP</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  </head>
+  <body>
+    <main class="setup-focus-main">
+      <section class="panel" style="max-width: 30rem; margin: 4rem auto;">
+        <h1>Sign in to FCP</h1>
+        <p>Use your human account. Device and Federation credentials cannot sign in here.</p>
+        <form method="post" action="{{ url_for_security('login') }}">
+          {{ login_user_form.hidden_tag() }}
+          <label>Email {{ login_user_form.email(autocomplete='username') }}</label>
+          <label>Password {{ login_user_form.password(autocomplete='current-password') }}</label>
+          <label>{{ login_user_form.remember() }} Remember me for up to 7 days</label>
+          {{ login_user_form.next() }}
+          <button type="submit">Sign in</button>
+        </form>
+        {% if login_user_form.errors %}<p class="flash flash-error">Sign-in failed. Check your credentials and account status.</p>{% endif %}
+      </section>
+    </main>
+  </body>
+</html>
