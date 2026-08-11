@@ -51,6 +51,15 @@ def _surface() -> ProviderOperatorSurface | None:
     return get_local_provider_operator_surface()
 
 
+@provider_federation_web.app_context_processor
+def _provider_operator_availability() -> dict[str, bool]:
+    try:
+        available = _surface() is not None
+    except Exception:  # noqa: BLE001 - navigation must fail closed
+        available = False
+    return {"provider_operator_available": available}
+
+
 def _csrf_token() -> str:
     value = session.get(_CSRF_SESSION_KEY)
     if not isinstance(value, str) or len(value) < 32:
