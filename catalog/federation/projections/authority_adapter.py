@@ -161,6 +161,11 @@ class FederationAuthorityAdapter:
                         break
 
             member_ids = {self._actor_node_id}
+            if isinstance(creator_node_id, str) and creator_node_id:
+                # The session creator is a member by construction, but unlike a
+                # joining peer it does not necessarily have a node.joined event.
+                # Remote viewers must still include it in their shared member view.
+                member_ids.add(creator_node_id)
             device_names: dict[str, str] = {}
             for event in events:
                 event_type = _value(event, "event_type")
