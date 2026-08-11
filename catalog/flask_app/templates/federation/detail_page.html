@@ -68,6 +68,14 @@
   </section>
   {% endif %}
 
+  {% if vm.active_section == 'devices' and federation_device_naming_available %}
+  <section class="federation-panel" role="status">
+    <span class="federation-eyebrow">Federation device names</span>
+    <h3>Name computers for operations</h3>
+    <p>Names are Federation-scoped labels. They are shown across device, service, storage, approval, and software-update views while the stable device ID remains unchanged.</p>
+  </section>
+  {% endif %}
+
   <section class="federation-panel">
     <header class="federation-panel__header">
       <div>
@@ -99,6 +107,17 @@
             </div>
             {% endfor %}
           </dl>
+          {% endif %}
+          {% if vm.active_section == 'devices' and federation_device_naming_available %}
+          <form method="post" action="{{ url_for('federation_web.rename_device') }}" style="margin-top:12px;display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+            <input type="hidden" name="_csrf_token" value="{{ federation_csrf_token }}">
+            <input type="hidden" name="target_node_id" value="{{ item.key }}">
+            <label style="display:grid;gap:4px">
+              <span>Federation name</span>
+              <input type="text" name="display_name" value="{{ item.label }}" maxlength="64" required autocomplete="off">
+            </label>
+            <button class="federation-button federation-button--secondary" type="submit">Save name</button>
+          </form>
           {% endif %}
         </div>
         <div style="display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap">
@@ -135,11 +154,7 @@
   {% if vm.technical_details %}
   <details class="federation-technical-details">
     <summary>Show technical details</summary>
-    <dl>
-      {% for detail in vm.technical_details %}
-      <div><dt>{{ detail.label }}</dt><dd><code>{{ detail.value }}</code></dd></div>
-      {% endfor %}
-    </dl>
+    <dl>{% for detail in vm.technical_details %}<div><dt>{{ detail.label }}</dt><dd><code>{{ detail.value }}</code></dd></div>{% endfor %}</dl>
     <p>Private addresses, credentials, and local provider configuration are intentionally not displayed.</p>
   </details>
   {% endif %}
