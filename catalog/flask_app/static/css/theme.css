@@ -64,6 +64,17 @@
   --violet-border: #c4b5fd;
   --marker-active: #facc15;
 
+  /* Data visualization */
+  --tooltip-bg: #0f172a;
+  --chart-1: #1d4ed8;
+  --chart-2: #15803d;
+  --chart-3: #a16207;
+  --chart-4: #7c3aed;
+  --chart-5: #be123c;
+  --chart-6: #0891b2;
+  --chart-7: #4338ca;
+  --chart-8: #0f766e;
+
   /* Elevation */
   --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.05);
   --shadow-md: 0 6px 18px rgba(15, 23, 42, 0.07);
@@ -140,6 +151,16 @@
     --violet-border: #4b3f88;
     --marker-active: #fbbf24;
 
+    --tooltip-bg: #080d15;
+    --chart-1: #60a5fa;
+    --chart-2: #4ade80;
+    --chart-3: #fbbf24;
+    --chart-4: #a78bfa;
+    --chart-5: #fb7185;
+    --chart-6: #22d3ee;
+    --chart-7: #818cf8;
+    --chart-8: #2dd4bf;
+
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
     --shadow-md: 0 8px 22px rgba(0, 0, 0, 0.42);
     --shadow-lg: 0 20px 46px rgba(0, 0, 0, 0.5);
@@ -195,6 +216,16 @@
   --violet-soft: #1c1934;
   --violet-border: #4b3f88;
   --marker-active: #fbbf24;
+
+  --tooltip-bg: #080d15;
+  --chart-1: #60a5fa;
+  --chart-2: #4ade80;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #fb7185;
+  --chart-6: #22d3ee;
+  --chart-7: #818cf8;
+  --chart-8: #2dd4bf;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
   --shadow-md: 0 8px 22px rgba(0, 0, 0, 0.42);
@@ -380,5 +411,18 @@ code, kbd, samp, pre {
 
   :root:not([data-theme="light"]) .theme-toggle__icon--light {
     display: none;
+  }
+}
+
+/* A 340px Live card cannot fit inside a 320px viewport after page gutters.
+   This higher-specificity guard overrides the component track minimum without
+   changing the denser two-column desktop layout. */
+@media (max-width: 380px) {
+  body .live-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body .live-card .kv-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
