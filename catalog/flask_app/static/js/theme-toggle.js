@@ -47,9 +47,16 @@
     }
   }
 
+  function announce(theme) {
+    document.dispatchEvent(
+      new CustomEvent("fcp:themechange", { detail: { theme: theme } })
+    );
+  }
+
   function apply(theme) {
     root.setAttribute("data-theme", theme);
     syncButtons(theme);
+    announce(theme);
   }
 
   function bind() {
@@ -73,6 +80,7 @@
       }
       root.removeAttribute("data-theme");
       syncButtons(systemTheme());
+      announce(systemTheme());
     };
     if (query.addEventListener) {
       query.addEventListener("change", onChange);

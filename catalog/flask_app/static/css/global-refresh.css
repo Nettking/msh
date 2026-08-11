@@ -1,7 +1,13 @@
+/* The gradient sits on html so short pages still fill the viewport and long
+   ones stay smooth; background-attachment: fixed janks badly on iOS. */
+html {
+  min-height: 100%;
+  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+}
+
 body {
   min-height: 100vh;
-  background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
-  background-attachment: fixed;
+  background: transparent;
 }
 
 /* The shell header is padded to the content column so the header, the page

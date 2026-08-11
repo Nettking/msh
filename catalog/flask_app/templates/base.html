@@ -33,6 +33,8 @@
     {% if not document_recorder_only %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <!-- Not deferred: page charts are constructed inline and must see themed defaults. -->
+    <script src="{{ url_for('static', filename='js/chart-theme.js') }}"></script>
     {% endif %}
   </head>
   {% set endpoint = request.endpoint or '' %}

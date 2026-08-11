@@ -156,6 +156,17 @@ p { margin: 0; color: var(--text-muted); }
   margin-bottom: 18px;
 }
 
+/* Small kicker above a page or panel heading. */
+.eyebrow {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--accent-text);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+}
+
 .page-intro p {
   margin-top: 8px;
   max-width: 78ch;
