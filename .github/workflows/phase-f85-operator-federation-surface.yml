@@ -92,6 +92,7 @@ jobs:
           catalog/flask_app/tests/test_docs_viewer.py
           catalog/flask_app/tests/test_provider_federation_surface.py
           catalog/flask_app/tests/test_pending_contribution_approval.py
+          catalog/flask_app/tests/test_pending_contribution_surface_upgrade.py
           catalog/flask_app/tests/test_read_only_storage_authority.py
           catalog/flask_app/tests/test_device_state_reset.py
           catalog/flask_app/tests/test_local_capability_candidates.py
@@ -139,6 +140,7 @@ jobs:
           catalog/flask_app/tests/test_docs_viewer.py
           catalog/flask_app/tests/test_provider_federation_surface.py
           catalog/flask_app/tests/test_pending_contribution_approval.py
+          catalog/flask_app/tests/test_pending_contribution_surface_upgrade.py
           catalog/flask_app/tests/test_read_only_storage_authority.py
           catalog/flask_app/tests/test_device_state_reset.py
           catalog/flask_app/tests/test_federation_auto_reconnect.py
