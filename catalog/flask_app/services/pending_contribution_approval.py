@@ -298,26 +298,72 @@ def local_provider_operator_available(app: Flask | None = None) -> bool:
     return _local_creator_context(selected) is not None
 
 
+def _surface_paths(
+    app: Flask,
+    coordinator: SessionCoordinator,
+    configured: ProviderOperatorSurface | None,
+) -> tuple[Path, Path]:
+    if configured is not None:
+        enrollment_store = getattr(configured.enrollment, "store", None)
+        health_store = getattr(configured.health, "store", None)
+        enrollment_database = getattr(enrollment_store, "database", None)
+        health_database = getattr(health_store, "database", None)
+        if isinstance(enrollment_database, str) and isinstance(health_database, str):
+            return Path(enrollment_database), Path(health_database)
+    return (
+        _authority_database_path(
+            app,
+            coordinator,
+            "CAPABILITY_PROVIDER_ENROLLMENT_DATABASE",
+            _DEFAULT_ENROLLMENT_NAME,
+        ),
+        _authority_database_path(
+            app,
+            coordinator,
+            "CAPABILITY_PROVIDER_HEALTH_DATABASE",
+            _DEFAULT_HEALTH_NAME,
+        ),
+    )
+
+
 def get_local_provider_operator_surface(
     app: Flask | None = None,
 ) -> ProviderOperatorSurface | None:
-    """Build the durable operator surface only on the local session creator.
+    """Build/upgrade the durable operator surface on the local session creator.
 
-    Merely rendering normal Federation pages uses
-    :func:`local_provider_operator_available` and never initializes enrollment or
-    health storage. The explicit approval surface reuses the relay's existing
-    F8.1/F8.2 sidecar databases next to coordinator authority.
+    A previously composed generic F8.5 surface (for example from the federated AI
+    bridge) is upgraded in-place semantically: the same coordinator, enrollment
+    database, health database, AI authority and compute authority are retained,
+    while the capability-first pending-approval rule is added. This prevents
+    startup ordering from deciding whether a REGISTERING candidate can be
+    reviewed.
+
+    Remotely paired members and explicit non-owner test surfaces remain unchanged.
     """
 
     selected = _selected_app(app)
-    configured = selected.config.get("PROVIDER_OPERATOR_SURFACE")
-    if isinstance(configured, ProviderOperatorSurface):
+    configured_value = selected.config.get("PROVIDER_OPERATOR_SURFACE")
+    configured = (
+        configured_value
+        if isinstance(configured_value, ProviderOperatorSurface)
+        else None
+    )
+    if isinstance(configured, CapabilityFirstProviderOperatorSurface):
         return configured
 
     resolved = _local_creator_context(selected)
     if resolved is None:
-        return None
+        return configured
     onboarding, coordinator, session_id, actor_node_id = resolved
+
+    if configured is not None and (
+        configured.session_id != session_id
+        or configured.actor_node_id != actor_node_id
+        or configured.enrollment.coordinator.store.database
+        != coordinator.store.database
+    ):
+        # Never transplant authority from a differently bound configured surface.
+        return None
 
     cache = selected.extensions.get(_EXTENSION_KEY)
     cache_key = (session_id, actor_node_id, str(coordinator.store.database))
@@ -325,34 +371,25 @@ def get_local_provider_operator_surface(
         isinstance(cache, tuple)
         and len(cache) == 2
         and cache[0] == cache_key
-        and isinstance(cache[1], ProviderOperatorSurface)
+        and isinstance(cache[1], CapabilityFirstProviderOperatorSurface)
     ):
         selected.config["PROVIDER_OPERATOR_SURFACE"] = cache[1]
         return cache[1]
 
+    enrollment_path, health_path = _surface_paths(
+        selected,
+        coordinator,
+        configured,
+    )
     clock = getattr(onboarding, "_clock", lambda: datetime.now(timezone.utc))
     enrollments = CapabilityFirstProviderEnrollmentService(
         coordinator,
-        SQLiteProviderEnrollmentStore(
-            _authority_database_path(
-                selected,
-                coordinator,
-                "CAPABILITY_PROVIDER_ENROLLMENT_DATABASE",
-                _DEFAULT_ENROLLMENT_NAME,
-            )
-        ),
+        SQLiteProviderEnrollmentStore(enrollment_path),
         clock=clock,
     )
     health = FederatedProviderHealthService(
         enrollments,
-        SQLiteProviderHealthStore(
-            _authority_database_path(
-                selected,
-                coordinator,
-                "CAPABILITY_PROVIDER_HEALTH_DATABASE",
-                _DEFAULT_HEALTH_NAME,
-            )
-        ),
+        SQLiteProviderHealthStore(health_path),
         clock=clock,
     )
     surface = CapabilityFirstProviderOperatorSurface(
@@ -360,6 +397,10 @@ def get_local_provider_operator_surface(
         health,
         session_id=session_id,
         actor_node_id=actor_node_id,
+        ai_authority=(None if configured is None else configured.ai_authority),
+        compute_authority=(
+            None if configured is None else configured.compute_authority
+        ),
         clock=clock,
     )
     selected.extensions[_EXTENSION_KEY] = (cache_key, surface)
