@@ -28,6 +28,10 @@ from catalog.federation.errors import (
     ProtocolCompatibilityError,
 )
 
+from .services.pending_contribution_approval import (
+    get_local_provider_operator_surface,
+)
+
 provider_federation_web = Blueprint(
     "provider_federation_web",
     __name__,
@@ -42,7 +46,9 @@ _FORBIDDEN_CONTEXT_FIELDS = frozenset({"actor_node_id", "session_id"})
 
 def _surface() -> ProviderOperatorSurface | None:
     value = current_app.config.get(_SURFACE_CONFIG_KEY)
-    return value if isinstance(value, ProviderOperatorSurface) else None
+    if isinstance(value, ProviderOperatorSurface):
+        return value
+    return get_local_provider_operator_surface()
 
 
 def _csrf_token() -> str:
