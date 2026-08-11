@@ -21,6 +21,7 @@ from catalog.flask_app.services.pending_contribution_approval import (
     local_provider_operator_available,
 )
 from catalog.node.identity import IdentityStore
+from catalog.relay.provider_service import provider_authority_paths
 
 NOW = datetime(2026, 8, 11, 9, tzinfo=timezone.utc)
 SESSION = "session-pending-contributions"
@@ -244,9 +245,7 @@ def test_local_availability_is_read_only_until_surface_is_opened(
                 coordinator=coordinator,
             )
 
-    coordinator_db = Path(coordinator.store.database)
-    enrollment_db = coordinator_db.with_name("provider_enrollment.sqlite3")
-    health_db = coordinator_db.with_name("provider_health.sqlite3")
+    enrollment_db, health_db = provider_authority_paths(coordinator)
     app = Flask(__name__)
     app.config.update(
         CAPABILITY_ONBOARDING_SERVICE=Onboarding(),
