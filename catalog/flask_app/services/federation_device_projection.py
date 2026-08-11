@@ -9,8 +9,6 @@ from catalog.federation.projections import (
     OnboardingSnapshot,
 )
 
-from .federation_device_names import FederationDeviceNameAdapter
-
 _RETIRED_PRODUCT_NAME = bytes((109, 115, 104)).decode("ascii")
 _GENERIC_REMOTE_SELF_LABELS = frozenset(
     {
@@ -30,13 +28,8 @@ class CapabilityFirstFederationDeviceAdapter:
     whose coordinator-authorized status is ``ready``. Disabled capabilities remain
     visible on the Services surface and are never discarded from authority state.
 
-    Federation-scoped names are overlaid from the authoritative event log before
-    any generic remote-self label translation. An assigned name therefore follows
-    the same stable node ID across every trusted member's read-only projections.
-
     The adapter also makes a generic remote self-label relative to this viewer.
-    It never creates membership, liveness, provider, storage, compute, or naming
-    authority.
+    It never creates membership, liveness, provider, storage, or compute authority.
     """
 
     def __init__(
@@ -49,27 +42,8 @@ class CapabilityFirstFederationDeviceAdapter:
         self._onboarding = onboarding
         self._providers = providers
 
-    def _named_snapshot(self) -> object:
-        coordinator = getattr(self._authority, "_coordinator", None)
-        actor_node_id = getattr(self._authority, "_actor_node_id", None)
-        session_id = getattr(self._authority, "_internal_session_id", None)
-        if (
-            coordinator is None
-            or not isinstance(actor_node_id, str)
-            or not actor_node_id
-            or not isinstance(session_id, str)
-            or not session_id
-        ):
-            return self._authority.snapshot()
-        return FederationDeviceNameAdapter(
-            self._authority,
-            coordinator,
-            session_id=session_id,
-            actor_node_id=actor_node_id,
-        ).snapshot()
-
     def snapshot(self) -> FederationAuthoritySnapshot:
-        federation = self._named_snapshot()
+        federation = self._authority.snapshot()
         onboarding = self._onboarding.snapshot()
         if not isinstance(federation, FederationAuthoritySnapshot):
             return federation
