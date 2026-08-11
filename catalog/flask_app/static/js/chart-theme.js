@@ -8,11 +8,35 @@
     return;
   }
 
+  var LEGACY_SERIES_INDEX = {
+    "#1d4ed8": 0,
+    "#15803d": 1,
+    "#a16207": 2,
+    "#7c3aed": 3,
+    "#be123c": 4,
+    "#0891b2": 5,
+    "#4338ca": 6,
+    "#0f766e": 7
+  };
+
   function token(name, fallback) {
     var value = getComputedStyle(document.documentElement)
       .getPropertyValue(name)
       .trim();
     return value || fallback;
+  }
+
+  function seriesPalette() {
+    return [
+      token("--chart-1", "#1d4ed8"),
+      token("--chart-2", "#15803d"),
+      token("--chart-3", "#a16207"),
+      token("--chart-4", "#7c3aed"),
+      token("--chart-5", "#be123c"),
+      token("--chart-6", "#0891b2"),
+      token("--chart-7", "#4338ca"),
+      token("--chart-8", "#0f766e")
+    ];
   }
 
   function applyDefaults() {
@@ -27,8 +51,33 @@
       Chart.defaults.plugins.legend.labels.color = token("--text", "#0f172a");
     }
     if (Chart.defaults.plugins && Chart.defaults.plugins.tooltip) {
-      Chart.defaults.plugins.tooltip.backgroundColor = token("--text", "#0f172a");
+      Chart.defaults.plugins.tooltip.backgroundColor = token("--tooltip-bg", "#0f172a");
+      Chart.defaults.plugins.tooltip.titleColor = token("--on-solid", "#ffffff");
+      Chart.defaults.plugins.tooltip.bodyColor = token("--on-solid", "#ffffff");
+      Chart.defaults.plugins.tooltip.footerColor = token("--on-solid", "#ffffff");
     }
+  }
+
+  function refreshSeries(chart) {
+    if (!chart.config || !chart.config.data || !Array.isArray(chart.config.data.datasets)) {
+      return;
+    }
+    var palette = seriesPalette();
+    chart.config.data.datasets.forEach(function (dataset) {
+      var paletteIndex = Number.isInteger(dataset._fcpThemeSeriesIndex)
+        ? dataset._fcpThemeSeriesIndex
+        : null;
+      if (paletteIndex === null && typeof dataset.borderColor === "string") {
+        var legacyIndex = LEGACY_SERIES_INDEX[dataset.borderColor.toLowerCase()];
+        if (Number.isInteger(legacyIndex)) {
+          paletteIndex = legacyIndex;
+          dataset._fcpThemeSeriesIndex = legacyIndex;
+        }
+      }
+      if (paletteIndex !== null) {
+        dataset.borderColor = palette[paletteIndex % palette.length];
+      }
+    });
   }
 
   // Chart.js caches resolved scale options, so changing the defaults alone
@@ -59,12 +108,22 @@
           scale.title.color = Chart.defaults.color;
         }
       });
+      refreshSeries(chart);
       chart.config.options = options;
       chart.update("none");
     }
   }
 
   applyDefaults();
+
+  // chart-theme.js is loaded in the head before inline page charts are built.
+  // Revisit them after DOMContentLoaded so initial Playback charts also receive
+  // the theme-aware series palette rather than waiting for the first toggle.
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", refreshExistingCharts);
+  } else {
+    refreshExistingCharts();
+  }
 
   document.addEventListener("fcp:themechange", function () {
     applyDefaults();
