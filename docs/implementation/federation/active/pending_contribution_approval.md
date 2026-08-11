@@ -25,6 +25,8 @@ For one `REGISTERING` capability-first candidate the leader may:
 
 Non-creator members remain read-only.
 
+The supported relay already persists F8.1 provider enrollment and F8.2 provider health in sidecar databases beside the coordinator database. The Flask leader surface must reuse those exact durable authority stores. It must never create a second onboarding-local enrollment/health authority that could disagree with the relay.
+
 Every mutation remains server-bound to the authenticated actor/session and uses the existing CSRF, command-id/idempotency, revision-fencing, and provider-enrollment audit boundaries. The browser must not supply a node identity, session identity, provider endpoint, executable path, storage path, credential, or arbitrary authority payload.
 
 ## Approval is not automatic activation
@@ -75,8 +77,9 @@ The implementation is complete when tests prove all of the following:
 4. Reconciliation to a matching `READY` announcement can make the already-approved record eligible without creating a second approval authority.
 5. A non-owner cannot approve/reject.
 6. The production Flask composition exposes the leader operator surface from the existing trusted local Federation context rather than requiring arbitrary config injection.
-7. The Storage projection does not render the creator's already-authoritative local storage as an additional candidate-only card.
-8. Existing provider/storage/compute authority tests remain fail-closed: approval alone never assigns storage, starts compute, executes handlers, or grants unrelated authority.
+7. The Flask leader surface uses the same provider enrollment/health authority files as the supported relay composition.
+8. The Storage projection does not render the creator's already-authoritative local storage as an additional candidate-only card.
+9. Existing provider/storage/compute authority tests remain fail-closed: approval alone never assigns storage, starts compute, executes handlers, or grants unrelated authority.
 
 ## Relation to the 2026-08-11 documentation reconciliation
 
