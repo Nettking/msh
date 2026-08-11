@@ -11,6 +11,7 @@ from flask import Flask, current_app, request
 
 from .capability_recovery_adapters import fresh_capability_inspection_adapters
 from .federated_ai_product_bridge import FederatedAIProductBridge
+from .federated_telemetry_product_bridge import FederatedTelemetryProductBridge
 from .federation_contribution_publication import publish_local_contributions
 from .federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
@@ -232,6 +233,7 @@ class SavedFederationReconnectMonitor:
         self.app = app
         self.service = service
         self.ai_bridge = FederatedAIProductBridge(app, service)
+        self.telemetry_bridge = FederatedTelemetryProductBridge(app, service)
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._wake = threading.Event()
@@ -355,6 +357,13 @@ class SavedFederationReconnectMonitor:
             return
         self.ai_bridge.sync(runtime_state, context)
 
+    def _sync_federated_telemetry(
+        self,
+        runtime_state: RemotePairingState,
+        context: object,
+    ) -> None:
+        self.telemetry_bridge.sync(runtime_state, context)
+
     def _run(self) -> None:
         failures = 0
         while not self._stop.is_set():
@@ -380,6 +389,13 @@ class SavedFederationReconnectMonitor:
                     except Exception as exc:  # noqa: BLE001 - provider sync is fail-closed
                         self.app.logger.info(
                             "Federation remote AI authority refresh unavailable (%s)",
+                            type(exc).__name__,
+                        )
+                    try:
+                        self._sync_federated_telemetry(runtime_state, context)
+                    except Exception as exc:  # noqa: BLE001 - storage reads fail closed
+                        self.app.logger.info(
+                            "Federation telemetry mirror refresh unavailable (%s)",
                             type(exc).__name__,
                         )
             except Exception as exc:  # noqa: BLE001 - network retry boundary
@@ -437,6 +453,9 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
     app.extensions[_RECONNECT_EXTENSION_KEY] = monitor
     app.extensions[_UPDATE_PROCESSOR_EXTENSION_KEY] = update_monitor
     app.extensions["federated_ai_product_bridge"] = monitor.ai_bridge
+    app.extensions["federated_telemetry_product_bridge"] = (
+        monitor.telemetry_bridge
+    )
     install_recorder_federation_publication(
         app,
         onboarding_service=service,

@@ -243,8 +243,9 @@ def _path_machine_hints(source_artifacts: list[dict[str, Any]]) -> set[str]:
     hints: set[str] = set()
     for artifact in source_artifacts:
         path = Path(str(artifact.get("path") or ""))
-        if len(path.parts) >= 3 and path.parts[-3].lower() == "data":
-            hints.add(path.parts[-2])
+        hint = _machine_from_path(path)
+        if hint:
+            hints.add(hint)
     return {item for item in hints if item}
 
 
@@ -292,9 +293,25 @@ def _recent_rows_by_machine(
         source_artifacts,
         key=lambda item: (str(item.get("modified_at") or ""), str(item.get("path") or "")),
         reverse=True,
-    )[:max_recent_artifacts]
-
+    )
+    # Apply the bound per source rather than globally. A busy recorder can
+    # otherwise occupy every one of the newest slots and hide quieter machines
+    # from the Federation view indefinitely.
+    selected_artifacts: list[dict[str, Any]] = []
+    selected_per_source: dict[str, int] = {}
+    total_limit = max(max_recent_artifacts, max_recent_artifacts * 64)
     for artifact in sorted_artifacts:
+        path = Path(str(artifact.get("path") or ""))
+        source_key = _artifact_source_key(path)
+        used = selected_per_source.get(source_key, 0)
+        if used >= max_recent_artifacts:
+            continue
+        selected_artifacts.append(artifact)
+        selected_per_source[source_key] = used + 1
+        if len(selected_artifacts) >= total_limit:
+            break
+
+    for artifact in selected_artifacts:
         path = Path(str(artifact.get("path") or ""))
         if not path.exists():
             continue
@@ -312,9 +329,37 @@ def _recent_rows_by_machine(
 
 
 def _machine_from_path(path: Path) -> str:
-    if len(path.parts) >= 3 and path.parts[-3].lower() == "data":
-        return path.parts[-2]
+    lowered = tuple(part.lower() for part in path.parts)
+    recorder_prefix = ("sources", "mtconnect_recorder", "jsonl")
+    for index in range(len(lowered) - len(recorder_prefix) + 1):
+        if lowered[index : index + 3] == recorder_prefix:
+            source_index = index + 3
+            if source_index < len(path.parts):
+                return path.parts[source_index]
+    for index, part in enumerate(lowered[:-2]):
+        if part == "data":
+            candidate = path.parts[index + 1]
+            if candidate.lower() not in {"federation", "sources"}:
+                return candidate
     return ""
+
+
+def _artifact_source_key(path: Path) -> str:
+    hint = _machine_from_path(path)
+    if hint:
+        return f"machine:{hint.casefold()}"
+    lowered = tuple(part.lower() for part in path.parts)
+    for index in range(len(lowered) - 2):
+        if lowered[index : index + 3] == (
+            "federation",
+            "shared",
+            "telemetry",
+        ):
+            # Mirror files are immutable, locally generated projections with one
+            # dataset per hashed filename. Treat each as a fairness bucket
+            # without exposing the remote dataset identity in a path.
+            return f"federated:{path.stem.casefold()}"
+    return f"directory:{path.parent.as_posix().casefold()}"
 
 
 def _tail_jsonl_records(path: Path, *, max_records: int) -> list[dict[str, Any]]:

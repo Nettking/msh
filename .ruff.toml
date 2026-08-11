@@ -1,0 +1,6 @@
+# Keep lint exceptions narrow and auditable.
+# recorder_storage_relay intentionally works with duck-typed relay adapters;
+# the constant getattr preserves compatibility with those adapters while the
+# concrete RelayNodeClient surface continues to evolve.
+[lint.per-file-ignores]
+"catalog/federation/recorder_storage_relay.py" = ["B009"]

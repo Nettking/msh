@@ -364,6 +364,9 @@ class PhaseDControlPlane:
             ensure_ascii=False,
             allow_nan=False,
         ).encode("utf-8")
+        source_id, first_sequence, last_sequence = (
+            self._manifest_source_metadata(request)
+        )
         return self.manifests.prepare_intent(
             ManifestCommitIntent(
                 session_id=authority.session_id,
@@ -376,9 +379,9 @@ class PhaseDControlPlane:
                 size_bytes=len(encoded_content),
                 schema_name=request.dataset_schema_name,
                 schema_version=request.dataset_schema_version,
-                source_id=None,
-                first_sequence=None,
-                last_sequence=None,
+                source_id=source_id,
+                first_sequence=first_sequence,
+                last_sequence=last_sequence,
                 dataset_required=True,
                 primary_provider_id=primary_provider_id,
                 assigned_replica_ids=assigned_replicas,
@@ -391,6 +394,50 @@ class PhaseDControlPlane:
                 prepared_at=now,
             )
         )
+
+    @staticmethod
+    def _manifest_source_metadata(
+        request: BatchIngestRequest,
+    ) -> tuple[str | None, int | None, int | None]:
+        """Extract recorder coverage only from a self-consistent known schema.
+
+        Older and opaque datasets intentionally remain catalogued without source
+        coverage.  The logical-storage authority performs the stricter producer
+        authentication; this helper merely prevents already validated recorder
+        sequence evidence from being discarded when the authoritative manifest
+        intent is created.
+        """
+
+        if (
+            request.dataset_schema_name != "fcp.mtconnect.observations"
+            or request.dataset_schema_version != 1
+            or not request.dataset_id.startswith("mtconnect:")
+            or not isinstance(request.content, dict)
+            or request.content.get("schema")
+            != "fcp.mtconnect.observations.v1"
+        ):
+            return None, None, None
+        first = request.content.get("first_sequence")
+        last = request.content.get("last_sequence")
+        observations = request.content.get("observations")
+        if (
+            isinstance(first, bool)
+            or not isinstance(first, int)
+            or first < 0
+            or isinstance(last, bool)
+            or not isinstance(last, int)
+            or last < first
+            or not isinstance(observations, list)
+            or not observations
+        ):
+            return None, None, None
+        sequences = [
+            value.get("sequence") if isinstance(value, dict) else None
+            for value in observations
+        ]
+        if sequences != list(range(first, last + 1)):
+            return None, None, None
+        return request.dataset_id, first, last
 
     @staticmethod
     def _request_matches_intent(

@@ -16,6 +16,12 @@ from catalog.federation.errors import (
     FederationOperationError,
 )
 from catalog.federation.models import CapabilityAnnouncement, SessionEvent
+from catalog.federation.recorder_storage_relay import RelayRecorderStorageClient
+from catalog.federation.storage_catalog import (
+    CommittedBatchDeltaPage,
+    CommittedBatchPage,
+    CommittedBatchReference,
+)
 from catalog.federation.onboarding_models import (
     FederationConnectionState,
     FederationSessionBinding,
@@ -198,6 +204,150 @@ class ResilientPairingRelayRuntime(PairingRelayRuntime):
                 state,
                 capability,
                 request_id=request_id,
+            )
+        )
+
+    async def _list_committed_batches(
+        self,
+        state: RemotePairingState,
+        *,
+        authority_node_id: str,
+        group_id: str,
+        dataset_id: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> CommittedBatchPage:
+        await self._ensure_connected(state)
+        storage = RelayRecorderStorageClient(
+            self._connected_client(),
+            session_id=state.binding.internal_session_id,
+            authority_node_id=authority_node_id,
+            request_timeout=min(self.timeout_seconds, 60.0),
+        )
+        try:
+            return await storage.list_committed_batches(
+                group_id=group_id,
+                dataset_id=dataset_id,
+                limit=limit,
+                cursor=cursor,
+            )
+        finally:
+            await storage.close()
+
+    def list_committed_batches(
+        self,
+        state: RemotePairingState,
+        *,
+        authority_node_id: str,
+        group_id: str,
+        dataset_id: str | None = None,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> CommittedBatchPage:
+        """Discover committed storage through the shared authenticated client."""
+
+        return self._submit(
+            self._list_committed_batches(
+                state,
+                authority_node_id=authority_node_id,
+                group_id=group_id,
+                dataset_id=dataset_id,
+                limit=limit,
+                cursor=cursor,
+            )
+        )
+
+    async def _list_committed_batch_delta(
+        self,
+        state: RemotePairingState,
+        *,
+        authority_node_id: str,
+        group_id: str,
+        baseline_manifest_revision: int,
+        baseline_manifest_hash: str,
+        dataset_id: str | None,
+        limit: int,
+        cursor: str | None,
+    ) -> CommittedBatchDeltaPage:
+        await self._ensure_connected(state)
+        storage = RelayRecorderStorageClient(
+            self._connected_client(),
+            session_id=state.binding.internal_session_id,
+            authority_node_id=authority_node_id,
+            request_timeout=min(self.timeout_seconds, 60.0),
+        )
+        try:
+            return await storage.list_committed_batch_delta(
+                group_id=group_id,
+                baseline_manifest_revision=baseline_manifest_revision,
+                baseline_manifest_hash=baseline_manifest_hash,
+                dataset_id=dataset_id,
+                limit=limit,
+                cursor=cursor,
+            )
+        finally:
+            await storage.close()
+
+    def list_committed_batch_delta(
+        self,
+        state: RemotePairingState,
+        *,
+        authority_node_id: str,
+        group_id: str,
+        baseline_manifest_revision: int,
+        baseline_manifest_hash: str,
+        dataset_id: str | None = None,
+        limit: int = 20,
+        cursor: str | None = None,
+    ) -> CommittedBatchDeltaPage:
+        """Discover commits after one exact trusted manifest checkpoint."""
+
+        return self._submit(
+            self._list_committed_batch_delta(
+                state,
+                authority_node_id=authority_node_id,
+                group_id=group_id,
+                baseline_manifest_revision=baseline_manifest_revision,
+                baseline_manifest_hash=baseline_manifest_hash,
+                dataset_id=dataset_id,
+                limit=limit,
+                cursor=cursor,
+            )
+        )
+
+    async def _read_committed_batch(
+        self,
+        state: RemotePairingState,
+        *,
+        authority_node_id: str,
+        reference: CommittedBatchReference,
+    ) -> object:
+        await self._ensure_connected(state)
+        storage = RelayRecorderStorageClient(
+            self._connected_client(),
+            session_id=state.binding.internal_session_id,
+            authority_node_id=authority_node_id,
+            request_timeout=min(self.timeout_seconds, 60.0),
+        )
+        try:
+            return await storage.read_committed_batch(reference)
+        finally:
+            await storage.close()
+
+    def read_committed_batch(
+        self,
+        state: RemotePairingState,
+        *,
+        authority_node_id: str,
+        reference: CommittedBatchReference,
+    ) -> object:
+        """Fetch one manifest-pinned batch through the authenticated authority."""
+
+        return self._submit(
+            self._read_committed_batch(
+                state,
+                authority_node_id=authority_node_id,
+                reference=reference,
             )
         )
 

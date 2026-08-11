@@ -8,10 +8,12 @@ import pytest
 
 import catalog.node.client as node_client_module
 from catalog.federation.models import SessionEvent
+from catalog.federation.protocol import RelayEnvelope
 from catalog.node.client import RelayNodeClient, RelayRemoteError
 from catalog.node.state import (
     ConnectionState,
     EnrollmentState,
+    NodeStateError,
     ReconnectPolicy,
 )
 
@@ -51,6 +53,236 @@ def _gap_event(client: RelayNodeClient, session_id: str = "session-a") -> Sessio
         actor_node_id="remote-node",
         payload={"revision": 2},
     )
+
+
+def _relay_message(
+    client: RelayNodeClient,
+    *,
+    request_id: str,
+    session_id: str,
+    actor_node_id: str,
+    correlation_id: str,
+) -> RelayEnvelope:
+    return RelayEnvelope(
+        request_id=request_id,
+        session_id=session_id,
+        actor_node_id=actor_node_id,
+        target_node_id=client.node_id,
+        message_type="relay.message",
+        authorization_context={"kind": "authenticated-node"},
+        payload={"correlation_id": correlation_id, "status": "ok"},
+        sent_at=client._clock(),
+    )
+
+
+def test_message_response_is_claimed_before_the_shared_inbound_queue(
+    tmp_path: Path,
+) -> None:
+    class FakeWebSocket:
+        def __init__(self, messages: list[str]) -> None:
+            self._messages = iter(messages)
+
+        def __aiter__(self) -> FakeWebSocket:
+            return self
+
+        async def __anext__(self) -> str:
+            try:
+                return next(self._messages)
+            except StopIteration as error:
+                raise StopAsyncIteration from error
+
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        sent = asyncio.Event()
+        release_delivery = asyncio.Event()
+        sent_payload: dict[str, Any] = {}
+
+        async def send_message(
+            *,
+            session_id: str,
+            target_node_id: str,
+            payload: dict[str, Any],
+            request_id: str | None = None,
+        ) -> dict[str, Any]:
+            assert session_id == "session-a"
+            assert target_node_id == "remote-node"
+            assert request_id is None
+            sent_payload.update(payload)
+            sent.set()
+            await release_delivery.wait()
+            return {"delivered": True}
+
+        client.send_message = send_message  # type: ignore[method-assign]
+        request = asyncio.create_task(
+            client.request_message_response(
+                "session-a",
+                "remote-node",
+                {"kind": "test.request"},
+                "correlation-a",
+            )
+        )
+        await asyncio.wait_for(sent.wait(), timeout=1)
+
+        wrong_actor = _relay_message(
+            client,
+            request_id="wrong-actor",
+            session_id="session-a",
+            actor_node_id="other-node",
+            correlation_id="correlation-a",
+        )
+        wrong_session = _relay_message(
+            client,
+            request_id="wrong-session",
+            session_id="session-b",
+            actor_node_id="remote-node",
+            correlation_id="correlation-a",
+        )
+        valid = _relay_message(
+            client,
+            request_id="valid-reply",
+            session_id="session-a",
+            actor_node_id="remote-node",
+            correlation_id="correlation-a",
+        )
+        websocket = FakeWebSocket(
+            [
+                wrong_actor.to_json(),
+                wrong_session.to_json(),
+                valid.to_json(),
+            ]
+        )
+        disconnect_codes: list[str | None] = []
+
+        async def disconnect(*, error_code: str | None = None) -> None:
+            disconnect_codes.append(error_code)
+
+        client._websocket = websocket  # type: ignore[assignment]
+        client.disconnect = disconnect  # type: ignore[method-assign]
+        await client._receiver_loop()
+        release_delivery.set()
+
+        assert await asyncio.wait_for(request, timeout=1) == valid
+        assert sent_payload == {
+            "kind": "test.request",
+            "correlation_id": "correlation-a",
+        }
+        assert await client.receive_message(timeout=1) == wrong_actor
+        assert await client.receive_message(timeout=1) == wrong_session
+        assert client._inbound.empty()
+        assert client._pending_message_responses == {}
+        assert disconnect_codes == [None]
+
+    asyncio.run(scenario())
+
+
+def test_message_response_rejects_duplicate_and_bounded_pending_ids(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def scenario() -> None:
+        monkeypatch.setattr(
+            node_client_module,
+            "MAX_PENDING_MESSAGE_RESPONSES",
+            1,
+        )
+        client = _client(tmp_path)
+        sending = asyncio.Event()
+
+        async def blocked_send(**_: Any) -> dict[str, Any]:
+            sending.set()
+            await asyncio.Event().wait()
+
+        client.send_message = blocked_send  # type: ignore[method-assign]
+        first = asyncio.create_task(
+            client.request_message_response(
+                "session-a",
+                "remote-node",
+                {},
+                "correlation-a",
+            )
+        )
+        await asyncio.wait_for(sending.wait(), timeout=1)
+
+        with pytest.raises(NodeStateError) as duplicate:
+            await client.request_message_response(
+                "session-a",
+                "remote-node",
+                {},
+                "correlation-a",
+            )
+        assert duplicate.value.code == "duplicate-local-correlation-id"
+
+        with pytest.raises(NodeStateError) as bounded:
+            await client.request_message_response(
+                "session-a",
+                "remote-node",
+                {},
+                "correlation-b",
+            )
+        assert bounded.value.code == "too-many-pending-message-responses"
+
+        first.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await first
+        assert client._pending_message_responses == {}
+
+    asyncio.run(scenario())
+
+
+def test_message_response_requires_delivery_confirmation(tmp_path: Path) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+
+        async def undelivered(**_: Any) -> dict[str, Any]:
+            return {"delivered": False}
+
+        client.send_message = undelivered  # type: ignore[method-assign]
+        with pytest.raises(RelayRemoteError) as rejected:
+            await client.request_message_response(
+                "session-a",
+                "remote-node",
+                {},
+                "correlation-a",
+            )
+
+        assert rejected.value.code == "message-delivery-not-confirmed"
+        assert client._pending_message_responses == {}
+
+    asyncio.run(scenario())
+
+
+def test_disconnect_fails_and_clears_pending_message_responses(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        delivered = asyncio.Event()
+
+        async def send_message(**_: Any) -> dict[str, Any]:
+            delivered.set()
+            return {"delivered": True}
+
+        client.send_message = send_message  # type: ignore[method-assign]
+        request = asyncio.create_task(
+            client.request_message_response(
+                "session-a",
+                "remote-node",
+                {},
+                "correlation-a",
+            )
+        )
+        await asyncio.wait_for(delivered.wait(), timeout=1)
+        await asyncio.sleep(0)
+
+        await client.disconnect(error_code="relay-lost")
+
+        with pytest.raises(RelayRemoteError) as rejected:
+            await request
+        assert rejected.value.code == "relay-lost"
+        assert client._pending_message_responses == {}
+
+    asyncio.run(scenario())
 
 
 def test_run_forever_uses_finite_capped_backoff(

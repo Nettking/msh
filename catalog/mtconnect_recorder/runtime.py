@@ -486,11 +486,13 @@ class RecorderRuntime:
             observation_path = self.store.store_observation_batch(
                 source_name=source_name,
                 batch=batch,
+                raw_sha256=ref.raw_sha256,
             )
             normalized_path, latest_values = self.store.store_normalized_batch(
                 source_name=source_name,
                 batch=batch,
                 initial_values=initial_values,
+                raw_sha256=ref.raw_sha256,
             )
             machine_id = str(batch.observations[0].get("machine_id") or source_name)
             stored = StoredBatch(

@@ -37,6 +37,7 @@ A current device inspection is sufficient to finish setup. Benchmarks and contri
 - **Capability-first runtime** — the retired role-first product runtime is no longer a normal authority path. Retained legacy state is migration input only.
 - **Manual Federation-wide updates** — the Federation coordinator can check an exact approved `main` commit and explicitly update eligible devices. Successful runtime verification is shown as **Updated**.
 - **Headless standalone recorder** — `python start_recorder.py FCP1-...` can identify, pair, scan its local private network, start loss-aware recording, and publish checkpoint-committed data to Federation logical storage.
+- **Verified Federation telemetry visibility** — connected members can discover committed recorder batches through the authoritative manifest and materialize hash-verified, schema-checked telemetry into their local workbench without exposing provider paths.
 - **Federation-wide recorder control** — any trusted Federation device can request a bounded scan on a connected standalone recorder and add/remove sources selected from that recorder's latest scan.
 - **Short-lived pairing** — browser-generated `FCP1-...` codes are signed, one-use, valid for up to 10 minutes, and can be generated again whenever another pairing attempt is needed.
 

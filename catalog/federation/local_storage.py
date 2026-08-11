@@ -12,6 +12,7 @@ import os
 import sqlite3
 import tempfile
 from dataclasses import dataclass
+from hashlib import sha256
 from pathlib import Path
 from typing import Protocol
 
@@ -127,21 +128,56 @@ class FilesystemBatchStorageProvider:
                        DEFAULT 1 CHECK(dataset_schema_version > 0)"""
                 )
 
-    @staticmethod
-    def _safe_component(value: str) -> str:
-        if value in {".", ".."} or "/" in value or "\\" in value:
-            raise FederationValidationError("invalid-storage-id", "identifier", "must not contain path separators")
-        return value
-
     def _relative_path(self, request: BatchIngestRequest) -> Path:
-        values = (
-            request.authority.session_id,
-            request.authority.group_id,
-            request.dataset_id,
-            request.batch_id,
-        )
-        session_id, group_id, dataset_id, batch_id = map(self._safe_component, values)
-        return Path(session_id) / group_id / dataset_id / f"{batch_id}.json"
+        # Storage identifiers are deliberately opaque protocol values. Recorder
+        # dataset and batch IDs contain colons, and callers may legitimately use
+        # characters that are reserved path syntax on one of our supported
+        # platforms. Never project those values into a backend path. Hash the
+        # complete logical identity and retain the originals only in SQLite.
+        identity = json.dumps(
+            [
+                request.authority.session_id,
+                request.authority.group_id,
+                request.dataset_id,
+                request.batch_id,
+            ],
+            ensure_ascii=False,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        digest = sha256(identity).hexdigest()
+        return Path("v2") / digest[:2] / digest[2:4] / f"{digest}.json"
+
+    @staticmethod
+    def _fsync_directory(path: Path) -> None:
+        """Persist an atomic rename on platforms that expose directory fsync."""
+
+        if os.name == "nt":
+            # Windows does not allow opening a directory with os.open(). The
+            # file itself is flushed before ReplaceFile semantics are used.
+            return
+        descriptor = os.open(path, os.O_RDONLY)
+        try:
+            os.fsync(descriptor)
+        finally:
+            os.close(descriptor)
+
+    def _stored_path(self, relative_path: object) -> Path:
+        if not isinstance(relative_path, str) or not relative_path:
+            raise FederationValidationError(
+                "stored-batch-integrity-failed",
+                "relative_path",
+                "stored batch catalogue path is malformed",
+            )
+        candidate = (self.batch_root / relative_path).resolve()
+        try:
+            candidate.relative_to(self.batch_root.resolve())
+        except ValueError as exc:
+            raise FederationValidationError(
+                "stored-batch-integrity-failed",
+                "relative_path",
+                "stored batch catalogue path escapes the managed storage root",
+            ) from exc
+        return candidate
 
     def _by_idempotency(
         self,
@@ -172,7 +208,7 @@ class FilesystemBatchStorageProvider:
     def ingest(self, request: BatchIngestRequest) -> BatchIngestResult:
         request.validate_content_hash()
         relative_path = self._relative_path(request)
-        final_path = self.batch_root / relative_path
+        final_path = self._stored_path(relative_path.as_posix())
         final_path.parent.mkdir(parents=True, exist_ok=True)
 
         with self._connect() as connection:
@@ -233,7 +269,11 @@ class FilesystemBatchStorageProvider:
                 )
 
             payload = json.dumps(request.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
-            fd, temporary_name = tempfile.mkstemp(prefix=f".{request.batch_id}-", suffix=".tmp", dir=final_path.parent)
+            fd, temporary_name = tempfile.mkstemp(
+                prefix=f".{final_path.stem}-",
+                suffix=".tmp",
+                dir=final_path.parent,
+            )
             temporary_path = Path(temporary_name)
             try:
                 with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
@@ -241,6 +281,7 @@ class FilesystemBatchStorageProvider:
                     handle.flush()
                     os.fsync(handle.fileno())
                 os.replace(temporary_path, final_path)
+                self._fsync_directory(final_path.parent)
                 connection.execute(
                     """INSERT INTO committed_batches
                        (session_id, group_id, dataset_id, dataset_schema_name,
@@ -317,15 +358,35 @@ class FilesystemBatchStorageProvider:
     def read(self, *, session_id: str, group_id: str, batch_id: str) -> object | None:
         with self._connect() as connection:
             row = connection.execute(
-                """SELECT relative_path FROM committed_batches
+                """SELECT dataset_id, dataset_schema_name,
+                          dataset_schema_version, idempotency_key, content_hash,
+                          relative_path
+                   FROM committed_batches
                    WHERE session_id = ? AND group_id = ? AND batch_id = ?""",
                 (session_id, group_id, batch_id),
             ).fetchone()
         if row is None:
             return None
-        path = self.batch_root / row["relative_path"]
+        path = self._stored_path(row["relative_path"])
         with path.open("r", encoding="utf-8") as handle:
-            return BatchIngestRequest.from_dict(json.load(handle)).content
+            request = BatchIngestRequest.from_dict(json.load(handle))
+        request.validate_content_hash()
+        if (
+            request.authority.session_id != session_id
+            or request.authority.group_id != group_id
+            or request.dataset_id != row["dataset_id"]
+            or request.dataset_schema_name != row["dataset_schema_name"]
+            or request.dataset_schema_version != int(row["dataset_schema_version"])
+            or request.batch_id != batch_id
+            or request.idempotency_key != row["idempotency_key"]
+            or request.content_hash != row["content_hash"]
+        ):
+            raise FederationValidationError(
+                "stored-batch-integrity-failed",
+                "batch_id",
+                "stored batch content does not match its committed catalogue identity",
+            )
+        return request.content
 
     def describe(self) -> dict[str, object]:
         return {"protocol": STORAGE_PROTOCOL, "protocol_version": STORAGE_PROTOCOL_VERSION, "backend": "filesystem"}

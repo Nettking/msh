@@ -132,6 +132,12 @@ from .selection import (
     evaluate_storage_promotion_candidate,
     select_storage_promotion_candidate,
 )
+from .storage_catalog import (
+    CommittedBatchDeltaPage,
+    CommittedBatchPage,
+    CommittedBatchReference,
+    ManifestBatchCatalog,
+)
 from .storage_control_plane import (
     STORAGE_ASSIGNMENT_CHANGED,
     STORAGE_GROUP_CREATED,
@@ -204,6 +210,9 @@ __all__ = [
     "CapabilityStatus",
     "CommitState",
     "CommittedBatchIdentity",
+    "CommittedBatchDeltaPage",
+    "CommittedBatchPage",
+    "CommittedBatchReference",
     "ControlledHandover",
     "DatasetCoverage",
     "DatasetManifest",
@@ -227,6 +236,7 @@ __all__ = [
     "LocalCapabilityRegistry",
     "LocalStorageService",
     "LogicalStorageClient",
+    "ManifestBatchCatalog",
     "ManifestCommitIntent",
     "ManifestCommitResult",
     "ManifestItem",

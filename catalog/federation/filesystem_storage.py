@@ -224,10 +224,46 @@ class FilesystemRecorderStorageProvider:
                         or ref.raw_sha256 != intent["raw_sha256"]):
                     continue
                 relative = ref.raw_path.relative_to(self.store.raw_root)
-                base = ref.raw_path.name.split("-" + ref.raw_sha256[:12] + ".xml.gz")[0]
-                observation = self.store.observation_root / relative.parent / f"{base}.ndjson"
-                normalized = self.store.normalized_root / relative.parent / f"{base}.jsonl"
-                if observation.is_file() and normalized.is_file():
+                full_suffix = f"-{ref.raw_sha256}.xml.gz"
+                short_suffix = f"-{ref.raw_sha256[:12]}.xml.gz"
+                if ref.raw_path.name.endswith(full_suffix):
+                    base = ref.raw_path.name.removesuffix(full_suffix)
+                elif ref.raw_path.name.endswith(short_suffix):
+                    base = ref.raw_path.name.removesuffix(short_suffix)
+                else:
+                    continue
+                full_hashed_base = f"{base}-{ref.raw_sha256}"
+                short_hashed_base = f"{base}-{ref.raw_sha256[:12]}"
+                observation_candidates = (
+                    self.store.observation_root
+                    / relative.parent
+                    / f"{full_hashed_base}.ndjson",
+                    self.store.observation_root
+                    / relative.parent
+                    / f"{short_hashed_base}.ndjson",
+                    self.store.observation_root / relative.parent / f"{base}.ndjson",
+                )
+                normalized_candidates = (
+                    self.store.normalized_root
+                    / relative.parent
+                    / f"{full_hashed_base}.jsonl",
+                    self.store.normalized_root
+                    / relative.parent
+                    / f"{short_hashed_base}.jsonl",
+                    self.store.normalized_root / relative.parent / f"{base}.jsonl",
+                )
+                # A crash may leave derived files from several raw variants in
+                # the same sequence slot.  Only activate the prepared delivery
+                # when both derived files belong to the same naming generation
+                # (full hash, transitional short hash, or legacy unhashed).
+                if any(
+                    observation.is_file() and normalized.is_file()
+                    for observation, normalized in zip(
+                        observation_candidates,
+                        normalized_candidates,
+                        strict=True,
+                    )
+                ):
                     self.outbox.activate(entry.outbox_id, now=now)
                     created += 1
                 break

@@ -157,6 +157,33 @@ Get-Content results/workflows/runtime_state.json -Raw | ConvertFrom-Json | Forma
 
 Open `/status` and verify `latest_available_source_date`, `total_available_days`, and `last_failure`.
 
+### Recorder data from another Federation device does not appear
+
+Remote recorder telemetry is not found by scanning another device's files. The
+local product must be connected to the same Federation and must discover a
+ready session-owner storage authority with the intended logical storage group.
+It then lists only committed manifest batches, verifies each read, and rebuilds
+them below `data/federation/shared/telemetry` for the normal catalog and live
+views.
+
+Check that:
+
+- both devices are current members and connected to the authenticated relay;
+- the recorder reports a committed Federation watermark rather than only a
+  local checkpoint;
+- the session owner advertises a ready `fcp.storage-control` authority;
+- the selected storage group matches on the recorder and Flask device when
+  more than one group exists; and
+- the local mirror has free space below its configured quota.
+
+Do not point the scanner at a provider's batch directory. It contains internal
+storage envelopes and may include prepared or stale data. A hash, schema, or
+sequence conflict is rejected and quarantined instead of being shown.
+
+General files uploaded on another machine are not part of this recorder path;
+they remain local until the separate grant-bound object-sharing runtime is
+implemented.
+
 ## Playback page has no selectable data
 
 Playback requires a workflow session with filtered data and a timeline export. Confirm that a session exists under `results/workflows/` and that it contains:

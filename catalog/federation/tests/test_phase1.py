@@ -183,6 +183,56 @@ def test_incomplete_recorder_prepare_is_not_enqueued(tmp_path):
     assert adapter.reconcile(now=NOW) == 0
 
 
+def test_reconcile_does_not_mix_derived_files_from_different_raw_variants(tmp_path):
+    probe = parse_probe(PROBE)
+    batch = parse_streams(SAMPLE, source_name="machine", probe=probe)
+    data_root = tmp_path / "data"
+    store = DurableRecorderStore(data_root)
+    ref = store.store_raw_batch(
+        source_name="machine",
+        requested_from=1,
+        xml_text=SAMPLE,
+        batch=batch,
+    )
+    outbox = SQLiteOutbox(tmp_path / "outbox.db")
+    adapter = FilesystemRecorderStorageProvider(data_root, outbox)
+    adapter.prepare_delivery(
+        source_name="machine",
+        instance_id=7,
+        requested_from=1,
+        first=1,
+        last=1,
+        next_sequence=2,
+        digest=ref.raw_sha256,
+        count=1,
+        session_id="s",
+        destination_id="cap",
+        now=NOW,
+    )
+
+    relative = ref.raw_path.relative_to(store.raw_root)
+    base = ref.raw_path.name.removesuffix(f"-{ref.raw_sha256}.xml.gz")
+    full_observation = (
+        store.observation_root
+        / relative.parent
+        / f"{base}-{ref.raw_sha256}.ndjson"
+    )
+    legacy_normalized = store.normalized_root / relative.parent / f"{base}.jsonl"
+    full_observation.parent.mkdir(parents=True, exist_ok=True)
+    legacy_normalized.parent.mkdir(parents=True, exist_ok=True)
+    full_observation.write_text("{}\n", encoding="utf-8")
+    legacy_normalized.write_text("{}\n", encoding="utf-8")
+
+    assert adapter.reconcile(now=NOW) == 0
+    full_normalized = (
+        store.normalized_root
+        / relative.parent
+        / f"{base}-{ref.raw_sha256}.jsonl"
+    )
+    full_normalized.write_text("{}\n", encoding="utf-8")
+    assert adapter.reconcile(now=NOW) == 1
+
+
 def test_filesystem_provider_write_with_outbox_persists_and_enqueues(tmp_path):
     parsed = parse_streams(SAMPLE, source_name="machine", probe=parse_probe(PROBE))
     digest = sha256(SAMPLE.encode("utf-8")).hexdigest()

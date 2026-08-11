@@ -171,9 +171,27 @@ flowchart LR
     W --> O[Checkpoint-gated publication outbox]
     O --> SA[Federation storage authority]
     SA --> P[Assigned logical storage primary/replica]
+    SA --> MC[Committed manifest catalog]
+    MC --> VR[Authenticated, bounded read and verification]
+    P --> VR
+    VR --> M[Managed local telemetry mirror]
+    M --> C
+    M --> L
 ```
 
 JSONL remains the local compatibility source. Recorder durability preserves raw/derived write ordering and checkpoints. Federation delivery is layered onto the local-first path; it must not make local recording depend on continuous remote availability.
+
+Federation members discover recorder batches only through the coordinator-owned
+committed manifest. Provider directories, prepared batches, remote paths, and
+uncommitted data are never catalogued. Every read is bound to its manifest
+revision and is checked for session membership, dataset identity, canonical
+size, content hash, and the allowlisted recorder schema before it enters a
+quota-limited, content-addressed local mirror. Only the mirror's rebuilt
+telemetry JSONL directory is visible to the Flask artifact catalog.
+
+This path is intentionally not general file sharing. Arbitrary uploads and
+other peer files require a separately authorized object grant, object catalog,
+type policy, and materializer before they can be exposed to another device.
 
 A standalone recorder may join the Federation without hosting Flask. On first configuration, `start_recorder.py` can run the existing bounded private-network scan, select discovered sources, join using the signed pairing flow, start recording, and start independent publication/control workers.
 

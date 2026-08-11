@@ -468,6 +468,10 @@ class PairingRelayNodeClient(RelayNodeClient):
         self._websocket = None
         self._send_lock = asyncio.Lock()
         self._pending = {}
+        # Keep this hand-written constructor in lockstep with RelayNodeClient.
+        # Correlated storage/catalog replies are resolved by the shared root
+        # receiver before ordinary inbound messages are queued.
+        self._pending_message_responses = {}
         self._replay_tasks = {}
         self._gap_replay_tasks = {}
         self._receiver_task = None

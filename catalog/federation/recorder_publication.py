@@ -266,22 +266,53 @@ class RecorderArchiveReconciler:
         first_sequence: int,
         last_sequence: int,
         next_sequence: int,
+        raw_sha256: str,
         day: str,
     ) -> Path:
-        filename = (
+        legacy_filename = (
             f"seq-{first_sequence}-{last_sequence}-next-{next_sequence}.ndjson"
+        )
+        digest = _hash(raw_sha256, field="raw_sha256")[7:]
+        full_hashed_filename = (
+            legacy_filename.removesuffix(".ndjson") + f"-{digest}.ndjson"
+        )
+        short_hashed_filename = (
+            legacy_filename.removesuffix(".ndjson") + f"-{digest[:12]}.ndjson"
         )
         candidates = (
             self.store.observation_root
             / _slug(source_name)
             / str(instance_id)
             / day
-            / filename,
+            / full_hashed_filename,
             self.store.observation_root
             / _slug(archive_source_name)
             / str(instance_id)
             / day
-            / filename,
+            / full_hashed_filename,
+            # Transitional builds used a 12-hex prefix. Retain read-only
+            # compatibility while all new writes use the collision-safe digest.
+            self.store.observation_root
+            / _slug(source_name)
+            / str(instance_id)
+            / day
+            / short_hashed_filename,
+            self.store.observation_root
+            / _slug(archive_source_name)
+            / str(instance_id)
+            / day
+            / short_hashed_filename,
+            # Legacy recorder archives predate raw-hash-bound derived names.
+            self.store.observation_root
+            / _slug(source_name)
+            / str(instance_id)
+            / day
+            / legacy_filename,
+            self.store.observation_root
+            / _slug(archive_source_name)
+            / str(instance_id)
+            / day
+            / legacy_filename,
         )
         for candidate in candidates:
             if candidate.exists():
@@ -464,7 +495,7 @@ class RecorderArchiveReconciler:
                 dict.fromkeys([source_name, *checkpoint.storage_aliases])
             )
             archive_refs: dict[
-                tuple[int, int, int, str], tuple[str, RawBatchRef]
+                tuple[int, int, int], tuple[str, RawBatchRef]
             ] = {}
             for archive_source_name in archive_names:
                 for ref in self.store.iter_raw_batches(
@@ -475,9 +506,22 @@ class RecorderArchiveReconciler:
                         ref.first_sequence,
                         ref.last_sequence,
                         ref.next_sequence,
-                        ref.raw_sha256,
                     )
-                    archive_refs.setdefault(identity, (archive_source_name, ref))
+                    candidate = (archive_source_name, ref)
+                    current_variant = archive_refs.get(identity)
+                    if current_variant is None or (
+                        ref.raw_sha256,
+                        ref.manifest_path.as_posix(),
+                    ) > (
+                        current_variant[1].raw_sha256,
+                        current_variant[1].manifest_path.as_posix(),
+                    ):
+                        # A crash can leave more than one raw envelope for the
+                        # same sequence range. Recovery deterministically picks
+                        # the greatest raw hash; publication must select that
+                        # same variant rather than binding both manifests to one
+                        # overwritten derived observation file.
+                        archive_refs[identity] = candidate
 
             ordered_refs = sorted(
                 archive_refs.values(),
@@ -502,6 +546,7 @@ class RecorderArchiveReconciler:
                     first_sequence=ref.first_sequence,
                     last_sequence=ref.last_sequence,
                     next_sequence=ref.next_sequence,
+                    raw_sha256=ref.raw_sha256,
                     day=day,
                 )
                 observations = self._read_observations(observation_path)

@@ -16,6 +16,20 @@ REQUIRED_PLAYBACK_COLUMNS = {"timestamp", "machine_id", "state"}
 PLAYBACK_TIMELINE_FILES = {"timeline_rows.csv"}
 PLAYBACK_AUXILIARY_FILES = {"candidate_events.csv", "strategy_summary.csv"}
 INTERNAL_METADATA_FILES = {"runtime_state.json", "session_state.json"}
+DATA_INTERNAL_ROOTS = {
+    "cache",
+    "capabilities",
+    "imports",
+    "source_config",
+    "source_state",
+}
+RECORDER_INTERNAL_TREES = {
+    "events",
+    "gaps",
+    "observations",
+    "probe",
+    "raw",
+}
 
 KEYWORD_RULES: list[tuple[tuple[str, ...], tuple[str, str, str]]] = [
     (("timeline", "playback"), ("Timeline Export", "Timeline-oriented export rows; playback compatibility depends on schema.", "analysis")),
@@ -239,6 +253,45 @@ def _relative_to_root(path: Path, source_dir: str) -> Path:
         return path
 
 
+def _is_managed_internal_file(path: Path, source_dir: str, roots: list[str]) -> bool:
+    """Keep credentials, checkpoints, databases and raw envelopes out of UI scans."""
+
+    del roots  # The mounted data directory may have an arbitrary host-side name.
+    relative = _relative_to_root(path, source_dir)
+    parts = tuple(part.lower() for part in relative.parts)
+    if not parts:
+        return False
+    source_root = Path(source_dir).expanduser().resolve()
+    source_parts = tuple(part.lower() for part in source_root.parts)
+    context_parts = (*source_parts, *parts)
+    if (
+        parts[0] in DATA_INTERNAL_ROOTS
+        or source_root.name.lower() in DATA_INTERNAL_ROOTS
+        or any(
+            part in {"source_config", "source_state"}
+            for part in source_parts
+        )
+    ):
+        return True
+    # Include the configured scan-root ancestry when applying boundaries. A
+    # caller may point FCP_SCAN_DIRS at data/federation (or deeper) instead of
+    # its data parent; stripping that context must not turn internal blobs into
+    # product-visible artifacts.
+    for index, part in enumerate(context_parts):
+        if part == "federation":
+            below_federation = context_parts[index + 1 :]
+            return below_federation[:2] != ("shared", "telemetry")
+        if context_parts[index : index + 2] == (
+            "sources",
+            "mtconnect_recorder",
+        ):
+            below_recorder = context_parts[index + 2 :]
+            return bool(
+                below_recorder and below_recorder[0] in RECORDER_INTERNAL_TREES
+            )
+    return False
+
+
 def _artifact_category(path: Path, source_dir: str, roots: list[str]) -> str:
     root_name = _source_root_for(path, roots)
     rel = _relative_to_root(path, source_dir)
@@ -347,6 +400,8 @@ def scan_artifacts(scan_dirs: list[str] | None = None) -> tuple[list[dict[str, A
 
         for path in sorted(root.rglob("*")):
             if not path.is_file() or path.suffix.lower() not in SUPPORTED_SUFFIXES:
+                continue
+            if _is_managed_internal_file(path, str(root), roots):
                 continue
             try:
                 artifact = _build_artifact(path, source_dir=str(root), roots=roots)

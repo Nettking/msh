@@ -102,6 +102,54 @@ def _telemetry_cache_status_model() -> dict[str, object]:
     }
 
 
+def _federated_telemetry_status_model() -> dict[str, object]:
+    """Expose bounded, credential-free mirror health to Diagnostics."""
+
+    fallback: dict[str, object] = {
+        "status": "not-started",
+        "group": None,
+        "manifest_revision": None,
+        "discovered": 0,
+        "downloaded": 0,
+        "already": 0,
+        "last_sync": None,
+        "last_error": None,
+    }
+    bridge = current_app.extensions.get("federated_telemetry_product_bridge")
+    snapshot = getattr(bridge, "snapshot", None)
+    if not callable(snapshot):
+        return fallback
+    try:
+        value = snapshot()
+    except Exception:  # noqa: BLE001 - diagnostics must not break /status
+        return {**fallback, "status": "error", "last_error": "snapshot-failed"}
+    if not isinstance(value, dict):
+        return {**fallback, "status": "error", "last_error": "snapshot-invalid"}
+    manifest = value.get("manifest")
+    revision = manifest.get("revision") if isinstance(manifest, dict) else None
+    status = value.get("status")
+    return {
+        "status": status if isinstance(status, str) and status else "unknown",
+        "group": value.get("group") if isinstance(value.get("group"), str) else None,
+        "manifest_revision": revision if isinstance(revision, int) else None,
+        "discovered": value.get("discovered")
+        if isinstance(value.get("discovered"), int)
+        else 0,
+        "downloaded": value.get("downloaded")
+        if isinstance(value.get("downloaded"), int)
+        else 0,
+        "already": value.get("already")
+        if isinstance(value.get("already"), int)
+        else 0,
+        "last_sync": value.get("last_sync")
+        if isinstance(value.get("last_sync"), str)
+        else None,
+        "last_error": value.get("last_error")
+        if isinstance(value.get("last_error"), str)
+        else None,
+    }
+
+
 def status() -> str:
     config, _config_error = _load_product_config()
     recorder_active = _active_recorder_contribution()
@@ -148,6 +196,7 @@ def status() -> str:
         ),
         operator_scope=operator_scope,
         telemetry_cache_status=_telemetry_cache_status_model(),
+        federated_telemetry_status=_federated_telemetry_status_model(),
         recorder_status=recorder_status,
         recorder_visible=recorder_visible,
     )

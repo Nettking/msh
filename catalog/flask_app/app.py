@@ -47,6 +47,7 @@ from .services.capability_startup_transition_service import (
 from .services.catalog_service import ArtifactCatalog
 from .services.federation_pairing_install import install_federation_pairing
 from .services.onboarding_view_normalizer import normalize_onboarding_view_model
+from .services.recorder_artifact_refresh import install_recorder_artifact_refresh
 from .services.run_once_capability_evidence import install_run_once_capability_evidence
 from .services.startup_contribution_reconcile import (
     run_startup_contribution_reconcile,
@@ -184,6 +185,26 @@ def create_app() -> Flask:
         "CAPABILITY_ONBOARDING_PAIRING_RELAY_URL",
         os.getenv("FCP_PAIRING_RELAY_URL", ""),
     )
+    app.config.setdefault(
+        "FEDERATED_TELEMETRY_STORAGE_GROUP_ID",
+        os.getenv("FCP_FEDERATION_STORAGE_GROUP")
+        or os.getenv("FCP_RECORDER_STORAGE_GROUP", ""),
+    )
+    app.config.setdefault(
+        "FEDERATED_TELEMETRY_MIRROR_DIRECTORY",
+        os.getenv(
+            "FCP_FEDERATED_TELEMETRY_MIRROR_DIR",
+            "data/federation/shared",
+        ),
+    )
+    app.config.setdefault(
+        "FEDERATED_TELEMETRY_MAX_PAGES_PER_SYNC",
+        int(os.getenv("FCP_FEDERATED_TELEMETRY_MAX_PAGES_PER_SYNC", "5")),
+    )
+    app.config.setdefault(
+        "FEDERATED_TELEMETRY_MAX_BATCHES_PER_SYNC",
+        int(os.getenv("FCP_FEDERATED_TELEMETRY_MAX_BATCHES_PER_SYNC", "100")),
+    )
     remote_pairing_path = os.getenv("FCP_FEDERATION_REMOTE_PAIRING_PATH", "")
     if remote_pairing_path:
         app.config.setdefault(
@@ -211,6 +232,7 @@ def create_app() -> Flask:
 
     catalog = ArtifactCatalog()
     app.config["ARTIFACT_CATALOG"] = catalog
+    install_recorder_artifact_refresh(app, catalog=catalog)
 
     @app.context_processor
     def inject_catalog_freshness() -> dict[str, object]:

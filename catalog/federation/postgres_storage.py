@@ -242,13 +242,22 @@ class PostgreSQLBatchStorageProvider:
         with self._connect() as connection, connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT content FROM fcp_storage_batches
+                SELECT content, content_hash FROM fcp_storage_batches
                 WHERE session_id = %s AND group_id = %s AND batch_id = %s
                 """,
                 (session_id, group_id, batch_id),
             )
             row = cursor.fetchone()
-            return None if row is None else row["content"]
+            if row is None:
+                return None
+            content = row["content"]
+            if BatchIngestRequest.calculate_content_hash(content) != row["content_hash"]:
+                raise FederationValidationError(
+                    "stored-batch-integrity-failed",
+                    "batch_id",
+                    "stored batch content does not match its committed content hash",
+                )
+            return content
 
     def describe(self) -> dict[str, object]:
         return {

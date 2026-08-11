@@ -99,6 +99,51 @@ def test_status_template_has_no_deployment_role_adapter() -> None:
     assert "recorder_visible" in template
 
 
+def test_federated_telemetry_diagnostics_expose_only_safe_progress() -> None:
+    app = Flask(__name__)
+    app.extensions["federated_telemetry_product_bridge"] = SimpleNamespace(
+        snapshot=lambda: {
+            "status": "up-to-date",
+            "authority": "internal-node-id-is-not-projected",
+            "group": "telemetry",
+            "manifest": {
+                "revision": 17,
+                "hash": "sha256:" + "a" * 64,
+            },
+            "discovered": 8,
+            "downloaded": 3,
+            "already": 5,
+            "last_sync": "2026-08-12T00:00:00Z",
+            "last_error": None,
+        }
+    )
+
+    with app.test_request_context("/status"):
+        model = capability_product_routes._federated_telemetry_status_model()
+
+    assert model == {
+        "status": "up-to-date",
+        "group": "telemetry",
+        "manifest_revision": 17,
+        "discovered": 8,
+        "downloaded": 3,
+        "already": 5,
+        "last_sync": "2026-08-12T00:00:00Z",
+        "last_error": None,
+    }
+    assert "authority" not in model
+
+
+def test_recorder_storage_group_is_flask_fallback(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setenv("FCP_FEDERATION_STORAGE_GROUP", "")
+    monkeypatch.setenv("FCP_RECORDER_STORAGE_GROUP", "telemetry")
+
+    app = create_app()
+
+    assert app.config["FEDERATED_TELEMETRY_STORAGE_GROUP_ID"] == "telemetry"
+
+
 def test_startup_is_a_capability_onboarding_handoff() -> None:
     app = Flask(__name__)
     app.add_url_rule(
