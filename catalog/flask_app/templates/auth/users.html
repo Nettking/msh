@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block body %}
+<section class="panel">
+  <h2>Human users</h2>
+  <p>These accounts authorize people using this web application. Federation nodes and device credentials are managed separately.</p>
+  <form method="post" action="{{ url_for('auth_users.create_user') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Email <input name="email" type="email" autocomplete="off" required></label>
+    <label>Initial password <input name="password" type="password" minlength="12" autocomplete="new-password" required></label>
+    <fieldset><legend>Roles</legend>{% for role in roles %}<label><input type="checkbox" name="roles" value="{{ role.name }}"> {{ role.name }}</label>{% endfor %}</fieldset>
+    <button type="submit">Create user</button>
+  </form>
+</section>
+{% for user in users %}
+<section class="panel">
+  <form method="post" action="{{ url_for('auth_users.update_user', user_id=user.id) }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <h3>{{ user.email }}</h3>
+    <label><input type="checkbox" name="active" value="1" {% if user.active %}checked{% endif %}> Active</label>
+    {% for role in roles %}<label><input type="checkbox" name="roles" value="{{ role.name }}" {% if user.has_role(role.name) %}checked{% endif %}> {{ role.name }}</label>{% endfor %}
+    <button type="submit">Save</button>
+  </form>
+</section>
+{% endfor %}
+{% endblock %}
