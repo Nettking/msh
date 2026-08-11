@@ -7,7 +7,6 @@ from typing import Any
 
 from flask import (
     Blueprint,
-    current_app,
     flash,
     jsonify,
     redirect,
@@ -40,15 +39,13 @@ provider_federation_web = Blueprint(
     template_folder="templates",
 )
 
-_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
 _CSRF_SESSION_KEY = "provider_federation_csrf_token"
 _FORBIDDEN_CONTEXT_FIELDS = frozenset({"actor_node_id", "session_id"})
 
 
 def _surface() -> ProviderOperatorSurface | None:
-    value = current_app.config.get(_SURFACE_CONFIG_KEY)
-    if isinstance(value, ProviderOperatorSurface):
-        return value
+    # The factory also upgrades an already-configured generic F8.5 leader surface
+    # while retaining its exact coordinator/authority stores and runtime binders.
     return get_local_provider_operator_surface()
 
 
