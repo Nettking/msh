@@ -15,6 +15,8 @@ from .adapter_common import (
 )
 from .safety import safe_reason_code
 
+_DEVICE_NAME_EVENT = "node.display-name.changed"
+
 
 @dataclass(frozen=True)
 class DeviceRecord:
@@ -65,6 +67,10 @@ _EVENT_COPY = {
     "node.joined": ("Device joined", "A trusted device joined the federation."),
     "node.left": ("Device removed", "A device membership was removed."),
     "node.revoked": ("Device revoked", "A device identity was revoked."),
+    _DEVICE_NAME_EVENT: (
+        "Device renamed",
+        "A Federation-scoped device name was changed.",
+    ),
     "capability.announced": (
         "Service announced",
         "A device published an available service.",
@@ -138,9 +144,11 @@ class FederationAuthorityAdapter:
             revision = _value(session, "revision")
             if not isinstance(revision, int):
                 revision = None
+            creator_node_id = _value(session, "created_by_node_id")
 
             events = self._events(revision)
             member_ids = {self._actor_node_id}
+            device_names: dict[str, str] = {}
             for event in events:
                 event_type = _value(event, "event_type")
                 payload = _value(event, "payload", {})
@@ -151,9 +159,19 @@ class FederationAuthorityAdapter:
                     member_ids.add(node_id)
                 elif event_type in {"node.left", "node.revoked"}:
                     member_ids.discard(node_id)
+                elif (
+                    event_type == _DEVICE_NAME_EVENT
+                    and isinstance(creator_node_id, str)
+                    and _value(event, "actor_node_id") == creator_node_id
+                ):
+                    display_name = _value(payload, "display_name")
+                    if isinstance(display_name, str):
+                        safe_name = _public_text(display_name, "")
+                        if safe_name:
+                            device_names[node_id] = safe_name
 
             raw_status = self._authorized_status()
-            devices = self._devices(raw_status, member_ids)
+            devices = self._devices(raw_status, member_ids, device_names)
             capabilities = self._capabilities(raw_status, member_ids)
             activity = tuple(
                 self._activity_record(event)
@@ -235,6 +253,7 @@ class FederationAuthorityAdapter:
         self,
         raw_status: object,
         member_ids: set[str],
+        device_names: dict[str, str] | None = None,
     ) -> tuple[DeviceRecord, ...]:
         capability_counts: dict[str, int] = {}
         for capability in _sequence(_value(raw_status, "capabilities", ())):
@@ -244,16 +263,19 @@ class FederationAuthorityAdapter:
             if isinstance(node_id, str) and node_id in member_ids:
                 capability_counts[node_id] = capability_counts.get(node_id, 0) + 1
 
+        names = {} if device_names is None else device_names
         devices: list[DeviceRecord] = []
         for candidate in _sequence(_value(raw_status, "nodes", ())):
             raw_node_id = _value(candidate, "node_id", _value(candidate, "id"))
             if raw_node_id not in member_ids:
                 continue
             node_id = _public_text(raw_node_id, "unknown-device")
-            label = _public_text(
-                _value(candidate, "display_name", _value(candidate, "label", node_id)),
-                node_id,
-            )
+            label = names.get(raw_node_id)
+            if label is None:
+                label = _public_text(
+                    _value(candidate, "display_name", _value(candidate, "label", node_id)),
+                    node_id,
+                )
             state = _enum_value(
                 _value(
                     candidate,
