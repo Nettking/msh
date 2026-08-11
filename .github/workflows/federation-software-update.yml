@@ -38,6 +38,7 @@ jobs:
           catalog/flask_app/tests/test_federation_update_host_agents.py
           catalog/flask_app/tests/test_windows_migration_script.py
           catalog/flask_app/tests/test_windows_relay_volume_selector.py
+          scripts/posix/fcp_recorder_update_agent.py
       - name: Run update contract tests
         run: >-
           python -m pytest -o addopts= -q
@@ -62,26 +63,41 @@ jobs:
           catalog/flask_app/tests/test_federation_update_host_agents.py
           catalog/flask_app/tests/test_windows_migration_script.py
           catalog/flask_app/tests/test_windows_relay_volume_selector.py
+          scripts/posix/fcp_recorder_update_agent.py
 
       - name: Parse and smoke Windows host agent
         if: runner.os == 'Windows'
         shell: powershell
         run: |
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path 'scripts/windows/fcp_update_agent.ps1'),
-            [ref]$tokens,
-            [ref]$errors
-          ) | Out-Null
-          if ($errors.Count -gt 0) {
-            $errors | Format-List | Out-String | Write-Error
-            exit 1
+          foreach ($script in @(
+            'scripts/windows/fcp_update_agent.ps1',
+            'scripts/windows/fcp_recorder_update_agent.ps1'
+          )) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $script),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | Format-List | Out-String | Write-Error
+              exit 1
+            }
           }
+
           $state = Join-Path $env:RUNNER_TEMP 'fcp-update-agent-smoke'
           powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\fcp_update_agent.ps1 `
             -RepoRoot (Resolve-Path '.').Path `
             -DataDirectory $state `
+            -Once
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+          $recorderState = Join-Path $env:RUNNER_TEMP 'fcp-recorder-update-agent-smoke'
+          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\fcp_recorder_update_agent.ps1 `
+            -RepoRoot (Resolve-Path '.').Path `
+            -DataDirectory $recorderState `
+            -ComposeProjectName recorder-smoke `
             -Once
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -133,4 +149,9 @@ jobs:
           python scripts/posix/fcp_update_agent.py \
             --repo-root "$PWD" \
             --data-directory "$RUNNER_TEMP/fcp-update-agent-smoke" \
+            --once
+          python scripts/posix/fcp_recorder_update_agent.py \
+            --repo-root "$PWD" \
+            --data-directory "$RUNNER_TEMP/fcp-recorder-update-agent-smoke" \
+            --compose-project-name recorder-smoke \
             --once
