@@ -34,7 +34,6 @@ from .capability_onboarding_service import (
     get_capability_onboarding_service,
 )
 from .federation_device_projection import CapabilityFirstFederationDeviceAdapter
-from .pending_contribution_approval import get_local_provider_operator_surface
 from .read_only_storage_authority import ReadOnlyStorageAuthorityStore
 from .upload_analysis_job_service import get_upload_analysis_job_service
 
@@ -202,29 +201,18 @@ def _job_adapter(internal_session_id: str) -> object:
         )
 
 
-def _operator_surface() -> ProviderOperatorSurface | None:
-    configured = current_app.config.get(_OPERATOR_SURFACE_CONFIG_KEY)
-    if isinstance(configured, ProviderOperatorSurface):
-        return configured
-    try:
-        return get_local_provider_operator_surface()
-    except Exception as exc:  # noqa: BLE001 - provider projection fails closed
-        _warn_projection("Federation provider operator", exc)
-        return None
-
-
 def get_federation_projection_service() -> FederationProjectionService:
     """Build product projections from server-bound read-only authorities.
 
-    The existing provider operator surface remains the preferred authorization
-    boundary. Otherwise the durable capability-first identity and trusted
-    binding are revalidated against the existing ``SessionCoordinator``. The
-    inspection, benchmark and contribution projections read the same CFI-3,
-    CFI-4 and CFI-5 services used by onboarding. Browser parameters are never
-    accepted as actor, session, endpoint or authority context.
+    A provider operator surface is consumed only when it has already been
+    explicitly composed. Normal Federation GETs never initialize provider
+    enrollment/health authority as a side effect. Otherwise the durable
+    capability-first identity and trusted binding are revalidated against the
+    existing coordinator. Browser parameters are never accepted as actor,
+    session, endpoint or authority context.
     """
 
-    surface = _operator_surface()
+    surface = current_app.config.get(_OPERATOR_SURFACE_CONFIG_KEY)
     binding: object | None = None
     provider_adapter: object | None = None
     coordinator: object | None = None
