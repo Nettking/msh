@@ -112,9 +112,9 @@ def test_bootstrap_creates_admin_once(app):
         )
 
 
-def test_production_rejects_weak_secret(tmp_path, monkeypatch):
+def test_production_rejects_explicit_short_secret(tmp_path, monkeypatch):
     monkeypatch.delenv("FCP_AUTH_DISABLED", raising=False)
-    monkeypatch.setenv("FCP_FLASK_SECRET", "fcp-dev")
+    monkeypatch.setenv("FCP_FLASK_SECRET", "too-short")
     monkeypatch.setenv("FCP_PASSWORD_SALT", "p" * 48)
     monkeypatch.setenv("FCP_AUTH_DATABASE", str(tmp_path / "other.sqlite3"))
     monkeypatch.delenv("FCP_DEVELOPMENT", raising=False)
@@ -122,10 +122,10 @@ def test_production_rejects_weak_secret(tmp_path, monkeypatch):
         init_human_auth(Flask("production"))
 
 
-def test_production_requires_independent_password_salt(tmp_path, monkeypatch):
+def test_production_rejects_explicit_short_password_salt(tmp_path, monkeypatch):
     monkeypatch.delenv("FCP_AUTH_DISABLED", raising=False)
     monkeypatch.setenv("FCP_FLASK_SECRET", "s" * 48)
-    monkeypatch.delenv("FCP_PASSWORD_SALT", raising=False)
+    monkeypatch.setenv("FCP_PASSWORD_SALT", "too-short")
     monkeypatch.setenv("FCP_AUTH_DATABASE", str(tmp_path / "other.sqlite3"))
     monkeypatch.delenv("FCP_DEVELOPMENT", raising=False)
     with pytest.raises(RuntimeError, match="FCP_PASSWORD_SALT"):
