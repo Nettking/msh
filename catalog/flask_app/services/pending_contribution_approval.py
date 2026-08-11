@@ -220,22 +220,16 @@ def _database_path(app: Flask, config_key: str, default_name: str) -> Path:
     return onboarding.parent / default_name
 
 
-def get_local_provider_operator_surface(
-    app: Flask | None = None,
-) -> ProviderOperatorSurface | None:
-    """Build the durable operator surface only on the local session creator.
+def _selected_app(app: Flask | None) -> Flask:
+    return current_app._get_current_object() if app is None else app
 
-    Remotely paired members intentionally return ``None``: their coordinator
-    facade is read-only and provider enrollment authority remains at the creator.
-    Explicitly injected surfaces still win for tests/advanced composition.
-    """
 
-    selected = current_app._get_current_object() if app is None else app
-    configured = selected.config.get("PROVIDER_OPERATOR_SURFACE")
-    if isinstance(configured, ProviderOperatorSurface):
-        return configured
+def _local_creator_context(
+    app: Flask,
+) -> tuple[object, SessionCoordinator, str, str] | None:
+    """Resolve a local creator context without constructing mutation stores."""
 
-    onboarding = selected.config.get("CAPABILITY_ONBOARDING_SERVICE")
+    onboarding = app.config.get("CAPABILITY_ONBOARDING_SERVICE")
     remote_store = getattr(onboarding, "remote_store", None)
     remote_loader = getattr(remote_store, "load", None)
     if callable(remote_loader):
@@ -268,6 +262,41 @@ def get_local_provider_operator_surface(
     session = coordinator.store.get_session(session_id)
     if session is None or session.created_by_node_id != actor_node_id:
         return None
+    return onboarding, coordinator, session_id, actor_node_id
+
+
+def local_provider_operator_available(app: Flask | None = None) -> bool:
+    """Report leader approval availability without creating authority databases."""
+
+    selected = _selected_app(app)
+    if isinstance(
+        selected.config.get("PROVIDER_OPERATOR_SURFACE"),
+        ProviderOperatorSurface,
+    ):
+        return True
+    return _local_creator_context(selected) is not None
+
+
+def get_local_provider_operator_surface(
+    app: Flask | None = None,
+) -> ProviderOperatorSurface | None:
+    """Build the durable operator surface only on the local session creator.
+
+    Merely rendering normal Federation pages uses
+    :func:`local_provider_operator_available` and never initializes enrollment or
+    health storage. The databases below are created only when the explicit
+    provider-approval surface is opened or otherwise requested.
+    """
+
+    selected = _selected_app(app)
+    configured = selected.config.get("PROVIDER_OPERATOR_SURFACE")
+    if isinstance(configured, ProviderOperatorSurface):
+        return configured
+
+    resolved = _local_creator_context(selected)
+    if resolved is None:
+        return None
+    onboarding, coordinator, session_id, actor_node_id = resolved
 
     cache = selected.extensions.get(_EXTENSION_KEY)
     cache_key = (session_id, actor_node_id, str(coordinator.store.database))
@@ -277,6 +306,7 @@ def get_local_provider_operator_surface(
         and cache[0] == cache_key
         and isinstance(cache[1], ProviderOperatorSurface)
     ):
+        selected.config["PROVIDER_OPERATOR_SURFACE"] = cache[1]
         return cache[1]
 
     clock = getattr(onboarding, "_clock", lambda: datetime.now(timezone.utc))
@@ -318,4 +348,5 @@ __all__ = [
     "CapabilityFirstProviderEnrollmentService",
     "CapabilityFirstProviderOperatorSurface",
     "get_local_provider_operator_surface",
+    "local_provider_operator_available",
 ]
