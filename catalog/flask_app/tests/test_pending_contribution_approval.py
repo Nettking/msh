@@ -12,7 +12,7 @@ from catalog.capabilities.provider_enrollment import (
     SQLiteProviderEnrollmentStore,
 )
 from catalog.federation.coordinator import SessionCoordinator
-from catalog.federation.errors import AuthorizationError
+from catalog.federation.errors import AuthorizationError, FederationOperationError
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 from catalog.flask_app.services.pending_contribution_approval import (
     CapabilityFirstProviderEnrollmentService,
@@ -74,7 +74,13 @@ def _environment(tmp_path: Path):
     return coordinator, service, owner, member, current
 
 
-def _announcement(node_id: str, *, status: CapabilityStatus, when: datetime):
+def _announcement(
+    node_id: str,
+    *,
+    status: CapabilityStatus,
+    when: datetime,
+    kind: str = "capability-first-candidate",
+):
     return CapabilityAnnouncement(
         capability_id="candidate-compute-one",
         node_id=node_id,
@@ -84,7 +90,7 @@ def _announcement(node_id: str, *, status: CapabilityStatus, when: datetime):
         protocol_version="1.0",
         status=status,
         properties={
-            "kind": "capability-first-candidate",
+            "kind": kind,
             "candidate_id": "candidate-compute-one",
             "label": "Compute fcp-system-summary",
         },
@@ -156,6 +162,46 @@ def test_registering_candidate_can_be_approved_without_becoming_eligible(
         capability_id=registering.capability_id,
     )
     assert persisted == approved
+
+
+def test_non_capability_first_registering_provider_keeps_ready_only_rule(
+    tmp_path: Path,
+) -> None:
+    coordinator, service, owner, member, current = _environment(tmp_path)
+    registering = _announcement(
+        member.identity.node_id,
+        status=CapabilityStatus.REGISTERING,
+        when=current[0],
+        kind="ordinary-provider",
+    )
+    coordinator.announce_capability(
+        registering,
+        actor_node_id=member.identity.node_id,
+        request_id="announce-ordinary-registering",
+    )
+    requested = service.request(
+        session_id=SESSION,
+        capability_id=registering.capability_id,
+        actor_node_id=member.identity.node_id,
+        command_id="request-ordinary-registering",
+    )
+
+    with pytest.raises(FederationOperationError) as rejected:
+        service.approve(
+            session_id=SESSION,
+            capability_id=registering.capability_id,
+            actor_node_id=owner.identity.node_id,
+            command_id="approve-ordinary-registering",
+            expected_revision=requested.revision,
+        )
+
+    assert rejected.value.code == "provider-not-ready"
+    persisted = service.store.get(
+        session_id=SESSION,
+        capability_id=registering.capability_id,
+    )
+    assert persisted == requested
+    assert persisted.state is ProviderEnrollmentState.PENDING
 
 
 def test_non_owner_cannot_approve_registering_candidate(tmp_path: Path) -> None:
