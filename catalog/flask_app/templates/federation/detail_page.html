@@ -54,10 +54,20 @@
     <header class="federation-panel__header">
       <div>
         <span class="federation-eyebrow">Device details</span>
-        <h3>This FCP device</h3>
-        <p>Safe inspection details from this device only.</p>
+        <h3>{{ federation_current_device_name or 'This FCP device' }}</h3>
+        <p>Safe inspection details from this device only. The Federation name is shared with trusted members while the device ID remains the technical identity.</p>
       </div>
     </header>
+    {% if federation_device_self_naming_available %}
+    <form method="post" action="{{ url_for('federation_web.rename_this_device') }}" style="margin:0 0 18px;display:flex;gap:8px;align-items:end;flex-wrap:wrap">
+      <input type="hidden" name="_csrf_token" value="{{ federation_csrf_token }}">
+      <label style="display:grid;gap:4px">
+        <span>This device name</span>
+        <input type="text" name="display_name" value="{{ federation_current_device_name or '' }}" maxlength="96" required autocomplete="off" placeholder="Office laptop">
+      </label>
+      <button class="federation-button federation-button--secondary" type="submit">Save name</button>
+    </form>
+    {% endif %}
     <dl class="federation-detail-list">
       <div><dt>Device ID</dt><dd>{{ vm.device_id }}</dd></div>
       <div><dt>Operating system</dt><dd>{{ vm.operating_system }}</dd></div>
@@ -114,7 +124,7 @@
             <input type="hidden" name="target_node_id" value="{{ item.key }}">
             <label style="display:grid;gap:4px">
               <span>Federation name</span>
-              <input type="text" name="display_name" value="{{ item.label }}" maxlength="64" required autocomplete="off">
+              <input type="text" name="display_name" value="{{ item.label }}" maxlength="96" required autocomplete="off">
             </label>
             <button class="federation-button federation-button--secondary" type="submit">Save name</button>
           </form>

@@ -1,113 +1,173 @@
-"""Leader-owned, Federation-scoped display names for trusted devices.
+"""Federation-scoped display-name operations for trusted devices.
 
-Names are public-safe operator metadata carried in the authoritative Federation
-event log. They never replace the Ed25519-derived ``node_id`` and therefore do
-not change identity, membership, routing, update authority, provider authority,
-or storage authority.
+The Federation creator may name any current member. Every trusted member may
+also name its own device. Names are public metadata only: the Ed25519-derived
+``node_id`` remains the identity and authority key.
 """
 
 from __future__ import annotations
 
 import uuid
 
+from catalog.federation.device_names import (
+    DEVICE_NAME_EVENT,
+    MAX_DEVICE_NAME_BYTES,
+    validate_device_name,
+)
 from catalog.federation.errors import (
     AuthorizationError,
     FederationOperationError,
     FederationValidationError,
 )
 from catalog.federation.projections.authority_adapter import FederationAuthorityAdapter
-from catalog.federation.redaction import is_nonpublic_location_text, is_secret_text
 
 from .capability_onboarding_service import get_capability_onboarding_service
 
-DEVICE_NAME_EVENT = "node.display-name.changed"
-MAX_DEVICE_NAME_BYTES = 96
-_RESERVED_NAMES = frozenset(
-    {
-        "this device",
-        "this fcp device",
-        "trusted fcp device",
-    }
-)
+
+def _session_owner_id(context: object) -> str | None:
+    """Read the creator when the coordinator status exposes it.
+
+    Remote status snapshots from older relays may omit ``created_by_node_id``.
+    Self-naming does not depend on that field; leader-wide naming still does.
+    The read-only Federation projection independently recovers the creator from
+    the authoritative ``session.created`` event when necessary.
+    """
+
+    try:
+        coordinator = getattr(context, "coordinator")
+        binding = getattr(context, "binding")
+        store = getattr(coordinator, "store")
+        session = store.get_session(binding.internal_session_id)
+    except (AttributeError, TypeError):
+        return None
+    value = getattr(session, "created_by_node_id", None)
+    return value if isinstance(value, str) and value else None
 
 
-def _validated_name(value: object) -> str:
-    if not isinstance(value, str):
-        raise FederationValidationError(
-            "invalid-device-name",
-            "display_name",
-            "must be text",
+def _append_name_event(
+    context: object,
+    *,
+    actor_node_id: str,
+    target_node_id: str,
+    display_name: str,
+) -> None:
+    """Append through local authority or the bounded paired-runtime API."""
+
+    coordinator = getattr(context, "coordinator", None)
+    binding = getattr(context, "binding", None)
+    session_id = getattr(binding, "internal_session_id", None)
+    if coordinator is None or not isinstance(session_id, str) or not session_id:
+        raise FederationOperationError(
+            "federation-device-name-context-unavailable",
+            "trusted Federation naming context is incomplete",
         )
-    name = value.strip()
-    if not name or any(ord(character) < 32 for character in name):
-        raise FederationValidationError(
-            "invalid-device-name",
-            "display_name",
-            "must be non-empty text without control characters",
+
+    request_id = f"device-name-{uuid.uuid4().hex}"
+    payload = {"node_id": target_node_id, "display_name": display_name}
+    append = getattr(coordinator, "append_event", None)
+    if callable(append):
+        append(
+            session_id=session_id,
+            actor_node_id=actor_node_id,
+            request_id=request_id,
+            event_type=DEVICE_NAME_EVENT,
+            payload=payload,
         )
-    if len(name.encode("utf-8")) > MAX_DEVICE_NAME_BYTES:
-        raise FederationValidationError(
-            "device-name-too-large",
-            "display_name",
-            f"must not exceed {MAX_DEVICE_NAME_BYTES} UTF-8 bytes",
+        return
+
+    # RemoteCoordinatorFacade intentionally stays read-only. Its pairing runtime
+    # already exposes one bounded public event-append operation that verifies the
+    # bound Federation session before reaching the authenticated relay client.
+    runtime = getattr(coordinator, "runtime", None)
+    state = getattr(coordinator, "state", None)
+    append_session_event = getattr(runtime, "append_session_event", None)
+    if runtime is None or state is None or not callable(append_session_event):
+        raise FederationOperationError(
+            "federation-device-name-write-unavailable",
+            "the authenticated Federation transport cannot publish a device name",
         )
-    if name.casefold() in _RESERVED_NAMES:
-        raise FederationValidationError(
-            "reserved-device-name",
-            "display_name",
-            "must distinguish this device from generic Federation labels",
-        )
-    if is_secret_text(name):
-        raise FederationValidationError(
-            "secret-device-name",
-            "display_name",
-            "must not contain credentials or secrets",
-        )
-    if is_nonpublic_location_text(name):
-        raise FederationValidationError(
-            "nonpublic-device-name",
-            "display_name",
-            "must not expose backend paths or physical storage addresses",
-        )
-    return name
+    append_session_event(
+        state,
+        session_id=session_id,
+        event_type=DEVICE_NAME_EVENT,
+        payload=payload,
+        request_id=request_id,
+    )
 
 
 class FederationDeviceNamingService:
-    """Append explicit leader-owned device-name decisions to Federation history."""
+    """Persist bounded Federation-scoped device-name decisions."""
 
     @staticmethod
-    def _context():
+    def _context() -> tuple[object, str]:
         context = get_capability_onboarding_service().authorized_context()
         if context is None:
             raise AuthorizationError(
                 "federation-device-name-authority-required",
                 "a trusted Federation context is required",
             )
-        session = context.coordinator.store.get_session(
-            context.binding.internal_session_id
-        )
         actor = context.credentials.identity.node_id
-        if session is None or session.created_by_node_id != actor:
-            raise AuthorizationError(
-                "federation-device-name-owner-required",
-                "only the Federation creator may assign device names",
-            )
         return context, actor
 
-    def rename(self, *, target_node_id: str, display_name: object) -> str:
-        context, actor = self._context()
-        name = _validated_name(display_name)
-        session_id = context.binding.internal_session_id
+    @staticmethod
+    def _snapshot(context: object, actor: str):
+        binding = getattr(context, "binding")
+        coordinator = getattr(context, "coordinator")
         snapshot = FederationAuthorityAdapter(
-            context.coordinator,
+            coordinator,
             actor_node_id=actor,
-            internal_session_id=session_id,
+            internal_session_id=binding.internal_session_id,
         ).snapshot()
         if not snapshot.available:
             raise FederationOperationError(
                 "federation-device-list-unavailable",
                 "current Federation membership could not be read",
             )
+        return snapshot
+
+    def _verify_applied_name(
+        self,
+        context: object,
+        actor: str,
+        *,
+        target_node_id: str,
+        display_name: str,
+    ) -> str:
+        """Confirm deterministic replay accepted the just-published name claim."""
+
+        snapshot = self._snapshot(context, actor)
+        target = next(
+            (device for device in snapshot.devices if device.node_id == target_node_id),
+            None,
+        )
+        if target is None:
+            raise FederationOperationError(
+                "federation-device-name-verification-unavailable",
+                "the renamed device disappeared before the name could be verified",
+                "target_node_id",
+            )
+        if target.label == display_name:
+            return display_name
+        folded = display_name.casefold()
+        if any(
+            device.node_id != target_node_id and device.label.casefold() == folded
+            for device in snapshot.devices
+        ):
+            raise FederationValidationError(
+                "duplicate-device-name",
+                "display_name",
+                "another concurrent name claim won the Federation revision order",
+            )
+        raise FederationOperationError(
+            "federation-device-name-not-applied",
+            "the published device name was not accepted by Federation replay",
+            "display_name",
+        )
+
+    def rename(self, *, target_node_id: str, display_name: object) -> str:
+        context, actor = self._context()
+        name = validate_device_name(display_name)
+        snapshot = self._snapshot(context, actor)
         target = next(
             (device for device in snapshot.devices if device.node_id == target_node_id),
             None,
@@ -118,6 +178,15 @@ class FederationDeviceNamingService:
                 "the target must be a current Federation member",
                 "target_node_id",
             )
+
+        owner = _session_owner_id(context)
+        if target_node_id != actor and owner != actor:
+            raise AuthorizationError(
+                "federation-device-name-owner-required",
+                "a member may name only itself; the Federation creator may name any member",
+                "target_node_id",
+            )
+
         folded = name.casefold()
         if any(
             device.node_id != target_node_id and device.label.casefold() == folded
@@ -130,36 +199,107 @@ class FederationDeviceNamingService:
             )
         if target.label == name:
             return name
-        context.coordinator.append_event(
-            session_id=session_id,
+
+        _append_name_event(
+            context,
             actor_node_id=actor,
-            request_id=f"device-name-{uuid.uuid4().hex}",
-            event_type=DEVICE_NAME_EVENT,
-            payload={"node_id": target_node_id, "display_name": name},
+            target_node_id=target_node_id,
+            display_name=name,
         )
-        return name
+        return self._verify_applied_name(
+            context,
+            actor,
+            target_node_id=target_node_id,
+            display_name=name,
+        )
+
+    def rename_self(self, display_name: object) -> str:
+        context, actor = self._context()
+        name = validate_device_name(display_name)
+        snapshot = self._snapshot(context, actor)
+        target = next(
+            (device for device in snapshot.devices if device.node_id == actor),
+            None,
+        )
+        if target is None:
+            raise FederationOperationError(
+                "current-federation-device-unavailable",
+                "this device is not visible in the current Federation membership",
+            )
+        folded = name.casefold()
+        if any(
+            device.node_id != actor and device.label.casefold() == folded
+            for device in snapshot.devices
+        ):
+            raise FederationValidationError(
+                "duplicate-device-name",
+                "display_name",
+                "must be unique within this Federation",
+            )
+        if target.label == name:
+            return name
+        _append_name_event(
+            context,
+            actor_node_id=actor,
+            target_node_id=actor,
+            display_name=name,
+        )
+        return self._verify_applied_name(
+            context,
+            actor,
+            target_node_id=actor,
+            display_name=name,
+        )
+
+    def current_name(self) -> str | None:
+        try:
+            context, actor = self._context()
+            snapshot = self._snapshot(context, actor)
+        except (AuthorizationError, FederationOperationError):
+            return None
+        target = next(
+            (device for device in snapshot.devices if device.node_id == actor),
+            None,
+        )
+        return None if target is None else target.label
 
 
 def local_device_naming_available() -> bool:
-    """Return whether the current local viewer owns Federation naming authority."""
+    """Return whether this viewer may name other Federation members."""
 
     try:
         context = get_capability_onboarding_service().authorized_context()
         if context is None:
             return False
-        session = context.coordinator.store.get_session(
-            context.binding.internal_session_id
-        )
-        return (
-            session is not None
-            and session.created_by_node_id == context.credentials.identity.node_id
-        )
+        actor = context.credentials.identity.node_id
+        return _session_owner_id(context) == actor
     except Exception:  # noqa: BLE001 - controls fail closed
         return False
 
 
+def local_device_self_naming_available() -> bool:
+    """Return whether this trusted member may publish its own device name."""
+
+    try:
+        context = get_capability_onboarding_service().authorized_context()
+        if context is None:
+            return False
+        actor = context.credentials.identity.node_id
+        binding = context.binding
+        return actor == binding.device_id
+    except Exception:  # noqa: BLE001 - controls fail closed
+        return False
+
+
+def current_federation_device_name() -> str | None:
+    return FederationDeviceNamingService().current_name()
+
+
 __all__ = [
     "DEVICE_NAME_EVENT",
+    "MAX_DEVICE_NAME_BYTES",
     "FederationDeviceNamingService",
+    "current_federation_device_name",
     "local_device_naming_available",
+    "local_device_self_naming_available",
 ]

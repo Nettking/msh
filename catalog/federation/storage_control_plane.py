@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import sqlite3
 import uuid
+from contextlib import closing
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -201,7 +202,7 @@ class StorageControlPlaneStore:
     def __init__(self, database: Path | str) -> None:
         self.database = str(database)
         Path(self.database).parent.mkdir(parents=True, exist_ok=True)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.executescript(
                 """
@@ -231,7 +232,7 @@ class StorageControlPlaneStore:
         return snapshot
 
     def events(self, session_id: str) -> tuple[SessionEvent, ...]:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             rows = connection.execute(
                 "SELECT * FROM storage_control_events WHERE session_id = ? ORDER BY revision",
                 (session_id,),
@@ -263,7 +264,7 @@ class StorageControlPlaneStore:
         occurred_at = _utc(occurred_at or datetime.now(timezone.utc))
         if not isinstance(payload, dict):
             raise FederationValidationError("invalid-object", "payload", "must be an object")
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute("BEGIN IMMEDIATE")
             revision = connection.execute(
                 "SELECT COALESCE(MAX(revision), 0) + 1 FROM storage_control_events WHERE session_id = ?",

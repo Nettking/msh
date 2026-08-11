@@ -35,7 +35,9 @@ from .services.capability_benchmark_service import get_capability_benchmark_serv
 from .services.capability_onboarding_service import get_capability_onboarding_service
 from .services.federation_device_names import (
     FederationDeviceNamingService,
+    current_federation_device_name,
     local_device_naming_available,
+    local_device_self_naming_available,
 )
 from .services.federation_projection_service import (
     get_federation_projection_service,
@@ -186,6 +188,16 @@ def _page_response(page: FederationPage) -> Response:
         if page is FederationPage.DEVICES
         else False
     )
+    self_naming_available = (
+        local_device_self_naming_available()
+        if page is FederationPage.THIS_DEVICE
+        else False
+    )
+    current_device_name = (
+        current_federation_device_name()
+        if page is FederationPage.THIS_DEVICE
+        else None
+    )
     update_status = None
     if page is FederationPage.OVERVIEW:
         try:
@@ -216,11 +228,14 @@ def _page_response(page: FederationPage) -> Response:
             federation_page=projection,
             federation_item_actions=item_actions,
             federation_device_naming_available=device_naming_available,
+            federation_device_self_naming_available=self_naming_available,
+            federation_current_device_name=current_device_name,
             federation_csrf_token=(
                 _csrf_token()
                 if item_actions
                 or page is FederationPage.OVERVIEW
                 or device_naming_available
+                or self_naming_available
                 else None
             ),
             federation_update=update_status,
@@ -267,6 +282,28 @@ def _require_update_csrf() -> None:
         abort(403)
 
 
+@federation_web.post("/federation/device/name")
+def rename_this_device() -> Response:
+    _require_update_csrf()
+    display_name = request.form.get("display_name")
+    try:
+        name = FederationDeviceNamingService().rename_self(display_name)
+        flash(f"This device is now named {name} across the Federation.", "success")
+    except AuthorizationError:
+        flash("A trusted Federation membership is required to name this device.", "error")
+    except FederationValidationError as exc:
+        code = getattr(exc, "code", "invalid-device-name")
+        flash(code.replace("-", " ").capitalize(), "error")
+    except FederationOperationError:
+        flash("This Federation device name could not be published.", "error")
+    except Exception as exc:  # noqa: BLE001 - diagnostics remain server-side
+        current_app.logger.warning(
+            "Federation self device rename failed (%s)", type(exc).__name__
+        )
+        flash("This Federation device name could not be saved safely.", "error")
+    return redirect(url_for("federation_web.detail", page_name="device"), code=303)
+
+
 @federation_web.post("/federation/devices/name")
 def rename_device() -> Response:
     _require_update_csrf()
@@ -279,7 +316,7 @@ def rename_device() -> Response:
         )
         flash(f"Federation device name saved as {name}.", "success")
     except AuthorizationError:
-        flash("Only the Federation leader can assign device names.", "error")
+        flash("Only the Federation leader can name another device.", "error")
     except FederationValidationError as exc:
         code = getattr(exc, "code", "invalid-device-name")
         flash(code.replace("-", " ").capitalize(), "error")

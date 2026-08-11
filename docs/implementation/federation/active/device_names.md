@@ -22,17 +22,21 @@ Device names are **Federation-scoped metadata**. They never replace or modify th
 - compute/execution authority; or
 - software-update authority.
 
-Only the Federation/session creator may assign or change a name. The decision is appended to the authoritative Federation event history as `node.display-name.changed` with the target `node_id` and public-safe `display_name`.
+A trusted member may assign or change the name of **its own** device. The Federation/session creator may additionally name any current member, including an offline member. Each accepted decision is appended to the authoritative Federation event history as `node.display-name.changed` with the target `node_id` and public-safe `display_name`.
 
-Readers apply a name only when the event was authored by the current session creator. A similarly shaped event written by another member must not override the displayed name.
+Readers apply a naming event only when its authenticated actor is either the target device itself or the current session creator. A third member cannot rename another device merely by appending a similarly shaped event.
+
+The creator identity must be recoverable from authoritative session history as well as coordinator status. This is required because remotely paired clients may receive a status representation that does not expose `created_by_node_id`; leader-assigned names must still resolve identically on every member.
 
 ## Product behavior
 
-The leader may edit names from the Federation **Devices** page, including while the target device is offline. Names are case-insensitively unique inside one Federation and generic labels such as `This FCP device` and `Trusted FCP device` are reserved.
+Every trusted member may edit its own name from Federation **This device**. The leader may additionally edit member names from Federation **Devices**, including while the target device is offline. Names are case-insensitively unique inside one Federation and generic labels such as `This FCP device` and `Trusted FCP device` are reserved.
 
-The current name follows the stable node ID across trusted read-only projections and should be used anywhere an operator needs to identify a computer, including:
+Concurrent claims are resolved deterministically from authoritative event order. If two current members race to claim the same case-insensitive name, the earlier accepted Federation revision keeps the name and the later claim is inert in projection. The writer verifies the post-append projection and reports the losing claim as `duplicate-device-name` rather than returning false success. This keeps every trusted reader on the same unique naming state without turning the generic relay event API into a separate naming authority.
 
-- Devices and Federation overview;
+The latest authorized name follows the stable node ID across trusted projections and should be used anywhere an operator needs to identify a computer, including:
+
+- This device, Devices, and Federation overview;
 - software update checks and rollout results;
 - shared service metadata;
 - provider/contribution approvals; and
@@ -40,17 +44,27 @@ The current name follows the stable node ID across trusted read-only projections
 
 The underlying `node_id` remains available where technical identity is useful.
 
+## Remote publication
+
+A locally hosted Federation creator writes through the coordinator directly. A remotely paired member publishes its own naming event through the pairing runtime's existing bounded `append_session_event(...)` operation, which verifies the bound Federation session before using the authenticated outbound relay client and the existing `event.append` protocol. The web application does not access private relay-client fields and does not expose a general remote coordinator mutation facade.
+
+The read side replays authoritative session history, so a name written by the leader or by the device itself is visible to every trusted member after normal Federation refresh/replay. Naming does not depend on the target being online after the event has been persisted.
+
 ## Safety
 
-Names are bounded public metadata. They reject control characters, credentials/secrets, and strings that would expose non-public backend/storage locations. Normal GET projections remain read-only; only the explicit leader POST appends a naming event.
+Names are bounded public metadata. They reject control characters, credentials/secrets, strings that expose non-public backend/storage locations, and reserved generic labels. Normal GET projections remain read-only; only explicit CSRF-protected naming POSTs publish an event.
 
 ## Acceptance criteria
 
 1. The leader can name a current Federation member while it is online or offline.
-2. A non-leader cannot assign a name.
-3. The assigned name is durable in authoritative event history.
-4. Every trusted member resolves the same latest leader-authored name for the same `node_id`.
-5. A member-authored spoofed naming event cannot override the leader's name.
-6. Names are unique within a Federation and do not alter node identity.
-7. Software Updates uses the Federation name so an offline/error row identifies the affected computer immediately.
-8. Services, provider approvals, and storage ownership use the same resolved name rather than inventing independent labels.
+2. Every trusted member can name its own device from **This device**.
+3. A non-leader cannot rename another member.
+4. The assigned name is durable in authoritative event history.
+5. Every trusted member resolves the same latest authorized name for the same `node_id`.
+6. A leader-authored name remains visible on remotely paired members even when their coordinator status omits the creator field.
+7. A self-authored naming event is accepted only for the authenticated actor's own `node_id`.
+8. A third-party spoofed naming event cannot rename another member.
+9. Names are unique within a Federation and concurrent duplicate claims resolve deterministically by authoritative revision order.
+10. A remotely paired member publishes through the bounded pairing-runtime API rather than private runtime/client internals.
+11. Software Updates uses the Federation name so an offline/error row identifies the affected computer immediately.
+12. Services, provider approvals, and storage ownership use the same resolved name rather than inventing independent labels.
