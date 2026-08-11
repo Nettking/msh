@@ -25,6 +25,7 @@ from catalog.federation.projections import (
     StorageAuthorityAdapter,
     StorageAuthoritySnapshot,
 )
+from catalog.federation.storage_control_plane import StorageControlPlaneStore
 
 from .capability_benchmark_service import get_capability_benchmark_service
 from .capability_contribution_service import get_capability_contribution_service
@@ -34,6 +35,7 @@ from .capability_onboarding_service import (
     get_capability_onboarding_service,
 )
 from .federation_device_projection import CapabilityFirstFederationDeviceAdapter
+from .pending_contribution_approval import get_local_provider_operator_surface
 from .upload_analysis_job_service import get_upload_analysis_job_service
 
 _OPERATOR_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
@@ -159,15 +161,34 @@ def _contribution_state() -> tuple[tuple[object, ...], tuple[object, ...], bool]
         return (), (), True
 
 
-def _storage_adapter(internal_session_id: str) -> object:
-    store = current_app.config.get(_STORAGE_STORE_CONFIG_KEY)
-    if store is None:
-        return _StaticSnapshotAdapter(
-            StorageAuthoritySnapshot(True, "not-configured")
+def _storage_adapter(internal_session_id: str, coordinator: object) -> object:
+    if _STORAGE_STORE_CONFIG_KEY in current_app.config:
+        store = current_app.config.get(_STORAGE_STORE_CONFIG_KEY)
+        if store is None:
+            return _StaticSnapshotAdapter(
+                StorageAuthoritySnapshot(True, "not-configured")
+            )
+        return StorageAuthorityAdapter(
+            store,
+            internal_session_id=internal_session_id,
         )
-    return StorageAuthorityAdapter(
-        store,
-        internal_session_id=internal_session_id,
+
+    coordinator_store = getattr(coordinator, "store", None)
+    database = getattr(coordinator_store, "database", None)
+    if isinstance(database, (str, bytes)) and database:
+        try:
+            return StorageAuthorityAdapter(
+                StorageControlPlaneStore(database),
+                internal_session_id=internal_session_id,
+            )
+        except Exception as exc:  # noqa: BLE001 - projection must fail closed
+            _warn_projection("Federation storage", exc)
+            return _StaticSnapshotAdapter(
+                StorageAuthoritySnapshot(False, "storage-projection-failed")
+            )
+
+    return _StaticSnapshotAdapter(
+        StorageAuthoritySnapshot(True, "not-configured")
     )
 
 
@@ -187,6 +208,17 @@ def _job_adapter(internal_session_id: str) -> object:
         )
 
 
+def _operator_surface() -> ProviderOperatorSurface | None:
+    configured = current_app.config.get(_OPERATOR_SURFACE_CONFIG_KEY)
+    if isinstance(configured, ProviderOperatorSurface):
+        return configured
+    try:
+        return get_local_provider_operator_surface()
+    except Exception as exc:  # noqa: BLE001 - provider projection fails closed
+        _warn_projection("Federation provider operator", exc)
+        return None
+
+
 def get_federation_projection_service() -> FederationProjectionService:
     """Build product projections from server-bound read-only authorities.
 
@@ -198,7 +230,7 @@ def get_federation_projection_service() -> FederationProjectionService:
     accepted as actor, session, endpoint or authority context.
     """
 
-    surface = current_app.config.get(_OPERATOR_SURFACE_CONFIG_KEY)
+    surface = _operator_surface()
     binding: object | None = None
     provider_adapter: object | None = None
     coordinator: object | None = None
@@ -274,7 +306,7 @@ def get_federation_projection_service() -> FederationProjectionService:
                 onboarding_adapter,
                 provider_adapter,
             ),
-            storage=_storage_adapter(internal_session_id),
+            storage=_storage_adapter(internal_session_id, coordinator),
             jobs=_job_adapter(internal_session_id),
         )
         return FederationProjectionService(adapters)
