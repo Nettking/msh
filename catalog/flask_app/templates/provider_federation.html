@@ -69,7 +69,13 @@
       </header>
 
       <dl>
-        <div><dt>Node</dt><dd><code>{{ provider.node_id }}</code></dd></div>
+        <div>
+          <dt>Device</dt>
+          <dd>
+            <strong>{{ provider_device_labels.get(provider.node_id, 'Trusted FCP device') }}</strong><br>
+            <code>{{ provider.node_id }}</code>
+          </dd>
+        </div>
         <div><dt>Protocol</dt><dd>{{ provider.protocol }} {{ provider.protocol_version }}</dd></div>
         <div><dt>Announcement</dt><dd>{{ provider.announcement_status }}</dd></div>
         <div><dt>Enrollment</dt><dd>{{ provider.enrollment_state }}{% if provider.enrollment_revision %} · revision {{ provider.enrollment_revision }}{% endif %}</dd></div>
