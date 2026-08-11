@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import secrets
 import uuid
 from datetime import timedelta
 from pathlib import Path
@@ -21,6 +22,7 @@ security = Security()
 csrf = CSRFProtect()
 _UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _HUMAN_CSRF_BLUEPRINTS = frozenset({"security", "auth_users"})
+_LEGACY_PLACEHOLDERS = frozenset({"fcp-dev", "fcp-dev-change-me"})
 
 
 def _boolean_env(name: str, default: bool) -> bool:
@@ -38,36 +40,58 @@ def _database_uri(value: str) -> str:
     return f"sqlite:///{path}"
 
 
+def _secret_directory() -> Path:
+    path = Path(os.getenv("FCP_AUTH_SECRET_DIR", "data/auth")).expanduser().resolve()
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def _read_or_create_secret(path: Path) -> str:
+    try:
+        value = path.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        value = secrets.token_urlsafe(48)
+        try:
+            with path.open("x", encoding="utf-8") as handle:
+                handle.write(value + "\n")
+        except FileExistsError:
+            value = path.read_text(encoding="utf-8").strip()
+        try:
+            path.chmod(0o600)
+        except OSError:
+            pass
+    if len(value) < 32:
+        raise RuntimeError(f"Persisted auth secret is invalid: {path}")
+    return value
+
+
 def _validated_secret(app: Flask) -> str:
-    secret = os.getenv("FCP_FLASK_SECRET", "")
+    secret = os.getenv("FCP_FLASK_SECRET", "").strip()
     development = _boolean_env("FCP_DEVELOPMENT", False)
-    weak = not secret or len(secret) < 32 or secret in {"fcp-dev", "fcp-dev-change-me"}
-    if weak and not development:
-        raise RuntimeError(
-            "FCP_FLASK_SECRET must be an unpredictable value of at least 32 characters; "
-            "generate one with: python -c 'import secrets; print(secrets.token_urlsafe(48))'"
-        )
-    if weak:
+    if secret and secret not in _LEGACY_PLACEHOLDERS:
+        if len(secret) < 32:
+            raise RuntimeError("FCP_FLASK_SECRET must contain at least 32 characters")
+        return secret
+    if development:
         app.logger.warning("Using an ephemeral development-only Flask session secret")
         return uuid.uuid4().hex + uuid.uuid4().hex
-    return secret
+    return _read_or_create_secret(_secret_directory() / "flask-secret")
 
 
 def _validated_password_salt(app: Flask) -> str:
-    salt = os.getenv("FCP_PASSWORD_SALT", "")
+    salt = os.getenv("FCP_PASSWORD_SALT", "").strip()
     development = _boolean_env("FCP_DEVELOPMENT", False)
-    if len(salt) >= 32:
+    if salt:
+        if len(salt) < 32:
+            raise RuntimeError("FCP_PASSWORD_SALT must contain at least 32 characters")
         return salt
-    if not development:
-        raise RuntimeError(
-            "FCP_PASSWORD_SALT must be a separate unpredictable value of at least "
-            "32 characters; generate one once and keep it stable"
+    if development:
+        app.logger.warning(
+            "Using an ephemeral development-only password salt; human passwords will "
+            "not survive a salt change"
         )
-    app.logger.warning(
-        "Using an ephemeral development-only password salt; human passwords will "
-        "not survive a salt change"
-    )
-    return uuid.uuid4().hex + uuid.uuid4().hex
+        return uuid.uuid4().hex + uuid.uuid4().hex
+    return _read_or_create_secret(_secret_directory() / "password-salt")
 
 
 def _seed_policy(datastore: SQLAlchemyUserDatastore) -> None:
