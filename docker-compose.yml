@@ -16,6 +16,12 @@ services:
       - FCP_DEVICE_NAME=${FCP_DEVICE_NAME:-This FCP device}
       - FCP_RELAY_PORT=${FCP_RELAY_PORT:-8765}
       - FCP_PAIRING_RELAY_URL=${FCP_PAIRING_RELAY_URL:-}
+      - FCP_RECORDER_STATE_FILE=${FCP_RECORDER_STATE_FILE:-data/source_state/mtconnect_recorder_state.json}
+      - FCP_RECORDER_STORAGE_GROUP=${FCP_RECORDER_STORAGE_GROUP:-}
+      - FCP_FEDERATION_STORAGE_GROUP=${FCP_FEDERATION_STORAGE_GROUP:-}
+      - FCP_FEDERATED_TELEMETRY_MIRROR_DIR=${FCP_FEDERATED_TELEMETRY_MIRROR_DIR:-data/federation/shared}
+      - FCP_FEDERATED_TELEMETRY_MAX_PAGES_PER_SYNC=${FCP_FEDERATED_TELEMETRY_MAX_PAGES_PER_SYNC:-5}
+      - FCP_FEDERATED_TELEMETRY_MAX_BATCHES_PER_SYNC=${FCP_FEDERATED_TELEMETRY_MAX_BATCHES_PER_SYNC:-100}
       - FCP_FEDERATION_NODE_STATE_DIR=${FCP_FEDERATION_NODE_STATE_DIR:-/app/data/federation/device}
       - FCP_FEDERATION_ONBOARDING_DATABASE=${FCP_FEDERATION_ONBOARDING_DATABASE:-/app/data/federation/onboarding/onboarding.sqlite3}
       - FCP_FEDERATION_COORDINATOR_DATABASE=${FCP_FEDERATION_COORDINATOR_DATABASE:-/var/lib/fcp-relay/control.sqlite3}
@@ -99,7 +105,7 @@ services:
     environment:
       - FCP_RECORDER_MANAGED=true
       - FCP_RECORDER_DATA_DIR=data
-      - FCP_RECORDER_STATE_FILE=data/source_state/mtconnect_recorder_state.json
+      - FCP_RECORDER_STATE_FILE=${FCP_RECORDER_STATE_FILE:-data/source_state/mtconnect_recorder_state.json}
       - FCP_RECORDER_CONTROL_FILE=data/source_state/mtconnect_recorder_control.json
       - FCP_RECORDER_CONFIG_FILE=data/capabilities/config.json
       - FCP_RECORDER_STATUS_FILE=data/source_state/mtconnect_recorder_status.json

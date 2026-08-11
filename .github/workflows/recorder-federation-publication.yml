@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - ".github/workflows/recorder-federation-publication.yml"
+      - ".ruff.toml"
       - "docker-compose.yml"
       - "start_recorder.py"
       - "catalog/federation/recorder_control_events.py"
@@ -40,6 +41,7 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/recorder-federation-publication.yml"
+      - ".ruff.toml"
       - "docker-compose.yml"
       - "start_recorder.py"
       - "catalog/federation/recorder_control_events.py"

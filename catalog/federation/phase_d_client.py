@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -22,6 +23,12 @@ from .storage_protocol import (
     StorageRequestEnvelope,
     StorageResponseEnvelope,
     WriteAuthority,
+)
+from .storage_catalog import (
+    CommittedBatchDeltaPage,
+    CommittedBatchPage,
+    CommittedBatchReference,
+    ManifestBatchCatalog,
 )
 
 
@@ -80,6 +87,7 @@ class PhaseDLogicalStorageClient:
         control_plane,
         transport: LogicalStorageTransport,
         acknowledgements: DurableAcknowledgementStore | None = None,
+        catalog_cursor_secret: bytes | None = None,
         clock: Callable[[], datetime] = _now,
     ) -> None:
         self.session_id = session_id
@@ -88,6 +96,11 @@ class PhaseDLogicalStorageClient:
         self.transport = transport
         self.acknowledgements = acknowledgements
         self.clock = clock
+        self.batch_catalog = ManifestBatchCatalog(
+            control_plane,
+            session_id,
+            cursor_secret=catalog_cursor_secret,
+        )
 
     def _route(self, group_id: str) -> _Route:
         snapshot = self.control_plane.snapshot(self.session_id)
@@ -476,6 +489,128 @@ class PhaseDLogicalStorageClient:
                 "is required",
             )
         return result["content"]
+
+    def list_committed_batches(
+        self,
+        *,
+        group_id: str,
+        dataset_id: str | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> CommittedBatchPage:
+        """Discover only coordinator-authoritative committed batches."""
+
+        return self.batch_catalog.list_batches(
+            group_id,
+            dataset_id=dataset_id,
+            limit=limit,
+            cursor=cursor,
+        )
+
+    def list_committed_batch_delta(
+        self,
+        *,
+        group_id: str,
+        baseline_manifest_revision: int,
+        baseline_manifest_hash: str,
+        dataset_id: str | None = None,
+        limit: int = 50,
+        cursor: str | None = None,
+    ) -> CommittedBatchDeltaPage:
+        """Discover commits added after an exact authoritative baseline."""
+
+        return self.batch_catalog.list_batch_delta(
+            group_id,
+            baseline_manifest_revision=baseline_manifest_revision,
+            baseline_manifest_hash=baseline_manifest_hash,
+            dataset_id=dataset_id,
+            limit=limit,
+            cursor=cursor,
+        )
+
+    async def read_committed_batch(
+        self,
+        *,
+        group_id: str | None = None,
+        batch_id: str | None = None,
+        dataset_id: str | None = None,
+        manifest_revision: int | None = None,
+        manifest_hash: str | None = None,
+        reference: CommittedBatchReference | dict[str, Any] | None = None,
+    ) -> object:
+        """Read one committed batch and verify it against manifest evidence.
+
+        A serialized reference pins the request to the exact immutable manifest
+        revision returned by discovery.  The group/batch shorthand resolves the
+        current authoritative head and is retained for simple trusted callers.
+        """
+
+        if reference is not None:
+            if any(
+                value is not None
+                for value in (
+                    group_id,
+                    batch_id,
+                    dataset_id,
+                    manifest_revision,
+                    manifest_hash,
+                )
+            ):
+                raise FederationValidationError(
+                    "ambiguous-batch-reference",
+                    "reference",
+                    "must not be combined with separate batch identity fields",
+                )
+            resolved = self.batch_catalog.resolve_reference(reference)
+        else:
+            if group_id is None or batch_id is None:
+                raise FederationValidationError(
+                    "missing-field",
+                    "batch_id" if batch_id is None else "group_id",
+                    "group_id and batch_id are required",
+                )
+            resolved = self.batch_catalog.resolve_batch(
+                group_id,
+                batch_id,
+                dataset_id=dataset_id,
+                manifest_revision=manifest_revision,
+                manifest_hash=manifest_hash,
+            )
+
+        content = await self.read(
+            group_id=resolved.group_id,
+            batch_id=resolved.batch_id,
+        )
+        actual_hash = BatchIngestRequest.calculate_content_hash(content)
+        if actual_hash != resolved.content_hash:
+            raise FederationValidationError(
+                StorageErrorCode.CONTENT_HASH_MISMATCH.value,
+                "content_hash",
+                "provider content does not match the authoritative manifest",
+            )
+        encoded = json.dumps(
+            content,
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+            allow_nan=False,
+        ).encode("utf-8")
+        if len(encoded) != resolved.size_bytes:
+            raise FederationValidationError(
+                "content-size-mismatch",
+                "size_bytes",
+                "provider content size does not match the authoritative manifest",
+            )
+        if resolved.schema_name == "fcp.mtconnect.observations" and (
+            not isinstance(content, dict)
+            or content.get("schema") != "fcp.mtconnect.observations.v1"
+        ):
+            raise FederationValidationError(
+                "content-schema-mismatch",
+                "content.schema",
+                "recorder content does not match the committed dataset schema",
+            )
+        return content
 
     async def _read_request(
         self,

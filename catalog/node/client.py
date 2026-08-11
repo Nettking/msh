@@ -11,6 +11,7 @@ import ssl
 import sys
 import uuid
 from collections.abc import Awaitable, Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -47,6 +48,7 @@ DEFAULT_REQUEST_TIMEOUT = 15.0
 DEFAULT_REPLAY_PAGE_TIMEOUT = 60.0
 MAX_CLIENT_INTERVAL_SECONDS = 3_600.0
 MAX_INBOUND_MESSAGES = 256
+MAX_PENDING_MESSAGE_RESPONSES = 128
 MAX_PENDING_REQUESTS = 128
 MAX_REPLAY_PAGES_PER_PASS = 1_024
 MAX_STATUS_PAGES = 1_024
@@ -55,6 +57,13 @@ MAX_STATUS_SNAPSHOT_RESTARTS = 3
 
 class RelayRemoteError(FederationOperationError):
     """A structured rejection returned by the relay."""
+
+
+@dataclass(frozen=True)
+class _PendingMessageResponse:
+    session_id: str
+    target_node_id: str
+    future: asyncio.Future[RelayEnvelope]
 
 
 def _now() -> datetime:
@@ -145,6 +154,9 @@ class RelayNodeClient:
         self._websocket: ClientConnection | None = None
         self._send_lock = asyncio.Lock()
         self._pending: dict[str, asyncio.Future[dict[str, Any]]] = {}
+        self._pending_message_responses: dict[
+            str, _PendingMessageResponse
+        ] = {}
         self._replay_tasks: dict[
             str, asyncio.Task[dict[str, Any]]
         ] = {}
@@ -393,6 +405,10 @@ class RelayNodeClient:
             if not future.done():
                 future.set_exception(error)
         self._pending.clear()
+        for pending in tuple(self._pending_message_responses.values()):
+            if not pending.future.done():
+                pending.future.set_exception(error)
+        self._pending_message_responses.clear()
         self.connected_event.clear()
         self.disconnected_event.set()
         enrollment_state = self.state.status()["enrollment_state"]
@@ -586,6 +602,85 @@ class RelayNodeClient:
             payload=payload,
             request_id=request_id,
         )
+
+    async def request_message_response(
+        self,
+        session_id: str,
+        target_node_id: str,
+        payload: dict[str, Any],
+        correlation_id: str,
+        timeout: float | None = None,
+    ) -> RelayEnvelope:
+        """Send one routed message and await its authenticated correlated reply."""
+
+        if not isinstance(correlation_id, str) or not correlation_id:
+            raise NodeStateError(
+                "invalid-correlation-id",
+                "correlation_id",
+                "correlation ID must be a non-empty string",
+            )
+        if (
+            "correlation_id" in payload
+            and payload["correlation_id"] != correlation_id
+        ):
+            raise NodeStateError(
+                "correlation-id-mismatch",
+                "correlation_id",
+                "payload correlation ID does not match the requested reply",
+            )
+        if correlation_id in self._pending_message_responses:
+            raise NodeStateError(
+                "duplicate-local-correlation-id",
+                "correlation_id",
+                "correlation ID already has an in-flight message response",
+            )
+        if (
+            len(self._pending_message_responses)
+            >= MAX_PENDING_MESSAGE_RESPONSES
+        ):
+            raise NodeStateError(
+                "too-many-pending-message-responses",
+                "correlation_id",
+                "bounded pending message response limit reached",
+            )
+
+        outbound_payload = dict(payload)
+        outbound_payload["correlation_id"] = correlation_id
+        loop = asyncio.get_running_loop()
+        future: asyncio.Future[RelayEnvelope] = loop.create_future()
+        pending = _PendingMessageResponse(
+            session_id=session_id,
+            target_node_id=target_node_id,
+            future=future,
+        )
+        self._pending_message_responses[correlation_id] = pending
+        try:
+            delivery = await self.send_message(
+                session_id=session_id,
+                target_node_id=target_node_id,
+                payload=outbound_payload,
+            )
+            if (
+                not isinstance(delivery, dict)
+                or delivery.get("delivered") is not True
+            ):
+                raise RelayRemoteError(
+                    "message-delivery-not-confirmed",
+                    "relay did not confirm routed message delivery",
+                )
+            return await asyncio.wait_for(
+                future,
+                timeout=self.request_timeout if timeout is None else timeout,
+            )
+        finally:
+            if self._pending_message_responses.get(correlation_id) is pending:
+                self._pending_message_responses.pop(correlation_id, None)
+            if not future.done():
+                future.cancel()
+            elif not future.cancelled():
+                # A disconnect can fail both the delivery request and this reply
+                # future. Retrieve the latter even when delivery fails first.
+                future.exception()
 
     async def request_replay(self, session_id: str) -> dict[str, Any]:
         task = self._replay_tasks.get(session_id)
@@ -946,6 +1041,8 @@ class RelayNodeClient:
                     await self._apply_replayed_event(envelope)
                     continue
                 if envelope.message_type == "relay.message":
+                    if self._resolve_pending_message_response(envelope):
+                        continue
                     try:
                         self._inbound.put_nowait(envelope)
                     except asyncio.QueueFull as exc:
@@ -980,6 +1077,24 @@ class RelayNodeClient:
         finally:
             if self._websocket is websocket:
                 await self.disconnect(error_code=error_code)
+
+    def _resolve_pending_message_response(
+        self, envelope: RelayEnvelope
+    ) -> bool:
+        correlation_id = envelope.payload.get("correlation_id")
+        if not isinstance(correlation_id, str):
+            return False
+        pending = self._pending_message_responses.get(correlation_id)
+        if pending is None:
+            return False
+        if (
+            envelope.session_id != pending.session_id
+            or envelope.actor_node_id != pending.target_node_id
+        ):
+            return False
+        if not pending.future.done():
+            pending.future.set_result(envelope)
+        return True
 
     async def _apply_replayed_event(self, envelope: RelayEnvelope) -> None:
         event = SessionEvent.from_dict(envelope.payload["event"])

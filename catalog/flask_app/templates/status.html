@@ -306,6 +306,36 @@
   <p>Raw JSONL remains the source of truth. The cache exists to make repeated analytics reads faster.</p>
 </section>
 
+{% set federation_telemetry = federated_telemetry_status|default({}) %}
+{% set federation_telemetry_state = federation_telemetry.status|default('not-started') %}
+<section class="section-block section-block--runtime" id="federated-telemetry-status">
+  <h3>Telemetry from the Federation</h3>
+  <div class="metrics metrics-grid">
+    <article class="metric-card {% if federation_telemetry_state == 'up-to-date' %}metric-card--success{% elif federation_telemetry_state == 'error' %}metric-card--danger{% elif federation_telemetry_state == 'syncing' %}metric-card--warning{% endif %}">
+      <span class="metric-label">Sharing state</span>
+      <span class="metric-value">{{ federation_telemetry_state.replace('-', ' ')|title }}</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">New batches this pass</span>
+      <span class="metric-value">{{ federation_telemetry.downloaded|default(0) }}</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Already available</span>
+      <span class="metric-value">{{ federation_telemetry.already|default(0) }}</span>
+    </article>
+    <article class="metric-card">
+      <span class="metric-label">Last successful sync</span>
+      <span class="metric-value metric-value--long">{{ federation_telemetry.last_sync|default('Not yet', true) }}</span>
+    </article>
+  </div>
+  <dl class="kv-grid">
+    <div class="kv-row"><dt>Storage group</dt><dd>{{ federation_telemetry.group|default('Waiting for one ready group', true) }}</dd></div>
+    <div class="kv-row"><dt>Committed catalog version</dt><dd>{{ federation_telemetry.manifest_revision|default('n/a', true) }}</dd></div>
+    <div class="kv-row"><dt>Last safe error</dt><dd>{{ federation_telemetry.last_error|default('None', true) }}</dd></div>
+  </dl>
+  <p>Only committed recorder data that passes identity, size, hash, schema, and sequence checks is added to this workbench.</p>
+</section>
+
 {% if runtime_state.view_contracts %}
 <section class="section-block section-block--readiness">
   <h3>View readiness</h3>

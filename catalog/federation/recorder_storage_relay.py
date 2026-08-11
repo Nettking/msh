@@ -15,12 +15,15 @@ from __future__ import annotations
 
 import asyncio
 import json
+import re
+import time
 import uuid
+from collections import deque
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timezone
 from typing import Any
 
-from .errors import FederationValidationError
+from .errors import FederationOperationError, FederationValidationError
 from .live_failover import (
     STORAGE_CONTROL_REFRESH_MESSAGE,
     STORAGE_CONTROL_RELAY_KIND,
@@ -28,7 +31,16 @@ from .live_failover import (
     StorageControlRelayChannel,
 )
 from .phase_d_client import PhaseDIngestOutcome
-from .storage_protocol import BatchIngestResult
+from .storage_catalog import (
+    CommittedBatchDeltaPage,
+    CommittedBatchPage,
+    CommittedBatchReference,
+)
+from .storage_protocol import (
+    BatchIngestRequest,
+    BatchIngestResult,
+    StorageOperation,
+)
 
 RECORDER_LOGICAL_STORAGE_KIND = "fcp-recorder-logical-storage-v1"
 STORAGE_CONTROL_CAPABILITY_TYPE = "storage-control"
@@ -36,6 +48,12 @@ STORAGE_CONTROL_CAPABILITY_PROTOCOL = "fcp.storage-control"
 STORAGE_CONTROL_CAPABILITY_VERSION = "1"
 RECORDER_RELAY_MAX_PAYLOAD_BYTES = 46_000
 RECORDER_RELAY_SAFE_CONTENT_BYTES = 30_000
+RECORDER_CATALOG_MAX_PAGE_SIZE = 20
+RECORDER_DATASET_SCHEMA_NAME = "fcp.mtconnect.observations"
+RECORDER_DATASET_SCHEMA_VERSION = 1
+RECORDER_CONTENT_SCHEMA = "fcp.mtconnect.observations.v1"
+_SHA256 = re.compile(r"sha256:[0-9a-f]{64}")
+_SOURCE_SLUG = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
 
 
 def _text(value: Any, field: str, *, maximum: int = 512) -> str:
@@ -59,6 +77,16 @@ def _positive(value: Any, field: str) -> int:
             "invalid-recorder-storage-field",
             field,
             "must be a positive integer",
+        )
+    return value
+
+
+def _non_negative(value: Any, field: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise FederationValidationError(
+            "invalid-recorder-storage-field",
+            field,
+            "must be a non-negative integer",
         )
     return value
 
@@ -106,6 +134,150 @@ def _bounded_payload(value: dict[str, Any]) -> None:
             "recorder-storage-payload-too-large",
             "payload",
             "recorder publication exceeds the bounded relay application payload",
+        )
+
+
+def _validate_recorder_ingest(
+    *,
+    actor_node_id: str,
+    session_id: str,
+    group_id: str,
+    dataset_id: str,
+    batch_id: str,
+    idempotency_key: str,
+    schema_name: str,
+    schema_version: int,
+    content: Any,
+) -> None:
+    """Bind recorder telemetry to the authenticated producer and immutable IDs."""
+
+    del group_id  # The selected logical group remains independently authorized.
+    prefix = f"mtconnect:{actor_node_id}:"
+    if not dataset_id.startswith(prefix):
+        raise FederationValidationError(
+            "recorder-dataset-actor-mismatch",
+            "dataset_id",
+            "recorder dataset namespace must match the authenticated producer",
+        )
+    source_slug = dataset_id.removeprefix(prefix)
+    if _SOURCE_SLUG.fullmatch(source_slug) is None:
+        raise FederationValidationError(
+            "invalid-recorder-dataset",
+            "dataset_id",
+            "recorder dataset source must be a bounded portable slug",
+        )
+    if (
+        schema_name != RECORDER_DATASET_SCHEMA_NAME
+        or schema_version != RECORDER_DATASET_SCHEMA_VERSION
+    ):
+        raise FederationValidationError(
+            "unsupported-recorder-dataset-schema",
+            "dataset_schema_name",
+            "recorder ingress accepts only the MTConnect observations schema v1",
+        )
+    if (
+        not isinstance(content, dict)
+        or content.get("schema") != RECORDER_CONTENT_SCHEMA
+    ):
+        raise FederationValidationError(
+            "unsupported-recorder-content-schema",
+            "content.schema",
+            "recorder content must use fcp.mtconnect.observations.v1",
+        )
+    source_name = content.get("source_name")
+    if not isinstance(source_name, str) or not source_name.strip():
+        raise FederationValidationError(
+            "invalid-recorder-content",
+            "content.source_name",
+            "source_name must be non-empty text",
+        )
+    normalized_source = (
+        re.sub(r"[^A-Za-z0-9._-]+", "-", source_name.strip()).strip("-._") or "unknown"
+    )
+    if normalized_source != source_slug:
+        raise FederationValidationError(
+            "recorder-source-dataset-mismatch",
+            "content.source_name",
+            "source identity does not match the authenticated dataset namespace",
+        )
+    observations = content.get("observations")
+    count = content.get("observation_count")
+    if (
+        not isinstance(observations, list)
+        or not observations
+        or isinstance(count, bool)
+        or not isinstance(count, int)
+        or count != len(observations)
+    ):
+        raise FederationValidationError(
+            "invalid-recorder-content",
+            "content.observations",
+            "observations must be a non-empty list matching observation_count",
+        )
+    sequences: list[int] = []
+    for index, observation in enumerate(observations):
+        if not isinstance(observation, dict):
+            raise FederationValidationError(
+                "invalid-recorder-content",
+                f"content.observations[{index}]",
+                "each observation must be an object",
+            )
+        sequence = observation.get("sequence")
+        if isinstance(sequence, bool) or not isinstance(sequence, int) or sequence < 0:
+            raise FederationValidationError(
+                "invalid-recorder-content",
+                f"content.observations[{index}].sequence",
+                "sequence must be a non-negative integer",
+            )
+        sequences.append(sequence)
+    if sequences != list(range(sequences[0], sequences[-1] + 1)):
+        raise FederationValidationError(
+            "invalid-recorder-sequence-range",
+            "content.observations",
+            "observation sequences must be contiguous and strictly increasing",
+        )
+    if (
+        content.get("first_sequence") != sequences[0]
+        or content.get("last_sequence") != sequences[-1]
+    ):
+        raise FederationValidationError(
+            "invalid-recorder-sequence-range",
+            "content.first_sequence",
+            "declared sequence bounds must match the observations",
+        )
+    instance_id = content.get("agent_instance_id")
+    if (
+        isinstance(instance_id, bool)
+        or not isinstance(instance_id, int)
+        or instance_id < 0
+    ):
+        raise FederationValidationError(
+            "invalid-recorder-content",
+            "content.agent_instance_id",
+            "agent instance ID must be a non-negative integer",
+        )
+    raw_hash = content.get("raw_sha256")
+    if not isinstance(raw_hash, str) or _SHA256.fullmatch(raw_hash) is None:
+        raise FederationValidationError(
+            "invalid-recorder-content",
+            "content.raw_sha256",
+            "raw_sha256 must be a lowercase SHA-256 digest",
+        )
+    expected_batch_id = (
+        f"{source_slug}:{instance_id}:{sequences[0]}:{sequences[-1]}:{raw_hash[7:]}"
+    )
+    if batch_id != expected_batch_id:
+        raise FederationValidationError(
+            "recorder-batch-identity-mismatch",
+            "batch_id",
+            "batch ID does not match the validated recorder content",
+        )
+    expected_idempotency_key = f"{session_id}:{dataset_id}:{batch_id}"
+    if idempotency_key != expected_idempotency_key:
+        raise FederationValidationError(
+            "recorder-idempotency-mismatch",
+            "idempotency_key",
+            "idempotency key does not match the authenticated immutable batch",
         )
 
 
@@ -211,10 +383,7 @@ class RecorderAwareStorageControlRelayChannel(StorageControlRelayChannel):
             ):
                 self._accept_report(message, payload)
                 continue
-            if (
-                kind == RECORDER_LOGICAL_STORAGE_KIND
-                and message_kind == "request"
-            ):
+            if kind == RECORDER_LOGICAL_STORAGE_KIND and message_kind == "request":
                 self._accept_recorder_request(message, payload)
 
     def _accept_recorder_request(
@@ -245,10 +414,23 @@ class RecorderLogicalStorageAuthority:
         client: Any,
         logical_client: Any,
         session_id: str,
+        authorize_ingest: Callable[[str, str], None] | None = None,
+        authorize_read: (Callable[[str, str, str, str | None], None] | None) = None,
+        read_requests_per_minute: int = 240,
     ) -> None:
         self.client = client
         self.logical_client = logical_client
         self.session_id = _text(session_id, "session_id")
+        self.authorize_ingest = authorize_ingest
+        self.authorize_read = authorize_read
+        if (
+            isinstance(read_requests_per_minute, bool)
+            or not isinstance(read_requests_per_minute, int)
+            or read_requests_per_minute < 1
+        ):
+            raise ValueError("read_requests_per_minute must be a positive integer")
+        self.read_requests_per_minute = read_requests_per_minute
+        self._read_windows: dict[str, deque[float]] = {}
 
     async def handle_request(
         self,
@@ -267,48 +449,40 @@ class RecorderLogicalStorageAuthority:
                     "recorder request belongs to another Federation session",
                 )
             correlation_id = _text(correlation_id, "correlation_id")
-            group_id = _text(payload.get("group_id"), "group_id")
-            dataset_id = _text(payload.get("dataset_id"), "dataset_id")
-            batch_id = _text(payload.get("batch_id"), "batch_id")
-            idempotency_key = _text(
-                payload.get("idempotency_key"),
-                "idempotency_key",
-                maximum=2048,
-            )
-            schema_name = _text(
-                payload.get("dataset_schema_name"),
-                "dataset_schema_name",
-            )
-            schema_version = _positive(
-                payload.get("dataset_schema_version"),
-                "dataset_schema_version",
-            )
-            created_at = _utc(payload.get("created_at"), "created_at")
-            if "content" not in payload:
-                raise FederationValidationError(
-                    "invalid-recorder-storage-field",
-                    "content",
-                    "is required",
-                )
             _bounded_payload(payload)
-            outcome = await self.logical_client.ingest_batch(
-                group_id=group_id,
-                dataset_id=dataset_id,
-                batch_id=batch_id,
-                idempotency_key=idempotency_key,
-                content=payload["content"],
-                created_at=created_at,
-                dataset_schema_name=schema_name,
-                dataset_schema_version=schema_version,
+            operation = payload.get(
+                "operation",
+                StorageOperation.BATCH_INGEST.value,
             )
-            response = {
-                "kind": RECORDER_LOGICAL_STORAGE_KIND,
-                "message": "response",
-                "correlation_id": correlation_id,
-                "status": "accepted",
-                "outcome": _outcome_dict(outcome),
-            }
-        except FederationValidationError as exc:
+            if operation == StorageOperation.BATCH_LIST.value:
+                response = self._list_response(
+                    actor_node_id,
+                    session_id,
+                    correlation_id,
+                    payload,
+                )
+            elif operation == StorageOperation.BATCH_READ.value:
+                response = await self._read_response(
+                    actor_node_id,
+                    session_id,
+                    correlation_id,
+                    payload,
+                )
+            elif operation == StorageOperation.BATCH_INGEST.value:
+                response = await self._ingest_response(
+                    actor_node_id,
+                    session_id,
+                    correlation_id,
+                    payload,
+                )
+            else:
+                raise FederationValidationError(
+                    "unsupported-recorder-storage-operation",
+                    "operation",
+                    "logical storage supports only batch ingest, list, and read",
+                )
+            _bounded_payload(response)
+        except (FederationValidationError, FederationOperationError) as exc:
             response = {
                 "kind": RECORDER_LOGICAL_STORAGE_KIND,
                 "message": "response",
@@ -318,7 +492,7 @@ class RecorderLogicalStorageAuthority:
                 "status": "rejected",
                 "error": {
                     "code": exc.code,
-                    "field": exc.field,
+                    "field": exc.field or "storage",
                     "message": exc.message,
                 },
             }
@@ -328,6 +502,232 @@ class RecorderLogicalStorageAuthority:
             request_id=f"recorder-storage-response-{uuid.uuid4().hex}",
             payload=response,
         )
+
+    async def _ingest_response(
+        self,
+        actor_node_id: str,
+        session_id: str,
+        correlation_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        group_id = _text(payload.get("group_id"), "group_id")
+        dataset_id = _text(payload.get("dataset_id"), "dataset_id")
+        batch_id = _text(payload.get("batch_id"), "batch_id")
+        idempotency_key = _text(
+            payload.get("idempotency_key"),
+            "idempotency_key",
+            maximum=2048,
+        )
+        schema_name = _text(
+            payload.get("dataset_schema_name"),
+            "dataset_schema_name",
+        )
+        schema_version = _positive(
+            payload.get("dataset_schema_version"),
+            "dataset_schema_version",
+        )
+        created_at = _utc(payload.get("created_at"), "created_at")
+        if "content" not in payload:
+            raise FederationValidationError(
+                "invalid-recorder-storage-field",
+                "content",
+                "is required",
+            )
+        if self.authorize_ingest is not None:
+            self.authorize_ingest(actor_node_id, session_id)
+        _validate_recorder_ingest(
+            actor_node_id=actor_node_id,
+            session_id=session_id,
+            group_id=group_id,
+            dataset_id=dataset_id,
+            batch_id=batch_id,
+            idempotency_key=idempotency_key,
+            schema_name=schema_name,
+            schema_version=schema_version,
+            content=payload["content"],
+        )
+        outcome = await self.logical_client.ingest_batch(
+            group_id=group_id,
+            dataset_id=dataset_id,
+            batch_id=batch_id,
+            idempotency_key=idempotency_key,
+            content=payload["content"],
+            created_at=created_at,
+            dataset_schema_name=schema_name,
+            dataset_schema_version=schema_version,
+        )
+        return {
+            "kind": RECORDER_LOGICAL_STORAGE_KIND,
+            "message": "response",
+            "correlation_id": correlation_id,
+            "status": "accepted",
+            "operation": StorageOperation.BATCH_INGEST.value,
+            "outcome": _outcome_dict(outcome),
+        }
+
+    def _list_response(
+        self,
+        actor_node_id: str,
+        session_id: str,
+        correlation_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        group_id = _text(payload.get("group_id"), "group_id")
+        dataset_value = payload.get("dataset_id")
+        dataset_id = (
+            None if dataset_value is None else _text(dataset_value, "dataset_id")
+        )
+        limit = _positive(payload.get("limit", 20), "limit")
+        if limit > RECORDER_CATALOG_MAX_PAGE_SIZE:
+            raise FederationValidationError(
+                "recorder-catalog-page-too-large",
+                "limit",
+                f"must not exceed {RECORDER_CATALOG_MAX_PAGE_SIZE}",
+            )
+        cursor_value = payload.get("cursor")
+        cursor = (
+            None
+            if cursor_value is None
+            else _text(cursor_value, "cursor", maximum=8192)
+        )
+        self._authorize_read_access(
+            actor_node_id,
+            session_id,
+            group_id,
+            dataset_id,
+        )
+        listing_mode = payload.get("listing_mode", "full")
+        if listing_mode == "full":
+            if (
+                "baseline_manifest_revision" in payload
+                or "baseline_manifest_hash" in payload
+            ):
+                raise FederationValidationError(
+                    "manifest-baseline-mode-required",
+                    "listing_mode",
+                    "manifest baseline fields require delta listing mode",
+                )
+            page = self.logical_client.list_committed_batches(
+                group_id=group_id,
+                dataset_id=dataset_id,
+                limit=limit,
+                cursor=cursor,
+            )
+            if not isinstance(page, CommittedBatchPage):
+                raise FederationValidationError(
+                    "invalid-storage-response",
+                    "page",
+                    "logical storage returned an invalid committed batch page",
+                )
+        elif listing_mode == "delta":
+            if "baseline_manifest_revision" not in payload:
+                raise FederationValidationError(
+                    "missing-field",
+                    "baseline_manifest_revision",
+                    "is required for a manifest delta listing",
+                )
+            if "baseline_manifest_hash" not in payload:
+                raise FederationValidationError(
+                    "missing-field",
+                    "baseline_manifest_hash",
+                    "is required for a manifest delta listing",
+                )
+            baseline_revision = _non_negative(
+                payload.get("baseline_manifest_revision"),
+                "baseline_manifest_revision",
+            )
+            baseline_hash = _text(
+                payload.get("baseline_manifest_hash"),
+                "baseline_manifest_hash",
+                maximum=71,
+            )
+            page = self.logical_client.list_committed_batch_delta(
+                group_id=group_id,
+                baseline_manifest_revision=baseline_revision,
+                baseline_manifest_hash=baseline_hash,
+                dataset_id=dataset_id,
+                limit=limit,
+                cursor=cursor,
+            )
+            if not isinstance(page, CommittedBatchDeltaPage):
+                raise FederationValidationError(
+                    "invalid-storage-response",
+                    "page",
+                    "logical storage returned an invalid committed batch delta page",
+                )
+        else:
+            raise FederationValidationError(
+                "unsupported-recorder-storage-listing-mode",
+                "listing_mode",
+                "batch listing mode must be full or delta",
+            )
+        return {
+            "kind": RECORDER_LOGICAL_STORAGE_KIND,
+            "message": "response",
+            "correlation_id": correlation_id,
+            "status": "accepted",
+            "operation": StorageOperation.BATCH_LIST.value,
+            "page": page.to_dict(),
+        }
+
+    async def _read_response(
+        self,
+        actor_node_id: str,
+        session_id: str,
+        correlation_id: str,
+        payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        reference = CommittedBatchReference.from_dict(payload.get("reference"))
+        self._authorize_read_access(
+            actor_node_id,
+            session_id,
+            reference.group_id,
+            reference.dataset_id,
+        )
+        content = await self.logical_client.read_committed_batch(
+            reference=reference,
+        )
+        return {
+            "kind": RECORDER_LOGICAL_STORAGE_KIND,
+            "message": "response",
+            "correlation_id": correlation_id,
+            "status": "accepted",
+            "operation": StorageOperation.BATCH_READ.value,
+            "content": content,
+        }
+
+    def _authorize_read_access(
+        self,
+        actor_node_id: str,
+        session_id: str,
+        group_id: str,
+        dataset_id: str | None,
+    ) -> None:
+        if self.authorize_read is not None:
+            self.authorize_read(
+                actor_node_id,
+                session_id,
+                group_id,
+                dataset_id,
+            )
+        now = time.monotonic()
+        cutoff = now - 60.0
+        window = self._read_windows.setdefault(actor_node_id, deque())
+        while window and window[0] <= cutoff:
+            window.popleft()
+        if len(window) >= self.read_requests_per_minute:
+            raise FederationValidationError(
+                "storage-read-rate-limit",
+                "actor_node_id",
+                "bounded logical-storage read rate exceeded; retry later",
+            )
+        window.append(now)
+        if len(self._read_windows) > 1024:
+            self._read_windows = {
+                actor: values
+                for actor, values in self._read_windows.items()
+                if values and values[-1] > cutoff
+            }
 
 
 class RelayRecorderStorageClient:
@@ -359,6 +759,8 @@ class RelayRecorderStorageClient:
     async def start(self) -> None:
         if self._closed:
             raise RuntimeError("recorder storage client is closed")
+        if callable(getattr(self.relay_client, "request_message_response", None)):
+            return
         if self._reader_task is None:
             self._reader_task = asyncio.create_task(
                 self._reader_loop(),
@@ -415,6 +817,13 @@ class RelayRecorderStorageClient:
             "content": content,
         }
         _bounded_payload(payload)
+        if callable(getattr(self.relay_client, "request_message_response", None)):
+            response = await self._request_response(
+                payload,
+                correlation_id=correlation_id,
+                operation=StorageOperation.BATCH_INGEST,
+            )
+            return _outcome_from_dict(response.get("outcome"))
         loop = asyncio.get_running_loop()
         future: asyncio.Future[PhaseDIngestOutcome] = loop.create_future()
         self._pending[correlation_id] = future
@@ -425,10 +834,7 @@ class RelayRecorderStorageClient:
                 request_id=f"recorder-storage-route-{uuid.uuid4().hex}",
                 payload=payload,
             )
-            if (
-                not isinstance(delivery, dict)
-                or delivery.get("delivered") is not True
-            ):
+            if not isinstance(delivery, dict) or delivery.get("delivered") is not True:
                 raise FederationValidationError(
                     "recorder-storage-route-failed",
                     "authority_node_id",
@@ -437,6 +843,221 @@ class RelayRecorderStorageClient:
             return await asyncio.wait_for(future, timeout=self.request_timeout)
         finally:
             self._pending.pop(correlation_id, None)
+
+    async def list_committed_batches(
+        self,
+        *,
+        group_id: str,
+        dataset_id: str | None = None,
+        limit: int = RECORDER_CATALOG_MAX_PAGE_SIZE,
+        cursor: str | None = None,
+    ) -> CommittedBatchPage:
+        """List manifest-authoritative batches visible to this session member."""
+
+        if not callable(getattr(self.relay_client, "request_message_response", None)):
+            raise FederationValidationError(
+                "correlated-relay-required",
+                "relay_client",
+                "federated batch discovery requires the shared correlated relay client",
+            )
+        correlation_id = f"storage-catalog-{uuid.uuid4().hex}"
+        payload: dict[str, Any] = {
+            "kind": RECORDER_LOGICAL_STORAGE_KIND,
+            "message": "request",
+            "operation": StorageOperation.BATCH_LIST.value,
+            "correlation_id": correlation_id,
+            "group_id": _text(group_id, "group_id"),
+            "dataset_id": (
+                None if dataset_id is None else _text(dataset_id, "dataset_id")
+            ),
+            "limit": _positive(limit, "limit"),
+            "cursor": (
+                None if cursor is None else _text(cursor, "cursor", maximum=8192)
+            ),
+        }
+        if limit > RECORDER_CATALOG_MAX_PAGE_SIZE:
+            raise FederationValidationError(
+                "recorder-catalog-page-too-large",
+                "limit",
+                f"must not exceed {RECORDER_CATALOG_MAX_PAGE_SIZE}",
+            )
+        _bounded_payload(payload)
+        response = await self._request_response(
+            payload,
+            correlation_id=correlation_id,
+            operation=StorageOperation.BATCH_LIST,
+        )
+        return CommittedBatchPage.from_dict(response.get("page"))
+
+    async def list_committed_batch_delta(
+        self,
+        *,
+        group_id: str,
+        baseline_manifest_revision: int,
+        baseline_manifest_hash: str,
+        dataset_id: str | None = None,
+        limit: int = RECORDER_CATALOG_MAX_PAGE_SIZE,
+        cursor: str | None = None,
+    ) -> CommittedBatchDeltaPage:
+        """List commits added after an exact manifest over the shared relay."""
+
+        if not callable(getattr(self.relay_client, "request_message_response", None)):
+            raise FederationValidationError(
+                "correlated-relay-required",
+                "relay_client",
+                "federated batch discovery requires the shared correlated relay client",
+            )
+        if limit > RECORDER_CATALOG_MAX_PAGE_SIZE:
+            raise FederationValidationError(
+                "recorder-catalog-page-too-large",
+                "limit",
+                f"must not exceed {RECORDER_CATALOG_MAX_PAGE_SIZE}",
+            )
+        correlation_id = f"storage-catalog-delta-{uuid.uuid4().hex}"
+        payload: dict[str, Any] = {
+            "kind": RECORDER_LOGICAL_STORAGE_KIND,
+            "message": "request",
+            "operation": StorageOperation.BATCH_LIST.value,
+            "listing_mode": "delta",
+            "correlation_id": correlation_id,
+            "group_id": _text(group_id, "group_id"),
+            "dataset_id": (
+                None if dataset_id is None else _text(dataset_id, "dataset_id")
+            ),
+            "baseline_manifest_revision": _non_negative(
+                baseline_manifest_revision,
+                "baseline_manifest_revision",
+            ),
+            "baseline_manifest_hash": _text(
+                baseline_manifest_hash,
+                "baseline_manifest_hash",
+                maximum=71,
+            ),
+            "limit": _positive(limit, "limit"),
+            "cursor": (
+                None if cursor is None else _text(cursor, "cursor", maximum=8192)
+            ),
+        }
+        _bounded_payload(payload)
+        response = await self._request_response(
+            payload,
+            correlation_id=correlation_id,
+            operation=StorageOperation.BATCH_LIST,
+        )
+        return CommittedBatchDeltaPage.from_dict(response.get("page"))
+
+    async def read_committed_batch(
+        self,
+        reference: CommittedBatchReference | dict[str, Any],
+    ) -> object:
+        """Read by signed manifest evidence, never by a provider path."""
+
+        if isinstance(reference, dict):
+            reference = CommittedBatchReference.from_dict(reference)
+        if not isinstance(reference, CommittedBatchReference):
+            raise FederationValidationError(
+                "invalid-batch-reference",
+                "reference",
+                "must be a committed batch reference",
+            )
+        if not callable(getattr(self.relay_client, "request_message_response", None)):
+            raise FederationValidationError(
+                "correlated-relay-required",
+                "relay_client",
+                "federated committed reads require the shared correlated relay client",
+            )
+        correlation_id = f"storage-read-{uuid.uuid4().hex}"
+        payload = {
+            "kind": RECORDER_LOGICAL_STORAGE_KIND,
+            "message": "request",
+            "operation": StorageOperation.BATCH_READ.value,
+            "correlation_id": correlation_id,
+            "reference": reference.to_dict(),
+        }
+        _bounded_payload(payload)
+        response = await self._request_response(
+            payload,
+            correlation_id=correlation_id,
+            operation=StorageOperation.BATCH_READ,
+        )
+        if "content" not in response:
+            raise FederationValidationError(
+                "invalid-recorder-storage-response",
+                "content",
+                "accepted read response must contain content",
+            )
+        content = response["content"]
+        if BatchIngestRequest.calculate_content_hash(content) != reference.content_hash:
+            raise FederationValidationError(
+                "content-hash-mismatch",
+                "content_hash",
+                "authority response does not match the committed reference",
+            )
+        return content
+
+    async def _request_response(
+        self,
+        payload: dict[str, Any],
+        *,
+        correlation_id: str,
+        operation: StorageOperation,
+    ) -> dict[str, Any]:
+        request = getattr(self.relay_client, "request_message_response")
+        message = await request(
+            session_id=self.session_id,
+            target_node_id=self.authority_node_id,
+            payload=payload,
+            correlation_id=correlation_id,
+            timeout=self.request_timeout,
+        )
+        response = getattr(message, "payload", None)
+        if (
+            getattr(message, "actor_node_id", None) != self.authority_node_id
+            or getattr(message, "session_id", None) != self.session_id
+            or not isinstance(response, dict)
+            or response.get("kind") != RECORDER_LOGICAL_STORAGE_KIND
+            or response.get("message") != "response"
+            or response.get("correlation_id") != correlation_id
+        ):
+            raise FederationValidationError(
+                "invalid-recorder-storage-response",
+                "response",
+                "relay response does not match the authenticated request",
+            )
+        if response.get("status") == "rejected":
+            self._raise_rejected(response)
+        if response.get("status") != "accepted":
+            raise FederationValidationError(
+                "invalid-recorder-storage-response",
+                "status",
+                "logical storage response must be accepted or rejected",
+            )
+        response_operation = response.get("operation")
+        if response_operation not in {None, operation.value} or (
+            response_operation is None
+            and operation is not StorageOperation.BATCH_INGEST
+        ):
+            raise FederationValidationError(
+                "invalid-recorder-storage-response",
+                "operation",
+                "logical storage response operation does not match the request",
+            )
+        return response
+
+    @staticmethod
+    def _raise_rejected(payload: dict[str, Any]) -> None:
+        error = payload.get("error")
+        if isinstance(error, dict):
+            raise FederationValidationError(
+                str(error.get("code") or "recorder-storage-rejected"),
+                str(error.get("field") or "storage"),
+                str(error.get("message") or "logical storage rejected the request"),
+            )
+        raise FederationValidationError(
+            "recorder-storage-rejected",
+            "storage",
+            "logical storage rejected the request",
+        )
 
     async def receive_other(self, *, timeout: float | None = None) -> Any:
         if timeout is None:
@@ -485,7 +1106,9 @@ class RelayRecorderStorageClient:
                     FederationValidationError(
                         str(error.get("code") or "recorder-storage-rejected"),
                         str(error.get("field") or "storage"),
-                        str(error.get("message") or "logical storage rejected the batch"),
+                        str(
+                            error.get("message") or "logical storage rejected the batch"
+                        ),
                     )
                 )
             else:

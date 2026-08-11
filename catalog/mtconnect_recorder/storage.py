@@ -89,7 +89,7 @@ class DurableRecorderStore:
             / source_slug
             / instance
             / day
-            / f"{base_name}-{raw_digest[:12]}.xml.gz"
+            / f"{base_name}-{raw_digest}.xml.gz"
         )
         _write_bytes_atomic(raw_path, gzip.compress(raw_bytes, mtime=0))
 
@@ -121,7 +121,13 @@ class DurableRecorderStore:
             observation_count=len(batch.observations),
         )
 
-    def _batch_location(self, *, source_name: str, batch: ParsedBatch) -> tuple[str, str]:
+    def _batch_location(
+        self,
+        *,
+        source_name: str,
+        batch: ParsedBatch,
+        raw_sha256: str | None = None,
+    ) -> tuple[str, str]:
         if not batch.observations:
             raise ValueError("Cannot store an empty MTConnect observation batch.")
         first = batch.first_observation_sequence
@@ -129,17 +135,29 @@ class DurableRecorderStore:
         if first is None or last is None:
             raise ValueError("Observation batch does not contain sequence numbers.")
         day = str(batch.observations[0].get("timestamp") or _utc_now())[:10]
-        return day, f"seq-{first}-{last}-next-{batch.header.next_sequence}"
+        base_name = f"seq-{first}-{last}-next-{batch.header.next_sequence}"
+        if raw_sha256 is not None:
+            if len(raw_sha256) != 64 or any(
+                character not in "0123456789abcdef" for character in raw_sha256
+            ):
+                raise ValueError("raw_sha256 must be 64 lowercase hexadecimal characters")
+            base_name = f"{base_name}-{raw_sha256}"
+        return day, base_name
 
     def store_observation_batch(
         self,
         *,
         source_name: str,
         batch: ParsedBatch,
+        raw_sha256: str | None = None,
     ) -> Path:
         """Store complete normalized observations outside FCP's wide JSONL scan."""
 
-        day, base_name = self._batch_location(source_name=source_name, batch=batch)
+        day, base_name = self._batch_location(
+            source_name=source_name,
+            batch=batch,
+            raw_sha256=raw_sha256,
+        )
         path = (
             self.observation_root
             / _slug(source_name)
@@ -175,6 +193,7 @@ class DurableRecorderStore:
         source_name: str,
         batch: ParsedBatch,
         initial_values: Mapping[str, Mapping[str, Any]] | None = None,
+        raw_sha256: str | None = None,
     ) -> tuple[Path, dict[str, dict[str, Any]]]:
         """Write FCP-compatible wide snapshots while retaining every sequence.
 
@@ -184,7 +203,11 @@ class DurableRecorderStore:
         columns such as ``Srpm``, ``execution``, and ``Xabs``.
         """
 
-        day, base_name = self._batch_location(source_name=source_name, batch=batch)
+        day, base_name = self._batch_location(
+            source_name=source_name,
+            batch=batch,
+            raw_sha256=raw_sha256,
+        )
         normalized_path = (
             self.normalized_root
             / _slug(source_name)
@@ -251,11 +274,13 @@ class DurableRecorderStore:
         observation_path = self.store_observation_batch(
             source_name=source_name,
             batch=batch,
+            raw_sha256=raw.raw_sha256,
         )
         normalized_path, latest_values = self.store_normalized_batch(
             source_name=source_name,
             batch=batch,
             initial_values=initial_values,
+            raw_sha256=raw.raw_sha256,
         )
         return StoredBatch(
             raw_path=raw.raw_path,

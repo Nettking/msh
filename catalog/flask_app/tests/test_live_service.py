@@ -17,14 +17,26 @@ class _FakeCatalog:
         return ScanSnapshot(artifacts=self.artifacts, warnings=[], scanned_at_epoch=1.0)
 
 
-def _artifact(path: Path) -> dict[str, object]:
+def _artifact(
+    path: Path,
+    *,
+    modified_at: datetime | None = None,
+) -> dict[str, object]:
     return {
         "path": str(path),
         "signature": "sig",
         "category": "source_data",
         "status": "ready",
-        "modified_at": datetime.now(timezone.utc).isoformat(),
+        "modified_at": (modified_at or datetime.now(timezone.utc)).isoformat(),
     }
+
+
+def _write_jsonl(path: Path, rows: list[dict[str, object]]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(
+        "\n".join(json.dumps(row) for row in rows) + "\n",
+        encoding="utf-8",
+    )
 
 
 def test_live_service_distinguishes_running_and_stopped_states(tmp_path: Path) -> None:
@@ -254,3 +266,141 @@ def test_live_service_emits_recent_candidate_events(tmp_path: Path) -> None:
     assert first_event["fired_rules"] != "-"
     fired_rules = str(first_event["fired_rules"])
     assert ("ovr_drop" in fired_rules) or ("fovr_drop" in fired_rules) or ("rpm_collapse" in fired_rules) or ("load_collapse" in fired_rules)
+
+
+def test_busy_machine_files_do_not_hide_an_older_machine_source(
+    tmp_path: Path,
+) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    artifacts: list[dict[str, object]] = []
+    recorder_root = (
+        tmp_path / "data" / "sources" / "mtconnect_recorder" / "jsonl"
+    )
+    for index in range(13):
+        path = recorder_root / "BusyMill" / "2026" / "08" / f"busy-{index}.jsonl"
+        _write_jsonl(
+            path,
+            [
+                {
+                    "timestamp": (now - timedelta(seconds=index)).isoformat(),
+                    "machine": "BusyMill",
+                    "execution": "ACTIVE",
+                    "program": f"BUSY-{index}",
+                    "Srpm": 900,
+                    "Sload": 20,
+                }
+            ],
+        )
+        artifacts.append(
+            _artifact(path, modified_at=now - timedelta(seconds=index))
+        )
+
+    quiet_path = (
+        recorder_root / "QuietLathe" / "2026" / "08" / "older.jsonl"
+    )
+    _write_jsonl(
+        quiet_path,
+        [
+            {
+                "timestamp": (now - timedelta(minutes=5)).isoformat(),
+                "machine": "QuietLathe",
+                "execution": "STOPPED",
+                "program": "QUIET-FOUND",
+                "Srpm": 0,
+                "Sload": 0,
+            }
+        ],
+    )
+    artifacts.append(
+        _artifact(quiet_path, modified_at=now - timedelta(minutes=5))
+    )
+
+    snapshot = LiveTelemetryService(
+        refresh_ttl_seconds=0,
+        max_recent_artifacts=12,
+    ).snapshot(_FakeCatalog(artifacts))
+    by_machine = {item["machine"]: item for item in snapshot.machines}
+
+    assert by_machine["BusyMill"]["values"]["program"].startswith("BUSY-")
+    assert by_machine["QuietLathe"]["freshness"] != "no_data"
+    assert by_machine["QuietLathe"]["values"]["program"] == "QUIET-FOUND"
+
+
+def test_recorder_deep_path_supplies_the_machine_hint_when_record_omits_it(
+    tmp_path: Path,
+) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    source = (
+        tmp_path
+        / "data"
+        / "sources"
+        / "mtconnect_recorder"
+        / "jsonl"
+        / "Mazak"
+        / "2026"
+        / "08"
+        / "11"
+        / "batch.jsonl"
+    )
+    _write_jsonl(
+        source,
+        [
+            {
+                "timestamp": now.isoformat(),
+                "execution": "READY",
+                "program": "FROM-DEEP-PATH",
+                "Srpm": 0,
+                "Sload": 0,
+            }
+        ],
+    )
+
+    snapshot = LiveTelemetryService(refresh_ttl_seconds=0).snapshot(
+        _FakeCatalog([_artifact(source)])
+    )
+    by_machine = {item["machine"]: item for item in snapshot.machines}
+
+    assert by_machine["Mazak"]["values"]["program"] == "FROM-DEEP-PATH"
+    assert "sources" not in by_machine
+    assert "mtconnect_recorder" not in by_machine
+    assert "jsonl" not in by_machine
+
+
+def test_federated_telemetry_files_have_independent_fairness_buckets_but_use_record_machine(
+    tmp_path: Path,
+) -> None:
+    now = datetime.now(timezone.utc).replace(microsecond=0)
+    shared_root = tmp_path / "data" / "federation" / "shared" / "telemetry"
+    hashes_and_machines = (
+        ("a" * 64, "RemoteMazak", "REMOTE-A"),
+        ("b" * 64, "RemoteVTC", "REMOTE-B"),
+    )
+    artifacts: list[dict[str, object]] = []
+    for index, (digest, machine, program) in enumerate(hashes_and_machines):
+        path = shared_root / f"{digest}.jsonl"
+        _write_jsonl(
+            path,
+            [
+                {
+                    "timestamp": (now - timedelta(seconds=index)).isoformat(),
+                    "machine": machine,
+                    "execution": "ACTIVE",
+                    "program": program,
+                    "Srpm": 800,
+                    "Sload": 15,
+                }
+            ],
+        )
+        artifacts.append(
+            _artifact(path, modified_at=now - timedelta(seconds=index))
+        )
+
+    snapshot = LiveTelemetryService(
+        refresh_ttl_seconds=0,
+        max_recent_artifacts=1,
+    ).snapshot(_FakeCatalog(artifacts))
+    by_machine = {item["machine"]: item for item in snapshot.machines}
+
+    assert by_machine["RemoteMazak"]["values"]["program"] == "REMOTE-A"
+    assert by_machine["RemoteVTC"]["values"]["program"] == "REMOTE-B"
+    assert all(digest not in by_machine for digest, _, _ in hashes_and_machines)
