@@ -27,6 +27,7 @@ from catalog.federation.errors import (
     ProtocolCompatibilityError,
 )
 
+from .services.federation_projection_service import get_federation_projection_service
 from .services.pending_contribution_approval import (
     get_local_provider_operator_surface,
     local_provider_operator_available,
@@ -56,6 +57,16 @@ def _provider_operator_availability() -> dict[str, bool]:
     except Exception:  # noqa: BLE001 - navigation must fail closed
         available = False
     return {"provider_operator_available": available}
+
+
+def _device_labels() -> dict[str, str]:
+    """Read the same Federation-scoped labels used by Devices and Updates."""
+
+    try:
+        view = get_federation_projection_service().devices()
+        return {item.key: item.label for item in view.items}
+    except Exception:  # noqa: BLE001 - provider authority remains usable without labels
+        return {}
 
 
 def _csrf_token() -> str:
@@ -138,6 +149,7 @@ def _unavailable_html():
             operator_view=None,
             operator_error="provider-operator-unavailable",
             provider_federation_csrf_token=_csrf_token(),
+            provider_device_labels={},
         ),
         503,
     )
@@ -193,6 +205,7 @@ def index():
                 operator_view=None,
                 operator_error=code,
                 provider_federation_csrf_token=_csrf_token(),
+                provider_device_labels={},
             ),
             403 if isinstance(exc, AuthorizationError) else 409,
         )
@@ -201,6 +214,7 @@ def index():
         operator_view=view,
         operator_error="",
         provider_federation_csrf_token=_csrf_token(),
+        provider_device_labels=_device_labels(),
     )
 
 
@@ -220,6 +234,7 @@ def providers_api():
     ) as exc:
         return _json_error(exc, 409)
     payload["csrf_token"] = _csrf_token()
+    payload["device_names"] = _device_labels()
     return jsonify({"ok": True, "view": payload})
 
 
