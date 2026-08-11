@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from contextlib import closing
 from datetime import datetime
 from pathlib import Path
 
@@ -32,7 +33,7 @@ class ReadOnlyStorageAuthorityStore:
 
     def snapshot(self, session_id: str) -> StorageControlPlaneSnapshot:
         snapshot = StorageControlPlaneSnapshot(session_id)
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             table = connection.execute(
                 """
                 SELECT name FROM sqlite_master
