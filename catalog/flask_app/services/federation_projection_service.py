@@ -25,7 +25,6 @@ from catalog.federation.projections import (
     StorageAuthorityAdapter,
     StorageAuthoritySnapshot,
 )
-from catalog.federation.storage_control_plane import StorageControlPlaneStore
 
 from .capability_benchmark_service import get_capability_benchmark_service
 from .capability_contribution_service import get_capability_contribution_service
@@ -36,6 +35,7 @@ from .capability_onboarding_service import (
 )
 from .federation_device_projection import CapabilityFirstFederationDeviceAdapter
 from .pending_contribution_approval import get_local_provider_operator_surface
+from .read_only_storage_authority import ReadOnlyStorageAuthorityStore
 from .upload_analysis_job_service import get_upload_analysis_job_service
 
 _OPERATOR_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
@@ -176,16 +176,10 @@ def _storage_adapter(internal_session_id: str, coordinator: object) -> object:
     coordinator_store = getattr(coordinator, "store", None)
     database = getattr(coordinator_store, "database", None)
     if isinstance(database, (str, bytes)) and database:
-        try:
-            return StorageAuthorityAdapter(
-                StorageControlPlaneStore(database),
-                internal_session_id=internal_session_id,
-            )
-        except Exception as exc:  # noqa: BLE001 - projection must fail closed
-            _warn_projection("Federation storage", exc)
-            return _StaticSnapshotAdapter(
-                StorageAuthoritySnapshot(False, "storage-projection-failed")
-            )
+        return StorageAuthorityAdapter(
+            ReadOnlyStorageAuthorityStore(database),
+            internal_session_id=internal_session_id,
+        )
 
     return _StaticSnapshotAdapter(
         StorageAuthoritySnapshot(True, "not-configured")
