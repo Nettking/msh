@@ -104,6 +104,47 @@ class _Coordinator:
         return event, True
 
 
+class _ThreeNodeCoordinator(_Coordinator):
+    def __init__(self, *, expose_creator: bool = True) -> None:
+        super().__init__(expose_creator=expose_creator)
+        self.events.append(
+            SimpleNamespace(
+                revision=4,
+                event_type="node.joined",
+                actor_node_id="node-other",
+                occurred_at=NOW,
+                payload={"node_id": "node-other"},
+            )
+        )
+
+    def status(self, *, actor_node_id: str, cursor: str | None = None) -> dict[str, object]:
+        value = super().status(actor_node_id=actor_node_id, cursor=cursor)
+        value["nodes"].append(
+            {
+                "node_id": "node-other",
+                "display_name": "Other computer",
+                "connection_state": "disconnected",
+            }
+        )
+        return value
+
+
+class _ConcurrentClaimCoordinator(_ThreeNodeCoordinator):
+    def append_event(self, **kwargs: object) -> tuple[object, bool]:
+        competing = SimpleNamespace(
+            revision=len(self.events) + 1,
+            event_type=naming.DEVICE_NAME_EVENT,
+            actor_node_id="node-other",
+            occurred_at=NOW,
+            payload={
+                "node_id": "node-other",
+                "display_name": kwargs["payload"]["display_name"],
+            },
+        )
+        self.events.append(competing)
+        return super().append_event(**kwargs)
+
+
 def _context(coordinator: object, *, actor: str = "node-leader") -> object:
     return SimpleNamespace(
         binding=SimpleNamespace(
@@ -167,6 +208,40 @@ def test_projection_accepts_self_name_and_ignores_third_party_spoof() -> None:
     assert by_id["node-remote"].label == "Workshop laptop"
 
 
+def test_concurrent_duplicate_name_claims_resolve_by_revision_order() -> None:
+    coordinator = _ThreeNodeCoordinator()
+    coordinator.events.extend(
+        [
+            SimpleNamespace(
+                revision=5,
+                event_type=naming.DEVICE_NAME_EVENT,
+                actor_node_id="node-remote",
+                occurred_at=NOW,
+                payload={"node_id": "node-remote", "display_name": "Shared name"},
+            ),
+            SimpleNamespace(
+                revision=6,
+                event_type=naming.DEVICE_NAME_EVENT,
+                actor_node_id="node-other",
+                occurred_at=NOW,
+                payload={"node_id": "node-other", "display_name": "shared NAME"},
+            ),
+        ]
+    )
+
+    snapshot = FederationAuthorityAdapter(
+        coordinator,
+        actor_node_id="node-remote",
+        internal_session_id="session-test",
+    ).snapshot()
+
+    assert snapshot.available is True
+    by_id = {device.node_id: device for device in snapshot.devices}
+    assert by_id["node-remote"].label == "Shared name"
+    assert by_id["node-other"].label == "Other computer"
+    assert len({device.label.casefold() for device in snapshot.devices}) == len(snapshot.devices)
+
+
 def test_leader_can_rename_offline_member_and_event_is_durable(monkeypatch) -> None:
     coordinator = _Coordinator()
     monkeypatch.setattr(
@@ -191,39 +266,79 @@ def test_leader_can_rename_offline_member_and_event_is_durable(monkeypatch) -> N
     }
 
 
-class _RemoteClient:
-    def __init__(self) -> None:
-        self.calls: list[dict[str, object]] = []
+def test_concurrent_losing_claim_is_reported_as_duplicate(monkeypatch) -> None:
+    coordinator = _ConcurrentClaimCoordinator()
+    monkeypatch.setattr(
+        naming,
+        "get_capability_onboarding_service",
+        lambda: SimpleNamespace(authorized_context=lambda: _context(coordinator)),
+    )
 
-    def append_event(self, **kwargs: object) -> object:
-        self.calls.append(dict(kwargs))
-        return SimpleNamespace(kind="remote-append")
+    with pytest.raises(FederationValidationError) as exc_info:
+        naming.FederationDeviceNamingService().rename(
+            target_node_id="node-remote",
+            display_name="Concurrent name",
+        )
+
+    assert exc_info.value.code == "duplicate-device-name"
+    snapshot = FederationAuthorityAdapter(
+        coordinator,
+        actor_node_id="node-leader",
+        internal_session_id="session-test",
+    ).snapshot()
+    by_id = {device.node_id: device for device in snapshot.devices}
+    assert by_id["node-other"].label == "Concurrent name"
+    assert by_id["node-remote"].label == "Office laptop"
 
 
 class _RemoteRuntime:
-    def __init__(self) -> None:
-        self._client = _RemoteClient()
-        self.ensure_calls = 0
-        self.submitted: list[object] = []
+    def __init__(self, coordinator: _Coordinator) -> None:
+        self.coordinator = coordinator
+        self.calls: list[dict[str, object]] = []
 
-    def ensure_connected(self, _state: object) -> None:
-        self.ensure_calls += 1
-
-    def _submit(self, value: object) -> object:
-        self.submitted.append(value)
-        return value
+    def append_session_event(
+        self,
+        state: object,
+        *,
+        session_id: str,
+        event_type: str,
+        payload: dict[str, object],
+        request_id: str,
+    ) -> object:
+        assert session_id == state.binding.internal_session_id
+        call = {
+            "session_id": session_id,
+            "event_type": event_type,
+            "payload": payload,
+            "request_id": request_id,
+        }
+        self.calls.append(call)
+        event = SimpleNamespace(
+            revision=len(self.coordinator.events) + 1,
+            event_type=event_type,
+            actor_node_id=state.binding.device_id,
+            occurred_at=NOW,
+            payload=payload,
+        )
+        self.coordinator.events.append(event)
+        return event
 
 
 class _RemoteCoordinator(_Coordinator):
     def __init__(self) -> None:
         super().__init__(expose_creator=False)
-        self.runtime = _RemoteRuntime()
-        self.state = SimpleNamespace(binding=SimpleNamespace(device_id="node-remote"))
+        self.state = SimpleNamespace(
+            binding=SimpleNamespace(
+                device_id="node-remote",
+                internal_session_id="session-test",
+            )
+        )
+        self.runtime = _RemoteRuntime(self)
         # The real RemoteCoordinatorFacade intentionally has no append_event.
         self.append_event = None  # type: ignore[assignment]
 
 
-def test_remote_member_can_publish_own_name_through_authenticated_relay(monkeypatch) -> None:
+def test_remote_member_uses_bounded_pairing_runtime_to_publish_own_name(monkeypatch) -> None:
     coordinator = _RemoteCoordinator()
     context = _context(coordinator, actor="node-remote")
     monkeypatch.setattr(
@@ -235,8 +350,7 @@ def test_remote_member_can_publish_own_name_through_authenticated_relay(monkeypa
     result = naming.FederationDeviceNamingService().rename_self("Lab laptop")
 
     assert result == "Lab laptop"
-    assert coordinator.runtime.ensure_calls == 1
-    assert coordinator.runtime._client.calls == [
+    assert coordinator.runtime.calls == [
         {
             "session_id": "session-test",
             "event_type": naming.DEVICE_NAME_EVENT,
@@ -244,13 +358,10 @@ def test_remote_member_can_publish_own_name_through_authenticated_relay(monkeypa
                 "node_id": "node-remote",
                 "display_name": "Lab laptop",
             },
-            "request_id": coordinator.runtime._client.calls[0]["request_id"],
+            "request_id": coordinator.runtime.calls[0]["request_id"],
         }
     ]
-    assert str(coordinator.runtime._client.calls[0]["request_id"]).startswith(
-        "device-name-"
-    )
-    assert coordinator.runtime.submitted
+    assert str(coordinator.runtime.calls[0]["request_id"]).startswith("device-name-")
 
 
 def test_nonleader_cannot_rename_another_member(monkeypatch) -> None:
@@ -269,7 +380,7 @@ def test_nonleader_cannot_rename_another_member(monkeypatch) -> None:
         )
 
     assert exc_info.value.code == "federation-device-name-owner-required"
-    assert not coordinator.runtime._client.calls
+    assert not coordinator.runtime.calls
 
 
 def test_federation_device_names_are_unique(monkeypatch) -> None:
