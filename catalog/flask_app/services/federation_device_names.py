@@ -8,7 +8,6 @@ also name its own device. Names are public metadata only: the Ed25519-derived
 from __future__ import annotations
 
 import uuid
-from typing import Any
 
 from catalog.federation.device_names import (
     DEVICE_NAME_EVENT,
@@ -52,14 +51,7 @@ def _append_name_event(
     target_node_id: str,
     display_name: str,
 ) -> None:
-    """Append through local coordinator authority or the paired relay client.
-
-    ``RemoteCoordinatorFacade`` is intentionally read-only. Device self-naming
-    is the one bounded metadata mutation added here, so a remotely paired member
-    writes the same authenticated ``event.append`` message that the underlying
-    relay client already supports. No generic Flask-to-relay mutation surface is
-    exposed.
-    """
+    """Append through local authority or the bounded paired-runtime API."""
 
     coordinator = getattr(context, "coordinator", None)
     binding = getattr(context, "binding", None)
@@ -83,33 +75,23 @@ def _append_name_event(
         )
         return
 
-    # Paired members use the already-authenticated relay client. Keep the
-    # compatibility access narrowly scoped here instead of granting the remote
-    # coordinator facade a general mutation API.
+    # RemoteCoordinatorFacade intentionally stays read-only. Its pairing runtime
+    # already exposes one bounded public event-append operation that verifies the
+    # bound Federation session before reaching the authenticated relay client.
     runtime = getattr(coordinator, "runtime", None)
     state = getattr(coordinator, "state", None)
-    ensure_connected = getattr(runtime, "ensure_connected", None)
-    submit = getattr(runtime, "_submit", None)
-    if runtime is None or state is None or not callable(ensure_connected) or not callable(submit):
+    append_session_event = getattr(runtime, "append_session_event", None)
+    if runtime is None or state is None or not callable(append_session_event):
         raise FederationOperationError(
             "federation-device-name-write-unavailable",
             "the authenticated Federation transport cannot publish a device name",
         )
-    ensure_connected(state)
-    client = getattr(runtime, "_client", None)
-    remote_append = getattr(client, "append_event", None)
-    if not callable(remote_append):
-        raise FederationOperationError(
-            "federation-device-name-write-unavailable",
-            "the authenticated Federation transport cannot publish a device name",
-        )
-    submit(
-        remote_append(
-            session_id=session_id,
-            event_type=DEVICE_NAME_EVENT,
-            payload=payload,
-            request_id=request_id,
-        )
+    append_session_event(
+        state,
+        session_id=session_id,
+        event_type=DEVICE_NAME_EVENT,
+        payload=payload,
+        request_id=request_id,
     )
 
 
@@ -142,6 +124,45 @@ class FederationDeviceNamingService:
                 "current Federation membership could not be read",
             )
         return snapshot
+
+    def _verify_applied_name(
+        self,
+        context: object,
+        actor: str,
+        *,
+        target_node_id: str,
+        display_name: str,
+    ) -> str:
+        """Confirm deterministic replay accepted the just-published name claim."""
+
+        snapshot = self._snapshot(context, actor)
+        target = next(
+            (device for device in snapshot.devices if device.node_id == target_node_id),
+            None,
+        )
+        if target is None:
+            raise FederationOperationError(
+                "federation-device-name-verification-unavailable",
+                "the renamed device disappeared before the name could be verified",
+                "target_node_id",
+            )
+        if target.label == display_name:
+            return display_name
+        folded = display_name.casefold()
+        if any(
+            device.node_id != target_node_id and device.label.casefold() == folded
+            for device in snapshot.devices
+        ):
+            raise FederationValidationError(
+                "duplicate-device-name",
+                "display_name",
+                "another concurrent name claim won the Federation revision order",
+            )
+        raise FederationOperationError(
+            "federation-device-name-not-applied",
+            "the published device name was not accepted by Federation replay",
+            "display_name",
+        )
 
     def rename(self, *, target_node_id: str, display_name: object) -> str:
         context, actor = self._context()
@@ -185,7 +206,12 @@ class FederationDeviceNamingService:
             target_node_id=target_node_id,
             display_name=name,
         )
-        return name
+        return self._verify_applied_name(
+            context,
+            actor,
+            target_node_id=target_node_id,
+            display_name=name,
+        )
 
     def rename_self(self, display_name: object) -> str:
         context, actor = self._context()
@@ -218,7 +244,12 @@ class FederationDeviceNamingService:
             target_node_id=actor,
             display_name=name,
         )
-        return name
+        return self._verify_applied_name(
+            context,
+            actor,
+            target_node_id=actor,
+            display_name=name,
+        )
 
     def current_name(self) -> str | None:
         try:
