@@ -42,6 +42,9 @@ class FederationProjectionService(
         """
 
         snapshot = self._snapshot()
+        device_labels = {
+            device.node_id: device.label for device in snapshot.federation.devices
+        }
         items = [
             ProjectionItem(
                 group.group_id,
@@ -68,7 +71,10 @@ class FederationProjectionService(
                     if provider.assignable
                     else "Candidate or unavailable"
                 ),
-                (("Device", provider.node_id),),
+                (
+                    ("Device", device_labels.get(provider.node_id, provider.node_id)),
+                    ("Device ID", provider.node_id),
+                ),
             )
             for provider in snapshot.storage.providers
         )
