@@ -7,8 +7,9 @@ leader UI unable to record an explicit approval for those pending candidates.
 
 This module keeps the F8.1 authority model and durability intact while adding one
 narrow product rule: the session creator may approve an already-requested
-``REGISTERING`` capability. The resulting enrollment is APPROVED but remains
-ineligible for resource binding until the member later advertises ``READY``.
+``REGISTERING`` capability-first candidate. The resulting enrollment is APPROVED
+but remains ineligible for resource binding until the member later advertises
+``READY``.
 
 No storage assignment, compute activation, provider endpoint, executable, or
 other capability authority is created here.
@@ -42,11 +43,12 @@ from catalog.federation.errors import (
     FederationOperationError,
     FederationValidationError,
 )
-from catalog.federation.models import CapabilityStatus
+from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 
 _EXTENSION_KEY = "capability_first_provider_operator_surface"
 _DEFAULT_ENROLLMENT_NAME = "provider_enrollment.sqlite3"
 _DEFAULT_HEALTH_NAME = "provider_health.sqlite3"
+_CAPABILITY_FIRST_KIND = "capability-first-candidate"
 
 
 def _utc(value: datetime) -> datetime:
@@ -59,10 +61,21 @@ def _utc(value: datetime) -> datetime:
     return value.astimezone(timezone.utc)
 
 
-class CapabilityFirstProviderEnrollmentService(FederatedProviderEnrollmentService):
-    """F8.1 enrollment with explicit approval of REGISTERING candidates.
+def _is_capability_first_pending(announcement: CapabilityAnnouncement) -> bool:
+    properties = announcement.properties
+    return (
+        announcement.status is CapabilityStatus.REGISTERING
+        and isinstance(properties, dict)
+        and properties.get("kind") == _CAPABILITY_FIRST_KIND
+    )
 
-    The core store intentionally keeps ``eligible_for_resource_binding`` strict:
+
+class CapabilityFirstProviderEnrollmentService(FederatedProviderEnrollmentService):
+    """F8.1 enrollment with explicit approval of capability-first REGISTERING.
+
+    The exception is intentionally narrower than generic provider enrollment:
+    unrelated REGISTERING announcements keep the frozen F8.1 READY-only approval
+    rule. The core store also keeps ``eligible_for_resource_binding`` strict:
     APPROVED is not sufficient; the reconciled announcement must also be READY.
     """
 
@@ -84,7 +97,7 @@ class CapabilityFirstProviderEnrollmentService(FederatedProviderEnrollmentServic
             capability_id=capability_id,
             actor_node_id=actor_node_id,
         )
-        if announcement.status is not CapabilityStatus.REGISTERING:
+        if not _is_capability_first_pending(announcement):
             return super().approve(
                 session_id=session_id,
                 capability_id=capability_id,
@@ -93,6 +106,7 @@ class CapabilityFirstProviderEnrollmentService(FederatedProviderEnrollmentServic
                 expected_revision=expected_revision,
             )
 
+        announcement = self.store._validated_announcement(announcement)
         now = _utc(self._clock())
         payload = {
             "session_id": announcement.session_id,
