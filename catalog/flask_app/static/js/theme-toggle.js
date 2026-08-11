@@ -47,7 +47,20 @@
     }
   }
 
+  // Browser chrome on mobile follows the page background.
+  function syncBrowserChrome() {
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (!meta) {
+      return;
+    }
+    var color = getComputedStyle(root).getPropertyValue("--bg-top").trim();
+    if (color) {
+      meta.setAttribute("content", color);
+    }
+  }
+
   function announce(theme) {
+    syncBrowserChrome();
     document.dispatchEvent(
       new CustomEvent("fcp:themechange", { detail: { theme: theme } })
     );
@@ -69,6 +82,7 @@
       });
     }
     syncButtons(activeTheme());
+    syncBrowserChrome();
   }
 
   // Follow the system while no explicit choice has been stored.

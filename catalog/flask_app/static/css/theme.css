@@ -36,7 +36,6 @@
 
   /* Brand and accent */
   --brand-solid: #0f172a;
-  --brand-solid-hover: #1d4ed8;
   --accent: #1d4ed8;
   --accent-hover: #1b3fae;
   --accent-text: #1e3a8a;
@@ -63,8 +62,6 @@
   --info-text: #176b87;
   --violet-soft: #f5f3ff;
   --violet-border: #c4b5fd;
-  --neutral-soft: #eef2f7;
-  --neutral-text: #334155;
   --marker-active: #facc15;
 
   /* Elevation */
@@ -117,7 +114,6 @@
     --border-subtle: #1c273a;
 
     --brand-solid: #2563eb;
-    --brand-solid-hover: #3b82f6;
     --accent: #2f6ff0;
     --accent-hover: #4483f7;
     --accent-text: #9cc2ff;
@@ -142,8 +138,6 @@
     --info-text: #7cc9e6;
     --violet-soft: #1c1934;
     --violet-border: #4b3f88;
-    --neutral-soft: #1a2436;
-    --neutral-text: #cbd5e1;
     --marker-active: #fbbf24;
 
     --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
@@ -176,7 +170,6 @@
   --border-subtle: #1c273a;
 
   --brand-solid: #2563eb;
-  --brand-solid-hover: #3b82f6;
   --accent: #2f6ff0;
   --accent-hover: #4483f7;
   --accent-text: #9cc2ff;
@@ -201,8 +194,6 @@
   --info-text: #7cc9e6;
   --violet-soft: #1c1934;
   --violet-border: #4b3f88;
-  --neutral-soft: #1a2436;
-  --neutral-text: #cbd5e1;
   --marker-active: #fbbf24;
 
   --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);

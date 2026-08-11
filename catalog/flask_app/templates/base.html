@@ -8,6 +8,8 @@
     {% set document_recorder_only = document_capability_complete and document_capabilities.recorder|default(false) and not document_capabilities.workbench|default(false) %}
     <title>{{ 'FCP Recorder' if document_recorder_only else 'FCP Webapp' }}</title>
     <meta name="color-scheme" content="light dark">
+    <!-- Kept in step with the active palette by theme-toggle.js. -->
+    <meta name="theme-color" content="#f8fbff">
     <script>
       // Applied before first paint so a stored dark choice never flashes light.
       (function () {
