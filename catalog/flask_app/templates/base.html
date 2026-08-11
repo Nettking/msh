@@ -7,6 +7,21 @@
     {% set document_capability_complete = document_capabilities.completed|default(false) %}
     {% set document_recorder_only = document_capability_complete and document_capabilities.recorder|default(false) and not document_capabilities.workbench|default(false) %}
     <title>{{ 'FCP Recorder' if document_recorder_only else 'FCP Webapp' }}</title>
+    <meta name="color-scheme" content="light dark">
+    <!-- Kept in step with the active palette by theme-toggle.js. -->
+    <meta name="theme-color" content="#f8fbff">
+    <script>
+      // Applied before first paint so a stored dark choice never flashes light.
+      (function () {
+        try {
+          var stored = window.localStorage.getItem('fcp-theme');
+          if (stored === 'dark' || stored === 'light') {
+            document.documentElement.setAttribute('data-theme', stored);
+          }
+        } catch (error) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/global-refresh.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/setup.css') }}">
@@ -16,9 +31,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/ai-explainer.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/data-upload.css') }}">
     <script defer src="{{ url_for('static', filename='js/mobile-navigation.js') }}"></script>
+    <script defer src="{{ url_for('static', filename='js/theme-toggle.js') }}"></script>
     {% if not document_recorder_only %}
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+    <!-- Not deferred: page charts are constructed inline and must see themed defaults. -->
+    <script src="{{ url_for('static', filename='js/chart-theme.js') }}"></script>
     {% endif %}
   </head>
   {% set endpoint = request.endpoint or '' %}
@@ -39,6 +57,13 @@
     {% elif endpoint == 'web.guide' or endpoint.startswith('source_web.') or endpoint == 'web.status' or endpoint.startswith('ai_web.') %}
       {% set active_group = 'system' %}
     {% endif %}
+    {% macro theme_toggle() -%}
+      <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode">
+        <svg class="theme-toggle__icon theme-toggle__icon--light" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20.5 13.4A8.5 8.5 0 1 1 10.6 3.5a6.8 6.8 0 0 0 9.9 9.9Z"/></svg>
+        <svg class="theme-toggle__icon theme-toggle__icon--dark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M4.4 4.4l1.6 1.6M18 18l1.6 1.6M2.6 12h2.2M19.2 12h2.2M4.4 19.6 6 18M18 6l1.6-1.6"/></svg>
+        <span class="theme-toggle__label" data-theme-toggle-label>Dark mode</span>
+      </button>
+    {%- endmacro %}
     {% macro primary_links(group) -%}
       {% if recorder_only %}
       <a class="{% if endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}" {% if endpoint == 'web.status' %}aria-current="page"{% endif %}>Status</a>
@@ -123,13 +148,16 @@
         <a class="setup-shell-header__exit" href="{{ url_for('web.status') }}#recorder-status">Configure recording</a>
         {% endif %}
       {% endif %}
-      {% if endpoint == 'web.get_started' %}
-      <a class="setup-shell-header__exit" href="{{ url_for('web.overview') }}">Full workbench</a>
-      {% elif capability_complete %}
-      <a class="setup-shell-header__exit" href="{{ url_for('web.status') if recorder_only else url_for('web.overview') }}">{{ 'Recorder status' if recorder_only else 'Exit setup' }}</a>
-      {% else %}
-      <span class="setup-shell-header__state">First-time setup</span>
-      {% endif %}
+      <div class="setup-shell-header__actions">
+        {{ theme_toggle() }}
+        {% if endpoint == 'web.get_started' %}
+        <a class="setup-shell-header__exit" href="{{ url_for('web.overview') }}">Full workbench</a>
+        {% elif capability_complete %}
+        <a class="setup-shell-header__exit" href="{{ url_for('web.status') if recorder_only else url_for('web.overview') }}">{{ 'Recorder status' if recorder_only else 'Exit setup' }}</a>
+        {% else %}
+        <span class="setup-shell-header__state">First-time setup</span>
+        {% endif %}
+      </div>
     </header>
     {% else %}
     <header class="site-header site-header--grouped {% if recorder_only %}site-header--recorder{% endif %}">
@@ -140,15 +168,18 @@
       <nav class="site-nav site-nav--primary" aria-label="Primary sections">
         {{ primary_links(active_group) }}
       </nav>
-      {% if artifact_catalog_freshness is defined and not recorder_only %}
-      <div class="catalog-freshness {% if artifact_catalog_freshness.stale %}catalog-freshness--stale{% endif %}">
-        <span>Artifact scan:</span><strong>{% if artifact_catalog_freshness.age_seconds is none %}not scanned yet{% elif artifact_catalog_freshness.age_seconds < 60 %}{{ "%.0f"|format(artifact_catalog_freshness.age_seconds) }}s ago{% else %}{{ "%.1f"|format(artifact_catalog_freshness.age_seconds / 60) }}m ago{% endif %}</strong>
-        {% if artifact_catalog_freshness.scan_in_progress %}<span>Rescan running</span>{% elif artifact_catalog_freshness.stale %}<span>May be stale</span>{% endif %}
+      <div class="site-header__actions">
+        {% if artifact_catalog_freshness is defined and not recorder_only %}
+        <div class="catalog-freshness {% if artifact_catalog_freshness.stale %}catalog-freshness--stale{% endif %}">
+          <span>Artifact scan:</span><strong>{% if artifact_catalog_freshness.age_seconds is none %}not scanned yet{% elif artifact_catalog_freshness.age_seconds < 60 %}{{ "%.0f"|format(artifact_catalog_freshness.age_seconds) }}s ago{% else %}{{ "%.1f"|format(artifact_catalog_freshness.age_seconds / 60) }}m ago{% endif %}</strong>
+          {% if artifact_catalog_freshness.scan_in_progress %}<span>Rescan running</span>{% elif artifact_catalog_freshness.stale %}<span>May be stale</span>{% endif %}
+        </div>
+        {% endif %}
+        {% if not recorder_only and capability_complete %}
+        <form class="rescan-form" method="post" action="{{ url_for('web.rescan') }}"><input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}"><button type="submit">Rescan</button></form>
+        {% endif %}
+        {{ theme_toggle() }}
       </div>
-      {% endif %}
-      {% if not recorder_only and capability_complete %}
-      <form class="rescan-form" method="post" action="{{ url_for('web.rescan') }}"><input type="hidden" name="next" value="{{ request.full_path if request.query_string else request.path }}"><button type="submit">Rescan</button></form>
-      {% endif %}
       {% if not recorder_only %}
       <nav class="site-nav site-section-nav" aria-label="Section pages">
         {{ section_links(active_group, endpoint) }}

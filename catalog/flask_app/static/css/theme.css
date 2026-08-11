@@ -1,0 +1,428 @@
+/*
+ * FCP theme layer.
+ *
+ * Single source of truth for colour, elevation, radius, and control shape.
+ * Every other stylesheet consumes these tokens, so light and dark stay in
+ * step and no surface needs a second hand-written palette.
+ *
+ * Light values live on bare :root. Dark values are declared twice on purpose:
+ * once for the system preference (guarded so an explicit light choice wins)
+ * and once for the explicit data-theme="dark" choice made in the top menu.
+ */
+
+:root {
+  color-scheme: light;
+
+  /* Page and panel surfaces */
+  --bg: #f2f6fc;
+  --bg-top: #f8fbff;
+  --bg-bottom: #eaf1fa;
+  --surface: #ffffff;
+  --surface-muted: #f7fafd;
+  --surface-sunken: #eef2f8;
+  --surface-overlay: rgba(255, 255, 255, 0.94);
+  --surface-veil: rgba(255, 255, 255, 0.72);
+
+  /* Text */
+  --text: #0f172a;
+  --text-muted: #475569;
+  --text-subtle: #64748b;
+  --on-solid: #ffffff;
+
+  /* Lines */
+  --border: #dae1ec;
+  --border-strong: #c2cddd;
+  --border-subtle: #e9eef6;
+
+  /* Brand and accent */
+  --brand-solid: #0f172a;
+  --accent: #1d4ed8;
+  --accent-hover: #1b3fae;
+  --accent-text: #1e3a8a;
+  --accent-soft: #eff6ff;
+  --accent-soft-strong: #dbeafe;
+  --accent-border: #bfdbfe;
+  --accent-border-strong: #93c5fd;
+
+  /* Status */
+  --success: #166534;
+  --success-soft: #ecfdf3;
+  --success-border: #86efac;
+  --success-strong: #16a34a;
+  --warning: #92400e;
+  --warning-soft: #fffbeb;
+  --warning-border: #fcd34d;
+  --warning-strong: #f59e0b;
+  --danger: #991b1b;
+  --danger-soft: #fef2f2;
+  --danger-border: #fca5a5;
+  --danger-strong: #dc2626;
+  --info-soft: #f0f9ff;
+  --info-border: #bae6fd;
+  --info-text: #176b87;
+  --violet-soft: #f5f3ff;
+  --violet-border: #c4b5fd;
+  --marker-active: #facc15;
+
+  /* Data visualization */
+  --tooltip-bg: #0f172a;
+  --chart-1: #1d4ed8;
+  --chart-2: #15803d;
+  --chart-3: #a16207;
+  --chart-4: #7c3aed;
+  --chart-5: #be123c;
+  --chart-6: #0891b2;
+  --chart-7: #4338ca;
+  --chart-8: #0f766e;
+
+  /* Elevation */
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.05);
+  --shadow-md: 0 6px 18px rgba(15, 23, 42, 0.07);
+  --shadow-lg: 0 18px 44px rgba(15, 23, 42, 0.1);
+  --shadow-pop: 0 22px 55px rgba(15, 23, 42, 0.22);
+  --ring: 0 0 0 3px rgba(29, 78, 216, 0.28);
+
+  /* Shape */
+  --radius-xs: 8px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 18px;
+  --radius-xl: 24px;
+  --radius-pill: 999px;
+
+  /* Layout */
+  --shell-width: 1320px;
+  --shell-gutter: max(20px, calc((100% - var(--shell-width)) / 2));
+  --control-height: 38px;
+
+  --font-sans: Inter, "Inter var", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas,
+    "Liberation Mono", monospace;
+}
+
+/* Dark values, shared by the system preference and the explicit choice. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+
+    --bg: #0a1020;
+    --bg-top: #0d1526;
+    --bg-bottom: #070c17;
+    --surface: #131c2e;
+    --surface-muted: #172236;
+    --surface-sunken: #0f1828;
+    --surface-overlay: rgba(13, 21, 38, 0.92);
+    --surface-veil: rgba(23, 34, 54, 0.6);
+
+    --text: #e7eefb;
+    --text-muted: #a8b6cc;
+    --text-subtle: #8496b0;
+    --on-solid: #ffffff;
+
+    --border: #26334a;
+    --border-strong: #36455f;
+    --border-subtle: #1c273a;
+
+    --brand-solid: #2563eb;
+    --accent: #2f6ff0;
+    --accent-hover: #4483f7;
+    --accent-text: #9cc2ff;
+    --accent-soft: #15223a;
+    --accent-soft-strong: #1b3055;
+    --accent-border: #2b4471;
+    --accent-border-strong: #3a6096;
+
+    --success: #7ee2a8;
+    --success-soft: #10261d;
+    --success-border: #1f6b45;
+    --success-strong: #22c55e;
+    --warning: #f7cf72;
+    --warning-soft: #271f11;
+    --warning-border: #77571c;
+    --danger: #f9a8a8;
+    --danger-soft: #2a1418;
+    --danger-border: #7d3034;
+    --danger-strong: #ef4444;
+    --info-soft: #0d2130;
+    --info-border: #2a5876;
+    --info-text: #7cc9e6;
+    --violet-soft: #1c1934;
+    --violet-border: #4b3f88;
+    --marker-active: #fbbf24;
+
+    --tooltip-bg: #080d15;
+    --chart-1: #60a5fa;
+    --chart-2: #4ade80;
+    --chart-3: #fbbf24;
+    --chart-4: #a78bfa;
+    --chart-5: #fb7185;
+    --chart-6: #22d3ee;
+    --chart-7: #818cf8;
+    --chart-8: #2dd4bf;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 8px 22px rgba(0, 0, 0, 0.42);
+    --shadow-lg: 0 20px 46px rgba(0, 0, 0, 0.5);
+    --shadow-pop: 0 24px 60px rgba(0, 0, 0, 0.62);
+    --ring: 0 0 0 3px rgba(96, 165, 250, 0.4);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+
+  --bg: #0a1020;
+  --bg-top: #0d1526;
+  --bg-bottom: #070c17;
+  --surface: #131c2e;
+  --surface-muted: #172236;
+  --surface-sunken: #0f1828;
+  --surface-overlay: rgba(13, 21, 38, 0.92);
+  --surface-veil: rgba(23, 34, 54, 0.6);
+
+  --text: #e7eefb;
+  --text-muted: #a8b6cc;
+  --text-subtle: #8496b0;
+  --on-solid: #ffffff;
+
+  --border: #26334a;
+  --border-strong: #36455f;
+  --border-subtle: #1c273a;
+
+  --brand-solid: #2563eb;
+  --accent: #2f6ff0;
+  --accent-hover: #4483f7;
+  --accent-text: #9cc2ff;
+  --accent-soft: #15223a;
+  --accent-soft-strong: #1b3055;
+  --accent-border: #2b4471;
+  --accent-border-strong: #3a6096;
+
+  --success: #7ee2a8;
+  --success-soft: #10261d;
+  --success-border: #1f6b45;
+  --success-strong: #22c55e;
+  --warning: #f7cf72;
+  --warning-soft: #271f11;
+  --warning-border: #77571c;
+  --danger: #f9a8a8;
+  --danger-soft: #2a1418;
+  --danger-border: #7d3034;
+  --danger-strong: #ef4444;
+  --info-soft: #0d2130;
+  --info-border: #2a5876;
+  --info-text: #7cc9e6;
+  --violet-soft: #1c1934;
+  --violet-border: #4b3f88;
+  --marker-active: #fbbf24;
+
+  --tooltip-bg: #080d15;
+  --chart-1: #60a5fa;
+  --chart-2: #4ade80;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #fb7185;
+  --chart-6: #22d3ee;
+  --chart-7: #818cf8;
+  --chart-8: #2dd4bf;
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 8px 22px rgba(0, 0, 0, 0.42);
+  --shadow-lg: 0 20px 46px rgba(0, 0, 0, 0.5);
+  --shadow-pop: 0 24px 60px rgba(0, 0, 0, 0.62);
+  --ring: 0 0 0 3px rgba(96, 165, 250, 0.4);
+}
+
+/* ---------------------------------------------------------------- base --- */
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  font-family: var(--font-sans);
+  font-feature-settings: "cv05" 1, "ss01" 1;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1, h2, h3, h4 {
+  color: var(--text);
+  text-wrap: balance;
+}
+
+a {
+  color: var(--accent-text);
+}
+
+::selection {
+  background: var(--accent-soft-strong);
+  color: var(--text);
+}
+
+:where(a, button, summary, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: var(--ring);
+  border-radius: var(--radius-xs);
+  outline-offset: 2px;
+}
+
+/* Form controls share one shape so dense pages stop looking assembled. */
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+select,
+textarea {
+  padding: 8px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-xs);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):hover,
+select:hover,
+textarea:hover {
+  border-color: var(--accent-border-strong);
+}
+
+input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):focus,
+select:focus,
+textarea:focus {
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+  outline: none;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--text-subtle);
+}
+
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--accent);
+  width: 16px;
+  height: 16px;
+}
+
+input[type="range"] {
+  accent-color: var(--accent);
+}
+
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
+}
+
+/* Scrollbars follow the palette instead of staying stark white in dark. */
+* {
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border: 3px solid transparent;
+  border-radius: var(--radius-pill);
+  background: var(--border-strong);
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-subtle);
+  background-clip: content-box;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* --------------------------------------------------------- theme toggle --- */
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: var(--control-height);
+  min-width: var(--control-height);
+  padding: 6px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-muted);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  line-height: 1;
+  transition: color 0.15s ease, border-color 0.15s ease, background 0.15s ease;
+}
+
+.theme-toggle:hover {
+  border-color: var(--accent-border-strong);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+.theme-toggle__icon {
+  display: block;
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+}
+
+.theme-toggle__label {
+  display: none;
+}
+
+/* Show the moon in light mode, the sun once the dark palette is active. */
+.theme-toggle__icon--dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .theme-toggle__icon--dark {
+  display: block;
+}
+
+:root[data-theme="dark"] .theme-toggle__icon--light {
+  display: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .theme-toggle__icon--dark {
+    display: block;
+  }
+
+  :root:not([data-theme="light"]) .theme-toggle__icon--light {
+    display: none;
+  }
+}
+
+/* A 340px Live card cannot fit inside a 320px viewport after page gutters.
+   This higher-specificity guard overrides the component track minimum without
+   changing the denser two-column desktop layout. */
+@media (max-width: 380px) {
+  body .live-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  body .live-card .kv-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

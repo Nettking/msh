@@ -23,32 +23,32 @@
   padding: 8px 10px;
   border-left: 2px solid transparent;
   border-radius: 7px;
-  color: #c4cfdd;
+  color: var(--docs-sidebar-text);
   line-height: 1.3;
   text-decoration: none;
 }
 
 .docs-nav-link:hover {
   background: var(--docs-ink-800);
-  color: #fff;
+  color: var(--docs-sidebar-strong);
 }
 
 .docs-nav-link.is-active {
   border-left-color: var(--docs-accent-bright);
-  background: #293548;
-  color: #fff;
+  background: var(--docs-sidebar-active-bg);
+  color: var(--docs-sidebar-strong);
   font-weight: 700;
 }
 
 .docs-all-files {
   margin: 4px 8px 0;
   padding-top: 14px;
-  border-top: 1px solid #303d4f;
+  border-top: 1px solid var(--docs-sidebar-rule);
 }
 
 .docs-all-files > summary {
   padding: 8px 2px;
-  color: #aeb9c8;
+  color: var(--docs-sidebar-muted);
   cursor: pointer;
   font-size: 0.78rem;
   font-weight: 700;
@@ -138,6 +138,7 @@
 .docs-main .docs-home__button--primary:hover {
   border-color: var(--docs-ink-950);
   background: var(--docs-ink-950);
+  /* Literal white: this button is ink in both themes and must stay readable. */
   color: #fff;
 }
 
@@ -191,12 +192,12 @@
   background: var(--docs-paper);
   color: var(--docs-text);
   text-decoration: none;
-  box-shadow: 0 8px 22px rgba(44, 54, 70, 0.045);
+  box-shadow: var(--docs-card-shadow);
 }
 
 .docs-home-card:hover {
-  border-color: #c9b895;
-  box-shadow: 0 12px 28px rgba(44, 54, 70, 0.08);
+  border-color: var(--docs-accent);
+  box-shadow: var(--docs-card-shadow-hover);
   transform: translateY(-2px);
 }
 

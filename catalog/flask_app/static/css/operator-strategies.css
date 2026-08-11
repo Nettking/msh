@@ -24,10 +24,10 @@
 .statement-quote {
   margin: 0;
   padding: 18px;
-  border-left: 5px solid #2563eb;
+  border-left: 5px solid var(--accent);
   border-radius: 14px;
-  background: #eff6ff;
-  color: #0f172a;
+  background: var(--accent-soft);
+  color: var(--text);
   font-size: 1.08rem;
   line-height: 1.55;
 }
@@ -49,7 +49,7 @@
   align-items: flex-start;
   padding: 18px;
   border-bottom: 1px solid var(--border);
-  background: #fbfdff;
+  background: var(--surface-muted);
 }
 
 .operator-section-heading p {
@@ -63,7 +63,7 @@
 }
 
 .operator-strategy-form--quick {
-  background: #ffffff;
+  background: var(--surface);
 }
 
 .operator-quick-section {
@@ -107,27 +107,27 @@
   align-items: center;
   gap: 8px 12px;
   padding: 10px 12px;
-  border: 1px solid #dbeafe;
+  border: 1px solid var(--accent-border);
   border-radius: 12px;
-  background: #f8fbff;
+  background: var(--surface-muted);
 }
 
 .operator-more-detail {
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-strong);
   border-radius: 14px;
-  background: #f8fafc;
+  background: var(--surface-muted);
   padding: 0;
 }
 
 .operator-more-detail > summary {
   cursor: pointer;
   padding: 13px 14px;
-  color: #1e3a8a;
+  color: var(--accent-text);
   font-weight: 850;
 }
 
 .operator-more-detail[open] > summary {
-  border-bottom: 1px solid #cbd5e1;
+  border-bottom: 1px solid var(--border-strong);
 }
 
 .operator-more-detail .operator-detail-grid {
@@ -149,9 +149,9 @@
 .operator-strategy-form select,
 .operator-strategy-form textarea {
   width: 100%;
-  border: 1px solid #cbd5e1;
+  border: 1px solid var(--border-strong);
   border-radius: 12px;
-  background: #ffffff;
+  background: var(--surface);
   color: var(--text);
   font: inherit;
   padding: 10px 12px;
@@ -166,8 +166,8 @@
 .operator-strategy-form input:focus,
 .operator-strategy-form select:focus,
 .operator-strategy-form textarea:focus {
-  border-color: #2563eb;
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  border-color: var(--accent);
+  box-shadow: var(--ring);
   outline: none;
 }
 
@@ -176,8 +176,8 @@
   margin-left: 6px;
   padding: 2px 7px;
   border-radius: 999px;
-  background: #fee2e2;
-  color: #991b1b;
+  background: var(--danger-soft);
+  color: var(--danger);
   font-size: 0.72rem;
   font-style: normal;
   font-weight: 850;
@@ -191,14 +191,14 @@
   align-items: center;
   padding: 18px 20px;
   border-top: 1px solid var(--border);
-  background: #f8fafc;
+  background: var(--surface-muted);
 }
 
 .operator-save-row--sticky {
   position: sticky;
   bottom: 0;
   z-index: 2;
-  box-shadow: 0 -10px 25px rgba(15, 23, 42, 0.06);
+  box-shadow: var(--shadow-md);
 }
 
 .operator-save-row strong {

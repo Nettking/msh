@@ -103,3 +103,14 @@ FCP should include a user-facing guide page inside the app. This is different fr
 - The in-app guide explains what the operator or researcher should click next.
 
 The in-app guide should stay short, concrete, and knowledge-flow based. It should avoid implementation details unless they help the user decide what to do next.
+
+## Appearance
+
+The top menu carries an appearance switch on every page, including the setup shell and the documentation portal.
+
+```text
+No stored choice = follow the operating system preference.
+Stored choice    = keep light or dark until the operator switches again.
+```
+
+The choice is stored per browser and is applied before first paint, so a returning dark-mode operator never sees a light flash. Colour, elevation, radius, and control shape come from one token layer (`static/css/theme.css`); page stylesheets consume those tokens instead of literal colours, so both palettes stay in step.
