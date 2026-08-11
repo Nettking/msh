@@ -4,7 +4,11 @@ import pytest
 from flask import Flask
 from flask_security import hash_password
 
-from catalog.flask_app.auth.extension import init_human_auth
+from catalog.flask_app.auth.extension import (
+    _validated_password_salt,
+    _validated_secret,
+    init_human_auth,
+)
 from catalog.flask_app.auth.models import Role, User, db
 from catalog.flask_app.auth.policy import ROLE_PERMISSIONS, audit_route_policy
 
@@ -91,6 +95,17 @@ def test_permission_model_and_route_audit_are_central(app):
     assert audit_route_policy(app) == []
 
 
+def test_real_application_has_no_unclassified_routes(tmp_path, monkeypatch):
+    monkeypatch.delenv("FCP_AUTH_DISABLED", raising=False)
+    monkeypatch.setenv("FCP_FLASK_SECRET", "r" * 48)
+    monkeypatch.setenv("FCP_PASSWORD_SALT", "q" * 48)
+    monkeypatch.setenv("FCP_AUTH_DATABASE", str(tmp_path / "real-users.sqlite3"))
+    from catalog.flask_app.app import create_app
+
+    application = create_app()
+    assert audit_route_policy(application) == []
+
+
 def test_bootstrap_creates_admin_once(app):
     runner = app.test_cli_runner()
     args = [
@@ -130,3 +145,22 @@ def test_production_rejects_explicit_short_password_salt(tmp_path, monkeypatch):
     monkeypatch.delenv("FCP_DEVELOPMENT", raising=False)
     with pytest.raises(RuntimeError, match="FCP_PASSWORD_SALT"):
         init_human_auth(Flask("production-salt"))
+
+
+def test_production_secrets_are_independent_persistent_and_reused(tmp_path, monkeypatch):
+    monkeypatch.delenv("FCP_AUTH_DISABLED", raising=False)
+    monkeypatch.delenv("FCP_FLASK_SECRET", raising=False)
+    monkeypatch.delenv("FCP_PASSWORD_SALT", raising=False)
+    monkeypatch.delenv("FCP_DEVELOPMENT", raising=False)
+    monkeypatch.setenv("FCP_AUTH_SECRET_DIR", str(tmp_path / "secrets"))
+
+    first_app = Flask("first-production")
+    first_secret = _validated_secret(first_app)
+    first_salt = _validated_password_salt(first_app)
+    second_app = Flask("second-production")
+
+    assert _validated_secret(second_app) == first_secret
+    assert _validated_password_salt(second_app) == first_salt
+    assert first_secret != first_salt
+    assert (tmp_path / "secrets" / "flask-secret").is_file()
+    assert (tmp_path / "secrets" / "password-salt").is_file()
