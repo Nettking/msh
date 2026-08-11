@@ -11,10 +11,21 @@ from catalog.mtconnect_recorder.managed_service import (
 )
 
 
+class FakeService:
+    def __init__(self, calls: list[object]) -> None:
+        self.calls = calls
+        self.context = object()
+
+    def authorized_context(self):
+        self.calls.append("authorized-context")
+        return self.context
+
+
 class FakeNode:
     def __init__(self, *, paired: bool, calls: list[object], **kwargs: object) -> None:
         self.paired = paired
         self.calls = calls
+        self.service = FakeService(calls)
         self.calls.append(("node", kwargs))
 
     def has_saved_membership(self) -> bool:
@@ -48,6 +59,27 @@ class FakeControl:
         self.stopped = True
 
 
+class FakeHandoff:
+    def __init__(self, directory: Path) -> None:
+        self.directory = Path(directory)
+
+
+class FakeUpdateProcessor:
+    def __init__(
+        self,
+        service: object,
+        handoff: FakeHandoff,
+        state_file: Path,
+    ) -> None:
+        self.service = service
+        self.handoff = handoff
+        self.state_file = Path(state_file)
+        self.contexts: list[object] = []
+
+    def process(self, context: object) -> None:
+        self.contexts.append(context)
+
+
 def test_companion_waits_for_pairing_without_touching_capture(tmp_path: Path) -> None:
     calls: list[object] = []
 
@@ -59,12 +91,15 @@ def test_companion_waits_for_pairing_without_touching_capture(tmp_path: Path) ->
             **kwargs,
         ),
         control_factory=FakeControl,
+        update_processor_factory=FakeUpdateProcessor,
+        handoff_factory=FakeHandoff,
         source_names_loader=lambda _path: ("Mazak",),
     )
 
     assert runtime.connect_once() == "waiting_for_pairing"
     assert "bootstrap" not in calls
     assert runtime._node is None
+    assert runtime._update_processor is None
     assert any(
         isinstance(value, tuple) and value[0] == "node-stop"
         for value in calls
@@ -85,6 +120,8 @@ def test_companion_reconnects_saved_membership_and_starts_control(
             **kwargs,
         ),
         control_factory=FakeControl,
+        update_processor_factory=FakeUpdateProcessor,
+        handoff_factory=FakeHandoff,
         source_names_loader=lambda _path: ("M8015RW221N", "MAZAK-M7ZDA13010Z"),
     )
 
@@ -93,6 +130,7 @@ def test_companion_reconnects_saved_membership_and_starts_control(
     assert runtime._node is not None
     assert runtime._control is not None
     assert runtime._control.started is True
+    assert runtime._update_processor is not None
 
     node_call = next(
         value
@@ -105,6 +143,70 @@ def test_companion_reconnects_saved_membership_and_starts_control(
     runtime.stop()
     assert runtime._node is None
     assert runtime._control is None
+    assert runtime._update_processor is None
+
+
+def test_companion_bridges_update_events_only_through_bounded_host_handoff(
+    tmp_path: Path,
+) -> None:
+    calls: list[object] = []
+
+    runtime = ManagedRecorderFederationRuntime(
+        data_directory=tmp_path,
+        node_factory=lambda **kwargs: FakeNode(
+            paired=True,
+            calls=calls,
+            **kwargs,
+        ),
+        control_factory=FakeControl,
+        update_processor_factory=FakeUpdateProcessor,
+        handoff_factory=FakeHandoff,
+        source_names_loader=lambda _path: ("Mazak",),
+    )
+
+    assert runtime.connect_once() == "connected"
+    processor = runtime._update_processor
+    assert isinstance(processor, FakeUpdateProcessor)
+    assert processor.handoff.directory == tmp_path / "federation" / "update-agent"
+    assert processor.state_file == (
+        tmp_path / "federation" / "update-events" / "processor.json"
+    )
+    assert processor.service is runtime._node.service
+
+    assert runtime.process_update_events_once() is True
+    assert processor.contexts == [runtime._node.service.context]
+    assert calls[-1] == "authorized-context"
+
+    runtime.stop()
+
+
+def test_companion_does_not_process_updates_without_authorized_context(
+    tmp_path: Path,
+) -> None:
+    calls: list[object] = []
+
+    runtime = ManagedRecorderFederationRuntime(
+        data_directory=tmp_path,
+        node_factory=lambda **kwargs: FakeNode(
+            paired=True,
+            calls=calls,
+            **kwargs,
+        ),
+        control_factory=FakeControl,
+        update_processor_factory=FakeUpdateProcessor,
+        handoff_factory=FakeHandoff,
+        source_names_loader=lambda _path: (),
+    )
+
+    assert runtime.connect_once() == "connected"
+    runtime._node.service.context = None
+
+    assert runtime.process_update_events_once() is False
+    processor = runtime._update_processor
+    assert isinstance(processor, FakeUpdateProcessor)
+    assert processor.contexts == []
+
+    runtime.stop()
 
 
 def test_managed_entrypoint_starts_capture_even_without_pairing_bootstrap(

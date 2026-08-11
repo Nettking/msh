@@ -1,14 +1,20 @@
 """Compose-managed recorder entry point with an independent Federation runtime.
 
-Local MTConnect capture remains the primary process commitment.  Federation
-membership, capability advertisement, recorder control, and durable publication
-run in a background companion and may fail or reconnect without stopping local
-capture.
+Local MTConnect capture remains the primary process commitment. Federation
+membership, capability advertisement, recorder control, durable publication,
+and bounded software-update intent processing run in a background companion and
+may fail or reconnect without stopping local capture.
 
-The companion never consumes a pairing key.  First pairing may be completed by
-a separate bounded bootstrap while the recorder is already running; once the
+The companion never consumes a pairing key. First pairing may be completed by a
+separate bounded bootstrap while the recorder is already running; once the
 public-safe reconnect state appears in the shared data directory, this runtime
 notices it and connects automatically.
+
+Software updates preserve the existing authority split: the recorder container
+only replays authenticated Federation intents and writes bounded declarative
+handoff files under ``data/federation/update-agent``. A separately owned host
+update agent must independently revalidate Git, rebuild/restart Compose, and
+prove the running commit before success is reported.
 """
 
 from __future__ import annotations
@@ -25,6 +31,10 @@ from catalog.flask_app.services.capability_config_service import (
     load_capability_config,
     parse_recorder_sources,
 )
+from catalog.flask_app.services.federation_update_events import (
+    FederationUpdateEventProcessor,
+)
+from catalog.flask_app.services.federation_update_handoff import HostUpdateHandoff
 from catalog.mtconnect_recorder import run
 from catalog.mtconnect_recorder.federation_control import (
     RecorderFederationControlWorker,
@@ -79,6 +89,8 @@ class ManagedRecorderFederationRuntime:
         poll_seconds: float = DEFAULT_POLL_SECONDS,
         node_factory: Callable[..., Any] = RecorderFederationNode,
         control_factory: Callable[..., Any] = RecorderFederationControlWorker,
+        update_processor_factory: Callable[..., Any] = FederationUpdateEventProcessor,
+        handoff_factory: Callable[..., Any] = HostUpdateHandoff,
         source_names_loader: Callable[[Path], tuple[str, ...]] = configured_source_names,
     ) -> None:
         if request_timeout <= 0 or poll_seconds <= 0:
@@ -94,11 +106,22 @@ class ManagedRecorderFederationRuntime:
         self.poll_seconds = float(poll_seconds)
         self.node_factory = node_factory
         self.control_factory = control_factory
+        self.update_processor_factory = update_processor_factory
+        self.handoff_factory = handoff_factory
         self.source_names_loader = source_names_loader
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._node: Any | None = None
         self._control: Any | None = None
+        self._update_processor: Any | None = None
+
+    def _build_update_processor(self, node: Any) -> Any:
+        federation_root = self.data_directory / "federation"
+        return self.update_processor_factory(
+            node.service,
+            self.handoff_factory(federation_root / "update-agent"),
+            federation_root / "update-events" / "processor.json",
+        )
 
     def connect_once(self) -> str:
         """Connect saved membership once, or report that pairing is still absent."""
@@ -122,22 +145,47 @@ class ManagedRecorderFederationRuntime:
                 data_directory=self.data_directory,
             )
             control.start()
+            update_processor = self._build_update_processor(node)
         except Exception:
             node.stop()
             raise
         self._node = node
         self._control = control
+        self._update_processor = update_processor
         print("Federation companion: connected", flush=True)
         print(f"  Device:     {snapshot.node_id}", flush=True)
         print(f"  Federation: {snapshot.federation_id}", flush=True)
         print(f"  Session:    {snapshot.session_id}", flush=True)
         return "connected"
 
+    def process_update_events_once(self) -> bool:
+        """Replay one bounded update-control cycle when membership is connected."""
+
+        node = self._node
+        processor = self._update_processor
+        if node is None or processor is None:
+            return False
+        context_loader = getattr(node.service, "authorized_context", None)
+        context = context_loader() if callable(context_loader) else None
+        if context is None:
+            return False
+        processor.process(context)
+        return True
+
     def _run(self) -> None:
         waiting_reported = False
         failures = 0
         while not self._stop.is_set():
             if self._node is not None:
+                try:
+                    self.process_update_events_once()
+                except Exception as exc:  # noqa: BLE001 - update path fails closed
+                    print(
+                        "Federation update processing unavailable "
+                        f"({type(exc).__name__}); local recording continues.",
+                        file=sys.stderr,
+                        flush=True,
+                    )
                 self._stop.wait(self.poll_seconds)
                 continue
             try:
@@ -185,6 +233,7 @@ class ManagedRecorderFederationRuntime:
         thread, self._thread = self._thread, None
         if thread is not None and thread.is_alive():
             thread.join(timeout=timeout)
+        self._update_processor = None
         control, self._control = self._control, None
         node, self._node = self._node, None
         if control is not None:

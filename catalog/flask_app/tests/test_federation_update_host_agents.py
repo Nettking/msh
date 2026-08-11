@@ -79,6 +79,51 @@ def test_posix_agent_never_executes_peer_supplied_process_shape() -> None:
     assert 'value.get("branch") != APPROVED_BRANCH' in text
 
 
+def test_recorder_only_host_agents_rebuild_only_the_recorder() -> None:
+    windows = (ROOT / "scripts/windows/fcp_recorder_update_agent.ps1").read_text(
+        encoding="utf-8"
+    )
+    posix = (ROOT / "scripts/posix/fcp_recorder_update_agent.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "$ApprovedRepository = 'Nettking/msh'" in windows
+    assert "$ApprovedBranch = 'main'" in windows
+    assert "merge', '--ff-only'" in windows
+    assert "'compose', 'build', 'recorder'" in windows
+    assert "'--no-deps', '--force-recreate', 'recorder'" in windows
+    assert "Wait-RecorderRuntime" in windows
+    assert "mtconnect_recorder_status.json" in windows
+    assert "FCP_BUILD_COMMIT" in windows
+    assert "runtime_verified" in windows
+    assert "Start-ReplacementAgent" in windows
+    assert "Invoke-Expression" not in windows
+    assert "reset --hard" not in windows
+    assert "git clean" not in windows
+    assert "git stash" not in windows
+    assert "'compose', 'build', 'relay'" not in windows
+    assert "Ensure-OllamaModel" not in windows
+
+    assert 'APPROVED_REPOSITORY = "Nettking/msh"' in posix
+    assert 'APPROVED_BRANCH = "main"' in posix
+    assert 'git(root, env, "merge", "--ff-only", target)' in posix
+    assert '["docker", "compose", "build", "recorder"]' in posix
+    assert '"--no-deps",' in posix
+    assert '"--force-recreate",' in posix
+    assert '"recorder",' in posix
+    assert "wait_recorder_runtime" in posix
+    assert "mtconnect_recorder_status.json" in posix
+    assert 'activation_env["FCP_BUILD_COMMIT"] = target' in posix
+    assert 'state="runtime_verified"' in posix
+    assert "os.execve(" in posix
+    assert "shell=False" in posix
+    assert "reset --hard" not in posix
+    assert "git clean" not in posix
+    assert "git stash" not in posix
+    assert '"build", "relay"' not in posix
+    assert "ensure_ollama_model" not in posix
+
+
 def test_supported_launchers_start_agent_and_embed_build_commit() -> None:
     windows = (ROOT / "start.cmd").read_text(encoding="utf-8")
     posix = (ROOT / "start.sh").read_text(encoding="utf-8")
