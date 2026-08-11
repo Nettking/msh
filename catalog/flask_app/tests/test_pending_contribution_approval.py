@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from flask import Flask
 
 from catalog.capabilities.provider_enrollment import (
@@ -11,6 +12,7 @@ from catalog.capabilities.provider_enrollment import (
     SQLiteProviderEnrollmentStore,
 )
 from catalog.federation.coordinator import SessionCoordinator
+from catalog.federation.errors import AuthorizationError
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 from catalog.flask_app.services.pending_contribution_approval import (
     CapabilityFirstProviderEnrollmentService,
@@ -88,10 +90,12 @@ def _announcement(node_id: str, *, status: CapabilityStatus, when: datetime):
     )
 
 
-def test_registering_candidate_can_be_approved_without_becoming_eligible(
-    tmp_path: Path,
-) -> None:
-    coordinator, service, owner, member, current = _environment(tmp_path)
+def _request_registering(
+    coordinator: SessionCoordinator,
+    service: CapabilityFirstProviderEnrollmentService,
+    member,
+    current: list[datetime],
+):
     registering = _announcement(
         member.identity.node_id,
         status=CapabilityStatus.REGISTERING,
@@ -107,6 +111,19 @@ def test_registering_candidate_can_be_approved_without_becoming_eligible(
         capability_id=registering.capability_id,
         actor_node_id=member.identity.node_id,
         command_id="request-registering",
+    )
+    return registering, requested
+
+
+def test_registering_candidate_can_be_approved_without_becoming_eligible(
+    tmp_path: Path,
+) -> None:
+    coordinator, service, owner, member, current = _environment(tmp_path)
+    registering, requested = _request_registering(
+        coordinator,
+        service,
+        member,
+        current,
     )
 
     current[0] += timedelta(seconds=1)
@@ -139,25 +156,41 @@ def test_registering_candidate_can_be_approved_without_becoming_eligible(
     assert persisted == approved
 
 
+def test_non_owner_cannot_approve_registering_candidate(tmp_path: Path) -> None:
+    coordinator, service, _owner, member, current = _environment(tmp_path)
+    registering, requested = _request_registering(
+        coordinator,
+        service,
+        member,
+        current,
+    )
+
+    with pytest.raises(AuthorizationError) as rejected:
+        service.approve(
+            session_id=SESSION,
+            capability_id=registering.capability_id,
+            actor_node_id=member.identity.node_id,
+            command_id="member-self-approval",
+            expected_revision=requested.revision,
+        )
+
+    assert rejected.value.code == "provider-enrollment-not-authorized"
+    persisted = service.store.get(
+        session_id=SESSION,
+        capability_id=registering.capability_id,
+    )
+    assert persisted == requested
+
+
 def test_approved_registering_candidate_becomes_eligible_only_after_ready_reconcile(
     tmp_path: Path,
 ) -> None:
     coordinator, service, owner, member, current = _environment(tmp_path)
-    registering = _announcement(
-        member.identity.node_id,
-        status=CapabilityStatus.REGISTERING,
-        when=current[0],
-    )
-    coordinator.announce_capability(
-        registering,
-        actor_node_id=member.identity.node_id,
-        request_id="announce-registering",
-    )
-    requested = service.request(
-        session_id=SESSION,
-        capability_id=registering.capability_id,
-        actor_node_id=member.identity.node_id,
-        command_id="request-registering",
+    registering, requested = _request_registering(
+        coordinator,
+        service,
+        member,
+        current,
     )
     approved = service.approve(
         session_id=SESSION,
