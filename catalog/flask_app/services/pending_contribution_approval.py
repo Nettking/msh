@@ -212,12 +212,19 @@ class CapabilityFirstProviderOperatorSurface(ProviderOperatorSurface):
         )
 
 
-def _database_path(app: Flask, config_key: str, default_name: str) -> Path:
+def _authority_database_path(
+    app: Flask,
+    coordinator: SessionCoordinator,
+    config_key: str,
+    default_name: str,
+) -> Path:
     configured = app.config.get(config_key)
     if configured:
         return Path(str(configured))
-    onboarding = Path(str(app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"]))
-    return onboarding.parent / default_name
+    # The supported relay already owns F8.1/F8.2 sidecar databases beside its
+    # coordinator DB. Flask must reuse those exact durable stores rather than
+    # create a second onboarding-local approval authority.
+    return Path(coordinator.store.database).with_name(default_name)
 
 
 def _selected_app(app: Flask | None) -> Flask:
@@ -284,8 +291,8 @@ def get_local_provider_operator_surface(
 
     Merely rendering normal Federation pages uses
     :func:`local_provider_operator_available` and never initializes enrollment or
-    health storage. The databases below are created only when the explicit
-    provider-approval surface is opened or otherwise requested.
+    health storage. The explicit approval surface reuses the relay's existing
+    F8.1/F8.2 sidecar databases next to coordinator authority.
     """
 
     selected = _selected_app(app)
@@ -313,8 +320,9 @@ def get_local_provider_operator_surface(
     enrollments = CapabilityFirstProviderEnrollmentService(
         coordinator,
         SQLiteProviderEnrollmentStore(
-            _database_path(
+            _authority_database_path(
                 selected,
+                coordinator,
                 "CAPABILITY_PROVIDER_ENROLLMENT_DATABASE",
                 _DEFAULT_ENROLLMENT_NAME,
             )
@@ -324,8 +332,9 @@ def get_local_provider_operator_surface(
     health = FederatedProviderHealthService(
         enrollments,
         SQLiteProviderHealthStore(
-            _database_path(
+            _authority_database_path(
                 selected,
+                coordinator,
                 "CAPABILITY_PROVIDER_HEALTH_DATABASE",
                 _DEFAULT_HEALTH_NAME,
             )
