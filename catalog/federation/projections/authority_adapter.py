@@ -6,6 +6,9 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from catalog.federation.device_names import DEVICE_NAME_EVENT, validate_device_name
+from catalog.federation.errors import FederationValidationError
+
 from .adapter_common import (
     _enum_value,
     _public_text,
@@ -14,8 +17,6 @@ from .adapter_common import (
     _value,
 )
 from .safety import safe_reason_code
-
-_DEVICE_NAME_EVENT = "node.display-name.changed"
 
 
 @dataclass(frozen=True)
@@ -67,7 +68,7 @@ _EVENT_COPY = {
     "node.joined": ("Device joined", "A trusted device joined the federation."),
     "node.left": ("Device removed", "A device membership was removed."),
     "node.revoked": ("Device revoked", "A device identity was revoked."),
-    _DEVICE_NAME_EVENT: (
+    DEVICE_NAME_EVENT: (
         "Device renamed",
         "A Federation-scoped device name was changed.",
     ),
@@ -147,6 +148,18 @@ class FederationAuthorityAdapter:
             creator_node_id = _value(session, "created_by_node_id")
 
             events = self._events(revision)
+            # Remote coordinator status historically omitted the creator field.
+            # The authoritative first session event still identifies the creator,
+            # so recover it before interpreting leader-authored naming events.
+            if not isinstance(creator_node_id, str) or not creator_node_id:
+                for event in events:
+                    if _value(event, "event_type") != "session.created":
+                        continue
+                    event_actor = _value(event, "actor_node_id")
+                    if isinstance(event_actor, str) and event_actor:
+                        creator_node_id = event_actor
+                        break
+
             member_ids = {self._actor_node_id}
             device_names: dict[str, str] = {}
             for event in events:
@@ -159,16 +172,19 @@ class FederationAuthorityAdapter:
                     member_ids.add(node_id)
                 elif event_type in {"node.left", "node.revoked"}:
                     member_ids.discard(node_id)
-                elif (
-                    event_type == _DEVICE_NAME_EVENT
-                    and isinstance(creator_node_id, str)
-                    and _value(event, "actor_node_id") == creator_node_id
-                ):
-                    display_name = _value(payload, "display_name")
-                    if isinstance(display_name, str):
-                        safe_name = _public_text(display_name, "")
-                        if safe_name:
-                            device_names[node_id] = safe_name
+                elif event_type == DEVICE_NAME_EVENT:
+                    event_actor = _value(event, "actor_node_id")
+                    # A member may name itself. The Federation creator may name
+                    # any member. Everyone else is ignored even if they append a
+                    # similarly shaped event directly through the relay protocol.
+                    if event_actor != node_id and event_actor != creator_node_id:
+                        continue
+                    try:
+                        device_names[node_id] = validate_device_name(
+                            _value(payload, "display_name")
+                        )
+                    except FederationValidationError:
+                        continue
 
             raw_status = self._authorized_status()
             devices = self._devices(raw_status, member_ids, device_names)
