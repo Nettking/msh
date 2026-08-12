@@ -16,11 +16,16 @@ from flask import (
     url_for,
 )
 from flask_security import current_user, hash_password
+from sqlalchemy.exc import IntegrityError
 
 from .federation import get_federated_human_auth_service, saved_remote_member
-from .models import Role, User, db
+from .models import FirstUserBootstrapClaim, Role, User, db
+from .policy import ROLE_SUMMARIES
 
 auth_users = Blueprint("auth_users", __name__, url_prefix="/admin/users")
+_BOOTSTRAP_ENDPOINT = "auth_users.bootstrap_user"
+_BOOTSTRAP_CLAIM_ID = 1
+_DISCOVERY_ENDPOINT = "federation_pairing_web.federation_discovery"
 
 
 def _active_admin_count() -> int:
@@ -31,6 +36,10 @@ def _active_admin_count() -> int:
         .distinct()
         .count()
     )
+
+
+def _has_users() -> bool:
+    return db.session.query(User.id).limit(1).first() is not None
 
 
 def _normalized_email(value: str) -> str | None:
@@ -70,6 +79,106 @@ def _publish_user_best_effort(user: User) -> None:
         )
 
 
+def _commit_first_user(user: User) -> bool:
+    """Atomically claim anonymous bootstrap and persist exactly one first user."""
+
+    db.session.add(FirstUserBootstrapClaim(id=_BOOTSTRAP_CLAIM_ID))
+    try:
+        # The singleton primary key is the concurrency boundary. Concurrent
+        # bootstrap requests may both observe an empty user table, but only one
+        # transaction can acquire this row and proceed to create the first user.
+        db.session.flush()
+    except IntegrityError:
+        db.session.rollback()
+        return False
+
+    # A trusted local administration path may have created a user before this
+    # transaction acquired the bootstrap claim. Close anonymous bootstrap rather
+    # than creating an additional administrator.
+    if _has_users():
+        db.session.rollback()
+        return False
+
+    db.session.add(user)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return False
+    return True
+
+
+@auth_users.before_app_request
+def first_user_bootstrap_gate():
+    """Send a new local installation to first-user setup instead of sign-in.
+
+    Remotely paired Federation members intentionally keep using their Federation
+    human sign-in authority even when they have no local shadow users yet.
+    """
+
+    if saved_remote_member() or _has_users():
+        return None
+    if request.endpoint in {
+        _BOOTSTRAP_ENDPOINT,
+        _DISCOVERY_ENDPOINT,
+        "static",
+        "security.static",
+    }:
+        return None
+    if request.is_json or request.path.startswith("/api/"):
+        abort(503)
+    return redirect(url_for(_BOOTSTRAP_ENDPOINT))
+
+
+@auth_users.route("/bootstrap", methods=["GET", "POST"])
+def bootstrap_user():
+    """Create exactly the first local human account as an administrator."""
+
+    _require_local_user_authority()
+    if _has_users():
+        return redirect(url_for("security.login"))
+    if request.method == "GET":
+        return render_template("auth/bootstrap_user.html")
+
+    email = _normalized_email(request.form.get("email", ""))
+    password = request.form.get("password", "")
+    confirmation = request.form.get("password_confirm", "")
+    if email is None:
+        flash("Enter a valid email address.", "error")
+        return redirect(url_for(_BOOTSTRAP_ENDPOINT))
+    if len(password) < 12:
+        flash("Password must contain at least 12 characters.", "error")
+        return redirect(url_for(_BOOTSTRAP_ENDPOINT))
+    if password != confirmation:
+        flash("The passwords do not match.", "error")
+        return redirect(url_for(_BOOTSTRAP_ENDPOINT))
+
+    admin = db.session.query(Role).filter_by(name="admin").one_or_none()
+    if admin is None:
+        current_app.logger.error("First-user setup could not find the seeded admin role")
+        abort(503)
+
+    user = User(
+        email=email,
+        password=hash_password(password),
+        active=True,
+        fs_uniquifier=uuid.uuid4().hex,
+        roles=[admin],
+    )
+    if not _commit_first_user(user):
+        if _has_users():
+            return redirect(url_for("security.login"))
+        current_app.logger.error(
+            "First-user bootstrap claim is unavailable while the user database is empty"
+        )
+        abort(503)
+
+    _publish_user_best_effort(user)
+    current_app.logger.info("First human administrator created: %s", email)
+    flash("Administrator created. Sign in to continue.", "success")
+    return redirect(url_for("security.login"))
+
+
 @auth_users.get("")
 def users():
     member_redirect = _member_admin_redirect()
@@ -88,6 +197,8 @@ def users():
         "auth/users.html",
         users=db.session.query(User).order_by(User.email).all(),
         roles=db.session.query(Role).order_by(Role.name).all(),
+        role_summaries=ROLE_SUMMARIES,
+        active_admin_count=_active_admin_count(),
     )
 
 
