@@ -339,6 +339,13 @@ body.has-admin-rail {
   flex-direction: column;
   gap: 18px;
   min-width: 0;
+  /* The global `main` rule centres with `margin: 0 auto` and caps the width for
+     the old full-bleed layout. An auto cross-axis margin turns off flex stretch,
+     so the column would size to its widest child and push the page sideways.
+     Inside the rail these must be reset explicitly. */
+  width: 100%;
+  max-width: none;
+  margin: 0;
 }
 
 .admin-content > section {
