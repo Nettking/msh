@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
+from .human_auth import enforce_human_auth_event_authority
 from .models import SessionEvent
 from .persistence import CoordinatorStore
 
@@ -28,6 +29,18 @@ class AuthoritativeSessionEventLog:
         payload: dict[str, Any],
         now: datetime,
     ) -> tuple[SessionEvent, bool]:
+        # Human-auth metadata is part of the same durable session log, but its
+        # authority is narrower than ordinary member-authenticated events.
+        # Enforce that boundary here so every transport/caller gets identical
+        # leader-only and self-advertisement rules.
+        session = self.store.get_session(session_id)
+        if session is not None:
+            enforce_human_auth_event_authority(
+                session=session,
+                actor_node_id=actor_node_id,
+                event_type=event_type,
+                payload=payload,
+            )
         return self.store.append_event(
             session_id=session_id,
             actor_node_id=actor_node_id,

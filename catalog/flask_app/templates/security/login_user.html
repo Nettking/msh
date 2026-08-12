@@ -11,16 +11,39 @@
     <main class="setup-focus-main">
       <section class="panel" style="max-width: 30rem; margin: 4rem auto;">
         <h1>Sign in to FCP</h1>
-        <p>Use your human account. Device and Federation credentials cannot sign in here.</p>
-        <form method="post" action="{{ url_for_security('login') }}">
-          {{ login_user_form.hidden_tag() }}
-          <label>Email {{ login_user_form.email(autocomplete='username') }}</label>
-          <label>Password {{ login_user_form.password(autocomplete='current-password') }}</label>
-          <label>{{ login_user_form.remember() }} Remember me for up to 7 days</label>
-          {{ login_user_form.next() }}
-          <button type="submit">Sign in</button>
-        </form>
-        {% if login_user_form.errors %}<p class="flash flash-error">Sign-in failed. Check your credentials and account status.</p>{% endif %}
+
+        {% if federation_auth.mode == 'authority' %}
+          <p>This device is the Federation human sign-in authority. Accounts managed here can sign in on Federation members.</p>
+        {% elif federation_auth.mode in ('member', 'member-unavailable') %}
+          <p>This device uses the Federation leader for human sign-in. Device and Federation machine credentials cannot sign in as a person.</p>
+
+          {% if federation_auth.mode == 'member' and federation_auth.authority %}
+            <form method="post" action="{{ url_for('federated_human_auth.start') }}">
+              {{ login_user_form.csrf_token }}
+              <input type="hidden" name="next" value="{{ request.args.get('next', '/') }}">
+              <button type="submit">Sign in through Federation leader</button>
+            </form>
+          {% else %}
+            <p class="flash flash-error">Federation sign-in is temporarily unavailable, or the leader has not advertised a browser sign-in address yet.</p>
+          {% endif %}
+        {% else %}
+          <p>Use your human account. Device and Federation machine credentials cannot sign in here.</p>
+        {% endif %}
+
+        {% if federation_auth.mode not in ('member', 'member-unavailable') or federation_auth.local_fallback %}
+          {% if federation_auth.mode in ('member', 'member-unavailable') %}
+            <p><strong>Recovery mode:</strong> local password sign-in is enabled on this Federation member.</p>
+          {% endif %}
+          <form method="post" action="{{ url_for_security('login') }}">
+            {{ login_user_form.hidden_tag() }}
+            <label>Email {{ login_user_form.email(autocomplete='username') }}</label>
+            <label>Password {{ login_user_form.password(autocomplete='current-password') }}</label>
+            <label>{{ login_user_form.remember() }} Remember me for up to 7 days</label>
+            {{ login_user_form.next() }}
+            <button type="submit">Sign in</button>
+          </form>
+          {% if login_user_form.errors %}<p class="flash flash-error">Sign-in failed. Check your credentials and account status.</p>{% endif %}
+        {% endif %}
       </section>
     </main>
   </body>

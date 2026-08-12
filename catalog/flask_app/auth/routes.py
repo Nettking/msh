@@ -17,6 +17,7 @@ from flask import (
 )
 from flask_security import current_user, hash_password
 
+from .federation import get_federated_human_auth_service, saved_remote_member
 from .models import Role, User, db
 
 auth_users = Blueprint("auth_users", __name__, url_prefix="/admin/users")
@@ -39,8 +40,50 @@ def _normalized_email(value: str) -> str | None:
         return None
 
 
+def _member_admin_redirect():
+    """Route member-side user administration to the password authority."""
+
+    service = get_federated_human_auth_service()
+    mode = service.mode(refresh=True)
+    if not mode.is_member and not saved_remote_member():
+        return None
+    authority = mode.authority or service.authority(refresh=True)
+    if authority is None:
+        abort(503)
+    return redirect(f"{authority.base_url}{url_for('auth_users.users')}")
+
+
+def _require_local_user_authority() -> None:
+    service = get_federated_human_auth_service()
+    mode = service.mode()
+    if mode.is_member or saved_remote_member():
+        abort(403)
+
+
+def _publish_user_best_effort(user: User) -> None:
+    try:
+        get_federated_human_auth_service().publish_user(user)
+    except Exception as exc:  # noqa: BLE001 - retain local admin recovery path
+        current_app.logger.warning(
+            "Federation human-user publication unavailable (%s)",
+            type(exc).__name__,
+        )
+
+
 @auth_users.get("")
 def users():
+    member_redirect = _member_admin_redirect()
+    if member_redirect is not None:
+        return member_redirect
+    try:
+        # This seeds accounts created before Federation SSO was enabled and is
+        # idempotent when no user state changed.
+        get_federated_human_auth_service().publish_all_users()
+    except Exception as exc:  # noqa: BLE001 - user admin remains usable locally
+        current_app.logger.warning(
+            "Federation human-user reconciliation unavailable (%s)",
+            type(exc).__name__,
+        )
     return render_template(
         "auth/users.html",
         users=db.session.query(User).order_by(User.email).all(),
@@ -50,6 +93,7 @@ def users():
 
 @auth_users.post("")
 def create_user():
+    _require_local_user_authority()
     email = _normalized_email(request.form.get("email", ""))
     password = request.form.get("password", "")
     role_names = set(request.form.getlist("roles"))
@@ -69,6 +113,7 @@ def create_user():
     )
     db.session.add(user)
     db.session.commit()
+    _publish_user_best_effort(user)
     current_app.logger.info("Human user created by %s: %s", current_user.email, email)
     flash("User created.", "success")
     return redirect(url_for("auth_users.users"))
@@ -76,6 +121,7 @@ def create_user():
 
 @auth_users.post("/<int:user_id>")
 def update_user(user_id: int):
+    _require_local_user_authority()
     user = db.session.get(User, user_id)
     if user is None:
         abort(404)
@@ -94,6 +140,7 @@ def update_user(user_id: int):
     user.active = active
     user.roles = db.session.query(Role).filter(Role.name.in_(role_names)).all()
     db.session.commit()
+    _publish_user_best_effort(user)
     current_app.logger.info(
         "Human user changed by %s: %s active=%s roles=%s",
         current_user.email,
