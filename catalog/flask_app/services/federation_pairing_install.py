@@ -11,6 +11,8 @@ from flask import Flask, current_app, request
 
 from .capability_recovery_adapters import fresh_capability_inspection_adapters
 from .federated_ai_product_bridge import FederatedAIProductBridge
+from .federated_data_runtime import FederatedDataPairingRelayRuntime
+from .federated_jsonl_product_bridge import FederatedJsonlProductBridge
 from .federated_telemetry_product_bridge import FederatedTelemetryProductBridge
 from .federation_capability_requests import FederationCapabilityRequestProcessor
 from .federation_contribution_publication import publish_local_contributions
@@ -24,7 +26,6 @@ from .federation_update_handoff import HostUpdateHandoff
 from .recorder_federation_publication_install import (
     install_recorder_federation_publication,
 )
-from .resilient_pairing_runtime import ResilientPairingRelayRuntime
 
 _RECONNECT_EXTENSION_KEY = "federation_saved_membership_reconnect"
 _UPDATE_PROCESSOR_EXTENSION_KEY = "federation_update_event_monitor"
@@ -81,7 +82,7 @@ def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
         )
     )
     device_name = str(app.config["CAPABILITY_ONBOARDING_DEVICE_NAME"])
-    runtime = ResilientPairingRelayRuntime(
+    runtime = FederatedDataPairingRelayRuntime(
         state_directory=identity_directory,
         display_name=device_name,
     )
@@ -270,6 +271,7 @@ class SavedFederationReconnectMonitor:
         self.service = service
         self.ai_bridge = FederatedAIProductBridge(app, service)
         self.telemetry_bridge = FederatedTelemetryProductBridge(app, service)
+        self.jsonl_bridge = FederatedJsonlProductBridge(app, service)
         self._lock = threading.Lock()
         self._stop = threading.Event()
         self._wake = threading.Event()
@@ -400,6 +402,13 @@ class SavedFederationReconnectMonitor:
     ) -> None:
         self.telemetry_bridge.sync(runtime_state, context)
 
+    def _sync_federated_jsonl(
+        self,
+        runtime_state: RemotePairingState,
+        context: object,
+    ) -> None:
+        self.jsonl_bridge.sync(runtime_state, context)
+
     def _run(self) -> None:
         failures = 0
         while not self._stop.is_set():
@@ -432,6 +441,13 @@ class SavedFederationReconnectMonitor:
                     except Exception as exc:  # noqa: BLE001 - storage reads fail closed
                         self.app.logger.info(
                             "Federation telemetry mirror refresh unavailable (%s)",
+                            type(exc).__name__,
+                        )
+                    try:
+                        self._sync_federated_jsonl(runtime_state, context)
+                    except Exception as exc:  # noqa: BLE001 - generic data sync fails closed
+                        self.app.logger.info(
+                            "Federation JSONL data refresh unavailable (%s)",
                             type(exc).__name__,
                         )
             except Exception as exc:  # noqa: BLE001 - network retry boundary
@@ -489,9 +505,8 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
     app.extensions[_RECONNECT_EXTENSION_KEY] = monitor
     app.extensions[_UPDATE_PROCESSOR_EXTENSION_KEY] = update_monitor
     app.extensions["federated_ai_product_bridge"] = monitor.ai_bridge
-    app.extensions["federated_telemetry_product_bridge"] = (
-        monitor.telemetry_bridge
-    )
+    app.extensions["federated_telemetry_product_bridge"] = monitor.telemetry_bridge
+    app.extensions["federated_jsonl_product_bridge"] = monitor.jsonl_bridge
     install_recorder_federation_publication(
         app,
         onboarding_service=service,
