@@ -16,8 +16,10 @@ from catalog.federation.onboarding_models import (
 from catalog.flask_app.services import federation_capability_requests as module
 from catalog.flask_app.services.federation_capability_requests import (
     REQUEST_EVENT,
+    SESSION_CREATED_EVENT,
     FederationCapabilityRequestProcessor,
     FederationCapabilityRequestService,
+    report_payload,
     request_payload,
     validate_request_payload,
 )
@@ -224,3 +226,136 @@ def test_member_execution_runs_bounded_plan_and_enables_only_allowed_candidates(
     assert contributions.applied == [
         {"candidate-allowed": ContributionDesiredState.ENABLED.value}
     ]
+
+
+class _ReplayCoordinator:
+    def __init__(self, request_actor: str) -> None:
+        now = datetime.now(timezone.utc)
+        self.events = (
+            SimpleNamespace(
+                revision=1,
+                event_type=SESSION_CREATED_EVENT,
+                actor_node_id=ACTOR,
+                payload={},
+            ),
+            SimpleNamespace(
+                revision=2,
+                event_type=REQUEST_EVENT,
+                actor_node_id=request_actor,
+                payload=request_payload(
+                    request_id="request-event-one",
+                    target_node_ids=(REMOTE,),
+                    created_at=now,
+                    expires_at=now + timedelta(minutes=5),
+                ),
+            ),
+        )
+
+    def replay_page(
+        self,
+        *,
+        last_applied_revision: int,
+        **_kwargs: Any,
+    ) -> tuple[tuple[object, ...], int]:
+        remaining = tuple(
+            event for event in self.events if event.revision > last_applied_revision
+        )
+        return remaining, 2
+
+
+class _RemoteStore:
+    def load(self) -> object:
+        return SimpleNamespace(relay_url="wss://relay.invalid")
+
+
+class _RelayRuntime:
+    def __init__(self) -> None:
+        self.appended: list[dict[str, Any]] = []
+
+    def append_session_event(self, _remote: object, **kwargs: Any) -> object:
+        self.appended.append(dict(kwargs))
+        return SimpleNamespace(revision=3)
+
+
+def _remote_context(coordinator: object) -> object:
+    return SimpleNamespace(
+        coordinator=coordinator,
+        binding=SimpleNamespace(internal_session_id="session-one"),
+        credentials=SimpleNamespace(identity=SimpleNamespace(node_id=REMOTE)),
+    )
+
+
+def _completed_report(request_id: str, node_id: str) -> dict[str, object]:
+    return report_payload(
+        request_id=request_id,
+        node_id=node_id,
+        state="completed",
+        benchmarks_attempted=1,
+        benchmarks_passed=1,
+        benchmark_errors=0,
+        contribution_candidates=1,
+        contributions_enabled=1,
+        contributions_blocked=0,
+        contribution_errors=0,
+        message="done",
+    )
+
+
+def test_member_processor_executes_only_session_creator_request(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    coordinator = _ReplayCoordinator(ACTOR)
+    runtime = _RelayRuntime()
+    service = SimpleNamespace(remote_store=_RemoteStore(), relay_runtime=runtime)
+    processor = FederationCapabilityRequestProcessor(
+        service,
+        tmp_path / "processor.json",
+    )
+    executions: list[tuple[str, str]] = []
+
+    def execute(request_id: str, node_id: str) -> dict[str, object]:
+        executions.append((request_id, node_id))
+        return _completed_report(request_id, node_id)
+
+    monkeypatch.setattr(
+        FederationCapabilityRequestProcessor,
+        "_execution_report",
+        staticmethod(execute),
+    )
+
+    processor.process(_remote_context(coordinator))
+
+    assert executions == [("request-event-one", REMOTE)]
+    assert len(runtime.appended) == 1
+    assert runtime.appended[0]["event_type"] == module.REPORT_EVENT
+    assert runtime.appended[0]["payload"]["request_id"] == "request-event-one"
+
+
+def test_member_processor_ignores_request_from_non_creator(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    coordinator = _ReplayCoordinator("node-attacker")
+    runtime = _RelayRuntime()
+    service = SimpleNamespace(remote_store=_RemoteStore(), relay_runtime=runtime)
+    processor = FederationCapabilityRequestProcessor(
+        service,
+        tmp_path / "processor.json",
+    )
+    executions: list[tuple[str, str]] = []
+
+    def execute(request_id: str, node_id: str) -> dict[str, object]:
+        executions.append((request_id, node_id))
+        return _completed_report(request_id, node_id)
+
+    monkeypatch.setattr(
+        FederationCapabilityRequestProcessor,
+        "_execution_report",
+        staticmethod(execute),
+    )
+
+    processor.process(_remote_context(coordinator))
+
+    assert executions == []
+    assert runtime.appended == []
