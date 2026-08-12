@@ -446,7 +446,7 @@ class FederationCapabilityRequestService:
             try:
                 context, actor = self._context()
                 refreshed = self._refresh(value, context, actor)
-            except Exception:
+            except Exception:  # noqa: BLE001 - passive status read fails closed
                 return value
             if refreshed != value:
                 self._save(refreshed)
@@ -599,7 +599,7 @@ class FederationCapabilityRequestProcessor:
                         benchmark_id=item.benchmark_id,
                         target_service_id=item.target_service_id,
                     )
-                except Exception:  # bounded runner failure is reported, not escalated
+                except Exception:  # noqa: BLE001 - bounded runner failure is reported
                     benchmark_errors += 1
                     continue
                 if result.state is BenchmarkState.PASSED:
@@ -622,7 +622,7 @@ class FederationCapabilityRequestProcessor:
                             ContributionDesiredState.ENABLED.value
                         }
                     )
-                except Exception:  # local policy/adapter remains authoritative
+                except Exception:  # noqa: BLE001 - local policy remains authoritative
                     contribution_errors += 1
                     continue
                 if not outcomes:
@@ -642,7 +642,7 @@ class FederationCapabilityRequestProcessor:
                     contributions_blocked += 1
                 else:
                     contribution_errors += 1
-        except Exception as exc:
+        except Exception as exc:  # noqa: BLE001 - failure becomes a bounded report
             return report_payload(
                 request_id=request_id,
                 node_id=node_id,
