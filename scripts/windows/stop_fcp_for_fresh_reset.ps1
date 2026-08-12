@@ -19,11 +19,7 @@ function Invoke-BoundedDocker {
 
     $docker = Get-Command docker -ErrorAction Stop
     Write-Host $Description
-    $process = Start-Process \
-        -FilePath $docker.Source \
-        -ArgumentList $Arguments \
-        -NoNewWindow \
-        -PassThru
+    $process = Start-Process -FilePath $docker.Source -ArgumentList $Arguments -NoNewWindow -PassThru
 
     try {
         if ($process.WaitForExit($TimeoutSeconds * 1000)) {
@@ -46,10 +42,7 @@ function Invoke-BoundedDocker {
 }
 
 try {
-    $primaryExit = Invoke-BoundedDocker \
-        -Arguments @("compose", "down", "--remove-orphans", "--timeout", "10") \
-        -TimeoutSeconds $PrimaryTimeoutSeconds \
-        -Description "Stopping the current FCP Compose project..."
+    $primaryExit = Invoke-BoundedDocker -Arguments @("compose", "down", "--remove-orphans", "--timeout", "10") -TimeoutSeconds $PrimaryTimeoutSeconds -Description "Stopping the current FCP Compose project..."
 
     if ($primaryExit -eq 0) {
         exit 0
@@ -57,19 +50,13 @@ try {
 
     Write-Warning "Normal Compose shutdown did not complete cleanly (exit $primaryExit). Attempting bounded project-scoped recovery."
 
-    $killExit = Invoke-BoundedDocker \
-        -Arguments @("compose", "kill") \
-        -TimeoutSeconds $RecoveryTimeoutSeconds \
-        -Description "Force-stopping containers in this FCP Compose project..."
+    $killExit = Invoke-BoundedDocker -Arguments @("compose", "kill") -TimeoutSeconds $RecoveryTimeoutSeconds -Description "Force-stopping containers in this FCP Compose project..."
 
     if ($killExit -ne 0) {
         Write-Warning "Project-scoped docker compose kill exited with code $killExit. Cleanup will still be attempted."
     }
 
-    $cleanupExit = Invoke-BoundedDocker \
-        -Arguments @("compose", "down", "--remove-orphans", "--timeout", "5") \
-        -TimeoutSeconds $RecoveryTimeoutSeconds \
-        -Description "Removing stopped FCP containers and project network..."
+    $cleanupExit = Invoke-BoundedDocker -Arguments @("compose", "down", "--remove-orphans", "--timeout", "5") -TimeoutSeconds $RecoveryTimeoutSeconds -Description "Removing stopped FCP containers and project network..."
 
     if ($cleanupExit -eq 0) {
         Write-Host "FCP shutdown recovered successfully."
