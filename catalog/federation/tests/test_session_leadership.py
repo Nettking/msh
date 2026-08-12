@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -14,6 +14,7 @@ from catalog.federation.session_leadership import (
 from catalog.node.identity import IdentityStore
 
 NOW = datetime(2026, 8, 12, 13, 30, tzinfo=timezone.utc)
+FAILOVER_TIMEOUT_SECONDS = 300
 
 
 def _enroll(coordinator: SessionCoordinator, root: Path, name: str):
@@ -56,7 +57,19 @@ def _two_member_session(tmp_path: Path):
     return coordinator, session, creator, member
 
 
-def test_creator_is_initial_leader_and_offline_creator_fails_over(tmp_path: Path) -> None:
+def _expire_offline_leader(coordinator: SessionCoordinator, member_node_id: str):
+    future = NOW + timedelta(seconds=FAILOVER_TIMEOUT_SECONDS + 1)
+    coordinator._clock = lambda: future
+    # The surviving candidate is still healthy at the election boundary.
+    coordinator.heartbeat(member_node_id)
+    return coordinator.sweep_stale(
+        heartbeat_timeout_seconds=FAILOVER_TIMEOUT_SECONDS
+    )
+
+
+def test_creator_is_initial_leader_and_offline_creator_fails_over_after_timeout(
+    tmp_path: Path,
+) -> None:
     coordinator, session, creator, member = _two_member_session(tmp_path)
 
     initial = coordinator.session_leadership(session.session_id)
@@ -65,7 +78,14 @@ def test_creator_is_initial_leader_and_offline_creator_fails_over(tmp_path: Path
     assert initial.term == 1
     assert initial.leader_connected is True
 
-    events = coordinator.disconnected(node_id=creator.identity.node_id)
+    # A clean/transient disconnect is not an immediate authority election.
+    assert coordinator.disconnected(node_id=creator.identity.node_id) == ()
+    during_grace = coordinator.session_leadership(session.session_id)
+    assert during_grace.leader_node_id == creator.identity.node_id
+    assert during_grace.term == 1
+    assert during_grace.leader_connected is False
+
+    _stale, events = _expire_offline_leader(coordinator, member.identity.node_id)
     changed = [event for event in events if event.event_type == LEADER_CHANGED_EVENT]
     assert len(changed) == 1
     assert changed[0].actor_node_id == coordinator.coordinator_id
@@ -75,7 +95,7 @@ def test_creator_is_initial_leader_and_offline_creator_fails_over(tmp_path: Path
         "previous_leader_node_id": creator.identity.node_id,
         "leader_node_id": member.identity.node_id,
         "term": 2,
-        "reason": "leader-disconnected",
+        "reason": "leader-offline-timeout",
     }
 
     current = coordinator.session_leadership(session.session_id)
@@ -88,6 +108,7 @@ def test_creator_is_initial_leader_and_offline_creator_fails_over(tmp_path: Path
 def test_former_leader_reconnect_does_not_reclaim_authority(tmp_path: Path) -> None:
     coordinator, session, creator, member = _two_member_session(tmp_path)
     coordinator.disconnected(node_id=creator.identity.node_id)
+    _expire_offline_leader(coordinator, member.identity.node_id)
 
     coordinator.connected(
         node_id=creator.identity.node_id,
@@ -116,6 +137,7 @@ def test_former_leader_reconnect_does_not_reclaim_authority(tmp_path: Path) -> N
 def test_active_leader_must_transfer_before_self_removal(tmp_path: Path) -> None:
     coordinator, session, creator, member = _two_member_session(tmp_path)
     coordinator.disconnected(node_id=creator.identity.node_id)
+    _expire_offline_leader(coordinator, member.identity.node_id)
 
     with pytest.raises(AuthorizationError) as error:
         coordinator.remove_member(
