@@ -5,6 +5,8 @@ Reviewed: **2026-08-12**
 
 FCP has a separate account system for **people using the web application**. These human accounts are not Federation devices and do not reuse node identities, pairing codes, recorder keys, or machine credentials.
 
+Human accounts are currently **local to one FCP installation**. They are stored in that installation's authentication database and are not synchronized through the Federation. If you operate several FCP workbench devices and want the same person to sign in directly to each one, create/manage that human account on each installation separately. Pairing a device never copies human users or passwords.
+
 If you are installing FCP for the first time, the human-account step comes before device onboarding:
 
 ```text
@@ -118,7 +120,7 @@ For example, an FCP administrator may be allowed to press a Federation managemen
 
 This separation is intentional:
 
-- **human account** — answers who may use a web operation;
+- **human account** — answers who may use a web operation on this FCP installation;
 - **device identity** — identifies one FCP installation;
 - **Federation membership** — determines whether that device belongs to a trusted Federation;
 - **Federation/local policy** — determines whether the requested distributed action is actually authorized.
@@ -139,7 +141,7 @@ Back up the authentication database and secrets together with the rest of the pe
 
 Important consequences:
 
-- deleting `users.sqlite3` removes the human-account database;
+- deleting `users.sqlite3` removes the human-account database for that installation;
 - changing or deleting `password-salt` can make existing password hashes unusable;
 - changing `flask-secret` invalidates existing browser sessions;
 - `start.cmd --fresh` resets device/Federation identity but intentionally preserves human accounts and human-auth secrets.
@@ -208,6 +210,10 @@ Do not try to recreate it. Sign in with that account or use another active admin
 ### A user can sign in but receives 403 Forbidden
 
 Check the user's roles at `/admin/users`. A valid login proves identity; it does not imply permission for every FCP operation.
+
+### I paired another FCP device but my web login does not work there
+
+That is expected. Human accounts are local to each installation. Create the appropriate account on the other workbench if the person should sign in there directly.
 
 ### I reset the device with `start.cmd --fresh` and my user still exists
 
