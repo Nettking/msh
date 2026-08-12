@@ -33,6 +33,9 @@ from catalog.federation.projections import (
 from .capability_onboarding_routes import _CSRF_SESSION_KEY, _csrf_token
 from .services.capability_benchmark_service import get_capability_benchmark_service
 from .services.capability_onboarding_service import get_capability_onboarding_service
+from .services.federation_capability_requests import (
+    get_federation_capability_request_service,
+)
 from .services.federation_device_names import (
     FederationDeviceNamingService,
     current_federation_device_name,
@@ -151,7 +154,7 @@ def _benchmark_item_actions(
 
 
 def _update_authority_view() -> tuple[bool, bool]:
-    """Return whether this viewer is a member and may manage software updates."""
+    """Return whether this viewer is a member and is the Federation leader."""
 
     try:
         context = get_capability_onboarding_service().authorized_context()
@@ -164,9 +167,9 @@ def _update_authority_view() -> tuple[bool, bool]:
         if session_record is None:
             return False, False
         return True, session_record.created_by_node_id == actor
-    except Exception as exc:  # noqa: BLE001 - update controls fail closed
+    except Exception as exc:  # noqa: BLE001 - leader controls fail closed
         current_app.logger.warning(
-            "Federation update authority unavailable (%s)", type(exc).__name__
+            "Federation leader authority unavailable (%s)", type(exc).__name__
         )
         return False, False
 
@@ -199,6 +202,7 @@ def _page_response(page: FederationPage) -> Response:
         else None
     )
     update_status = None
+    capability_request_status = None
     if page is FederationPage.OVERVIEW:
         try:
             update_status = get_federation_update_service().snapshot()
@@ -207,10 +211,25 @@ def _page_response(page: FederationPage) -> Response:
                 "Federation update status unavailable (%s)", type(exc).__name__
             )
             update_status = {"status": "unavailable", "devices": []}
+        try:
+            capability_request_status = (
+                get_federation_capability_request_service().snapshot()
+            )
+        except Exception as exc:  # noqa: BLE001 - safe passive degradation
+            current_app.logger.warning(
+                "Federation capability request status unavailable (%s)",
+                type(exc).__name__,
+            )
+            capability_request_status = {"status": "unavailable", "devices": []}
 
         is_member, can_manage_updates = _update_authority_view()
         update_status = {
             **update_status,
+            "can_manage": can_manage_updates,
+            "managed_by_coordinator": is_member and not can_manage_updates,
+        }
+        capability_request_status = {
+            **capability_request_status,
             "can_manage": can_manage_updates,
             "managed_by_coordinator": is_member and not can_manage_updates,
         }
@@ -219,6 +238,10 @@ def _page_response(page: FederationPage) -> Response:
                 **update_status,
                 "status": "managed_by_coordinator",
                 "eligible_count": 0,
+            }
+            capability_request_status = {
+                **capability_request_status,
+                "status": "managed_by_coordinator",
             }
 
     response = make_response(
@@ -239,6 +262,7 @@ def _page_response(page: FederationPage) -> Response:
                 else None
             ),
             federation_update=update_status,
+            federation_capability_request=capability_request_status,
         )
     )
     response.headers["Cache-Control"] = "no-store"
@@ -328,6 +352,39 @@ def rename_device() -> Response:
         )
         flash("The Federation device name could not be saved safely.", "error")
     return redirect(url_for("federation_web.detail", page_name="devices"), code=303)
+
+
+@federation_web.post("/federation/capabilities/request")
+def request_member_capabilities() -> Response:
+    _require_update_csrf()
+    try:
+        result = get_federation_capability_request_service().request_all()
+        expected = result.get("expected_report_node_ids", [])
+        requested_count = len(expected) if isinstance(expected, list) else 0
+        if requested_count:
+            flash(
+                f"Asked {requested_count} reachable Federation member"
+                f"{'s' if requested_count != 1 else ''} to benchmark local "
+                "capabilities and contribute services allowed by their local policy.",
+                "success",
+            )
+        else:
+            flash(
+                "No reachable remote Federation members were available for a "
+                "capability request.",
+                "error",
+            )
+    except PermissionError:
+        flash(
+            "Only the Federation leader can request member benchmarks and contributions.",
+            "error",
+        )
+    except Exception as exc:  # noqa: BLE001 - diagnostics remain server-side
+        current_app.logger.warning(
+            "Federation capability request failed (%s)", type(exc).__name__
+        )
+        flash("The bounded capability request could not be started safely.", "error")
+    return redirect(url_for("federation_web.overview"), code=303)
 
 
 @federation_web.post("/federation/updates/check")
