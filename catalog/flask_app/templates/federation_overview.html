@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% from 'federation/_status_badge.html' import status_badge %}
-{% from 'federation/_section_nav.html' import section_nav %}
 {% from 'federation/_empty_state.html' import empty_state %}
 {% from 'federation/_contribution_card.html' import contribution_card %}
 {% block body %}
@@ -20,8 +19,6 @@
       <span>{{ vm.updated_label }}</span>
     </div>
   </header>
-
-  {{ section_nav(vm.sections, vm.active_section) }}
 
   {% if vm.degraded.visible %}
   <section class="federation-degraded" role="alert">

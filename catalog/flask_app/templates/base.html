@@ -51,6 +51,15 @@
     {% set ai_role = capability_complete and capability_flags.language_model|default(false) %}
     {% set recorder_only = capability_complete and recorder_role and not workbench_role %}
     {% set knowledge_endpoints = ['operator_support_web.strategy_comparison', 'operator_support_web.osl_export', 'operator_support_web.first_part', 'operator_support_web.quality_outcomes', 'operator_support_web.machine_notes', 'operator_support_web.learning', 'operator_support_web.recommender_artifacts', 'web.strategies', 'web.save_strategies'] %}
+    {#- Federation pages name their projection differently and resolve `vm`
+        inside their own body block, which the rail cannot see. Resolve the same
+        projection here so the rail can carry the section list. -#}
+    {%- set federation_vm = federation_page if federation_page is defined
+          else (federation_overview if federation_overview is defined
+          else (recorder_control if recorder_control is defined else none)) %}
+    {% set page_sections = federation_vm.sections if federation_vm and federation_vm.sections is defined else none %}
+    {% set page_active_section = federation_vm.active_section if federation_vm and federation_vm.active_section is defined else none %}
+    {% set page_shows_approvals = provider_operator_available|default(false) %}
     {% set active_group = 'monitor' %}
     {% if endpoint.startswith('federation_web.') or endpoint.startswith('capability_') %}
       {% set active_group = 'federation' %}
@@ -112,15 +121,24 @@
       {% endif %}
     {%- endmacro %}
     {% macro section_links(group, current_endpoint) -%}
-      {% if recorder_only %}
+      {#- A Federation page always carries its own section list, so the rail shows
+          it whatever the onboarding state. Otherwise these pages would be
+          reachable with no way to move between them. -#}
+      {% if page_sections %}
+        {% for section in page_sections %}
+        <a class="admin-subnav__link {% if section.key == page_active_section %}is-active{% endif %}" href="{{ section.url }}" {% if section.key == page_active_section %}aria-current="page"{% endif %}>{{ section.label }}</a>
+        {% endfor %}
+        {% if page_shows_approvals %}
+        <a class="admin-subnav__link {% if page_active_section == 'approvals' %}is-active{% endif %}" href="{{ url_for('provider_federation_web.index') }}">Approvals</a>
+        {% endif %}
+        <a class="admin-subnav__link {% if page_active_section == 'recorders' %}is-active{% endif %}" href="{{ url_for('federation_recorder_web.index') }}">Recorders</a>
+        <a class="admin-subnav__link {% if current_endpoint.startswith('capability_') %}is-active{% endif %}" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}">Device onboarding</a>
+      {% elif recorder_only %}
         <a class="admin-subnav__link {% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Recorder status</a>
         <a class="admin-subnav__link {% if current_endpoint.startswith('federation_web.') %}is-active{% endif %}" href="{{ endpoint_url('federation_web.overview', '/federation') }}">Federation overview</a>
         <a class="admin-subnav__link {% if current_endpoint.startswith('capability_') %}is-active{% endif %}" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}">Device setup</a>
       {% elif not capability_complete %}
         <a class="is-active" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}">Device onboarding</a>
-      {% elif group == 'federation' %}
-        <a class="admin-subnav__link {% if current_endpoint.startswith('federation_web.') %}is-active{% endif %}" href="{{ endpoint_url('federation_web.overview', '/federation') }}">Overview</a>
-        <a class="admin-subnav__link {% if current_endpoint.startswith('capability_') %}is-active{% endif %}" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}">Device onboarding</a>
       {% elif group == 'knowledge' %}
         <a class="admin-subnav__link {% if current_endpoint == 'operator_strategy_web.index' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.index', '/operator-strategies') }}">Overview</a>
         <a class="admin-subnav__link {% if current_endpoint == 'operator_strategy_web.capture' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.capture', '/operator-strategies/capture') }}">Capture</a>
