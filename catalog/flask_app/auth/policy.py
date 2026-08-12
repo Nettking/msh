@@ -90,6 +90,7 @@ PRE_AUTH_FEDERATION_BOOTSTRAP_ENDPOINTS = frozenset(
         "federation_pairing_web.pair_device",
         "federation_enrollment.start",
         "federation_enrollment.callback",
+        "federation_enrollment.complete",
     }
 )
 
@@ -104,6 +105,7 @@ ENDPOINT_PERMISSIONS: dict[str, str] = {
     "federation_pairing_web.pair_device": "pairing.manage",
     "federation_enrollment.start": "pairing.manage",
     "federation_enrollment.callback": "pairing.manage",
+    "federation_enrollment.complete": "pairing.manage",
     "federation_enrollment.authorize": "pairing.manage",
     "auth_users.users": "users.manage",
     "auth_users.create_user": "users.manage",
@@ -126,7 +128,7 @@ READ_PERMISSIONS = {
     "source_web": "data.read",
     "operator_strategy_web": "data.read",
     "operator_support_web": "data.read",
-    "ai_web": "data.read",
+    "ai_web": "analysis.run",
     "server_setup_web": "dashboard.read",
     "web": "dashboard.read",
 }
