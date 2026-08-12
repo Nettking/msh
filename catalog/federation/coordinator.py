@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +13,7 @@ from .errors import AuthenticationError, AuthorizationError
 from .event_log import AuthoritativeSessionEventLog
 from .models import CapabilityAnnouncement, NodeIdentity, Session, SessionEvent
 from .persistence import CoordinatorStore
+from .session_leadership import SessionLeadership, SessionLeadershipService
 
 
 def _utc_now() -> datetime:
@@ -32,6 +33,7 @@ class SessionCoordinator:
             database if isinstance(database, CoordinatorStore) else CoordinatorStore(database)
         )
         self.event_log = AuthoritativeSessionEventLog(self.store)
+        self.leadership = SessionLeadershipService(self.store)
         self._clock = clock
 
     @property
@@ -46,6 +48,36 @@ class SessionCoordinator:
             ttl_seconds=ttl_seconds,
             max_uses=max_uses,
         )
+
+    def create_pairing_material(
+        self,
+        *,
+        session_id: str,
+        actor_node_id: str,
+        ttl_seconds: int = 600,
+        request_id: str,
+    ) -> dict[str, Any]:
+        """Issue bounded enrollment + invitation material for the active leader."""
+
+        self.leadership.require_leader(
+            session_id=session_id,
+            actor_node_id=actor_node_id,
+        )
+        enrollment = self.store.create_enrollment_token(
+            now=self._clock(),
+            ttl_seconds=ttl_seconds,
+            max_uses=1,
+            created_by=f"federation-leader:{actor_node_id}",
+        )
+        invitation = self.leadership.create_invitation(
+            session_id=session_id,
+            actor_node_id=actor_node_id,
+            now=self._clock(),
+            ttl_seconds=ttl_seconds,
+            max_uses=1,
+            request_id=request_id,
+        )
+        return {"enrollment": enrollment, "invitation": invitation}
 
     def enroll_node(self, identity: NodeIdentity, *, token: str) -> NodeIdentity:
         if derive_node_id_from_public_key(identity.public_key) != identity.node_id:
@@ -81,6 +113,33 @@ class SessionCoordinator:
             now=self._clock(),
         )
 
+    def session_leadership(self, session_id: str) -> SessionLeadership:
+        return self.leadership.current(session_id)
+
+    def require_session_leader(
+        self, *, session_id: str, actor_node_id: str
+    ) -> SessionLeadership:
+        return self.leadership.require_leader(
+            session_id=session_id,
+            actor_node_id=actor_node_id,
+        )
+
+    def transfer_session_leader(
+        self,
+        *,
+        session_id: str,
+        actor_node_id: str,
+        target_node_id: str,
+        request_id: str,
+    ) -> tuple[SessionLeadership, SessionEvent | None]:
+        return self.leadership.transfer(
+            session_id=session_id,
+            actor_node_id=actor_node_id,
+            target_node_id=target_node_id,
+            request_id=request_id,
+            now=self._clock(),
+        )
+
     def create_invitation(
         self,
         *,
@@ -90,12 +149,12 @@ class SessionCoordinator:
         max_uses: int = 1,
         request_id: str | None = None,
     ) -> dict[str, Any]:
-        return self.store.create_invitation(
+        return self.leadership.create_invitation(
             session_id=session_id,
             actor_node_id=actor_node_id,
             ttl_seconds=ttl_seconds,
             max_uses=max_uses,
-            request_id=request_id,
+            request_id=request_id or f"leader-invite-{self.store._id_factory()}",
             now=self._clock(),
         )
 
@@ -124,7 +183,23 @@ class SessionCoordinator:
         request_id: str,
         reason: str,
     ) -> bool:
-        return self.store.remove_member(
+        leadership = self.leadership.current(session_id)
+        if actor_node_id == target_node_id:
+            if actor_node_id == leadership.leader_node_id:
+                raise AuthorizationError(
+                    "leader-self-removal-requires-transfer",
+                    "transfer Federation leadership before removing the active leader",
+                    "target_node_id",
+                )
+            return self.store.remove_member(
+                session_id=session_id,
+                actor_node_id=actor_node_id,
+                target_node_id=target_node_id,
+                request_id=request_id,
+                reason=reason,
+                now=self._clock(),
+            )
+        return self.leadership.remove_member_as_leader(
             session_id=session_id,
             actor_node_id=actor_node_id,
             target_node_id=target_node_id,
@@ -167,13 +242,24 @@ class SessionCoordinator:
         self.store.heartbeat(node_id=node_id, now=self._clock())
 
     def connected(self, *, node_id: str, connection_id: str) -> None:
+        """Record connectivity without electing from relay reconnect order."""
+
         self.store.mark_connected(
-            node_id=node_id, connection_id=connection_id, now=self._clock()
+            node_id=node_id,
+            connection_id=connection_id,
+            now=self._clock(),
         )
 
     def disconnected(
         self, *, node_id: str, error: str | None = None
     ) -> tuple[SessionEvent, ...]:
+        """Record a disconnect but do not make transient closure an election.
+
+        Leadership is transferred by explicit handover or after the bounded
+        heartbeat/offline timeout in ``sweep_stale``. This avoids authority churn
+        during orderly client shutdowns and relay restarts.
+        """
+
         return self.store.mark_disconnected(
             node_id=node_id,
             now=self._clock(),
@@ -183,13 +269,95 @@ class SessionCoordinator:
     def relay_started(self) -> None:
         self.store.mark_all_disconnected(now=self._clock())
 
+    @staticmethod
+    def _connectivity_time(value: object) -> datetime | None:
+        if not isinstance(value, str) or not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return None
+        return parsed.astimezone(timezone.utc)
+
+    def _expired_disconnected_leader_sessions(
+        self,
+        *,
+        now: datetime,
+        heartbeat_timeout_seconds: float,
+    ) -> tuple[str, ...]:
+        """Find leaders continuously offline for at least one timeout window."""
+
+        if heartbeat_timeout_seconds <= 0:
+            return ()
+        cutoff = now - timedelta(seconds=heartbeat_timeout_seconds)
+        expired: list[str] = []
+        with self.store.read_transaction() as database:
+            session_rows = database.execute(
+                "SELECT session_id FROM sessions ORDER BY session_id"
+            ).fetchall()
+            for row in session_rows:
+                session_id = str(row["session_id"])
+                leadership = self.leadership._snapshot_tx(database, session_id)
+                if leadership.leader_connected:
+                    continue
+                connectivity = database.execute(
+                    """
+                    SELECT state,disconnected_at FROM node_connectivity
+                    WHERE node_id=?
+                    """,
+                    (leadership.leader_node_id,),
+                ).fetchone()
+                if connectivity is None or connectivity["state"] == "revoked":
+                    continue
+                disconnected_at = self._connectivity_time(
+                    connectivity["disconnected_at"]
+                )
+                if disconnected_at is not None and disconnected_at <= cutoff:
+                    expired.append(session_id)
+        return tuple(expired)
+
     def sweep_stale(
         self, *, heartbeat_timeout_seconds: float
     ) -> tuple[tuple[str, ...], tuple[SessionEvent, ...]]:
-        return self.store.sweep_stale_with_events(
-            now=self._clock(),
+        now = self._clock()
+        stale, original_events = self.store.sweep_stale_with_events(
+            now=now,
             heartbeat_timeout_seconds=heartbeat_timeout_seconds,
         )
+        events = list(original_events)
+        affected_sessions: set[str] = set()
+        for node_id in stale:
+            affected_sessions.update(self.store.session_ids_for_node(node_id))
+        # A node whose heartbeat itself expired has already exceeded the timeout,
+        # so it may be considered immediately here.
+        for session_id in sorted(affected_sessions):
+            leadership = self.leadership.current(session_id)
+            if leadership.leader_node_id not in stale:
+                continue
+            _updated, event = self.leadership.ensure_available(
+                session_id=session_id,
+                now=now,
+                reason="leader-heartbeat-expired",
+            )
+            if event is not None:
+                events.append(event)
+        # Clean/error disconnects receive the same bounded grace period. This
+        # covers a powered-off leader whose socket closure was observed before a
+        # heartbeat sweep without turning every brief disconnect into a new term.
+        for session_id in self._expired_disconnected_leader_sessions(
+            now=now,
+            heartbeat_timeout_seconds=heartbeat_timeout_seconds,
+        ):
+            _updated, event = self.leadership.ensure_available(
+                session_id=session_id,
+                now=now,
+                reason="leader-offline-timeout",
+            )
+            if event is not None:
+                events.append(event)
+        return stale, tuple(events)
 
     def append_event(
         self,

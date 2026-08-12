@@ -118,7 +118,7 @@ function Get-VolumeInspection {
 
 function Find-ProjectVolume {
     param(
-        [Parameter(Mandatory = $true)][string]$ProjectName,
+        [Parameter(Mandatory = $true)][AllowEmptyString()][string]$ProjectName,
         [Parameter(Mandatory = $true)][string]$LogicalName
     )
 
