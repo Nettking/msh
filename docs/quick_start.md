@@ -1,14 +1,15 @@
 # Quick start
 
 Status: **current user guide**
-Reviewed: **2026-08-11**
+Reviewed: **2026-08-12**
 
 This guide describes the normal supported way to start FCP and complete capability-first onboarding.
 
 An FCP device is not assigned one permanent product role during first setup. The required first-run flow is:
 
 ```text
-Identity
+Human sign-in
+  -> Identity
   -> Federation
   -> Inspect
   -> finish setup
@@ -52,7 +53,7 @@ The web interface is limited to the local FCP computer by default. Open:
 http://localhost:5000
 ```
 
-For a device without completed onboarding, open:
+On a fresh installation, create the first human administrator before using onboarding. See **Create the first human administrator** below. After signing in, a device without completed onboarding uses:
 
 ```text
 http://localhost:5000/onboarding
@@ -103,13 +104,14 @@ The reset removes:
 
 It preserves:
 
+- human accounts and their authentication secrets;
 - recorded telemetry and imported data;
 - source configuration and recorder checkpoints;
 - analysis and workflow results;
 - Docker images;
 - downloaded Ollama models.
 
-After the reset, FCP verifies that authoritative setup state is empty and opens capability-first onboarding.
+After the reset, FCP verifies that authoritative device/Federation setup state is empty and opens capability-first onboarding after human sign-in.
 
 ## Linux or macOS: supported launcher
 
@@ -121,7 +123,7 @@ cd fcp
 bash start.sh
 ```
 
-The POSIX launcher starts the same default core services, verifies the configured Ollama model, bakes the exact Git commit into the FCP images, and starts the single-instance host update agent. Normal starts preserve device, Federation, inspection, benchmark, recorder, model, and data state.
+The POSIX launcher starts the same default core services, verifies the configured Ollama model, bakes the exact Git commit into the FCP images, and starts the single-instance host update agent. Normal starts preserve device, Federation, inspection, benchmark, recorder, model, data, and human-account state.
 
 To reconnect an existing saved Federation before opening the workbench:
 
@@ -129,7 +131,7 @@ To reconnect an existing saved Federation before opening the workbench:
 bash start.sh --resume
 ```
 
-Then open:
+After human sign-in, open:
 
 ```text
 http://localhost:5000/onboarding
@@ -156,15 +158,37 @@ python3 scripts/posix/fcp_update_agent.py \
 
 The agent accepts only the bounded local handoff contract. It does not expose a network endpoint or accept arbitrary commands from Federation messages.
 
+## Create the first human administrator
+
+Human web accounts are separate from Federation node identities, pairing grants, and device credentials. Authentication is enabled by default.
+
+On the first production start FCP atomically creates two independent random secrets under `data/auth/`: one for Flask sessions and one for password hashing. They are reused on later starts, so a normal restart does not invalidate sessions or password verification. Do not delete or rotate `data/auth/password-salt` unless you intentionally plan to reset existing human passwords.
+
+After the Flask image has been built, create the first administrator with:
+
+```bash
+docker compose run --rm --no-deps --entrypoint flask flask \
+  --app catalog.flask_app.app:create_app fcp-user create-admin
+```
+
+The command prompts for an email address and password, requires a password of at least 12 characters, and refuses to recreate an existing account. Then open:
+
+```text
+http://localhost:5000/login
+```
+
+Administrators can manage additional human users at `/admin/users`. See [Human authentication and authorization](human-authentication.md) for roles, cookie/CSRF behavior, secret overrides, and deployment notes.
+
 ## Complete first-run onboarding
 
 The mandatory setup is intentionally short:
 
-1. **Identity** — create or load the stable identity for this FCP device.
-2. **Federation** — reconnect, join, or create the user-facing Federation through an authenticated path.
-3. **Inspect** — inspect the device's supported local capabilities and persist that evidence.
-4. **Finish setup** — enable the normal workbench without granting optional contribution authority.
-5. **Open Federation** — review connected devices and available capabilities.
+1. **Human sign-in** — authenticate with a separate FCP human account.
+2. **Identity** — create or load the stable identity for this FCP device.
+3. **Federation** — reconnect, join, or create the user-facing Federation through an authenticated path.
+4. **Inspect** — inspect the device's supported local capabilities and persist that evidence.
+5. **Finish setup** — enable the normal workbench without granting optional contribution authority.
+6. **Open Federation** — review connected devices and available capabilities.
 
 Finishing setup does not automatically grant recorder, language-model, compute, or storage contribution authority. Optional benchmarks and contribution choices remain available from the Federation pages.
 
@@ -221,6 +245,7 @@ See [Federation operations](federation_operations.md).
 
 ## First pages to open
 
+- <http://localhost:5000/login> — sign in with a human FCP account.
 - <http://localhost:5000/onboarding> — complete or repair capability-first onboarding.
 - <http://localhost:5000/federation> — inspect the Federation, devices, capabilities, updates, benchmarks, and contribution state.
 - <http://localhost:5000/federation/recorders> — manage connected standalone recorder scans and source selections.
@@ -299,7 +324,11 @@ Useful environment variables include:
 - `FLASK_RUN_HOST` — defaults to `0.0.0.0` for direct Flask startup.
 - `FLASK_RUN_PORT` — defaults to `5000`.
 - `FLASK_DEBUG=1` — enables Flask debug mode.
-- `FCP_FLASK_SECRET` — Flask secret key.
+- `FCP_FLASK_SECRET` — optional explicit session secret; production automatically persists one when omitted.
+- `FCP_PASSWORD_SALT` — optional explicit password-hashing salt; production automatically persists a separate one when omitted.
+- `FCP_AUTH_DATABASE` — human account database path; defaults to `data/auth/users.sqlite3`.
+- `FCP_AUTH_SECRET_DIR` — persistent human-auth secret directory; defaults to `data/auth`.
+- `FCP_HTTPS=1` — marks session and remember-me cookies Secure when HTTPS is actually enforced.
 - `FCP_SKIP_ORCHESTRATION=1` — starts Flask without the background runtime.
 - `FCP_SCAN_DIRS` — comma-separated artifact scan roots.
 - `FCP_AI_MODEL` — selected Ollama model.
