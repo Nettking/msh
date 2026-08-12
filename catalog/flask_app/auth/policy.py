@@ -49,11 +49,15 @@ PUBLIC_ENDPOINTS = frozenset(
         "security.logout",
         "security.forgot_password",
         "security.reset_password",
+        "security.verify",
+        "security.static",
     }
 )
 
 ENDPOINT_PERMISSIONS: dict[str, str] = {
+    # Keep both names while older/rebased branches may expose either endpoint.
     "federation_web.rename_device": "federation.manage",
+    "federation_web.rename_this_device": "federation.manage",
     "federation_web.check_updates": "software.update",
     "federation_web.apply_updates": "software.update",
     "federation_pairing_web.create_pairing_code": "pairing.manage",
