@@ -4,23 +4,33 @@ on:
   pull_request:
     paths:
       - ".github/workflows/cf5-ui-shell.yml"
+      - "catalog/flask_app/templates/base.html"
       - "catalog/flask_app/templates/onboarding.html"
       - "catalog/flask_app/templates/federation_overview.html"
       - "catalog/flask_app/templates/federation/**"
+      - "catalog/flask_app/static/css/admin-shell.css"
       - "catalog/flask_app/static/css/federation.css"
+      - "catalog/flask_app/static/js/admin-rail.js"
       - "catalog/flask_app/static/js/onboarding.js"
       - "catalog/flask_app/tests/test_cf5_ui_shell.py"
+      - "catalog/flask_app/tests/test_mobile_layout_contract.py"
+      - "catalog/flask_app/tests/test_navigation_information_architecture.py"
       - "catalog/flask_app/tests/fixtures/cf5_*_view_models.json"
   push:
     branches: [main]
     paths:
       - ".github/workflows/cf5-ui-shell.yml"
+      - "catalog/flask_app/templates/base.html"
       - "catalog/flask_app/templates/onboarding.html"
       - "catalog/flask_app/templates/federation_overview.html"
       - "catalog/flask_app/templates/federation/**"
+      - "catalog/flask_app/static/css/admin-shell.css"
       - "catalog/flask_app/static/css/federation.css"
+      - "catalog/flask_app/static/js/admin-rail.js"
       - "catalog/flask_app/static/js/onboarding.js"
       - "catalog/flask_app/tests/test_cf5_ui_shell.py"
+      - "catalog/flask_app/tests/test_mobile_layout_contract.py"
+      - "catalog/flask_app/tests/test_navigation_information_architecture.py"
       - "catalog/flask_app/tests/fixtures/cf5_*_view_models.json"
 
 permissions:
@@ -54,14 +64,18 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements.txt -c constraints-phase2.txt
           python -m pip install pytest ruff
-      - name: Compile CF5 UI test
+      - name: Compile CF5 UI tests
         run: >-
           python -m compileall
           catalog/flask_app/tests/test_cf5_ui_shell.py
+          catalog/flask_app/tests/test_mobile_layout_contract.py
+          catalog/flask_app/tests/test_navigation_information_architecture.py
       - name: Run CF5 UI shell tests
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_cf5_ui_shell.py
+          catalog/flask_app/tests/test_mobile_layout_contract.py
+          catalog/flask_app/tests/test_navigation_information_architecture.py
       - name: Validate onboarding JavaScript
         run: node --check catalog/flask_app/static/js/onboarding.js
       - name: Parse CF5 fixtures
@@ -71,10 +85,12 @@ jobs:
           'catalog/flask_app/tests/fixtures/cf5_onboarding_view_models.json',
           'catalog/flask_app/tests/fixtures/cf5_overview_view_models.json');
           [json.loads(pathlib.Path(path).read_text(encoding='utf-8')) for path in paths]"
-      - name: Ruff CF5 UI test
+      - name: Ruff CF5 UI tests
         run: >-
           python -m ruff check
           catalog/flask_app/tests/test_cf5_ui_shell.py
+          catalog/flask_app/tests/test_mobile_layout_contract.py
+          catalog/flask_app/tests/test_navigation_information_architecture.py
       - name: Diff hygiene
         shell: bash
         run: |
