@@ -42,6 +42,7 @@ from .services.federation_device_names import (
     local_device_naming_available,
     local_device_self_naming_available,
 )
+from .services.federation_leader_authority import resolve_federation_leader
 from .services.federation_projection_service import (
     get_federation_projection_service,
 )
@@ -153,25 +154,40 @@ def _benchmark_item_actions(
         return {}
 
 
-def _update_authority_view() -> tuple[bool, bool]:
-    """Return whether this viewer is a member and is the Federation leader."""
+def _leader_authority_view() -> tuple[bool, bool, dict[str, object] | None]:
+    """Return membership, active-leader control, and public-safe leadership state."""
 
     try:
         context = get_capability_onboarding_service().authorized_context()
         if context is None:
-            return False, False
-        session_record = context.coordinator.store.get_session(
-            context.binding.internal_session_id
-        )
+            return False, False, None
+        authority = resolve_federation_leader(context)
         actor = context.credentials.identity.node_id
-        if session_record is None:
-            return False, False
-        return True, session_record.created_by_node_id == actor
+        return (
+            True,
+            authority.leader_node_id == actor,
+            {
+                "creator_node_id": authority.creator_node_id,
+                "leader_node_id": authority.leader_node_id,
+                "term": authority.term,
+                "this_device_is_leader": authority.leader_node_id == actor,
+                "creator_is_leader": (
+                    authority.creator_node_id == authority.leader_node_id
+                ),
+            },
+        )
     except Exception as exc:  # noqa: BLE001 - leader controls fail closed
         current_app.logger.warning(
             "Federation leader authority unavailable (%s)", type(exc).__name__
         )
-        return False, False
+        return False, False, None
+
+
+def _update_authority_view() -> tuple[bool, bool]:
+    """Compatibility helper for tests and existing route composition."""
+
+    is_member, can_manage, _leadership = _leader_authority_view()
+    return is_member, can_manage
 
 
 def _page_response(page: FederationPage) -> Response:
@@ -203,6 +219,7 @@ def _page_response(page: FederationPage) -> Response:
     )
     update_status = None
     capability_request_status = None
+    leadership_status = None
     if page is FederationPage.OVERVIEW:
         try:
             update_status = get_federation_update_service().snapshot()
@@ -222,7 +239,7 @@ def _page_response(page: FederationPage) -> Response:
             )
             capability_request_status = {"status": "unavailable", "devices": []}
 
-        is_member, can_manage_updates = _update_authority_view()
+        is_member, can_manage_updates, leadership_status = _leader_authority_view()
         update_status = {
             **update_status,
             "can_manage": can_manage_updates,
@@ -263,6 +280,7 @@ def _page_response(page: FederationPage) -> Response:
             ),
             federation_update=update_status,
             federation_capability_request=capability_request_status,
+            federation_leadership=leadership_status,
         )
     )
     response.headers["Cache-Control"] = "no-store"
@@ -399,7 +417,7 @@ def check_updates() -> Response:
         )
     except PermissionError:
         flash(
-            "Only the authoritative Federation coordinator can check updates.",
+            "Only the current Federation leader can check updates.",
             "error",
         )
     except Exception as exc:  # noqa: BLE001 - diagnostics remain server-side
