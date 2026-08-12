@@ -8,6 +8,11 @@ from typing import Any
 
 from catalog.federation.device_names import DEVICE_NAME_EVENT, validate_device_name
 from catalog.federation.errors import FederationValidationError
+from catalog.federation.session_leadership import (
+    INITIAL_TERM,
+    LEADER_CHANGED_EVENT,
+    LEADERSHIP_SCHEMA,
+)
 
 from .adapter_common import (
     _enum_value,
@@ -64,6 +69,10 @@ _EVENT_COPY = {
     "session.created": (
         "Federation created",
         "The federation authority was initialized.",
+    ),
+    LEADER_CHANGED_EVENT: (
+        "Federation leader changed",
+        "Operational Federation leadership moved to another trusted device.",
     ),
     "node.joined": ("Device joined", "A trusted device joined the federation."),
     "node.left": ("Device removed", "A device membership was removed."),
@@ -127,6 +136,37 @@ class FederationAuthorityAdapter:
         self._internal_session_id = internal_session_id
         self._activity_limit = max(1, min(int(activity_limit), 100))
 
+    @staticmethod
+    def _advance_leader(
+        event: object,
+        *,
+        coordinator_id: str | None,
+        leader_node_id: str | None,
+        term: int,
+    ) -> tuple[str | None, int]:
+        """Apply one valid coordinator-authored leadership transition."""
+
+        if _value(event, "event_type") != LEADER_CHANGED_EVENT:
+            return leader_node_id, term
+        if not coordinator_id or _value(event, "actor_node_id") != coordinator_id:
+            return leader_node_id, term
+        payload = _value(event, "payload", {})
+        previous = _value(payload, "previous_leader_node_id")
+        next_leader = _value(payload, "leader_node_id")
+        next_term = _value(payload, "term")
+        if (
+            _value(payload, "schema") != LEADERSHIP_SCHEMA
+            or _value(payload, "session_id") is None
+            or previous != leader_node_id
+            or not isinstance(next_leader, str)
+            or not next_leader
+            or isinstance(next_term, bool)
+            or not isinstance(next_term, int)
+            or next_term != term + 1
+        ):
+            return leader_node_id, term
+        return next_leader, next_term
+
     def snapshot(self) -> FederationAuthoritySnapshot:
         if self._coordinator is None:
             return FederationAuthoritySnapshot(
@@ -146,11 +186,18 @@ class FederationAuthorityAdapter:
             if not isinstance(revision, int):
                 revision = None
             creator_node_id = _value(session, "created_by_node_id")
+            coordinator_id = _value(session, "coordinator_id")
+            if not isinstance(coordinator_id, str) or not coordinator_id:
+                fallback_coordinator = _value(self._coordinator, "coordinator_id")
+                coordinator_id = (
+                    fallback_coordinator
+                    if isinstance(fallback_coordinator, str) and fallback_coordinator
+                    else None
+                )
 
             events = self._events(revision)
             # Remote coordinator status historically omitted the creator field.
-            # The authoritative first session event still identifies the creator,
-            # so recover it before interpreting leader-authored naming events.
+            # The authoritative first session event still identifies the creator.
             if not isinstance(creator_node_id, str) or not creator_node_id:
                 for event in events:
                     if _value(event, "event_type") != "session.created":
@@ -179,11 +226,10 @@ class FederationAuthorityAdapter:
             raw_status = self._authorized_status()
 
             # Seed effective labels from public node metadata. Naming events are
-            # then replayed strictly in authoritative revision order. If two
-            # members concurrently claim the same case-insensitive name, the
-            # earlier accepted revision wins and the later claim is inert. This
-            # gives every trusted reader the same unique result without adding
-            # naming authority to the generic relay event API.
+            # then replayed strictly in authoritative revision order. A member may
+            # name itself. The leader valid at that exact revision may name any
+            # current member. A former leader loses that authority immediately
+            # after a coordinator-authored term transition.
             effective_labels: dict[str, str] = {}
             for candidate in _sequence(_value(raw_status, "nodes", ())):
                 raw_node_id = _value(candidate, "node_id", _value(candidate, "id"))
@@ -196,7 +242,19 @@ class FederationAuthorityAdapter:
                 )
 
             device_names: dict[str, str] = {}
+            leader_node_id = (
+                creator_node_id
+                if isinstance(creator_node_id, str) and creator_node_id
+                else None
+            )
+            leader_term = INITIAL_TERM
             for event in events:
+                leader_node_id, leader_term = self._advance_leader(
+                    event,
+                    coordinator_id=coordinator_id,
+                    leader_node_id=leader_node_id,
+                    term=leader_term,
+                )
                 if _value(event, "event_type") != DEVICE_NAME_EVENT:
                     continue
                 payload = _value(event, "payload", {})
@@ -204,10 +262,7 @@ class FederationAuthorityAdapter:
                 if not isinstance(node_id, str) or node_id not in member_ids:
                     continue
                 event_actor = _value(event, "actor_node_id")
-                # A member may name itself. The Federation creator may name any
-                # current member. Everyone else is ignored even if they append a
-                # similarly shaped event directly through the relay protocol.
-                if event_actor != node_id and event_actor != creator_node_id:
+                if event_actor != node_id and event_actor != leader_node_id:
                     continue
                 try:
                     display_name = validate_device_name(
