@@ -11,21 +11,26 @@ on:
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
       - "catalog/federation/recorder_storage_relay.py"
+      - "catalog/federation/shared_file_storage.py"
       - "catalog/federation/onboarding_compat.py"
       - "catalog/federation/tests/test_recorder_control_events.py"
       - "catalog/federation/tests/test_recorder_publication.py"
       - "catalog/federation/tests/test_recorder_storage_relay.py"
+      - "catalog/federation/tests/test_shared_file_storage.py"
       - "catalog/flask_app/app.py"
       - "catalog/flask_app/federation_pairing_routes.py"
       - "catalog/flask_app/federation_recorder_routes.py"
       - "catalog/flask_app/services/capability_config_migration_service.py"
       - "catalog/flask_app/services/legacy_settings_migration.py"
+      - "catalog/flask_app/services/federated_data_runtime.py"
+      - "catalog/flask_app/services/federated_jsonl_product_bridge.py"
       - "catalog/flask_app/services/federation_pairing_install.py"
       - "catalog/flask_app/services/federation_recorder_control_service.py"
       - "catalog/flask_app/services/recorder_federation_publication_install.py"
       - "catalog/flask_app/templates/federation/_section_nav.html"
       - "catalog/flask_app/templates/federation/onboarding/_federation.html"
       - "catalog/flask_app/templates/federation_recorders.html"
+      - "catalog/flask_app/tests/test_federated_jsonl_product_bridge.py"
       - "catalog/flask_app/tests/test_federation_pairing_service.py"
       - "catalog/flask_app/tests/test_federation_recorder_control_service.py"
       - "catalog/flask_app/tests/test_recorder_config_bootstrap.py"
@@ -48,21 +53,26 @@ on:
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
       - "catalog/federation/recorder_storage_relay.py"
+      - "catalog/federation/shared_file_storage.py"
       - "catalog/federation/onboarding_compat.py"
       - "catalog/federation/tests/test_recorder_control_events.py"
       - "catalog/federation/tests/test_recorder_publication.py"
       - "catalog/federation/tests/test_recorder_storage_relay.py"
+      - "catalog/federation/tests/test_shared_file_storage.py"
       - "catalog/flask_app/app.py"
       - "catalog/flask_app/federation_pairing_routes.py"
       - "catalog/flask_app/federation_recorder_routes.py"
       - "catalog/flask_app/services/capability_config_migration_service.py"
       - "catalog/flask_app/services/legacy_settings_migration.py"
+      - "catalog/flask_app/services/federated_data_runtime.py"
+      - "catalog/flask_app/services/federated_jsonl_product_bridge.py"
       - "catalog/flask_app/services/federation_pairing_install.py"
       - "catalog/flask_app/services/federation_recorder_control_service.py"
       - "catalog/flask_app/services/recorder_federation_publication_install.py"
       - "catalog/flask_app/templates/federation/_section_nav.html"
       - "catalog/flask_app/templates/federation/onboarding/_federation.html"
       - "catalog/flask_app/templates/federation_recorders.html"
+      - "catalog/flask_app/tests/test_federated_jsonl_product_bridge.py"
       - "catalog/flask_app/tests/test_federation_pairing_service.py"
       - "catalog/flask_app/tests/test_federation_recorder_control_service.py"
       - "catalog/flask_app/tests/test_recorder_config_bootstrap.py"
@@ -121,20 +131,27 @@ jobs:
           catalog/federation/recorder_delivery.py
           catalog/federation/recorder_publication.py
           catalog/federation/recorder_storage_relay.py
+          catalog/federation/shared_file_storage.py
+          catalog/federation/tests/test_shared_file_storage.py
           catalog/flask_app/app.py
           catalog/flask_app/federation_pairing_routes.py
           catalog/flask_app/federation_recorder_routes.py
           catalog/flask_app/services/capability_config_migration_service.py
           catalog/flask_app/services/legacy_settings_migration.py
+          catalog/flask_app/services/federated_data_runtime.py
+          catalog/flask_app/services/federated_jsonl_product_bridge.py
           catalog/flask_app/services/federation_pairing_install.py
           catalog/flask_app/services/federation_recorder_control_service.py
           catalog/flask_app/services/recorder_federation_publication_install.py
+          catalog/flask_app/tests/test_federated_jsonl_product_bridge.py
           catalog/flask_app/tests/test_federation_pairing_service.py
           catalog/flask_app/tests/test_recorder_config_bootstrap.py
 
       - name: Recorder capture and Federation publication regressions
         run: >-
           python -m pytest -o addopts= -q
+          catalog/federation/tests/test_shared_file_storage.py
+          catalog/flask_app/tests/test_federated_jsonl_product_bridge.py
           catalog/flask_app/tests/test_federation_pairing_service.py
           catalog/flask_app/tests/test_recorder_config_bootstrap.py
           catalog/standalone-recorder_v2/tests/test_lossless_recorder.py
@@ -155,9 +172,14 @@ jobs:
           start_recorder.py
           catalog/federation/onboarding_compat.py
           catalog/federation/recorder_control_events.py
+          catalog/federation/shared_file_storage.py
           catalog/federation/tests/test_recorder_control_events.py
+          catalog/federation/tests/test_shared_file_storage.py
           catalog/flask_app/services/capability_config_migration_service.py
           catalog/flask_app/services/legacy_settings_migration.py
+          catalog/flask_app/services/federated_data_runtime.py
+          catalog/flask_app/services/federated_jsonl_product_bridge.py
+          catalog/flask_app/tests/test_federated_jsonl_product_bridge.py
           catalog/mtconnect_recorder/federation_control.py
           catalog/mtconnect_recorder/federation_node.py
           catalog/mtconnect_recorder/managed_service.py
