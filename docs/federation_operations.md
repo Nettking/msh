@@ -2,11 +2,13 @@
 
 Status: **current operator/administrator guide**
 
-Reviewed: **2026-08-11**
+Reviewed: **2026-08-12**
 
-This guide covers the operational Federation actions that intentionally mutate trusted distributed state: pairing another device, reviewing pending contribution enrollment, checking for software updates, and rolling an approved update across the Federation.
+This guide covers the operational Federation actions that intentionally mutate trusted distributed state: pairing another device, requesting bounded capability discovery/contribution work from reachable members, reviewing pending contribution enrollment, checking for software updates, and rolling an approved update across the Federation.
 
 These actions are deliberately narrower than general remote administration. FCP does not expose a Federation shell, arbitrary process execution, peer-selected Git repositories, or unrestricted host configuration.
+
+Human web permissions and Federation authority are separate. A browser user must first have the required human permission for a control, and the FCP device/session must independently satisfy the Federation-side authority check.
 
 ## Pair another device
 
@@ -36,6 +38,30 @@ When another physical machine must connect, open the issuing FCP installation th
 
 Do not expose the Flask workbench, relay, Ollama, or recorder control surface directly to the public internet.
 
+## Ask reachable members to benchmark and contribute
+
+The Federation leader/session creator can issue one bounded request asking all currently reachable **remote** members to inspect their local capability state, run eligible registered benchmarks, and request contribution for capabilities that their own local policy considers eligible.
+
+This is a request for an outcome, not remote execution authority. The leader does not select commands, executable paths, endpoints, credentials, benchmark IDs, candidate IDs, or provider grants.
+
+The current request boundary is:
+
+1. the human browser user must have `federation.manage` permission (currently an `admin` capability);
+2. the issuing FCP device must be the immutable Federation/session creator;
+3. only members reported reachable when the request is created are targeted;
+4. the request is written through the authenticated Federation event log and expires after 10 minutes;
+5. every target authenticates that the request came from the pinned session creator before acting;
+6. the target refreshes its own local read-only capability inspection;
+7. only locally registered, bounded benchmark definitions that are runnable on that member may execute;
+8. contribution is requested only for candidates whose current local recommendation is `ALLOWED` and whose prerequisites are present; and
+9. contribution/provider policy is re-evaluated locally when the enable intent is applied.
+
+A leader request therefore cannot bypass approval or provider policy. A capability that requires a separate approval may remain `PENDING`/`REGISTERING` and still require the normal provider-enrollment decision before it can become authoritative.
+
+Offline members are not silently queued for later. When a member reconnects, issue another request if you want that member to participate.
+
+The Federation overview reports the request and per-member benchmark/contribution counts or failures. A member failure is isolated; it does not grant authority to another member or turn a partial request into a successful provider activation.
+
 ## Review pending contributions
 
 A member may explicitly enable a supported local contribution while its runtime/control-plane authority is not yet active. The member then publishes the candidate to the Federation as **Registering** rather than silently granting itself authority.
@@ -62,6 +88,24 @@ For a newly visible candidate, **Request** first creates the durable revision-fe
 If an already-authoritative local storage provider also appears as a candidate-only row on the Storage page, that is a projection error: candidate decision IDs and storage provider IDs are separate identity domains. The Storage page should suppress the candidate-only duplicate when its explicit provider identity is already represented by storage-control-plane state.
 
 See [the active pending-contribution approval contract](implementation/federation/active/pending_contribution_approval.md) for the authority and acceptance boundary.
+
+## Federation-visible JSONL data
+
+Normal FCP workbench nodes now synchronize supported non-recorder `data/**/*.jsonl` through Federation logical storage so existing recursive JSONL consumers can operate over a Federation-wide logical data corpus without being rewritten.
+
+The compatibility boundary remains local-file based: authenticated remote data is verified and materialized under the local `data/` scan boundary, after which the existing analysis/orchestration code sees ordinary files.
+
+The synchronization path is intentionally constrained:
+
+- recorder JSONL continues to use its separate checkpoint/manifest publication path;
+- generic JSONL publication requires current Federation membership;
+- producer identity is bound to the authenticated relay actor;
+- relative paths are normalized and traversal/non-JSONL paths fail closed;
+- content-addressed chunks and manifests are hash/size verified before materialization;
+- exact duplicate file content is deduplicated so legacy recursive scanners do not count it twice; and
+- publication/mirroring work is bounded per reconnect synchronization pass.
+
+This feature does not make arbitrary host files visible to peers. It extends the reviewed Federation storage path specifically to supported JSONL data inside the FCP data corpus.
 
 ## Check for software updates
 
@@ -168,6 +212,7 @@ A dirty checkout must be reviewed and cleaned intentionally before an update can
 See also:
 
 - [Quick start](quick_start.md)
+- [Human users, sign-in, and permissions](human-authentication.md)
 - [Server setup](server_setup.md)
 - [Standalone recorder](standalone_recorder.md)
 - [Troubleshooting](troubleshooting.md)

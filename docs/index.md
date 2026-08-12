@@ -5,6 +5,7 @@ Use the guides below for the current FCP product. Start from the task or product
 ## Use FCP
 
 - [Operator guide](operator_guide.md) — use Federation, Monitor, Knowledge, System, sources, recording, benchmarks, contributions, and diagnostics.
+- [Human users, sign-in, and permissions](human-authentication.md) — create the first administrator, add users, choose `viewer`/`operator`/`admin` roles, preserve authentication state, and troubleshoot sign-in/authorization.
 - [Federation operations](federation_operations.md) — pair devices, check for updates, run **Update all devices**, understand update states, and bootstrap legacy Windows hosts safely.
 - [Standalone recorder](standalone_recorder.md) — start a headless recorder with a pairing code, run startup discovery, manage sources remotely, and understand local-first Federation publication.
 - [Connected capabilities](connected_capabilities.md) — use capabilities contributed by another trusted device.
@@ -16,14 +17,26 @@ Use the guides below for the current FCP product. Start from the task or product
 
 ## New installation or device
 
-- [Quick start](quick_start.md) — start FCP, complete capability-first onboarding, and open the workbench.
-- [Human authentication](human-authentication.md) — create the first administrator, understand roles and permissions, and manage browser sign-in. Human accounts are per device and separate from Federation identity.
+- [Quick start](quick_start.md) — start FCP, create the first human administrator, sign in, complete capability-first onboarding, and open the workbench.
+- [Human users, sign-in, and permissions](human-authentication.md) — first-admin setup and ongoing human account administration.
 - [One-command setup](one_command_setup.md) — use the supported Windows or POSIX launcher.
-- [Getting started](getting_started.md) — understand devices, Federations, inspection, contributions, authority, and the workbench mental model.
+- [Getting started](getting_started.md) — understand human sign-in, devices, Federations, inspection, contributions, authority, and the workbench mental model.
 - [Server setup](server_setup.md) — administer network access, recorder configuration, model installation, migration, and advanced deployments.
 - [Termux phone setup](termux_phone.md) — Android development and operation.
 
-The required first-run product path remains `Identity -> Federation -> Inspect -> finish setup`. Benchmarks and contribution choices are optional follow-up work rather than prerequisites for normal workbench access.
+The required first-run product path is:
+
+```text
+Human sign-in
+  -> Identity
+  -> Federation
+  -> Inspect
+  -> finish setup
+```
+
+A fresh production installation has no default human administrator. Create the first administrator with the containerized `fcp-user create-admin` command documented in [Quick start](quick_start.md) and [Human users, sign-in, and permissions](human-authentication.md) before completing device onboarding.
+
+Benchmarks and contribution choices are optional follow-up work rather than prerequisites for normal workbench access.
 
 The installed product is capability-first. Retained legacy setup state and old command spellings exist only where explicitly documented for migration/administration; they do not define product authority or permanent device roles.
 
@@ -59,6 +72,7 @@ Current track entry points:
 
 ## Current development status
 
+- Human authentication and central RBAC: merged and enabled by default.
 - Capability-first Federation baseline: merged.
 - Role-first runtime compatibility retirement (CF8): merged for the installed product.
 - Verified manual Federation-wide runtime updates: merged.

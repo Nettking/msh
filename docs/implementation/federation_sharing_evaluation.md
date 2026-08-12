@@ -423,8 +423,9 @@ from `docs/index.md`. `releases/federation_v1_scope.md` is stamped
 human accounts, roles, or permissions anywhere in its supported boundary.
 
 
-**Resolved.** `docs/index.md` links the guide and the v1 scope has a human
-authentication section.
+**Resolved.** #259 linked the guide from `docs/index.md` independently while this
+branch was open, and its wording is kept. The v1 scope now has a human
+authentication section stating the device-local boundary.
 
 ### Severity 5 — minor
 
