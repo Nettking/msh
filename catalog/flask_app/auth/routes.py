@@ -20,7 +20,7 @@ from sqlalchemy.exc import IntegrityError
 
 from .federation import get_federated_human_auth_service, saved_remote_member
 from .models import FirstUserBootstrapClaim, Role, User, db
-from .policy import ROLE_SUMMARIES
+from .policy import PRE_AUTH_FEDERATION_BOOTSTRAP_ENDPOINTS, ROLE_SUMMARIES
 
 auth_users = Blueprint("auth_users", __name__, url_prefix="/admin/users")
 _BOOTSTRAP_ENDPOINT = "auth_users.bootstrap_user"
@@ -112,8 +112,10 @@ def _commit_first_user(user: User) -> bool:
 def first_user_bootstrap_gate():
     """Send a new local installation to first-user setup instead of sign-in.
 
-    Remotely paired Federation members intentionally keep using their Federation
-    human sign-in authority even when they have no local shadow users yet.
+    A fresh device may enter only the bounded identity/pairing endpoints needed
+    to join an existing Federation before a local human shadow account exists.
+    Remotely paired Federation members then use their Federation human sign-in
+    authority even when they still have no local shadow users.
     """
 
     if saved_remote_member() or _has_users():
@@ -123,7 +125,7 @@ def first_user_bootstrap_gate():
         _DISCOVERY_ENDPOINT,
         "static",
         "security.static",
-    }:
+    } or request.endpoint in PRE_AUTH_FEDERATION_BOOTSTRAP_ENDPOINTS:
         return None
     if request.is_json or request.path.startswith("/api/"):
         abort(503)

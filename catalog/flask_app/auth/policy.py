@@ -7,6 +7,9 @@ from collections.abc import Iterable
 from flask import Flask, abort, current_app, redirect, request, url_for
 from flask_security import current_user
 
+from .federation import saved_remote_member
+from .models import User, db
+
 PERMISSIONS: dict[str, str] = {
     "dashboard.read": "View dashboards and runtime status",
     "data.read": "View data, analyses, playback, documentation, and system state",
@@ -75,6 +78,19 @@ PUBLIC_ENDPOINTS = frozenset(
     }
 )
 
+# A fresh installation that is joining an existing Federation has no local human
+# row yet. Permit only the minimum browser endpoints needed to establish the
+# device identity and redeem a signed one-use pairing grant. This is deliberately
+# conditional rather than part of PUBLIC_ENDPOINTS: the exception closes as soon
+# as either a local user exists or a persisted remote Federation binding exists.
+PRE_AUTH_FEDERATION_BOOTSTRAP_ENDPOINTS = frozenset(
+    {
+        "capability_onboarding_web.onboarding",
+        "capability_onboarding_web.create_identity",
+        "federation_pairing_web.pair_device",
+    }
+)
+
 ENDPOINT_PERMISSIONS: dict[str, str] = {
     # Keep both names while older/rebased branches may expose either endpoint.
     "federation_web.rename_device": "federation.manage",
@@ -140,11 +156,26 @@ def permission_for(endpoint: str, method: str) -> str | None:
     return WRITE_PERMISSIONS.get(blueprint)
 
 
+def pre_auth_federation_bootstrap_allowed(endpoint: str | None) -> bool:
+    """Return whether a fresh device may use one bounded pairing endpoint."""
+
+    if endpoint not in PRE_AUTH_FEDERATION_BOOTSTRAP_ENDPOINTS:
+        return False
+    try:
+        if saved_remote_member():
+            return False
+        return db.session.query(User.id).limit(1).first() is None
+    except Exception:  # noqa: BLE001 - authorization exceptions must fail closed
+        return False
+
+
 def enforce_human_authorization():
     if not current_app.config.get("FCP_AUTH_ENABLED", True):
         return None
     endpoint = request.endpoint
     if endpoint is None or endpoint in PUBLIC_ENDPOINTS or endpoint == "static":
+        return None
+    if pre_auth_federation_bootstrap_allowed(endpoint):
         return None
     if not current_user.is_authenticated or not current_user.is_active:
         if request.is_json or request.path.startswith("/api/"):

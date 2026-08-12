@@ -1,7 +1,9 @@
 from __future__ import annotations
 
-from flask import Flask
+from flask import Blueprint, Flask
 
+from catalog.flask_app.auth import policy as auth_policy
+from catalog.flask_app.auth import routes as auth_routes
 from catalog.flask_app.auth.extension import init_human_auth
 from catalog.flask_app.auth.models import FirstUserBootstrapClaim, User, db
 from catalog.flask_app.auth.policy import audit_route_policy
@@ -18,10 +20,46 @@ def _empty_app(tmp_path, monkeypatch) -> Flask:
     init_human_auth(app)
     app.add_url_rule("/", "web.dashboard", lambda: "dashboard", methods=["GET"])
     app.add_url_rule("/api/status", "web.api_status", lambda: {"ok": True}, methods=["GET"])
+
+    onboarding = Blueprint("capability_onboarding_web", __name__)
+    onboarding.add_url_rule(
+        "/onboarding",
+        endpoint="onboarding",
+        view_func=lambda: "onboarding",
+        methods=["GET"],
+    )
+    onboarding.add_url_rule(
+        "/onboarding/identity",
+        endpoint="create_identity",
+        view_func=lambda: "identity-created",
+        methods=["POST"],
+    )
+    onboarding.add_url_rule(
+        "/onboarding/federation",
+        endpoint="federation_action",
+        view_func=lambda: "federation-action",
+        methods=["POST"],
+    )
+    app.register_blueprint(onboarding)
+
+    pairing = Blueprint("federation_pairing_web", __name__)
+    pairing.add_url_rule(
+        "/onboarding/federation/pair",
+        endpoint="pair_device",
+        view_func=lambda: "paired",
+        methods=["POST"],
+    )
+    pairing.add_url_rule(
+        "/onboarding/federation/pairing-code",
+        endpoint="create_pairing_code",
+        view_func=lambda: "pairing-code",
+        methods=["POST"],
+    )
+    app.register_blueprint(pairing)
     return app
 
 
-def test_empty_installation_meets_user_with_first_admin_setup(tmp_path, monkeypatch):
+def test_empty_installation_meets_user_with_human_access_choices(tmp_path, monkeypatch):
     app = _empty_app(tmp_path, monkeypatch)
     client = app.test_client()
 
@@ -32,8 +70,10 @@ def test_empty_installation_meets_user_with_first_admin_setup(tmp_path, monkeypa
     page = client.get("/admin/users/bootstrap")
     assert page.status_code == 200
     body = page.get_data(as_text=True)
-    assert "Create the first user" in body
-    assert "Create administrator" in body
+    assert "Set up human access" in body
+    assert "Use an existing Federation account" in body
+    assert 'href="/onboarding"' in body
+    assert "Create administrator on this device" in body
 
     created = client.post(
         "/admin/users/bootstrap",
@@ -70,7 +110,62 @@ def test_empty_installation_meets_user_with_first_admin_setup(tmp_path, monkeypa
     normal = client.get("/")
     assert normal.status_code == 302
     assert "/login" in normal.headers["Location"]
+
+    # The anonymous pairing exception closes when this installation owns a human
+    # account. Normal role-based permissions apply from this point onward.
+    onboarding = client.get("/onboarding")
+    assert onboarding.status_code == 302
+    assert "/login" in onboarding.headers["Location"]
     assert audit_route_policy(app) == []
+
+
+def test_empty_installation_can_join_existing_federation_before_local_user(
+    tmp_path, monkeypatch
+):
+    app = _empty_app(tmp_path, monkeypatch)
+    client = app.test_client()
+
+    assert client.get("/onboarding").get_data(as_text=True) == "onboarding"
+    assert (
+        client.post("/onboarding/identity").get_data(as_text=True)
+        == "identity-created"
+    )
+    assert client.post("/onboarding/federation/pair").get_data(as_text=True) == "paired"
+
+    # Broader onboarding mutation remains closed. In particular, an anonymous
+    # browser cannot use federation_action to create a local Federation or join
+    # through a different authority path, and it cannot mint pairing grants.
+    federation_action = client.post("/onboarding/federation")
+    assert federation_action.status_code == 302
+    assert federation_action.headers["Location"].endswith("/admin/users/bootstrap")
+
+    pairing_code = client.post("/onboarding/federation/pairing-code")
+    assert pairing_code.status_code == 302
+    assert pairing_code.headers["Location"].endswith("/admin/users/bootstrap")
+
+    with app.app_context():
+        assert db.session.query(User).count() == 0
+
+
+def test_remote_member_closes_anonymous_pairing_before_shadow_user_exists(
+    tmp_path, monkeypatch
+):
+    app = _empty_app(tmp_path, monkeypatch)
+    monkeypatch.setattr(auth_routes, "saved_remote_member", lambda: True)
+    monkeypatch.setattr(auth_policy, "saved_remote_member", lambda: True)
+    client = app.test_client()
+
+    response = client.get("/onboarding")
+    assert response.status_code == 302
+    assert "/login" in response.headers["Location"]
+    assert "/admin/users/bootstrap" not in response.headers["Location"]
+
+    pair = client.post("/onboarding/federation/pair")
+    assert pair.status_code == 302
+    assert "/login" in pair.headers["Location"]
+
+    with app.app_context():
+        assert db.session.query(User).count() == 0
 
 
 def test_first_user_setup_validates_password_confirmation(tmp_path, monkeypatch):
