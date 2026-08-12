@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% from 'federation/_status_badge.html' import status_badge %}
-{% from 'federation/_section_nav.html' import section_nav %}
 {% block body %}
 {% set vm = recorder_control %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/federation.css') }}">
@@ -13,8 +12,6 @@
       <p>{{ vm.intro }}</p>
     </div>
   </header>
-
-  {{ section_nav(vm.sections, vm.active_section) }}
 
   {% if vm.degraded|default(false) %}
   <section class="federation-degraded" role="alert">

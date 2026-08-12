@@ -1,6 +1,5 @@
 {% extends 'base.html' %}
 {% from 'federation/_status_badge.html' import status_badge %}
-{% from 'federation/_section_nav.html' import section_nav %}
 {% from 'federation/_empty_state.html' import empty_state %}
 {% block body %}
 {% set vm = federation_page %}
@@ -18,8 +17,6 @@
       <span>{{ vm.updated_label }}</span>
     </div>
   </header>
-
-  {{ section_nav(vm.sections, vm.active_section) }}
 
   {% if vm.degraded.visible and vm['items'] %}
   <section class="federation-degraded" role="alert">
@@ -57,6 +54,7 @@
         <h3>{{ federation_current_device_name or 'This FCP device' }}</h3>
         <p>Safe inspection details from this device only. The Federation name is shared with trusted members while the device ID remains the technical identity.</p>
       </div>
+      <a class="federation-text-link" href="{{ url_for('web.status') }}">Open diagnostics</a>
     </header>
     {% if federation_device_self_naming_available %}
     <form method="post" action="{{ url_for('federation_web.rename_this_device') }}" style="margin:0 0 18px;display:flex;gap:8px;align-items:end;flex-wrap:wrap">
