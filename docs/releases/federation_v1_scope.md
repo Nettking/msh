@@ -17,6 +17,7 @@ Current release state:
 - automated foundation and product-composition evidence: implemented;
 - verified manual Federation-wide runtime-update capability: merged;
 - standalone recorder Federation bootstrap/publication and bounded remote recorder control: merged;
+- Federation-scoped human sign-in with leader-held credentials and signed member assertions: implemented;
 - complete physical CF7 evidence: not accepted;
 - Federation v1 end-to-end acceptance: false;
 - release tag: not created.
@@ -144,18 +145,20 @@ A standalone recorder launched directly through `python start_recorder.py` does 
 
 ### Human authentication and authorization
 
-- browser users sign in with human accounts that never reuse Federation node
-  IDs, pairing grants, recorder keys, or device identities;
-- `viewer`, `operator`, and `admin` map onto a central server-side permission
-  policy that routes check by permission rather than by role name;
-- the account store, roles, and authentication secrets are **device-local**, so
-  each installation bootstraps its own first administrator and a deactivation on
-  one device does not propagate to another; and
-- no human identity is carried on a Federation event, so the coordinator audit
-  log attributes a shared change to the acting device rather than to a person.
+- browser users sign in with human accounts that never reuse Federation node IDs, pairing grants, recorder keys, or device identities;
+- the Federation creator/leader is the human credential authority for a connected Federation;
+- passwords and password hashes remain only in the leader's local authentication database and are never replicated through Federation state;
+- trusted member devices use a browser redirect to the leader and accept only short-lived Ed25519-signed assertions bound to the Federation session, target node, human subject, roles, active state, random browser state, and expiry;
+- non-secret human authorization metadata (`email`, `active`, and role names), the leader's public sign-in identity/origin, and each member's own browser origin are carried on authenticated Federation session events;
+- coordinator policy permits only the Federation creator to publish human authority/user state, while members may advertise only their own browser endpoint;
+- `viewer`, `operator`, and `admin` map onto a central server-side permission policy that routes check by permission rather than by role name;
+- `/admin/users` is authoritative on the leader; member user-administration requests redirect to the leader or fail closed for unsafe writes;
+- member-local password login is disabled by default, including during Federation outages, so an old local credential store cannot silently bypass Federation revocation; and
+- an explicit `FCP_HUMAN_AUTH_LOCAL_FALLBACK=1` recovery setting can re-enable local member password login when an operator accepts that weaker boundary.
 
-Federation-wide human identity, cross-device revocation, and human attribution
-on shared writes are outside this scope and require a separate design.
+Human authentication and device/Federation authority remain distinct. A human `admin` permission allows the web application to request Federation administration, but does not create node membership or bypass coordinator authorization.
+
+The coordinator event audit still identifies the acting **device** for shared operations. End-to-end attribution of every non-auth Federation write to the initiating human is separate work; the new human-auth events themselves carry the human subject/authorization metadata needed for sign-in and revocation projection.
 
 ### Shared operator knowledge
 
@@ -220,8 +223,8 @@ A release tag may be created only after one exact candidate has:
 - desktop and mobile browser review;
 - recorder-plus-AI and separate AI/compute/storage-device scenarios;
 - restart, evidence invalidation/rerun, disable/re-enable, revocation, fencing, and controlled-rejoin evidence;
-- physical review of the current update/pairing/standalone-recorder surfaces relevant to the candidate;
+- physical review of the current update/pairing/standalone-recorder/human-sign-in surfaces relevant to the candidate;
 - a complete redacted physical evidence document validating against the candidate commit; and
-- no unresolved authority, privacy, data-loss, platform, browser, migration, update, or recorder-control blocker.
+- no unresolved authority, privacy, data-loss, platform, browser, migration, update, recorder-control, or human-authentication blocker.
 
 Acceptance truth is recorded in `catalog/federation/tests/cf7_acceptance/scenarios.json`. The false flags must remain false until a separate evidence-backed review changes them.
