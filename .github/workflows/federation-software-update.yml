@@ -36,9 +36,11 @@ jobs:
           catalog/flask_app/tests/test_federation_update_runtime.py
           catalog/flask_app/tests/test_federation_update_orchestration.py
           catalog/flask_app/tests/test_federation_update_host_agents.py
+          catalog/flask_app/tests/test_termux_federation_update_agent.py
           catalog/flask_app/tests/test_windows_migration_script.py
           catalog/flask_app/tests/test_windows_relay_volume_selector.py
           scripts/posix/fcp_recorder_update_agent.py
+          termux/fcp_phone_update_codec.py
       - name: Run update contract tests
         run: >-
           python -m pytest -o addopts= -q
@@ -46,6 +48,7 @@ jobs:
           catalog/flask_app/tests/test_federation_update_runtime.py
           catalog/flask_app/tests/test_federation_update_orchestration.py
           catalog/flask_app/tests/test_federation_update_host_agents.py
+          catalog/flask_app/tests/test_termux_federation_update_agent.py
           catalog/flask_app/tests/test_windows_migration_script.py
           catalog/flask_app/tests/test_windows_relay_volume_selector.py
       - name: Ruff update Python
@@ -65,9 +68,11 @@ jobs:
           catalog/flask_app/tests/test_federation_update_runtime.py
           catalog/flask_app/tests/test_federation_update_orchestration.py
           catalog/flask_app/tests/test_federation_update_host_agents.py
+          catalog/flask_app/tests/test_termux_federation_update_agent.py
           catalog/flask_app/tests/test_windows_migration_script.py
           catalog/flask_app/tests/test_windows_relay_volume_selector.py
           scripts/posix/fcp_recorder_update_agent.py
+          termux/fcp_phone_update_codec.py
 
       - name: Parse and smoke Windows host agent
         if: runner.os == 'Windows'
@@ -150,6 +155,8 @@ jobs:
         shell: bash
         run: |
           bash -n start.sh
+          bash -n termux/fcp-phone.sh
+          bash -n termux/fcp-phone-update-agent.sh
           python scripts/posix/fcp_update_agent.py \
             --repo-root "$PWD" \
             --data-directory "$RUNNER_TEMP/fcp-update-agent-smoke" \
