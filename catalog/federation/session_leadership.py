@@ -1,13 +1,13 @@
 """Durable Federation leader selection and fencing over session event history.
 
-The session creator remains immutable provenance.  Operational leader authority
-is a separate monotonic term recorded by coordinator-authored events.  Ordinary
+The session creator remains immutable provenance. Operational leader authority
+is a separate monotonic term recorded by coordinator-authored events. Ordinary
 members cannot self-promote: only the authoritative coordinator may append a
 leadership transition, either as an explicit handover requested by the current
 leader or after it observes the current leader disconnect while another current
 member remains connected.
 
-This is control-plane leadership inside one durable coordinator authority.  It
+This is control-plane leadership inside one durable coordinator authority. It
 does not claim cross-host consensus if the coordinator database/relay host itself
 is unavailable.
 """
@@ -16,11 +16,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from datetime import timedelta
 from typing import Any
 
 from .errors import AuthorizationError, FederationOperationError, FederationValidationError
-from .models import SessionEvent
-from .persistence import CoordinatorStore
+from .models import CapabilityStatus, SessionEvent
+from .persistence import CoordinatorStore, _request_key, _time, _token_hash
+from .redaction import redact_secrets
 
 LEADER_CHANGED_EVENT = "session.leader.changed"
 LEADERSHIP_SCHEMA = "fcp.session-leadership.v1"
@@ -296,9 +298,9 @@ class SessionLeadershipService:
     ) -> tuple[SessionLeadership, SessionEvent | None]:
         """Promote one connected member when the current leader is not connected.
 
-        Selection is deterministic by stable node ID.  The coordinator is the
+        Selection is deterministic by stable node ID. The coordinator is the
         sole writer of the transition, so temporary peer-to-peer partitions do
-        not let a member self-elect.  If the coordinator itself is unavailable,
+        not let a member self-elect. If the coordinator itself is unavailable,
         no transition can be committed and the Federation fails closed.
         """
 
@@ -321,6 +323,233 @@ class SessionLeadershipService:
                 request_id=request_id,
                 now=now,
             )
+
+    def create_invitation(
+        self,
+        *,
+        session_id: str,
+        actor_node_id: str,
+        now: Any,
+        ttl_seconds: int,
+        max_uses: int,
+        request_id: str,
+    ) -> dict[str, Any]:
+        """Create an invitation for the current leader, including successors."""
+
+        leadership = self.require_leader(
+            session_id=session_id, actor_node_id=actor_node_id
+        )
+        if leadership.creator_node_id == actor_node_id:
+            return self.store.create_invitation(
+                session_id=session_id,
+                actor_node_id=actor_node_id,
+                now=now,
+                ttl_seconds=ttl_seconds,
+                max_uses=max_uses,
+                request_id=request_id,
+            )
+        # The legacy store intentionally authorizes only the immutable creator.
+        # Reproduce its bounded/idempotent token mutation here after the current
+        # leader check rather than rewriting historical creator provenance.
+        if not 1 <= ttl_seconds <= 7 * 24 * 60 * 60:
+            raise FederationValidationError(
+                "invalid-token-ttl", "ttl_seconds", "is outside the supported bound"
+            )
+        if not 1 <= max_uses <= 100:
+            raise FederationValidationError(
+                "invalid-token-use-limit", "max_uses", "is outside the supported bound"
+            )
+        request_key = _request_key(request_id)
+        if request_key is None:
+            raise FederationValidationError(
+                "invalid-request-id", "request_id", "must be non-empty text"
+            )
+        raw_token = f"fcp_join_{self.store._token_factory(32)}"
+        expires_at = now + timedelta(seconds=ttl_seconds)
+        replaced = False
+        with self.store.transaction() as database:
+            self.store._require_membership(
+                database, session_id=session_id, node_id=actor_node_id
+            )
+            current = self._snapshot_tx(database, session_id)
+            if current.leader_node_id != actor_node_id:
+                raise AuthorizationError(
+                    "federation-leader-required",
+                    "leadership changed before the invitation could be committed",
+                    "actor_node_id",
+                )
+            existing = database.execute(
+                """
+                SELECT * FROM session_invitations
+                WHERE created_by_node_id=? AND request_id=?
+                """,
+                (actor_node_id, request_key),
+            ).fetchone()
+            if existing is not None and (
+                existing["session_id"] != session_id
+                or existing["requested_ttl_seconds"] != ttl_seconds
+                or existing["max_uses"] != max_uses
+            ):
+                raise FederationOperationError(
+                    "idempotency-conflict",
+                    "invitation request ID was reused with different bounds",
+                    "request_id",
+                )
+            if existing is not None and existing["use_count"] > 0:
+                raise FederationOperationError(
+                    "invitation-already-used",
+                    "an invitation from this request has already been used",
+                    "request_id",
+                )
+            if existing is None:
+                invitation_id = f"invite-{self.store._id_factory()}"
+                database.execute(
+                    """
+                    INSERT INTO session_invitations(
+                        token_hash,invitation_id,session_id,created_by_node_id,
+                        request_id,requested_ttl_seconds,created_at,expires_at,max_uses
+                    ) VALUES(?,?,?,?,?,?,?,?,?)
+                    """,
+                    (
+                        _token_hash(raw_token), invitation_id, session_id,
+                        actor_node_id, request_key, ttl_seconds, _time(now),
+                        _time(expires_at), max_uses,
+                    ),
+                )
+            else:
+                invitation_id = str(existing["invitation_id"])
+                replaced = True
+                database.execute(
+                    """
+                    UPDATE session_invitations
+                    SET token_hash=?,created_at=?,expires_at=?,revoked_at=NULL
+                    WHERE invitation_id=?
+                    """,
+                    (_token_hash(raw_token), _time(now), _time(expires_at), invitation_id),
+                )
+            self.store._audit(
+                database,
+                now=now,
+                action="session-invitation.created",
+                outcome="accepted",
+                reason="idempotent-token-rotated" if replaced else "bounded-token-created",
+                actor_node_id=actor_node_id,
+                session_id=session_id,
+                request_id=request_id,
+                details={
+                    "invitation_id": invitation_id,
+                    "expires_at": _time(expires_at),
+                    "max_uses": max_uses,
+                },
+            )
+        return {
+            "token": raw_token,
+            "invitation_id": invitation_id,
+            "session_id": session_id,
+            "expires_at": _time(expires_at),
+            "max_uses": max_uses,
+            "replaced": replaced,
+        }
+
+    def remove_member_as_leader(
+        self,
+        *,
+        session_id: str,
+        actor_node_id: str,
+        target_node_id: str,
+        request_id: str,
+        reason: str,
+        now: Any,
+    ) -> bool:
+        """Remove another member while fencing stale or self-removing leaders."""
+
+        summary = str(reason).strip()[:512] or "removed-by-federation-leader"
+        if redact_secrets(summary) != summary:
+            raise FederationValidationError(
+                "nonpublic-removal-reason",
+                "reason",
+                "must not contain credentials, backend paths, or physical addresses",
+            )
+        with self.store.transaction() as database:
+            self.store._require_membership(
+                database, session_id=session_id, node_id=actor_node_id
+            )
+            leadership = self._snapshot_tx(database, session_id)
+            if leadership.leader_node_id != actor_node_id:
+                raise AuthorizationError(
+                    "federation-leader-required",
+                    "only the current Federation leader may remove another member",
+                    "actor_node_id",
+                )
+            if target_node_id == actor_node_id:
+                raise AuthorizationError(
+                    "leader-self-removal-requires-transfer",
+                    "transfer Federation leadership before removing the active leader",
+                    "target_node_id",
+                )
+            target = database.execute(
+                "SELECT * FROM session_memberships WHERE session_id=? AND node_id=?",
+                (session_id, target_node_id),
+            ).fetchone()
+            prior = database.execute(
+                """
+                SELECT payload_json FROM session_events
+                WHERE session_id=? AND actor_node_id=? AND request_id=?
+                  AND event_type='node.left'
+                """,
+                (session_id, actor_node_id, _request_key(f"{request_id}:left")),
+            ).fetchone()
+            if prior is not None:
+                prior_payload = json.loads(prior["payload_json"])
+                if prior_payload != {"node_id": target_node_id, "reason": summary}:
+                    raise FederationOperationError(
+                        "idempotency-conflict",
+                        "membership removal request ID was reused with different content",
+                        "request_id",
+                    )
+                if target is not None and target["removed_at"] is None:
+                    raise FederationOperationError(
+                        "idempotency-conflict",
+                        "membership removal request belongs to an earlier membership lifecycle",
+                        "request_id",
+                    )
+                return False
+            if target is None or target["removed_at"] is not None:
+                return False
+            database.execute(
+                """
+                UPDATE session_memberships
+                SET removed_at=?,removed_by=?,removal_reason=?
+                WHERE session_id=? AND node_id=?
+                """,
+                (_time(now), actor_node_id, summary, session_id, target_node_id),
+            )
+            database.execute(
+                "UPDATE capabilities SET status=? WHERE session_id=? AND node_id=?",
+                (CapabilityStatus.REVOKED.value, session_id, target_node_id),
+            )
+            self.store._append_event_tx(
+                database,
+                session_id=session_id,
+                actor_node_id=actor_node_id,
+                request_id=f"{request_id}:left",
+                event_type="node.left",
+                payload={"node_id": target_node_id, "reason": summary},
+                now=now,
+                authorize_actor=False,
+            )
+            self.store._audit(
+                database,
+                now=now,
+                action="session.member.remove",
+                outcome="accepted",
+                reason="membership-removed",
+                actor_node_id=actor_node_id,
+                session_id=session_id,
+                request_id=request_id,
+                details={"target_node_id": target_node_id},
+            )
+            return True
 
 
 __all__ = [
