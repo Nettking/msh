@@ -1,6 +1,6 @@
 # Human users, sign-in, and permissions
 
-Status: **current user and administrator guide**  
+Status: **current user and administrator guide**
 Reviewed: **2026-08-12**
 
 FCP has a separate account system for **people using the web application**. These human accounts are not Federation devices and do not reuse node identities, pairing codes, recorder keys, or machine credentials.
