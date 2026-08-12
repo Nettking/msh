@@ -1,0 +1,35 @@
+{% extends 'security/_auth_base.html' %}
+
+{% block auth_title %}Connect device · FCP{% endblock %}
+
+{% block auth_card %}
+  <h1 class="auth-title">Connect this device</h1>
+  <p class="auth-lede">You are signed in to the Federation authority. Approve this device to join the Federation using your existing human account.</p>
+
+  <dl class="auth-summary">
+    <div>
+      <dt>Device</dt>
+      <dd>{{ target_name }}</dd>
+    </div>
+    <div>
+      <dt>Device ID</dt>
+      <dd><code>{{ target_node_id }}</code></dd>
+    </div>
+    <div>
+      <dt>Federation fingerprint</dt>
+      <dd><code>{{ federation_fingerprint }}</code></dd>
+    </div>
+  </dl>
+
+  <form class="auth-form" method="post" action="{{ url_for('federation_enrollment.authorize') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="state" value="{{ state }}">
+    <input type="hidden" name="return_url" value="{{ return_url }}">
+    <input type="hidden" name="target_node_id" value="{{ target_node_id }}">
+    <input type="hidden" name="target_name" value="{{ target_name }}">
+    <input type="hidden" name="federation_fingerprint" value="{{ federation_fingerprint }}">
+    <button class="button-primary auth-submit" type="submit">Connect device and continue</button>
+  </form>
+
+  <p class="auth-note">FCP creates a short-lived one-use enrollment grant. Your password stays on this Federation authority and is never sent to the joining device.</p>
+{% endblock %}
