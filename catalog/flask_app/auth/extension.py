@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import os
-import re
 import secrets
 import uuid
 from datetime import timedelta
 from pathlib import Path
 
 import click
+from email_validator import EmailNotValidError, validate_email
 from flask import Flask, current_app, request
 from flask_security import SQLAlchemyUserDatastore, Security, hash_password
 from flask_wtf.csrf import CSRFProtect
@@ -94,6 +94,13 @@ def _validated_password_salt(app: Flask) -> str:
     return _read_or_create_secret(_secret_directory() / "password-salt")
 
 
+def _normalize_email(value: str) -> str:
+    try:
+        return validate_email(value.strip(), check_deliverability=False).normalized.lower()
+    except EmailNotValidError as exc:
+        raise ValueError("invalid email") from exc
+
+
 def _seed_policy(datastore: SQLAlchemyUserDatastore) -> None:
     for role_name, names in ROLE_PERMISSIONS.items():
         role = datastore.find_role(role_name)
@@ -115,9 +122,10 @@ def _register_cli(app: Flask, datastore: SQLAlchemyUserDatastore) -> None:
     @click.option("--password", prompt=True, hide_input=True, confirmation_prompt=True)
     def create_admin(email: str, password: str) -> None:
         """Create an administrator; safely refuse duplicates."""
-        normalized = email.strip().lower()
-        if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", normalized):
-            raise click.ClickException("A valid email address is required")
+        try:
+            normalized = _normalize_email(email)
+        except ValueError as exc:
+            raise click.ClickException("A valid email address is required") from exc
         if len(password) < 12:
             raise click.ClickException("Password must contain at least 12 characters")
         if datastore.find_user(email=normalized) is not None:
