@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from collections.abc import Mapping
 
 from flask import (
@@ -25,6 +26,7 @@ from catalog.federation.errors import (
     FederationValidationError,
     ProtocolCompatibilityError,
 )
+from catalog.federation.tailscale_host_discovery import load_snapshot
 from catalog.node.identity import NodeIdentityStateError
 
 from .capability_contribution_routes import (
@@ -215,6 +217,15 @@ def _reconcile_contributions_once() -> None:
         )
 
 
+def _attach_tailscale_discovery(view_model: dict[str, object]) -> dict[str, object]:
+    path = os.getenv(
+        "FCP_TAILSCALE_DISCOVERY_FILE",
+        "data/federation/onboarding/tailscale_discovery.json",
+    )
+    view_model["tailscale_discovery"] = load_snapshot(path)
+    return view_model
+
+
 def _build_view_model() -> dict[str, object]:
     _reconcile_contributions_once()
     view_model, _benchmark_complete = (
@@ -222,7 +233,7 @@ def _build_view_model() -> dict[str, object]:
     )
     requested_step = request.args.get("step")
     try:
-        return get_capability_startup_transition_service().apply_to_onboarding_view_model(
+        resolved = get_capability_startup_transition_service().apply_to_onboarding_view_model(
             view_model,
             requested_step=requested_step,
         )
@@ -231,13 +242,14 @@ def _build_view_model() -> dict[str, object]:
             "Capability startup transition unavailable (%s)",
             type(exc).__name__,
         )
-        return _degraded_view_model(view_model)
+        resolved = _degraded_view_model(view_model)
     except Exception as exc:  # noqa: BLE001 - render must fail closed
         current_app.logger.warning(
             "Capability startup transition unavailable (%s)",
             type(exc).__name__,
         )
-        return _degraded_view_model(view_model)
+        resolved = _degraded_view_model(view_model)
+    return _attach_tailscale_discovery(resolved)
 
 
 def _render_onboarding() -> Response:
