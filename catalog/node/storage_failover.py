@@ -24,12 +24,12 @@ from catalog.federation.phase_d_client import PhaseDLogicalStorageClient
 from catalog.federation.phase_d_control import PhaseDControlPlane
 from catalog.federation.recorder_storage_relay import (
     RecorderAwareStorageControlRelayChannel,
-    RecorderLogicalStorageAuthority,
     STORAGE_CONTROL_CAPABILITY_PROTOCOL,
     STORAGE_CONTROL_CAPABILITY_TYPE,
     STORAGE_CONTROL_CAPABILITY_VERSION,
 )
 from catalog.federation.relay_storage import RelayStorageEndpoint
+from catalog.federation.shared_file_storage import FederationLogicalStorageAuthority
 
 from .client import RelayNodeClient
 from .state import EnrollmentState
@@ -271,7 +271,7 @@ async def _run(arguments: argparse.Namespace) -> int:
             ),
             catalog_cursor_secret=_catalog_cursor_secret(arguments),
         )
-        recorder_authority = RecorderLogicalStorageAuthority(
+        recorder_authority = FederationLogicalStorageAuthority(
             client=client,
             logical_client=logical_client,
             session_id=arguments.session_id,
