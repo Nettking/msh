@@ -4,9 +4,13 @@ from __future__ import annotations
 
 from typing import Any
 
-from .federation_knowledge_service import get_federation_knowledge_repository
+from .federation_knowledge_service import (
+    FederationKnowledgeRejected,
+    get_federation_knowledge_repository,
+)
 from .operator_strategy_service import (
     SCHEMA_VERSION,
+    OperatorStrategyError,
     OperatorStrategyService,
     _normalize_record,
 )
@@ -46,16 +50,21 @@ class FederatedOperatorStrategyService(OperatorStrategyService):
 
     def _write_records(self, records: list[dict[str, Any]]) -> None:
         desired = [_normalize_record(record) for record in records]
-        payload = get_federation_knowledge_repository().write_payload(
-            collection=COLLECTION,
-            document_schema=SCHEMA_VERSION,
-            items_key=ITEMS_KEY,
-            desired_payload={
-                "schema": SCHEMA_VERSION,
-                "updated_at": "",
-                ITEMS_KEY: desired,
-            },
-        )
+        try:
+            payload = get_federation_knowledge_repository().write_payload(
+                collection=COLLECTION,
+                document_schema=SCHEMA_VERSION,
+                items_key=ITEMS_KEY,
+                desired_payload={
+                    "schema": SCHEMA_VERSION,
+                    "updated_at": "",
+                    ITEMS_KEY: desired,
+                },
+            )
+        except FederationKnowledgeRejected as exc:
+            # Every operator-strategy route already reports this error type, so
+            # a refused record reaches the operator instead of the error page.
+            raise OperatorStrategyError(f"Not shared: {exc.message}.") from exc
         authoritative = [
             _normalize_record(item)
             for item in payload.get(ITEMS_KEY, [])

@@ -1,6 +1,6 @@
 {% extends 'base.html' %}
 {% block body %}
-<section class="page-intro"><h2>Machine notes</h2><p>Capture machine-specific experience such as warm-up behavior, drift, and habits.</p><p><strong>{{ storage_scope|default('Federation shared') }}</strong> · The note belongs to the machine in the shared knowledge model, not to the PC that captured it.</p></section>
+<section class="page-intro"><h2>Machine notes</h2><p>Capture machine-specific experience such as warm-up behavior, drift, and habits.</p><p><strong>{{ storage_scope|default('Local cache') }}</strong> · The note belongs to the machine in the shared knowledge model, not to the PC that captured it.</p></section>
 <section class="section-block section-block--primary">
   <h3>Add machine note</h3>
   <form method="post" action="{{ url_for('operator_support_web.save_machine_note') }}" class="control-form control-card source-inline-form">
@@ -12,5 +12,5 @@
     <button class="button-primary" type="submit">Save machine note</button>
   </form>
 </section>
-<section class="section-block"><h3>Recent machine notes</h3><p>Local compatibility cache: <code>{{ records_path }}</code>.</p>{% if notes %}<div class="stack-list">{% for item in notes %}<article class="stack-row"><div><h4>{{ item.applies_when or 'Machine note' }}</h4><p>{{ item.note }}</p><p class="text-muted">machine {{ item.machine_id or 'unassigned' }} · {{ item.source }}</p><p>{{ item.caution }}</p></div></article>{% endfor %}</div>{% else %}<p>No machine notes saved yet.</p>{% endif %}</section>
+<section class="section-block"><h3>Recent machine notes</h3><p>Local compatibility cache: <code>{{ records_path }}</code>.</p>{% if notes %}<div class="stack-list">{% for item in notes %}<article class="stack-row"><div><h4>{{ item.applies_when or 'Machine note' }}</h4><p>{{ item.note }}</p><p class="text-muted">machine {{ item.machine_name or item.machine_id or 'unassigned' }} · {{ item.source }}</p><p>{{ item.caution }}</p></div></article>{% endfor %}</div>{% else %}<p>No machine notes saved yet.</p>{% endif %}</section>
 {% endblock %}

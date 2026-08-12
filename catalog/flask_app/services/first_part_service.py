@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from .source_inventory_service import machine_label
+
 
 DEFAULT_FIRST_PART_PATH = Path("data") / "quality" / "first_part_checks.json"
 CHECKLIST_ITEMS = [
@@ -38,6 +40,7 @@ class FirstPartService:
                 "created_at": _now_utc(),
                 "signed_at": _now_utc() if signed else "",
                 "machine_id": _text(form, "machine_id"),
+                "machine_name": machine_label(_text(form, "machine_id")),
                 "part_id": _text(form, "part_id"),
                 "program_id": _text(form, "program_id"),
                 "checklist": {item: bool(form.get(item)) for item in CHECKLIST_ITEMS},

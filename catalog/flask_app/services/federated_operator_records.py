@@ -4,7 +4,10 @@ from __future__ import annotations
 
 from typing import Any
 
-from .federation_knowledge_service import get_federation_knowledge_repository
+from .federation_knowledge_service import (
+    FederationKnowledgeRejected,
+    get_federation_knowledge_repository,
+)
 from .first_part_service import FirstPartService
 from .machine_notes_service import MachineNotesService
 from .operator_confirmation_service import OperatorConfirmationService
@@ -20,6 +23,14 @@ class _FederatedCollectionMixin:
     def storage_scope(self) -> str:
         repository = get_federation_knowledge_repository()
         return "Federation shared" if repository.is_shared() else "Local cache"
+
+    def add_from_form(self, form: Any) -> tuple[bool, str]:
+        # A refused record is the operator's to correct, so report it the same
+        # way ordinary validation is reported instead of failing the request.
+        try:
+            return super().add_from_form(form)  # type: ignore[misc]
+        except FederationKnowledgeRejected as exc:
+            return False, f"Not shared: {exc.message}."
 
     def _load(self) -> dict[str, Any]:
         local_payload = super()._load()  # type: ignore[misc]
