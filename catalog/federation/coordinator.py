@@ -64,7 +64,9 @@ class SessionCoordinator:
             actor_node_id=actor_node_id,
         )
         enrollment = self.store.create_enrollment_token(
-            now=self._clock(), ttl_seconds=ttl_seconds, max_uses=1,
+            now=self._clock(),
+            ttl_seconds=ttl_seconds,
+            max_uses=1,
             created_by=f"federation-leader:{actor_node_id}",
         )
         invitation = self.leadership.create_invitation(
@@ -114,7 +116,9 @@ class SessionCoordinator:
     def session_leadership(self, session_id: str) -> SessionLeadership:
         return self.leadership.current(session_id)
 
-    def require_session_leader(self, *, session_id: str, actor_node_id: str) -> SessionLeadership:
+    def require_session_leader(
+        self, *, session_id: str, actor_node_id: str
+    ) -> SessionLeadership:
         return self.leadership.require_leader(
             session_id=session_id,
             actor_node_id=actor_node_id,
@@ -237,21 +241,21 @@ class SessionCoordinator:
     def heartbeat(self, node_id: str) -> None:
         self.store.heartbeat(node_id=node_id, now=self._clock())
 
-    def connected(self, *, node_id: str, connection_id: str) -> tuple[SessionEvent, ...]:
-        now = self._clock()
+    def connected(self, *, node_id: str, connection_id: str) -> None:
+        """Record connectivity without electing from relay reconnect order.
+
+        After a relay restart every node starts disconnected. Promoting whichever
+        member reconnects first would make startup timing an authority decision
+        and would insert unrelated session revisions. Failover is therefore
+        triggered only by an observed live disconnect or stale-heartbeat sweep
+        while this coordinator is continuously authoritative.
+        """
+
         self.store.mark_connected(
-            node_id=node_id, connection_id=connection_id, now=now
+            node_id=node_id,
+            connection_id=connection_id,
+            now=self._clock(),
         )
-        events: list[SessionEvent] = []
-        for session_id in self.store.session_ids_for_node(node_id):
-            _leadership, event = self.leadership.ensure_available(
-                session_id=session_id,
-                now=now,
-                reason="leader-unavailable-on-connect",
-            )
-            if event is not None:
-                events.append(event)
-        return tuple(events)
 
     def disconnected(
         self, *, node_id: str, error: str | None = None
