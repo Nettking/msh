@@ -19,6 +19,7 @@ from flask_security import current_user, hash_password
 from sqlalchemy.exc import IntegrityError
 
 from .federation import get_federated_human_auth_service, saved_remote_member
+from .federation_enrollment import fresh_discovered_federations
 from .models import FirstUserBootstrapClaim, Role, User, db
 from .policy import PRE_AUTH_FEDERATION_BOOTSTRAP_ENDPOINTS, ROLE_SUMMARIES
 
@@ -110,16 +111,32 @@ def _commit_first_user(user: User) -> bool:
 
 @auth_users.before_app_request
 def first_user_bootstrap_gate():
-    """Send a new local installation to first-user setup instead of sign-in.
+    """Choose first-authority bootstrap or existing-Federation human sign-in.
 
-    A fresh device may enter only the bounded identity/pairing endpoints needed
-    to join an existing Federation before a local human shadow account exists.
-    Remotely paired Federation members then use their Federation human sign-in
-    authority even when they still have no local shadow users.
+    If Tailscale has already discovered an existing Federation, a fresh device
+    goes to the normal sign-in surface.  Human authentication on the authority
+    then approves device enrollment.  Local administrator creation remains only
+    the explicit first-device/standalone path.
     """
 
     if saved_remote_member() or _has_users():
         return None
+
+    # The login page is a valid fresh-device surface.  With a discovered
+    # Federation it offers authenticated enrollment; without one it remains a
+    # harmless sign-in page and the default bootstrap redirect still points at
+    # first-user creation.
+    if request.endpoint == "security.login":
+        return None
+
+    if (
+        request.endpoint == _BOOTSTRAP_ENDPOINT
+        and request.method == "GET"
+        and request.args.get("local") != "1"
+        and fresh_discovered_federations()
+    ):
+        return redirect(url_for("security.login"))
+
     if request.endpoint in {
         _BOOTSTRAP_ENDPOINT,
         _DISCOVERY_ENDPOINT,
@@ -147,13 +164,13 @@ def bootstrap_user():
     confirmation = request.form.get("password_confirm", "")
     if email is None:
         flash("Enter a valid email address.", "error")
-        return redirect(url_for(_BOOTSTRAP_ENDPOINT))
+        return redirect(url_for(_BOOTSTRAP_ENDPOINT, local=1))
     if len(password) < 12:
         flash("Password must contain at least 12 characters.", "error")
-        return redirect(url_for(_BOOTSTRAP_ENDPOINT))
+        return redirect(url_for(_BOOTSTRAP_ENDPOINT, local=1))
     if password != confirmation:
         flash("The passwords do not match.", "error")
-        return redirect(url_for(_BOOTSTRAP_ENDPOINT))
+        return redirect(url_for(_BOOTSTRAP_ENDPOINT, local=1))
 
     admin = db.session.query(Role).filter_by(name="admin").one_or_none()
     if admin is None:
