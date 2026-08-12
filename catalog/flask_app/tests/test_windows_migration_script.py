@@ -77,7 +77,8 @@ def test_migrate_cmd_delegates_to_powershell_bootstrap() -> None:
     launcher = _migration_launcher()
 
     assert "migrate_existing_fcp.ps1" in launcher
-    assert '-RepoRoot "%~dp0"' in launcher
+    assert '-RepoRoot "%~dp0."' in launcher
+    assert '-RepoRoot "%~dp0"' not in launcher
     assert "start.cmd --fresh" not in launcher
     assert "git reset" not in launcher
     assert "git clean" not in launcher
