@@ -36,11 +36,6 @@ _UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _HUMAN_CSRF_BLUEPRINTS = frozenset(
     {"security", "auth_users", "federated_human_auth", "federation_enrollment"}
 )
-# The authority posts the one-use enrollment grant cross-origin to the fresh
-# device. That callback is protected by a high-entropy, expiring browser state
-# value instead of a same-origin CSRF token. No other enrollment mutation is
-# exempt from normal Flask-WTF CSRF protection.
-_HUMAN_CSRF_EXEMPT_ENDPOINTS = frozenset({"federation_enrollment.callback"})
 _LEGACY_PLACEHOLDERS = frozenset({"fcp-dev", "fcp-dev-change-me"})
 
 
@@ -263,8 +258,6 @@ def init_human_auth(app: Flask) -> None:
     @app.before_request
     def protect_human_auth_forms():
         if not current_app.config.get("WTF_CSRF_ENABLED", True):
-            return None
-        if request.endpoint in _HUMAN_CSRF_EXEMPT_ENDPOINTS:
             return None
         if (
             request.method in _UNSAFE_METHODS
