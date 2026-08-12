@@ -1,0 +1,156 @@
+from __future__ import annotations
+
+import json
+from datetime import datetime, timezone
+from pathlib import Path
+from types import SimpleNamespace
+
+from flask import Flask
+
+from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
+from catalog.federation.models import CommitState
+from catalog.federation.storage_catalog import CommittedBatchReference
+from catalog.federation.storage_protocol import BatchIngestRequest
+from catalog.flask_app.services.federated_jsonl_product_bridge import (
+    FederatedJsonlProductBridge,
+)
+
+_MANIFEST_HASH = "sha256:" + "a" * 64
+
+
+def _bridge(tmp_path: Path, name: str) -> FederatedJsonlProductBridge:
+    data_root = tmp_path / name / "data"
+    app = Flask(name)
+    bridge = FederatedJsonlProductBridge(
+        app,
+        SimpleNamespace(relay_runtime=None),
+        data_root=data_root,
+        database=tmp_path / name / "state.sqlite3",
+        cache_root=tmp_path / name / "cache",
+        mirror_root=data_root / "federation" / "shared" / "jsonl-files",
+    )
+    bridge._ensure_initialized()
+    return bridge
+
+
+def _reference(batch: dict[str, object], *, session_id: str) -> CommittedBatchReference:
+    content = batch["content"]
+    assert isinstance(content, dict)
+    encoded = json.dumps(
+        content,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return CommittedBatchReference(
+        session_id=session_id,
+        group_id=str(batch["group_id"]),
+        dataset_id=str(batch["dataset_id"]),
+        batch_id=str(batch["batch_id"]),
+        idempotency_key=str(batch["idempotency_key"]),
+        content_hash=BatchIngestRequest.calculate_content_hash(content),
+        size_bytes=len(encoded),
+        schema_name=str(batch["dataset_schema_name"]),
+        schema_version=int(batch["dataset_schema_version"]),
+        source_id=None,
+        first_sequence=None,
+        last_sequence=None,
+        commit_state=CommitState.COMMITTED,
+        acknowledged_provider_ids=("storage-a",),
+        committed_at=datetime(2026, 8, 12, tzinfo=timezone.utc),
+        manifest_revision=1,
+        manifest_hash=_MANIFEST_HASH,
+    )
+
+
+def test_remote_upload_materializes_into_unchanged_legacy_jsonl_scanner(tmp_path: Path):
+    source = _bridge(tmp_path, "source")
+    target = _bridge(tmp_path, "target")
+    session_id = "session-federated-jsonl-test"
+    source_node = "node-source"
+    target_node = "node-target"
+
+    upload = source.data_root / "uploads" / "upload-1" / "measurements.jsonl"
+    upload.parent.mkdir(parents=True, exist_ok=True)
+    original = (
+        b'{"timestamp":"2026-08-12T00:00:00Z","machine_id":"A","sequence":1}\n'
+        b'{"timestamp":"2026-08-12T00:00:01Z","machine_id":"A","sequence":2}\n'
+    )
+    upload.write_bytes(original)
+
+    recorder = (
+        source.data_root
+        / "sources"
+        / "mtconnect_recorder"
+        / "jsonl"
+        / "machine"
+        / "1"
+        / "2026-08-12"
+        / "recorder.jsonl"
+    )
+    recorder.parent.mkdir(parents=True, exist_ok=True)
+    recorder.write_text('{"timestamp":"2026-08-12T00:00:00Z"}\n', encoding="utf-8")
+
+    candidates = {relative for relative, _path in source._local_candidates()}
+    assert "uploads/upload-1/measurements.jsonl" in candidates
+    assert not any(value.startswith("sources/mtconnect_recorder/jsonl/") for value in candidates)
+
+    source._prepare_local_rows(source_node)
+    entries = source._pending_publish_entries(
+        session_id=session_id,
+        node_id=source_node,
+        group_id="storage-1",
+        maximum=128,
+    )
+    assert entries
+
+    materialized = False
+    for batch, _relative_path, _index in entries:
+        reference = _reference(batch, session_id=session_id)
+        materialized = (
+            target._ingest_remote(
+                reference,
+                batch["content"],
+                local_node_id=target_node,
+            )
+            or materialized
+        )
+
+    assert materialized is True
+    mirrored = list(target.mirror_root.rglob("*.jsonl"))
+    assert len(mirrored) == 1
+    assert mirrored[0].read_bytes() == original
+
+    discovered = list(iter_jsonl_files(target.data_root, recursive=True))
+    assert mirrored[0] in discovered
+    records = list(iter_jsonl_records(mirrored[0]))
+    assert [record["sequence"] for record in records] == [1, 2]
+
+
+def test_own_published_file_is_not_mirrored_back_as_a_duplicate(tmp_path: Path):
+    bridge = _bridge(tmp_path, "self")
+    session_id = "session-self-jsonl-test"
+    node_id = "node-self"
+    source = bridge.data_root / "uploads" / "self.jsonl"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text('{"timestamp":"2026-08-12T00:00:00Z"}\n', encoding="utf-8")
+
+    bridge._prepare_local_rows(node_id)
+    entries = bridge._pending_publish_entries(
+        session_id=session_id,
+        node_id=node_id,
+        group_id="storage-1",
+        maximum=128,
+    )
+    for batch, _relative_path, _index in entries:
+        assert (
+            bridge._ingest_remote(
+                _reference(batch, session_id=session_id),
+                batch["content"],
+                local_node_id=node_id,
+            )
+            is False
+        )
+
+    assert list(bridge.mirror_root.rglob("*.jsonl")) == []
