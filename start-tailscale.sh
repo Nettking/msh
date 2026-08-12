@@ -17,16 +17,22 @@ if [ -z "$FCP_TAILSCALE_IP" ]; then
 fi
 
 : "${FCP_WEB_BIND:=$FCP_TAILSCALE_IP}"
-: "${FCP_WEB_PORT:=5000}"
 : "${FCP_DATA_DIR:=$ROOT/data}"
-export FCP_WEB_BIND FCP_WEB_PORT FCP_DATA_DIR
+FCP_TAILSCALE_DISCOVERY_PORT=${FCP_WEB_PORT:-5000}
+export FCP_WEB_BIND FCP_DATA_DIR
 
-DISCOVERY_FILE="$FCP_DATA_DIR/federation/onboarding/tailscale_discovery.json"
+# Keep the public-safe discovery snapshot outside data/federation. A --fresh
+# reset intentionally removes data/federation, but a fresh second device still
+# needs this snapshot on its login screen to find the existing Federation.
+DISCOVERY_FILE="$FCP_DATA_DIR/tailscale_discovery.json"
 if command -v python3 >/dev/null 2>&1; then
   echo "Discovering FCP Federations through the existing Tailscale login..."
-  if ! python3 -m catalog.federation.tailscale_host_discovery \
+  # Execute the standalone stdlib-only file directly. Running it with -m would
+  # first import catalog.federation.__init__ and accidentally require optional
+  # PostgreSQL/libpq support on the host.
+  if ! python3 "$ROOT/catalog/federation/tailscale_host_discovery.py" \
     --output "$DISCOVERY_FILE" \
-    --web-port "$FCP_WEB_PORT"; then
+    --web-port "$FCP_TAILSCALE_DISCOVERY_PORT"; then
     echo "Tailscale discovery failed safely; normal Federation onboarding remains available." >&2
   fi
 else
