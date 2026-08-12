@@ -21,7 +21,6 @@ from catalog.federation.shared_file_storage import (
     normalize_jsonl_relative_path,
     validate_federated_jsonl_ingest,
 )
-from catalog.federation.storage_protocol import BatchIngestResult, BatchIngestState
 
 SESSION = "session-jsonl-tests"
 ACTOR = "node-jsonl-tests"
@@ -74,15 +73,7 @@ class _LogicalStorage:
 
     async def ingest_batch(self, **kwargs):
         self.calls.append(dict(kwargs))
-        return PhaseDIngestOutcome(
-            committed=True,
-            result=BatchIngestResult(
-                batch_id=str(kwargs["batch_id"]),
-                idempotency_key=str(kwargs["idempotency_key"]),
-                content_hash="sha256:" + "0" * 64,
-                state=BatchIngestState.STORED,
-            ),
-        )
+        return PhaseDIngestOutcome(committed=True)
 
 
 @pytest.mark.asyncio
@@ -118,7 +109,7 @@ async def test_generic_jsonl_uses_membership_authorizer_not_recorder_authorizer(
     )
 
     assert response["status"] == "accepted"
-    assert response["operation"] == "batch_ingest"
+    assert response["operation"] == "batch.ingest"
     assert membership_calls == [
         (ACTOR, SESSION, GROUP, str(payload["dataset_id"]))
     ]
@@ -143,7 +134,12 @@ def test_ingest_is_bound_to_authenticated_actor():
 
 
 def test_traversal_and_non_jsonl_paths_are_rejected():
-    for value in ("../secret.jsonl", "/tmp/file.jsonl", "data/file.txt", "a\\b.jsonl"):
+    for value in (
+        "../secret.jsonl",
+        "/tmp/file.jsonl",
+        "data/file.txt",
+        "a\\b.jsonl",
+    ):
         with pytest.raises(FederationValidationError):
             normalize_jsonl_relative_path(value)
 
