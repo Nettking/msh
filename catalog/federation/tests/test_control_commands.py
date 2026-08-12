@@ -76,8 +76,9 @@ def test_parse_payload_rejects_reversed_lifetime() -> None:
 
 
 def test_timestamp_helpers_require_aware_values() -> None:
+    naive = datetime.fromisoformat("2026-08-12T20:00:00")
     with pytest.raises(ValueError, match="malformed_timestamp"):
-        stamp_utc(datetime(2026, 8, 12, 20, 0))
+        stamp_utc(naive)
     with pytest.raises(ValueError, match="malformed_timestamp"):
         parse_utc_stamp("2026-08-12T20:00:00")
 
