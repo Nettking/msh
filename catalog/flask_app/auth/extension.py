@@ -14,6 +14,14 @@ from flask import Flask, current_app, request
 from flask_security import SQLAlchemyUserDatastore, Security, hash_password
 from flask_wtf.csrf import CSRFProtect
 
+from .federation import (
+    federated_human_auth,
+    federation_login_context,
+    get_federated_human_auth_service,
+    guard_member_local_password_login,
+    redirect_member_password_change,
+    sync_federated_human_user,
+)
 from .models import Role, User, db
 from .policy import ROLE_PERMISSIONS, audit_route_policy, enforce_human_authorization
 from .routes import auth_users
@@ -21,7 +29,9 @@ from .routes import auth_users
 security = Security()
 csrf = CSRFProtect()
 _UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
-_HUMAN_CSRF_BLUEPRINTS = frozenset({"security", "auth_users"})
+_HUMAN_CSRF_BLUEPRINTS = frozenset(
+    {"security", "auth_users", "federated_human_auth"}
+)
 _LEGACY_PLACEHOLDERS = frozenset({"fcp-dev", "fcp-dev-change-me"})
 
 
@@ -112,6 +122,16 @@ def _seed_policy(datastore: SQLAlchemyUserDatastore) -> None:
     db.session.commit()
 
 
+def _publish_user_best_effort(app: Flask, user: User) -> None:
+    try:
+        get_federated_human_auth_service().publish_user(user)
+    except Exception as exc:  # noqa: BLE001 - local account creation must remain recoverable
+        app.logger.warning(
+            "Federation human-user publication unavailable (%s)",
+            type(exc).__name__,
+        )
+
+
 def _register_cli(app: Flask, datastore: SQLAlchemyUserDatastore) -> None:
     @app.cli.group("fcp-user")
     def user_cli() -> None:
@@ -133,12 +153,13 @@ def _register_cli(app: Flask, datastore: SQLAlchemyUserDatastore) -> None:
         user = datastore.create_user(email=normalized, password=hash_password(password))
         datastore.add_role_to_user(user, "admin")
         db.session.commit()
+        _publish_user_best_effort(app, user)
         app.logger.info("Human administrator created: %s", normalized)
         click.echo(f"Created administrator {normalized}")
 
 
 def init_human_auth(app: Flask) -> None:
-    """Install human auth without changing Federation/device authentication."""
+    """Install human auth while preserving device/Federation identity boundaries."""
     enabled = not _boolean_env("FCP_AUTH_DISABLED", False)
     if not enabled and not (_boolean_env("FCP_DEVELOPMENT", False) or app.testing):
         raise RuntimeError("FCP_AUTH_DISABLED is permitted only with FCP_DEVELOPMENT=1")
@@ -197,13 +218,23 @@ def init_human_auth(app: Flask) -> None:
     db.init_app(app)
     datastore = SQLAlchemyUserDatastore(db, User, Role)
     security.init_app(app, datastore)
+
+    @security.login_context_processor
+    def federation_auth_login_context():
+        return {"federation_auth": federation_login_context()}
+
     csrf.init_app(app)
     app.register_blueprint(auth_users)
+    app.register_blueprint(federated_human_auth)
 
-    # Authorization runs before form CSRF. An anonymous request to a protected
-    # human-admin route is therefore redirected/denied without first disclosing
-    # anything through CSRF behavior; public Security routes continue to CSRF.
+    # Refresh a signed-in member's federated authorization before the normal
+    # permission gate. Then prevent member-local passwords/change-password from
+    # bypassing the Federation authority. Public login/callback routes remain
+    # available to anonymous browsers.
+    app.before_request(sync_federated_human_user)
     app.before_request(enforce_human_authorization)
+    app.before_request(guard_member_local_password_login)
+    app.before_request(redirect_member_password_change)
 
     @app.before_request
     def protect_human_auth_forms():
