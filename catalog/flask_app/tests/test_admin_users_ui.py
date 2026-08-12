@@ -31,7 +31,7 @@ def test_admin_users_template_keeps_management_guards_visible() -> None:
     assert 'name="csrf_token"' in template
     assert 'minlength="12"' in template
     assert "active_admin_count <= 1" in template
-    assert "final active administrator" in template.lower()
+    assert "only active administrator" in template.lower()
     assert "current_user.is_authenticated" in template
 
 
