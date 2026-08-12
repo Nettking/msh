@@ -43,7 +43,6 @@ _LEGACY_CAPABILITY_SERVICE = capability_requests.FederationCapabilityRequestServ
 _LEGACY_CAPABILITY_PROCESSOR = capability_requests.FederationCapabilityRequestProcessor
 _LEGACY_UPDATE_SERVICE = update_service.FederationUpdateService
 _LEGACY_UPDATE_PROCESSOR = update_events.FederationUpdateEventProcessor
-_INSTALLED = False
 
 
 def _append_authenticated_event(
@@ -97,7 +96,10 @@ def _prepare_processor_state(
     coordinator_id = str(getattr(context.coordinator, "coordinator_id", "") or "")
     persisted_coordinator = state.get("coordinator_id")
     if coordinator_id:
-        if persisted_coordinator is not None and persisted_coordinator != coordinator_id:
+        if (
+            persisted_coordinator is not None
+            and persisted_coordinator != coordinator_id
+        ):
             raise ValueError("federation_coordinator_identity_changed")
         if persisted_coordinator != coordinator_id:
             state["coordinator_id"] = coordinator_id
@@ -170,7 +172,9 @@ class ActiveLeaderFederationUpdateService(_LEGACY_UPDATE_SERVICE):
     """Existing bounded updater with transferable leader issuance authority."""
 
     def _context(self):
-        context = update_service.get_capability_onboarding_service().authorized_context()
+        context = (
+            update_service.get_capability_onboarding_service().authorized_context()
+        )
         if context is None:
             raise PermissionError("federation_authority_required")
         authority = require_federation_leader(context)
@@ -181,7 +185,9 @@ class ActiveLeaderFederationUpdateService(_LEGACY_UPDATE_SERVICE):
 
     def _authorize_intent(self, intent: update_service.UpdateIntent) -> None:
         intent.validate()
-        context = update_service.get_capability_onboarding_service().authorized_context()
+        context = (
+            update_service.get_capability_onboarding_service().authorized_context()
+        )
         if context is None or intent.session_id != context.binding.internal_session_id:
             raise PermissionError("wrong_federation")
         authority = resolve_federation_leader(context)
@@ -234,7 +240,9 @@ class ActiveLeaderFederationCapabilityRequestService(_LEGACY_CAPABILITY_SERVICE)
     """Existing bounded capability request flow with transferable leadership."""
 
     def _context(self) -> tuple[Any, str]:
-        context = capability_requests.get_capability_onboarding_service().authorized_context()
+        context = (
+            capability_requests.get_capability_onboarding_service().authorized_context()
+        )
         if context is None:
             raise PermissionError("federation_authority_required")
         authority = require_federation_leader(context)
@@ -324,7 +332,7 @@ class ActiveLeaderFederationCapabilityRequestProcessor(_LEGACY_CAPABILITY_PROCES
         super().process(context)
 
 
-def _get_active_update_service() -> ActiveLeaderFederationUpdateService:
+def get_active_update_service() -> ActiveLeaderFederationUpdateService:
     configured = current_app.config.get("FEDERATION_UPDATE_SERVICE")
     if isinstance(configured, ActiveLeaderFederationUpdateService):
         return configured
@@ -372,7 +380,9 @@ def _get_active_update_service() -> ActiveLeaderFederationUpdateService:
     return service
 
 
-def _get_active_capability_request_service() -> ActiveLeaderFederationCapabilityRequestService:
+def get_active_capability_request_service() -> (
+    ActiveLeaderFederationCapabilityRequestService
+):
     configured = current_app.config.get("FEDERATION_CAPABILITY_REQUEST_SERVICE")
     if isinstance(configured, ActiveLeaderFederationCapabilityRequestService):
         return configured
@@ -398,31 +408,11 @@ def _get_active_capability_request_service() -> ActiveLeaderFederationCapability
     return service
 
 
-def install_active_leader_runtime() -> None:
-    """Replace creator-pinned Flask service bindings once per interpreter."""
-
-    global _INSTALLED
-    if _INSTALLED:
-        return
-    capability_requests.FederationCapabilityRequestService = (
-        ActiveLeaderFederationCapabilityRequestService
-    )
-    capability_requests.FederationCapabilityRequestProcessor = (
-        ActiveLeaderFederationCapabilityRequestProcessor
-    )
-    capability_requests.get_federation_capability_request_service = (
-        _get_active_capability_request_service
-    )
-    update_service.FederationUpdateService = ActiveLeaderFederationUpdateService
-    update_service.get_federation_update_service = _get_active_update_service
-    update_events.FederationUpdateEventProcessor = ActiveLeaderFederationUpdateEventProcessor
-    _INSTALLED = True
-
-
 __all__ = [
     "ActiveLeaderFederationCapabilityRequestProcessor",
     "ActiveLeaderFederationCapabilityRequestService",
     "ActiveLeaderFederationUpdateEventProcessor",
     "ActiveLeaderFederationUpdateService",
-    "install_active_leader_runtime",
+    "get_active_capability_request_service",
+    "get_active_update_service",
 ]

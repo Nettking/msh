@@ -19,11 +19,11 @@ prove the running commit before success is reported.
 
 from __future__ import annotations
 
-from collections.abc import Callable
 import os
-from pathlib import Path
 import sys
 import threading
+from collections.abc import Callable
+from pathlib import Path
 from typing import Any
 
 from catalog.flask_app.services.capability_config_service import (
@@ -31,8 +31,8 @@ from catalog.flask_app.services.capability_config_service import (
     load_capability_config,
     parse_recorder_sources,
 )
-from catalog.flask_app.services.federation_update_events import (
-    FederationUpdateEventProcessor,
+from catalog.flask_app.services.federation_active_leader_runtime import (
+    ActiveLeaderFederationUpdateEventProcessor as FederationUpdateEventProcessor,
 )
 from catalog.flask_app.services.federation_update_handoff import HostUpdateHandoff
 from catalog.mtconnect_recorder import run
@@ -41,7 +41,6 @@ from catalog.mtconnect_recorder.federation_control import (
 )
 from catalog.mtconnect_recorder.federation_node import RecorderFederationNode
 from catalog.mtconnect_recorder.upgrade_compat import ensure_recorder_upgrade_config
-
 
 DEFAULT_DEVICE_NAME = "FCP MTConnect recorder"
 DEFAULT_POLL_SECONDS = 2.0
@@ -91,7 +90,9 @@ class ManagedRecorderFederationRuntime:
         control_factory: Callable[..., Any] = RecorderFederationControlWorker,
         update_processor_factory: Callable[..., Any] = FederationUpdateEventProcessor,
         handoff_factory: Callable[..., Any] = HostUpdateHandoff,
-        source_names_loader: Callable[[Path], tuple[str, ...]] = configured_source_names,
+        source_names_loader: Callable[
+            [Path], tuple[str, ...]
+        ] = configured_source_names,
     ) -> None:
         if request_timeout <= 0 or poll_seconds <= 0:
             raise ValueError("Federation companion intervals must be positive")
