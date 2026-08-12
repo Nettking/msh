@@ -122,7 +122,7 @@ def normalize_jsonl_relative_path(value: Any) -> str:
 def federated_jsonl_dataset_id(actor_node_id: str, relative_path: str) -> str:
     actor = _text(actor_node_id, "actor_node_id")
     normalized = normalize_jsonl_relative_path(relative_path)
-    digest = hashlib.sha256(f"{actor}\0{normalized}".encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(f"{actor}\0{normalized}".encode()).hexdigest()
     return f"federated-jsonl:{digest}"
 
 
