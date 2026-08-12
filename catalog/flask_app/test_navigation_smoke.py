@@ -172,7 +172,7 @@ def test_get_started_is_a_focused_task_handoff(monkeypatch, tmp_path) -> None:
     assert "Full workbench" in html
 
 
-def test_main_pages_include_mobile_navigation_and_retired_startup_redirects(
+def test_main_pages_include_rail_navigation_and_retired_startup_redirects(
     monkeypatch,
     tmp_path,
 ) -> None:
@@ -188,9 +188,13 @@ def test_main_pages_include_mobile_navigation_and_retired_startup_redirects(
     overview = client.get("/").get_data(as_text=True)
     startup_response = client.get("/startup?legacy=1")
 
-    assert 'data-mobile-navigation' in overview
-    assert 'aria-label="Mobile primary sections"' in overview
-    assert "Rescan now" in overview
+    # The left rail is the navigation on every width: on small screens the same
+    # markup slides in over the content instead of a separate mobile panel.
+    assert 'data-admin-shell' in overview
+    assert 'data-rail-open' in overview
+    assert 'class="admin-rail"' in overview
+    assert 'aria-label="Primary sections"' in overview
+    assert "Rescan artifacts" in overview
     assert startup_response.status_code == 302
     assert startup_response.location == "/"
 

@@ -1,0 +1,413 @@
+/*
+ * Left-rail application shell.
+ *
+ * The workbench navigation moves from a stacked top header to a fixed left
+ * rail, in the shape operators already know from WordPress admin: a dark rail
+ * carrying the top-level sections, the current section's pages expanded
+ * beneath it, and a light content column to the right.
+ *
+ * The rail keeps its dark surface in both palettes on purpose — it is chrome,
+ * not content, and a rail that inverts with the theme stops being a stable
+ * landmark. Content-side colour still comes from theme.css.
+ */
+
+:root {
+  --rail-width: 15rem;
+  --rail-width-collapsed: 3.5rem;
+  --rail-bg: #1d2530;
+  --rail-bg-deep: #161d26;
+  --rail-text: #cfd8e4;
+  --rail-text-strong: #ffffff;
+  --rail-text-muted: #8d9bb0;
+  --rail-hover: #27313f;
+  --rail-active: #2563eb;
+  --rail-border: #2b3543;
+  --topbar-height: 3.25rem;
+}
+
+/* ---------- Frame ---------- */
+
+body.has-admin-rail {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bg);
+}
+
+.admin-shell {
+  display: grid;
+  grid-template-columns: var(--rail-width) minmax(0, 1fr);
+  min-height: 100vh;
+  min-height: 100dvh;
+}
+
+.admin-shell[data-rail-collapsed="true"] {
+  grid-template-columns: var(--rail-width-collapsed) minmax(0, 1fr);
+}
+
+/* ---------- Rail ---------- */
+
+.admin-rail {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--rail-bg);
+  color: var(--rail-text);
+  border-right: 1px solid var(--rail-border);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.admin-rail__brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 14px;
+  border-bottom: 1px solid var(--rail-border);
+  color: var(--rail-text-strong);
+  text-decoration: none;
+  min-height: var(--topbar-height);
+}
+
+.admin-rail__mark {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 auto;
+  border-radius: 9px;
+  background: var(--rail-active);
+  color: #fff;
+  font-size: 0.66rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.admin-rail__title {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.admin-rail__title strong {
+  font-size: 0.92rem;
+  font-weight: 700;
+  color: var(--rail-text-strong);
+}
+
+.admin-rail__title span {
+  font-size: 0.72rem;
+  color: var(--rail-text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-rail__nav {
+  flex: 1;
+  padding: 8px 0 16px;
+}
+
+.admin-rail__group-label {
+  padding: 14px 16px 6px;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--rail-text-muted);
+}
+
+/* Top-level entries. */
+.admin-nav__link {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: 10px 16px;
+  color: var(--rail-text);
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 500;
+  border-left: 3px solid transparent;
+}
+
+.admin-nav__link:hover,
+.admin-nav__link:focus-visible {
+  background: var(--rail-hover);
+  color: var(--rail-text-strong);
+  outline: none;
+}
+
+.admin-nav__link.is-active {
+  background: var(--rail-bg-deep);
+  border-left-color: var(--rail-active);
+  color: var(--rail-text-strong);
+  font-weight: 650;
+}
+
+.admin-nav__icon {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  opacity: 0.9;
+}
+
+.admin-nav__icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.admin-nav__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Section pages, shown under the section they belong to. */
+.admin-subnav {
+  display: flex;
+  flex-direction: column;
+  padding: 4px 0 8px;
+  background: var(--rail-bg-deep);
+  border-left: 3px solid var(--rail-active);
+}
+
+.admin-subnav__link {
+  display: block;
+  padding: 7px 16px 7px 47px;
+  color: var(--rail-text-muted);
+  text-decoration: none;
+  font-size: 0.86rem;
+}
+
+.admin-subnav__link:hover,
+.admin-subnav__link:focus-visible {
+  color: var(--rail-text-strong);
+  outline: none;
+}
+
+.admin-subnav__link.is-active {
+  color: var(--rail-text-strong);
+  font-weight: 650;
+}
+
+.admin-rail__footer {
+  padding: 10px 8px 14px;
+  border-top: 1px solid var(--rail-border);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-rail__action {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 9px 8px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--rail-text-muted);
+  font: inherit;
+  font-size: 0.84rem;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.admin-rail__action:hover {
+  background: var(--rail-hover);
+  color: var(--rail-text-strong);
+}
+
+.admin-rail__action svg {
+  width: 17px;
+  height: 17px;
+  flex: 0 0 auto;
+}
+
+/* Collapsed rail keeps icons only, the way the WordPress rail does. */
+.admin-shell[data-rail-collapsed="true"] .admin-nav__label,
+.admin-shell[data-rail-collapsed="true"] .admin-rail__title,
+.admin-shell[data-rail-collapsed="true"] .admin-rail__group-label,
+.admin-shell[data-rail-collapsed="true"] .admin-subnav,
+.admin-shell[data-rail-collapsed="true"] .admin-rail__action span {
+  display: none;
+}
+
+.admin-shell[data-rail-collapsed="true"] .admin-nav__link,
+.admin-shell[data-rail-collapsed="true"] .admin-rail__brand {
+  justify-content: center;
+  padding-inline: 8px;
+}
+
+.admin-shell[data-rail-collapsed="true"] .admin-rail__action {
+  justify-content: center;
+}
+
+.admin-shell[data-rail-collapsed="true"] .admin-rail__collapse svg {
+  transform: rotate(180deg);
+}
+
+/* The first-run wizard keeps its focused, rail-free shell. */
+.admin-shell--focus {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+/* ---------- Content column ---------- */
+
+.admin-main {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.admin-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--topbar-height);
+  padding: 8px clamp(14px, 3vw, 26px);
+  background: var(--surface-overlay);
+  backdrop-filter: saturate(140%) blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-topbar__heading {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.admin-topbar__section {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.admin-topbar__page {
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-topbar__actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.admin-rail-toggle {
+  display: none;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+}
+
+.admin-content {
+  flex: 1;
+  padding: clamp(16px, 2.4vw, 26px) clamp(14px, 3vw, 26px) 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  min-width: 0;
+}
+
+.admin-content > section {
+  margin: 0;
+}
+
+/* ---------- Small screens: the rail slides over the content ---------- */
+
+.admin-rail__scrim {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(6, 10, 17, 0.55);
+  border: 0;
+}
+
+@media (max-width: 900px) {
+  .admin-shell,
+  .admin-shell[data-rail-collapsed="true"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .admin-rail {
+    position: fixed;
+    z-index: 50;
+    top: 0;
+    left: 0;
+    width: min(17rem, 82vw);
+    transform: translateX(-100%);
+    transition: transform 0.18s ease;
+    box-shadow: var(--shadow-pop);
+  }
+
+  .admin-shell[data-rail-open="true"] .admin-rail {
+    transform: translateX(0);
+  }
+
+  .admin-shell[data-rail-open="true"] .admin-rail__scrim {
+    display: block;
+  }
+
+  /* The collapsed state is a desktop affordance only. */
+  .admin-shell[data-rail-collapsed="true"] .admin-nav__label,
+  .admin-shell[data-rail-collapsed="true"] .admin-rail__title,
+  .admin-shell[data-rail-collapsed="true"] .admin-rail__group-label,
+  .admin-shell[data-rail-collapsed="true"] .admin-subnav,
+  .admin-shell[data-rail-collapsed="true"] .admin-rail__action span {
+    display: revert;
+  }
+
+  .admin-shell[data-rail-collapsed="true"] .admin-nav__link,
+  .admin-shell[data-rail-collapsed="true"] .admin-rail__brand,
+  .admin-shell[data-rail-collapsed="true"] .admin-rail__action {
+    justify-content: flex-start;
+    padding-inline: 16px;
+  }
+
+  .admin-rail-toggle {
+    display: inline-flex;
+  }
+
+  .admin-rail__collapse {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin-rail {
+    transition: none;
+  }
+}
