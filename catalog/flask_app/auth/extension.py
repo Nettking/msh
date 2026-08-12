@@ -10,7 +10,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import click
-from flask import Flask, request
+from flask import Flask, current_app, request
 from flask_security import SQLAlchemyUserDatastore, Security, hash_password
 from flask_wtf.csrf import CSRFProtect
 
@@ -192,8 +192,15 @@ def init_human_auth(app: Flask) -> None:
     csrf.init_app(app)
     app.register_blueprint(auth_users)
 
+    # Authorization runs before form CSRF. An anonymous request to a protected
+    # human-admin route is therefore redirected/denied without first disclosing
+    # anything through CSRF behavior; public Security routes continue to CSRF.
+    app.before_request(enforce_human_authorization)
+
     @app.before_request
     def protect_human_auth_forms():
+        if not current_app.config.get("WTF_CSRF_ENABLED", True):
+            return None
         if (
             request.method in _UNSAFE_METHODS
             and request.blueprint in _HUMAN_CSRF_BLUEPRINTS
@@ -201,7 +208,6 @@ def init_human_auth(app: Flask) -> None:
             csrf.protect()
         return None
 
-    app.before_request(enforce_human_authorization)
     with app.app_context():
         db.create_all()
         _seed_policy(datastore)
