@@ -1,0 +1,213 @@
+/*
+ * Human sign-in surface.
+ *
+ * These pages render outside the signed-in shell, so they cannot rely on the
+ * layout in global-refresh.css. Colour, elevation, radius, and shape still come
+ * from theme.css, and the submit button reuses the shared .button-primary
+ * component, so the sign-in screen stays in step with the rest of the product
+ * in both palettes.
+ *
+ * Input styling is scoped to .auth-field on purpose. The product has no global
+ * input rule, and adding one here would restyle every form in the app.
+ */
+
+.auth-page {
+  min-height: 100vh;
+  min-height: 100dvh;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(120% 90% at 50% 0%, var(--accent-soft) 0%, transparent 60%),
+    linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+}
+
+.auth-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 20px 48px;
+}
+
+.auth-card {
+  width: min(26rem, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  padding: 30px 30px 26px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  background: var(--surface);
+  box-shadow: var(--shadow-lg);
+}
+
+.auth-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+/* Matches the setup shell's brand mark so the product is recognisable before
+   the operator has signed in. */
+.auth-identity__mark {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  flex: 0 0 auto;
+  border-radius: 13px;
+  background: var(--brand-solid);
+  color: var(--on-solid);
+  font-size: 0.82rem;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+}
+
+.auth-identity__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.auth-identity__product {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-subtle);
+}
+
+.auth-title {
+  margin: 0;
+  font-size: 1.32rem;
+  font-weight: 700;
+  line-height: 1.25;
+  color: var(--text);
+  text-wrap: balance;
+}
+
+.auth-lede {
+  margin: -8px 0 0;
+  font-size: 0.92rem;
+  color: var(--text-muted);
+}
+
+.auth-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.auth-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.auth-field__label {
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.auth-field input[type="email"],
+.auth-field input[type="text"],
+.auth-field input[type="password"] {
+  width: 100%;
+  min-height: 42px;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 0.95rem;
+  color: var(--text);
+  background: var(--surface-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.auth-field input::placeholder {
+  color: var(--text-subtle);
+}
+
+.auth-field input:focus-visible {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+.auth-remember {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.88rem;
+  color: var(--text-muted);
+}
+
+.auth-remember input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  flex: 0 0 auto;
+  accent-color: var(--accent);
+}
+
+.auth-submit,
+button.auth-submit {
+  width: 100%;
+  min-height: 42px;
+  padding: 10px 16px;
+  font: inherit;
+  font-size: 0.95rem;
+  border-radius: var(--radius-sm);
+  border-style: solid;
+  border-width: 1px;
+}
+
+.auth-alert {
+  margin: 0;
+  padding: 11px 14px;
+  font-size: 0.89rem;
+  font-weight: 600;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--danger-border);
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+
+.auth-note {
+  margin: 0;
+  padding-top: 18px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 0.83rem;
+  line-height: 1.5;
+  color: var(--text-subtle);
+}
+
+.auth-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.auth-actions .auth-submit {
+  width: auto;
+  flex: 1 1 auto;
+}
+
+@media (max-width: 420px) {
+  .auth-card {
+    padding: 24px 20px 22px;
+    border-radius: var(--radius-lg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-field input[type="email"],
+  .auth-field input[type="text"],
+  .auth-field input[type="password"] {
+    transition: none;
+  }
+}
