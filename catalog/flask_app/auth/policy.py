@@ -79,15 +79,17 @@ PUBLIC_ENDPOINTS = frozenset(
 )
 
 # A fresh installation that is joining an existing Federation has no local human
-# row yet. Permit only the minimum browser endpoints needed to establish the
-# device identity and redeem a signed one-use pairing grant. This is deliberately
-# conditional rather than part of PUBLIC_ENDPOINTS: the exception closes as soon
-# as either a local user exists or a persisted remote Federation binding exists.
+# row yet. Permit only the browser endpoints needed to establish device identity,
+# redeem a signed pairing grant, or run the login-first Tailscale enrollment
+# handshake. This is conditional rather than public: it closes as soon as either
+# a local human exists or a persisted remote Federation binding exists.
 PRE_AUTH_FEDERATION_BOOTSTRAP_ENDPOINTS = frozenset(
     {
         "capability_onboarding_web.onboarding",
         "capability_onboarding_web.create_identity",
         "federation_pairing_web.pair_device",
+        "federation_enrollment.start",
+        "federation_enrollment.callback",
     }
 )
 
@@ -100,6 +102,9 @@ ENDPOINT_PERMISSIONS: dict[str, str] = {
     "federation_web.apply_updates": "software.update",
     "federation_pairing_web.create_pairing_code": "pairing.manage",
     "federation_pairing_web.pair_device": "pairing.manage",
+    "federation_enrollment.start": "pairing.manage",
+    "federation_enrollment.callback": "pairing.manage",
+    "federation_enrollment.authorize": "pairing.manage",
     "auth_users.users": "users.manage",
     "auth_users.create_user": "users.manage",
     "auth_users.update_user": "users.manage",
