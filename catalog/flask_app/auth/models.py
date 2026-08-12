@@ -35,3 +35,11 @@ class User(db.Model, UserMixin):
     roles = relationship(
         "Role", secondary=roles_users, backref="users", lazy="selectin"
     )
+
+
+class FirstUserBootstrapClaim(db.Model):
+    """Singleton row that atomically closes anonymous first-user creation."""
+
+    __tablename__ = "first_user_bootstrap_claim"
+
+    id: Mapped[int] = mapped_column(Integer(), primary_key=True)
