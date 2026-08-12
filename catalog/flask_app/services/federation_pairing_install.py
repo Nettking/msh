@@ -12,6 +12,7 @@ from flask import Flask, current_app, request
 from .capability_recovery_adapters import fresh_capability_inspection_adapters
 from .federated_ai_product_bridge import FederatedAIProductBridge
 from .federated_telemetry_product_bridge import FederatedTelemetryProductBridge
+from .federation_capability_requests import FederationCapabilityRequestProcessor
 from .federation_contribution_publication import publish_local_contributions
 from .federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
@@ -141,7 +142,7 @@ class LazyPairingOnboardingService(PairingAwareCapabilityOnboardingService):
 
 
 class FederationUpdateEventMonitor:
-    """Poll bounded update intents without accelerating contribution/AI sync."""
+    """Poll bounded Federation control intents without accelerating metadata sync."""
 
     def __init__(
         self,
@@ -154,6 +155,7 @@ class FederationUpdateEventMonitor:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._update_processor: FederationUpdateEventProcessor | None = None
+        self._capability_processor: FederationCapabilityRequestProcessor | None = None
 
     def _processor(self) -> FederationUpdateEventProcessor:
         processor = self._update_processor
@@ -183,6 +185,27 @@ class FederationUpdateEventMonitor:
         self._update_processor = processor
         return processor
 
+    def _capability_request_processor(self) -> FederationCapabilityRequestProcessor:
+        processor = self._capability_processor
+        if processor is not None:
+            return processor
+        onboarding_database = Path(
+            self.app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"]
+        )
+        federation_root = onboarding_database.parent.parent
+        processor_state = Path(
+            self.app.config.get(
+                "FEDERATION_CAPABILITY_REQUEST_PROCESSOR_STATE",
+                federation_root / "capability-requests" / "processor.json",
+            )
+        )
+        processor = FederationCapabilityRequestProcessor(
+            self.service,
+            processor_state,
+        )
+        self._capability_processor = processor
+        return processor
+
     def start(self) -> None:
         with self._lock:
             if self._thread is not None and self._thread.is_alive():
@@ -190,7 +213,7 @@ class FederationUpdateEventMonitor:
             self._stop.clear()
             self._thread = threading.Thread(
                 target=self._run,
-                name="fcp-federation-update-events",
+                name="fcp-federation-control-events",
                 daemon=True,
             )
             self._thread.start()
@@ -204,10 +227,23 @@ class FederationUpdateEventMonitor:
                 with self.app.app_context():
                     context = self.service.authorized_context()
                     if context is not None:
-                        self._processor().process(context)
-            except Exception as exc:  # noqa: BLE001 - update authority fails closed
+                        try:
+                            self._processor().process(context)
+                        except Exception as exc:  # noqa: BLE001 - update authority fails closed
+                            self.app.logger.warning(
+                                "Federation update event processing unavailable (%s)",
+                                type(exc).__name__,
+                            )
+                        try:
+                            self._capability_request_processor().process(context)
+                        except Exception as exc:  # noqa: BLE001 - capability authority fails closed
+                            self.app.logger.warning(
+                                "Federation capability request processing unavailable (%s)",
+                                type(exc).__name__,
+                            )
+            except Exception as exc:  # noqa: BLE001 - context/authentication fails closed
                 self.app.logger.warning(
-                    "Federation update event processing unavailable (%s)",
+                    "Federation control event processing unavailable (%s)",
                     type(exc).__name__,
                 )
             if self._stop.wait(_UPDATE_POLL_SECONDS):
