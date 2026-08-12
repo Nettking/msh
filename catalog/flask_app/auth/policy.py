@@ -43,6 +43,14 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "admin": frozenset(PERMISSIONS),
 }
 
+#: One-line summaries for the user administration screen. Kept beside
+#: ROLE_PERMISSIONS so the wording and the grants change together.
+ROLE_SUMMARIES: dict[str, str] = {
+    "viewer": "Read dashboards, data, and Federation status.",
+    "operator": "Adds upload, analysis, workflow, runtime, and recorder control.",
+    "admin": "Everything, including Federation administration, software updates, and user management.",
+}
+
 PUBLIC_ENDPOINTS = frozenset(
     {
         "security.login",
@@ -51,6 +59,13 @@ PUBLIC_ENDPOINTS = frozenset(
         "security.reset_password",
         "security.verify",
         "security.static",
+        # This route exists only while the local authority has zero human users.
+        # Its handler closes itself as soon as the first administrator commits.
+        "auth_users.bootstrap_user",
+        # Host-side Tailscale discovery has no browser session. This endpoint
+        # exposes only bounded public-safe metadata and never enrollment,
+        # invitation, pairing, human-auth, or session authority.
+        "federation_pairing_web.federation_discovery",
         # A member starts sign-in before it has a human session, and the signed
         # assertion returns to an anonymous browser. The authority endpoint is
         # intentionally not public: the leader must already authenticate the
