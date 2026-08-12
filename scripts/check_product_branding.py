@@ -19,7 +19,10 @@ ALLOWED_REPOSITORY_FILES = frozenset(
         "catalog/federation/tests/test_software_update.py",
         "catalog/flask_app/tests/test_federation_update_host_agents.py",
         "catalog/flask_app/tests/test_federation_update_runtime.py",
+        "catalog/flask_app/tests/test_termux_federation_update_agent.py",
         "catalog/flask_app/tests/test_windows_migration_script.py",
+        "termux/fcp-phone-update-agent.sh",
+        "termux/fcp_phone_update_codec.py",
     }
 )
 
