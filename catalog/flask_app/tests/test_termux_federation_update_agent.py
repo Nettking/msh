@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
 import importlib.util
 import json
-from pathlib import Path
+import os
 import subprocess
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 import pytest
-
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 CODEC_PATH = REPO_ROOT / "termux" / "fcp_phone_update_codec.py"
@@ -116,6 +116,7 @@ def test_phone_start_bootstraps_agent_and_records_only_ready_runtime() -> None:
     assert start_body.index("if http_ready; then") < start_body.index("record_running_commit")
 
 
+@pytest.mark.skipif(os.name == "nt", reason="Termux shell syntax is validated on Linux")
 def test_termux_update_shells_are_syntactically_valid() -> None:
     for path in (AGENT_PATH, PHONE_PATH):
         result = subprocess.run(
