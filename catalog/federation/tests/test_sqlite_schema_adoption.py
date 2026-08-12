@@ -63,7 +63,7 @@ def test_filesystem_storage_registers_and_migrates_legacy_index(tmp_path: Path) 
         assert row["dataset_schema_name"] == "fcp.storage.dataset.opaque"
         assert row["dataset_schema_version"] == 1
         assert row["idempotency_key"] == "idem-1"
-        assert connection.execute("SELECT COUNT(*) FROM committed_batches").fetchone() == (1,)
+        assert connection.execute("SELECT COUNT(*) FROM committed_batches").fetchone()[0] == 1
 
 
 def test_acknowledgement_store_registers_and_migrates_legacy_state(tmp_path: Path) -> None:
