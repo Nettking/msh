@@ -5,100 +5,95 @@ Reviewed: **2026-08-12**
 
 FCP has a separate account system for **people using the web application**. Human identity is deliberately separate from device identity, pairing credentials, recorder keys, and Federation membership.
 
-## What is shared now?
+## What is shared across the Federation?
 
-A standalone FCP installation still has a local human-account database. Once devices belong to a Federation, however, the **Federation creator/leader becomes the human sign-in authority**:
+Human passwords are **not** copied to every Federation member.
 
-- human accounts are created and managed on the Federation leader;
-- the same account can sign in on trusted Federation member devices;
-- passwords and password hashes **never leave the leader**;
-- members authenticate by sending the browser to the leader and accepting a short-lived, Ed25519-signed login assertion targeted to that member device;
-- non-secret authorization metadata — email address, active state, and roles — is published through the authenticated Federation session log;
-- member devices keep only a local shadow account needed for the local Flask session and permission checks.
+The immutable Federation creator remains the human credential/password authority:
 
-This is Federation SSO rather than password-database replication. A stolen member database therefore does not contain the leader's human password hashes.
+- authoritative human accounts are created and managed there;
+- passwords and password hashes remain there;
+- trusted Federation members redirect the browser to that authority for sign-in;
+- the authority returns a short-lived Ed25519-signed assertion targeted to the member device; and
+- non-secret authorization metadata such as email, active state, and roles is published through the authenticated Federation session log.
 
-Device and human authority remain independent. An authenticated human `admin` can request a Federation administration action, but the underlying device/session operation still has to satisfy Federation membership and coordinator policy.
+Members keep only the local shadow account needed for the local Flask session and permission checks.
 
-## First-time setup: create the first administrator
+This is Federation SSO, not password-database replication.
 
-Authentication is enabled by default. A fresh production installation does not create a default username or password.
+## Credential authority versus current operational leader
 
-1. Start the FCP installation that will create/lead the Federation:
+The human credential authority and the current Federation operational leader are intentionally different concepts.
 
-   **Windows**
+- **Federation creator** — immutable creation provenance and human credential/password authority.
+- **Current operational leader** — the node holding the current coordinator-authored leadership term and current-leader product controls such as software updates, capability requests, member/invitation administration, and reviewed provider actions.
 
-   ```cmd
-   start.cmd
+If operational leadership transfers after bounded leader failover, the human password database does **not** silently move to the successor. Member sign-in continues to use the creator-backed human credential authority unless a future explicitly reviewed credential-migration mechanism changes that boundary.
+
+## First-time setup: create the first administrator in the browser
+
+Authentication is enabled by default. There is no built-in administrator and no fallback password.
+
+1. Start FCP with `start.cmd` or `bash start.sh`.
+2. Open the FCP web interface.
+3. If this local authority has zero human users, normal browser requests redirect to:
+
+   ```text
+   /admin/users/bootstrap
    ```
 
-   **Linux/macOS**
+4. Enter a valid email address.
+5. Enter and confirm a password of at least **12 characters**.
+6. Submit the form.
 
-   ```bash
-   bash start.sh
-   ```
+FCP atomically claims the one-time first-user bootstrap and creates exactly the first active `admin` account. After that commit, the anonymous bootstrap surface closes and ordinary login enforcement takes over.
 
-2. From the repository directory, create the first administrator:
+You do **not** need the old `fcp-user create-admin` CLI command for the normal supported first-user workflow.
 
-   ```bash
-   docker compose run --rm --no-deps --entrypoint flask flask --app catalog.flask_app.app:create_app fcp-user create-admin
-   ```
+A remotely paired Federation member with an empty local shadow-user database does not reopen anonymous bootstrap. It stays on the Federation human sign-in path.
 
-3. Enter the administrator email address and a password of at least **12 characters**.
+## Sign in on a Federation member
 
-4. Open the FCP web UI and sign in. On a fresh device, continue with Identity and Federation onboarding.
+On a member, `/login` offers **Sign in through Federation leader/authority** instead of treating the member's local password database as authoritative.
 
-There is intentionally no built-in administrator or fallback password.
-
-## Signing in on Federation members
-
-On a Federation member, `/login` shows **Sign in through Federation leader** instead of accepting the member's local password database.
-
-The browser flow is:
+The browser flow is conceptually:
 
 ```text
 member /login
-  -> leader /federation-auth/authorize
-  -> normal human login on leader when needed
-  -> leader signs a short-lived assertion
-  -> member /federation-auth/callback
+  -> human credential authority
+  -> normal human login when needed
+  -> authority signs short-lived assertion
+  -> member callback
   -> local browser session
 ```
 
-The assertion is bound to:
-
-- the Federation ID and internal session;
-- the leader node identity;
-- the exact target member node;
-- the human email, active state, and roles;
-- a random browser `state` value;
-- a short validity window.
-
-The member verifies the leader's Ed25519 signature using the leader public identity advertised through Federation state. An assertion issued for one member cannot be replayed on another member, and a response with the wrong browser state is rejected.
+The assertion is bound to Federation/session identity, authority node, target member node, human subject, active state/roles, browser state, and expiry. An assertion for one member cannot simply be replayed on another.
 
 ## Browser addresses must be reachable
 
-Federation relay connectivity and browser connectivity are different things. The browser must be able to reach the web address advertised by both the leader and the member.
-
-For stable multi-device deployments, set a routable origin on each installation:
+Federation relay connectivity and browser connectivity are different. For stable multi-device deployments, configure a browser-reachable origin when automatic request-origin discovery is insufficient:
 
 ```text
 FCP_HUMAN_AUTH_BASE_URL=http://192.0.2.10:5000
 ```
 
-Use the actual HTTPS origin when FCP is served through HTTPS. The value must be an `http://` or `https://` origin root without credentials, query parameters, fragments, or an application subpath.
-
-If `FCP_HUMAN_AUTH_BASE_URL` is not set, FCP learns the origin from the browser request that publishes the sign-in metadata. `localhost` is usually unsuitable when the browser must move between physical machines, because `localhost` then refers to the browser's own machine.
+Use the real HTTPS origin when serving FCP through HTTPS. `localhost` is unsuitable when the browser must move between different physical machines.
 
 ## Add and manage users
 
-Human-user administration is Federation-scoped. Manage accounts at:
+Administrators manage human accounts at:
 
 ```text
 /admin/users
 ```
 
-On the Federation leader this page creates and changes the authoritative accounts. Opening the same page on a member redirects the browser to the leader. Member-side POST requests to mutate users are rejected rather than creating a divergent local account.
+On the credential authority, the page shows:
+
+- each user's active/inactive state;
+- role chips and concise role summaries;
+- a `You` marker for the signed-in administrator;
+- the account-active toggle separately from role assignment; and
+- a visible warning when an account is the last active administrator.
 
 To add a user:
 
@@ -106,26 +101,22 @@ To add a user:
 2. open `/admin/users`;
 3. enter the user's email address;
 4. enter an initial password of at least 12 characters;
-5. select one or more roles;
+5. select one or more roles; and
 6. choose **Create user**.
 
-Changes to active state and roles are published as non-secret Federation metadata. Existing member sessions refresh that authorization state from the Federation; deactivating a user causes the member shadow account to be deactivated when the updated state is observed.
+The application refuses to deactivate or demote the final active administrator.
 
-The application prevents the final active administrator on the authority from being deactivated or stripped of the `admin` role.
+On a Federation member, opening `/admin/users` redirects to the human credential authority. Unsafe member-local writes are rejected rather than creating divergent credentials.
 
 ## Roles
 
-Use the least-privileged role that matches the person's job.
-
 | Role | Intended use | Main capabilities |
 | --- | --- | --- |
-| `viewer` | Read-only users | View dashboards, data, analyses, documentation, system state, Federation status, devices, and capabilities; manage their own account password through the authority. |
-| `operator` | Normal FCP operators | Everything in `viewer`, plus data upload, analyses, workflows, normal runtime controls, and recorder controls. |
-| `admin` | FCP/Federation administrators | All human permissions, including Federation/provider administration, pairing, software updates, and human-user administration, subject to Federation device/session authority. |
+| `viewer` | Read-only users | View dashboards, data, documentation, system/Federation state, and manage their own account password through the authority. |
+| `operator` | Normal FCP operators | `viewer` plus upload, analysis, workflow, runtime, and recorder operations. |
+| `admin` | FCP/Federation administrators | All human permissions, including Federation/provider administration, pairing, software updates, and human-user administration, still subject to Federation-side device authority. |
 
-An `operator` is intentionally **not** a Federation administrator.
-
-Current human permissions are:
+Current human permissions include:
 
 - `dashboard.read`
 - `data.read`
@@ -141,29 +132,15 @@ Current human permissions are:
 - `users.manage`
 - `account.manage`
 
-Routes are authorized by permissions rather than by hard-coded role names.
+Routes are authorized by permissions rather than by scattered role-name checks.
 
 ## Password changes
 
-Passwords live only on the Federation authority. Therefore a password change requested from a member is redirected to the leader. Unsafe member-side password-change requests are rejected.
-
-A member shadow account is not an independent credential. Its purpose is to represent an already verified Federation human inside the member's local Flask session and permission model.
-
-## Federation human-auth events
-
-The durable Federation log can contain these human-auth control records:
-
-- `human_auth.authority.published` — leader node ID, public key, and browser base URL;
-- `human_auth.member_endpoint.published` — a member's own browser base URL;
-- `human_auth.user.changed` — email, active state, and roles.
-
-Coordinator policy permits only the Federation creator to publish authority/user state. A member may advertise an endpoint only for its own authenticated node identity.
-
-**Passwords, password hashes, password salts, Flask session secrets, pairing tokens, and device private keys are not placed in these events.**
+Passwords live only on the human credential authority. A password change requested from a member is redirected to the authority. A member shadow account is not an independent Federation credential.
 
 ## Local authentication data
 
-The leader still stores its human credential database and local web-session secrets under `data/auth/` by default:
+The credential-authority installation stores its human credential database and persistent web-auth secrets under `data/auth/` by default:
 
 ```text
 data/auth/users.sqlite3
@@ -171,39 +148,37 @@ data/auth/flask-secret
 data/auth/password-salt
 ```
 
-A member can also have `users.sqlite3`, but Federation-authenticated users there are shadow records rather than an authoritative password store.
-
-Back up the leader authentication database and its secrets together. Do not commit them to Git or copy them into documentation/logs.
+Back up the credential database and its secrets together. Do not commit them to Git or copy them into logs/documentation.
 
 Important consequences:
 
-- deleting the leader `users.sqlite3` removes the authoritative human-account database;
-- changing/deleting the leader `password-salt` can make its password hashes unusable;
-- changing a device's `flask-secret` invalidates browser sessions on that device;
-- `start.cmd --fresh` still preserves human-auth files unless the reset operation explicitly says otherwise.
+- deleting the authority `users.sqlite3` removes authoritative human accounts;
+- changing/deleting its `password-salt` can invalidate password hashes;
+- changing a device `flask-secret` invalidates browser sessions on that device;
+- `start.cmd --fresh` preserves human-auth files unless the reset boundary explicitly says otherwise.
 
 ## Configuration
 
-Normal single-machine use needs no human-auth environment variables. Relevant advanced settings are:
+Normal single-machine use needs no human-auth environment variables. Advanced settings include:
 
-- `FCP_AUTH_DATABASE` — local human/shadow database path; default `data/auth/users.sqlite3`;
-- `FCP_AUTH_SECRET_DIR` — local secret directory; default `data/auth`;
+- `FCP_AUTH_DATABASE` — local human/shadow database path;
+- `FCP_AUTH_SECRET_DIR` — local persistent secret directory;
 - `FCP_FLASK_SECRET` — explicit Flask session secret, at least 32 characters;
-- `FCP_PASSWORD_SALT` — explicit local password-hashing salt, at least 32 characters;
-- `FCP_SESSION_MINUTES` — authenticated session lifetime in minutes; default `480`;
-- `FCP_HTTPS=1` — mark session/remember cookies Secure when HTTPS is actually enforced;
-- `FCP_HUMAN_AUTH_BASE_URL` — stable browser-reachable FCP origin for Federation SSO;
-- `FCP_HUMAN_AUTH_LOCAL_FALLBACK=1` — explicitly allow member-local password login for emergency recovery.
+- `FCP_PASSWORD_SALT` — explicit password-hashing salt, at least 32 characters;
+- `FCP_SESSION_MINUTES` — authenticated session lifetime;
+- `FCP_HTTPS=1` — mark relevant cookies Secure when HTTPS is actually enforced;
+- `FCP_HUMAN_AUTH_BASE_URL` — stable browser-reachable FCP origin;
+- `FCP_HUMAN_AUTH_LOCAL_FALLBACK=1` — explicit member-local recovery login.
 
 ### Emergency local fallback
 
-Member-local password login is disabled by default, including when the Federation relay is temporarily unreachable. This prevents a network outage from silently turning an old local password database into an authentication bypass.
+Member-local password login is disabled by default, including during a Federation outage. This avoids turning an old local credential database into a silent authorization bypass.
 
-`FCP_HUMAN_AUTH_LOCAL_FALLBACK=1` deliberately weakens that boundary and should be used only as an operator-controlled recovery mechanism. When enabled, the member login page labels the local form as recovery mode.
+`FCP_HUMAN_AUTH_LOCAL_FALLBACK=1` deliberately weakens that boundary and should be used only as an operator-controlled recovery mechanism.
 
 ## Development-only authentication bypass
 
-For local development only, human authentication can still be disabled with both:
+For local development/test only:
 
 ```text
 FCP_DEVELOPMENT=1
@@ -212,46 +187,35 @@ FCP_AUTH_DISABLED=1
 
 `FCP_AUTH_DISABLED=1` is rejected outside development/test operation.
 
-## Sessions and CSRF protection
+## Sessions and CSRF
 
-Human sessions use HttpOnly cookies with SameSite=Lax. Secure cookies are enabled when `FCP_HTTPS=1`.
+Human sessions use HttpOnly cookies with SameSite=Lax. Secure cookie behavior follows `FCP_HTTPS`.
 
-Human login, user administration, and the member's Federation sign-in start form use CSRF protection. The Federation login callback additionally validates the signed assertion and random browser state. Hiding a UI control is never treated as authorization; permission and Federation authority checks are enforced server-side.
-
-## Upgrading an existing Federation
-
-For an existing installation:
-
-1. update all Federation devices to a version containing Federation human SSO;
-2. ensure the Federation creator has the intended authoritative human accounts;
-3. give the leader and members browser-reachable `FCP_HUMAN_AUTH_BASE_URL` values when automatic request-origin discovery is not sufficient;
-4. load/sign in to the leader so its authority metadata is published;
-5. open a member `/login` and choose **Sign in through Federation leader**.
-
-Accounts that existed only on a member are **not automatically promoted to Federation credentials**, because that would let an arbitrary member create a Federation-wide human identity. Recreate any such account on the leader if it should be Federation-wide.
+Human login, first-user setup, user administration, and Federation sign-in entry points retain CSRF/server-side authorization checks. Hiding a UI control is never treated as authorization.
 
 ## Troubleshooting
 
-### I only see the login page and have no account
+### I opened a fresh installation and have no account
 
-On the future Federation leader, create the first administrator:
+Open the FCP web interface. With zero local users, FCP should redirect to `/admin/users/bootstrap`. Create the first administrator there.
 
-```bash
-docker compose run --rm --no-deps --entrypoint flask flask --app catalog.flask_app.app:create_app fcp-user create-admin
-```
+If the bootstrap claim exists while the user table is unexpectedly empty, FCP fails closed rather than reopening anonymous administrator creation. Treat that as damaged auth state and investigate it; do not delete individual auth files to bypass the guard.
 
-### A member says the Federation leader has not advertised sign-in
+### A Federation member does not show local first-admin setup
 
-Open the leader's FCP web UI/login page and verify its Federation connection. For multi-host use, configure `FCP_HUMAN_AUTH_BASE_URL` to a browser-reachable leader origin rather than `localhost`.
+That is intentional. A remotely paired member uses Federation human sign-in instead of claiming new local human credential authority.
 
-### The browser is redirected to the wrong machine
+### A member says the human sign-in authority is unreachable
 
-Check `FCP_HUMAN_AUTH_BASE_URL` on the leader and member. Federation relay addresses are not substitutes for browser HTTP/HTTPS addresses.
+Verify the creator/credential-authority FCP web origin and `FCP_HUMAN_AUTH_BASE_URL`. The current operational leader may be a different device after leader failover; that does not move human credential custody.
 
-### A user can sign in but receives 403 Forbidden
+### A user signs in but receives 403
 
-Check the user's roles on the leader at `/admin/users`. Authentication establishes identity; permissions still determine which FCP operations are allowed.
+Check roles at `/admin/users`. Authentication establishes identity; permissions still determine allowed browser actions, and Federation-side authority may impose an additional device-level check.
 
-### I cannot use a member's old local password
+## Related guides
 
-That is intentional. Federation members trust the leader for human authentication. Use **Sign in through Federation leader**, or explicitly enable the emergency local fallback only when you understand the security trade-off.
+- [Quick start](quick_start.md)
+- [Federation operations](federation_operations.md)
+- [Tailscale Federation discovery](tailscale_federation_discovery.md)
+- [Troubleshooting](troubleshooting.md)
