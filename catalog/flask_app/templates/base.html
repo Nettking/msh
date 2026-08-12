@@ -61,12 +61,10 @@
     {% set page_active_section = federation_vm.active_section if federation_vm and federation_vm.active_section is defined else none %}
     {% set page_shows_approvals = provider_operator_available|default(false) %}
     {% set active_group = 'monitor' %}
-    {% if endpoint.startswith('federation_web.') or endpoint.startswith('capability_') %}
+    {% if endpoint.startswith('federation_web.') or endpoint.startswith('provider_federation_web.') or endpoint.startswith('federation_recorder_web.') or endpoint.startswith('source_web.') or endpoint == 'web.status' or endpoint.startswith('capability_') %}
       {% set active_group = 'federation' %}
-    {% elif endpoint.startswith('operator_strategy_web.') or endpoint in knowledge_endpoints %}
+    {% elif endpoint.startswith('operator_strategy_web.') or endpoint in knowledge_endpoints or endpoint == 'web.guide' or endpoint.startswith('ai_web.') %}
       {% set active_group = 'knowledge' %}
-    {% elif endpoint == 'web.guide' or endpoint.startswith('source_web.') or endpoint == 'web.status' or endpoint.startswith('ai_web.') %}
-      {% set active_group = 'system' %}
     {% endif %}
     {% macro theme_toggle() -%}
       <button class="theme-toggle" type="button" data-theme-toggle aria-pressed="false" aria-label="Switch to dark mode" title="Switch to dark mode">
@@ -83,10 +81,6 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H19v15H6.5A2.5 2.5 0 0 0 4 20.5Z"/><path d="M4 20.5A2.5 2.5 0 0 1 6.5 18H19v3H6.5A2.5 2.5 0 0 1 4 20.5Z"/></svg>
       {%- elif name == 'federation' -%}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2.4"/><circle cx="5" cy="18" r="2.4"/><circle cx="19" cy="18" r="2.4"/><path d="M12 7.4 6.4 15.8M12 7.4l5.6 8.4M7.4 18h9.2"/></svg>
-      {%- elif name == 'system' -%}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.1"/><path d="M12 2.8v2.6M12 18.6v2.6M4.5 4.5l1.9 1.9M17.6 17.6l1.9 1.9M2.8 12h2.6M18.6 12h2.6M4.5 19.5l1.9-1.9M17.6 6.4l1.9-1.9"/></svg>
-      {%- elif name == 'device' -%}
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3.2" y="4.4" width="17.6" height="12" rx="2"/><path d="M8 20h8"/></svg>
       {%- else -%}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.2"/><path d="M12 8.4v4.2l2.6 1.6"/></svg>
       {%- endif -%}
@@ -96,15 +90,13 @@
         which is what makes the rail readable as a two-level menu. -#}
     {% macro nav_item(href, label, icon, active) -%}
       <a class="admin-nav__link {% if active %}is-active{% endif %}" href="{{ href }}" {% if active %}aria-current="page"{% endif %}>{{ nav_icon(icon) }}<span class="admin-nav__label">{{ label }}</span></a>
-      {%- if active and not recorder_only %}
+      {%- if active %}
       <div class="admin-subnav">{{ section_links(active_group, endpoint) }}</div>
       {%- endif %}
     {%- endmacro %}
     {% macro primary_links(group) -%}
       {% if recorder_only %}
-      {{ nav_item(url_for('web.status'), 'Status', 'monitor', endpoint == 'web.status') }}
-      {{ nav_item(endpoint_url('federation_web.overview', '/federation'), 'Federation', 'federation', group == 'federation') }}
-      {{ nav_item(endpoint_url('capability_startup_transition_web.onboarding', '/onboarding'), 'Device', 'device', endpoint.startswith('capability_')) }}
+      {{ nav_item(endpoint_url('federation_web.overview', '/federation'), 'Federation', 'federation', true) }}
       {% else %}
       {% if workbench_role %}
       {{ nav_item(url_for('web.overview'), 'Monitor', 'monitor', group == 'monitor') }}
@@ -112,33 +104,44 @@
       {% endif %}
       {% if capability_complete %}
       {{ nav_item(endpoint_url('federation_web.overview', '/federation'), 'Federation', 'federation', group == 'federation') }}
-      {% else %}
-      {{ nav_item(endpoint_url('capability_startup_transition_web.onboarding', '/onboarding'), 'Device setup', 'device', true) }}
-      {% endif %}
-      {% if capability_complete %}
-      {{ nav_item(url_for('web.guide'), 'System', 'system', group == 'system') }}
       {% endif %}
       {% endif %}
     {%- endmacro %}
-    {% macro section_links(group, current_endpoint) -%}
-      {#- A Federation page always carries its own section list, so the rail shows
-          it whatever the onboarding state. Otherwise these pages would be
-          reachable with no way to move between them. -#}
+    {% macro federation_links(current_endpoint) -%}
       {% if page_sections %}
         {% for section in page_sections %}
-        <a class="admin-subnav__link {% if section.key == page_active_section %}is-active{% endif %}" href="{{ section.url }}" {% if section.key == page_active_section %}aria-current="page"{% endif %}>{{ section.label }}</a>
-        {% endfor %}
-        {% if page_shows_approvals %}
-        <a class="admin-subnav__link {% if page_active_section == 'approvals' %}is-active{% endif %}" href="{{ url_for('provider_federation_web.index') }}">Approvals</a>
+        {% set section_active = section.key == page_active_section or (section.key == 'this-device' and current_endpoint == 'web.status') %}
+        <a class="admin-subnav__link {% if section_active %}is-active{% endif %}" href="{{ section.url }}" {% if section_active %}aria-current="page"{% endif %}>{{ section.label }}</a>
+        {% if section.key == 'this-device' %}
+        <a class="admin-subnav__link {% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}" {% if current_endpoint == 'web.status' %}aria-current="page"{% endif %}>↳ Diagnostics</a>
         {% endif %}
-        <a class="admin-subnav__link {% if page_active_section == 'recorders' %}is-active{% endif %}" href="{{ url_for('federation_recorder_web.index') }}">Recorders</a>
-        <a class="admin-subnav__link {% if current_endpoint.startswith('capability_') %}is-active{% endif %}" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}">Device onboarding</a>
-      {% elif recorder_only %}
-        <a class="admin-subnav__link {% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Recorder status</a>
-        <a class="admin-subnav__link {% if current_endpoint.startswith('federation_web.') %}is-active{% endif %}" href="{{ endpoint_url('federation_web.overview', '/federation') }}">Federation overview</a>
-        <a class="admin-subnav__link {% if current_endpoint.startswith('capability_') %}is-active{% endif %}" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}">Device setup</a>
-      {% elif not capability_complete %}
-        <a class="is-active" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}">Device onboarding</a>
+        {% if section.key == 'benchmarks' and workbench_role %}
+        <a class="admin-subnav__link {% if current_endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ endpoint_url('source_web.index', '/sources/') }}" {% if current_endpoint.startswith('source_web.') %}aria-current="page"{% endif %}>Sources</a>
+        {% endif %}
+        {% endfor %}
+      {% else %}
+        <a class="admin-subnav__link {% if current_endpoint == 'federation_web.overview' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.overview', '/federation') }}">Overview</a>
+        <a class="admin-subnav__link {% if current_endpoint == 'federation_web.this_device' or current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.this_device', '/federation/device') }}">This device</a>
+        <a class="admin-subnav__link {% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}" {% if current_endpoint == 'web.status' %}aria-current="page"{% endif %}>↳ Diagnostics</a>
+        <a class="admin-subnav__link {% if current_endpoint == 'federation_web.devices' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.devices', '/federation/devices') }}">Devices</a>
+        <a class="admin-subnav__link {% if current_endpoint == 'federation_web.services' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.services', '/federation/services') }}">Services</a>
+        <a class="admin-subnav__link {% if current_endpoint == 'federation_web.benchmarks' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.benchmarks', '/federation/benchmarks') }}">Benchmarks</a>
+        {% if workbench_role %}
+        <a class="admin-subnav__link {% if current_endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ endpoint_url('source_web.index', '/sources/') }}" {% if current_endpoint.startswith('source_web.') %}aria-current="page"{% endif %}>Sources</a>
+        {% endif %}
+        <a class="admin-subnav__link {% if current_endpoint == 'federation_web.storage' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.storage', '/federation/storage') }}">Storage</a>
+        <a class="admin-subnav__link {% if current_endpoint == 'federation_web.jobs' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.jobs', '/federation/jobs') }}">Jobs</a>
+        <a class="admin-subnav__link {% if current_endpoint == 'federation_web.activity' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.activity', '/federation/activity') }}">Activity</a>
+        <a class="admin-subnav__link {% if current_endpoint == 'federation_web.settings' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.settings', '/federation/settings') }}">Settings</a>
+      {% endif %}
+      {% if page_shows_approvals %}
+      <a class="admin-subnav__link {% if page_active_section == 'approvals' or current_endpoint.startswith('provider_federation_web.') %}is-active{% endif %}" href="{{ url_for('provider_federation_web.index') }}">Approvals</a>
+      {% endif %}
+      <a class="admin-subnav__link {% if page_active_section == 'recorders' or current_endpoint.startswith('federation_recorder_web.') %}is-active{% endif %}" href="{{ url_for('federation_recorder_web.index') }}">Recorders</a>
+    {%- endmacro %}
+    {% macro section_links(group, current_endpoint) -%}
+      {% if group == 'federation' %}
+        {{ federation_links(current_endpoint) }}
       {% elif group == 'knowledge' %}
         <a class="admin-subnav__link {% if current_endpoint == 'operator_strategy_web.index' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.index', '/operator-strategies') }}">Overview</a>
         <a class="admin-subnav__link {% if current_endpoint == 'operator_strategy_web.capture' %}is-active{% endif %}" href="{{ endpoint_url('operator_strategy_web.capture', '/operator-strategies/capture') }}">Capture</a>
@@ -146,24 +149,15 @@
         <a class="admin-subnav__link {% if current_endpoint == 'operator_support_web.strategy_comparison' %}is-active{% endif %}" href="{{ endpoint_url('operator_support_web.strategy_comparison', '/strategy-comparison') }}">Strategies</a>
         <a class="admin-subnav__link {% if current_endpoint in ['web.strategies', 'web.save_strategies'] %}is-active{% endif %}" href="{{ url_for('web.strategies') }}">Intervention Logic</a>
         <a class="admin-subnav__link {% if current_endpoint == 'operator_support_web.osl_export' %}is-active{% endif %}" href="{{ endpoint_url('operator_support_web.osl_export', '/osl-export') }}">SysML Export</a>
-      {% elif group == 'system' %}
-        <a class="admin-subnav__link {% if current_endpoint == 'web.guide' %}is-active{% endif %}" href="{{ url_for('web.guide') }}">Guide</a>
-        <a class="admin-subnav__link {% if current_endpoint.startswith('capability_') %}is-active{% endif %}" href="{{ endpoint_url('capability_startup_transition_web.onboarding', '/onboarding') }}">Device setup</a>
-        {% if recorder_role %}
-        <a class="admin-subnav__link" href="{{ url_for('web.status') }}#recorder-status">Recording</a>
-        {% endif %}
-        {% if workbench_role %}
-        <a class="admin-subnav__link {% if current_endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ endpoint_url('source_web.index', '/sources/') }}">Sources</a>
-        {% endif %}
-        <a class="admin-subnav__link {% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}">Diagnostics</a>
         {% if ai_role %}
         <a class="admin-subnav__link {% if current_endpoint.startswith('ai_web.') %}is-active{% endif %}" href="{{ endpoint_url('ai_web.ai_page', '/ai') }}">AI Explainer</a>
         {% endif %}
+        <a class="admin-subnav__link {% if current_endpoint == 'web.guide' %}is-active{% endif %}" href="{{ url_for('web.guide') }}">Guide</a>
       {% else %}
         <a class="admin-subnav__link {% if current_endpoint == 'web.overview' %}is-active{% endif %}" href="{{ url_for('web.overview') }}">Overview</a>
-        <a class="admin-subnav__link {% if current_endpoint.startswith('data_upload_web.') %}is-active{% endif %}" href="{{ endpoint_url('data_upload_web.index', '/data-upload/') }}">Data upload</a>
         <a class="admin-subnav__link {% if current_endpoint == 'web.live' %}is-active{% endif %}" href="{{ url_for('web.live') }}">Live</a>
         <a class="admin-subnav__link {% if current_endpoint == 'web.playback' %}is-active{% endif %}" href="{{ url_for('web.playback') }}">Playback</a>
+        <a class="admin-subnav__link {% if current_endpoint == 'web.exploration' %}is-active{% endif %}" href="{{ url_for('web.exploration') }}">Explore</a>
         <a class="admin-subnav__link {% if current_endpoint == 'operator_support_web.assist' %}is-active{% endif %}" href="{{ endpoint_url('operator_support_web.assist', '/assist') }}">Assist</a>
       {% endif %}
     {%- endmacro %}
@@ -172,7 +166,7 @@
       {% if not setup_focus %}
       <button class="admin-rail__scrim" type="button" data-rail-close aria-label="Close navigation"></button>
       <aside class="admin-rail" id="admin-rail">
-        <a class="admin-rail__brand" href="{{ url_for('web.status') if recorder_only else url_for('web.overview') }}">
+        <a class="admin-rail__brand" href="{{ endpoint_url('federation_web.overview', '/federation') if recorder_only else url_for('web.overview') }}">
           <span class="admin-rail__mark" aria-hidden="true">FCP</span>
           <span class="admin-rail__title">
             <strong>{{ 'FCP Recorder' if recorder_only else 'FCP Webapp' }}</strong>
@@ -244,7 +238,7 @@
             <span>Menu</span>
           </button>
           <div class="admin-topbar__heading">
-            <span class="admin-topbar__section">{{ 'Recorder' if recorder_only else active_group|capitalize }}</span>
+            <span class="admin-topbar__section">{{ active_group|capitalize }}</span>
             <span class="admin-topbar__page">{{ 'FCP Recorder station' if recorder_only else 'FCP Webapp' }}</span>
           </div>
           <div class="admin-topbar__actions">
