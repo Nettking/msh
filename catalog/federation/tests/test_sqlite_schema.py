@@ -68,7 +68,9 @@ def test_fresh_schema_runs_consecutive_migrations_and_is_idempotent() -> None:
     )
 
 
-def test_current_unversioned_schema_is_registered_without_replaying_migrations() -> None:
+def test_current_unversioned_schema_is_registered_without_replaying_migrations() -> (
+    None
+):
     connection = sqlite3.connect(":memory:")
     _create_example_v1(connection)
     _upgrade_example_v2(connection)
@@ -85,7 +87,10 @@ def test_current_unversioned_schema_is_registered_without_replaying_migrations()
             connection,
             schema_name="test.current",
             target_version=2,
-            migrations=(SQLiteMigration(1, must_not_run), SQLiteMigration(2, must_not_run)),
+            migrations=(
+                SQLiteMigration(1, must_not_run),
+                SQLiteMigration(2, must_not_run),
+            ),
             detect_legacy_version=current,
             validate=_validate_example_v2,
         )
@@ -113,12 +118,18 @@ def test_failed_migration_rolls_back_schema_and_version_marker() -> None:
             validate=lambda _: None,
         )
 
-    assert connection.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name='example'"
-    ).fetchone() is None
-    assert connection.execute(
-        f"SELECT name FROM sqlite_master WHERE type='table' AND name='{SQLITE_SCHEMA_VERSION_TABLE}'"
-    ).fetchone() is None
+    assert (
+        connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='example'"
+        ).fetchone()
+        is None
+    )
+    assert (
+        connection.execute(
+            f"SELECT name FROM sqlite_master WHERE type='table' AND name='{SQLITE_SCHEMA_VERSION_TABLE}'"
+        ).fetchone()
+        is None
+    )
 
 
 def test_newer_schema_version_is_rejected_without_mutation() -> None:

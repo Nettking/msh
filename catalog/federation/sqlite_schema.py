@@ -27,7 +27,9 @@ class SQLiteMigration:
     upgrade: Callable[[sqlite3.Connection], None]
 
 
-def _unsupported(schema_name: str, version: object, target_version: int) -> FederationValidationError:
+def _unsupported(
+    schema_name: str, version: object, target_version: int
+) -> FederationValidationError:
     return FederationValidationError(
         "unsupported-sqlite-schema",
         schema_name,
@@ -46,12 +48,18 @@ def _validate_plan(
         or len(schema_name) > MAX_SQLITE_SCHEMA_NAME_LENGTH
     ):
         raise ValueError("schema_name must be bounded non-empty text")
-    if isinstance(target_version, bool) or not isinstance(target_version, int) or target_version < 1:
+    if (
+        isinstance(target_version, bool)
+        or not isinstance(target_version, int)
+        or target_version < 1
+    ):
         raise ValueError("target_version must be a positive integer")
     by_target = {migration.to_version: migration for migration in migrations}
     expected = tuple(range(1, target_version + 1))
     if len(by_target) != len(migrations) or tuple(sorted(by_target)) != expected:
-        raise ValueError("migrations must contain exactly one consecutive step for each target version")
+        raise ValueError(
+            "migrations must contain exactly one consecutive step for each target version"
+        )
     return by_target
 
 
@@ -93,7 +101,11 @@ def ensure_sqlite_schema(
         ).fetchone()
         if row is None:
             version = detect_legacy_version(connection)
-            if isinstance(version, bool) or not isinstance(version, int) or not 0 <= version <= target_version:
+            if (
+                isinstance(version, bool)
+                or not isinstance(version, int)
+                or not 0 <= version <= target_version
+            ):
                 raise _unsupported(schema_name, version, target_version)
             connection.execute(
                 f"INSERT INTO {SQLITE_SCHEMA_VERSION_TABLE}(schema_name, version) VALUES (?, ?)",
@@ -101,7 +113,11 @@ def ensure_sqlite_schema(
             )
         else:
             version = row[0]
-            if isinstance(version, bool) or not isinstance(version, int) or not 0 <= version <= target_version:
+            if (
+                isinstance(version, bool)
+                or not isinstance(version, int)
+                or not 0 <= version <= target_version
+            ):
                 raise _unsupported(schema_name, version, target_version)
 
         while version < target_version:

@@ -63,10 +63,15 @@ def test_filesystem_storage_registers_and_migrates_legacy_index(tmp_path: Path) 
         assert row["dataset_schema_name"] == "fcp.storage.dataset.opaque"
         assert row["dataset_schema_version"] == 1
         assert row["idempotency_key"] == "idem-1"
-        assert connection.execute("SELECT COUNT(*) FROM committed_batches").fetchone()[0] == 1
+        assert (
+            connection.execute("SELECT COUNT(*) FROM committed_batches").fetchone()[0]
+            == 1
+        )
 
 
-def test_acknowledgement_store_registers_and_migrates_legacy_state(tmp_path: Path) -> None:
+def test_acknowledgement_store_registers_and_migrates_legacy_state(
+    tmp_path: Path,
+) -> None:
     database = tmp_path / "acknowledgements.sqlite3"
     with sqlite3.connect(database) as connection:
         connection.executescript(
@@ -117,7 +122,10 @@ def test_acknowledgement_store_registers_and_migrates_legacy_state(tmp_path: Pat
     store = DurableAcknowledgementStore(database)
     status = store.status("session-1", "storage-main", "batch-1")
 
-    assert _version(database, ACKNOWLEDGEMENT_SCHEMA_NAME) == ACKNOWLEDGEMENT_SCHEMA_VERSION
+    assert (
+        _version(database, ACKNOWLEDGEMENT_SCHEMA_NAME)
+        == ACKNOWLEDGEMENT_SCHEMA_VERSION
+    )
     assert status is not None
     assert status.dataset_id == "legacy-unknown-dataset"
     assert status.dataset_schema_name == "fcp.storage.dataset.opaque"
@@ -125,8 +133,12 @@ def test_acknowledgement_store_registers_and_migrates_legacy_state(tmp_path: Pat
     assert status.primary_committed is True
     assert status.acknowledged_replica_ids == ("storage-b",)
     with sqlite3.connect(database) as connection:
-        assert connection.execute("SELECT COUNT(*) FROM storage_commits").fetchone() == (1,)
-        assert connection.execute("SELECT COUNT(*) FROM storage_commit_replicas").fetchone() == (1,)
+        assert connection.execute(
+            "SELECT COUNT(*) FROM storage_commits"
+        ).fetchone() == (1,)
+        assert connection.execute(
+            "SELECT COUNT(*) FROM storage_commit_replicas"
+        ).fetchone() == (1,)
 
 
 def test_fresh_federation_stores_record_current_schema_versions(tmp_path: Path) -> None:
@@ -139,4 +151,7 @@ def test_fresh_federation_stores_record_current_schema_versions(tmp_path: Path) 
         _version(storage_root / "storage-index.sqlite3", STORAGE_INDEX_SCHEMA_NAME)
         == STORAGE_INDEX_SCHEMA_VERSION
     )
-    assert _version(acknowledgements, ACKNOWLEDGEMENT_SCHEMA_NAME) == ACKNOWLEDGEMENT_SCHEMA_VERSION
+    assert (
+        _version(acknowledgements, ACKNOWLEDGEMENT_SCHEMA_NAME)
+        == ACKNOWLEDGEMENT_SCHEMA_VERSION
+    )
