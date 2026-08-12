@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Mapping, Sequence
 
 MAX_COMMAND_REQUEST_ID_LENGTH = 128
 MAX_COMMAND_NODE_ID_LENGTH = 512
@@ -117,7 +117,7 @@ class ControlCommandEnvelope:
         expires_at: datetime,
         max_lifetime: timedelta,
         max_targets: int = MAX_COMMAND_TARGETS,
-    ) -> "ControlCommandEnvelope":
+    ) -> ControlCommandEnvelope:
         request = _request_id(request_id)
         targets = _targets(
             tuple(target_node_ids),
@@ -140,7 +140,7 @@ class ControlCommandEnvelope:
         max_targets: int = MAX_COMMAND_TARGETS,
         require_unique_targets: bool,
         now: datetime | None = None,
-    ) -> "ControlCommandEnvelope":
+    ) -> ControlCommandEnvelope:
         request = _request_id(value.get("request_id"))
         targets = _targets(
             value.get("target_node_ids"),
