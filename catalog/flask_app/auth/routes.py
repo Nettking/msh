@@ -19,6 +19,7 @@ from flask_security import current_user, hash_password
 
 from .federation import get_federated_human_auth_service, saved_remote_member
 from .models import Role, User, db
+from .policy import ROLE_SUMMARIES
 
 auth_users = Blueprint("auth_users", __name__, url_prefix="/admin/users")
 
@@ -88,6 +89,8 @@ def users():
         "auth/users.html",
         users=db.session.query(User).order_by(User.email).all(),
         roles=db.session.query(Role).order_by(Role.name).all(),
+        role_summaries=ROLE_SUMMARIES,
+        active_admin_count=_active_admin_count(),
     )
 
 

@@ -43,6 +43,14 @@ ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
     "admin": frozenset(PERMISSIONS),
 }
 
+#: One-line summaries for the user administration screen. Kept beside
+#: ROLE_PERMISSIONS so the wording and the grants change together.
+ROLE_SUMMARIES: dict[str, str] = {
+    "viewer": "Read dashboards, data, and Federation status.",
+    "operator": "Adds upload, analysis, workflow, runtime, and recorder control.",
+    "admin": "Everything, including Federation administration, software updates, and user management.",
+}
+
 PUBLIC_ENDPOINTS = frozenset(
     {
         "security.login",

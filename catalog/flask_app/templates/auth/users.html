@@ -1,25 +1,99 @@
 {% extends "base.html" %}
 {% block body %}
-<section class="panel">
+<section class="page-intro">
   <h2>Human users</h2>
-  <p>These accounts authorize people using this web application. Federation nodes and device credentials are managed separately.</p>
-  <form method="post" action="{{ url_for('auth_users.create_user') }}">
+  <p>These accounts authorize people using the web application. Device identities, pairing grants, and recorder keys are a separate security domain and are managed elsewhere.</p>
+  <p class="users-intro__note">Passwords are stored only on this device. In a Federation, members sign people in against these accounts without ever receiving the password.</p>
+</section>
+
+<section class="section-block">
+  <h3>Add a person</h3>
+  <form class="users-form" method="post" action="{{ url_for('auth_users.create_user') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <label>Email <input name="email" type="email" autocomplete="off" required></label>
-    <label>Initial password <input name="password" type="password" minlength="12" autocomplete="new-password" required></label>
-    <fieldset><legend>Roles</legend>{% for role in roles %}<label><input type="checkbox" name="roles" value="{{ role.name }}"> {{ role.name }}</label>{% endfor %}</fieldset>
-    <button type="submit">Create user</button>
+
+    <div class="users-field-grid">
+      <div class="users-field">
+        <label class="users-field__label" for="new-user-email">Email</label>
+        <input id="new-user-email" name="email" type="email" autocomplete="off" required placeholder="person@example.com">
+      </div>
+      <div class="users-field">
+        <label class="users-field__label" for="new-user-password">Initial password</label>
+        <input id="new-user-password" name="password" type="password" minlength="12" autocomplete="new-password" required>
+        <span class="users-field__hint">At least 12 characters. The person can change it after signing in.</span>
+      </div>
+    </div>
+
+    <fieldset class="role-options">
+      <legend>Roles</legend>
+      {% for role in roles %}
+        <label class="role-option">
+          <input type="checkbox" name="roles" value="{{ role.name }}">
+          <span class="role-option__name">{{ role.name }}</span>
+        </label>
+      {% endfor %}
+    </fieldset>
+
+    <ul class="role-legend">
+      {% for role in roles %}
+        {% if role_summaries.get(role.name) %}
+          <li><b>{{ role.name }}</b> — {{ role_summaries[role.name] }}</li>
+        {% endif %}
+      {% endfor %}
+    </ul>
+
+    <div class="users-form__actions">
+      <button class="button-primary" type="submit">Create user</button>
+    </div>
   </form>
 </section>
-{% for user in users %}
-<section class="panel">
-  <form method="post" action="{{ url_for('auth_users.update_user', user_id=user.id) }}">
-    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-    <h3>{{ user.email }}</h3>
-    <label><input type="checkbox" name="active" value="1" {% if user.active %}checked{% endif %}> Active</label>
-    {% for role in roles %}<label><input type="checkbox" name="roles" value="{{ role.name }}" {% if user.has_role(role.name) %}checked{% endif %}> {{ role.name }}</label>{% endfor %}
-    <button type="submit">Save</button>
-  </form>
+
+<section class="section-block">
+  <h3>Existing accounts <span class="user-badge">{{ users|length }}</span></h3>
+
+  {% if users %}
+    <div class="user-list">
+      {% for user in users %}
+        {% set is_last_admin = user.active and user.has_role('admin') and active_admin_count <= 1 %}
+        <form class="user-row{% if not user.active %} user-row--inactive{% endif %}"
+              method="post" action="{{ url_for('auth_users.update_user', user_id=user.id) }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+          <div class="user-row__identity">
+            <span class="user-row__email">{{ user.email }}</span>
+            {% if user.active %}
+              <span class="user-badge user-badge--active">Active</span>
+            {% else %}
+              <span class="user-badge user-badge--inactive">Inactive</span>
+            {% endif %}
+            {% if current_user.is_authenticated and user.id == current_user.id %}
+              <span class="user-badge user-badge--you">You</span>
+            {% endif %}
+          </div>
+
+          <div class="user-row__controls">
+            <label class="role-option">
+              <input type="checkbox" name="active" value="1" {% if user.active %}checked{% endif %}>
+              <span class="role-option__name">Active</span>
+            </label>
+            <span class="user-row__divider" aria-hidden="true"></span>
+            {% for role in roles %}
+              <label class="role-option">
+                <input type="checkbox" name="roles" value="{{ role.name }}" {% if user.has_role(role.name) %}checked{% endif %}>
+                <span class="role-option__name">{{ role.name }}</span>
+              </label>
+            {% endfor %}
+            <span class="user-row__save"><button type="submit">Save</button></span>
+          </div>
+
+          {% if is_last_admin %}
+            <p class="user-row__guard">This is the only active administrator. Deactivating this account or removing its admin role is refused, so another administrator must exist first.</p>
+          {% endif %}
+
+        </form>
+      {% endfor %}
+    </div>
+  {% else %}
+    <p class="users-empty">No human accounts yet. Create the first one above.</p>
+  {% endif %}
 </section>
-{% endfor %}
 {% endblock %}
