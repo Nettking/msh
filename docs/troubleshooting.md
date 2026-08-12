@@ -1,22 +1,71 @@
 # Troubleshooting
 
 Status: **current operator guide**
-Reviewed: **2026-08-11**
+Reviewed: **2026-08-12**
 
-Use `/status` first for local runtime/data problems and **Federation** first for membership, distributed update, contribution, or standalone-recorder control problems.
+Use `/status` first for local runtime/data problems and **Federation** first for membership, leadership, distributed update, contribution, Tailscale discovery, or standalone-recorder control problems.
 
-Do not delete identity, Federation databases, Docker volumes, recorder checkpoints, or capability evidence merely to clear a warning. Use the documented reset/migration boundary only when you intentionally want that state change.
+Do not delete identity, Federation databases, Docker volumes, recorder checkpoints, human-auth state, or capability evidence merely to clear a warning. Use the documented reset/migration boundary only when you intentionally want that state change.
+
+## Fresh installation has no account
+
+A fresh local authority has no default username/password. Open the FCP web interface. While the local human-user database is empty, normal browser requests should redirect to:
+
+```text
+/admin/users/bootstrap
+```
+
+Create the first administrator there with a valid email address and a confirmed password of at least 12 characters. After that account commits, the anonymous bootstrap closes and normal sign-in takes over.
+
+A remotely paired Federation member with an empty local shadow-user database intentionally does **not** reopen first-admin bootstrap. Use Federation human sign-in instead.
+
+If a first-user bootstrap claim exists while the user table is unexpectedly empty, FCP fails closed with 503 rather than reopening anonymous admin creation. Investigate the auth database/state; do not delete individual guard files merely to bypass the protection.
 
 ## Federation device is missing or will not reconnect
 
 Check:
 
 1. the device is using its existing `data/` directory and stable identity;
-2. relay/Flask networking is reachable on the trusted LAN/VPN;
+2. relay/Flask networking is reachable on the trusted LAN/VPN/Tailscale path;
 3. the joining device was paired through a current signed `FCP1-...` code or already has a saved trusted binding; and
 4. the issuing FCP installation was opened through a LAN/VPN address reachable by the other physical machine before the pairing code was generated.
 
 Current browser pairing codes are one-use and valid for up to 10 minutes. If a code expired or was already redeemed, generate another code; do not try to turn the old code into a persistent credential.
+
+## Tailscale discovery finds no Federation
+
+On the host, check the already signed-in Tailscale client:
+
+```bash
+tailscale status
+tailscale ip -4
+```
+
+Then verify:
+
+- both FCP hosts are signed in to the intended same tailnet;
+- the existing FCP host is online;
+- its FCP web port is reachable through its Tailscale IPv4 address;
+- the firewall permits that trusted Tailscale path; and
+- the advertising FCP installation has local Federation authority. A remotely paired member deliberately does not advertise itself as the Federation authority.
+
+Discovery is a pre-start snapshot. Run `start-tailscale.cmd` or `bash start-tailscale.sh` again to refresh it after peers come online.
+
+If the Federation is discovered but onboarding still requires `FCP1-...`, that is expected. Tailscale proves reachability, not Federation membership.
+
+See [Tailscale Federation discovery](tailscale_federation_discovery.md).
+
+## Leader-only controls disappeared from this device
+
+Open Federation Overview and inspect the **creator**, **current leader**, and **leadership term**.
+
+Immutable creator provenance and current operational leadership are separate. After a valid coordinator-authored leader transition, the former leader is fenced from current-leader controls such as Federation-wide updates, leader capability requests, and reviewed member/provider administration.
+
+A brief disconnect does not immediately churn leadership. Promotion occurs only after the bounded offline/heartbeat timeout and only when a valid connected successor exists.
+
+If the authoritative coordinator/relay service itself is unavailable, automatic leader promotion cannot replace it. The current implementation does not provide replicated coordinator/quorum failover.
+
+Human credential/password authority remains creator-backed even if another device becomes current operational leader.
 
 ## Federation update check times out
 
@@ -55,13 +104,13 @@ Common safe failure states include:
 
 Do not use `git reset --hard`, `git clean`, or delete Federation state to bypass these checks.
 
-A standalone recorder launched directly with `python start_recorder.py` does not run the normal Flask update-event processor/host update agent. It currently requires its own host checkout/process update path.
+A standalone recorder launched directly with `python start_recorder.py` does not run the normal Flask host update agent. It currently requires its own host checkout/process update path.
 
 ## Update is stuck on Activation Queued
 
 `Activation Queued` means the device accepted the update request but has not yet proved the exact running target commit.
 
-Wait for build/restart/verification to finish before pressing **Update all devices** again. The coordinator may briefly be unavailable while its Flask/relay runtime restarts.
+Wait for build/restart/verification to finish before the current leader presses **Update all devices** again. The coordinator service may briefly be unavailable while its Flask/relay runtime restarts.
 
 If the state does not resolve, inspect:
 
@@ -81,9 +130,28 @@ An installation from before the current updater may need one safe migration boot
 migrate.cmd
 ```
 
-The migration preserves existing identity, Federation state, evidence, data, models, and retained relay volume while fast-forwarding only approved `main` and starting the current launcher/update agent.
+The migration preserves existing identity, Federation state, evidence, data, human-auth state, models, and retained relay volume while fast-forwarding only approved `main` and starting the current launcher/update agent.
 
 If migration reports ambiguous retained relay volumes, do not delete volumes to guess. The migration deliberately fails closed when it cannot uniquely identify the saved device's relay state.
+
+## A member does not act on a benchmark/contribution request
+
+Current-leader capability requests target only remote members that are reachable when the request is issued. Offline members are not silently queued.
+
+A reachable member may legitimately contribute nothing when:
+
+- no locally registered benchmark definition is runnable;
+- a candidate is not locally `ALLOWED`;
+- prerequisites are missing; or
+- the contribution still requires separate provider-enrollment approval.
+
+Issue another request after a member reconnects. The leader request cannot inject arbitrary benchmark code or bypass member-local/provider policy.
+
+## Device display name is rejected
+
+A trusted member can rename itself under **Federation -> This device**. The current leader can rename other members under **Federation -> Devices**.
+
+Names must satisfy bounded validation, case-insensitive uniqueness, and reserved/public-safe-name rules. The stable cryptographic `node_id` remains the technical identity even when the display name changes.
 
 ## Standalone recorder does not find machines on first start
 
@@ -159,30 +227,31 @@ Open `/status` and verify `latest_available_source_date`, `total_available_days`
 
 ### Recorder data from another Federation device does not appear
 
-Remote recorder telemetry is not found by scanning another device's files. The
-local product must be connected to the same Federation and must discover a
-ready session-owner storage authority with the intended logical storage group.
-It then lists only committed manifest batches, verifies each read, and rebuilds
-them below `data/federation/shared/telemetry` for the normal catalog and live
-views.
+Remote recorder telemetry is not found by scanning another device's files. The local product must be connected to the same Federation and must discover a ready session-owner storage authority with the intended logical storage group. It then lists only committed manifest batches, verifies each read, and rebuilds them below `data/federation/shared/telemetry` for the normal catalog and live views.
 
 Check that:
 
 - both devices are current members and connected to the authenticated relay;
-- the recorder reports a committed Federation watermark rather than only a
-  local checkpoint;
+- the recorder reports a committed Federation watermark rather than only a local checkpoint;
 - the session owner advertises a ready `fcp.storage-control` authority;
-- the selected storage group matches on the recorder and Flask device when
-  more than one group exists; and
+- the selected storage group matches on the recorder and Flask device when more than one group exists; and
 - the local mirror has free space below its configured quota.
 
-Do not point the scanner at a provider's batch directory. It contains internal
-storage envelopes and may include prepared or stale data. A hash, schema, or
-sequence conflict is rejected and quarantined instead of being shown.
+Do not point the scanner at a provider's batch directory. It contains internal storage envelopes and may include prepared or stale data. A hash, schema, or sequence conflict is rejected and quarantined instead of being shown.
 
-General files uploaded on another machine are not part of this recorder path;
-they remain local until the separate grant-bound object-sharing runtime is
-implemented.
+### Generic JSONL from another Federation device does not appear
+
+Supported non-recorder `data/**/*.jsonl` is handled by a separate generic Federation logical-storage bridge. Browser-uploaded JSONL is included by default. Authenticated remote files are hash/size verified and materialized below the normal `data/federation/shared/` scan boundary so existing recursive JSONL consumers can discover them.
+
+Check that:
+
+- both devices are current Federation members;
+- the source is valid JSONL under the supported `data/` corpus;
+- the generic Federation storage synchronization path is running;
+- the local generic mirror has space below `FCP_FEDERATED_JSONL_MAX_MIRROR_BYTES`; and
+- the publishing installation has not explicitly set `FCP_FEDERATED_JSONL_PUBLISH_UPLOADS=0` when the source is a browser upload.
+
+This does not expose arbitrary host files outside the reviewed FCP data corpus.
 
 ## Playback page has no selectable data
 
@@ -279,6 +348,8 @@ This is expected for runner internals, recorders, simulator, desktop automation,
 ## Related guides
 
 - [Federation operations](federation_operations.md)
+- [Tailscale Federation discovery](tailscale_federation_discovery.md)
+- [Human users, sign-in, and permissions](human-authentication.md)
 - [Standalone recorder](standalone_recorder.md)
 - [Server setup](server_setup.md)
 - [Quick start](quick_start.md)

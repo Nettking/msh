@@ -1,5 +1,8 @@
 # Run FCP on an Android phone with Termux
 
+Status: **current user guide**
+Reviewed: **2026-08-12**
+
 This profile runs FCP on Android without Docker and without a model server on the phone. It uses Termux `proot-distro` to build the existing FCP Dockerfile into a rootless Linux container, so the Python dependencies run in a normal Linux userland instead of directly against Android's Python ABI.
 
 The phone profile provides:
@@ -13,7 +16,8 @@ The phone profile provides:
 - SysML export;
 - Parquet/DuckDB cache rebuilding;
 - optional MTConnect recording when a reachable source is provided;
-- optional Observer Phoenix synchronization when credentials and connectivity are configured.
+- optional Observer Phoenix synchronization when credentials and connectivity are configured; and
+- the bounded phone-side Federation update agent.
 
 Local Ollama is deliberately disabled. The AI explainer can instead use Ollama contributed by a connected laptop or workstation; see [Connected capabilities](connected_capabilities.md).
 
@@ -50,10 +54,10 @@ The setup script:
 2. builds the root-level `Dockerfile` without a Docker daemon;
 3. installs the resulting container as `fcp-phone`;
 4. creates persistent data and result directories under `~/fcp-phone-state`;
-5. writes safe web-workbench defaults with AI disabled, while leaving the browser setup pending;
+5. writes safe web-workbench defaults with AI disabled, while leaving browser setup pending; and
 6. copies bundled example data into `data/demo` when no JSONL telemetry exists.
 
-The first build downloads an Ubuntu/Python container base and all Python dependencies. It can therefore take a while.
+The first build downloads an Ubuntu/Python container base and all Python dependencies.
 
 ## Start and open FCP
 
@@ -62,17 +66,27 @@ bash termux/fcp-phone.sh start
 bash termux/fcp-phone.sh open
 ```
 
-The supported phone launcher also starts one host-owned, single-instance Federation update agent. The agent has no general remote-command interface: it accepts only bounded update handoffs for an exact commit on the approved `main`, revalidates the local checkout and remote, permits only fast-forward source updates, restarts the PRoot runtime through the supported phone setup path, and reports success only after the restarted web process is healthy at the requested commit.
+The supported phone launcher also starts one host-owned, single-instance Federation update agent. The agent has no general remote-command interface: it accepts only bounded update handoffs for an exact commit on approved `main`, revalidates the local checkout and remote, permits only fast-forward source updates, restarts the PRoot runtime through the supported phone setup path, and reports success only after the restarted web process is healthy at the requested commit.
 
-On a fresh phone installation, the browser opens the focused setup wizard. The technical defaults written by the Termux installer do not count as a completed user setup. After setup and the session-start choice, a compact first-task screen lets the user capture an operator statement, connect machine data, or open the full workbench.
-
-Alternatively, open this manually in the Android browser:
+Alternatively, open manually:
 
 ```text
 http://127.0.0.1:5000
 ```
 
 The server continues in the background after the start command returns.
+
+### First human administrator on a standalone/local phone authority
+
+If this phone is a fresh local FCP authority with zero human users, opening the web interface redirects to:
+
+```text
+/admin/users/bootstrap
+```
+
+Create exactly the first active administrator there with a valid email address and a confirmed password of at least 12 characters. Then sign in and continue Identity/Federation/Inspect onboarding.
+
+A remotely paired Federation member with an empty local shadow-user database does not reopen this anonymous first-admin path; use Federation human sign-in instead.
 
 ## Common commands
 
@@ -169,7 +183,9 @@ The Federation update-agent log is:
 
 ## Update FCP
 
-A phone that already has the Federation update agent can be included in the coordinator's **Check for updates** and **Update all devices** flow while it is online in the Federation. The coordinator still selects one immutable `main` commit; the phone independently validates that target, fast-forwards only, updates/rebuilds the PRoot environment when required, restarts FCP, and proves the restarted commit before reporting `runtime_verified`.
+A phone that already has the Federation update agent can be included in the **current operational leader's** **Check for updates** and **Update all devices** flow while it is online in the Federation. The leader still selects one immutable approved `main` commit; the phone independently validates that target, fast-forwards only, updates/rebuilds the PRoot environment when required, restarts FCP, and proves the restarted commit before reporting `runtime_verified`.
+
+If leadership has transferred through a valid leadership term, the successor current leader owns the update controls; the immutable Federation creator does not retain them merely because it created the Federation.
 
 Existing phone installations from before this capability need one bootstrap update and one supported restart:
 
@@ -196,7 +212,13 @@ The updater fingerprints `Dockerfile` and `requirements.txt`. It performs the sl
 bash termux/fcp-phone.sh rebuild
 ```
 
-External `data` and `results` directories remain preserved in both paths. Custom browser setup is also preserved, including a connected laptop model provider. Untouched defaults created by an older phone installer are migrated once to pending first-time setup; custom roles, AI providers, and recorder settings are not reset.
+External `data` and `results` directories remain preserved in both paths. Custom browser setup is also preserved, including a connected laptop model provider. Human-auth state under the persistent data directory is preserved by normal phone updates/rebuilds.
+
+## Federation pairing and current leader
+
+When the phone needs to join an existing Federation, obtain the normal signed one-use `FCP1-...` pairing code from the **current Federation leader**. Current browser codes are valid for up to 10 minutes.
+
+Tailscale host-side automatic discovery is currently documented for the normal Windows/POSIX launchers, not as a Termux-specific phone launcher feature. A phone can still use a trusted LAN/VPN/Tailscale network for reachability while using the normal FCP pairing code.
 
 ## Scope and limitations
 
@@ -207,7 +229,15 @@ Most local FCP functions can be exercised with the bundled example data. Functio
 - MTConnect tests and recording require a reachable MTConnect endpoint;
 - VPN/network tests require an actual target network;
 - Observer Phoenix synchronization requires credentials and connectivity;
-- manufacturing conclusions require real telemetry and validation;
+- manufacturing conclusions require real telemetry and validation; and
 - the AI page requires a reachable connected Ollama provider because this profile intentionally does not install a model server on the phone.
 
 Do not expose port 5000 directly to the public internet. Keep the phone server on localhost, a trusted LAN, or a trusted VPN.
+
+## Related guides
+
+- [Quick start](quick_start.md)
+- [Human users, sign-in, and permissions](human-authentication.md)
+- [Federation operations](federation_operations.md)
+- [Connected capabilities](connected_capabilities.md)
+- [Troubleshooting](troubleshooting.md)

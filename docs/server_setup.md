@@ -1,7 +1,7 @@
 # Server setup and deployment
 
 Status: **current administrator guide**
-Reviewed: **2026-08-11**
+Reviewed: **2026-08-12**
 
 FCP is designed to run as a persistent device that may host several independent capabilities. The normal product setup does not assign the device one permanent role.
 
@@ -14,12 +14,12 @@ FCP device
   -> managed recorder
   -> Ollama service
   -> bounded host update agent
-  -> persistent data, results, model, and Federation state
+  -> persistent data, results, model, Federation, and human-auth state
 ```
 
-A browser on the same computer, or on another trusted LAN/VPN device when explicitly enabled, connects to the Flask workbench.
+A browser on the same computer, or on another trusted LAN/VPN/Tailscale device when explicitly enabled, connects to the Flask workbench.
 
-Do not expose Flask, the Federation relay, Ollama, or recorder control directly to the public internet. Use a trusted private network, VPN, or an authenticated HTTPS reverse proxy.
+Do not expose Flask, the Federation relay, Ollama, or recorder control directly to the public internet. Use a trusted private network, VPN, Tailscale, or an authenticated HTTPS reverse proxy.
 
 ## Normal first installation
 
@@ -41,7 +41,7 @@ start.cmd
 - builds the relay, Flask, and managed recorder images;
 - starts relay, Ollama, recorder, and Flask;
 - installs the configured Ollama model when it is missing;
-- preserves existing device, capability-evidence, recorder, model, and data state;
+- preserves existing device, capability-evidence, recorder, human-auth, model, and data state;
 - starts one bounded host-owned update agent; and
 - opens the workbench after readiness checks pass.
 
@@ -68,9 +68,23 @@ docker compose up -d --build relay ollama recorder flask
 
 If you bypass `start.sh`, Federation-wide updates will not have their normal host-owned activation boundary unless you start the update agent separately.
 
+## First human administrator
+
+A fresh local FCP authority has no default username/password. Start FCP and open the browser. While the local human-user database is empty, normal browser requests redirect to:
+
+```text
+/admin/users/bootstrap
+```
+
+Create the first active administrator there with a valid email address and a confirmed password of at least 12 characters. The one-time anonymous bootstrap closes as soon as the first account commits.
+
+A remotely paired Federation member with an empty local shadow-user database does not claim local human credential authority through this path. It continues through Federation human sign-in.
+
+See [Human users, sign-in, and permissions](human-authentication.md).
+
 ## Capability-first browser setup
 
-The mandatory first-run flow is:
+After human sign-in, the mandatory first-run flow is:
 
 ```text
 Identity
@@ -94,13 +108,49 @@ The installed product is capability-first. The former role-first runtime path is
 
 ## Pairing another physical device
 
-Generate a signed `FCP1-...` code from the current Federation. Browser-generated codes are one-use and valid for up to 10 minutes. A new code can be generated whenever another attempt is required.
+Generate a signed `FCP1-...` code on the **current Federation leader**. Browser-generated codes are one-use and valid for up to 10 minutes. A new code can be generated whenever another attempt is required.
 
 Before generating the code, access the issuing FCP installation through a LAN/VPN address that the joining machine can reach. A `localhost` relay address is not reachable from another physical device.
 
 After pairing, the joining installation persists a stable identity and public-safe reconnect binding. The pairing code itself is not a persistent credential.
 
 See [Federation operations](federation_operations.md).
+
+## Optional Tailscale Federation discovery
+
+If both FCP hosts are already signed in to the same Tailscale tailnet, a joining device can use:
+
+### Windows
+
+```cmd
+start-tailscale.cmd
+```
+
+### Linux/macOS
+
+```bash
+bash start-tailscale.sh
+```
+
+The wrapper uses only the local already-authenticated Tailscale CLI, resolves the host's Tailscale IPv4 address, performs a bounded peer scan for public-safe FCP advertisements, writes the discovery snapshot below `data/federation/onboarding/`, and then delegates to the normal supported launcher.
+
+FCP does not need a Tailscale API key, auth key, or OAuth credential. Tailscale discovery is reachability only; the joining device must still use the normal signed `FCP1-...` pairing flow.
+
+See [Tailscale Federation discovery](tailscale_federation_discovery.md).
+
+## Current operational leader and failover
+
+The immutable Federation creator and current operational leader are separate concepts.
+
+The authoritative coordinator tracks a monotonic leadership term. If the active leader remains offline beyond the bounded heartbeat/offline timeout and a valid connected successor exists, the coordinator can promote a deterministic successor. The former leader is then fenced from current-leader product controls.
+
+Current-leader controls include reviewed member/invitation operations, pairing, software-update checks/rollouts, leader capability requests, and provider-management decisions.
+
+If no connected successor exists, FCP fails closed rather than inventing one.
+
+This does **not** provide replicated coordinator/quorum failover. If the host that owns the authoritative coordinator database/relay is unavailable, leader promotion cannot substitute for that missing coordinator service.
+
+Human credential/password authority remains creator-backed and does not automatically move with operational leadership. See [Human users, sign-in, and permissions](human-authentication.md).
 
 ## Starting an existing device
 
@@ -116,6 +166,12 @@ On Windows, use the explicit resume operation after an update or migration when 
 start.cmd --resume
 ```
 
+On Linux/macOS:
+
+```bash
+bash start.sh --resume
+```
+
 The resume operation is evidence-preserving:
 
 - it retains the existing identity and Federation;
@@ -123,7 +179,7 @@ The resume operation is evidence-preserving:
 - it loads saved benchmark results rather than executing benchmark probes; and
 - it leaves contribution authority to the long-running capability-first runtime reconciliation path.
 
-`update.cmd` performs a safe approved-main fast-forward and then invokes this resume behavior.
+`update.cmd` performs a safe approved-main fast-forward and then invokes this resume behavior on Windows.
 
 Normal product composition treats inspection and benchmark evidence as run-once evidence until a relevant structural dependency changes or an operator explicitly reruns it. Old evidence is not rewritten to appear newer merely because time passed.
 
@@ -140,7 +196,7 @@ The migration bootstrap:
 - accepts only the approved source repository and `main`;
 - requires a clean checkout and fast-forward relationship;
 - preflights Docker/Compose before mutating Git;
-- preserves the current data/results paths and device/Federation state;
+- preserves the current data/results paths, human-auth files, and device/Federation state;
 - identifies the retained relay-state volume conservatively, using read-only inspection and the saved device identity when necessary;
 - refuses to guess when multiple retained volumes remain ambiguous;
 - uses only `git merge --ff-only` for source mutation;
@@ -163,18 +219,19 @@ It removes device identity, Federation membership and pairing state, onboarding 
 
 It intentionally preserves:
 
+- human accounts and authentication secrets;
 - recorded and imported data;
 - source configuration;
 - recorder checkpoints;
 - workflow and analysis results;
-- Docker images;
+- Docker images; and
 - downloaded Ollama and provider models.
 
-Do not manually delete only part of the Federation state. Partial deletion can leave contradictory identity, membership, or authority records.
+Do not manually delete only part of Federation or human-auth state. Partial deletion can leave contradictory identity, membership, authority, or credential records.
 
 ## Federation-wide software updates
 
-The Federation coordinator/session creator can run **Check for updates** and then explicitly choose **Update all devices**.
+The **current operational leader** can run **Check for updates** and then explicitly choose **Update all devices**.
 
 The normal update path is manual. Each normal FCP installation's host update agent independently validates the exact approved commit, clean working tree, approved repository/branch, and fast-forward relationship before changing source or Docker runtime.
 
@@ -182,7 +239,7 @@ For an eligible FCP device, activation rebuilds `relay`, `flask`, and the Compos
 
 The UI displays that successful `runtime_verified` state as **Updated** with a green indicator.
 
-A standalone recorder launched directly with `python start_recorder.py` is not a host update agent and is not restarted by the normal Compose runtime activation. Administer that standalone checkout/process explicitly until a dedicated standalone-recorder update path exists.
+A standalone recorder launched directly with `python start_recorder.py` is not a normal host update agent and is not restarted by the normal Compose runtime activation. Administer that standalone checkout/process explicitly until a dedicated standalone-recorder update path exists.
 
 See [Federation operations](federation_operations.md) for failure semantics and bootstrap requirements.
 
@@ -233,11 +290,15 @@ Find the address with `hostname -I` on Linux or `ipconfig` on Windows.
 
 If access fails, verify:
 
-- both devices are on the same trusted LAN or VPN;
+- both devices are on the same trusted LAN/VPN;
 - Docker is running;
 - the `flask` and `relay` services are healthy;
 - the selected host port is allowed by the firewall; and
 - the URL uses the port printed by the launcher when a fallback port was selected.
+
+### Tailscale-specific bind
+
+The Tailscale wrappers set `FCP_WEB_BIND` to the host's Tailscale IPv4 address before delegating to the normal launcher. This lets another trusted tailnet peer reach the workbench while preserving the normal product startup path.
 
 ## Persistent state
 
@@ -246,6 +307,7 @@ The default deployment persists:
 | State | Default location |
 | --- | --- |
 | Recorded/imported data, capability/source config, recorder checkpoints, device and pairing state | `data/` |
+| Human account database and auth secrets | `data/auth/` |
 | Workflow and analysis results | `results/` |
 | Federation coordinator authority database | retained relay-state Docker volume |
 | Local Ollama models | Ollama model Docker volume |
@@ -262,13 +324,13 @@ The standalone recorder is the simplest way to place loss-aware capture on a mac
 
 ### First join and automatic discovery
 
-Generate a normal `FCP1-...` pairing code and run:
+Generate a normal `FCP1-...` pairing code on the current leader and run:
 
 ```bash
 python start_recorder.py FCP1-...
 ```
 
-On first configuration the launcher attempts the existing bounded private-network MTConnect scan, auto-selects discovered sources, creates/reuses a stable recorder identity, joins the Federation, starts recording, and starts independent publication/control workers.
+On first configuration the launcher attempts the bounded private-network MTConnect scan, auto-selects discovered sources, creates/reuses a stable recorder identity, joins the Federation, starts recording, and starts independent publication/control workers.
 
 After successful pairing, later starts can be:
 
@@ -304,9 +366,23 @@ The scan executes on the recorder host. Remote additions can select only opaque 
 
 ### Local-first publication
 
-Recorder capture commits locally before Federation delivery. Checkpoint-committed data is reconciled into a durable publication outbox and sent through the Federation owner's logical-storage authority. Relay/storage outages do not block MTConnect polling; the backlog retries later.
+Recorder capture commits locally before Federation delivery. Checkpoint-committed data is reconciled into a durable publication outbox and sent through the session-owner logical-storage authority. Relay/storage outages do not block MTConnect polling; the backlog retries later.
+
+Pairing/current-leader authority and storage/session-owner authority are separate boundaries.
 
 See [Standalone recorder](standalone_recorder.md) and [`catalog/standalone-recorder_v2/README.md`](../catalog/standalone-recorder_v2/README.md).
+
+## Federation-visible generic JSONL
+
+Supported non-recorder `data/**/*.jsonl` can be published through Federation logical storage and verified/materialized on connected workbench members.
+
+Browser-uploaded JSONL is included by default. To withhold uploaded JSONL from Federation publication on one installation:
+
+```text
+FCP_FEDERATED_JSONL_PUBLISH_UPLOADS=0
+```
+
+The generic local mirror is quota-bounded through `FCP_FEDERATED_JSONL_MAX_MIRROR_BYTES`. Recorder telemetry keeps its separate checkpoint/manifest path.
 
 ## Advanced deployment shapes
 
@@ -425,12 +501,14 @@ On Windows, perform a supported local update with:
 update.cmd
 ```
 
-For a multi-device Federation, prefer the coordinator-owned **Check for updates** -> **Update all devices** flow once every participating normal FCP device has the current update agent.
+For a multi-device Federation, prefer the current leader's **Check for updates** -> **Update all devices** flow once every participating normal FCP device has the current update agent.
 
 ## Related documentation
 
 - [Quick start](quick_start.md)
+- [Human users, sign-in, and permissions](human-authentication.md)
 - [Federation operations](federation_operations.md)
+- [Tailscale Federation discovery](tailscale_federation_discovery.md)
 - [Standalone recorder](standalone_recorder.md)
 - [Connected capabilities](connected_capabilities.md)
 - [Troubleshooting](troubleshooting.md)
