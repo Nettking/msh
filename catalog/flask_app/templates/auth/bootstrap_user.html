@@ -1,0 +1,37 @@
+{% extends 'security/_auth_base.html' %}
+
+{% block auth_title %}Create administrator · FCP{% endblock %}
+
+{% block auth_card %}
+  <h1 class="auth-title">Create the first user</h1>
+  <p class="auth-lede">No human users exist on this FCP installation yet. Create the first administrator to continue.</p>
+
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% for category, message in messages %}
+      <p class="auth-alert" role="alert">{{ message }}</p>
+    {% endfor %}
+  {% endwith %}
+
+  <form class="auth-form" method="post" action="{{ url_for('auth_users.bootstrap_user') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+
+    <div class="auth-field">
+      <label class="auth-field__label" for="bootstrap-email">Email</label>
+      <input id="bootstrap-email" type="email" name="email" autocomplete="username" autofocus required placeholder="you@example.com">
+    </div>
+
+    <div class="auth-field">
+      <label class="auth-field__label" for="bootstrap-password">Password</label>
+      <input id="bootstrap-password" type="password" name="password" autocomplete="new-password" minlength="12" required>
+    </div>
+
+    <div class="auth-field">
+      <label class="auth-field__label" for="bootstrap-password-confirm">Confirm password</label>
+      <input id="bootstrap-password-confirm" type="password" name="password_confirm" autocomplete="new-password" minlength="12" required>
+    </div>
+
+    <button class="button-primary auth-submit" type="submit">Create administrator</button>
+  </form>
+
+  <p class="auth-note">This bootstrap page closes as soon as the first human account is created. Additional users are managed by an authenticated administrator.</p>
+{% endblock %}

@@ -109,7 +109,7 @@ def test_request_all_targets_only_connected_remote_members(
     assert by_id[OFFLINE]["reachable"] is False
 
 
-def test_request_all_requires_session_creator_authority(
+def test_request_all_requires_active_federation_leader(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
@@ -117,7 +117,7 @@ def test_request_all_requires_session_creator_authority(
     _install_context(monkeypatch, coordinator, ())
     service = FederationCapabilityRequestService(tmp_path / "capabilities.json")
 
-    with pytest.raises(PermissionError, match="capability_request_authority_required"):
+    with pytest.raises(PermissionError, match="federation_leader_required"):
         service.request_all()
 
     assert coordinator.events == []

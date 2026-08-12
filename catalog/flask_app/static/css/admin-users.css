@@ -1,0 +1,265 @@
+/*
+ * Human user administration.
+ *
+ * Colour, elevation, radius, and shape come from theme.css. This file only
+ * adds the layout the page needs: a real field grid, role choices that are
+ * separable at a glance, and one row per account with its state visible
+ * before the checkboxes are read.
+ */
+
+.users-intro__note {
+  margin: 10px 0 0;
+  font-size: 0.88rem;
+  color: var(--text-subtle);
+}
+
+.users-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.users-field-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px;
+}
+
+.users-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.users-field__label {
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.users-field__hint {
+  font-size: 0.78rem;
+  color: var(--text-subtle);
+}
+
+.users-field input[type="email"],
+.users-field input[type="password"] {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 12px;
+  font: inherit;
+  font-size: 0.94rem;
+  color: var(--text);
+  background: var(--surface-muted);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+}
+
+.users-field input:focus-visible {
+  outline: none;
+  background: var(--surface);
+  border-color: var(--accent);
+  box-shadow: var(--ring);
+}
+
+/* Role choices. The previous markup ran the boxes and their names together,
+   so "admin operator viewer" read as one string. */
+.role-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.role-options legend {
+  padding: 0 0 8px;
+  font-size: 0.85rem;
+  font-weight: 650;
+  color: var(--text);
+}
+
+.role-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 13px 7px 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  font-size: 0.88rem;
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.role-option:hover {
+  border-color: var(--accent-border-strong);
+  background: var(--accent-soft);
+}
+
+.role-option input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.role-option:has(input:checked) {
+  border-color: var(--accent-border-strong);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  font-weight: 650;
+}
+
+.role-option__name {
+  text-transform: capitalize;
+}
+
+.role-legend {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 0.82rem;
+  color: var(--text-subtle);
+}
+
+.role-legend b {
+  color: var(--text-muted);
+  font-weight: 650;
+  text-transform: capitalize;
+}
+
+.users-form__actions {
+  display: flex;
+  justify-content: flex-start;
+}
+
+/* One account per row. */
+.user-list {
+  display: grid;
+  gap: 10px;
+}
+
+.user-row {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.user-row--inactive {
+  background: var(--surface-sunken);
+}
+
+.user-row__identity {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.user-row__email {
+  font-weight: 700;
+  font-size: 0.98rem;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+
+/* Editable state and the save action share one line, so a row stays one
+   scannable band instead of three. */
+.user-row__controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-row__save {
+  margin-left: auto;
+}
+
+/* The account toggle is not a role; a rule keeps the two groups apart. */
+.user-row__divider {
+  align-self: stretch;
+  width: 1px;
+  min-height: 22px;
+  background: var(--border-strong);
+}
+
+.user-badge {
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-pill);
+  padding: 3px 10px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  white-space: nowrap;
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  background: var(--surface-sunken);
+}
+
+.user-badge--active {
+  border-color: var(--success-border);
+  background: var(--success-soft);
+  color: var(--success);
+}
+
+.user-badge--inactive {
+  border-color: var(--warning-border);
+  background: var(--warning-soft);
+  color: var(--warning);
+}
+
+.user-badge--you {
+  border-color: var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+}
+
+/* The final active administrator cannot be deactivated or demoted. Saying so
+   here prevents a save that the server would reject anyway. */
+.user-row__guard {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--text-subtle);
+}
+
+.users-empty {
+  margin: 0;
+  padding: 18px;
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+  color: var(--text-subtle);
+  text-align: center;
+}
+
+@media (max-width: 640px) {
+  .user-row__save {
+    margin-left: 0;
+    width: 100%;
+  }
+
+  .user-row__save button {
+    width: 100%;
+  }
+
+  .user-row__divider {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .role-option {
+    transition: none;
+  }
+}

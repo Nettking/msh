@@ -1,7 +1,7 @@
 """Federation-scoped display-name operations for trusted devices.
 
-The Federation creator may name any current member. Every trusted member may
-also name its own device. Names are public metadata only: the Ed25519-derived
+The current Federation leader may name any current member. Every trusted member
+may also name its own device. Names are public metadata only: the Ed25519-derived
 ``node_id`` remains the identity and authority key.
 """
 
@@ -22,26 +22,16 @@ from catalog.federation.errors import (
 from catalog.federation.projections.authority_adapter import FederationAuthorityAdapter
 
 from .capability_onboarding_service import get_capability_onboarding_service
+from .federation_leader_authority import resolve_federation_leader
 
 
 def _session_owner_id(context: object) -> str | None:
-    """Read the creator when the coordinator status exposes it.
-
-    Remote status snapshots from older relays may omit ``created_by_node_id``.
-    Self-naming does not depend on that field; leader-wide naming still does.
-    The read-only Federation projection independently recovers the creator from
-    the authoritative ``session.created`` event when necessary.
-    """
+    """Compatibility name for the current operational Federation leader."""
 
     try:
-        coordinator = getattr(context, "coordinator")
-        binding = getattr(context, "binding")
-        store = getattr(coordinator, "store")
-        session = store.get_session(binding.internal_session_id)
-    except (AttributeError, TypeError):
+        return resolve_federation_leader(context).leader_node_id
+    except Exception:  # noqa: BLE001 - leader controls fail closed
         return None
-    value = getattr(session, "created_by_node_id", None)
-    return value if isinstance(value, str) and value else None
 
 
 def _append_name_event(
@@ -76,8 +66,8 @@ def _append_name_event(
         return
 
     # RemoteCoordinatorFacade intentionally stays read-only. Its pairing runtime
-    # already exposes one bounded public event-append operation that verifies the
-    # bound Federation session before reaching the authenticated relay client.
+    # exposes one bounded public event-append operation that verifies the bound
+    # Federation session before reaching the authenticated relay client.
     runtime = getattr(coordinator, "runtime", None)
     state = getattr(coordinator, "state", None)
     append_session_event = getattr(runtime, "append_session_event", None)
@@ -179,11 +169,11 @@ class FederationDeviceNamingService:
                 "target_node_id",
             )
 
-        owner = _session_owner_id(context)
-        if target_node_id != actor and owner != actor:
+        leader = _session_owner_id(context)
+        if target_node_id != actor and leader != actor:
             raise AuthorizationError(
                 "federation-device-name-owner-required",
-                "a member may name only itself; the Federation creator may name any member",
+                "a member may name only itself; the current Federation leader may name any member",
                 "target_node_id",
             )
 
