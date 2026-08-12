@@ -76,6 +76,12 @@ def test_authentication_login_logout_and_inactive_user(app):
     assert client.get("/").status_code == 302
 
 
+def test_login_requires_csrf_when_enabled(app):
+    app.config["WTF_CSRF_ENABLED"] = True
+    client = app.test_client()
+    assert _login(client, "viewer@example.test").status_code == 400
+
+
 @pytest.mark.parametrize(
     ("role", "write_status"), [("viewer", 403), ("operator", 200), ("admin", 200)]
 )
