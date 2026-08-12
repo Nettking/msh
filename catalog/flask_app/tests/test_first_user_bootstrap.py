@@ -17,6 +17,7 @@ def _empty_app(tmp_path, monkeypatch) -> Flask:
     app.config["WTF_CSRF_ENABLED"] = False
     init_human_auth(app)
     app.add_url_rule("/", "web.dashboard", lambda: "dashboard", methods=["GET"])
+    app.add_url_rule("/api/status", "web.api_status", lambda: {"ok": True}, methods=["GET"])
     return app
 
 
@@ -76,3 +77,42 @@ def test_first_user_setup_validates_password_confirmation(tmp_path, monkeypatch)
     assert response.headers["Location"].endswith("/admin/users/bootstrap")
     with app.app_context():
         assert db.session.query(User).count() == 0
+
+
+def test_empty_installation_api_fails_closed_instead_of_html_redirect(tmp_path, monkeypatch):
+    app = _empty_app(tmp_path, monkeypatch)
+    client = app.test_client()
+
+    response = client.get("/api/status", headers={"Accept": "application/json"})
+    assert response.status_code == 503
+    with app.app_context():
+        assert db.session.query(User).count() == 0
+
+
+def test_stale_bootstrap_form_cannot_create_second_user(tmp_path, monkeypatch):
+    app = _empty_app(tmp_path, monkeypatch)
+    client = app.test_client()
+
+    first = client.post(
+        "/admin/users/bootstrap",
+        data={
+            "email": "first@example.com",
+            "password": "correct horse battery staple",
+            "password_confirm": "correct horse battery staple",
+        },
+    )
+    assert first.status_code == 302
+
+    second = client.post(
+        "/admin/users/bootstrap",
+        data={
+            "email": "second@example.com",
+            "password": "another correct horse battery staple",
+            "password_confirm": "another correct horse battery staple",
+        },
+    )
+    assert second.status_code == 302
+    assert second.headers["Location"].endswith("/login")
+    with app.app_context():
+        assert db.session.query(User).count() == 1
+        assert db.session.query(User).filter_by(email="second@example.com").one_or_none() is None
