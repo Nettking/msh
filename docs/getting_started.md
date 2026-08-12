@@ -1,6 +1,6 @@
 # Getting started with FCP
 
-Status: **current user guide**  
+Status: **current user guide**
 Reviewed: **2026-08-12**
 
 This guide gives you the mental model you need before using FCP. If you only want to install and start the software, go directly to the [Quick start](quick_start.md).
