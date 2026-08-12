@@ -4,21 +4,23 @@ Use the guides below for the current FCP product. Start from the task or product
 
 ## Use FCP
 
-- [Operator guide](operator_guide.md) — use Federation, Monitor, Knowledge, System, sources, recording, benchmarks, contributions, and diagnostics.
-- [Human users, sign-in, and permissions](human-authentication.md) — create the first administrator, add users, choose `viewer`/`operator`/`admin` roles, preserve authentication state, and troubleshoot sign-in/authorization.
-- [Federation operations](federation_operations.md) — pair devices, check for updates, run **Update all devices**, understand update states, and bootstrap legacy Windows hosts safely.
+- [Operator guide](operator_guide.md) — use Federation, Monitor, Knowledge, System, sources, recording, benchmarks, contributions, diagnostics, device naming, and appearance controls.
+- [Human users, sign-in, and permissions](human-authentication.md) — create the first administrator in the browser, add users, choose `viewer`/`operator`/`admin` roles, preserve authentication state, and troubleshoot sign-in/authorization.
+- [Federation operations](federation_operations.md) — pair devices, understand current-leader authority and failover, request benchmark/contribution work, check for updates, and run **Update all devices**.
+- [Tailscale Federation discovery](tailscale_federation_discovery.md) — discover an existing FCP Federation through an already signed-in Tailscale client without giving Tailscale membership any Federation authority.
 - [Standalone recorder](standalone_recorder.md) — start a headless recorder with a pairing code, run startup discovery, manage sources remotely, and understand local-first Federation publication.
 - [Connected capabilities](connected_capabilities.md) — use capabilities contributed by another trusted device.
 - [Operator knowledge capture](operator_strategy_capture.md) — capture, review, structure, compare, and export operator knowledge.
 - [Source synchronization](source_synchronization.md) — configure sources, normalized landing paths, and synchronization state.
 - [Workflow sessions](workflow_sessions.md) — work with workflow metadata, filtering, execution, cache reuse, bootstrap, and catch-up.
 - [AI explainer](ai_explainer.md) — use read-only repository explanation with local or connected Ollama.
-- [Troubleshooting](troubleshooting.md) — diagnose startup, data, playback, Docker, runtime, recorder, Federation update, and connectivity problems.
+- [Troubleshooting](troubleshooting.md) — diagnose startup, data, playback, Docker, runtime, recorder, Federation update/discovery, and connectivity problems.
 
 ## New installation or device
 
-- [Quick start](quick_start.md) — start FCP, create the first human administrator, sign in, complete capability-first onboarding, and open the workbench.
+- [Quick start](quick_start.md) — start FCP, create the first human administrator in the browser, sign in, complete capability-first onboarding, and open the workbench.
 - [Human users, sign-in, and permissions](human-authentication.md) — first-admin setup and ongoing human account administration.
+- [Tailscale Federation discovery](tailscale_federation_discovery.md) — optional private-network discovery for a new device that is already on the same tailnet as an existing Federation.
 - [One-command setup](one_command_setup.md) — use the supported Windows or POSIX launcher.
 - [Getting started](getting_started.md) — understand human sign-in, devices, Federations, inspection, contributions, authority, and the workbench mental model.
 - [Server setup](server_setup.md) — administer network access, recorder configuration, model installation, migration, and advanced deployments.
@@ -27,14 +29,17 @@ Use the guides below for the current FCP product. Start from the task or product
 The required first-run product path is:
 
 ```text
-Human sign-in
+Create first administrator in browser
+  -> Human sign-in
   -> Identity
   -> Federation
   -> Inspect
   -> finish setup
 ```
 
-A fresh production installation has no default human administrator. Create the first administrator with the containerized `fcp-user create-admin` command documented in [Quick start](quick_start.md) and [Human users, sign-in, and permissions](human-authentication.md) before completing device onboarding.
+A fresh local authority has no default human administrator. Start FCP and open the web interface; while the local human-user database is empty, normal browser requests are redirected to the dedicated first-user setup page. Create exactly the first active administrator there, then sign in and continue device onboarding. You do not need a separate Flask CLI command for the normal first-user path.
+
+A remotely paired Federation member with an empty local shadow-user database does **not** reopen anonymous first-admin setup. It continues through Federation human sign-in instead.
 
 Benchmarks and contribution choices are optional follow-up work rather than prerequisites for normal workbench access.
 
@@ -73,10 +78,14 @@ Current track entry points:
 ## Current development status
 
 - Human authentication and central RBAC: merged and enabled by default.
+- Browser first-user administrator bootstrap: merged.
+- Federation-scoped human sign-in without password/hash replication: merged.
 - Capability-first Federation baseline: merged.
+- Fenced operational leader failover and current-leader product authority: merged.
 - Role-first runtime compatibility retirement (CF8): merged for the installed product.
 - Verified manual Federation-wide runtime updates: merged.
 - Standalone recorder Federation bootstrap, logical-storage publication, startup scan, and remote source control: merged.
+- Tailscale-based Federation reachability discovery for onboarding: merged.
 - Complete physical CF7 acceptance: not accepted.
 - Complete Federation v1 end-to-end acceptance: not accepted.
 - OSL production implementation: not started.
