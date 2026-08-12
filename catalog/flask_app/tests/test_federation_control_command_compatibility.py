@@ -7,11 +7,15 @@ import pytest
 from catalog.federation.software_update import APPROVED_BRANCH, APPROVED_REPOSITORY
 from catalog.flask_app.services.federation_capability_requests import (
     EVENT_SCHEMA as CAPABILITY_SCHEMA,
+)
+from catalog.flask_app.services.federation_capability_requests import (
     request_payload,
     validate_request_payload,
 )
 from catalog.flask_app.services.federation_update_events import (
     EVENT_SCHEMA as UPDATE_SCHEMA,
+)
+from catalog.flask_app.services.federation_update_events import (
     command_payload,
     validate_command_payload,
 )

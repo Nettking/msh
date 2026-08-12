@@ -83,9 +83,7 @@ def _targets(
         raise ValueError("malformed_targets")
     targets = tuple(value)
     if any(
-        not isinstance(item, str)
-        or not item
-        or len(item) > MAX_COMMAND_NODE_ID_LENGTH
+        not isinstance(item, str) or not item or len(item) > MAX_COMMAND_NODE_ID_LENGTH
         for item in targets
     ):
         raise ValueError("malformed_targets")

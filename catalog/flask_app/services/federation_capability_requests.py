@@ -13,7 +13,6 @@ back through the authoritative Federation event log.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import tempfile
@@ -25,6 +24,19 @@ from typing import Any
 
 from flask import current_app
 
+from catalog.federation.control_commands import (
+    ControlCommandEnvelope,
+    ensure_bounded_json,
+)
+from catalog.federation.control_commands import (
+    correlated_event_request_id as _event_request_id,
+)
+from catalog.federation.control_commands import (
+    parse_utc_stamp as _parse_stamp,
+)
+from catalog.federation.control_commands import (
+    stamp_utc as _stamp,
+)
 from catalog.federation.onboarding_models import (
     BenchmarkState,
     ContributionActivationState,
@@ -53,29 +65,12 @@ TERMINAL_STATES = frozenset({"completed", "partial", "failed", "offline"})
 _MAX_PROCESSOR_REPORTS = 32
 
 
-def _stamp(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _parse_stamp(value: object) -> datetime:
-    if not isinstance(value, str):
-        raise TypeError("malformed_timestamp")
-    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError("malformed_timestamp")
-    return parsed.astimezone(timezone.utc)
-
-
 def _bounded(value: object) -> None:
-    encoded = json.dumps(
+    ensure_bounded_json(
         value,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    ).encode("utf-8")
-    if len(encoded) > MAX_EVENT_BYTES:
-        raise ValueError("capability_event_too_large")
+        max_bytes=MAX_EVENT_BYTES,
+        error_code="capability_event_too_large",
+    )
 
 
 def request_payload(
@@ -85,25 +80,18 @@ def request_payload(
     created_at: datetime,
     expires_at: datetime,
 ) -> dict[str, object]:
-    if not request_id or len(request_id) > 128:
-        raise ValueError("malformed_request_id")
-    targets = tuple(dict.fromkeys(target_node_ids))
-    if not 1 <= len(targets) <= MAX_TARGETS:
-        raise ValueError("malformed_targets")
-    if any(
-        not isinstance(item, str) or not item or len(item) > 512
-        for item in targets
-    ):
-        raise ValueError("malformed_targets")
-    if expires_at <= created_at or expires_at - created_at > COMMAND_TTL:
-        raise ValueError("invalid_lifetime")
+    envelope = ControlCommandEnvelope.issue(
+        request_id=request_id,
+        target_node_ids=target_node_ids,
+        created_at=created_at,
+        expires_at=expires_at,
+        max_lifetime=COMMAND_TTL,
+        max_targets=MAX_TARGETS,
+    )
     value: dict[str, object] = {
         "schema": EVENT_SCHEMA,
-        "request_id": request_id,
+        **envelope.payload_fields(),
         "actions": list(REQUEST_ACTIONS),
-        "target_node_ids": list(targets),
-        "created_at": _stamp(created_at),
-        "expires_at": _stamp(expires_at),
     }
     _bounded(value)
     return value
@@ -112,33 +100,15 @@ def request_payload(
 def validate_request_payload(value: object) -> dict[str, object]:
     if not isinstance(value, dict) or value.get("schema") != EVENT_SCHEMA:
         raise ValueError("malformed_message")
-    request_id = value.get("request_id")
-    targets = value.get("target_node_ids")
+    ControlCommandEnvelope.parse_payload(
+        value,
+        max_lifetime=COMMAND_TTL,
+        max_targets=MAX_TARGETS,
+        require_unique_targets=True,
+    )
     actions = value.get("actions")
-    if not isinstance(request_id, str) or not request_id or len(request_id) > 128:
-        raise ValueError("malformed_request_id")
     if actions != list(REQUEST_ACTIONS):
         raise ValueError("unsupported_actions")
-    if (
-        not isinstance(targets, list)
-        or not 1 <= len(targets) <= MAX_TARGETS
-        or len(set(targets)) != len(targets)
-        or any(
-            not isinstance(item, str) or not item or len(item) > 512
-            for item in targets
-        )
-    ):
-        raise ValueError("malformed_targets")
-    created = _parse_stamp(value.get("created_at"))
-    expires = _parse_stamp(value.get("expires_at"))
-    now = datetime.now(timezone.utc)
-    if (
-        created > now + timedelta(minutes=1)
-        or expires <= now
-        or expires <= created
-        or expires - created > COMMAND_TTL
-    ):
-        raise ValueError("expired_or_invalid_request")
     _bounded(value)
     return value
 
@@ -172,7 +142,10 @@ def report_payload(
         contributions_blocked,
         contribution_errors,
     )
-    if any(isinstance(item, bool) or not isinstance(item, int) or item < 0 for item in counts):
+    if any(
+        isinstance(item, bool) or not isinstance(item, int) or item < 0
+        for item in counts
+    ):
         raise ValueError("malformed_report_counts")
     value: dict[str, object] = {
         "schema": EVENT_SCHEMA,
@@ -231,12 +204,9 @@ def parse_report(value: object) -> tuple[str, str, dict[str, object]] | None:
     return request_id, node_id, normalized
 
 
-def _event_request_id(prefix: str, request_id: str, node_id: str) -> str:
-    digest = hashlib.sha256(f"{request_id}\0{node_id}".encode()).hexdigest()[:32]
-    return f"{prefix}-{digest}"
-
-
-def _read_json(path: Path, *, schema: str, default: dict[str, object]) -> dict[str, object]:
+def _read_json(
+    path: Path, *, schema: str, default: dict[str, object]
+) -> dict[str, object]:
     try:
         raw = path.read_bytes()
         if len(raw) > 256 * 1024:
@@ -315,7 +285,9 @@ class FederationCapabilityRequestService:
         if context is None:
             raise PermissionError("federation_authority_required")
         actor = context.credentials.identity.node_id
-        session = context.coordinator.store.get_session(context.binding.internal_session_id)
+        session = context.coordinator.store.get_session(
+            context.binding.internal_session_id
+        )
         if session is None or session.created_by_node_id != actor:
             raise PermissionError("capability_request_authority_required")
         return context, actor
@@ -426,9 +398,7 @@ class FederationCapabilityRequestService:
 
         ordered = list(devices.values())
         expected_states = [
-            devices[node_id].get("state")
-            for node_id in expected
-            if node_id in devices
+            devices[node_id].get("state") for node_id in expected if node_id in devices
         ]
         if any(state == "requested" for state in expected_states):
             status = "requested"
@@ -556,7 +526,9 @@ class FederationCapabilityRequestProcessor:
         node_id = context.credentials.identity.node_id
         changed = False
         for federation_request_id, payload in list(pending.items()):
-            if not isinstance(federation_request_id, str) or not isinstance(payload, dict):
+            if not isinstance(federation_request_id, str) or not isinstance(
+                payload, dict
+            ):
                 pending.pop(federation_request_id, None)
                 changed = True
                 continue
@@ -617,10 +589,7 @@ class FederationCapabilityRequestProcessor:
             for candidate in allowed:
                 try:
                     outcomes = contribution_service.apply_choices(
-                        {
-                            candidate.candidate_id:
-                            ContributionDesiredState.ENABLED.value
-                        }
+                        {candidate.candidate_id: ContributionDesiredState.ENABLED.value}
                     )
                 except Exception:  # noqa: BLE001 - local policy remains authoritative
                     contribution_errors += 1
