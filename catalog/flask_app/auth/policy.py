@@ -59,6 +59,9 @@ PUBLIC_ENDPOINTS = frozenset(
         "security.reset_password",
         "security.verify",
         "security.static",
+        # This route exists only while the local authority has zero human users.
+        # Its handler closes itself as soon as the first administrator commits.
+        "auth_users.bootstrap_user",
         # A member starts sign-in before it has a human session, and the signed
         # assertion returns to an anonymous browser. The authority endpoint is
         # intentionally not public: the leader must already authenticate the
