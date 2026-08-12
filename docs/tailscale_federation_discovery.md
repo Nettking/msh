@@ -3,13 +3,14 @@
 Status: **current user and administrator guide**
 Reviewed: **2026-08-12**
 
-FCP can use an already installed and signed-in Tailscale client to find another FCP Federation on the same tailnet during onboarding. This is a convenience feature for **discovery and reachability only**. Tailscale membership does not grant FCP Federation membership.
+FCP can use an already installed and signed-in Tailscale client to find another FCP Federation on the same tailnet during first-device setup. This is a convenience feature for **discovery and reachability only**. Tailscale membership does not itself grant FCP Federation membership.
 
 ## What you need
 
 - Tailscale installed on the FCP host.
 - The host already signed in to the intended tailnet.
-- The other FCP device online on the same tailnet.
+- The existing FCP Federation authority online on the same tailnet.
+- A human Federation administrator account on that existing FCP installation.
 - The normal FCP repository checkout and supported launcher prerequisites.
 
 FCP does **not** require a Tailscale API key, auth key, OAuth credential, or reusable Tailscale secret for this feature. It reads the local `tailscale` CLI state that already belongs to the host.
@@ -36,48 +37,57 @@ The Tailscale launcher:
 2. resolves the host's Tailscale IPv4 address;
 3. asks the local Tailscale client for currently online peers;
 4. probes only Tailscale IPv4 peers in `100.64.0.0/10` for the bounded FCP discovery endpoint;
-5. stores a public-safe discovery snapshot under `data/federation/onboarding/tailscale_discovery.json`; and
+5. stores a public-safe discovery snapshot as `data/tailscale_discovery.json`; and
 6. delegates normal startup to `start.cmd` or `start.sh`.
 
-If Tailscale is unavailable, the launcher falls back to the normal supported FCP launcher. If discovery itself fails, normal Federation onboarding remains available.
+The snapshot is deliberately outside `data/federation`. A deliberate `--fresh` reset removes device and Federation authority state, but it must not erase the just-completed reachability scan that a new device needs to find the existing Federation.
 
-## What appears in onboarding
+If Tailscale is unavailable, the launcher falls back to the normal supported FCP launcher. If discovery itself fails, manual Federation onboarding remains available.
 
-When another FCP Federation is found, the Federation step shows the discovered Federation and the FCP device that advertised it. You can open that discovered FCP device using its Tailscale address to obtain the normal pairing code.
+## What a fresh second device shows
 
-The discovery record contains only bounded public-safe metadata such as:
+If a fresh FCP installation discovers an existing Federation, the normal human sign-in page shows the discovered Federation instead of asking the operator to create another administrator and password.
 
-- Federation display label;
-- a derived Federation fingerprint;
-- advertising device name;
-- Tailscale reachability address; and
-- the relay port required by the existing pairing flow.
+Choose **Sign in to _Federation name_**. The browser opens the existing Federation authority over Tailscale. Enter the human credentials that already belong to that Federation there. An administrator then approves the new device.
 
-It does not contain a password, enrollment token, invitation token, pairing code, device private key, or Tailscale credential.
+The joining device does **not** receive or store that password. After approval, FCP internally uses the existing signed, short-lived, one-use pairing grant to enroll the device and then uses the normal Federation human SSO assertion flow.
 
-## Discovery does not join the Federation
+Only a genuinely first device that is creating a new Federation, or a standalone installation, should use **Create the first administrator**.
 
-Finding a Federation is not enough to join it. The joining FCP device must still use the normal signed one-use `FCP1-...` pairing flow:
+## Discovery does not grant membership
 
-1. use the discovered link to open the existing FCP device;
-2. on the current Federation leader, create a pairing code;
-3. copy the `FCP1-...` code;
-4. paste it into the joining device's Federation onboarding step; and
-5. complete the normal authenticated pairing validation.
+The convenience flow combines discovery, human authentication, administrator approval, and the existing pairing primitive, but those are still separate security boundaries:
 
-Current browser-generated pairing codes are one-use and valid for up to 10 minutes. Generate a new code when a previous code expires or has already been redeemed.
+1. Tailscale discovery proves only that an FCP authority is reachable on the private tailnet.
+2. The human signs in on the existing Federation authority.
+3. The authenticated administrator explicitly approves the new device.
+4. The authority creates the existing short-lived, one-use FCP pairing grant.
+5. The joining device verifies and redeems that grant.
+6. Normal Federation human SSO supplies the signed user assertion for the new member.
+
+The discovery record itself contains only bounded public-safe metadata such as the Federation display label, a derived Federation fingerprint, advertising device name, Tailscale reachability address, web port, and relay port. It contains no password, enrollment token, invitation token, pairing code, device private key, or Tailscale credential.
+
+The manual copy-and-paste `FCP1-...` pairing flow remains a fallback when Tailscale discovery or login-first enrollment is not being used.
+
+## Enrollment return safety
+
+The one-use pairing grant is not placed in an HTTP query or sent as a cross-site form body. The authority returns it in the browser URL fragment, which is not transmitted in the HTTP request. The joining device immediately removes the fragment from browser history and submits the grant to itself with a same-origin CSRF-protected request bound to an expiring high-entropy browser state.
+
+The enrollment callback accepts only a Tailscale IPv4 origin and the exact FCP enrollment callback path. A grant whose Federation identity does not match the Federation fingerprint selected during discovery is rejected before redemption.
 
 ## Why one discovery endpoint is public
 
 `/onboarding/federation/discovery.json` is intentionally readable before human sign-in so a new FCP device can identify a reachable Federation before it has a human or Federation session on that host.
 
-That endpoint advertises only the public-safe metadata described above. It cannot create pairing codes, redeem pairing codes, add members, change Federation state, or grant provider/update authority. Those controls keep their normal human and Federation authorization checks.
+That endpoint advertises only the public-safe metadata described above. It cannot create pairing grants, redeem pairing grants, add members, change Federation state, or grant provider/update authority. Those controls keep their normal human and Federation authorization checks.
 
 A remotely paired member does not advertise itself as the Federation authority through this endpoint.
 
 ## Network and port behavior
 
-Discovery is currently IPv4-first. It probes the configured FCP web port, normally `5000`, on online Tailscale peers.
+Discovery is currently IPv4-first. Unless separately configured, it probes web port `5000` on online Tailscale peers.
+
+The discovery port and the joining device's local web port are not the same setting. The Tailscale launcher no longer forces the joining device to reserve port `5000`; the normal launcher can use its safe local fallback behavior when that port is already occupied unless `FCP_WEB_PORT` was explicitly configured.
 
 The Tailscale launcher binds the local FCP web interface to the host's Tailscale IPv4 address so another tailnet device can reach it. This is different from the normal launcher, which defaults to `127.0.0.1`.
 
@@ -97,20 +107,28 @@ tailscale ip -4
 Then verify:
 
 - both FCP devices are signed in to the same intended tailnet;
-- the existing FCP device is online;
-- the existing FCP web interface is reachable on its Tailscale IPv4 address and configured web port;
+- the existing FCP authority is online;
+- the existing FCP web interface is reachable on its Tailscale IPv4 address and discovery web port;
 - the existing FCP device is the local Federation authority that can advertise discovery metadata; and
-- a firewall is not blocking the FCP web port over Tailscale.
+- a firewall is not blocking the FCP web or relay port over Tailscale.
 
 Discovery is a startup snapshot. If another device came online afterward, run the Tailscale launcher again to refresh the host-side discovery snapshot.
 
-### The Federation is shown, but joining still asks for a code
+### The new device shows first-administrator creation instead of Federation sign-in
 
-That is expected. Tailscale proves private-network reachability, not FCP trust. Create and redeem the normal signed `FCP1-...` pairing code.
+That means FCP does not currently have a valid discovered Federation candidate. Re-run the Tailscale launcher and verify that it reports at least one discovered FCP Federation before the web application starts.
+
+Do not create a second administrator merely to get past this page. If this device is supposed to join an existing Federation, correct discovery/reachability instead.
+
+### Federation sign-in opens the authority but enrollment is rejected
+
+The account approving a new device needs the current `pairing.manage` permission; with the default role policy this is an administrator permission. Also verify that the authority was opened through its Tailscale IPv4 address so it can construct a reachable private relay address for the joining device.
 
 ### `start-tailscale.cmd` says Python was not found
 
 The Windows launcher can still bind FCP to the Tailscale address and continue with normal startup, but the pre-start discovery scan is skipped. Install a supported host Python if you want automatic discovery, or use the normal manual pairing flow.
+
+Host discovery itself is standard-library-only and should not require PostgreSQL, `psycopg`, or `libpq` on the host.
 
 ## Related guides
 
