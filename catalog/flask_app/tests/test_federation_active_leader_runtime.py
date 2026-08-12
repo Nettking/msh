@@ -69,7 +69,7 @@ def test_update_service_accepts_successor_and_fences_former_creator(
     replay = (_created(), _leader_changed())
     successor = _context(SUCCESSOR, replay)
     monkeypatch.setattr(
-        active,
+        active.update_service,
         "get_capability_onboarding_service",
         lambda: SimpleNamespace(authorized_context=lambda: successor),
     )
@@ -83,7 +83,7 @@ def test_update_service_accepts_successor_and_fences_former_creator(
 
     creator = _context(CREATOR, replay)
     monkeypatch.setattr(
-        active,
+        active.update_service,
         "get_capability_onboarding_service",
         lambda: SimpleNamespace(authorized_context=lambda: creator),
     )
@@ -92,7 +92,6 @@ def test_update_service_accepts_successor_and_fences_former_creator(
 
 
 def test_successor_update_intent_uses_authenticated_remote_event_append(
-    monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
     replay = (_created(), _leader_changed())
@@ -103,12 +102,15 @@ def test_successor_update_intent_uses_authenticated_remote_event_append(
         def append_session_event(self, remote, **kwargs):
             recorded.append({"remote": remote, **kwargs})
 
-    onboarding = SimpleNamespace(
-        authorized_context=lambda: context,
-        remote_store=SimpleNamespace(load=lambda: "saved-remote"),
-        relay_runtime=Runtime(),
+    # RemoteCoordinatorFacade exposes runtime/state but intentionally no local
+    # append_event authority.
+    context.coordinator = SimpleNamespace(
+        coordinator_id=COORDINATOR,
+        store=context.coordinator.store,
+        replay_page=context.coordinator.replay_page,
+        runtime=Runtime(),
+        state="saved-remote",
     )
-    monkeypatch.setattr(active, "get_capability_onboarding_service", lambda: onboarding)
     service = active.ActiveLeaderFederationUpdateService(
         SimpleNamespace(), tmp_path / "update.json"
     )
