@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-import re
 import uuid
 
+from email_validator import EmailNotValidError, validate_email
 from flask import (
     Blueprint,
     abort,
@@ -32,6 +32,13 @@ def _active_admin_count() -> int:
     )
 
 
+def _normalized_email(value: str) -> str | None:
+    try:
+        return validate_email(value.strip(), check_deliverability=False).normalized.lower()
+    except EmailNotValidError:
+        return None
+
+
 @auth_users.get("")
 def users():
     return render_template(
@@ -43,10 +50,10 @@ def users():
 
 @auth_users.post("")
 def create_user():
-    email = request.form.get("email", "").strip().lower()
+    email = _normalized_email(request.form.get("email", ""))
     password = request.form.get("password", "")
     role_names = set(request.form.getlist("roles"))
-    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email) or len(password) < 12:
+    if email is None or len(password) < 12:
         flash("Enter a valid email and a password of at least 12 characters.", "error")
         return redirect(url_for("auth_users.users"))
     if db.session.query(User).filter_by(email=email).first() is not None:
