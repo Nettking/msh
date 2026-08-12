@@ -201,7 +201,10 @@ def init_human_auth(app: Flask) -> None:
         REMEMBER_COOKIE_SECURE=secure_cookie,
         REMEMBER_COOKIE_DURATION=timedelta(days=7),
         WTF_CSRF_FIELD_NAME="csrf_token",
-        WTF_CSRF_TIME_LIMIT=timedelta(hours=8),
+        # Flask-WTF forwards this value to itsdangerous as max_age, where it is
+        # compared against an integer token age. Keep the configured value in
+        # seconds rather than as a timedelta so valid CSRF tokens can be checked.
+        WTF_CSRF_TIME_LIMIT=int(timedelta(hours=8).total_seconds()),
         WTF_CSRF_CHECK_DEFAULT=False,
     )
 
