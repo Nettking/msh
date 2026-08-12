@@ -21,6 +21,7 @@ from .federation import get_federated_human_auth_service, saved_remote_member
 from .models import Role, User, db
 
 auth_users = Blueprint("auth_users", __name__, url_prefix="/admin/users")
+_BOOTSTRAP_ENDPOINT = "auth_users.bootstrap_user"
 
 
 def _active_admin_count() -> int:
@@ -31,6 +32,10 @@ def _active_admin_count() -> int:
         .distinct()
         .count()
     )
+
+
+def _has_users() -> bool:
+    return db.session.query(User.id).limit(1).first() is not None
 
 
 def _normalized_email(value: str) -> str | None:
@@ -68,6 +73,70 @@ def _publish_user_best_effort(user: User) -> None:
             "Federation human-user publication unavailable (%s)",
             type(exc).__name__,
         )
+
+
+@auth_users.before_app_request
+def first_user_bootstrap_gate():
+    """Send a new local installation to first-user setup instead of sign-in.
+
+    Remotely paired Federation members intentionally keep using their Federation
+    human sign-in authority even when they have no local shadow users yet.
+    """
+
+    if saved_remote_member() or _has_users():
+        return None
+    if request.endpoint in {_BOOTSTRAP_ENDPOINT, "static", "security.static"}:
+        return None
+    if request.is_json or request.path.startswith("/api/"):
+        abort(503)
+    return redirect(url_for(_BOOTSTRAP_ENDPOINT))
+
+
+@auth_users.route("/bootstrap", methods=["GET", "POST"])
+def bootstrap_user():
+    """Create exactly the first local human account as an administrator."""
+
+    _require_local_user_authority()
+    if _has_users():
+        return redirect(url_for("security.login"))
+    if request.method == "GET":
+        return render_template("auth/bootstrap_user.html")
+
+    email = _normalized_email(request.form.get("email", ""))
+    password = request.form.get("password", "")
+    confirmation = request.form.get("password_confirm", "")
+    if email is None:
+        flash("Enter a valid email address.", "error")
+        return redirect(url_for(_BOOTSTRAP_ENDPOINT))
+    if len(password) < 12:
+        flash("Password must contain at least 12 characters.", "error")
+        return redirect(url_for(_BOOTSTRAP_ENDPOINT))
+    if password != confirmation:
+        flash("The passwords do not match.", "error")
+        return redirect(url_for(_BOOTSTRAP_ENDPOINT))
+
+    admin = db.session.query(Role).filter_by(name="admin").one_or_none()
+    if admin is None:
+        current_app.logger.error("First-user setup could not find the seeded admin role")
+        abort(503)
+    # Recheck immediately before the insert so a completed bootstrap closes the
+    # anonymous creation surface even if another browser still has the form open.
+    if _has_users():
+        return redirect(url_for("security.login"))
+
+    user = User(
+        email=email,
+        password=hash_password(password),
+        active=True,
+        fs_uniquifier=uuid.uuid4().hex,
+        roles=[admin],
+    )
+    db.session.add(user)
+    db.session.commit()
+    _publish_user_best_effort(user)
+    current_app.logger.info("First human administrator created: %s", email)
+    flash("Administrator created. Sign in to continue.", "success")
+    return redirect(url_for("security.login"))
 
 
 @auth_users.get("")
