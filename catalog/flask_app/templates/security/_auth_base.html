@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block auth_title %}FCP{% endblock %}</title>
+    <meta name="color-scheme" content="light dark">
+    <meta name="theme-color" content="#f8fbff">
+    <script>
+      // Applied before first paint so a stored dark choice never flashes light.
+      // Sign-in renders outside the signed-in shell, so it repeats the small
+      // bootstrap from base.html rather than inheriting it.
+      (function () {
+        try {
+          var stored = window.localStorage.getItem('fcp-theme');
+          if (stored === 'dark' || stored === 'light') {
+            document.documentElement.setAttribute('data-theme', stored);
+          }
+        } catch (error) {}
+      })();
+    </script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/theme.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/auth.css') }}">
+  </head>
+  <body class="auth-page">
+    <main class="auth-main">
+      <section class="auth-card">
+        <div class="auth-identity">
+          <span class="auth-identity__mark" aria-hidden="true">FCP</span>
+          <span class="auth-identity__text">
+            <span class="auth-identity__product">Federated Capability Platform</span>
+          </span>
+        </div>
+        {% block auth_card %}{% endblock %}
+      </section>
+    </main>
+  </body>
+</html>

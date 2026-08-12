@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import re
+
 import pytest
 from flask import Flask
 from flask_security import hash_password
@@ -57,6 +59,12 @@ def app(tmp_path, monkeypatch):
     return application
 
 
+def _csrf_token(client) -> str:
+    body = client.get("/login").get_data(as_text=True)
+    match = re.search(r'name="csrf_token"[^>]*value="([^"]+)"', body)
+    return match.group(1) if match else ""
+
+
 def _login(client, email: str, password: str = "correct horse battery staple"):
     return client.post("/login", data={"email": email, "password": password})
 
@@ -80,6 +88,38 @@ def test_login_requires_csrf_when_enabled(app):
     app.config["WTF_CSRF_ENABLED"] = True
     client = app.test_client()
     assert _login(client, "viewer@example.com").status_code == 400
+
+
+def test_login_succeeds_with_a_valid_csrf_token(app):
+    """Cover the accept path, not only the reject path.
+
+    ``WTF_CSRF_TIME_LIMIT`` reaches itsdangerous as ``max_age`` and is compared
+    against an integer age. Configuring it as a timedelta raises TypeError while
+    validating an otherwise correct token, so sign-in fails closed with a 500
+    for every human — a failure a missing-token test cannot see.
+    """
+
+    app.config["WTF_CSRF_ENABLED"] = True
+    client = app.test_client()
+    token = _csrf_token(client)
+    assert token
+
+    response = client.post(
+        "/login",
+        data={
+            "email": "viewer@example.com",
+            "password": "correct horse battery staple",
+            "csrf_token": token,
+        },
+    )
+
+    assert response.status_code == 302
+
+
+def test_csrf_time_limit_is_configured_in_seconds(app):
+    limit = app.config["WTF_CSRF_TIME_LIMIT"]
+    assert isinstance(limit, int) and not isinstance(limit, bool)
+    assert limit == 8 * 60 * 60
 
 
 @pytest.mark.parametrize(
