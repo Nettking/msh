@@ -3,157 +3,156 @@
 Status: **current user guide**
 Reviewed: **2026-08-12**
 
-This guide gives you the mental model you need before using FCP. If you only want to install and start the software, go directly to the [Quick start](quick_start.md).
+This guide gives the product mental model. For installation commands, start with [Quick start](quick_start.md).
 
 ## What FCP is
 
 FCP is a workbench for collecting, understanding, and sharing machine-related capabilities across trusted devices.
 
-One FCP installation represents one persistent device. A device can use the workbench and can also contribute selected capabilities such as recording, a language model, registered compute handlers, or storage capacity. Those capabilities are separate choices; a device does not receive one permanent product role.
+One installation represents one persistent device. A device can use the workbench and independently contribute capabilities such as recording, a language model, registered compute handlers, or storage capacity. A device does not receive one permanent product role.
 
-People who use the web application have separate human accounts. Human roles control which browser operations a person may use; they do not replace device identity or Federation authority.
+People have separate human web accounts. Human roles control browser actions; they do not replace device identity or Federation authority.
 
-The installed product is capability-first. Older role-first setup state and command spellings are retained only where they are needed for migration or explicit administration; they are not current product authority.
-
-## The eight ideas to understand first
+## The ideas to understand first
 
 ### 1. Human users and devices are different identities
 
-FCP authenticates people separately from machines. A human user signs in with an email/password account and receives `viewer`, `operator`, or `admin` permissions. An FCP device has its own persistent cryptographic identity and Federation membership.
+A fresh local FCP authority has no default human administrator. Start FCP and open the browser. While the local user database is empty, FCP redirects you to `/admin/users/bootstrap`, where you create exactly the first active administrator. Then sign in and continue device onboarding.
 
-A fresh production installation has no default web administrator. After the first start, create the first administrator with the documented `fcp-user create-admin` command, sign in at `/login`, and then continue device onboarding. See [Human users, sign-in, and permissions](human-authentication.md).
+Additional users are administered at `/admin/users`. See [Human users, sign-in, and permissions](human-authentication.md).
+
+A remotely paired member with no local shadow users does not expose first-admin bootstrap; it signs people in through the Federation human credential authority instead.
 
 ### 2. A device has a persistent identity
 
-FCP treats each installation as a device with its own cryptographic identity. Normal restarts and updates reuse that identity. Starting fresh is an explicit action because replacing identity also changes Federation membership and trust state.
+Each FCP installation has a stable cryptographic node identity. Normal restarts and updates reuse it. A display name is only human-friendly Federation metadata and never replaces the stable `node_id`.
+
+You can rename your own device under **Federation -> This device**. The current Federation leader can rename other members under **Federation -> Devices**.
 
 ### 3. Devices meet inside a Federation
 
-A Federation is the trusted boundary in which FCP devices discover and use approved capabilities. Discovery alone is not trust: another machine does not gain authority merely because it can be seen on the network.
+A Federation is the trusted boundary in which FCP devices share approved state and capabilities. Network visibility is not trust.
 
-Additional devices join through an authenticated binding or a signed one-use `FCP1-...` pairing code. Current browser-generated codes are valid for up to 10 minutes and can be generated again when another pairing attempt is needed.
+Additional devices normally join with a signed one-use `FCP1-...` pairing code, valid for up to 10 minutes.
 
-### 4. Inspection describes what a device can do
+If both devices already use Tailscale, FCP can discover a reachable Federation through the already signed-in Tailscale client. That only helps you find the other FCP device; it does not grant membership. You still redeem the normal pairing code. See [Tailscale Federation discovery](tailscale_federation_discovery.md).
 
-During first-time setup, FCP inspects the local device and stores capability evidence. Inspection answers questions such as whether a recorder, model provider, compute handler, or storage candidate is available.
+### 4. Creator provenance and current leadership are different
 
-Inspection is evidence, not permission. It does not automatically make a capability available to other devices.
+The Federation creator is immutable provenance. Operational leader authority can move to another connected member through a coordinator-authored monotonic leadership term.
 
-### 5. Contribution is an explicit choice
+If the current leader remains offline beyond the bounded timeout and a valid connected successor exists, the coordinator can promote a deterministic successor. The former leader is then fenced from current-leader controls.
 
-A device owner can choose which eligible capabilities to contribute. FCP keeps contribution intent separate from authority so that benchmarking, AI output, or hardware discovery cannot silently grant access.
+This leader failover assumes the authoritative coordinator/relay service remains available. It is not replicated-quorum failover of the coordinator database itself.
 
-### 6. Federation actions are bounded operations, not remote shell access
+### 5. Human credential authority is separate from operational leadership
 
-FCP now includes a small number of reviewed distributed control operations, including coordinator-owned software updates, leader-requested capability benchmarking/contribution requests, and standalone-recorder scan/source control.
+Federation human passwords are not replicated to every member. The immutable Federation creator remains the human credential/password authority and members use signed Federation SSO assertions.
 
-Those operations send authenticated declarative intent. The target device validates the request locally and executes only a fixed operation. Federation peers do not receive arbitrary shell, process, URL, repository, or host-configuration authority.
+Operational leader transfer does not automatically move the password database. This separation prevents a temporary operational leader transition from silently transferring human credential custody.
 
-### 7. Recording is local-first
+### 6. Inspection describes what a device can do
 
-The MTConnect recorder commits capture and checkpoints locally first. Federation publication is a separate retryable path through logical storage. Losing relay or storage availability does not make the recorder move its checkpoint backward or stop normal MTConnect polling.
+During onboarding, FCP inspects the device and stores capability evidence. Inspection is evidence, not permission.
 
-A standalone recorder can join the Federation with:
+### 7. Contribution is an explicit choice
 
-```bash
-python start_recorder.py FCP1-...
-```
+A device can independently contribute recorder, AI, compute, or storage-related capabilities. Contribution intent is separate from provider/storage authority and may still require leader review or another control-plane decision.
 
-and can run the existing bounded private-network scan automatically on first configuration.
+### 8. Federation controls are bounded operations, not remote shell access
 
-### 8. The workbench is where you use the system
+Reviewed distributed actions include:
 
-After onboarding, the normal FCP interface gives you access to Federation status and operations, data sources, recording, workflows, knowledge capture, AI explanation, playback, and generated analyses according to your human permissions and the device's current capability/Federation authority.
+- current-leader pairing/member administration;
+- current-leader benchmark/contribution requests;
+- provider-enrollment review;
+- manual Federation-wide software updates; and
+- standalone-recorder scan/source control.
+
+Peers send authenticated declarative intent. Targets execute only fixed locally validated operations. FCP does not expose a general Federation shell.
+
+### 9. Recording is local-first
+
+The MTConnect recorder commits capture/checkpoints locally before Federation publication. Relay or storage outages do not move the checkpoint backward or block normal polling.
+
+### 10. The workbench is where you use the system
+
+After onboarding, the workbench exposes Federation, Monitor, Knowledge, System, sources, recording, workflows, AI, playback, and analysis according to the human user's permissions and current device/Federation authority.
 
 ## Your first ten minutes
 
-Use this path for a new installation:
-
-1. Follow the [Quick start](quick_start.md) to start FCP.
-2. Create the first human administrator with `fcp-user create-admin`.
-3. Open `/login` and sign in.
-4. Open `/onboarding` and create or load the device identity.
-5. Join, reconnect to, or create a Federation.
-6. Run **Inspect** so FCP records the device's local capability evidence.
+1. Run `start.cmd` on Windows or `bash start.sh` on Linux/macOS.
+2. Open the FCP URL and create the first administrator in the browser if prompted.
+3. Sign in.
+4. Complete **Identity**.
+5. Join/reconnect/create the **Federation**.
+6. Run **Inspect**.
 7. Finish setup and open **Federation**.
-8. Review the device and capability cards before enabling any optional contribution.
-9. Pair any additional trusted device using the signed pairing flow.
-10. Open the workbench feature that matches what you want to do next.
-
-The mandatory first-run flow is deliberately short:
+8. Give the device a useful display name if needed.
+9. Pair additional trusted devices, optionally using Tailscale discovery to find the existing FCP endpoint.
+10. Review optional benchmarks/contributions only when relevant.
 
 ```text
 Start FCP
-  -> create first administrator
+  -> browser first-admin setup
   -> Human sign-in
   -> Identity
   -> Federation
   -> Inspect
   -> finish setup
-  -> open Federation
 ```
-
-Benchmarks and contribution choices are follow-up actions. They do not need to be completed before using the normal workbench.
 
 ## Common next steps
 
-### I want to manage people who can use FCP
+### Manage human users
 
-Read [Human users, sign-in, and permissions](human-authentication.md). Administrators manage users at `/admin/users`; normal operators do not receive user-management or Federation-administration permissions.
+Use `/admin/users` and [Human users, sign-in, and permissions](human-authentication.md).
 
-### I want to operate FCP
+### Connect another device
 
-Read the [Operator guide](operator_guide.md) for Federation, Monitor, Knowledge, System, sources, recording, benchmarks, contributions, and diagnostics.
+Use [Federation operations](federation_operations.md). If both hosts already use Tailscale, also see [Tailscale Federation discovery](tailscale_federation_discovery.md).
 
-### I want to connect another device or update the Federation
+### Ask members to benchmark/contribute
 
-Read [Federation operations](federation_operations.md) for pairing, coordinator-owned update checks, **Update all devices**, update states, leader capability requests, and legacy Windows bootstrap.
+The **current operational leader** can ask currently reachable remote members to refresh local inspection, run eligible locally registered benchmarks, and request contributions that local policy allows. The request cannot inject commands or bypass provider approval.
 
-### I want a headless recorder
+### Update all devices
 
-Read [Standalone recorder](standalone_recorder.md). The normal first-run command is:
+The **current operational leader** runs **Check for updates** and then **Update all devices** after reviewing the exact approved target and per-device states.
+
+### Use a standalone recorder
 
 ```bash
 python start_recorder.py FCP1-...
 ```
 
-After joining, any trusted Federation device can use `/federation/recorders` to request a recorder-local bounded scan and add/remove sources selected from that recorder's latest scan.
+See [Standalone recorder](standalone_recorder.md).
 
-### I want to connect or use contributed capabilities
+### Change appearance
 
-Read [Connected capabilities](connected_capabilities.md) to understand how trusted devices expose usable capabilities to each other.
+Use the light/dark switch in the top menu. FCP follows the OS preference until you make an explicit browser-local choice.
 
-### I want to configure data collection
+## Important boundaries
 
-Use the [Operator guide](operator_guide.md) together with [Source synchronization](source_synchronization.md), [Standalone recorder](standalone_recorder.md), and the [Data contract](data_contract.md).
-
-### I want to understand how the system works
-
-Read [Current architecture](architecture.md) for the component and data-flow view, then [Federated network reference](federated_session_network.md) for identity, membership, transport, storage, capabilities, and failure behavior.
-
-### Something is not working
-
-Start with [Troubleshooting](troubleshooting.md). For network exposure, recorder configuration, model installation, migration, authentication deployment settings, and other deployment administration, use [Server setup](server_setup.md).
-
-## Important authority boundaries
-
-FCP intentionally separates human authorization, evidence, intent, and device/Federation authority:
-
-- a human login is not a Federation identity;
-- a human `admin` permission does not bypass Federation membership or coordinator/leader authority;
-- discovery is not trust;
+- human login is not device identity;
+- a human `admin` permission does not bypass Federation-side authority;
+- Tailscale/network discovery is not Federation membership;
 - inspection and benchmarks are evidence, not activation;
-- contribution intent is not authority;
-- AI may explain or propose but does not approve, assign authority, or execute unregistered code;
-- storage candidates cannot assign themselves primary or replica authority;
-- compute is limited to explicitly registered handlers;
-- a Federation update request cannot select an arbitrary repository, branch, executable, or command;
-- recorder control cannot inject arbitrary source URLs or scan unrestricted networks.
+- contribution intent is not provider/storage authority;
+- display names do not replace cryptographic node identity;
+- current operational leader authority is not the same as immutable creator provenance;
+- human credential authority remains separate from transferable operational leadership;
+- AI does not approve, assign authority, or execute unregistered code;
+- Federation updates cannot select arbitrary repositories/commands;
+- recorder control cannot inject arbitrary URLs or unrestricted scans.
 
-These boundaries are part of the product model, not optional security recommendations.
+## Where to read next
 
-## Development material versus user documentation
-
-The `docs/implementation/` tree contains active plans, acceptance material, reference material, and retained history. It is useful when developing FCP, but it is not the normal starting point for operating the product.
-
-For normal use, prefer the current user guides linked from the [documentation home](index.md).
+- [Quick start](quick_start.md)
+- [Operator guide](operator_guide.md)
+- [Human users, sign-in, and permissions](human-authentication.md)
+- [Federation operations](federation_operations.md)
+- [Tailscale Federation discovery](tailscale_federation_discovery.md)
+- [Troubleshooting](troubleshooting.md)
+- [Current architecture](architecture.md)
+- [Federated network reference](federated_session_network.md)
