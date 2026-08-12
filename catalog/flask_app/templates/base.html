@@ -102,7 +102,7 @@
       {{ nav_item(url_for('web.overview'), 'Monitor', 'monitor', group == 'monitor') }}
       {{ nav_item(endpoint_url('operator_strategy_web.index', '/operator-strategies'), 'Knowledge', 'knowledge', group == 'knowledge') }}
       {% endif %}
-      {% if capability_complete %}
+      {% if capability_complete or group == 'federation' %}
       {{ nav_item(endpoint_url('federation_web.overview', '/federation'), 'Federation', 'federation', group == 'federation') }}
       {% endif %}
       {% endif %}
