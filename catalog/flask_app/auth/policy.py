@@ -51,6 +51,12 @@ PUBLIC_ENDPOINTS = frozenset(
         "security.reset_password",
         "security.verify",
         "security.static",
+        # A member starts sign-in before it has a human session, and the signed
+        # assertion returns to an anonymous browser. The authority endpoint is
+        # intentionally not public: the leader must already authenticate the
+        # human before it can issue an assertion.
+        "federated_human_auth.start",
+        "federated_human_auth.callback",
     }
 )
 
@@ -67,6 +73,7 @@ ENDPOINT_PERMISSIONS: dict[str, str] = {
     "auth_users.create_user": "users.manage",
     "auth_users.update_user": "users.manage",
     "security.change_password": "account.manage",
+    "federated_human_auth.authorize": "account.manage",
 }
 
 READ_PERMISSIONS = {
