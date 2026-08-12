@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -46,7 +47,12 @@ def main() -> int:
             continue
         searchable = text
         if path_text in ALLOWED_REPOSITORY_FILES:
-            searchable = searchable.replace(REPOSITORY_SLUG, "")
+            searchable = re.sub(
+                re.escape(REPOSITORY_SLUG),
+                "",
+                searchable,
+                flags=re.IGNORECASE,
+            )
         lowered = searchable.casefold()
         if LEGACY in lowered or SPACED_LEGACY in lowered:
             failures.append(f"retired product spelling in file: {path_text}")
