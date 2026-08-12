@@ -149,8 +149,15 @@ def _validate_advertisement(payload: object) -> dict[str, object] | None:
 
 
 def _validated_snapshot_federation(payload: object) -> dict[str, object] | None:
-    advertisement = _validate_advertisement(payload)
-    if advertisement is None or not isinstance(payload, dict):
+    if not isinstance(payload, dict):
+        return None
+    raw_schema = payload.get("schema")
+    if raw_schema not in (None, ADVERTISEMENT_SCHEMA):
+        return None
+    normalized = dict(payload)
+    normalized["schema"] = ADVERTISEMENT_SCHEMA
+    advertisement = _validate_advertisement(normalized)
+    if advertisement is None:
         return None
     tailscale_ip = _safe_tailscale_ipv4(payload.get("tailscale_ip"))
     web_port = payload.get("web_port")
