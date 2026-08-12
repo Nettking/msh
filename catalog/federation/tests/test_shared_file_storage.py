@@ -119,6 +119,28 @@ def test_generic_jsonl_uses_membership_authorizer_not_recorder_authorizer():
     assert logical.calls[0]["dataset_schema_name"] == FEDERATED_JSONL_DATASET_SCHEMA_NAME
 
 
+def test_generic_jsonl_fails_closed_without_membership_authorizer():
+    logical = _LogicalStorage()
+    authority = FederationLogicalStorageAuthority(
+        client=object(),
+        logical_client=logical,
+        session_id=SESSION,
+    )
+
+    with pytest.raises(FederationValidationError) as invalid:
+        asyncio.run(
+            authority._ingest_response(
+                ACTOR,
+                SESSION,
+                "correlation-no-authorizer",
+                _payload(),
+            )
+        )
+
+    assert invalid.value.code == "federated-jsonl-membership-authorizer-required"
+    assert logical.calls == []
+
+
 def test_ingest_is_bound_to_authenticated_actor():
     payload = _payload()
     with pytest.raises(FederationValidationError) as invalid:
