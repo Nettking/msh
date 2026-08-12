@@ -46,6 +46,11 @@ def test_empty_installation_meets_user_with_first_admin_setup(tmp_path, monkeypa
     assert created.status_code == 302
     assert created.headers["Location"].endswith("/login")
 
+    login_page = client.get(created.headers["Location"])
+    login_body = login_page.get_data(as_text=True)
+    assert "Administrator created." in login_body
+    assert "Sign in to continue" not in login_body
+
     with app.app_context():
         user = db.session.query(User).filter_by(email="first@example.com").one()
         assert user.active is True

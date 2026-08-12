@@ -175,7 +175,7 @@ def bootstrap_user():
 
     _publish_user_best_effort(user)
     current_app.logger.info("First human administrator created: %s", email)
-    flash("Administrator created. Sign in to continue.", "success")
+    flash("Administrator created.", "success")
     return redirect(url_for("security.login"))
 
 
