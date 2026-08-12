@@ -337,28 +337,28 @@ class FederatedJsonlProductBridge:
             if existing["published_at"] is not None or cache_path.is_file():
                 return existing
 
-        temporary = tempfile.NamedTemporaryFile(
-            prefix="fcp-jsonl-",
-            suffix=".jsonl.gz",
-            dir=self.cache_root,
-            delete=False,
-        )
-        temp_path = Path(temporary.name)
         file_digest = hashlib.sha256()
+        temp_path: Path | None = None
         try:
-            with temporary:
+            with tempfile.NamedTemporaryFile(
+                prefix="fcp-jsonl-",
+                suffix=".jsonl.gz",
+                dir=self.cache_root,
+                delete=False,
+            ) as temporary:
+                temp_path = Path(temporary.name)
                 with gzip.GzipFile(
                     filename="",
                     mode="wb",
                     fileobj=temporary,
                     mtime=0,
-                ) as compressed:
-                    with path.open("rb") as source:
-                        for raw in iter(lambda: source.read(1024 * 1024), b""):
-                            file_digest.update(raw)
-                            compressed.write(raw)
+                ) as compressed, path.open("rb") as source:
+                    for raw in iter(lambda: source.read(1024 * 1024), b""):
+                        file_digest.update(raw)
+                        compressed.write(raw)
                 temporary.flush()
                 os.fsync(temporary.fileno())
+            assert temp_path is not None
             stat_after = path.stat()
             if (
                 stat_after.st_size != stat_before.st_size
@@ -426,7 +426,8 @@ class FederatedJsonlProductBridge:
             assert row is not None
             return row
         except BaseException:
-            temp_path.unlink(missing_ok=True)
+            if temp_path is not None:
+                temp_path.unlink(missing_ok=True)
             raise
 
     def _prepare_local_rows(self, node_id: str) -> None:
@@ -1106,15 +1107,21 @@ class FederatedJsonlProductBridge:
         if callback is not None:
             try:
                 callback(reason="federated_jsonl_materialized")
-            except Exception:
-                pass
+            except Exception as exc:  # noqa: BLE001 - refresh is best effort
+                self.app.logger.info(
+                    "Federated JSONL artifact refresh unavailable (%s)",
+                    type(exc).__name__,
+                )
         runtime_callback = self.runtime_refresh_callback
         if runtime_callback is None:
             runtime_callback = get_runtime_manager().request_refresh
         try:
             runtime_callback()
-        except Exception:
-            pass
+        except Exception as exc:  # noqa: BLE001 - runtime polling remains fallback
+            self.app.logger.info(
+                "Federated JSONL runtime refresh unavailable (%s)",
+                type(exc).__name__,
+            )
 
     def sync(self, runtime_state: object, context: object) -> dict[str, object]:
         """Publish and mirror one bounded Federation JSONL synchronization pass."""
