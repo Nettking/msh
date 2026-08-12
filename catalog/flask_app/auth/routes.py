@@ -16,12 +16,14 @@ from flask import (
     url_for,
 )
 from flask_security import current_user, hash_password
+from sqlalchemy.exc import IntegrityError
 
 from .federation import get_federated_human_auth_service, saved_remote_member
-from .models import Role, User, db
+from .models import FirstUserBootstrapClaim, Role, User, db
 
 auth_users = Blueprint("auth_users", __name__, url_prefix="/admin/users")
 _BOOTSTRAP_ENDPOINT = "auth_users.bootstrap_user"
+_BOOTSTRAP_CLAIM_ID = 1
 
 
 def _active_admin_count() -> int:
@@ -75,6 +77,35 @@ def _publish_user_best_effort(user: User) -> None:
         )
 
 
+def _commit_first_user(user: User) -> bool:
+    """Atomically claim anonymous bootstrap and persist exactly one first user."""
+
+    db.session.add(FirstUserBootstrapClaim(id=_BOOTSTRAP_CLAIM_ID))
+    try:
+        # The singleton primary key is the concurrency boundary. Concurrent
+        # bootstrap requests may both observe an empty user table, but only one
+        # transaction can acquire this row and proceed to create the first user.
+        db.session.flush()
+    except IntegrityError:
+        db.session.rollback()
+        return False
+
+    # A trusted local administration path may have created a user before this
+    # transaction acquired the bootstrap claim. Close anonymous bootstrap rather
+    # than creating an additional administrator.
+    if _has_users():
+        db.session.rollback()
+        return False
+
+    db.session.add(user)
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return False
+    return True
+
+
 @auth_users.before_app_request
 def first_user_bootstrap_gate():
     """Send a new local installation to first-user setup instead of sign-in.
@@ -119,10 +150,6 @@ def bootstrap_user():
     if admin is None:
         current_app.logger.error("First-user setup could not find the seeded admin role")
         abort(503)
-    # Recheck immediately before the insert so a completed bootstrap closes the
-    # anonymous creation surface even if another browser still has the form open.
-    if _has_users():
-        return redirect(url_for("security.login"))
 
     user = User(
         email=email,
@@ -131,8 +158,14 @@ def bootstrap_user():
         fs_uniquifier=uuid.uuid4().hex,
         roles=[admin],
     )
-    db.session.add(user)
-    db.session.commit()
+    if not _commit_first_user(user):
+        if _has_users():
+            return redirect(url_for("security.login"))
+        current_app.logger.error(
+            "First-user bootstrap claim is unavailable while the user database is empty"
+        )
+        abort(503)
+
     _publish_user_best_effort(user)
     current_app.logger.info("First human administrator created: %s", email)
     flash("Administrator created. Sign in to continue.", "success")

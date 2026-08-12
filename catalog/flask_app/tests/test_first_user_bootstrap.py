@@ -3,7 +3,7 @@ from __future__ import annotations
 from flask import Flask
 
 from catalog.flask_app.auth.extension import init_human_auth
-from catalog.flask_app.auth.models import User, db
+from catalog.flask_app.auth.models import FirstUserBootstrapClaim, User, db
 from catalog.flask_app.auth.policy import audit_route_policy
 
 
@@ -50,6 +50,7 @@ def test_empty_installation_meets_user_with_first_admin_setup(tmp_path, monkeypa
         user = db.session.query(User).filter_by(email="first@example.com").one()
         assert user.active is True
         assert user.has_role("admin")
+        assert db.session.query(FirstUserBootstrapClaim).count() == 1
 
     closed = client.get("/admin/users/bootstrap")
     assert closed.status_code == 302
@@ -77,6 +78,7 @@ def test_first_user_setup_validates_password_confirmation(tmp_path, monkeypatch)
     assert response.headers["Location"].endswith("/admin/users/bootstrap")
     with app.app_context():
         assert db.session.query(User).count() == 0
+        assert db.session.query(FirstUserBootstrapClaim).count() == 0
 
 
 def test_empty_installation_api_fails_closed_instead_of_html_redirect(tmp_path, monkeypatch):
@@ -116,3 +118,27 @@ def test_stale_bootstrap_form_cannot_create_second_user(tmp_path, monkeypatch):
     with app.app_context():
         assert db.session.query(User).count() == 1
         assert db.session.query(User).filter_by(email="second@example.com").one_or_none() is None
+        assert db.session.query(FirstUserBootstrapClaim).count() == 1
+
+
+def test_bootstrap_claim_fails_closed_if_claim_exists_without_user(tmp_path, monkeypatch):
+    app = _empty_app(tmp_path, monkeypatch)
+    client = app.test_client()
+
+    with app.app_context():
+        db.session.add(FirstUserBootstrapClaim(id=1))
+        db.session.commit()
+        assert db.session.query(User).count() == 0
+
+    response = client.post(
+        "/admin/users/bootstrap",
+        data={
+            "email": "blocked@example.com",
+            "password": "correct horse battery staple",
+            "password_confirm": "correct horse battery staple",
+        },
+    )
+    assert response.status_code == 503
+    with app.app_context():
+        assert db.session.query(User).count() == 0
+        assert db.session.query(FirstUserBootstrapClaim).count() == 1
