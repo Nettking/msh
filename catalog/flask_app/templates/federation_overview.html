@@ -71,6 +71,58 @@
     {% endfor %}
   </div>
 
+  {% set capability_request = federation_capability_request|default({'status': 'not_requested', 'devices': []}) %}
+  {% set capability_csrf = federation_csrf_token|default(none) %}
+  {% set capability_devices = capability_request.devices|default([]) %}
+  {% set capability_can_manage = capability_request.can_manage|default(false) %}
+  {% set capability_managed = capability_request.managed_by_coordinator|default(false) %}
+  <section class="federation-panel">
+    <header class="federation-panel__header">
+      <div>
+        <span class="federation-eyebrow">Member capabilities</span>
+        <h3>{% if capability_managed %}Managed by Federation leader{% else %}{{ (capability_request.status|default('not_requested')).replace('_', ' ')|title }}{% endif %}</h3>
+        {% if capability_managed %}
+        <p>The Federation leader can ask this device to inspect its local capabilities, run its registered bounded benchmarks, and contribute services that this device's local policy allows.</p>
+        {% else %}
+        <p>Ask reachable Federation members to refresh their read-only capability inspection, run only their registered bounded benchmarks, and contribute only services permitted by each member's existing local policy.</p>
+        {% endif %}
+      </div>
+      {% if capability_csrf and capability_can_manage and capability_request.status|default('not_requested') != 'requested' %}
+      <form method="post" action="{{ url_for('federation_web.request_member_capabilities') }}">
+        <input type="hidden" name="_csrf_token" value="{{ capability_csrf }}">
+        <button class="federation-button federation-button--primary" type="submit">Benchmark &amp; contribute on members</button>
+      </form>
+      {% endif %}
+    </header>
+    {% if capability_request.requested_at|default(none) and not capability_managed %}
+    <dl class="federation-detail-list">
+      <div><dt>Last requested</dt><dd><time datetime="{{ capability_request.requested_at }}" data-local-datetime>{{ capability_request.requested_at }}</time></dd></div>
+      <div><dt>Authority</dt><dd>Federation leader request; member-local policy remains authoritative</dd></div>
+    </dl>
+    {% endif %}
+    {% if capability_devices %}
+    <ul class="federation-entity-list">
+      {% for device in capability_devices %}
+      <li>
+        <div>
+          <strong>{{ device.label }}</strong>
+          <span>{{ device.message|default('') }}</span>
+          {% if device.benchmarks_attempted|default(none) is not none %}
+          <span>{{ device.benchmarks_passed|default(0) }}/{{ device.benchmarks_attempted|default(0) }} benchmark target{{ '' if device.benchmarks_attempted|default(0) == 1 else 's' }} passed · {{ device.contributions_enabled|default(0) }} contribution{{ '' if device.contributions_enabled|default(0) == 1 else 's' }} enabled</span>
+          {% endif %}
+        </div>
+        {{ status_badge(device.state, device.state.replace('_', ' ')|title) }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+    {% if capability_managed %}
+    <p class="federation-muted">A leader request is declarative, not executable authority: this member independently authenticates the session creator, chooses only its installed benchmark definitions, and keeps local contribution policy in force.</p>
+    {% else %}
+    <p class="federation-muted">Offline members are not queued. Requests expire after ten minutes and carry no commands, paths, endpoints, credentials, benchmark IDs, candidate IDs, or provider grants.</p>
+    {% endif %}
+  </section>
+
   {% set updates = federation_update|default({'status': 'not_checked', 'devices': []}) %}
   {% set update_csrf = federation_csrf_token|default(none) %}
   {% set update_target = updates.target_commit|default(none) %}
