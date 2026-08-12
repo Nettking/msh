@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
@@ -242,14 +242,7 @@ class SessionCoordinator:
         self.store.heartbeat(node_id=node_id, now=self._clock())
 
     def connected(self, *, node_id: str, connection_id: str) -> None:
-        """Record connectivity without electing from relay reconnect order.
-
-        After a relay restart every node starts disconnected. Promoting whichever
-        member reconnects first would make startup timing an authority decision
-        and would insert unrelated session revisions. Failover is therefore
-        triggered only by an observed live disconnect or stale-heartbeat sweep
-        while this coordinator is continuously authoritative.
-        """
+        """Record connectivity without electing from relay reconnect order."""
 
         self.store.mark_connected(
             node_id=node_id,
@@ -260,30 +253,70 @@ class SessionCoordinator:
     def disconnected(
         self, *, node_id: str, error: str | None = None
     ) -> tuple[SessionEvent, ...]:
-        now = self._clock()
-        session_ids = self.store.session_ids_for_node(node_id)
-        events = list(
-            self.store.mark_disconnected(
-                node_id=node_id,
-                now=now,
-                error=error,
-            )
+        """Record a disconnect but do not make transient closure an election.
+
+        Leadership is transferred by explicit handover or after the bounded
+        heartbeat/offline timeout in ``sweep_stale``. This avoids authority churn
+        during orderly client shutdowns and relay restarts.
+        """
+
+        return self.store.mark_disconnected(
+            node_id=node_id,
+            now=self._clock(),
+            error=error,
         )
-        for session_id in session_ids:
-            leadership = self.leadership.current(session_id)
-            if leadership.leader_node_id != node_id:
-                continue
-            _updated, event = self.leadership.ensure_available(
-                session_id=session_id,
-                now=now,
-                reason="leader-disconnected",
-            )
-            if event is not None:
-                events.append(event)
-        return tuple(events)
 
     def relay_started(self) -> None:
         self.store.mark_all_disconnected(now=self._clock())
+
+    @staticmethod
+    def _connectivity_time(value: object) -> datetime | None:
+        if not isinstance(value, str) or not value:
+            return None
+        try:
+            parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        except ValueError:
+            return None
+        if parsed.tzinfo is None or parsed.utcoffset() is None:
+            return None
+        return parsed.astimezone(timezone.utc)
+
+    def _expired_disconnected_leader_sessions(
+        self,
+        *,
+        now: datetime,
+        heartbeat_timeout_seconds: float,
+    ) -> tuple[str, ...]:
+        """Find leaders continuously offline for at least one timeout window."""
+
+        if heartbeat_timeout_seconds <= 0:
+            return ()
+        cutoff = now - timedelta(seconds=heartbeat_timeout_seconds)
+        expired: list[str] = []
+        with self.store.read_transaction() as database:
+            session_rows = database.execute(
+                "SELECT session_id FROM sessions ORDER BY session_id"
+            ).fetchall()
+            for row in session_rows:
+                session_id = str(row["session_id"])
+                leadership = self.leadership._snapshot_tx(database, session_id)
+                if leadership.leader_connected:
+                    continue
+                connectivity = database.execute(
+                    """
+                    SELECT state,disconnected_at FROM node_connectivity
+                    WHERE node_id=?
+                    """,
+                    (leadership.leader_node_id,),
+                ).fetchone()
+                if connectivity is None or connectivity["state"] == "revoked":
+                    continue
+                disconnected_at = self._connectivity_time(
+                    connectivity["disconnected_at"]
+                )
+                if disconnected_at is not None and disconnected_at <= cutoff:
+                    expired.append(session_id)
+        return tuple(expired)
 
     def sweep_stale(
         self, *, heartbeat_timeout_seconds: float
@@ -297,6 +330,8 @@ class SessionCoordinator:
         affected_sessions: set[str] = set()
         for node_id in stale:
             affected_sessions.update(self.store.session_ids_for_node(node_id))
+        # A node whose heartbeat itself expired has already exceeded the timeout,
+        # so it may be considered immediately here.
         for session_id in sorted(affected_sessions):
             leadership = self.leadership.current(session_id)
             if leadership.leader_node_id not in stale:
@@ -305,6 +340,20 @@ class SessionCoordinator:
                 session_id=session_id,
                 now=now,
                 reason="leader-heartbeat-expired",
+            )
+            if event is not None:
+                events.append(event)
+        # Clean/error disconnects receive the same bounded grace period. This
+        # covers a powered-off leader whose socket closure was observed before a
+        # heartbeat sweep without turning every brief disconnect into a new term.
+        for session_id in self._expired_disconnected_leader_sessions(
+            now=now,
+            heartbeat_timeout_seconds=heartbeat_timeout_seconds,
+        ):
+            _updated, event = self.leadership.ensure_available(
+                session_id=session_id,
+                now=now,
+                reason="leader-offline-timeout",
             )
             if event is not None:
                 events.append(event)
