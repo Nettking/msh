@@ -1,7 +1,7 @@
 """Best-effort host-side Federation discovery through an existing Tailscale client.
 
-This module intentionally uses only the local ``tailscale`` CLI.  It never accepts,
-reads, stores, or forwards a Tailscale auth/API key.  Tailnet membership is only a
+This module intentionally uses only the local ``tailscale`` CLI. It never accepts,
+reads, stores, or forwards a Tailscale auth/API key. Tailnet membership is only a
 reachability/discovery signal: the returned descriptors contain no enrollment or
 invitation material and therefore grant no Federation authority.
 """
@@ -9,6 +9,7 @@ invitation material and therefore grant no Federation authority.
 from __future__ import annotations
 
 import argparse
+import ipaddress
 import json
 import os
 import re
@@ -26,22 +27,29 @@ DEFAULT_WEB_PORT = 5000
 DEFAULT_TIMEOUT_SECONDS = 0.75
 MAX_PEERS = 32
 MAX_RESPONSE_BYTES = 16_384
+MAX_SNAPSHOT_BYTES = 256 * 1024
 _FINGERPRINT = re.compile(r"^[0-9a-f]{32}$")
+_TAILSCALE_IPV4_NETWORK = ipaddress.IPv4Network("100.64.0.0/10")
 
 
-def _safe_ipv4(value: object) -> str | None:
+def _empty_snapshot(*, tailscale_available: bool = False) -> dict[str, object]:
+    return {
+        "schema": DISCOVERY_SCHEMA,
+        "tailscale_available": tailscale_available,
+        "federations": [],
+    }
+
+
+def _safe_tailscale_ipv4(value: object) -> str | None:
     if not isinstance(value, str):
         return None
-    parts = value.strip().split(".")
-    if len(parts) != 4:
-        return None
     try:
-        numbers = tuple(int(part, 10) for part in parts)
-    except ValueError:
+        address = ipaddress.IPv4Address(value.strip())
+    except ipaddress.AddressValueError:
         return None
-    if any(number < 0 or number > 255 for number in numbers):
+    if address not in _TAILSCALE_IPV4_NETWORK:
         return None
-    return ".".join(str(number) for number in numbers)
+    return str(address)
 
 
 def _online_peers(payload: object) -> tuple[dict[str, str], ...]:
@@ -58,7 +66,12 @@ def _online_peers(payload: object) -> tuple[dict[str, str], ...]:
         ips = raw.get("TailscaleIPs")
         if not isinstance(ips, list):
             continue
-        address = next((_safe_ipv4(value) for value in ips if _safe_ipv4(value)), None)
+        address = None
+        for value in ips:
+            candidate = _safe_tailscale_ipv4(value)
+            if candidate is not None:
+                address = candidate
+                break
         if address is None or address in seen:
             continue
         seen.add(address)
@@ -135,6 +148,36 @@ def _validate_advertisement(payload: object) -> dict[str, object] | None:
     }
 
 
+def _validated_snapshot_federation(payload: object) -> dict[str, object] | None:
+    advertisement = _validate_advertisement(payload)
+    if advertisement is None or not isinstance(payload, dict):
+        return None
+    tailscale_ip = _safe_tailscale_ipv4(payload.get("tailscale_ip"))
+    web_port = payload.get("web_port")
+    if (
+        tailscale_ip is None
+        or isinstance(web_port, bool)
+        or not isinstance(web_port, int)
+        or not 1 <= web_port <= 65_535
+    ):
+        return None
+    dns_name = payload.get("tailscale_dns_name")
+    host_name = payload.get("tailscale_host_name")
+    if not isinstance(dns_name, str) or len(dns_name.encode("utf-8")) > 256:
+        dns_name = ""
+    if not isinstance(host_name, str) or len(host_name.encode("utf-8")) > 256:
+        host_name = ""
+    advertisement.update(
+        {
+            "tailscale_ip": tailscale_ip,
+            "tailscale_dns_name": dns_name.strip().rstrip("."),
+            "tailscale_host_name": host_name.strip(),
+            "web_port": web_port,
+        }
+    )
+    return advertisement
+
+
 def _probe_peer(
     peer: dict[str, str],
     *,
@@ -147,7 +190,10 @@ def _probe_peer(
         url = f"http://{address}:{port}/onboarding/federation/discovery.json"
         request = Request(
             url,
-            headers={"Accept": "application/json", "User-Agent": "FCP-Tailscale-Discovery/1"},
+            headers={
+                "Accept": "application/json",
+                "User-Agent": "FCP-Tailscale-Discovery/1",
+            },
             method="GET",
         )
         try:
@@ -197,11 +243,7 @@ def discover(
         ports = (DEFAULT_WEB_PORT,)
     peers = _run_tailscale_status(runner=runner)
     if peers is None:
-        return {
-            "schema": DISCOVERY_SCHEMA,
-            "tailscale_available": False,
-            "federations": [],
-        }
+        return _empty_snapshot()
 
     federations: list[dict[str, object]] = []
     seen_fingerprints: set[str] = set()
@@ -220,6 +262,64 @@ def discover(
         seen_fingerprints.add(fingerprint)
         federations.append(advertisement)
 
+    federations.sort(
+        key=lambda item: (
+            str(item.get("federation_label", "")).casefold(),
+            str(item.get("federation_fingerprint", "")),
+        )
+    )
+    return {
+        "schema": DISCOVERY_SCHEMA,
+        "tailscale_available": True,
+        "federations": federations,
+    }
+
+
+def load_snapshot(path: Path | str) -> dict[str, object]:
+    """Load a persisted host snapshot through the same bounded allowlist.
+
+    The bind-mounted data directory is treated as untrusted input. Malformed,
+    oversized, non-Tailscale, or unexpectedly shaped content collapses to an
+    empty unavailable snapshot rather than reaching the browser view model.
+    """
+
+    target = Path(path)
+    try:
+        size = target.stat().st_size
+        if size < 0 or size > MAX_SNAPSHOT_BYTES:
+            return _empty_snapshot()
+        raw = target.read_bytes()
+    except OSError:
+        return _empty_snapshot()
+    if len(raw) > MAX_SNAPSHOT_BYTES:
+        return _empty_snapshot()
+    try:
+        payload = json.loads(raw.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return _empty_snapshot()
+    if (
+        not isinstance(payload, dict)
+        or payload.get("schema") != DISCOVERY_SCHEMA
+        or not isinstance(payload.get("tailscale_available"), bool)
+        or not isinstance(payload.get("federations"), list)
+    ):
+        return _empty_snapshot()
+
+    tailscale_available = payload["tailscale_available"] is True
+    if not tailscale_available:
+        return _empty_snapshot()
+
+    federations: list[dict[str, object]] = []
+    seen_fingerprints: set[str] = set()
+    for raw_federation in payload["federations"][:MAX_PEERS]:
+        federation = _validated_snapshot_federation(raw_federation)
+        if federation is None:
+            continue
+        fingerprint = str(federation["federation_fingerprint"])
+        if fingerprint in seen_fingerprints:
+            continue
+        seen_fingerprints.add(fingerprint)
+        federations.append(federation)
     federations.sort(
         key=lambda item: (
             str(item.get("federation_label", "")).casefold(),
@@ -268,7 +368,9 @@ def write_snapshot(path: Path | str, payload: dict[str, object]) -> None:
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Discover FCP Federations through the already logged-in Tailscale client.",
+        description=(
+            "Discover FCP Federations through the already logged-in Tailscale client."
+        ),
     )
     parser.add_argument("--output", required=True)
     parser.add_argument("--web-port", type=int, action="append", dest="web_ports")
