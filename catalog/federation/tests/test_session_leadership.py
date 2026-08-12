@@ -171,18 +171,27 @@ def test_member_cannot_spoof_coordinator_leadership_event(tmp_path: Path) -> Non
     assert current.term == 1
 
 
-def test_connected_successor_recovers_leadership_after_relay_restart(tmp_path: Path) -> None:
+def test_relay_restart_does_not_elect_from_reconnect_order(tmp_path: Path) -> None:
     coordinator, session, creator, member = _two_member_session(tmp_path)
     coordinator.relay_started()
 
-    events = coordinator.connected(
+    coordinator.connected(
         node_id=member.identity.node_id,
         connection_id="member-after-restart",
     )
-    assert len([event for event in events if event.event_type == LEADER_CHANGED_EVENT]) == 1
     current = coordinator.session_leadership(session.session_id)
-    assert current.leader_node_id == member.identity.node_id
-    assert current.term == 2
+    assert current.leader_node_id == creator.identity.node_id
+    assert current.term == 1
+    assert current.leader_connected is False
+
+    coordinator.connected(
+        node_id=creator.identity.node_id,
+        connection_id="creator-after-restart",
+    )
+    restored = coordinator.session_leadership(session.session_id)
+    assert restored.leader_node_id == creator.identity.node_id
+    assert restored.term == 1
+    assert restored.leader_connected is True
 
 
 def test_no_connected_successor_does_not_invent_leader(tmp_path: Path) -> None:
