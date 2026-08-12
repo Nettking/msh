@@ -62,6 +62,8 @@ bash termux/fcp-phone.sh start
 bash termux/fcp-phone.sh open
 ```
 
+The supported phone launcher also starts one host-owned, single-instance Federation update agent. The agent has no general remote-command interface: it accepts only bounded update handoffs for an exact commit on the approved `main`, revalidates the local checkout and remote, permits only fast-forward source updates, restarts the PRoot runtime through the supported phone setup path, and reports success only after the restarted web process is healthy at the requested commit.
+
 On a fresh phone installation, the browser opens the focused setup wizard. The technical defaults written by the Termux installer do not count as a completed user setup. After setup and the session-start choice, a compact first-task screen lets the user capture an operator statement, connect machine data, or open the full workbench.
 
 Alternatively, open this manually in the Android browser:
@@ -81,6 +83,8 @@ bash termux/fcp-phone.sh logs
 bash termux/fcp-phone.sh restart
 bash termux/fcp-phone.sh stop
 ```
+
+`status` also reports whether the Termux Federation update agent is running.
 
 Run in the foreground when debugging:
 
@@ -157,14 +161,34 @@ The server log is:
 ~/fcp-phone-state/results/termux-phone.log
 ```
 
+The Federation update-agent log is:
+
+```text
+~/fcp-phone-state/results/termux-update-agent.log
+```
+
 ## Update FCP
+
+A phone that already has the Federation update agent can be included in the coordinator's **Check for updates** and **Update all devices** flow while it is online in the Federation. The coordinator still selects one immutable `main` commit; the phone independently validates that target, fast-forwards only, updates/rebuilds the PRoot environment when required, restarts FCP, and proves the restarted commit before reporting `runtime_verified`.
+
+Existing phone installations from before this capability need one bootstrap update and one supported restart:
+
+```bash
+cd ~/fcp
+bash termux/fcp-phone.sh update
+bash termux/fcp-phone.sh start
+```
+
+After that bootstrap, future approved Federation updates do not require a separate Termux update command.
+
+The manual phone update command remains available:
 
 ```bash
 cd ~/fcp
 bash termux/fcp-phone.sh update
 ```
 
-Normal updates pull the latest `main`, reuse the installed Linux/Python environment, and restart FCP automatically when it was already running. The application checkout is mounted into the container, so ordinary Python, template, CSS, JavaScript, and documentation changes do not reinstall dependencies.
+Normal manual updates pull the latest `main`, reuse the installed Linux/Python environment, and restart FCP automatically when it was already running. The application checkout is mounted into the container, so ordinary Python, template, CSS, JavaScript, and documentation changes do not reinstall dependencies.
 
 The updater fingerprints `Dockerfile` and `requirements.txt`. It performs the slower clean rebuild only when either file changes, the installed Python environment fails validation, or no container exists. Force that recovery path explicitly with:
 
