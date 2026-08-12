@@ -1,10 +1,10 @@
 from __future__ import annotations
 
+from datetime import datetime, timedelta, timezone
 import importlib.util
 import json
-import subprocess
-from datetime import datetime, timedelta, timezone
 from pathlib import Path
+import subprocess
 
 import pytest
 
