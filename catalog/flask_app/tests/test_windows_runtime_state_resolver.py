@@ -43,6 +43,16 @@ def test_relay_selection_does_not_guess_between_ambiguous_volumes() -> None:
     assert "No state was changed" in script
 
 
+def test_project_volume_lookup_accepts_empty_project_name() -> None:
+    script = _resolver_script()
+
+    assert (
+        '[Parameter(Mandatory = $true)][AllowEmptyString()][string]$ProjectName'
+        in script
+    )
+    assert 'if ([string]::IsNullOrWhiteSpace($ProjectName)) {' in script
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell native argument check")
 def test_encoded_python_survives_windows_powershell_native_argument_forwarding(
     tmp_path: Path,
