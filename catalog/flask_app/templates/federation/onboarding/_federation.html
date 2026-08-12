@@ -22,6 +22,36 @@
         </div>
         {% endif %}
 
+        {% set tailscale_discovery = vm.tailscale_discovery|default({}) %}
+        {% set tailscale_federations = tailscale_discovery.federations|default([]) %}
+        {% if not vm.federation.connected_label|default('') and tailscale_discovery.tailscale_available|default(false) %}
+          {% if tailscale_federations %}
+          <section class="federation-notice" aria-labelledby="tailscale-discovery-heading">
+            <strong id="tailscale-discovery-heading">Tailscale found an FCP Federation</strong>
+            <span>FCP used the Tailscale login already present on this machine. Discovery proves reachability only; it does not grant Federation membership and no Tailscale auth or API key is stored by FCP.</span>
+            <div class="federation-candidate-grid">
+              {% for federation in tailscale_federations %}
+              <article class="federation-candidate">
+                <span class="federation-candidate__main">
+                  <strong>{{ federation.federation_label }}</strong>
+                  <small>{{ federation.device_name|default(federation.tailscale_host_name)|default(federation.tailscale_ip) }}</small>
+                </span>
+                <span class="federation-candidate__fingerprint">Fingerprint: {{ federation.federation_fingerprint }}</span>
+                <span class="federation-candidate__reason">Tailscale address: {{ federation.tailscale_ip }}:{{ federation.web_port }}</span>
+                <a class="federation-button federation-button--secondary" href="http://{{ federation.tailscale_ip }}:{{ federation.web_port }}/onboarding?step=federation" target="_blank" rel="noopener noreferrer">Open discovered FCP device</a>
+              </article>
+              {% endfor %}
+            </div>
+            <span>Generate a one-use FCP pairing code on the discovered device, then paste that FCP1 code below.</span>
+          </section>
+          {% else %}
+          <div class="federation-notice">
+            <strong>Tailscale is connected, but no other FCP Federation is advertising yet.</strong>
+            <span>Normal pairing and local Federation creation remain available. Starting FCP through the Tailscale launcher on the other device will make it discoverable on the next scan.</span>
+          </div>
+          {% endif %}
+        {% endif %}
+
         {% if vm.federation.can_reconnect|default(false) %}
         <form method="post" action="{{ vm.actions.federation_url|default('/onboarding/federation') }}" class="local-federation-action">
           <input type="hidden" name="_csrf_token" value="{{ vm.csrf_token }}">
