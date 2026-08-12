@@ -18,6 +18,7 @@ from catalog.orchestrator.capability_startup import (
 from catalog.orchestrator.pipeline import get_runtime_manager
 
 from .ai_routes import ai_web
+from .auth import init_human_auth
 from .capability_benchmark_routes import capability_benchmark_web
 from .capability_contribution_routes import capability_contribution_web
 from .capability_inspection_routes import capability_inspection_web
@@ -98,7 +99,7 @@ def _resume_persisted_contributions_safely() -> tuple[int, int]:
 
 def create_app() -> Flask:
     app = Flask(__name__, template_folder="templates", static_folder="static")
-    app.config["SECRET_KEY"] = os.getenv("FCP_FLASK_SECRET", "fcp-dev")
+    init_human_auth(app)
     if app.config.get("MAX_CONTENT_LENGTH") is None:
         app.config["MAX_CONTENT_LENGTH"] = int(
             os.getenv("FCP_UPLOAD_MAX_REQUEST_BYTES", str(1100 * 1024 * 1024))

@@ -18,12 +18,21 @@ bash start.sh
 
 The supported launchers preserve existing device/Federation state, start the core services, bake the exact Git commit into the runtime images, verify the configured Ollama model, and start the bounded host-owned update agent used by Federation-wide software updates.
 
+On the first production start, FCP creates persistent human-auth session and password-hashing secrets under `data/auth/`. Before using the browser, create the first human administrator through the same containerized runtime:
+
+```bash
+docker compose run --rm --no-deps --entrypoint flask flask --app catalog.flask_app.app:create_app fcp-user create-admin
+```
+
+Then sign in at `http://localhost:5000/login`. Human accounts authorize browser users and remain separate from Federation/device identities and credentials.
+
 Open `http://localhost:5000/onboarding` on a device that has not completed setup. Returning devices normally open the workbench or Federation surface using their persisted identity and trusted Federation binding.
 
 ## Required first-run flow
 
 ```text
-Identity
+Human sign-in
+  -> Identity
   -> Federation
   -> Inspect
   -> finish setup
@@ -34,6 +43,7 @@ A current device inspection is sufficient to finish setup. Benchmarks and contri
 
 ## Current product highlights
 
+- **Human authentication and central RBAC** — browser users sign in with separate human accounts. `viewer`, `operator`, and `admin` permissions are enforced server-side without reusing Federation or device credentials.
 - **Capability-first runtime** — the retired role-first product runtime is no longer a normal authority path. Retained legacy state is migration input only.
 - **Manual Federation-wide updates** — the Federation coordinator can check an exact approved `main` commit and explicitly update eligible devices. Successful runtime verification is shown as **Updated**.
 - **Headless standalone recorder** — `python start_recorder.py FCP1-...` can identify, pair, scan its local private network, start loss-aware recording, and publish checkpoint-committed data to Federation logical storage.
@@ -45,6 +55,7 @@ See:
 
 - [Documentation index](docs/index.md)
 - [Quick start](docs/quick_start.md)
+- [Human authentication](docs/human-authentication.md)
 - [Federation operations](docs/federation_operations.md)
 - [Standalone recorder](docs/standalone_recorder.md)
 - [Server setup](docs/server_setup.md)
