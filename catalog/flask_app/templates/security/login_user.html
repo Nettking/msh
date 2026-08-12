@@ -9,14 +9,31 @@
     <p class="auth-lede">This device is the Federation human sign-in authority. Accounts managed here can sign in on Federation members.</p>
   {% elif federation_auth.mode in ('member', 'member-unavailable') %}
     <p class="auth-lede">Use your Federation human account. Sign-in is handled by the Federation leader.</p>
+  {% elif federation_auth.mode == 'discovered' %}
+    <p class="auth-lede">This is a new FCP device and an existing Federation was found through Tailscale. Sign in with the Federation account you already have; this device will be enrolled after the Federation administrator approves it.</p>
   {% else %}
     <p class="auth-lede">Use your human account to open the workbench.</p>
   {% endif %}
 
-  {% if login_user_form.errors and (federation_auth.mode not in ('member', 'member-unavailable') or federation_auth.local_fallback) %}
+  {% if login_user_form.errors and federation_auth.mode not in ('discovered', 'member', 'member-unavailable') %}
     {#- One generic message on purpose. Naming the failing field would tell an
         unauthenticated visitor whether an account exists. -#}
     <p class="auth-alert" role="alert">Sign-in failed. Check your credentials and account status.</p>
+  {% endif %}
+
+  {% if federation_auth.mode == 'discovered' %}
+    <div class="auth-form">
+      {% for federation in federation_auth.federations %}
+        <form method="post" action="{{ url_for('federation_enrollment.start') }}">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <input type="hidden" name="federation_fingerprint" value="{{ federation.federation_fingerprint }}">
+          <button class="button-primary auth-submit" type="submit">Sign in to {{ federation.federation_label }}</button>
+          <p class="auth-note">Found on {{ federation.device_name }} · {{ federation.tailscale_ip }}:{{ federation.web_port }}</p>
+        </form>
+      {% endfor %}
+    </div>
+    <p class="auth-note">Your password is entered only on the existing Federation authority. This new device receives a signed human-login assertion after it has joined; it does not create or store another password.</p>
+    <p class="auth-note"><a href="{{ url_for('auth_users.bootstrap_user', local=1) }}">This is actually the first or a standalone device</a></p>
   {% endif %}
 
   {% if federation_auth.mode in ('member', 'member-unavailable') %}
@@ -31,7 +48,7 @@
     {% endif %}
   {% endif %}
 
-  {% if federation_auth.mode not in ('member', 'member-unavailable') or federation_auth.local_fallback %}
+  {% if federation_auth.mode not in ('discovered', 'member', 'member-unavailable') or federation_auth.local_fallback %}
     {% if federation_auth.mode in ('member', 'member-unavailable') %}
       <p class="auth-alert" role="alert">Recovery mode is enabled. Local password sign-in can bypass the normal Federation sign-in path on this member.</p>
     {% endif %}
