@@ -12,5 +12,6 @@ if errorlevel 1 (
     exit /b 1
 )
 
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\migrate_existing_fcp.ps1" -RepoRoot "%~dp0"
+rem Append "." so the RepoRoot argument never ends in a backslash before the closing quote.
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\migrate_existing_fcp.ps1" -RepoRoot "%~dp0."
 exit /b %ERRORLEVEL%
