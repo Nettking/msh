@@ -355,11 +355,16 @@ class FederationLogicalStorageAuthority(RecorderLogicalStorageAuthority):
                 "is required",
             )
 
-        # Generic source-data publication is allowed to current Federation
-        # members, but not by anonymous relay presence. Reuse the existing
-        # read/member authorizer so recorder contribution authority is unchanged.
-        if self.authorize_read is not None:
-            self.authorize_read(actor_node_id, session_id, group_id, dataset_id)
+        # Generic source-data publication is allowed only to current Federation
+        # members. An authority missing that explicit authorizer is unsafe and
+        # therefore fails closed rather than treating relay presence as trust.
+        if self.authorize_read is None:
+            raise FederationValidationError(
+                "federated-jsonl-membership-authorizer-required",
+                "authorize_read",
+                "generic Federation JSONL ingress requires membership authorization",
+            )
+        self.authorize_read(actor_node_id, session_id, group_id, dataset_id)
         validate_federated_jsonl_ingest(
             actor_node_id=actor_node_id,
             session_id=session_id,
