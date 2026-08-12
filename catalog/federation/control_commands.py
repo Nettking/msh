@@ -79,10 +79,9 @@ def _targets(
     deduplicate: bool,
     require_unique: bool,
 ) -> tuple[str, ...]:
-    if not isinstance(value, (list, tuple)):
-        raise ValueError("malformed_targets")
-    targets = tuple(value)
-    if any(
+    is_collection = isinstance(value, (list, tuple))
+    targets = tuple(value) if is_collection else ()
+    if not is_collection or any(
         not isinstance(item, str) or not item or len(item) > MAX_COMMAND_NODE_ID_LENGTH
         for item in targets
     ):
