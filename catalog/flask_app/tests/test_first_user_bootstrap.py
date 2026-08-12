@@ -46,6 +46,17 @@ def test_empty_installation_meets_user_with_first_admin_setup(tmp_path, monkeypa
     assert created.status_code == 302
     assert created.headers["Location"].endswith("/login")
 
+    # The signed-out authentication shell intentionally does not consume normal
+    # workbench flashes. Keep this success queued so it appears after sign-in,
+    # where the operator continues setup, and ensure the stale instruction is gone.
+    login_page = client.get(created.headers["Location"])
+    login_body = login_page.get_data(as_text=True)
+    assert "Administrator created." not in login_body
+    with client.session_transaction() as session:
+        flashes = session.get("_flashes", [])
+    assert ("success", "Administrator created.") in flashes
+    assert all("Sign in to continue" not in message for _, message in flashes)
+
     with app.app_context():
         user = db.session.query(User).filter_by(email="first@example.com").one()
         assert user.active is True
