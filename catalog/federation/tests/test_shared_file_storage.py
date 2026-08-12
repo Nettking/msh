@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import gzip
 import hashlib
 from datetime import datetime, timezone
@@ -76,8 +77,7 @@ class _LogicalStorage:
         return PhaseDIngestOutcome(committed=True)
 
 
-@pytest.mark.asyncio
-async def test_generic_jsonl_uses_membership_authorizer_not_recorder_authorizer():
+def test_generic_jsonl_uses_membership_authorizer_not_recorder_authorizer():
     logical = _LogicalStorage()
     membership_calls: list[tuple[str, str, str, str | None]] = []
 
@@ -101,11 +101,13 @@ async def test_generic_jsonl_uses_membership_authorizer_not_recorder_authorizer(
     )
     payload = _payload()
 
-    response = await authority._ingest_response(
-        ACTOR,
-        SESSION,
-        "correlation-1",
-        payload,
+    response = asyncio.run(
+        authority._ingest_response(
+            ACTOR,
+            SESSION,
+            "correlation-1",
+            payload,
+        )
     )
 
     assert response["status"] == "accepted"
