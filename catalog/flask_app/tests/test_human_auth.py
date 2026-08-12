@@ -37,7 +37,7 @@ def app(tmp_path, monkeypatch):
         for name in ("viewer", "operator", "admin"):
             db.session.add(
                 User(
-                    email=f"{name}@example.test",
+                    email=f"{name}@example.com",
                     password=hash_password("correct horse battery staple"),
                     active=True,
                     fs_uniquifier=f"test-{name}",
@@ -46,7 +46,7 @@ def app(tmp_path, monkeypatch):
             )
         db.session.add(
             User(
-                email="inactive@example.test",
+                email="inactive@example.com",
                 password=hash_password("correct horse battery staple"),
                 active=False,
                 fs_uniquifier="test-inactive",
@@ -65,21 +65,21 @@ def test_authentication_login_logout_and_inactive_user(app):
     client = app.test_client()
     assert client.get("/").status_code == 302
     assert (
-        _login(client, "viewer@example.test", "incorrect-password").status_code == 200
+        _login(client, "viewer@example.com", "incorrect-password").status_code == 200
     )
     assert client.get("/").status_code == 302
-    assert _login(client, "viewer@example.test").status_code == 302
+    assert _login(client, "viewer@example.com").status_code == 302
     assert client.get("/").status_code == 200
     client.get("/logout")
     assert client.get("/").status_code == 302
-    assert _login(client, "inactive@example.test").status_code == 200
+    assert _login(client, "inactive@example.com").status_code == 200
     assert client.get("/").status_code == 302
 
 
 def test_login_requires_csrf_when_enabled(app):
     app.config["WTF_CSRF_ENABLED"] = True
     client = app.test_client()
-    assert _login(client, "viewer@example.test").status_code == 400
+    assert _login(client, "viewer@example.com").status_code == 400
 
 
 @pytest.mark.parametrize(
@@ -87,7 +87,7 @@ def test_login_requires_csrf_when_enabled(app):
 )
 def test_role_boundaries(app, role, write_status):
     client = app.test_client()
-    _login(client, f"{role}@example.test")
+    _login(client, f"{role}@example.com")
     assert client.get("/").status_code == 200
     assert client.post("/operate").status_code == write_status
 
@@ -118,7 +118,7 @@ def test_bootstrap_creates_admin_once(app):
         "fcp-user",
         "create-admin",
         "--email",
-        "first@example.test",
+        "first@example.com",
         "--password",
         "a-secure-bootstrap-password",
     ]
@@ -127,10 +127,26 @@ def test_bootstrap_creates_admin_once(app):
     with app.app_context():
         assert (
             db.session.query(User)
-            .filter_by(email="first@example.test")
+            .filter_by(email="first@example.com")
             .one()
             .has_role("admin")
         )
+
+
+def test_bootstrap_rejects_reserved_domain_email(app):
+    runner = app.test_cli_runner()
+    result = runner.invoke(
+        args=[
+            "fcp-user",
+            "create-admin",
+            "--email",
+            "first@example.test",
+            "--password",
+            "a-secure-bootstrap-password",
+        ]
+    )
+    assert result.exit_code != 0
+    assert "valid email address" in result.output
 
 
 def test_production_rejects_explicit_short_secret(tmp_path, monkeypatch):
