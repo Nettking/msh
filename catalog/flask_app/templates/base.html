@@ -113,7 +113,7 @@
         {% set section_active = section.key == page_active_section or (section.key == 'this-device' and current_endpoint == 'web.status') %}
         <a class="admin-subnav__link {% if section_active %}is-active{% endif %}" href="{{ section.url }}" {% if section_active %}aria-current="page"{% endif %}>{{ section.label }}</a>
         {% if section.key == 'this-device' %}
-        <a class="admin-subnav__link {% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}" {% if current_endpoint == 'web.status' %}aria-current="page"{% endif %}>↳ Diagnostics</a>
+        <a class="admin-subnav__link {% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ endpoint_url('web.status', '/status') }}" {% if current_endpoint == 'web.status' %}aria-current="page"{% endif %}>↳ Diagnostics</a>
         {% endif %}
         {% if section.key == 'benchmarks' and workbench_role %}
         <a class="admin-subnav__link {% if current_endpoint.startswith('source_web.') %}is-active{% endif %}" href="{{ endpoint_url('source_web.index', '/sources/') }}" {% if current_endpoint.startswith('source_web.') %}aria-current="page"{% endif %}>Sources</a>
@@ -122,7 +122,7 @@
       {% else %}
         <a class="admin-subnav__link {% if current_endpoint == 'federation_web.overview' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.overview', '/federation') }}">Overview</a>
         <a class="admin-subnav__link {% if current_endpoint == 'federation_web.this_device' or current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.this_device', '/federation/device') }}">This device</a>
-        <a class="admin-subnav__link {% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ url_for('web.status') }}" {% if current_endpoint == 'web.status' %}aria-current="page"{% endif %}>↳ Diagnostics</a>
+        <a class="admin-subnav__link {% if current_endpoint == 'web.status' %}is-active{% endif %}" href="{{ endpoint_url('web.status', '/status') }}" {% if current_endpoint == 'web.status' %}aria-current="page"{% endif %}>↳ Diagnostics</a>
         <a class="admin-subnav__link {% if current_endpoint == 'federation_web.devices' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.devices', '/federation/devices') }}">Devices</a>
         <a class="admin-subnav__link {% if current_endpoint == 'federation_web.services' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.services', '/federation/services') }}">Services</a>
         <a class="admin-subnav__link {% if current_endpoint == 'federation_web.benchmarks' %}is-active{% endif %}" href="{{ endpoint_url('federation_web.benchmarks', '/federation/benchmarks') }}">Benchmarks</a>
@@ -137,7 +137,7 @@
       {% if page_shows_approvals %}
       <a class="admin-subnav__link {% if page_active_section == 'approvals' or current_endpoint.startswith('provider_federation_web.') %}is-active{% endif %}" href="{{ url_for('provider_federation_web.index') }}">Approvals</a>
       {% endif %}
-      <a class="admin-subnav__link {% if page_active_section == 'recorders' or current_endpoint.startswith('federation_recorder_web.') %}is-active{% endif %}" href="{{ url_for('federation_recorder_web.index') }}">Recorders</a>
+      <a class="admin-subnav__link {% if page_active_section == 'recorders' or current_endpoint.startswith('federation_recorder_web.') %}is-active{% endif %}" href="{{ endpoint_url('federation_recorder_web.index', '/federation/recorders') }}">Recorders</a>
     {%- endmacro %}
     {% macro section_links(group, current_endpoint) -%}
       {% if group == 'federation' %}
