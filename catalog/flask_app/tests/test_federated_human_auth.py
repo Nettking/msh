@@ -180,6 +180,12 @@ def test_signed_assertion_is_target_bound_and_creates_shadow_user(auth_app, tmp_
             state="browser-state",
         )
 
+        # The real leader and member have separate local auth databases. Remove
+        # the authority-side row before consuming the assertion so this test
+        # exercises creation of a member-only shadow record in one test DB.
+        db.session.delete(user)
+        db.session.commit()
+
         shadow = member_service.consume_assertion(
             assertion,
             expected_state="browser-state",
