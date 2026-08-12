@@ -1,228 +1,182 @@
 # Operator guide
 
 Status: **current user guide**
-
 Reviewed: **2026-08-12**
 
-This guide describes normal operation after FCP starts. It does not assign the device one permanent server role.
+This guide describes normal operation after FCP starts. A device is capability-first and is not assigned one permanent server role.
 
 ## First use
 
-A new production installation first needs a human administrator and sign-in, then the device completes capability-first onboarding:
+A new local authority uses this path:
 
 ```text
-create first administrator
+Start FCP
+  -> create first administrator in browser
   -> Human sign-in
   -> Identity
   -> Federation
   -> Inspect
   -> finish setup
-  -> open Federation
 ```
 
-Create the first administrator with the `fcp-user create-admin` command documented in [Human users, sign-in, and permissions](human-authentication.md). Human accounts authorize people using the web application; they are separate from device identity and Federation membership.
+When there are zero local human users, FCP redirects normal browser requests to `/admin/users/bootstrap`. Create the first active administrator there, sign in, and continue onboarding. See [Human users, sign-in, and permissions](human-authentication.md).
 
-A current inspection is sufficient to finish setup. Benchmarks and contribution decisions are optional follow-up work.
+A remotely paired Federation member with an empty local shadow-user database uses Federation sign-in instead of local first-admin bootstrap.
 
-The first device may create a local Federation. Additional devices join through an authenticated trusted binding or signed expiring pairing flow. A public device ID or network presence never grants membership.
+## Federation
 
-Current browser-generated pairing codes begin with `FCP1-`, are signed, one-use, valid for up to 10 minutes, and can be generated again whenever another pairing attempt is needed.
+Use Federation to understand and operate distributed product state.
 
-## Main product areas
-
-### Federation
-
-Use Federation to understand and operate the distributed product state.
-
-- **Overview** — current device, connection, recommendations, software-update state, leader capability-request state, and safe high-level status.
-- **This device** — identity, inspection, local capability availability, and contribution state.
-- **Devices** — authorized Federation members and connection state.
+- **Overview** — current device, creator/current leader/term, connection, recommendations, software updates, capability-request state, and safe high-level status.
+- **This device** — identity, self display name, inspection, local capabilities, and contribution state.
+- **Devices** — authorized Federation members, names, and connection state.
 - **Services** — contributed service state without private endpoint disclosure.
-- **Recorders** — connected standalone MTConnect recorders, bounded remote scan requests, and add/remove source selection.
-- **Benchmarks** — optional benchmark evidence, invalidation, and rerun status.
-- **Storage** — storage candidates and coordinator-assigned authority.
+- **Recorders** — connected standalone recorder scans/source selection.
+- **Benchmarks** — optional benchmark evidence and rerun/invalidation state.
+- **Storage** — storage candidates and assigned authority.
 - **Jobs** — authorized job state and registered-handler execution.
-- **Activity** — public-safe Federation events and diagnostics.
-- **Settings** — supported Federation information and retained migration context where applicable.
+- **Activity** — public-safe Federation events/diagnostics.
 
-Most Federation content is a public-safe projection. Mutations exist only on explicit reviewed action surfaces such as pairing, contribution choices, leader capability requests, recorder control, and coordinator-owned software updates.
+### Creator and current leader
 
-#### Ask members to benchmark and contribute
+The Federation creator is immutable provenance. Operational leader authority can move to a successor through a coordinator-authored monotonic term after the previous leader remains offline beyond the bounded timeout.
 
-The Federation leader/session creator can ask all currently reachable remote members to inspect local capability state, run eligible registered benchmarks, and request contribution for locally allowed candidates.
+The current leader owns reviewed leader-only product controls. A former leader is fenced after a valid transition.
 
-The request does not grant remote shell or provider authority. Each member authenticates the session creator, runs only locally registered bounded benchmark definitions, and re-evaluates its own contribution/provider policy. Capabilities that require separate approval may remain pending.
+Leader failover assumes the authoritative coordinator/relay remains available; it is not replicated-quorum failover of that service.
 
-Offline members are not queued for later. Issue another request after they reconnect if you want them included.
+Human credential/password authority remains creator-backed and separate from transferable operational leadership.
 
-This leader action requires the human browser user to have Federation-management permission as well as the issuing device having leader/session-creator authority. See [Federation operations](federation_operations.md).
+### Rename devices
 
-#### Software updates
+- Rename this device from **Federation -> This device**.
+- The current leader can rename other members from **Federation -> Devices**.
 
-Only the Federation coordinator/session creator receives **Check for updates** and **Update all devices** controls.
+Names are Federation-scoped public display metadata. They do not replace stable `node_id` identity or change authority.
 
-Use them in this order:
+### Pair another device
 
-1. run **Check for updates**;
-2. review the exact target and every device result;
-3. run **Update all devices** only when you intend to activate that target; and
-4. wait for terminal per-device results before starting another rollout.
+The current leader generates a signed one-use `FCP1-...` pairing code, valid for up to 10 minutes. The joining device redeems it in onboarding.
 
-A successful device is shown as **Updated** with the green success indicator. This means the running runtime proved the exact requested commit; a source fast-forward alone is not success.
+If both hosts already use Tailscale, the joining host can run `start-tailscale.cmd` or `bash start-tailscale.sh` to find the existing FCP Federation. Discovery only finds a reachable endpoint; the `FCP1-...` code is still required. See [Tailscale Federation discovery](tailscale_federation_discovery.md).
 
-The operation requires the supported host-owned update agent on each normal FCP installation. See [Federation operations](federation_operations.md).
+### Ask members to benchmark and contribute
 
-#### Standalone recorder control
+The current leader can ask currently reachable remote members to refresh local inspection, run eligible locally registered benchmarks, and request locally allowed contributions.
 
-Open **Federation -> Recorders** from any trusted Federation device. Choose a connected standalone recorder and request a scan or source change.
+The request cannot inject commands, paths, arbitrary benchmark code, provider grants, credentials, or host configuration. Each member re-evaluates local policy and any separate approval requirements.
 
-The scan executes on the recorder's network, not on the device displaying the browser. Source additions can select only opaque IDs returned by that recorder's latest bounded scan, so another Federation member cannot inject an arbitrary URL or credential.
+Offline members are not queued. Issue another request after they reconnect.
 
-Removing a source stops future capture for that source but does not delete previously recorded telemetry or historical checkpoints.
+### Review provider/contribution requests
 
-#### Federation-visible JSONL data
+Pending/registering provider candidates are reviewed on `/provider-federation` by the current leader. Approval does not automatically create unrelated compute/storage/AI authority.
 
-Supported non-recorder JSONL under `data/` can now be published through Federation logical storage and hash-verified/materialized on connected workbench members. Existing recursive JSONL consumers still operate on local paths; the Federation synchronization layer makes verified remote data visible inside that local compatibility boundary.
+### Software updates
 
-Recorder telemetry keeps its separate checkpoint-gated publication path. Generic Federation JSONL synchronization does not expose arbitrary host files and rejects invalid paths, non-JSONL content declarations, identity mismatches, contradictory versions, and failed hash/size verification.
+Only the current leader receives **Check for updates** and **Update all devices**.
 
-Exact duplicate content is deduplicated so an existing recursive data scan does not count the same immutable file twice.
+Use them in order:
 
-### Monitor
+1. **Check for updates**.
+2. Review the exact approved target and every device state.
+3. **Update all devices** only when you intend to activate that target.
+4. Wait for terminal per-device results.
 
-Use Monitor to inspect current or replayed telemetry and data visible to this workbench.
+A device is shown as **Updated** only after its running runtime proves the exact target commit.
 
-- **Overview** — local runtime and data readiness.
-- **Live** — recent telemetry from supported data sources.
-- **Playback** — machine/day replay from prepared timeline exports.
-- **Assist** — possible causes, next actions, risks, alternatives, and operator confirmation.
-- **Status/Diagnostics** — recorder, runtime, source, cache, and failure details.
+### Federation-visible JSONL
 
-Because supported Federation JSONL is materialized into the normal local data scan boundary, existing analyses/workflows may discover verified data originally produced by another Federation member without requiring a separate legacy-analysis code path.
+Supported non-recorder JSONL under `data/` can be published through Federation logical storage, verified, and materialized under the local data scan boundary on connected workbench members.
 
-### Knowledge
+Recorder telemetry keeps its separate checkpoint/manifest path. Exact duplicate generic JSONL content is deduplicated.
 
-Use Knowledge to capture and structure operator experience.
+Browser-uploaded JSONL is included by default; an advanced deployment can set `FCP_FEDERATED_JSONL_PUBLISH_UPLOADS=0` to withhold uploaded JSONL from Federation publication on that installation.
 
-- **Capture** — save one raw statement quickly.
-- **Review Notes** — review and structure captured statements.
-- **Strategies** — compare structured strategies by context, action, evidence, confidence, outcome, and trade-off.
-- **Intervention Logic** — maintain technical detection rules when telemetry can identify a candidate situation.
-- **SysML Export** — export supported structured records through the current compatibility path.
+### Standalone recorder control
 
-OSL production implementation has not started. Existing operator records and SysML exports are compatibility inputs, not proof of future OSL conformance, review, approval, or publication.
+Open **Federation -> Recorders** from any trusted Federation device. A scan executes on the recorder host, and additions can select only opaque source IDs from that recorder's latest bounded scan. Remote users cannot inject arbitrary URLs or unrestricted scans.
 
-### System
+## Monitor
 
-Use System for local configuration and support.
+Use Monitor to inspect current/replayed telemetry and data visible to this workbench.
 
-- **Sources** — configure machines, MTConnect endpoints, vibration sensors, and supported connectors.
-- **Documentation** — browse canonical repository documentation through `/docs`.
-- **Diagnostics** — inspect local runtime and failure reasons.
-- **Migration/compatibility state** — retained only where an upgraded installation still needs deterministic migration input.
+- **Overview** — local runtime/data readiness.
+- **Live** — recent telemetry.
+- **Playback** — prepared historical replay.
+- **Assist** — possible causes/actions/risks with operator validation.
+- **Status/Diagnostics** — runtime, recorder, source, cache, and failure details.
 
-Human administrators manage human web accounts at `/admin/users`. This is a separate administrative surface from device onboarding and Federation membership. See [Human users, sign-in, and permissions](human-authentication.md).
+Federation JSONL and recorder mirrors are materialized into the normal local data boundary only after their respective verification paths succeed.
 
-The installed product is capability-first. Retained migration state and old command aliases do not define product authority or a permanent device role.
+## Knowledge
 
-## Recommended operator workflow
+Use Knowledge to capture and structure operator experience:
 
-1. Start FCP using `start.cmd` or `bash start.sh`.
-2. On a fresh production installation, create the first human administrator and sign in.
+- **Capture** — save a raw statement quickly.
+- **Review Notes** — structure captured statements.
+- **Strategies** — compare context/action/evidence/confidence/outcomes.
+- **Intervention Logic** — maintain technical detection rules.
+- **SysML Export** — current compatibility export.
+
+Federation knowledge sharing may degrade to the local cache when Federation access is unavailable. Credential-shaped content is refused at the shared-event write boundary rather than being committed into durable Federation history.
+
+## System
+
+Use System for local configuration and support:
+
+- **Sources** — configure supported machine/data connections.
+- **Documentation** — browse current repository docs through `/docs`.
+- **Diagnostics** — inspect local runtime/failures.
+
+Human admins manage web accounts at `/admin/users`.
+
+## Appearance
+
+Use the light/dark switch in the top menu. With no explicit choice, FCP follows the operating-system preference. An explicit choice is saved in that browser and applies before first paint across the normal shell, onboarding, sign-in/account surfaces, and docs portal.
+
+## Recommended workflow
+
+1. Start FCP with the supported launcher.
+2. On a fresh local authority, create the first administrator in the browser and sign in.
 3. Complete Identity, Federation, and Inspect when onboarding is incomplete.
-4. Open Federation Overview and confirm the expected device and connection state.
-5. Pair additional FCP devices only through the signed trusted pairing flow.
-6. Configure supported machine sources under System -> Sources, or use the standalone-recorder first-run scan.
-7. Test MTConnect and network reachability from the FCP runtime or recorder host.
-8. Enable recording explicitly only after the intended sources are verified.
-9. Use Monitor -> Live or Playback to inspect telemetry.
-10. Run optional benchmarks only when suitability or capacity evidence is needed, or let the Federation leader request eligible member-local benchmark/contribution work.
-11. Enable or disable independent contributions through their reviewed product surfaces.
-12. Review any contribution that still requires provider-enrollment approval rather than assuming a leader request activated it.
-13. Use Federation -> Recorders when another trusted device must manage a standalone recorder's discovery/source selection.
-14. Use Federation software updates only after reviewing the exact checked target and device states.
-15. Use Knowledge -> Capture during field work and structure notes later.
-16. Use Diagnostics when any surface reports degraded, blocked, unavailable, or failed state.
-
-## Source checks
-
-### MTConnect test
-
-The MTConnect test verifies that the Flask runtime can reach the configured endpoint and receive a response. A successful connection does not grant Federation contribution authority.
-
-A base adapter address may be normalized to the supported MTConnect endpoint, for example:
-
-```text
-10.0.0.20:5000
--> http://10.0.0.20:5000/current
-```
-
-### Network test
-
-The network test opens a bounded TCP connection from the FCP runtime to the configured host and port. It proves application-level reachability, not the operating system's VPN state and not Federation trust.
-
-### Standalone-recorder scan
-
-The standalone recorder can run the existing bounded private-network MTConnect discovery automatically on first configuration. A trusted Federation member may later request the same recorder-local scan remotely.
-
-Discovery remains restricted to validated RFC1918 private IPv4 networks of `/24` or smaller and retains address, timeout, redirect, and response-size limits.
-
-## Recording
-
-Recording configuration and contribution authority remain separate.
-
-- Source discovery identifies candidates only.
-- The operator selects the intended source, or the standalone recorder auto-selects discovered sources only during its first configuration.
-- Recorder state and checkpoints remain durable across normal restarts.
-- A deliberately removed standalone-recorder source set is not silently repopulated on later restart.
-- Disabling recorder contribution fences future Federation use without deleting device membership or unrelated contributions.
-- Local telemetry capture remains the recorder's primary commit boundary.
-- Federation publication retries independently from a durable outbox and must not block MTConnect polling.
-
-See [Standalone recorder](standalone_recorder.md) for the headless recorder workflow.
+4. Open Federation Overview and confirm the expected current leader and connection state.
+5. Give devices useful display names.
+6. Pair additional trusted devices; optionally use Tailscale discovery to find the existing endpoint.
+7. Configure/verify data sources.
+8. Enable recording explicitly after source verification.
+9. Use Monitor for telemetry/playback.
+10. Run benchmarks when capacity/suitability evidence is useful.
+11. Enable contributions through reviewed product surfaces.
+12. Review pending provider candidates where separate approval is required.
+13. Use Federation -> Recorders for remote recorder scan/source control.
+14. Use Federation updates only after reviewing the exact target and member states.
+15. Use Knowledge capture during field work.
+16. Use Diagnostics instead of deleting state when something is blocked/degraded.
 
 ## Optional benchmarks
 
-Benchmarks are evidence, not authority.
+Benchmarks are evidence, not authority. A benchmark may be run/skipped/rerun/cancelled/invalidated. Missing benchmark evidence does not block the workbench after accepted inspection.
 
-- A benchmark may be run, skipped, rerun, cancelled, or invalidated.
-- Missing benchmark evidence does not block the workbench after current inspection.
-- A changed benchmark identity, implementation version, or declared dependency input requires new evidence before that evidence can support contribution reconciliation.
-- Elapsed wall-clock time alone is not an automatic product rerun trigger.
-- A Federation leader may request eligible member-local benchmark work, but the member decides what registered benchmark definitions are runnable and never accepts arbitrary benchmark code from the request.
+A leader request can ask for eligible member-local benchmark work, but members only execute locally registered definitions.
 
 ## Contributions
 
-One device may contribute several independent capabilities.
-
-- Recorder enablement grants no AI, compute, or storage authority.
-- AI enablement grants no job, storage, or membership authority.
-- Compute exposes only explicitly registered local handlers.
-- Storage remains candidate-only until the existing control plane assigns authority.
-- Disabling one contribution must not remove membership or unrelated contributions.
-- A leader capability request can request eligible local contribution intent but cannot bypass member-local policy or any separate provider-approval requirement.
-
-## Knowledge capture
-
-The current supported knowledge workflow is:
-
-```text
-raw statement
-  -> later review
-  -> structured strategy
-  -> comparison or compatibility export
-  -> intervention logic only when detectable
-```
-
-Capture should remain fast. Review and structuring may add context, observation, hypothesis, action, rationale, risk, evidence, confidence, and outcome.
+One device may contribute several independent capabilities. Enabling one does not grant unrelated authority or remove membership when another is disabled.
 
 ## Troubleshooting order
 
-1. Confirm that the human account is signed in and has the role required for the intended operation.
-2. Open Federation Overview for connection, update, capability-request, and recommendation state.
-3. If a standalone recorder is involved, open Federation -> Recorders and inspect its latest scan/source-change report.
-4. Open Status/Diagnostics for local runtime, recorder, source, and cache failures.
-5. Open `/docs` and the [Troubleshooting guide](troubleshooting.md).
-6. Preserve device identity, Federation state, telemetry, checkpoints, evidence, and human authentication state unless a documented reset explicitly names the deletion boundary.
+1. Confirm human sign-in/role.
+2. Open Federation Overview for current leader, connection, update, and capability-request state.
+3. For recorder issues, open Federation -> Recorders.
+4. Open Status/Diagnostics.
+5. Read [Troubleshooting](troubleshooting.md).
+6. Preserve identity, Federation state, evidence, auth data, telemetry, and checkpoints unless a documented reset explicitly names them.
 
-Do not delete state merely to clear a UI warning. Use `start.cmd --fresh` only when intentionally creating a fresh device identity and Federation setup; that reset intentionally preserves human accounts and authentication secrets.
+## Related guides
+
+- [Federation operations](federation_operations.md)
+- [Tailscale Federation discovery](tailscale_federation_discovery.md)
+- [Human users, sign-in, and permissions](human-authentication.md)
+- [Standalone recorder](standalone_recorder.md)
+- [Troubleshooting](troubleshooting.md)
