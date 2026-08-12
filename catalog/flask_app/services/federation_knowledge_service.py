@@ -18,6 +18,7 @@ from flask import current_app, has_app_context
 
 from catalog.federation.errors import FederationOperationError
 from catalog.federation.models import SessionEvent
+from catalog.federation.redaction import contains_secret_material
 
 from .capability_onboarding_service import get_capability_onboarding_service
 
@@ -26,9 +27,41 @@ DELETE_EVENT = "knowledge.document.deleted"
 CHANGE_SCHEMA = "fcp.federation.knowledge-change.v1"
 MAX_DOCUMENT_BYTES = 32_000
 
+# The authoritative log is read one bounded page at a time. The unpaged replay
+# API fails closed above its own window, which would take the shared knowledge
+# surface offline on the coordinator device once a Federation has accumulated
+# enough events of any kind.
+REPLAY_PAGE_EVENTS = 500
+MAX_REPLAY_PAGES = 2_000
+
 
 class FederationKnowledgeError(FederationOperationError):
     """A shared knowledge operation could not be completed safely."""
+
+
+class FederationKnowledgeRejected(FederationKnowledgeError):
+    """A document was refused on its content and must not be retried as-is.
+
+    This is separate from an unavailable Federation. A rejection is the
+    operator's to resolve, so it is reported rather than degraded to the local
+    cache.
+    """
+
+
+#: Coordinator failures that mean this client built a bad request rather than
+#: that the Federation is unreachable. Degrading to the local cache would hide
+#: them behind an apparently successful save, so they are always reported.
+NON_DEGRADABLE_CODES = frozenset(
+    {
+        "idempotency-conflict",
+        "unknown-session",
+        "authoritative-revision-gap",
+    }
+)
+
+
+def _is_degradable(exc: FederationOperationError) -> bool:
+    return getattr(exc, "code", None) not in NON_DEGRADABLE_CODES
 
 
 @dataclass(frozen=True)
@@ -127,11 +160,23 @@ def _request_id(
     document_id: str,
     operation: str,
     content_hash: str,
+    base_revision: int,
 ) -> str:
+    """Identify one logical change to one document from one observed state.
+
+    ``base_revision`` is the collection revision the writer reduced before
+    deciding to change anything. Retrying the same change against the same
+    observed state is idempotent, while genuinely restoring an earlier value —
+    an undo, a re-enable, or a delete followed by a recreate — observes a later
+    revision and is therefore a new request rather than a replayed one.
+    """
+
     identity = hashlib.sha256(
         f"{collection}\0{document_id}".encode("utf-8")
     ).hexdigest()[:16]
-    return f"knowledge-{operation}-{identity}-{content_hash[:20]}"
+    return (
+        f"knowledge-{operation}-{identity}-{base_revision}-{content_hash[:20]}"
+    )
 
 
 class FederationKnowledgeRepository:
@@ -180,6 +225,24 @@ class FederationKnowledgeRepository:
                         after_revision=0,
                     )
                 )
+        replay_page = getattr(coordinator, "replay_page", None)
+        if callable(replay_page):
+            events: list[SessionEvent] = []
+            last_applied_revision = 0
+            for _ in range(MAX_REPLAY_PAGES):
+                page, current_revision = replay_page(
+                    session_id=context.session_id,
+                    actor_node_id=context.actor_node_id,
+                    last_applied_revision=last_applied_revision,
+                    limit=REPLAY_PAGE_EVENTS,
+                )
+                if not page:
+                    break
+                events.extend(page)
+                last_applied_revision = page[-1].revision
+                if last_applied_revision >= current_revision:
+                    break
+            return tuple(events)
         replay = getattr(coordinator, "replay", None)
         if not callable(replay):
             raise FederationKnowledgeError(
@@ -296,6 +359,7 @@ class FederationKnowledgeRepository:
         collection: str,
         document_schema: str,
         document: dict[str, Any],
+        base_revision: int,
     ) -> SessionEvent:
         document_id = _document_id(document)
         if document_id is None:
@@ -311,7 +375,21 @@ class FederationKnowledgeRepository:
                 f"shared knowledge documents must not exceed {MAX_DOCUMENT_BYTES} bytes",
                 "document",
             )
+        if contains_secret_material(document):
+            # The authoritative log is append-only and has no retention, so a
+            # credential accepted here is replayed to every trusted device and
+            # cannot be withdrawn. Ordinary location text an operator may
+            # legitimately record is deliberately still allowed.
+            raise FederationKnowledgeRejected(
+                "knowledge-document-contains-credentials",
+                "remove the credential, token, or key before sharing this record",
+                "document",
+            )
         content_hash = hashlib.sha256(encoded).hexdigest()
+        # The payload carries no wall-clock stamp of its own. The coordinator
+        # assigns the authoritative ``occurred_at``, and a stamp here would make
+        # otherwise identical retries differ, which the event store reads as a
+        # reused request ID and refuses.
         payload = {
             "schema": CHANGE_SCHEMA,
             "collection": collection,
@@ -319,7 +397,6 @@ class FederationKnowledgeRepository:
             "document_id": document_id,
             "document_hash": f"sha256:{content_hash}",
             "document": document,
-            "changed_at": _stamp(self._now()),
         }
         return self._append(
             context,
@@ -330,6 +407,7 @@ class FederationKnowledgeRepository:
                 document_id=document_id,
                 operation="upsert",
                 content_hash=content_hash,
+                base_revision=base_revision,
             ),
         )
 
@@ -344,43 +422,63 @@ class FederationKnowledgeRepository:
         context = self._context_provider()
         if context is None:
             return local_payload
-        reduced = self._reduce(self._events(context), collection=collection)
-        changed = False
-        for local_document in _documents(local_payload, items_key):
-            document_id = _document_id(local_document)
-            assert document_id is not None
-            shared_document = reduced.documents.get(document_id)
-            should_import = document_id not in reduced.seen_document_ids
-            if shared_document is not None:
-                local_time = _document_time(local_document)
-                shared_time = _document_time(shared_document)
-                should_import = (
-                    local_time is not None
-                    and shared_time is not None
-                    and local_time > shared_time
-                    and _content_hash(local_document) != _content_hash(shared_document)
-                )
-            if not should_import:
-                continue
-            event = self._upsert(
-                context,
-                collection=collection,
-                document_schema=document_schema,
-                document=local_document,
-            )
-            reduced.documents[document_id] = dict(local_document)
-            reduced = ReducedCollection(
-                documents=reduced.documents,
-                seen_document_ids=frozenset(
-                    set(reduced.seen_document_ids) | {document_id}
-                ),
-                latest_revision=max(reduced.latest_revision, event.revision),
-                latest_at=event.occurred_at,
-            )
-            changed = True
-        if changed:
-            # Re-read to include concurrent changes accepted while migration ran.
+        try:
             reduced = self._reduce(self._events(context), collection=collection)
+            changed = False
+            for local_document in _documents(local_payload, items_key):
+                document_id = _document_id(local_document)
+                assert document_id is not None
+                shared_document = reduced.documents.get(document_id)
+                should_import = document_id not in reduced.seen_document_ids
+                if shared_document is not None:
+                    local_time = _document_time(local_document)
+                    shared_time = _document_time(shared_document)
+                    should_import = (
+                        local_time is not None
+                        and shared_time is not None
+                        and local_time > shared_time
+                        and _content_hash(local_document)
+                        != _content_hash(shared_document)
+                    )
+                if not should_import:
+                    continue
+                try:
+                    event = self._upsert(
+                        context,
+                        collection=collection,
+                        document_schema=document_schema,
+                        document=local_document,
+                        base_revision=reduced.latest_revision,
+                    )
+                except FederationKnowledgeRejected as exc:
+                    # A cached document cannot be corrected from a read. Leave
+                    # it local and keep the rest of the collection readable
+                    # rather than failing the page the operator asked for.
+                    self._log_rejected(collection, document_id, exc)
+                    continue
+                reduced.documents[document_id] = dict(local_document)
+                reduced = ReducedCollection(
+                    documents=reduced.documents,
+                    seen_document_ids=frozenset(
+                        set(reduced.seen_document_ids) | {document_id}
+                    ),
+                    latest_revision=max(reduced.latest_revision, event.revision),
+                    latest_at=event.occurred_at,
+                )
+                changed = True
+            if changed:
+                # Re-read to include concurrent changes accepted while migration ran.
+                reduced = self._reduce(self._events(context), collection=collection)
+        except FederationKnowledgeRejected:
+            raise
+        except FederationOperationError as exc:
+            if not _is_degradable(exc):
+                raise
+            # A paired device whose Federation is momentarily unreachable keeps
+            # reading its own cache. The unimported local documents are offered
+            # again on the next successful read.
+            self._log_degraded("read", collection, exc)
+            return local_payload
         return self._payload(
             schema=document_schema,
             items_key=items_key,
@@ -398,31 +496,44 @@ class FederationKnowledgeRepository:
         context = self._context_provider()
         if context is None:
             return desired_payload
-        reduced = self._reduce(self._events(context), collection=collection)
-        for document in _documents(desired_payload, items_key):
-            document_id = _document_id(document)
-            assert document_id is not None
-            current = reduced.documents.get(document_id)
-            if current is not None and _content_hash(current) == _content_hash(document):
-                continue
-            event = self._upsert(
-                context,
-                collection=collection,
-                document_schema=document_schema,
-                document=document,
-            )
-            reduced.documents[document_id] = dict(document)
-            reduced = ReducedCollection(
-                documents=reduced.documents,
-                seen_document_ids=frozenset(
-                    set(reduced.seen_document_ids) | {document_id}
-                ),
-                latest_revision=max(reduced.latest_revision, event.revision),
-                latest_at=event.occurred_at,
-            )
-        # Include concurrent documents instead of treating a stale page submit as
-        # an instruction to replace the whole Federation collection.
-        reduced = self._reduce(self._events(context), collection=collection)
+        try:
+            reduced = self._reduce(self._events(context), collection=collection)
+            for document in _documents(desired_payload, items_key):
+                document_id = _document_id(document)
+                assert document_id is not None
+                current = reduced.documents.get(document_id)
+                if current is not None and _content_hash(current) == _content_hash(
+                    document
+                ):
+                    continue
+                event = self._upsert(
+                    context,
+                    collection=collection,
+                    document_schema=document_schema,
+                    document=document,
+                    base_revision=reduced.latest_revision,
+                )
+                reduced.documents[document_id] = dict(document)
+                reduced = ReducedCollection(
+                    documents=reduced.documents,
+                    seen_document_ids=frozenset(
+                        set(reduced.seen_document_ids) | {document_id}
+                    ),
+                    latest_revision=max(reduced.latest_revision, event.revision),
+                    latest_at=event.occurred_at,
+                )
+            # Include concurrent documents instead of treating a stale page submit
+            # as an instruction to replace the whole Federation collection.
+            reduced = self._reduce(self._events(context), collection=collection)
+        except FederationKnowledgeRejected:
+            raise
+        except FederationOperationError as exc:
+            if not _is_degradable(exc):
+                raise
+            # Keep the operator's change in the local cache. The next successful
+            # read imports it, because the local document is the newer one.
+            self._log_degraded("write", collection, exc)
+            return desired_payload
         return self._payload(
             schema=document_schema,
             items_key=items_key,
@@ -438,29 +549,67 @@ class FederationKnowledgeRepository:
         context = self._context_provider()
         if context is None:
             return False
-        reduced = self._reduce(self._events(context), collection=collection)
-        if document_id not in reduced.documents:
+        try:
+            reduced = self._reduce(self._events(context), collection=collection)
+            if document_id not in reduced.documents:
+                return False
+            prior_hash = _content_hash(reduced.documents[document_id])
+            payload = {
+                "schema": CHANGE_SCHEMA,
+                "collection": collection,
+                "document_id": document_id,
+                "previous_hash": f"sha256:{prior_hash}",
+            }
+            self._append(
+                context,
+                event_type=DELETE_EVENT,
+                payload=payload,
+                request_id=_request_id(
+                    collection=collection,
+                    document_id=document_id,
+                    operation="delete",
+                    content_hash=prior_hash,
+                    base_revision=reduced.latest_revision,
+                ),
+            )
+        except FederationKnowledgeRejected:
+            raise
+        except FederationOperationError as exc:
+            if not _is_degradable(exc):
+                raise
+            self._log_degraded("delete", collection, exc)
             return False
-        prior_hash = _content_hash(reduced.documents[document_id])
-        payload = {
-            "schema": CHANGE_SCHEMA,
-            "collection": collection,
-            "document_id": document_id,
-            "previous_hash": f"sha256:{prior_hash}",
-            "changed_at": _stamp(self._now()),
-        }
-        self._append(
-            context,
-            event_type=DELETE_EVENT,
-            payload=payload,
-            request_id=_request_id(
-                collection=collection,
-                document_id=document_id,
-                operation="delete",
-                content_hash=prior_hash,
-            ),
-        )
         return True
+
+    @staticmethod
+    def _log_degraded(
+        operation: str,
+        collection: str,
+        exc: FederationOperationError,
+    ) -> None:
+        if not has_app_context():
+            return
+        current_app.logger.info(
+            "Shared knowledge %s for %s degraded to the local cache (%s)",
+            operation,
+            collection,
+            getattr(exc, "code", type(exc).__name__),
+        )
+
+    @staticmethod
+    def _log_rejected(
+        collection: str,
+        document_id: str,
+        exc: FederationOperationError,
+    ) -> None:
+        if not has_app_context():
+            return
+        current_app.logger.warning(
+            "Cached %s document %s stays local and is not shared (%s)",
+            collection,
+            document_id,
+            getattr(exc, "code", type(exc).__name__),
+        )
 
 
 def get_federation_knowledge_repository() -> FederationKnowledgeRepository:
@@ -480,7 +629,10 @@ def get_federation_knowledge_repository() -> FederationKnowledgeRepository:
 __all__ = [
     "CHANGE_SCHEMA",
     "DELETE_EVENT",
+    "MAX_REPLAY_PAGES",
+    "REPLAY_PAGE_EVENTS",
     "FederationKnowledgeError",
+    "FederationKnowledgeRejected",
     "FederationKnowledgeRepository",
     "KnowledgeContext",
     "UPSERT_EVENT",

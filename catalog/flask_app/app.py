@@ -10,6 +10,7 @@ from catalog.capabilities.benchmarking.policy import (
     DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS,
 )
 from catalog.common.artifact_refresh import register_artifact_catalog_refresh
+from catalog.common.federation_paths import DEFAULT_COORDINATOR_DATABASE
 from catalog.federation.onboarding_models import ContributionDesiredState
 from catalog.orchestrator.capability_startup import (
     prepare_capability_runtime,
@@ -171,7 +172,7 @@ def create_app() -> Flask:
         "CAPABILITY_ONBOARDING_COORDINATOR_DATABASE",
         os.getenv(
             "FCP_FEDERATION_COORDINATOR_DATABASE",
-            "data/federation/relay/control.sqlite3",
+            DEFAULT_COORDINATOR_DATABASE,
         ),
     )
     app.config.setdefault(
@@ -205,6 +206,20 @@ def create_app() -> Flask:
     app.config.setdefault(
         "FEDERATED_TELEMETRY_MAX_BATCHES_PER_SYNC",
         int(os.getenv("FCP_FEDERATED_TELEMETRY_MAX_BATCHES_PER_SYNC", "100")),
+    )
+    app.config.setdefault(
+        "FEDERATED_JSONL_MAX_MIRROR_BYTES",
+        int(
+            os.getenv(
+                "FCP_FEDERATED_JSONL_MAX_MIRROR_BYTES",
+                str(2 * 1024 * 1024 * 1024),
+            )
+        ),
+    )
+    app.config.setdefault(
+        "FEDERATED_JSONL_PUBLISH_UPLOADS",
+        os.getenv("FCP_FEDERATED_JSONL_PUBLISH_UPLOADS", "1").strip().lower()
+        not in {"0", "false", "no", "off"},
     )
     remote_pairing_path = os.getenv("FCP_FEDERATION_REMOTE_PAIRING_PATH", "")
     if remote_pairing_path:

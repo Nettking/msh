@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from .source_inventory_service import machine_label
+
 
 DEFAULT_QUALITY_OUTCOME_PATH = Path("data") / "quality" / "quality_outcomes.json"
 
@@ -30,6 +32,7 @@ class QualityOutcomeService:
                 "recorded_at": _now_utc(),
                 "operator_note_id": _text(form, "operator_note_id"),
                 "machine_id": _text(form, "machine_id"),
+                "machine_name": machine_label(_text(form, "machine_id")),
                 "part_id": _text(form, "part_id"),
                 "measurement_type": _text(form, "measurement_type"),
                 "measurement_value": _text(form, "measurement_value"),

@@ -6,6 +6,8 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
+from .source_inventory_service import machine_label
+
 
 DEFAULT_MACHINE_NOTES_PATH = Path("data") / "source_config" / "machine_notes.json"
 
@@ -29,6 +31,7 @@ class MachineNotesService:
                 "id": uuid4().hex,
                 "created_at": _now_utc(),
                 "machine_id": _text(form, "machine_id"),
+                "machine_name": machine_label(_text(form, "machine_id")),
                 "applies_when": _text(form, "applies_when"),
                 "note": text,
                 "caution": _text(form, "caution"),

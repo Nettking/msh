@@ -32,6 +32,7 @@ from typing import Any, Final, Self
 from websockets.asyncio.server import Server, ServerConnection, serve
 from websockets.exceptions import ConnectionClosed, ConnectionClosedError
 
+from catalog.common.federation_paths import DEFAULT_COORDINATOR_DATABASE
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import (
     AuthenticationError,
@@ -60,7 +61,7 @@ from .authentication import (
 
 LOGGER = logging.getLogger(__name__)
 
-DEFAULT_DATABASE: Final = "data/federation/relay/control.sqlite3"
+DEFAULT_DATABASE: Final = DEFAULT_COORDINATOR_DATABASE
 DEFAULT_HOST: Final = "127.0.0.1"
 DEFAULT_PORT: Final = 8765
 DEFAULT_AUTH_TIMEOUT_SECONDS: Final = 10.0

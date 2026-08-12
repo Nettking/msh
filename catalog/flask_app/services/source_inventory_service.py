@@ -173,6 +173,28 @@ class SourceInventoryService:
         tmp.replace(self.inventory_path)
 
 
+def machine_label(machine_id: str) -> str:
+    """Resolve a local machine ID to the name an operator would recognize.
+
+    Machine IDs live in this device's inventory, which is not Federation state.
+    Records that travel between devices denormalize the label at capture time so
+    the receiving device shows a machine name instead of an opaque ID it has
+    never seen. An empty result means the caller should fall back to the ID.
+    """
+
+    machine_id = str(machine_id or "").strip()
+    if not machine_id:
+        return ""
+    try:
+        inventory = SourceInventoryService().load()
+    except (SourceInventoryError, OSError):
+        return ""
+    for machine in inventory.get("machines", []):
+        if str(machine.get("id") or "") == machine_id:
+            return str(machine.get("name") or "").strip()
+    return ""
+
+
 def _empty_inventory() -> dict[str, Any]:
     return {
         "schema": "fcp.source_inventory.v1",

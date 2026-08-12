@@ -2,7 +2,7 @@
 
 Status: **pre-release scope definition**
 
-Reviewed: **2026-08-11 Europe/Oslo**
+Reviewed: **2026-08-12 Europe/Oslo**
 
 This document defines the intended trusted Federation v1 boundary. It does not declare that a release tag exists or that end-to-end physical acceptance has passed.
 
@@ -141,6 +141,47 @@ The internal successful state is `runtime_verified`; the product presents it as 
 The update is explicit/manual, not automatic on startup/reconnect. Offline devices are not silently queued for later.
 
 A standalone recorder launched directly through `python start_recorder.py` does not currently host the normal Flask/host-agent update pipeline and therefore remains outside automatic process restart by **Update all devices**.
+
+### Human authentication and authorization
+
+- browser users sign in with human accounts that never reuse Federation node
+  IDs, pairing grants, recorder keys, or device identities;
+- `viewer`, `operator`, and `admin` map onto a central server-side permission
+  policy that routes check by permission rather than by role name;
+- the account store, roles, and authentication secrets are **device-local**, so
+  each installation bootstraps its own first administrator and a deactivation on
+  one device does not propagate to another; and
+- no human identity is carried on a Federation event, so the coordinator audit
+  log attributes a shared change to the acting device rather than to a person.
+
+Federation-wide human identity, cross-device revocation, and human attribution
+on shared writes are outside this scope and require a separate design.
+
+### Shared operator knowledge
+
+- operator confirmations, first-part checks, quality outcomes, machine notes,
+  and operator strategy records are shared through the authoritative session
+  log;
+- local JSON files remain compatibility caches and migration inputs;
+- credential-shaped content is refused rather than written to an append-only log
+  that has no retention; and
+- a device with an unreachable Federation keeps using its local cache and offers
+  unshared documents again on the next successful read.
+
+Machine and sensor inventory remains device-local, so shared records carry a
+denormalized machine label. Sharing the inventory itself is open work.
+
+### Federated JSONL corpus
+
+- ordinary JSONL under `data/` is published as content-addressed chunks so the
+  existing analysis stack can read another device's data unchanged;
+- the active recorder JSONL path and the local Federation mirror are excluded;
+- browser uploads are included by default and can be withheld per installation;
+  and
+- the local mirror of remote files is bounded by a total quota.
+
+This path applies no content-schema allowlist and is authorized by Federation
+membership. It is weaker than the recorder telemetry contract by design.
 
 ### Product and migration compatibility
 

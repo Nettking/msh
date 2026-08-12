@@ -24,6 +24,31 @@ reading with file references.
 This document authorizes no deletion, migration, protocol change, or acceptance
 claim. It does not change `catalog/federation/tests/cf7_acceptance/scenarios.json`.
 
+## Resolution status
+
+Thirteen of the sixteen findings are resolved on this branch. Every finding
+below closes with a status note. The original analysis is left intact so the
+reasoning behind each fix stays readable.
+
+| Finding | Status |
+| --- | --- |
+| I-1 revert/recreate conflict | Resolved |
+| I-2 unpaged replay ceiling | Resolved |
+| I-3 upload publication contradiction | Resolved as documentation + opt-out |
+| I-4 unbounded JSONL mirror | Resolved |
+| I-5 human identity is device-local | **Open** — design decision |
+| I-6 unredacted knowledge payloads | Resolved |
+| I-7 no degradation tolerance | Resolved |
+| I-8 dangling machine references | Partly resolved — label denormalized |
+| I-9 five identity domains | **Open** — design decision |
+| I-10 undocumented sharing mechanisms | Resolved |
+| I-11 human auth missing from docs | Resolved |
+| I-12 … I-15 minor defects | Resolved |
+| I-16 no tests | Resolved |
+
+The three open items are the ones Part 4 identifies as product decisions rather
+than defects. They are deliberately not resolved inside a defect fix.
+
 ## Part 1 — What is shared today
 
 Sharing happens through four distinct mechanisms. They have different authority
@@ -156,6 +181,12 @@ Fix direction: either drop `changed_at` from the payload so the event is truly
 content-addressed, or include it in the `request_id` so each write is a new
 request. The two cannot both stay as they are.
 
+
+**Resolved.** The request ID now also carries the collection revision the
+writer observed, and the payload no longer carries a per-call `changed_at`
+stamp. Retrying the same change from the same observed state stays idempotent;
+an undo or a recreate observes a later revision and is a new request.
+
 **I-2. Shared knowledge breaks on the coordinator device past 10,000 events.**
 
 `_events()` (`federation_knowledge_service.py:183-195`) falls back to
@@ -186,6 +217,10 @@ note 3: RevisionGapError: use paged replay for more than 5 events
 The log has no compaction or retention, so this ceiling is reached, not
 approached. `replay_page` already exists and is what this call site should use.
 
+
+**Resolved.** The coordinator path now reads bounded pages, which is what every
+member already did.
+
 ### Severity 2 — boundary and policy contradictions
 
 **I-3. The JSONL bridge is general file sharing, which `architecture.md` says
@@ -209,6 +244,13 @@ There is a type policy (`.jsonl` only) and a materializer, but no object grant
 and no opt-in. Either the documentation or the default needs to change; today
 they contradict each other.
 
+
+**Resolved as documentation plus an opt-out.** Publishing uploads is a decision
+#258 encoded in a test, so the default is unchanged and `architecture.md` now
+states it plainly instead of denying it. `FCP_FEDERATED_JSONL_PUBLISH_UPLOADS=0`
+withholds uploads per installation. Whether that default is the right one
+remains the product's call, not a defect fix's.
+
 **I-4. The JSONL mirror has no quota; the telemetry mirror does.**
 
 `architecture.md:188-190` describes federated reads entering "a quota-limited,
@@ -221,6 +263,11 @@ accumulates every other member's entire JSONL corpus without bound.
 The two mirrors also differ in verification depth: the telemetry path validates
 the allowlisted recorder schema and per-observation shape; the JSONL path
 verifies hashes, sizes, and offsets but performs no schema check, by design.
+
+
+**Resolved.** The mirror enforces a total quota
+(`FCP_FEDERATED_JSONL_MAX_MIRROR_BYTES`, 2 GB by default). Reaching it stops
+further materialization rather than failing the synchronization pass.
 
 **I-5. Human identity is local; the permissions it gates are Federation-wide.**
 
@@ -250,6 +297,11 @@ The inconsistency is downstream of that decision:
 `README.md` describes this as "Human authentication and central RBAC". The
 policy table is central; the user store is not. A reader will read "central" as
 Federation-wide.
+
+
+**Open.** Human attribution and a federated account model are Part 4 items 2 and
+3. The scope document now states the device-local boundary and its consequences
+explicitly rather than leaving it unwritten.
 
 **I-6. Session event payloads are never redaction-checked, and free-text
 operator content now flows through them.**
@@ -283,6 +335,12 @@ Fix direction: apply the existing `redact_secrets` classification to knowledge
 document payloads at the `_upsert` boundary, or reject rather than redact so the
 operator learns the note was not accepted.
 
+
+**Resolved.** Documents carrying credential-shaped material are refused at the
+write boundary and reported to the operator. Ordinary location text is still
+accepted, because operators legitimately record addresses. A refused document
+already in the local cache is left local instead of failing the page.
+
 **I-7. Shared knowledge is not degradation-tolerant.**
 
 `_default_context()` guards context acquisition with a bare
@@ -293,6 +351,12 @@ unreachable raises `FederationOperationError("pairing-relay-disconnected")` out
 of `ensure_connected` and up through the route. `operator_strategy_routes.index`
 catches only `OperatorStrategyError` (`:29-33`), so the page returns 500 rather
 than degrading to the cache the design says exists.
+
+
+**Resolved.** Reads and writes degrade to the local cache when the Federation is
+unreachable. Coordinator errors that indicate a malformed request rather than
+unavailability are still reported, so a real defect cannot hide behind an
+apparently successful save.
 
 ### Severity 3 — model fragmentation
 
@@ -309,6 +373,12 @@ A note captured on device A therefore arrives on device B as a shared document
 pointing at a `uuid4` that B has never seen, and B cannot author a matching one.
 Even on A, the list shows the opaque id rather than the machine name.
 
+
+**Partly resolved.** The machine label is denormalized into the record at capture
+and rendered in preference to the ID, so a shared note reads correctly on a
+device that has never seen that machine. Sharing the inventory itself is Part 4
+item 1 and remains open.
+
 **I-9. At least five machine/source identity domains coexist, none reconciled:**
 
 1. `machines_and_sensors.json` machine ids (`uuid4`, device-local);
@@ -322,6 +392,9 @@ Even on A, the list shows the opaque id rather than the machine name.
 
 Shared knowledge uses (1); shared telemetry uses (4) and (5); shared recorder
 control uses (3). Nothing maps between them.
+
+
+**Open.** Reconciling these domains is design work, not a defect fix.
 
 ### Severity 4 — documentation drift
 
@@ -339,11 +412,19 @@ control uses (3). Nothing maps between them.
 telemetry data flow" section still describes recorder publication as the only
 Federation data path.
 
+
+**Resolved.** `architecture.md` now documents the federated JSONL corpus and the
+shared knowledge documents, and the v1 scope covers both.
+
 **I-11. Human authentication is missing from the docs index and the v1 scope.**
 `docs/human-authentication.md` exists and is linked from `README.md`, but not
 from `docs/index.md`. `releases/federation_v1_scope.md` is stamped
 "Reviewed: 2026-08-11" — after #255 merged human auth — and does not mention
 human accounts, roles, or permissions anywhere in its supported boundary.
+
+
+**Resolved.** `docs/index.md` links the guide and the v1 scope has a human
+authentication section.
 
 ### Severity 5 — minor
 
@@ -366,6 +447,12 @@ human accounts, roles, or permissions anywhere in its supported boundary.
   services to `/var/lib/fcp-relay/control.sqlite3`. Consistent under Compose;
   divergent for any non-Compose invocation.
 
+
+**Resolved.** I-12 renders the scope on Assist; I-13 defaults the label to
+`Local cache`; I-14 bounds `encoded_size` by what the chunk index can address;
+I-15 gives the Flask app, relay service, and reset tool one shared default in
+`catalog/common/federation_paths.py`.
+
 ### Test coverage gap
 
 **I-16.** `catalog/flask_app/services/federation_knowledge_service.py` has **no
@@ -374,6 +461,12 @@ tests**. Nothing under `catalog/` references `FederationKnowledgeRepository`,
 modules and four templates that use them. This is the mechanism that carries all
 operator knowledge across the Federation, and both Severity 1 defects live in
 it.
+
+
+**Resolved.** `catalog/flask_app/tests/test_federation_knowledge_service.py`
+covers revert, delete-then-recreate, idempotent retry, reads past one replay
+page, credential refusal, location text, offline reconciliation, and both
+degradation paths. Each test was checked against the unfixed behaviour.
 
 ## Part 4 — What should become shared
 

@@ -17,6 +17,7 @@ Use the guides below for the current FCP product. Start from the task or product
 ## New installation or device
 
 - [Quick start](quick_start.md) — start FCP, complete capability-first onboarding, and open the workbench.
+- [Human authentication](human-authentication.md) — create the first administrator, understand roles and permissions, and manage browser sign-in. Human accounts are per device and separate from Federation identity.
 - [One-command setup](one_command_setup.md) — use the supported Windows or POSIX launcher.
 - [Getting started](getting_started.md) — understand devices, Federations, inspection, contributions, authority, and the workbench mental model.
 - [Server setup](server_setup.md) — administer network access, recorder configuration, model installation, migration, and advanced deployments.

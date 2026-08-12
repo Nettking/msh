@@ -2,7 +2,7 @@
 
 Status: **current architecture reference**
 
-Reviewed: **2026-08-11 Europe/Oslo**
+Reviewed: **2026-08-12 Europe/Oslo**
 
 FCP is a Flask-first CNC telemetry workbench with a trusted multi-device Federation layer. Local telemetry, operator workflows, and analysis remain usable without remote providers. Federation adds authenticated device identity, membership, capability contribution, storage authority, jobs, transport, recovery, bounded software-update intent, and bounded standalone-recorder control without turning the Flask request process into a general host administrator.
 
@@ -189,9 +189,55 @@ size, content hash, and the allowlisted recorder schema before it enters a
 quota-limited, content-addressed local mirror. Only the mirror's rebuilt
 telemetry JSONL directory is visible to the Flask artifact catalog.
 
-This path is intentionally not general file sharing. Arbitrary uploads and
-other peer files require a separately authorized object grant, object catalog,
-type policy, and materializer before they can be exposed to another device.
+This recorder path is not general file sharing. Peer files of other types
+require a separately authorized object grant, object catalog, type policy, and
+materializer before they can be exposed to another device.
+
+## Federated JSONL corpus
+
+A second, deliberately weaker storage path shares ordinary JSONL so the
+pre-Federation runner, orchestrator, and analysis stack can read another
+device's data without changes.
+
+Every `*.jsonl` file under `data/` is deterministically gzip-compressed, split
+into bounded content-addressed chunks, and committed through the same logical
+storage authority under the `fcp.federation.jsonl-file-chunk` schema. Two
+prefixes are excluded: `data/federation/`, which is already mirrored, and the
+active recorder's JSONL, which has the stronger sequence-aware contract above.
+
+This path differs from recorder telemetry in three ways that matter
+operationally:
+
+- it is authorized by Federation membership rather than recorder authority, and
+  it applies no content-schema allowlist;
+- **browser uploads under `data/uploads/` are included.** Uploading a file makes
+  it available to every trusted device. Set
+  `FCP_FEDERATED_JSONL_PUBLISH_UPLOADS=0` on an installation that treats
+  uploaded files as device-local. Already-committed files stay committed,
+  because the storage log is append-only; and
+- remote files are reconstructed under `data/federation/shared/jsonl-files/`
+  after their size and hash are verified, bounded by a total mirror quota
+  (`FCP_FEDERATED_JSONL_MAX_MIRROR_BYTES`, 2 GB by default). Reaching the quota
+  stops further materialization; it does not fail the synchronization pass.
+
+## Shared operator knowledge
+
+Small operator and production records belong to the Federation rather than to
+one Flask checkout. Operator confirmations, first-part checks, quality outcomes,
+machine notes, and operator strategy records are projected from
+`knowledge.document.upserted` / `knowledge.document.deleted` events on the
+authoritative session log. The local JSON files under `data/` remain
+compatibility caches and migration inputs; they never grant authority.
+
+Because that log is append-only and has no retention, a shared knowledge
+document is refused when it contains credential-shaped material. Ordinary
+location text an operator may legitimately record is accepted. A device whose
+Federation is momentarily unreachable keeps reading and writing its local cache,
+and offers the unshared documents again on the next successful read.
+
+Machine identifiers in these records come from this device's own inventory,
+which is not Federation state, so the machine label is denormalized into the
+record when it is captured. Sharing the inventory itself remains open work.
 
 A standalone recorder may join the Federation without hosting Flask. On first configuration, `start_recorder.py` can run the existing bounded private-network scan, select discovered sources, join using the signed pairing flow, start recording, and start independent publication/control workers.
 
@@ -274,7 +320,13 @@ Important durable state includes:
 - host-update handoff/result state;
 - storage assignments, manifests, outboxes, terms, leases, and recovery records;
 - provider, job, attempt, artifact, and reconciliation state;
+- shared operator knowledge documents on the session log;
+- federated JSONL publication/mirror state; and
 - local telemetry and generated workflow results.
+
+Human accounts, roles, and authentication secrets under `data/auth/` are a
+separate security domain and remain device-local. They are not Federation
+state and are never carried on a Federation event.
 
 Normal startup preserves state. A documented fresh reset must name exactly what is removed and what is retained.
 

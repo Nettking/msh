@@ -54,6 +54,12 @@ _DEFAULT_MAX_PUBLISH_CHUNKS = 64
 _HARD_MAX_PAGES = 20
 _HARD_MAX_REMOTE_BATCHES = _PAGE_SIZE * _HARD_MAX_PAGES
 _HARD_MAX_PUBLISH_CHUNKS = 128
+# Remote JSONL lands on local disk and is never evicted, so the mirror needs the
+# same kind of ceiling the recorder telemetry mirror already enforces. Reaching
+# it stops further materialization instead of failing the pass, so local
+# publication and discovery keep working and the condition stays visible.
+_DEFAULT_MAX_MIRROR_BYTES = 2 * 1024 * 1024 * 1024
+_HARD_MAX_MIRROR_BYTES = 64 * 1024 * 1024 * 1024
 _STORAGE_GROUP_CONFIG_KEYS = (
     "FEDERATED_JSONL_STORAGE_GROUP_ID",
     "FEDERATED_TELEMETRY_STORAGE_GROUP_ID",
@@ -62,9 +68,18 @@ _STORAGE_GROUP_CONFIG_KEYS = (
     "RECORDER_FEDERATION_STORAGE_GROUP_ID",
 )
 _EXCLUDED_LOCAL_PREFIXES = (
+    # Already mirrored from the Federation; republishing would loop.
     "federation/",
+    # Has a stronger sequence-aware publication and mirror contract of its own.
     "sources/mtconnect_recorder/jsonl/",
 )
+#: Prefixes that are published by default but that a deployment may withhold.
+#: Browser uploads are the case that matters: they are shared like any other
+#: local JSONL, and an installation that treats uploaded files as device-local
+#: material sets ``FEDERATED_JSONL_PUBLISH_UPLOADS`` to false to keep them off
+#: the Federation. Files already committed stay committed; the log is
+#: append-only, so this governs what is published from now on.
+_OPTIONAL_LOCAL_PREFIXES = {"uploads/": "FEDERATED_JSONL_PUBLISH_UPLOADS"}
 
 Clock = Callable[[], datetime]
 RefreshCallback = Callable[..., bool]
@@ -164,6 +179,9 @@ class FederatedJsonlProductBridge:
             "remote_discovered": 0,
             "remote_downloaded": 0,
             "materialized_files": 0,
+            "mirror_bytes": 0,
+            "mirror_quota_bytes": None,
+            "mirror_quota_reached": False,
             "last_error": None,
             "last_sync": None,
         }
@@ -274,6 +292,32 @@ class FederatedJsonlProductBridge:
             )
         return value
 
+    def _mirror_quota_bytes(self) -> int:
+        return self._positive_bound(
+            "FEDERATED_JSONL_MAX_MIRROR_BYTES",
+            _DEFAULT_MAX_MIRROR_BYTES,
+            _HARD_MAX_MIRROR_BYTES,
+        )
+
+    def _mirrored_bytes(self, *, excluding: tuple[str, str] | None = None) -> int:
+        """Total bytes this device holds from other members' JSONL files."""
+
+        with self._connect() as connection:
+            if excluding is None:
+                row = connection.execute(
+                    "SELECT COALESCE(SUM(size_bytes),0) AS total FROM materialized_files"
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    """
+                    SELECT COALESCE(SUM(size_bytes),0) AS total
+                    FROM materialized_files
+                    WHERE NOT (session_id=? AND dataset_id=?)
+                    """,
+                    excluding,
+                ).fetchone()
+        return int(row["total"]) if row is not None else 0
+
     def _configured_group(self) -> str | None:
         for key in _STORAGE_GROUP_CONFIG_KEYS:
             configured = self.app.config.get(key)
@@ -307,13 +351,22 @@ class FederatedJsonlProductBridge:
             )
         return session_id, node_id
 
+    def _excluded_prefixes(self) -> tuple[str, ...]:
+        withheld = tuple(
+            prefix
+            for prefix, key in _OPTIONAL_LOCAL_PREFIXES.items()
+            if not bool(self.app.config.get(key, True))
+        )
+        return _EXCLUDED_LOCAL_PREFIXES + withheld
+
     def _local_candidates(self) -> Iterable[tuple[str, Path]]:
+        excluded = self._excluded_prefixes()
         for path in iter_jsonl_files(self.data_root, recursive=True):
             try:
                 relative = path.resolve().relative_to(self.data_root).as_posix()
             except (OSError, ValueError):
                 continue
-            if any(relative.startswith(prefix) for prefix in _EXCLUDED_LOCAL_PREFIXES):
+            if any(relative.startswith(prefix) for prefix in excluded):
                 continue
             yield normalize_jsonl_relative_path(relative), path
 
@@ -899,6 +952,17 @@ class FederatedJsonlProductBridge:
                     "content.file_sha256",
                     "reconstructed JSONL hash does not match committed metadata",
                 )
+            # A replacement for an already-mirrored dataset only costs its delta,
+            # so the existing row is excluded from the running total.
+            quota = self._mirror_quota_bytes()
+            retained = self._mirrored_bytes(excluding=(session_id, dataset_id))
+            if retained + size > quota:
+                self._set_state(
+                    mirror_bytes=retained,
+                    mirror_quota_bytes=quota,
+                    mirror_quota_reached=True,
+                )
+                return False
             os.replace(raw_temp, target)
             raw_temp = None
             _fsync_directory(target.parent)
@@ -1183,6 +1247,8 @@ class FederatedJsonlProductBridge:
             )
             if materialized:
                 self._request_refreshes()
+            quota = self._mirror_quota_bytes()
+            retained = self._mirrored_bytes()
             self._set_state(
                 status="up-to-date" if self._resume_cursor is None else "syncing",
                 authority=authority_node_id,
@@ -1191,6 +1257,9 @@ class FederatedJsonlProductBridge:
                 remote_discovered=discovered,
                 remote_downloaded=downloaded,
                 materialized_files=materialized,
+                mirror_bytes=retained,
+                mirror_quota_bytes=quota,
+                mirror_quota_reached=retained >= quota,
                 last_error=None,
                 last_sync=_stamp(self.clock()),
             )

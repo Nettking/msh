@@ -33,9 +33,15 @@ FEDERATED_JSONL_CONTENT_SCHEMA = "fcp.federation.jsonl-file-chunk.v1"
 FEDERATED_JSONL_ENCODING = "gzip"
 FEDERATED_JSONL_CHUNK_BYTES = 24 * 1024
 FEDERATED_JSONL_MAX_CHUNKS = 1_000_000
-FEDERATED_JSONL_MAX_FILE_BYTES = (
-    FEDERATED_JSONL_CHUNK_BYTES * FEDERATED_JSONL_MAX_CHUNKS * 16
+# The largest gzip stream the chunk index can address. Anything larger cannot
+# produce a valid ``chunk_count``, so bounding ``encoded_size`` by anything
+# looser only trades a clear limit error for a confusing count mismatch.
+FEDERATED_JSONL_MAX_ENCODED_BYTES = (
+    FEDERATED_JSONL_CHUNK_BYTES * FEDERATED_JSONL_MAX_CHUNKS
 )
+# Uncompressed JSONL compresses well, so the declared source size is allowed a
+# bounded multiple of the encoded limit.
+FEDERATED_JSONL_MAX_FILE_BYTES = FEDERATED_JSONL_MAX_ENCODED_BYTES * 16
 
 
 def _sha256_bytes(value: bytes) -> str:
@@ -255,7 +261,7 @@ def validate_federated_jsonl_ingest(
     encoded_size = _positive_int(
         content.get("encoded_size"),
         "content.encoded_size",
-        maximum=FEDERATED_JSONL_MAX_FILE_BYTES,
+        maximum=FEDERATED_JSONL_MAX_ENCODED_BYTES,
     )
     file_sha256 = _sha256_text(content.get("file_sha256"), "content.file_sha256")
     _sha256_text(content.get("encoded_sha256"), "content.encoded_sha256")
@@ -398,6 +404,7 @@ class FederationLogicalStorageAuthority(RecorderLogicalStorageAuthority):
 __all__ = [
     "FEDERATED_JSONL_CHUNK_BYTES",
     "FEDERATED_JSONL_CONTENT_SCHEMA",
+    "FEDERATED_JSONL_MAX_ENCODED_BYTES",
     "FEDERATED_JSONL_DATASET_SCHEMA_NAME",
     "FEDERATED_JSONL_DATASET_SCHEMA_VERSION",
     "FEDERATED_JSONL_ENCODING",

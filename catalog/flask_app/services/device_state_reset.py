@@ -15,6 +15,11 @@ from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
+from catalog.common.federation_paths import (
+    DEFAULT_COORDINATOR_DATABASE,
+    DEFAULT_RELAY_STATE_ROOT,
+)
+
 _SQLITE_SIDECARS = ("-wal", "-shm", "-journal")
 
 
@@ -65,7 +70,7 @@ def resolved_state_paths(
     *,
     environ: Mapping[str, str] | None = None,
     app_root: Path | str | None = None,
-    relay_root: Path | str = "/var/lib/fcp-relay",
+    relay_root: Path | str = DEFAULT_RELAY_STATE_ROOT,
 ) -> ResolvedStatePaths:
     values = os.environ if environ is None else environ
     root = Path.cwd() if app_root is None else Path(app_root)
@@ -106,7 +111,10 @@ def resolved_state_paths(
     coordinator = _configured_path(
         values,
         "FCP_FEDERATION_COORDINATOR_DATABASE",
-        relay / "control.sqlite3",
+        # Same fallback the Flask app and relay service resolve, so reset and
+        # runtime never reason about different databases. Compose sets the
+        # variable explicitly and keeps both on the mounted relay volume.
+        Path(DEFAULT_COORDINATOR_DATABASE),
         app_root=root,
     )
     remote_pairing = _configured_path(
@@ -157,7 +165,7 @@ def planned_reset_targets(
     *,
     environ: Mapping[str, str] | None = None,
     app_root: Path | str | None = None,
-    relay_root: Path | str = "/var/lib/fcp-relay",
+    relay_root: Path | str = DEFAULT_RELAY_STATE_ROOT,
 ) -> tuple[ResetTarget, ...]:
     """Resolve current configured paths plus complete retained state roots."""
 
@@ -260,7 +268,7 @@ def reset_device_state(
     *,
     environ: Mapping[str, str] | None = None,
     app_root: Path | str | None = None,
-    relay_root: Path | str = "/var/lib/fcp-relay",
+    relay_root: Path | str = DEFAULT_RELAY_STATE_ROOT,
 ) -> tuple[Path, ...]:
     """Remove all configured and retained device/Federation state."""
 
@@ -284,7 +292,7 @@ def verify_fresh_application_state(
     *,
     environ: Mapping[str, str] | None = None,
     app_root: Path | str | None = None,
-    relay_root: Path | str = "/var/lib/fcp-relay",
+    relay_root: Path | str = DEFAULT_RELAY_STATE_ROOT,
 ) -> tuple[str, ...]:
     """Verify the user-visible state sources used by the started Flask app."""
 
