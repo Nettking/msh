@@ -16,6 +16,7 @@
 - [Current task handoff](current_task_handoff.md) — current merged baseline, blockers, resume safety, and next acceptance/documentation work.
 - [Federation implementation](federation/) — durable plans, acceptance documents, technical references, current update/rollout notes, and historical delivery evidence.
 - [OSL integration](osl_integration/) — active OSL planning package and authoritative execution order for that track.
+- [Federation sharing evaluation](federation_sharing_evaluation.md) — what the Federation shares today, what remains device-local, and the open inconsistencies between the shared model, the code, and the canonical documentation.
 
 ## Current status
 
