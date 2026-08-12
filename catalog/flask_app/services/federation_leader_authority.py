@@ -35,9 +35,42 @@ def _session(context: Any) -> tuple[str, Any, str]:
     creator = getattr(session, "created_by_node_id", None)
     if not isinstance(creator, str) or not creator:
         # Older remote status snapshots can omit creator identity. Recover it
-        # from the immutable first event below.
+        # from the immutable first event below when replay is available.
         creator = ""
     return session_id, coordinator, creator
+
+
+def _replay_page(
+    coordinator: Any,
+    *,
+    session_id: str,
+    actor_node_id: str,
+    last_revision: int,
+) -> tuple[tuple[Any, ...], int] | None:
+    replay_page = getattr(coordinator, "replay_page", None)
+    if callable(replay_page):
+        page, current_revision = replay_page(
+            session_id=session_id,
+            actor_node_id=actor_node_id,
+            last_applied_revision=last_revision,
+            limit=1_000,
+        )
+        return tuple(page), int(current_revision)
+    replay = getattr(coordinator, "replay", None)
+    if callable(replay):
+        events = tuple(
+            replay(
+                session_id=session_id,
+                actor_node_id=actor_node_id,
+                last_applied_revision=last_revision,
+            )
+        )
+        current_revision = max(
+            (int(getattr(event, "revision", 0)) for event in events),
+            default=last_revision,
+        )
+        return events, current_revision
+    return None
 
 
 def resolve_federation_leader(context: Any) -> FederationLeaderAuthority:
@@ -47,13 +80,34 @@ def resolve_federation_leader(context: Any) -> FederationLeaderAuthority:
     leader = creator
     term = INITIAL_TERM
     last_revision = 0
-    for _ in range(128):
-        events, current_revision = coordinator.replay_page(
+
+    # Some compatibility/test facades expose only the historical session row.
+    # With no event replay surface there is provably no transferable-leadership
+    # evidence to consume, so retain the established term-1 creator semantics.
+    first_page = _replay_page(
+        coordinator,
+        session_id=session_id,
+        actor_node_id=actor,
+        last_revision=last_revision,
+    )
+    if first_page is None:
+        if not creator:
+            raise FederationOperationError(
+                "federation-leadership-unavailable",
+                "current Federation leader could not be resolved",
+            )
+        return FederationLeaderAuthority(
             session_id=session_id,
-            actor_node_id=actor,
-            last_applied_revision=last_revision,
-            limit=1_000,
+            creator_node_id=creator,
+            leader_node_id=creator,
+            term=INITIAL_TERM,
         )
+
+    pending_page: tuple[tuple[Any, ...], int] | None = first_page
+    for _ in range(128):
+        if pending_page is None:
+            break
+        events, current_revision = pending_page
         for event in events:
             last_revision = int(event.revision)
             if event.event_type == "session.created":
@@ -74,7 +128,7 @@ def resolve_federation_leader(context: Any) -> FederationLeaderAuthority:
                 continue
             if event.event_type != LEADER_CHANGED_EVENT:
                 continue
-            if event.actor_node_id != coordinator_id:
+            if not coordinator_id or event.actor_node_id != coordinator_id:
                 # Members cannot promote themselves through the generic event API.
                 continue
             payload = event.payload
@@ -101,6 +155,13 @@ def resolve_federation_leader(context: Any) -> FederationLeaderAuthority:
             term = next_term
         if not events or last_revision >= current_revision:
             break
+        pending_page = _replay_page(
+            coordinator,
+            session_id=session_id,
+            actor_node_id=actor,
+            last_revision=last_revision,
+        )
+
     if not creator or not leader:
         raise FederationOperationError(
             "federation-leadership-unavailable",
