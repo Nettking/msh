@@ -99,7 +99,9 @@ def _atomic_json(path: Path, value: dict[str, object]) -> None:
     )
     temporary = Path(temporary_name)
     try:
-        os.fchmod(descriptor, 0o600)
+        # chmod by path works on both the Linux/Android runtime and Windows CI;
+        # os.fchmod is not available on Windows.
+        os.chmod(temporary, 0o600)
         with os.fdopen(descriptor, "wb") as stream:
             descriptor = -1
             stream.write(encoded)
