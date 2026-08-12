@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import hmac
 import os
 from urllib.parse import urlsplit
@@ -11,6 +12,7 @@ from flask import (
     Response,
     current_app,
     flash,
+    jsonify,
     redirect,
     request,
     session,
@@ -18,6 +20,7 @@ from flask import (
 )
 
 from catalog.federation.errors import FederationOperationError
+from catalog.federation.tailscale_host_discovery import ADVERTISEMENT_SCHEMA
 
 from .capability_onboarding_routes import _CSRF_SESSION_KEY
 from .services.capability_onboarding_service import get_capability_onboarding_service
@@ -76,6 +79,54 @@ def _relay_url() -> str:
     return f"ws://{formatted_host}:{port}"
 
 
+def _discovery_response() -> Response:
+    """Advertise public-safe identity only; never mint or expose join authority."""
+
+    try:
+        service = _pairing_service()
+        # A remotely paired member is not the Federation authority and must not
+        # impersonate the coordinator during discovery.
+        if service.remote_store.load() is not None:
+            return Response(status=404)
+        context = service.authorized_context()
+        if context is None:
+            return Response(status=404)
+        federation = context.coordinator.store.get_session(
+            context.binding.internal_session_id
+        )
+        if federation is None:
+            return Response(status=404)
+        relay_port = int(os.getenv("FCP_RELAY_PORT", "8765"))
+        if not 1 <= relay_port <= 65_535:
+            relay_port = 8765
+        fingerprint = hashlib.sha256(
+            (
+                "fcp-tailscale-discovery-v1\0"
+                + context.binding.federation_id
+            ).encode("utf-8")
+        ).hexdigest()[:32]
+        response = jsonify(
+            {
+                "schema": ADVERTISEMENT_SCHEMA,
+                "federation_label": str(federation.display_name),
+                "federation_fingerprint": fingerprint,
+                "device_name": context.credentials.identity.display_name,
+                "relay_port": relay_port,
+                "pairing_required": True,
+            }
+        )
+    except Exception as exc:  # noqa: BLE001 - discovery endpoint fails closed
+        current_app.logger.info(
+            "Federation discovery advertisement unavailable (%s)",
+            type(exc).__name__,
+        )
+        return Response(status=404)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 @federation_pairing_web.before_app_request
 def _dispatch_before_legacy_setup_gate() -> Response | None:
     """Execute pairing endpoints before the retained role-first setup gate."""
@@ -87,6 +138,11 @@ def _dispatch_before_legacy_setup_gate() -> Response | None:
     if view is None:
         return None
     return current_app.ensure_sync(view)(**(request.view_args or {}))
+
+
+@federation_pairing_web.get("/onboarding/federation/discovery.json")
+def federation_discovery():
+    return _discovery_response()
 
 
 @federation_pairing_web.post("/onboarding/federation/pairing-code")

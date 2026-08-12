@@ -25,6 +25,7 @@ from .policy import ROLE_SUMMARIES
 auth_users = Blueprint("auth_users", __name__, url_prefix="/admin/users")
 _BOOTSTRAP_ENDPOINT = "auth_users.bootstrap_user"
 _BOOTSTRAP_CLAIM_ID = 1
+_DISCOVERY_ENDPOINT = "federation_pairing_web.federation_discovery"
 
 
 def _active_admin_count() -> int:
@@ -117,7 +118,12 @@ def first_user_bootstrap_gate():
 
     if saved_remote_member() or _has_users():
         return None
-    if request.endpoint in {_BOOTSTRAP_ENDPOINT, "static", "security.static"}:
+    if request.endpoint in {
+        _BOOTSTRAP_ENDPOINT,
+        _DISCOVERY_ENDPOINT,
+        "static",
+        "security.static",
+    }:
         return None
     if request.is_json or request.path.startswith("/api/"):
         abort(503)
