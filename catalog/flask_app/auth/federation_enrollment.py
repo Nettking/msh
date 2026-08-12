@@ -1,15 +1,15 @@
 """Human-authenticated enrollment for a fresh device discovered through Tailscale.
 
-A second FCP device should not create another local administrator.  Instead, a
+A second FCP device should not create another local administrator. Instead, a
 fresh device can use the public-safe Tailscale discovery snapshot to send the
-browser to the existing Federation authority.  The human signs in there, an
+browser to the existing Federation authority. The human signs in there, an
 administrator explicitly approves the new device, and the authority returns a
 short-lived one-use pairing bundle to the fresh device.
 
-Passwords never pass through the joining device.  The only cross-device secret
-is the already supported one-use pairing bundle, returned in a POST body and
-bound to a high-entropy browser state value.  After pairing, normal Federation
-SSO creates the local shadow user on first sign-in.
+Passwords never pass through the joining device. The one-use pairing bundle is
+returned in the URL fragment (which HTTP never sends to either server), removed
+from browser history immediately, and then submitted same-origin to the joining
+device with its normal CSRF token and high-entropy enrollment state.
 """
 
 from __future__ import annotations
@@ -34,6 +34,7 @@ from flask import (
     session,
     url_for,
 )
+from flask_security import current_user
 
 from catalog.federation.errors import FederationOperationError
 from catalog.federation.tailscale_host_discovery import load_snapshot
@@ -256,7 +257,10 @@ def start():
     fingerprint = str(request.form.get("federation_fingerprint") or "").strip()
     candidate = _candidate(fingerprint)
     if candidate is None:
-        flash("That discovered Federation is no longer available. Restart discovery and try again.", "error")
+        flash(
+            "That discovered Federation is no longer available. Restart discovery and try again.",
+            "error",
+        )
         return redirect(url_for("security.login"))
 
     try:
@@ -288,7 +292,9 @@ def start():
             "federation_fingerprint": fingerprint,
         }
     )
-    return redirect(f"{authority_origin}{url_for('federation_enrollment.authorize')}?{query}")
+    return redirect(
+        f"{authority_origin}{url_for('federation_enrollment.authorize')}?{query}"
+    )
 
 
 def _authorization_fields() -> tuple[str, str, str, str, str]:
@@ -349,12 +355,27 @@ def authorize():
         )
         abort(503)
 
-    response = render_template(
-        "auth/federation_enroll_return.html",
-        return_url=return_url,
-        state=state,
-        pairing_code=pairing_code,
-    )
+    # Fragments are never included in HTTP requests. The fresh device receives a
+    # normal top-level GET (so its SameSite=Lax session cookie is present), then
+    # same-origin JavaScript strips the fragment from history and POSTs the grant.
+    fragment = urlencode({"state": state, "pairing_code": pairing_code})
+    response = redirect(f"{return_url}#{fragment}")
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["Referrer-Policy"] = "no-referrer"
+    return response
+
+
+@federation_enrollment.get("/callback")
+def callback():
+    """Bridge the fragment-only grant into a same-origin protected POST."""
+
+    if not _is_fresh_device():
+        abort(409)
+    if not isinstance(session.get(_STATE_KEY), str):
+        flash("Federation enrollment request is missing or expired.", "error")
+        return redirect(url_for("security.login"))
+    response = render_template("auth/federation_enroll_callback.html")
     return response, 200, {
         "Cache-Control": "no-store",
         "Pragma": "no-cache",
@@ -362,8 +383,8 @@ def authorize():
     }
 
 
-@federation_enrollment.post("/callback")
-def callback():
+@federation_enrollment.post("/complete")
+def complete():
     """Redeem the approved one-use pairing bundle on the fresh device."""
 
     if not _is_fresh_device():
@@ -381,11 +402,15 @@ def callback():
         or not pairing_code
     ):
         _clear_state()
-        flash("Federation enrollment response was missing or did not match this browser session.", "error")
+        flash(
+            "Federation enrollment response was missing or did not match this browser session.",
+            "error",
+        )
         return redirect(url_for("security.login"))
     try:
         requested_at = _parse_stamp(issued)
-        if _utc_now() - requested_at > _ENROLLMENT_TTL:
+        age = _utc_now() - requested_at
+        if age < timedelta(seconds=-30) or age > _ENROLLMENT_TTL:
             raise ValueError("expired enrollment")
         service = _pairing_service()
         offer = service.pairing_codec.decode(pairing_code)
@@ -401,9 +426,12 @@ def callback():
     except (FederationOperationError, ValueError) as exc:
         _clear_state()
         current_app.logger.warning(
-            "Federation enrollment callback failed (%s)", type(exc).__name__
+            "Federation enrollment completion failed (%s)", type(exc).__name__
         )
-        flash("The Federation enrollment could not be verified. Try signing in again.", "error")
+        flash(
+            "The Federation enrollment could not be verified. Try signing in again.",
+            "error",
+        )
         return redirect(url_for("security.login"))
 
     _clear_state()
