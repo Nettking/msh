@@ -128,7 +128,7 @@ READ_PERMISSIONS = {
     "source_web": "data.read",
     "operator_strategy_web": "data.read",
     "operator_support_web": "data.read",
-    "ai_web": "analysis.run",
+    "ai_web": "data.read",
     "server_setup_web": "dashboard.read",
     "web": "dashboard.read",
 }
