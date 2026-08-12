@@ -8,7 +8,8 @@ This guide describes the normal supported way to start FCP and complete capabili
 An FCP device is not assigned one permanent product role during first setup. The required first-run flow is:
 
 ```text
-Human sign-in
+Create first administrator in browser
+  -> Human sign-in
   -> Identity
   -> Federation
   -> Inspect
@@ -45,7 +46,7 @@ The launcher builds and starts the current core services:
 - Flask workbench;
 - managed recorder.
 
-It checks that the configured Ollama model is installed and downloads it when necessary. Existing identity, Federation, inspection, benchmark, recorder, model, and data state are preserved during normal starts. The launcher bakes the exact Git commit into the FCP runtime images and starts the bounded host-owned update agent used by **Federation -> Update all devices**.
+It checks that the configured Ollama model is installed and downloads it when necessary. Existing identity, Federation, inspection, benchmark, recorder, human-auth, model, and data state are preserved during normal starts. The launcher bakes the exact Git commit into the FCP runtime images and starts the bounded host-owned update agent used by **Federation -> Update all devices**.
 
 The web interface is limited to the local FCP computer by default. Open:
 
@@ -53,7 +54,7 @@ The web interface is limited to the local FCP computer by default. Open:
 http://localhost:5000
 ```
 
-On a fresh installation, create the first human administrator before using onboarding. See **Create the first human administrator** below. After signing in, a device without completed onboarding uses:
+On a fresh local authority, create the first human administrator in the browser before completing device onboarding. See **Create the first human administrator** below. After signing in, a device without completed onboarding uses:
 
 ```text
 http://localhost:5000/onboarding
@@ -81,7 +82,7 @@ A Windows installation from before the current launcher/update-agent path can us
 migrate.cmd
 ```
 
-The migration is intentionally conservative. It validates the approved repository and `main`, requires a clean fast-forwardable checkout, preserves the existing data/results directories and retained Federation relay state, then starts the current product through the supported resume path. It does not reset, clean, stash, rebase, delete volumes, or silently guess between ambiguous old relay-state volumes.
+The migration is intentionally conservative. It validates the approved repository and `main`, requires a clean fast-forwardable checkout, preserves the existing data/results directories, human-auth state, and retained Federation relay state, then starts the current product through the supported resume path. It does not reset, clean, stash, rebase, delete volumes, or silently guess between ambiguous old relay-state volumes.
 
 Use this migration only for an existing older checkout. New installations should use `start.cmd` directly.
 
@@ -123,7 +124,7 @@ cd fcp
 bash start.sh
 ```
 
-The POSIX launcher starts the same default core services, verifies the configured Ollama model, bakes the exact Git commit into the FCP images, and starts the single-instance host update agent. Normal starts preserve device, Federation, inspection, benchmark, recorder, model, data, and human-account state.
+The POSIX launcher starts the same default core services, verifies the configured Ollama model, bakes the exact Git commit into the FCP images, and starts the single-instance host update agent. Normal starts preserve device, Federation, inspection, benchmark, recorder, human-auth, model, and data state.
 
 To reconnect an existing saved Federation before opening the workbench:
 
@@ -164,20 +165,20 @@ Human web accounts are separate from Federation node identities, pairing grants,
 
 On the first production start FCP atomically creates two independent random secrets under `data/auth/`: one for Flask sessions and one for password hashing. They are reused on later starts, so a normal restart does not invalidate sessions or password verification. Do not delete or rotate `data/auth/password-salt` unless you intentionally plan to reset existing human passwords.
 
-After the Flask image has been built, create the first administrator with:
+A fresh local authority no longer needs a separate Flask CLI command for normal first-user setup:
 
-```bash
-docker compose run --rm --no-deps --entrypoint flask flask \
-  --app catalog.flask_app.app:create_app fcp-user create-admin
-```
+1. start FCP;
+2. open the FCP web interface;
+3. while the local user database is empty, normal browser requests redirect to `/admin/users/bootstrap`;
+4. enter a valid email address;
+5. enter and confirm a password of at least **12 characters**; and
+6. submit the form.
 
-The command prompts for an email address and password, requires a password of at least 12 characters, and refuses to recreate an existing account. Then open:
+The first account is created as an active `admin`. The anonymous bootstrap closes as soon as that first account commits, and normal sign-in enforcement takes over.
 
-```text
-http://localhost:5000/login
-```
+A remotely paired Federation member with an empty local shadow-user database does **not** expose first-admin bootstrap. It uses Federation human sign-in instead.
 
-Administrators can manage additional human users at `/admin/users`. See [Human authentication and authorization](human-authentication.md) for roles, cookie/CSRF behavior, secret overrides, and deployment notes.
+Administrators manage additional human users at `/admin/users`. See [Human users, sign-in, and permissions](human-authentication.md) for roles, SSO, cookie/CSRF behavior, secret overrides, and deployment notes.
 
 ## Complete first-run onboarding
 
@@ -194,15 +195,47 @@ Finishing setup does not automatically grant recorder, language-model, compute, 
 
 ## Pair another FCP device
 
-Generate a pairing code from the existing Federation. Current browser-generated `FCP1-...` codes are signed, one-use, and valid for up to **10 minutes**. A fresh code can be generated whenever a previous attempt expired or another device needs to join.
+Generate a pairing code from the **current Federation leader**. Current browser-generated `FCP1-...` codes are signed, one-use, and valid for up to **10 minutes**. A fresh code can be generated whenever a previous attempt expired or another device needs to join.
 
 When pairing across physical machines, open the issuing FCP installation using a LAN/VPN address reachable by the other device before generating the code.
 
 See [Federation operations](federation_operations.md) for the trust and network boundaries.
 
+### Optional Tailscale Federation discovery
+
+If the joining host and an existing FCP host are already signed in to the same Tailscale tailnet, use:
+
+Windows:
+
+```cmd
+start-tailscale.cmd
+```
+
+Linux/macOS:
+
+```bash
+bash start-tailscale.sh
+```
+
+The wrapper uses only the already authenticated local Tailscale client to find public-safe FCP Federation advertisements from online Tailscale IPv4 peers. FCP does not require a Tailscale API key or auth key.
+
+A discovered Federation is **not** automatically joined. Use the discovered endpoint to locate the existing FCP installation, then obtain and redeem the normal signed one-use `FCP1-...` pairing code.
+
+See [Tailscale Federation discovery](tailscale_federation_discovery.md).
+
+## Current Federation leader and device names
+
+Federation creator provenance and operational leadership are separate. The creator remains immutable history; current-leader product authority follows the coordinator-authored monotonic leadership term.
+
+If the current leader remains offline beyond the bounded timeout and a valid connected successor exists, the coordinator can promote that successor and fence the former leader from current-leader controls. This does not provide replicated coordinator/quorum failover if the authoritative coordinator service itself is unavailable.
+
+Use **Federation -> This device** to name the local device. The current leader can rename other members under **Federation -> Devices**. Display names never replace the stable cryptographic `node_id`.
+
+Human password/credential authority remains creator-backed and does not automatically transfer with operational leadership.
+
 ## Standalone recorder: simplest first start
 
-For a headless MTConnect recorder, generate the normal Federation pairing code and run:
+For a headless MTConnect recorder, generate the normal Federation pairing code on the current leader and run:
 
 ```bash
 python start_recorder.py FCP1-...
@@ -226,9 +259,19 @@ to request a scan on a connected standalone recorder and add/remove recorder sou
 
 See [Standalone recorder](standalone_recorder.md) for details.
 
+## Ask members to benchmark and contribute
+
+The **current Federation leader** can ask all currently reachable remote members to refresh local capability inspection, run eligible locally registered benchmarks, and request contribution for candidates allowed by each member's own local policy.
+
+The request does not grant remote shell/provider authority and cannot inject executable commands, paths, credentials, or arbitrary benchmark/provider definitions. Capabilities that require separate provider review may remain registering/pending until the current leader reviews them through the existing provider-enrollment surface.
+
+Offline members are not queued. Issue another request after they reconnect.
+
+See [Federation operations](federation_operations.md).
+
 ## Manual Federation-wide software updates
 
-On the Federation coordinator/session-creator device:
+On the **current Federation leader**:
 
 1. open **Federation**;
 2. press **Check for updates**;
@@ -246,6 +289,7 @@ See [Federation operations](federation_operations.md).
 ## First pages to open
 
 - <http://localhost:5000/login> — sign in with a human FCP account.
+- <http://localhost:5000/admin/users> — administer human users when signed in as an admin.
 - <http://localhost:5000/onboarding> — complete or repair capability-first onboarding.
 - <http://localhost:5000/federation> — inspect the Federation, devices, capabilities, updates, benchmarks, and contribution state.
 - <http://localhost:5000/federation/recorders> — manage connected standalone recorder scans and source selections.
@@ -257,6 +301,10 @@ See [Federation operations](federation_operations.md).
 - <http://localhost:5000/playback> — inspect playback-ready exports.
 - <http://localhost:5000/analyses> — browse discovered CSV and JSON artifacts.
 - <http://localhost:5000/docs> — browse repository documentation.
+
+## Appearance
+
+Use the light/dark switch in the top menu. With no explicit browser choice, FCP follows the operating-system preference. An explicit choice is stored in that browser and applied before first paint across the normal shell, onboarding, sign-in/account pages, and docs portal.
 
 ## Access from another trusted device
 
@@ -332,5 +380,6 @@ Useful environment variables include:
 - `FCP_SKIP_ORCHESTRATION=1` — starts Flask without the background runtime.
 - `FCP_SCAN_DIRS` — comma-separated artifact scan roots.
 - `FCP_AI_MODEL` — selected Ollama model.
+- `FCP_FEDERATED_JSONL_PUBLISH_UPLOADS=0` — withhold browser-uploaded JSONL from generic Federation publication on this installation.
 
 Direct Flask startup does not provide the host-owned Docker activation boundary required by Federation-wide software updates.

@@ -1,169 +1,216 @@
 # Federation operations
 
 Status: **current operator/administrator guide**
-
 Reviewed: **2026-08-12**
 
-This guide covers the operational Federation actions that intentionally mutate trusted distributed state: pairing another device, requesting bounded capability discovery/contribution work from reachable members, reviewing pending contribution enrollment, checking for software updates, and rolling an approved update across the Federation.
+This guide covers the user-facing Federation actions that intentionally mutate trusted distributed state: pairing, device naming, current-leader failover semantics, benchmark/contribution requests, provider review, software updates, recorder control, and Federation-visible JSONL.
 
-These actions are deliberately narrower than general remote administration. FCP does not expose a Federation shell, arbitrary process execution, peer-selected Git repositories, or unrestricted host configuration.
+Human web permissions and Federation device authority are separate. A browser user must have the relevant human permission, and the FCP device/session must independently satisfy the Federation-side authority check.
 
-Human web permissions and Federation authority are separate. A browser user must first have the required human permission for a control, and the FCP device/session must independently satisfy the Federation-side authority check.
+## Creator provenance, current leader, and coordinator availability
 
-## Pair another device
+FCP separates three concepts that older documentation sometimes treated as one:
 
-A Federation member with local Federation authority can generate a signed `FCP1-...` pairing code from the onboarding Federation surface.
+- **Federation creator** — immutable creation provenance.
+- **Current operational leader** — the member holding the current coordinator-authored monotonic leadership term.
+- **Authoritative coordinator/relay service** — the durable service/database that validates membership and leadership transitions.
 
-The current browser-generated code is:
+The Federation overview exposes creator, current leader, and leadership term so operators can see which device currently owns leader-only product controls.
 
-- signed by the issuing device;
+### Leader failover
+
+A brief disconnect does not immediately move leadership. If the active leader remains offline beyond the bounded heartbeat/offline timeout and a valid connected successor exists, the coordinator can promote a deterministic successor.
+
+After a valid transition:
+
+- the leadership term increases monotonically;
+- the former leader is fenced from current-leader operations;
+- the successor receives the reviewed current-leader product controls; and
+- an ordinary member cannot self-promote by publishing a lookalike event.
+
+If no connected successor exists, FCP fails closed rather than inventing a leader.
+
+This is **not** replicated coordinator/quorum failover. If the machine holding the authoritative coordinator database/relay is unavailable, leader promotion cannot replace that missing coordinator service.
+
+### Human credential authority is separate
+
+Operational leader transfer does not move the human password database. The immutable Federation creator remains the human credential/password authority used by Federation SSO. See [Human users, sign-in, and permissions](human-authentication.md).
+
+## Pair another FCP device
+
+The current Federation leader can generate a signed `FCP1-...` pairing code from the Federation onboarding surface.
+
+The code is:
+
+- signed;
 - one-use;
 - valid for up to **10 minutes**;
 - scoped to the existing Federation/session and relay address; and
-- never intended to become a persistent credential.
+- not a persistent credential.
 
-You may generate another code whenever a fresh pairing attempt is needed. Each generated code keeps its own one-use and expiry boundary; generating another code does not convert either code into a reusable secret.
+Generate a new code whenever another pairing attempt is needed.
 
-For another normal FCP installation, paste the code into its Federation onboarding flow. For a standalone recorder, pass it directly on first start:
+For a normal FCP installation, paste it into the joining device's Federation onboarding flow. For a standalone recorder:
 
 ```bash
 python start_recorder.py FCP1-...
 ```
 
-After successful pairing, the joining device persists its stable device identity and public-safe reconnect binding. It does **not** need the pairing code on later starts.
+After successful pairing, the joining device persists its stable identity and public-safe reconnect binding. It does not need the pairing code on later starts.
 
 ### Reachable address requirement
 
-When another physical machine must connect, open the issuing FCP installation through a LAN or VPN address reachable by the joining machine before generating the code. A code created while the product is only reachable as `localhost` cannot make that loopback address reachable from a different computer.
+When another physical machine must connect, the issuing FCP installation must be reachable through a trusted LAN/VPN address rather than only `localhost`.
 
-Do not expose the Flask workbench, relay, Ollama, or recorder control surface directly to the public internet.
+Do not expose the Flask workbench, relay, Ollama, or recorder control directly to the public internet.
+
+## Optional Tailscale discovery
+
+If the joining device and an existing FCP device are already signed in to the same Tailscale tailnet, start the joining FCP device with:
+
+```cmd
+start-tailscale.cmd
+```
+
+or:
+
+```bash
+bash start-tailscale.sh
+```
+
+FCP uses the local Tailscale client to discover public-safe FCP Federation advertisements from online Tailscale IPv4 peers. It does not request/store a Tailscale API key or auth key.
+
+Discovery proves reachability only. The joining device must still obtain and redeem the normal `FCP1-...` pairing code. See [Tailscale Federation discovery](tailscale_federation_discovery.md).
+
+## Rename Federation devices
+
+Display names make it easier to identify physical machines without changing authority identity.
+
+- Any trusted member can rename **itself** from **Federation -> This device**.
+- The **current leader** can rename other current members from **Federation -> Devices**.
+
+Names are bounded public Federation metadata. They must satisfy validation/uniqueness rules and do not replace the stable cryptographic `node_id`, membership, routing, provider authority, storage assignment, or update authority.
 
 ## Ask reachable members to benchmark and contribute
 
-The Federation leader/session creator can issue one bounded request asking all currently reachable **remote** members to inspect their local capability state, run eligible registered benchmarks, and request contribution for capabilities that their own local policy considers eligible.
+The **current Federation leader** can issue one bounded request asking all currently reachable remote members to refresh local capability state, run eligible locally registered benchmarks, and request contribution for locally allowed candidates.
 
-This is a request for an outcome, not remote execution authority. The leader does not select commands, executable paths, endpoints, credentials, benchmark IDs, candidate IDs, or provider grants.
+This is a request for an outcome, not remote execution authority. The leader cannot select commands, executable paths, credentials, benchmark code, arbitrary candidate IDs, provider grants, or host configuration.
 
-The current request boundary is:
+The boundary is:
 
-1. the human browser user must have `federation.manage` permission (currently an `admin` capability);
-2. the issuing FCP device must be the immutable Federation/session creator;
-3. only members reported reachable when the request is created are targeted;
+1. the human browser user must have `federation.manage` permission;
+2. the issuing device must be the current leader for the leadership term in force;
+3. only currently reachable remote members are targeted;
 4. the request is written through the authenticated Federation event log and expires after 10 minutes;
-5. every target authenticates that the request came from the pinned session creator before acting;
+5. each target verifies the ordered leadership chain and accepts the command only from the leader valid at that revision;
 6. the target refreshes its own local read-only capability inspection;
-7. only locally registered, bounded benchmark definitions that are runnable on that member may execute;
-8. contribution is requested only for candidates whose current local recommendation is `ALLOWED` and whose prerequisites are present; and
-9. contribution/provider policy is re-evaluated locally when the enable intent is applied.
+7. only locally registered/runnable benchmark definitions may execute;
+8. contribution is requested only for locally eligible candidates; and
+9. local contribution/provider policy is re-evaluated before activation.
 
-A leader request therefore cannot bypass approval or provider policy. A capability that requires a separate approval may remain `PENDING`/`REGISTERING` and still require the normal provider-enrollment decision before it can become authoritative.
+Capabilities requiring separate approval may remain pending/registering. A leader request cannot bypass those approval or provider-policy gates.
 
-Offline members are not silently queued for later. When a member reconnects, issue another request if you want that member to participate.
+Offline members are not queued for later. Issue another request after they reconnect if you want them included.
 
-The Federation overview reports the request and per-member benchmark/contribution counts or failures. A member failure is isolated; it does not grant authority to another member or turn a partial request into a successful provider activation.
+## Review pending contributions/providers
 
-## Review pending contributions
+A device may request contribution while provider/control-plane authority is not yet active. The candidate then appears as registering/pending rather than silently granting itself authority.
 
-A member may explicitly enable a supported local contribution while its runtime/control-plane authority is not yet active. The member then publishes the candidate to the Federation as **Registering** rather than silently granting itself authority.
-
-On the Federation creator/session-owner device, open:
+Open:
 
 ```text
 /provider-federation
 ```
 
-The leader can create the durable review record and then explicitly approve, suspend, reject/revoke, or reconcile the candidate through the existing provider-enrollment authority. Other members do not receive those mutation controls.
+on the **current Federation leader**.
 
-Approval and activation are deliberately separate:
+The leader can create/review the durable enrollment record and explicitly approve, suspend, reject/revoke, or reconcile the candidate through the existing provider-enrollment authority.
 
-- approving a `REGISTERING` candidate records the leader's explicit decision;
-- the approved record remains ineligible for resource binding until the announcing member provides the existing `READY` runtime evidence;
-- storage approval does not create a storage primary/replica assignment or invent a storage-provider runtime;
-- compute approval does not start a worker or transfer executable code;
-- AI approval grants no storage or compute authority; and
-- recorder control stays on the separate bounded recorder-control path.
+Approval and activation remain separate. For example:
 
-For a newly visible candidate, **Request** first creates the durable revision-fenced enrollment record. **Approve** then records the leader decision. A pending record can be rejected through **Revoke**; the product retains the audit trail instead of deleting the candidate history.
-
-If an already-authoritative local storage provider also appears as a candidate-only row on the Storage page, that is a projection error: candidate decision IDs and storage provider IDs are separate identity domains. The Storage page should suppress the candidate-only duplicate when its explicit provider identity is already represented by storage-control-plane state.
-
-See [the active pending-contribution approval contract](implementation/federation/active/pending_contribution_approval.md) for the authority and acceptance boundary.
+- AI approval grants no storage or compute authority;
+- compute approval does not allow arbitrary executable code;
+- storage approval does not invent a storage primary/replica assignment; and
+- recorder control stays on its separate bounded recorder-control path.
 
 ## Federation-visible JSONL data
 
-Normal FCP workbench nodes now synchronize supported non-recorder `data/**/*.jsonl` through Federation logical storage so existing recursive JSONL consumers can operate over a Federation-wide logical data corpus without being rewritten.
+Supported non-recorder `data/**/*.jsonl` can be published through Federation logical storage and materialized on connected workbench members inside the normal local `data/` scan boundary.
 
-The compatibility boundary remains local-file based: authenticated remote data is verified and materialized under the local `data/` scan boundary, after which the existing analysis/orchestration code sees ordinary files.
+The compatibility boundary remains local-file based: remote content is authenticated, hash/size verified, and materialized locally before unchanged recursive JSONL consumers see it.
 
-The synchronization path is intentionally constrained:
+Important behavior:
 
-- recorder JSONL continues to use its separate checkpoint/manifest publication path;
+- recorder JSONL keeps its separate checkpoint/manifest publication path;
 - generic JSONL publication requires current Federation membership;
-- producer identity is bound to the authenticated relay actor;
-- relative paths are normalized and traversal/non-JSONL paths fail closed;
-- content-addressed chunks and manifests are hash/size verified before materialization;
-- exact duplicate file content is deduplicated so legacy recursive scanners do not count it twice; and
-- publication/mirroring work is bounded per reconnect synchronization pass.
+- producer identity is bound to the authenticated Federation actor;
+- traversal/non-JSONL paths fail closed;
+- chunks/manifests are verified before materialization;
+- exact duplicate file content is deduplicated; and
+- publication/mirroring is bounded per reconnect pass.
 
-This feature does not make arbitrary host files visible to peers. It extends the reviewed Federation storage path specifically to supported JSONL data inside the FCP data corpus.
+Browser uploads under the supported `data/` corpus are included by default in this generic JSONL bridge when they are JSONL. To withhold uploaded JSONL from Federation publication on a specific installation:
+
+```text
+FCP_FEDERATED_JSONL_PUBLISH_UPLOADS=0
+```
+
+The local generic JSONL mirror is also quota-bounded. `FCP_FEDERATED_JSONL_MAX_MIRROR_BYTES` controls that advanced deployment limit.
+
+This still does not expose arbitrary host files outside the reviewed FCP data corpus.
+
+## Standalone recorder control
+
+From any trusted Federation device, open **Federation -> Recorders**.
+
+A trusted operator can request a bounded scan on a connected standalone recorder and add/remove sources selected from that recorder's own latest scan. The scan executes on the recorder host.
+
+Remote members cannot inject an arbitrary MTConnect URL/credential or unrestricted network scan.
 
 ## Check for software updates
 
-Open **Federation** on the Federation coordinator/session-creator device and use **Check for updates**.
+Open **Federation** on the **current operational leader** and choose **Check for updates**.
 
-The check is coordinator-managed. Other Federation members can see the resulting state but do not receive the coordinator's update controls.
+Other members can see resulting state but do not receive current-leader update controls.
 
-The update system accepts only an exact commit from the approved repository `main`. Every participating host independently validates its local checkout and the requested commit before reporting whether activation is possible.
+The update system accepts only an exact commit on the approved repository `main`. Every participating host independently validates its checkout and requested target.
 
-Typical outcomes include:
+Typical results include:
 
-- already running the approved target;
+- already running target;
 - update available;
-- source is current but runtime activation is required;
-- dirty local checkout;
-- ahead or diverged checkout;
-- offline or unavailable host; or
-- another bounded validation/activation failure.
+- activation required;
+- dirty checkout;
+- ahead/diverged checkout;
+- offline/unavailable host; or
+- bounded validation/activation failure.
 
-A check does not automatically apply an update.
+A check does not apply an update.
 
 ## Update all devices
 
-After reviewing a successful check, the coordinator can explicitly choose **Update all devices**.
+After reviewing the check, the current leader can choose **Update all devices**.
 
-The rollout is manual by design. FCP does not automatically update on start or reconnect.
+The rollout is manual. For each eligible normal FCP host, the host-owned agent:
 
-For every eligible queued host, the host-owned update agent:
+1. revalidates the authenticated handoff, repository, branch, target, and clean tree;
+2. permits only a fast-forward to the exact approved target;
+3. rebuilds the required FCP runtime images;
+4. restarts services;
+5. preserves/resumes the saved device/Federation setup;
+6. verifies required model/runtime readiness; and
+7. reports success only when the running runtime proves the exact target commit.
 
-1. revalidates the request, repository, branch, exact commit, and clean working tree;
-2. fetches the approved `main` and permits only a fast-forward to the exact target;
-3. rebuilds the `relay`, `flask`, and `recorder` images with the target commit baked into the runtime;
-4. restarts the required services;
-5. preserves the saved device/Federation state and resumes the existing setup;
-6. verifies the configured Ollama model when required; and
-7. proves that the running Flask image reports the exact target commit and that `relay`, `recorder`, and `flask` are running.
+The successful UI state is **Updated**. A Git fast-forward alone is not success.
 
-The coordinator is activated after the remote eligible devices have been queued so the initiating state is durable before the coordinator restarts itself.
-
-### What success means
-
-The internal terminal activation state is `runtime_verified`. The product UI presents that successful state as **Updated** with the green success indicator.
-
-Success means the running runtime commit equals the exact approved target. A Git fast-forward by itself is not reported as success.
-
-### Independent failure semantics
-
-Each device is evaluated independently. One dirty, offline, divergent, or failed host cannot make another host's result successful or failed.
+Each device is evaluated independently. One dirty/offline/failed member cannot make another member's result successful or failed.
 
 Offline devices are not silently queued for later. Run another check after they reconnect.
 
-Do not repeatedly press **Update all devices** while an activation is already queued. Allow the hosts to rebuild/restart and report their terminal state.
-
 ## Host update-agent requirement
 
-Federation-wide updates require the bounded host update agent to already be installed and running on each participating device.
-
-The supported launchers start it automatically:
+Normal FCP installations launched with the supported launchers start the bounded host update agent automatically:
 
 ### Windows
 
@@ -177,44 +224,39 @@ start.cmd
 bash start.sh
 ```
 
-A legacy Windows installation from before the update capability was introduced may need the one-shot migration bootstrap first:
+A legacy Windows installation may need:
 
 ```cmd
 migrate.cmd
 ```
 
-The migration path preserves existing identity, Federation state, evidence, data, models, and retained relay state while bringing the checkout onto the current supported launcher/update-agent path. It fails closed instead of resetting or guessing when the old checkout or relay state cannot be identified safely.
-
-## Why Flask cannot update the host directly
-
-The Flask process does not receive Git, Docker, shell, or arbitrary host-execution authority. Federation update intent is a bounded authenticated session event. Flask writes a bounded local handoff under the FCP data directory, and the separate host-owned agent validates that handoff again before it can mutate Git or Docker.
-
-The host agent permits only the locally fixed update procedure. It does not accept peer-supplied commands, repositories, paths, executables, or arguments.
+A standalone recorder launched directly with `python start_recorder.py` is not itself a host update agent and currently needs its own host checkout/process administration path.
 
 ## If an update fails
 
-Start with the per-device result shown in Federation. On the affected host, inspect the host-agent result file and service state rather than deleting Federation state:
+Inspect the per-device Federation result first, then on the affected host:
+
+Windows:
 
 ```cmd
 type data\federation\update-agent\result.json
 docker compose ps
 ```
 
-On Linux/macOS:
+Linux/macOS:
 
 ```bash
 cat data/federation/update-agent/result.json
 docker compose ps
 ```
 
-A dirty checkout must be reviewed and cleaned intentionally before an update can proceed. Do not use `git reset --hard`, `git clean`, delete Docker volumes, or remove device/Federation state merely to make an update indicator green.
+Do not use `git reset --hard`, `git clean`, delete Docker volumes, or remove Federation state simply to clear an update warning.
 
-See also:
+## Related guides
 
 - [Quick start](quick_start.md)
 - [Human users, sign-in, and permissions](human-authentication.md)
-- [Server setup](server_setup.md)
+- [Tailscale Federation discovery](tailscale_federation_discovery.md)
 - [Standalone recorder](standalone_recorder.md)
+- [Server setup](server_setup.md)
 - [Troubleshooting](troubleshooting.md)
-- [Pending-contribution approval contract](implementation/federation/active/pending_contribution_approval.md)
-- [Detailed update security design](implementation/federation/active/manual_updates.md)

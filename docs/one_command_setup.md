@@ -1,119 +1,129 @@
 # One-command setup
 
 Status: **current startup guide**
+Reviewed: **2026-08-12**
 
-Reviewed: **2026-08-11**
-
-This page describes the supported default startup. It does not assign the device one permanent server role.
+This page describes the supported default startup. A device is capability-first and does not receive one permanent product role.
 
 ## Normal FCP device
 
 ### Windows
 
-From the repository root:
-
 ```cmd
 start.cmd
 ```
 
-The launcher starts the current core services, preserves existing device/Federation/capability/data state, checks the configured Ollama model, bakes the exact Git commit into the runtime, starts the bounded host update agent, and opens the appropriate product page.
-
-Use:
-
-```cmd
-start.cmd --resume
-```
-
-to reconnect the saved Federation and reuse persisted capability evidence before opening the workbench.
-
-Use:
-
-```cmd
-start.cmd --fresh
-```
-
-to remove the local device identity and Federation onboarding state after an explicit confirmation. Recorded telemetry, source configuration, recorder checkpoints, analysis results, Docker images, and downloaded Ollama models are preserved.
-
-For an older Windows checkout that predates the supported launcher/update-agent path, use the one-shot migration bootstrap:
-
-```cmd
-migrate.cmd
-```
-
-It preserves existing state and fails closed rather than resetting or guessing when the old installation cannot be identified safely.
-
 ### Linux or macOS
-
-From the repository root:
 
 ```bash
 bash start.sh
 ```
 
-The launcher starts the same normal service set and bounded host update agent.
+The supported launcher starts the normal core services, preserves device/Federation/capability/data/auth state, verifies the configured Ollama model, bakes the exact Git commit into the runtime, and starts the bounded host update agent.
 
-Direct Compose remains available for development/troubleshooting, but bypassing `start.sh` also bypasses the normal host-owned Federation update activation boundary unless the update agent is started separately.
+## First browser use
 
-## Open the product
-
-Use:
+Open the URL printed by the launcher, normally:
 
 ```text
-http://localhost:5000/onboarding
+http://localhost:5000
 ```
 
-for a device without completed capability-first onboarding.
+A fresh local authority with zero human users redirects to `/admin/users/bootstrap`. Create the first active administrator there with a valid email address and a confirmed password of at least 12 characters, then sign in.
 
-The required first-run path is:
+After sign-in, incomplete devices follow:
 
 ```text
 Identity
   -> Federation
   -> Inspect
   -> finish setup
-  -> open Federation
 ```
 
-A current inspection is enough to finish setup. Benchmarks and contribution choices are optional follow-up work.
+Benchmarks and contribution choices are optional follow-up work.
 
-Returning devices normally reconnect using persisted identity and trusted Federation state. Open:
+## Existing device
 
-```text
-http://localhost:5000/federation
+Windows:
+
+```cmd
+start.cmd --resume
 ```
 
-to inspect the current device, Federation members, services, recorders, software updates, benchmarks, storage, jobs, and activity.
+Linux/macOS:
 
-## Standalone recorder: one pairing argument
+```bash
+bash start.sh --resume
+```
 
-For a headless MTConnect recorder, generate the normal signed Federation pairing code and run:
+Resume reconnects the saved Federation and reuses persisted capability evidence without replacing identity or rerunning inspection/benchmarks merely because time passed.
+
+## Fresh-device reset
+
+Windows:
+
+```cmd
+start.cmd --fresh
+```
+
+After explicit confirmation, this removes local device/Federation onboarding/evidence state while preserving human accounts/auth secrets, recorded data, source configuration, recorder checkpoints, analyses, Docker images, and downloaded models.
+
+## Older Windows installation
+
+```cmd
+migrate.cmd
+```
+
+The one-shot migration bootstrap preserves existing state and fails closed rather than resetting/guessing when the old installation cannot be identified safely.
+
+## Optional Tailscale discovery
+
+If an existing Federation is already reachable through the same Tailscale tailnet:
+
+### Windows
+
+```cmd
+start-tailscale.cmd
+```
+
+### Linux/macOS
+
+```bash
+bash start-tailscale.sh
+```
+
+This uses the already signed-in local Tailscale client to find reachable FCP Federations before normal startup. No Tailscale API/auth key is required.
+
+Discovery only helps locate the existing FCP endpoint. The joining device must still redeem a signed one-use `FCP1-...` pairing code.
+
+See [Tailscale Federation discovery](tailscale_federation_discovery.md).
+
+## Standalone recorder
+
+First join:
 
 ```bash
 python start_recorder.py FCP1-...
 ```
 
-On first configuration the recorder runs the existing bounded private-network scan by default, selects discovered sources, joins the Federation, starts loss-aware recording, and starts its independent Federation publication/control workers.
-
-After the first successful join, the pairing code is not needed again:
+Later starts:
 
 ```bash
 python start_recorder.py
 ```
 
-Any trusted Federation device can then open `/federation/recorders` to request a scan on that recorder and add/remove sources selected from its latest scan.
-
-See [Standalone recorder](standalone_recorder.md).
+Any trusted Federation device can use `/federation/recorders` for bounded recorder-local scan/source control.
 
 ## Federation-wide updates
 
-The coordinator can explicitly run **Check for updates** and then **Update all devices**. Normal FCP devices started by `start.cmd`/`start.sh` have the host update agent required for this operation.
+The **current operational leader** can run **Check for updates** and then **Update all devices**. Normal FCP devices started with the supported launcher have the required host update agent.
 
-The Compose-managed recorder on a normal FCP device is updated together with that runtime. A standalone `python start_recorder.py` process is not restarted by the normal Compose update agent and must currently be administered through its own host process/update path.
+A standalone `python start_recorder.py` process is not restarted by the normal Compose update agent and currently needs its own host process/update path.
 
-See [Federation operations](federation_operations.md).
+## Related guides
 
-## Specialized deployment commands
-
-`setup_fcp.py` and optional Compose profiles remain compatibility and administration tools for explicit local process composition. Old deployment-mode names may remain accepted as aliases, but selecting them does not grant Federation, provider, storage, compute, job, artifact, or recorder contribution authority.
-
-See [Quick start](quick_start.md) and [Server setup](server_setup.md) for reset boundaries, network binding, recorder configuration, migration, model installation, and advanced deployment choices.
+- [Quick start](quick_start.md)
+- [Human users, sign-in, and permissions](human-authentication.md)
+- [Federation operations](federation_operations.md)
+- [Tailscale Federation discovery](tailscale_federation_discovery.md)
+- [Server setup](server_setup.md)
