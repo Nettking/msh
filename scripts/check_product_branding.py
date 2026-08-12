@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import re
 import subprocess
 import sys
 
@@ -19,7 +20,10 @@ ALLOWED_REPOSITORY_FILES = frozenset(
         "catalog/federation/tests/test_software_update.py",
         "catalog/flask_app/tests/test_federation_update_host_agents.py",
         "catalog/flask_app/tests/test_federation_update_runtime.py",
+        "catalog/flask_app/tests/test_termux_federation_update_agent.py",
         "catalog/flask_app/tests/test_windows_migration_script.py",
+        "termux/fcp-phone-update-agent.sh",
+        "termux/fcp_phone_update_codec.py",
     }
 )
 
@@ -43,7 +47,12 @@ def main() -> int:
             continue
         searchable = text
         if path_text in ALLOWED_REPOSITORY_FILES:
-            searchable = searchable.replace(REPOSITORY_SLUG, "")
+            searchable = re.sub(
+                re.escape(REPOSITORY_SLUG),
+                "",
+                searchable,
+                flags=re.IGNORECASE,
+            )
         lowered = searchable.casefold()
         if LEGACY in lowered or SPACED_LEGACY in lowered:
             failures.append(f"retired product spelling in file: {path_text}")

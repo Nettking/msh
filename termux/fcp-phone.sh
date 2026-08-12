@@ -8,6 +8,9 @@ DATA_DIR="$STATE_DIR/data"
 RESULTS_DIR="$STATE_DIR/results"
 LOG_FILE="$RESULTS_DIR/termux-phone.log"
 PID_FILE="$RESULTS_DIR/termux-phone.pid"
+UPDATE_AGENT_LOG="$RESULTS_DIR/termux-update-agent.log"
+UPDATE_AGENT_PID_FILE="$RESULTS_DIR/termux-update-agent.pid"
+RUNNING_COMMIT_FILE="$RESULTS_DIR/termux-running-commit"
 PORT="${FCP_PHONE_PORT:-5000}"
 URL="http://127.0.0.1:$PORT"
 STOP_WAIT_SECONDS="${FCP_PHONE_STOP_WAIT_SECONDS:-10}"
@@ -24,7 +27,7 @@ Commands:
   foreground             Run FCP in the foreground for debugging.
   stop                   Stop all FCP phone sessions.
   restart                Stop and start FCP.
-  status                 Show PRoot and HTTP status.
+  status                 Show PRoot, update-agent, and HTTP status.
   logs [LINES]           Show the latest log lines (default 120).
   open                   Open FCP in the Android browser.
   shell                  Open a shell inside the FCP Linux container.
@@ -112,6 +115,52 @@ tracked_server_pid() {
     current_start="$(process_start_time "$pid")" || return 1
     [[ "$current_start" == "$expected_start" ]] || return 1
     printf '%s\n' "$pid"
+}
+
+update_agent_running() {
+    local pid=""
+    [[ -f "$UPDATE_AGENT_PID_FILE" ]] || return 1
+    IFS= read -r pid < "$UPDATE_AGENT_PID_FILE" || return 1
+    [[ "$pid" =~ ^[0-9]+$ ]] || return 1
+    kill -0 "$pid" 2>/dev/null || return 1
+    if [[ -r "$PROC_ROOT/$pid/cmdline" ]]; then
+        tr '\0' ' ' < "$PROC_ROOT/$pid/cmdline" 2>/dev/null | grep -q 'fcp-phone-update-agent.sh' || return 1
+    fi
+    return 0
+}
+
+start_update_agent() {
+    require_ready
+    if update_agent_running; then
+        return 0
+    fi
+    rm -f "$UPDATE_AGENT_PID_FILE"
+    mkdir -p "$DATA_DIR/federation/update-agent" "$RESULTS_DIR"
+    nohup bash "$ROOT/termux/fcp-phone-update-agent.sh" \
+        --repo-root "$ROOT" \
+        --state-directory "$STATE_DIR" \
+        --container "$CONTAINER" \
+        --port "$PORT" \
+        >> "$UPDATE_AGENT_LOG" 2>&1 </dev/null &
+    local agent_pid=$!
+    printf '%s\n' "$agent_pid" > "$UPDATE_AGENT_PID_FILE"
+    disown "$agent_pid" 2>/dev/null || true
+    sleep 0.1
+    kill -0 "$agent_pid" 2>/dev/null || {
+        echo "The Termux Federation update agent failed to start." >&2
+        tail -n 40 "$UPDATE_AGENT_LOG" 2>/dev/null || true
+        rm -f "$UPDATE_AGENT_PID_FILE"
+        return 1
+    }
+}
+
+record_running_commit() {
+    local commit=""
+    commit="$(git -C "$ROOT" rev-parse --verify 'HEAD^{commit}')" || return 1
+    commit="${commit,,}"
+    [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || return 1
+    printf '%s\n' "$commit" > "$RUNNING_COMMIT_FILE.tmp"
+    mv "$RUNNING_COMMIT_FILE.tmp" "$RUNNING_COMMIT_FILE"
 }
 
 container_session_pids() {
@@ -205,7 +254,7 @@ stop_server() {
         return 1
     fi
 
-    rm -f "$PID_FILE"
+    rm -f "$PID_FILE" "$RUNNING_COMMIT_FILE"
     if [[ "$quiet" != "true" && "${FCP_PHONE_STOP_QUIET:-0}" != "1" ]]; then
         echo "FCP stopped."
     fi
@@ -256,19 +305,26 @@ doctor() {
     fi
     [[ -d "$DATA_DIR" ]] && echo "  [ok] data directory" || { echo "  [missing] $DATA_DIR"; status=1; }
     [[ -d "$RESULTS_DIR" ]] && echo "  [ok] results directory" || { echo "  [missing] $RESULTS_DIR"; status=1; }
+    [[ -f "$ROOT/termux/fcp-phone-update-agent.sh" ]] && echo "  [ok] Federation update agent" || { echo "  [missing] Federation update agent"; status=1; }
     return "$status"
 }
 
 start_server() {
     require_ready
     stop_server true
+    start_update_agent
     : > "$LOG_FILE"
-    rm -f "$PID_FILE"
+    rm -f "$PID_FILE" "$RUNNING_COMMIT_FILE"
     start_server_process
 
     echo "Starting FCP at $URL ..."
     for _ in $(seq 1 30); do
         if http_ready; then
+            if ! record_running_commit; then
+                echo "FCP responded, but its running commit could not be recorded safely." >&2
+                stop_server true || true
+                return 1
+            fi
             echo "FCP is ready: $URL"
             return 0
         fi
@@ -302,6 +358,8 @@ main() {
     foreground)
         require_ready
         stop_server true
+        start_update_agent
+        rm -f "$RUNNING_COMMIT_FILE"
         "${login_base[@]}" "$CONTAINER" -- python -m catalog.flask_app.app
         ;;
     stop)
@@ -322,6 +380,11 @@ main() {
             else
                 echo "PRoot: no FCP session found"
             fi
+        fi
+        if update_agent_running; then
+            echo "Update agent: running"
+        else
+            echo "Update agent: not running"
         fi
         if http_ready; then
             echo "HTTP: ready at $URL"
