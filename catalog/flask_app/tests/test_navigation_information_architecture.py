@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 TEMPLATES = Path("catalog/flask_app/templates")
 
 
