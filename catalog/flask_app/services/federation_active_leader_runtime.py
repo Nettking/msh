@@ -13,9 +13,8 @@ weakening their local safety boundaries:
 * existing processor state is replayed once from session genesis when upgraded
   from creator-pinned authority.
 
-The adapter preserves the original service classes for configured test/product
-instances and is installed once by ``services.__init__`` before submodules are
-returned to callers.
+The adapter preserves the original service classes and their test injection
+seams while replacing only leader/processor authority semantics.
 """
 
 from __future__ import annotations
@@ -35,7 +34,6 @@ from catalog.federation.session_leadership import (
 from . import federation_capability_requests as capability_requests
 from . import federation_update_events as update_events
 from . import federation_update_service as update_service
-from .capability_onboarding_service import get_capability_onboarding_service
 from .federation_leader_authority import (
     require_federation_leader,
     resolve_federation_leader,
@@ -55,14 +53,12 @@ def _append_authenticated_event(
     payload: dict[str, object],
     request_id: str,
 ) -> None:
-    """Append through local coordinator authority or the paired relay runtime."""
+    """Append through the context's local authority or paired relay facade."""
 
-    onboarding = get_capability_onboarding_service()
-    remote_store = getattr(onboarding, "remote_store", None)
-    load_remote = getattr(remote_store, "load", None)
-    remote = load_remote() if callable(load_remote) else None
-    if remote is None:
-        context.coordinator.append_event(
+    coordinator = context.coordinator
+    append = getattr(coordinator, "append_event", None)
+    if callable(append):
+        append(
             session_id=context.binding.internal_session_id,
             actor_node_id=context.credentials.identity.node_id,
             request_id=request_id,
@@ -70,12 +66,14 @@ def _append_authenticated_event(
             payload=payload,
         )
         return
-    relay_runtime = getattr(onboarding, "relay_runtime", None)
-    append = getattr(relay_runtime, "append_session_event", None)
-    if not callable(append):
+
+    runtime = getattr(coordinator, "runtime", None)
+    state = getattr(coordinator, "state", None)
+    append_remote = getattr(runtime, "append_session_event", None)
+    if runtime is None or state is None or not callable(append_remote):
         raise PermissionError("federation_leader_transport_unavailable")
-    append(
-        remote,
+    append_remote(
+        state,
         session_id=context.binding.internal_session_id,
         event_type=event_type,
         payload=payload,
@@ -105,9 +103,6 @@ def _prepare_processor_state(
             state["coordinator_id"] = coordinator_id
             changed = True
 
-    # Older processors pinned session.created forever and could already have a
-    # cursor beyond a new leadership event. Replay once from genesis so the
-    # coordinator-authored chain is reconstructed before another command runs.
     authority_term = state.get("authority_term")
     if (
         isinstance(authority_term, bool)
@@ -146,8 +141,6 @@ def _pin_leadership_event(state: dict[str, object], event: Any) -> str | None:
         return current
     coordinator_id = state.get("coordinator_id")
     if not isinstance(coordinator_id, str) or event.actor_node_id != coordinator_id:
-        # Generic members may append public session events, but only the durable
-        # coordinator authority can advance the leader term.
         return current
     payload = event.payload
     next_leader = payload.get("leader_node_id") if isinstance(payload, dict) else None
@@ -177,7 +170,7 @@ class ActiveLeaderFederationUpdateService(_LEGACY_UPDATE_SERVICE):
     """Existing bounded updater with transferable leader issuance authority."""
 
     def _context(self):
-        context = get_capability_onboarding_service().authorized_context()
+        context = update_service.get_capability_onboarding_service().authorized_context()
         if context is None:
             raise PermissionError("federation_authority_required")
         authority = require_federation_leader(context)
@@ -188,7 +181,7 @@ class ActiveLeaderFederationUpdateService(_LEGACY_UPDATE_SERVICE):
 
     def _authorize_intent(self, intent: update_service.UpdateIntent) -> None:
         intent.validate()
-        context = get_capability_onboarding_service().authorized_context()
+        context = update_service.get_capability_onboarding_service().authorized_context()
         if context is None or intent.session_id != context.binding.internal_session_id:
             raise PermissionError("wrong_federation")
         authority = resolve_federation_leader(context)
@@ -241,7 +234,7 @@ class ActiveLeaderFederationCapabilityRequestService(_LEGACY_CAPABILITY_SERVICE)
     """Existing bounded capability request flow with transferable leadership."""
 
     def _context(self) -> tuple[Any, str]:
-        context = get_capability_onboarding_service().authorized_context()
+        context = capability_requests.get_capability_onboarding_service().authorized_context()
         if context is None:
             raise PermissionError("federation_authority_required")
         authority = require_federation_leader(context)
