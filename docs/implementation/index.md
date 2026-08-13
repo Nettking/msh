@@ -8,7 +8,7 @@
 | Authority | This index classifies tracks; current status comes from this index/current handoff, while each track identifies its durable decisions and acceptance source |
 | Entry point | [Current task handoff](current_task_handoff.md) |
 | Parent | [FCP documentation](../index.md) |
-| Reviewed | 2026-08-11 Europe/Oslo |
+| Reviewed | 2026-08-14 Europe/Oslo |
 | Retention | Permanent while implementation planning remains in this repository |
 
 ## Current tracks
@@ -16,6 +16,7 @@
 - [Current task handoff](current_task_handoff.md) — current merged baseline, blockers, resume safety, and next acceptance/documentation work.
 - [Federation implementation](federation/) — durable plans, acceptance documents, technical references, current update/rollout notes, and historical delivery evidence.
 - [OSL integration](osl_integration/) — active OSL planning package and authoritative execution order for that track.
+- [MTConnect operational segmentation](mtconnect_operational_segmentation_plan.md) — **active authoritative execution order** from canonical MTConnect observations through semantic roles, state/context timelines, MachineRun, ProductionCycle, OperationalEpisode, durable projection, and reference-shape validation. This track explicitly stops before features, baselines, anomaly detection, prediction, recommendations, OSL/SysML integration, and dashboards.
 - [Federation sharing evaluation](federation_sharing_evaluation.md) — what the Federation shares today, what remains device-local, and the open inconsistencies between the shared model, the code, and the canonical documentation.
 - [Federated JSONL analysis jobs](federated_jsonl_analysis_jobs.md) — how discovered or uploaded JSONL becomes a durable federation-dispatched job: identity and deduplication, provider selection, ownership, artifact authorization, worker execution, and failure behaviour.
 
@@ -25,6 +26,7 @@
 - CF8 retirement of the role-first installed-product runtime is merged. Retained legacy state/readers are migration/compatibility seams only.
 - Verified manual Federation-wide software update support is merged, including host-owned Windows/POSIX activation and exact running-commit verification.
 - Standalone recorder Federation bootstrap, checkpoint-gated logical-storage publication, startup discovery, and Federation-wide recorder source control are merged.
+- Canonical MTConnect observations are merged via PR #284. The operational-segmentation track is active; its next permitted implementation phase is **S1 Semantic-role resolver**.
 - Complete physical CF7 acceptance is **not accepted**.
 - Complete Federation v1 end-to-end acceptance remains **false**.
 - Federation v1 release tag is not created.
