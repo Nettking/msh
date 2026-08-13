@@ -40,6 +40,7 @@ from .parsing import (
     plan_sequence,
     validate_batch_continuity,
 )
+from .schema_compat import CHECKPOINT_SCHEMA, LEGACY_CHECKPOINT_SCHEMAS
 from .storage import DurableRecorderStore
 
 
@@ -122,11 +123,8 @@ RUN_ONCE = _bool_from_env("FCP_RECORDER_ONCE", False)
 
 _CAPABILITY_CONFIG_SCHEMA = "fcp.capability_config.v1"
 _LEGACY_SETUP_SCHEMA = "fcp.server_setup.v3"
-_CHECKPOINT_SCHEMA = "fcp.mtconnect_recorder.checkpoints.v3"
-_RETIRED_PRODUCT = bytes((109, 115, 104)).decode("ascii")
-_LEGACY_CHECKPOINT_SCHEMAS = frozenset(
-    {f"{_RETIRED_PRODUCT}.mtconnect_recorder.checkpoints.v3"}
-)
+_CHECKPOINT_SCHEMA = CHECKPOINT_SCHEMA
+_LEGACY_CHECKPOINT_SCHEMAS = LEGACY_CHECKPOINT_SCHEMAS
 
 
 def _managed_configuration(payload: Mapping[str, Any]) -> tuple[dict[str, str], float]:

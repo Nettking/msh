@@ -26,11 +26,16 @@ from hashlib import sha256
 from pathlib import Path
 
 MANIFEST_SUFFIX = ".manifest.json"
+# Kept deliberately in step with catalog/mtconnect_recorder/schema_compat.py,
+# which is the product-side authority. This script stays importable without the
+# catalog package so it can profile a capture on a machine that has no FCP
+# installation, so the enumeration is repeated here rather than imported.
+_RETIRED_PRODUCT = bytes((109, 115, 104)).decode("ascii")
 ACCEPTED_MANIFEST_SCHEMAS = frozenset(
     {
         "fcp.mtconnect.raw_batch_manifest.v1",
-        # Batches recorded before the product rename carry the old prefix.
-        "msh.mtconnect.raw_batch_manifest.v1",
+        # Batches recorded before the product rename carry the retired prefix.
+        f"{_RETIRED_PRODUCT}.mtconnect.raw_batch_manifest.v1",
     }
 )
 OBSERVATION_CONTAINERS = frozenset({"Samples", "Events", "Condition"})

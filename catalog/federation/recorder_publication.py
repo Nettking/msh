@@ -17,6 +17,10 @@ from pathlib import Path
 from typing import Any
 
 from catalog.mtconnect_recorder.model import RawBatchRef, SourceCheckpoint
+from catalog.mtconnect_recorder.schema_compat import (
+    SUPPORTED_CHECKPOINT_SCHEMAS,
+    is_supported_checkpoint_schema,
+)
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
 from .errors import FederationValidationError
@@ -220,14 +224,19 @@ class RecorderArchiveReconciler:
                 "checkpoint_file",
                 "recorder checkpoint state is not valid JSON",
             ) from exc
-        if (
-            not isinstance(payload, dict)
-            or payload.get("schema") != "fcp.mtconnect_recorder.checkpoints.v3"
+        # ``RecorderRuntime.load_state`` restores a pre-rename checkpoint and
+        # deliberately leaves the file untouched until the next successful
+        # commit. Publication reads the same file, so it has to accept the same
+        # schemas or an upgraded installation cannot publish anything it has
+        # already recorded during that window. Both forms carry an identical
+        # payload shape and go through identical validation below.
+        if not isinstance(payload, dict) or not is_supported_checkpoint_schema(
+            payload.get("schema")
         ):
             raise FederationValidationError(
                 "unsupported-recorder-state",
                 "schema",
-                "expected fcp.mtconnect_recorder.checkpoints.v3",
+                "expected one of " + ", ".join(sorted(SUPPORTED_CHECKPOINT_SCHEMAS)),
             )
         sources = payload.get("sources")
         if not isinstance(sources, dict):
