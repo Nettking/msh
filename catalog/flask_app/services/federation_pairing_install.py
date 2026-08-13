@@ -9,6 +9,8 @@ from typing import Any
 
 from flask import Flask, current_app, request
 
+from catalog.orchestrator.analysis_federation import DeviceFederationAuthority
+
 from .capability_recovery_adapters import fresh_capability_inspection_adapters
 from .federated_ai_product_bridge import FederatedAIProductBridge
 from .federated_data_runtime import FederatedDataPairingRelayRuntime
@@ -70,6 +72,18 @@ _TERMINAL_RECONNECT_CODES = frozenset(
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _session_owner(status: dict[str, Any], session_id: str) -> str | None:
+    sessions = status.get("sessions")
+    if not isinstance(sessions, list):
+        return None
+    for value in sessions:
+        if not isinstance(value, dict) or value.get("session_id") != session_id:
+            continue
+        owner = value.get("created_by_node_id")
+        return owner if isinstance(owner, str) and owner else None
+    return None
 
 
 def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
@@ -228,19 +242,19 @@ class FederationUpdateEventMonitor:
                     if context is not None:
                         try:
                             self._processor().process(context)
-                        except Exception as exc:  # noqa: BLE001 - update authority fails closed
+                        except Exception as exc:  # noqa: BLE001
                             self.app.logger.warning(
                                 "Federation update event processing unavailable (%s)",
                                 type(exc).__name__,
                             )
                         try:
                             self._capability_request_processor().process(context)
-                        except Exception as exc:  # noqa: BLE001 - capability authority fails closed
+                        except Exception as exc:  # noqa: BLE001
                             self.app.logger.warning(
                                 "Federation capability request processing unavailable (%s)",
                                 type(exc).__name__,
                             )
-            except Exception as exc:  # noqa: BLE001 - context/authentication fails closed
+            except Exception as exc:  # noqa: BLE001
                 self.app.logger.warning(
                     "Federation control event processing unavailable (%s)",
                     type(exc).__name__,
@@ -334,10 +348,6 @@ class SavedFederationReconnectMonitor:
                 raise RuntimeError("saved remote Federation context is unavailable")
             return remote, context
 
-        # A local Federation creator previously had no relay client at all. That
-        # made every remote member see the owner as offline while the owner's UI
-        # locally overrode itself to online. Revalidate the existing membership,
-        # then establish a real authenticated connection using the same identity.
         context = self.service.authorized_context()
         if context is None:
             return None
@@ -348,14 +358,62 @@ class SavedFederationReconnectMonitor:
         self.service.relay_runtime.ensure_connected(local_state)
         return local_state, context
 
+    def analysis_authority(
+        self,
+        identity: object,
+        capability_root: Path,
+        clock,
+    ) -> DeviceFederationAuthority | None:
+        """Build analysis on the product's live authenticated relay connection."""
+
+        with self.app.app_context():
+            resolved = self._connected_state_and_context()
+            if resolved is None:
+                return None
+            runtime_state, context = resolved
+            binding = getattr(context, "binding", None)
+            credentials = getattr(context, "credentials", None)
+            node_identity = getattr(credentials, "identity", None)
+            session_id = getattr(binding, "internal_session_id", None)
+            node_id = getattr(node_identity, "node_id", None)
+            if (
+                not isinstance(session_id, str)
+                or not isinstance(node_id, str)
+                or session_id != getattr(identity, "session_id", None)
+                or node_id != getattr(identity, "node_id", None)
+            ):
+                raise RuntimeError("analysis federation identity changed during binding")
+
+            runtime = self.service.relay_runtime
+            status = runtime.coordinator_status()
+            owner_node_id = _session_owner(status, session_id)
+            if owner_node_id is None:
+                raise RuntimeError("analysis federation owner is unavailable")
+
+            # Remote-AI is the product's first owner of relay.message. Analysis
+            # lifecycle chains behind its receive_other(), and artifacts chain
+            # behind lifecycle, preserving exactly one inbound relay reader.
+            upstream, event_loop = self.ai_bridge._transport_context(
+                runtime,
+                runtime_state,
+            )
+            return DeviceFederationAuthority.from_authenticated_relay(
+                capability_root=capability_root,
+                session_id=session_id,
+                node_id=node_id,
+                clock=clock,
+                runtime=runtime,
+                runtime_state=runtime_state,
+                event_loop=event_loop,
+                upstream_message_source=upstream,
+                local_leader=owner_node_id == node_id,
+            )
+
     def _publish_contributions(
         self,
         runtime_state: RemotePairingState,
         context: object,
     ) -> None:
-        # The app's one-shot startup reconciliation must run first. Otherwise a
-        # persisted active intent with stale evidence could briefly be advertised
-        # as ready before the existing fail-closed suspension path fences it.
         if self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY) is not True:
             return
         from .capability_contribution_service import (
@@ -416,33 +474,33 @@ class SavedFederationReconnectMonitor:
                     runtime_state, context = resolved
                     try:
                         self._publish_contributions(runtime_state, context)
-                    except Exception as exc:  # noqa: BLE001 - metadata sync is fail-closed
+                    except Exception as exc:  # noqa: BLE001
                         self.app.logger.info(
                             "Federation capability metadata refresh unavailable (%s)",
                             type(exc).__name__,
                         )
                     try:
                         self._sync_remote_ai(runtime_state, context)
-                    except Exception as exc:  # noqa: BLE001 - provider sync is fail-closed
+                    except Exception as exc:  # noqa: BLE001
                         self.app.logger.info(
                             "Federation remote AI authority refresh unavailable (%s)",
                             type(exc).__name__,
                         )
                     try:
                         self._sync_federated_telemetry(runtime_state, context)
-                    except Exception as exc:  # noqa: BLE001 - storage reads fail closed
+                    except Exception as exc:  # noqa: BLE001
                         self.app.logger.info(
                             "Federation telemetry mirror refresh unavailable (%s)",
                             type(exc).__name__,
                         )
                     try:
                         self._sync_federated_jsonl(runtime_state, context)
-                    except Exception as exc:  # noqa: BLE001 - generic data sync fails closed
+                    except Exception as exc:  # noqa: BLE001
                         self.app.logger.info(
                             "Federation JSONL data refresh unavailable (%s)",
                             type(exc).__name__,
                         )
-            except Exception as exc:  # noqa: BLE001 - network retry boundary
+            except Exception as exc:  # noqa: BLE001
                 failures += 1
                 code = str(getattr(exc, "code", type(exc).__name__))
                 if code in _TERMINAL_RECONNECT_CODES:
@@ -499,6 +557,14 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
     app.extensions["federated_ai_product_bridge"] = monitor.ai_bridge
     app.extensions["federated_telemetry_product_bridge"] = monitor.telemetry_bridge
     app.extensions["federated_jsonl_product_bridge"] = monitor.jsonl_bridge
+
+    # Analysis resolves identity in the orchestrator, but its *authority* comes
+    # from this installed product relay. Register the composition seam here so a
+    # real federation identity can never fall back to a fabricated local session.
+    from catalog.orchestrator.analysis_runtime import register_federation_supplier
+
+    register_federation_supplier(monitor.analysis_authority)
+
     install_recorder_federation_publication(
         app,
         onboarding_service=service,
@@ -506,18 +572,12 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
 
     @app.before_request
     def _start_saved_membership_reconnect() -> None:
-        # This hook is registered before the retained one-shot reconnect hook.
-        # The monitor owns retries, so prevent the old hook from marking a
-        # transient first failure as permanently checked.
         app.extensions[_RETAINED_STARTUP_CHECK_KEY] = True
         monitor.start()
         update_monitor.start()
 
     @app.after_request
     def _wake_contribution_publication(response):
-        # Local contribution intent and explicit provider decisions are persisted
-        # by their authorities first. Wake the authenticated synchronization loop
-        # afterwards so peers observe the resulting metadata/health promptly.
         if (
             request.method == "POST"
             and request.endpoint
