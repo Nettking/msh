@@ -112,7 +112,9 @@ def _iter_observations(xml_text: str) -> list[Observation]:
 def profile_directory(directory: Path) -> Profile:
     profile = Profile()
     manifests = sorted(directory.rglob(f"*{MANIFEST_SUFFIX}"))
-    spans: list[tuple[int, int, int]] = []
+    spans_by_stream: defaultdict[tuple[str, str], list[tuple[int, int, int]]] = (
+        defaultdict(list)
+    )
 
     for manifest_path in manifests:
         try:
@@ -155,7 +157,12 @@ def profile_directory(directory: Path) -> Profile:
 
         profile.batch_count += 1
         try:
-            spans.append(
+            spans_by_stream[
+                (
+                    str(payload.get("source_name")),
+                    str(payload.get("agent_instance_id")),
+                )
+            ].append(
                 (
                     int(payload["first_observation_sequence"]),
                     int(payload["last_observation_sequence"]),
@@ -165,12 +172,17 @@ def profile_directory(directory: Path) -> Profile:
         except (KeyError, TypeError, ValueError):
             continue
 
-    spans.sort()
-    expected_next: int | None = None
-    for first, _last, next_sequence in spans:
-        if expected_next is not None and first != expected_next:
-            profile.sequence_gaps.append((expected_next, first))
-        expected_next = next_sequence
+    # Sequence numbers belong to one Agent buffer, so continuity is only
+    # meaningful within a single (source, instance). Chaining every batch in the
+    # directory through one cursor invents reverse gaps when two instances both
+    # start at 1, and can hide a real gap when sources interleave.
+    for _stream, stream_spans in sorted(spans_by_stream.items()):
+        stream_spans.sort()
+        expected_next: int | None = None
+        for first, _last, next_sequence in stream_spans:
+            if expected_next is not None and first != expected_next:
+                profile.sequence_gaps.append((expected_next, first))
+            expected_next = next_sequence
 
     profile.observations.sort(key=lambda observation: observation.sequence)
     return profile

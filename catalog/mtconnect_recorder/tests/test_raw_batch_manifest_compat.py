@@ -268,6 +268,53 @@ def test_relocated_capture_resolves_its_payload_beside_the_manifest(recorder_arc
     assert recorder_archive.store.read_raw_batch(scan.refs[0]) == xml_text
 
 
+def _load_profile_script():
+    import importlib.util
+    from pathlib import Path
+
+    script = Path("scripts/profile_mtconnect_raw_batches.py")
+    spec = importlib.util.spec_from_file_location("_profile_script", script)
+    module = importlib.util.module_from_spec(spec)
+    # The script defines dataclasses under postponed annotations, which resolve
+    # through sys.modules, so it has to be registered before execution.
+    sys.modules[spec.name] = module
+    try:
+        spec.loader.exec_module(module)
+    finally:
+        sys.modules.pop(spec.name, None)
+    return module
+
+
+def test_profiler_scopes_sequence_continuity_to_one_agent_buffer(recorder_archive):
+    # Two Agent instances both numbering from 1. Chaining every batch through a
+    # single cursor would report a reverse gap such as (7, 1) that does not
+    # exist, and could hide a real gap when sources interleave.
+    for instance in (INSTANCE, 1786099999):
+        xml_text, _ = machine_batch(instance_id=instance, start_sequence=1)
+        recorder_archive.write_batch(source_name=SOURCE, xml_text=xml_text)
+    other, _ = machine_batch(instance_id=INSTANCE, start_sequence=1)
+    recorder_archive.write_batch(source_name="MACHINE-BETA-0002", xml_text=other)
+
+    module = _load_profile_script()
+    profile = module.profile_directory(recorder_archive.store.raw_root)
+
+    assert profile.batch_count == 3
+    assert profile.sequence_gaps == []
+
+
+def test_profiler_still_reports_a_real_gap_within_one_buffer(recorder_archive):
+    first, _ = machine_batch(instance_id=INSTANCE, start_sequence=1)
+    # Sequences 7-12 are never recorded, so 13 leaves a genuine hole.
+    third, _ = machine_batch(instance_id=INSTANCE, start_sequence=13)
+    recorder_archive.write_batch(source_name=SOURCE, xml_text=first)
+    recorder_archive.write_batch(source_name=SOURCE, xml_text=third)
+
+    module = _load_profile_script()
+    profile = module.profile_directory(recorder_archive.store.raw_root)
+
+    assert profile.sequence_gaps == [(7, 13)]
+
+
 def test_the_profiling_script_accepts_the_same_schemas():
     import importlib.util
     from pathlib import Path

@@ -13,10 +13,12 @@ from catalog.mtconnect_recorder.canonical import (
     CATEGORY_CONDITION,
     CATEGORY_EVENT,
     CATEGORY_SAMPLE,
+    NOTE_COUNT_MISMATCH,
     REJECT_DIGEST_MISMATCH,
     REJECT_DUPLICATE_SEQUENCE,
     REJECT_INSTANCE_MISMATCH,
     REJECT_OVERLAP_CONFLICT,
+    REJECT_SOURCE_KEY_MISMATCH,
     REJECT_XML_INVALID,
     TIMESTAMP_FROM_BATCH,
     TIMESTAMP_FROM_OBSERVATION,
@@ -26,8 +28,11 @@ from catalog.mtconnect_recorder.canonical import (
     VALUE_UNAVAILABLE,
     CanonicalObservationProjection,
     CanonicalObservationStore,
+    epoch_micros,
+    parse_timestamp,
     rebuild_from_recorder_archive,
 )
+from catalog.mtconnect_recorder.model import _slug
 
 from .conftest import (
     Observation,
@@ -266,6 +271,56 @@ def test_canonical_timestamps_have_one_fixed_width(recorder_archive, projection)
     assert {len(row.observed_at) for row in rows} == {len("2026-08-07T09:00:33.000000Z")}
     assert all(row.observed_at.endswith("Z") for row in rows)
     assert [row.observed_at for row in rows] == sorted(row.observed_at for row in rows)
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("1970-01-01T00:00:00.000000Z", 0),
+        ("1970-01-01T00:00:00.000001Z", 1),
+        ("1969-12-31T23:59:59.999999Z", -1),
+        ("2026-08-07T09:00:33.123456Z", 1786093233123456),
+        # Far beyond any machine data, but the point is that the conversion is
+        # exact arithmetic rather than exact-for-the-values-we-tried.
+        ("2262-04-11T23:47:16.854775Z", 9223372036854775),
+    ],
+)
+def test_epoch_microseconds_are_exact_integers(text, expected):
+    assert epoch_micros(parse_timestamp(text)) == expected
+
+
+def test_epoch_conversion_does_not_go_through_a_float():
+    # datetime.timestamp() is a float; at large magnitudes neighbouring
+    # microseconds stop being separately representable and rounding decides the
+    # result. The canonical conversion must not inherit that.
+    moment = parse_timestamp("2262-04-11T23:47:16.854775Z")
+
+    assert epoch_micros(moment) == 9223372036854775
+    assert round(moment.timestamp() * 1_000_000) != epoch_micros(moment)
+
+
+def test_query_bounds_use_the_same_conversion_as_stored_rows(
+    recorder_archive, projection
+):
+    _write_run(recorder_archive, start=1, count=6)
+    _project(projection)
+
+    rows = projection.database.query_observations(source_key=SOURCE)
+    first = rows[0]
+
+    # A bound written as the row's own timestamp must include that row: if the
+    # two conversions ever diverged, an inclusive bound would drop its own value.
+    exactly_at = projection.database.query_observations(
+        source_key=SOURCE, start=first.observed_at
+    )
+    assert exactly_at and exactly_at[0].sequence == first.sequence
+    assert _as_micros_equivalent(first)
+
+
+def _as_micros_equivalent(observation) -> bool:
+    return epoch_micros(parse_timestamp(observation.observed_at)) == (
+        observation.observed_at_us
+    )
 
 
 def test_normal_observations_report_their_own_timestamp(recorder_archive, projection):
@@ -582,6 +637,54 @@ def test_rebuild_from_scratch_reproduces_the_projection(recorder_archive, tmp_pa
     )
 
 
+def test_archive_only_rebuild_preserves_a_source_name_the_slug_rewrites(
+    recorder_archive, tmp_path
+):
+    # The storage partition is _slug(source_name), which is lossy: "Machine A"
+    # and "Machine-A" share a directory. The recorded name must therefore come
+    # from the manifest, never from the directory it was found in.
+    original = "Machine A 01"
+    assert _slug(original) != original
+
+    xml_text, _ = machine_batch(
+        instance_id=INSTANCE, start_sequence=1, device_uuid=""
+    )
+    recorder_archive.write_batch(source_name=original, xml_text=xml_text)
+
+    configured_path = tmp_path / "configured.sqlite3"
+    configured = CanonicalObservationStore(configured_path)
+    CanonicalObservationProjection(
+        store=recorder_archive.store, database=configured
+    ).project_instance(source_name=original, agent_instance_id=INSTANCE)
+
+    # Archive-only: no configured source list, discovery walks directories.
+    discovered_path = tmp_path / "discovered.sqlite3"
+    rebuild_from_recorder_archive(
+        data_dir=recorder_archive.data_dir, database_path=discovered_path
+    )
+    discovered = CanonicalObservationStore(discovered_path)
+
+    assert configured.content_fingerprint() == discovered.content_fingerprint()
+    for store in (configured, discovered):
+        rows = store.query_observations()
+        assert rows, "expected the capture to project"
+        assert {row.source_name for row in rows} == {original}
+        assert {row.source_key for row in rows} == {_slug(original)}
+        # A stream with no device identity falls back to the source name, so a
+        # slugged name would have changed machine_id too.
+        assert {row.machine_id for row in rows} == {original}
+
+
+def test_a_manifest_naming_another_partition_is_rejected(recorder_archive, projection):
+    manifest = _write_run(recorder_archive, start=1, count=6)
+    recorder_archive.rewrite_manifest(manifest, source_name="A Completely Other Name")
+
+    report = _project(projection)
+
+    assert [item.reason for item in report.rejections] == [REJECT_SOURCE_KEY_MISMATCH]
+    assert projection.database.count_observations() == 0
+
+
 def test_deleting_the_projection_loses_nothing_recoverable(recorder_archive, tmp_path):
     _write_run(recorder_archive, start=1, count=6)
     database_path = tmp_path / "canonical.sqlite3"
@@ -730,7 +833,7 @@ def test_every_observation_traces_back_to_its_raw_batch(recorder_archive, projec
 
     rows = projection.database.query_observations(source_key=SOURCE)
     row = rows[-1]
-    batch = projection.database.batch_for_digest(row.raw_batch_sha256)
+    batch = projection.database.batch_for_observation(row)
 
     assert batch is not None
     assert batch.status == BATCH_STATUS_PROJECTED
@@ -743,9 +846,46 @@ def test_every_observation_traces_back_to_its_raw_batch(recorder_archive, projec
 
     payload = recorder_archive.raw_payload_path(second)
     assert row.raw_batch_sha256 == sha256(gzip.decompress(payload.read_bytes())).hexdigest()
-    assert projection.database.batch_for_digest(
-        recorder_archive.read_manifest(first)["raw_sha256"]
-    ).first_sequence == 1
+    assert (
+        projection.database.batch_for_digest(
+            source_key=SOURCE,
+            raw_sha256=recorder_archive.read_manifest(first)["raw_sha256"],
+        ).first_sequence
+        == 1
+    )
+
+
+def test_identical_content_under_two_sources_traces_to_the_right_one(
+    recorder_archive, projection
+):
+    # Two identically configured machines can record byte-identical payloads,
+    # so raw_sha256 alone is not a provenance key.
+    xml_text, _ = machine_batch(instance_id=INSTANCE, start_sequence=1)
+    alpha_manifest = recorder_archive.write_batch(
+        source_name=SOURCE, xml_text=xml_text
+    )
+    beta_manifest = recorder_archive.write_batch(
+        source_name=OTHER_SOURCE, xml_text=xml_text
+    )
+    _project(projection)
+    _project(projection, source=OTHER_SOURCE)
+
+    digest = recorder_archive.read_manifest(alpha_manifest)["raw_sha256"]
+    assert digest == recorder_archive.read_manifest(beta_manifest)["raw_sha256"]
+
+    alpha = projection.database.batch_for_digest(source_key=SOURCE, raw_sha256=digest)
+    beta = projection.database.batch_for_digest(
+        source_key=OTHER_SOURCE, raw_sha256=digest
+    )
+
+    assert Path(alpha.manifest_path) == alpha_manifest
+    assert Path(beta.manifest_path) == beta_manifest
+    assert alpha.source_key != beta.source_key
+
+    for observation in projection.database.query_observations():
+        traced = projection.database.batch_for_observation(observation)
+        assert traced is not None
+        assert traced.source_key == observation.source_key
 
 
 def test_the_ledger_records_which_manifest_generation_was_read(
@@ -765,6 +905,61 @@ def test_the_ledger_records_which_manifest_generation_was_read(
     assert ledger[0].manifest_schema == LEGACY_RAW_BATCH_MANIFEST_SCHEMA
     assert ledger[0].manifest_observation_count == 6
     assert ledger[0].projected_count == 6
+
+
+def test_ledger_range_comes_from_the_verified_payload(recorder_archive, projection):
+    manifest = _write_run(recorder_archive, start=1, count=6)
+    # The digest covers the XML, not the sidecar, so a corrupted range survives
+    # verification. The ledger must not repeat it as though it were checked.
+    recorder_archive.rewrite_manifest(
+        manifest, first_observation_sequence=999, last_observation_sequence=4242
+    )
+
+    report = _project(projection)
+    ledger = projection.database.batches(source_key=SOURCE)
+
+    assert report.projected_batches == 1
+    assert ledger[0].status == BATCH_STATUS_PROJECTED
+    assert (ledger[0].first_sequence, ledger[0].last_sequence) == (1, 6)
+
+
+def test_a_declared_count_that_disagrees_is_recorded_not_hidden(
+    recorder_archive, projection
+):
+    manifest = _write_run(recorder_archive, start=1, count=6)
+    recorder_archive.rewrite_manifest(manifest, observation_count=99)
+
+    report = _project(projection)
+    ledger = projection.database.batches(source_key=SOURCE)[0]
+
+    # Advisory rather than fatal: rejecting here would make a legacy capture
+    # whose recorder counted differently unreadable, which is the exact failure
+    # this work exists to remove. The disagreement is visible instead.
+    assert report.projected_batches == 1
+    assert ledger.status == BATCH_STATUS_PROJECTED
+    assert ledger.manifest_observation_count == 99
+    assert ledger.projected_count == 6
+    assert NOTE_COUNT_MISMATCH in (ledger.detail or "")
+
+
+def test_a_payload_with_no_observations_is_rejected(recorder_archive, projection):
+    manifest = _write_run(recorder_archive, start=1, count=6)
+    empty = (
+        '<?xml version="1.0" encoding="UTF-8"?>'
+        '<MTConnectStreams xmlns="urn:mtconnect.org:MTConnectStreams:1.3">'
+        f'<Header creationTime="2026-08-07T09:00:33Z" sender="a" instanceId="{INSTANCE}"'
+        ' bufferSize="1" firstSequence="1" lastSequence="1" nextSequence="2"/>'
+        "<Streams/></MTConnectStreams>"
+    ).encode()
+    from hashlib import sha256
+
+    recorder_archive.raw_payload_path(manifest).write_bytes(gzip.compress(empty))
+    recorder_archive.rewrite_manifest(manifest, raw_sha256=sha256(empty).hexdigest())
+
+    report = _project(projection)
+
+    assert report.rejected_batches == 1
+    assert projection.database.count_observations() == 0
 
 
 def test_describe_reports_projection_state(recorder_archive, projection):

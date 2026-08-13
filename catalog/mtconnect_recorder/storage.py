@@ -133,6 +133,7 @@ class DurableRecorderStore:
             observation_count=len(batch.observations),
             manifest_schema=RAW_BATCH_MANIFEST_SCHEMA,
             received_at=str(received_at) if isinstance(received_at, str) else None,
+            source_name=source_name,
         )
 
     def _batch_location(
@@ -437,6 +438,7 @@ class DurableRecorderStore:
                 continue
 
             received_at = payload.get("received_at")
+            declared_source = payload.get("source_name")
             refs.append(
                 RawBatchRef(
                     raw_path=raw_path,
@@ -450,6 +452,11 @@ class DurableRecorderStore:
                     manifest_schema=str(payload["schema"]),
                     received_at=(
                         str(received_at) if isinstance(received_at, str) else None
+                    ),
+                    source_name=(
+                        str(declared_source)
+                        if isinstance(declared_source, str) and declared_source.strip()
+                        else None
                     ),
                 )
             )

@@ -40,7 +40,7 @@ from typing import Any
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.sqlite_schema import SQLiteMigration, ensure_sqlite_schema
 
-from .observation import CanonicalObservation
+from .observation import CanonicalObservation, epoch_micros, parse_timestamp
 
 CANONICAL_SCHEMA_NAME = "mtconnect_recorder.canonical_observations"
 CANONICAL_SCHEMA_VERSION = 1
@@ -266,6 +266,14 @@ def _validate(connection: sqlite3.Connection) -> None:
 
 
 def _as_micros(value: datetime | str | int | None) -> int | None:
+    """Convert a query bound to the same integer scale rows are stored on.
+
+    Deliberately routed through the observation module's ``epoch_micros`` and
+    ``parse_timestamp`` rather than repeating the arithmetic: a query bound
+    computed even one microsecond differently from the stored value would make
+    range queries silently disagree with their own data at the boundary.
+    """
+
     if value is None:
         return None
     if isinstance(value, bool):
@@ -274,12 +282,8 @@ def _as_micros(value: datetime | str | int | None) -> int | None:
         return value
     if isinstance(value, datetime):
         moment = value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
-        return round(moment.astimezone(timezone.utc).timestamp() * 1_000_000)
-    text = str(value).strip().replace("Z", "+00:00")
-    parsed = datetime.fromisoformat(text)
-    if parsed.tzinfo is None:
-        parsed = parsed.replace(tzinfo=timezone.utc)
-    return round(parsed.astimezone(timezone.utc).timestamp() * 1_000_000)
+        return epoch_micros(moment)
+    return epoch_micros(parse_timestamp(str(value)))
 
 
 def _row_to_observation(row: sqlite3.Row) -> CanonicalObservation:
@@ -506,14 +510,35 @@ class CanonicalObservationStore:
             ).fetchall()
         return tuple(_row_to_batch(row) for row in rows)
 
-    def batch_for_digest(self, raw_sha256: str) -> ProjectedBatchRecord | None:
-        """Trace an observation's ``raw_batch_sha256`` back to its raw capture."""
+    def batch_for_digest(
+        self, *, source_key: str, raw_sha256: str
+    ) -> ProjectedBatchRecord | None:
+        """Trace an observation's ``raw_batch_sha256`` back to its raw capture.
+
+        Both halves of the ledger's key are required. ``raw_sha256`` is a
+        content digest, so two sources that record byte-identical payloads —
+        two identically configured machines, or the same capture restored under
+        a second source — share it. Looking up by digest alone would return
+        whichever partition happened to be found first and quietly attribute an
+        observation to the wrong machine's evidence.
+        """
 
         with self._connect() as connection:
             row = connection.execute(
-                "SELECT * FROM projected_batches WHERE raw_sha256 = ?", (raw_sha256,)
+                "SELECT * FROM projected_batches WHERE source_key = ? AND raw_sha256 = ?",
+                (source_key, raw_sha256),
             ).fetchone()
         return _row_to_batch(row) if row is not None else None
+
+    def batch_for_observation(
+        self, observation: CanonicalObservation
+    ) -> ProjectedBatchRecord | None:
+        """Return the raw batch one observation was projected from."""
+
+        return self.batch_for_digest(
+            source_key=observation.source_key,
+            raw_sha256=observation.raw_batch_sha256,
+        )
 
     # -- queries -----------------------------------------------------------
 

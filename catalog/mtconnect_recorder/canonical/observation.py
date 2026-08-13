@@ -89,7 +89,12 @@ def source_key(source_name: str) -> str:
     return _slug(source_name)
 
 
-def _parse_timestamp(value: str) -> datetime:
+_EPOCH_UTC = datetime(1970, 1, 1, tzinfo=timezone.utc)
+
+
+def parse_timestamp(value: str) -> datetime:
+    """Parse an MTConnect timestamp into an aware UTC ``datetime``."""
+
     text = value.strip()
     if not text:
         raise CanonicalObservationError("observation timestamp is empty")
@@ -107,10 +112,23 @@ def _parse_timestamp(value: str) -> datetime:
     return parsed.astimezone(timezone.utc)
 
 
-def _epoch_micros(moment: datetime) -> int:
-    """Return exact integer microseconds; never a float for range queries."""
+def epoch_micros(moment: datetime) -> int:
+    """Return exact integer microseconds since the UTC epoch.
 
-    return round(moment.timestamp() * 1_000_000)
+    Deliberately avoids ``datetime.timestamp()``: that returns a float, and a
+    float carries only 53 bits of mantissa, so microsecond values near the
+    present already sit close to the point where neighbouring microseconds stop
+    being separately representable and rounding decides the result. ``timedelta``
+    stores days, seconds and microseconds as exact integers, so subtracting from
+    a fixed epoch and recombining them keeps the conversion exact for every
+    timestamp, not merely for most of them.
+
+    Both stored observation times and query bounds go through this one function,
+    so a range query can never disagree with the value it is comparing against.
+    """
+
+    delta = moment.astimezone(timezone.utc) - _EPOCH_UTC
+    return (delta.days * 86_400 + delta.seconds) * 1_000_000 + delta.microseconds
 
 
 def _canonical_stamp(moment: datetime) -> str:
@@ -257,7 +275,7 @@ class CanonicalObservation:
             raise CanonicalObservationError(
                 f"observation {sequence} has no timestamp and the batch supplies none"
             )
-        moment = _parse_timestamp(timestamp_text)
+        moment = parse_timestamp(timestamp_text)
 
         observation_type = str(record.get("observation_type") or "")
         if not observation_type:
@@ -291,7 +309,7 @@ class CanonicalObservation:
             source_name=source_name,
             raw_batch_sha256=raw_batch_sha256,
             observed_at=_canonical_stamp(moment),
-            observed_at_us=_epoch_micros(moment),
+            observed_at_us=epoch_micros(moment),
             timestamp_source=timestamp_source,
             machine_id=str(record.get("machine_id") or source_name),
             device_uuid=_optional(record.get("device_uuid")),

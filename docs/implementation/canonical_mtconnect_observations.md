@@ -130,6 +130,25 @@ to type inference.
 cannot disagree with time ordering; `observed_at_us` is exact integer
 microseconds so range queries never depend on float comparison.
 
+That exactness is arithmetic, not luck. `epoch_micros` subtracts from a fixed
+UTC epoch and recombines `timedelta`'s integer days/seconds/microseconds rather
+than going through `datetime.timestamp()`, which returns a float whose 53-bit
+mantissa cannot separate neighbouring microseconds at large magnitudes. Stored
+values and query bounds both call that one function, so a range bound can never
+land a microsecond away from the value it is being compared against.
+
+### The recorded source name
+
+`source_key` is `_slug(source_name)`, which is lossy — `Machine A` and
+`Machine-A` share a directory. The original name therefore comes from the
+manifest, which records it at capture time, never from the directory a batch was
+found in. This matters because a projection driven from a configured source list
+and an archive-only rebuild that discovers directories must produce identical
+observations, and because a stream with no device identity falls back to the
+source name for `machine_id`. A manifest whose `source_name` slugs to a
+different partition than the one it was found in is rejected as
+`source-key-mismatch`.
+
 Probe-derived fields (`data_item_name`, `mtconnect_type`, `units`,
 `native_units`) are null for a capture with no archived `/probe`. Nothing that
 can be absent participates in identity. `component_path` is derived from the
@@ -227,7 +246,20 @@ by `(observed_at_us, source_key, agent_instance_id, sequence)` — a total order
 not merely a stable one.
 
 **Auditable.** Every observation row carries the `raw_sha256` of its batch;
-`batch_for_digest` maps that to the manifest and payload on disk.
+`batch_for_observation` (or `batch_for_digest(source_key=…, raw_sha256=…)`) maps
+that to the manifest and payload on disk. Both halves of the ledger key are
+required: `raw_sha256` is a content digest, so two identically configured
+machines can share one, and a digest-only lookup would attribute an observation
+to the wrong machine's evidence.
+
+A projected ledger row reports the sequence range derived from the
+digest-verified payload, not the range declared in the manifest. The digest
+covers the XML, not the sidecar, so a corrupted sidecar survives verification;
+the ledger must not repeat unverified numbers as fact. The manifest's declared
+count is kept beside it as `manifest_observation_count`, and a disagreement is
+recorded as an advisory on the row rather than rejecting the batch — rejecting
+would make a legacy capture whose recorder counted differently unreadable, which
+is the exact failure this work exists to remove.
 
 **Failure safe.** Each batch is validated and committed in one transaction. A
 rejected batch leaves no rows and is recorded with a reason; every other batch

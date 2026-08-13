@@ -142,6 +142,12 @@ class RawBatchRef:
     #: Used as the deterministic fallback for observations whose XML carries no
     #: timestamp; never substituted with a wall-clock read at projection time.
     received_at: str | None = None
+    #: ``source_name`` exactly as the recorder wrote it. The directory this
+    #: batch lives in is ``_slug(source_name)``, which is lossy: a name
+    #: containing characters the slug rewrites cannot be recovered from the
+    #: path. Keeping the recorded name means a consumer that discovered this
+    #: batch by walking directories still reports the original identity.
+    source_name: str | None = None
 
 
 @dataclass(frozen=True)

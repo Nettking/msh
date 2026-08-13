@@ -94,6 +94,14 @@ REJECT_DUPLICATE_SEQUENCE = "duplicate-sequence-in-batch"
 #: the two batches is not what it claims to be.
 REJECT_OVERLAP_CONFLICT = "overlapping-observation-conflict"
 
+#: The manifest's ``source_name`` does not slug to the directory the batch was
+#: found in, so the recorded identity and the storage partition disagree.
+REJECT_SOURCE_KEY_MISMATCH = "source-key-mismatch"
+
+#: Advisory, not a rejection: the manifest's declared observation count differs
+#: from the number of observations actually parsed from the verified payload.
+NOTE_COUNT_MISMATCH = "manifest-observation-count-mismatch"
+
 
 @dataclass(frozen=True)
 class BatchRejection:
@@ -101,6 +109,32 @@ class BatchRejection:
     manifest_path: str
     reason: str
     detail: str
+
+
+@dataclass(frozen=True)
+class ObservedRange:
+    """What the digest-verified payload actually contained.
+
+    The manifest's declared range and count are metadata: the digest covers the
+    XML, not the sidecar, so a corrupted sidecar can survive verification. The
+    ledger therefore records the range derived from the parsed observations and
+    keeps the manifest's count separately, under a name that says where it came
+    from, rather than asserting unverified numbers as fact.
+    """
+
+    first_sequence: int
+    last_sequence: int
+    count: int
+    declared_count: int
+
+    @property
+    def advisory(self) -> str | None:
+        if self.count == self.declared_count:
+            return None
+        return (
+            f"{NOTE_COUNT_MISMATCH}: manifest declares {self.declared_count} "
+            f"observations, payload contains {self.count}"
+        )
 
 
 @dataclass(frozen=True)
@@ -219,9 +253,14 @@ class CanonicalObservationProjection:
             if already.get(ref.raw_sha256) == BATCH_STATUS_PROJECTED:
                 skipped += 1
                 continue
+            # The manifest carries the source name exactly as recorded. The
+            # directory is only its slug, so a caller that discovered this
+            # batch by walking directories must not persist the slug as though
+            # it were the original identity.
+            recorded_name = ref.source_name or source_name
             outcome = self._project_batch(
                 ref=ref,
-                source_name=source_name,
+                source_name=recorded_name,
                 source_key=source_key,
                 agent_instance_id=agent_instance_id,
                 probe=probe,
@@ -230,24 +269,25 @@ class CanonicalObservationProjection:
                 rejected.append(outcome)
                 self._record_rejection(
                     ref=ref,
-                    source_name=source_name,
+                    source_name=recorded_name,
                     source_key=source_key,
                     agent_instance_id=agent_instance_id,
                     rejection=outcome,
                 )
                 continue
-            new_rows, repeated = outcome
+            new_rows, repeated, observed = outcome
             self.database.record_batch(
                 observations=new_rows,
                 batch=self._ledger_row(
                     ref=ref,
-                    source_name=source_name,
+                    source_name=recorded_name,
                     source_key=source_key,
                     agent_instance_id=agent_instance_id,
                     projected_count=len(new_rows) + repeated,
                     status=BATCH_STATUS_PROJECTED,
                     reason=None,
-                    detail=None,
+                    detail=observed.advisory,
+                    observed=observed,
                 ),
             )
             projected += 1
@@ -293,13 +333,23 @@ class CanonicalObservationProjection:
         source_key: str,
         agent_instance_id: int,
         probe: ProbeModel | None,
-    ) -> tuple[list[CanonicalObservation], int] | BatchRejection:
+    ) -> tuple[list[CanonicalObservation], int, ObservedRange] | BatchRejection:
         def reject(reason: str, detail: str) -> BatchRejection:
             return BatchRejection(
                 raw_sha256=ref.raw_sha256,
                 manifest_path=str(ref.manifest_path),
                 reason=reason,
                 detail=detail,
+            )
+
+        # The recorded name must belong to the partition the batch was found
+        # in, or the identity written into every row would disagree with where
+        # the evidence lives.
+        if _slug(source_name) != source_key:
+            return reject(
+                REJECT_SOURCE_KEY_MISMATCH,
+                f"manifest source_name {source_name!r} belongs to partition "
+                f"{_slug(source_name)!r}, not {source_key!r}",
             )
 
         # read_raw_batch decompresses and re-hashes, so digest verification
@@ -349,6 +399,14 @@ class CanonicalObservationProjection:
 
         rows.sort(key=lambda item: item.sequence)
         sequences = [item.sequence for item in rows]
+        if not sequences:
+            # The recorder refuses to store an empty batch, so a payload with no
+            # observations is evidence that does not match its own manifest.
+            return reject(
+                REJECT_XML_INVALID,
+                "verified payload contains no observations while its manifest "
+                f"declares {ref.observation_count}",
+            )
         if len(set(sequences)) != len(sequences):
             repeated = sorted(
                 {value for value in sequences if sequences.count(value) > 1}
@@ -381,7 +439,16 @@ class CanonicalObservationProjection:
                     f"{existing.raw_batch_sha256} with different content",
                 )
             repeated_rows += 1
-        return fresh, repeated_rows
+        return (
+            fresh,
+            repeated_rows,
+            ObservedRange(
+                first_sequence=sequences[0],
+                last_sequence=sequences[-1],
+                count=len(rows),
+                declared_count=ref.observation_count,
+            ),
+        )
 
     # -- ledger ------------------------------------------------------------
 
@@ -396,7 +463,17 @@ class CanonicalObservationProjection:
         status: str,
         reason: str | None,
         detail: str | None,
+        observed: ObservedRange | None = None,
     ) -> ProjectedBatchRecord:
+        # A projected row reports the range derived from the digest-verified
+        # payload. Only a rejected row falls back to the manifest's declared
+        # range, and it is not claiming that range is correct.
+        first_sequence = (
+            observed.first_sequence if observed is not None else ref.first_sequence
+        )
+        last_sequence = (
+            observed.last_sequence if observed is not None else ref.last_sequence
+        )
         return ProjectedBatchRecord(
             source_key=source_key,
             raw_sha256=ref.raw_sha256,
@@ -405,8 +482,8 @@ class CanonicalObservationProjection:
             manifest_path=str(ref.manifest_path),
             raw_path=str(ref.raw_path),
             manifest_schema=ref.manifest_schema,
-            first_sequence=ref.first_sequence,
-            last_sequence=ref.last_sequence,
+            first_sequence=first_sequence,
+            last_sequence=last_sequence,
             manifest_observation_count=ref.observation_count,
             projected_count=projected_count,
             status=status,
