@@ -9,12 +9,15 @@ from pathlib import Path
 
 from .acknowledgement import AcknowledgementPolicy
 from .errors import FederationValidationError
+from .sqlite_schema import SQLiteMigration, ensure_sqlite_schema
 from .storage_protocol import BatchIngestRequest
 
 
 def _time(value: datetime) -> str:
     if value.tzinfo is None or value.utcoffset() is None:
-        raise FederationValidationError("invalid-timestamp", "now", "must be timezone-aware")
+        raise FederationValidationError(
+            "invalid-timestamp", "now", "must be timezone-aware"
+        )
     return value.astimezone(timezone.utc).isoformat()
 
 
@@ -40,6 +43,188 @@ class StorageCommitStatus:
         )
 
 
+ACKNOWLEDGEMENT_SCHEMA_NAME = "federation.storage_acknowledgements"
+ACKNOWLEDGEMENT_SCHEMA_VERSION = 2
+_ACKNOWLEDGEMENT_BASE_COLUMNS = frozenset(
+    {
+        "session_id",
+        "group_id",
+        "batch_id",
+        "idempotency_key",
+        "content_hash",
+        "required_replica_acks",
+        "primary_committed",
+        "created_at",
+        "updated_at",
+    }
+)
+_ACKNOWLEDGEMENT_IDENTITY_COLUMNS = frozenset(
+    {"dataset_id", "dataset_schema_name", "dataset_schema_version"}
+)
+_ACKNOWLEDGEMENT_REPLICA_COLUMNS = frozenset(
+    {
+        "session_id",
+        "group_id",
+        "batch_id",
+        "provider_id",
+        "acknowledged",
+        "acknowledged_at",
+    }
+)
+_ACKNOWLEDGEMENT_PENDING_INDEX = "storage_commit_replica_pending"
+
+
+def _ack_table_exists(connection: sqlite3.Connection, table: str) -> bool:
+    return (
+        connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)
+        ).fetchone()
+        is not None
+    )
+
+
+def _ack_columns(connection: sqlite3.Connection, table: str) -> set[str]:
+    if table == "storage_commits":
+        pragma = "PRAGMA table_info(storage_commits)"
+    elif table == "storage_commit_replicas":
+        pragma = "PRAGMA table_info(storage_commit_replicas)"
+    else:
+        raise ValueError("unsupported acknowledgement table")
+    return {str(row[1]) for row in connection.execute(pragma)}
+
+
+def _ack_pending_index_exists(connection: sqlite3.Connection) -> bool:
+    return (
+        connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='index' AND name=?",
+            (_ACKNOWLEDGEMENT_PENDING_INDEX,),
+        ).fetchone()
+        is not None
+    )
+
+
+def _detect_acknowledgement_version(connection: sqlite3.Connection) -> int:
+    commits = _ack_table_exists(connection, "storage_commits")
+    replicas = _ack_table_exists(connection, "storage_commit_replicas")
+    if not commits and not replicas:
+        return 0
+    if not commits or not replicas:
+        raise FederationValidationError(
+            "unsupported-acknowledgement-schema",
+            "schema",
+            "legacy acknowledgement database is missing one of its required tables",
+        )
+    commit_columns = _ack_columns(connection, "storage_commits")
+    replica_columns = _ack_columns(connection, "storage_commit_replicas")
+    missing_commits = _ACKNOWLEDGEMENT_BASE_COLUMNS.difference(commit_columns)
+    missing_replicas = _ACKNOWLEDGEMENT_REPLICA_COLUMNS.difference(replica_columns)
+    if missing_commits or missing_replicas:
+        raise FederationValidationError(
+            "unsupported-acknowledgement-schema",
+            "schema",
+            "legacy acknowledgement database is missing required base columns",
+        )
+    return (
+        ACKNOWLEDGEMENT_SCHEMA_VERSION
+        if _ACKNOWLEDGEMENT_IDENTITY_COLUMNS.issubset(commit_columns)
+        and _ack_pending_index_exists(connection)
+        else 1
+    )
+
+
+def _create_acknowledgement_v1(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE storage_commits (
+            session_id TEXT NOT NULL,
+            group_id TEXT NOT NULL,
+            batch_id TEXT NOT NULL,
+            idempotency_key TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            required_replica_acks INTEGER NOT NULL CHECK(required_replica_acks >= 0),
+            primary_committed INTEGER NOT NULL DEFAULT 0 CHECK(primary_committed IN (0,1)),
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY(session_id, group_id, batch_id),
+            UNIQUE(session_id, group_id, idempotency_key)
+        )
+        """
+    )
+    connection.execute(
+        """
+        CREATE TABLE storage_commit_replicas (
+            session_id TEXT NOT NULL,
+            group_id TEXT NOT NULL,
+            batch_id TEXT NOT NULL,
+            provider_id TEXT NOT NULL,
+            acknowledged INTEGER NOT NULL DEFAULT 0 CHECK(acknowledged IN (0,1)),
+            acknowledged_at TEXT,
+            PRIMARY KEY(session_id, group_id, batch_id, provider_id),
+            FOREIGN KEY(session_id, group_id, batch_id)
+                REFERENCES storage_commits(session_id, group_id, batch_id)
+                ON DELETE CASCADE
+        )
+        """
+    )
+    connection.execute(
+        """CREATE INDEX storage_commit_replica_pending
+           ON storage_commit_replicas(
+               provider_id, acknowledged, session_id, group_id, batch_id
+           )"""
+    )
+
+
+def _upgrade_acknowledgement_v2(connection: sqlite3.Connection) -> None:
+    columns = _ack_columns(connection, "storage_commits")
+    if "dataset_id" not in columns:
+        connection.execute(
+            """ALTER TABLE storage_commits
+               ADD COLUMN dataset_id TEXT NOT NULL
+               DEFAULT 'legacy-unknown-dataset'"""
+        )
+    if "dataset_schema_name" not in columns:
+        connection.execute(
+            """ALTER TABLE storage_commits
+               ADD COLUMN dataset_schema_name TEXT NOT NULL
+               DEFAULT 'fcp.storage.dataset.opaque'"""
+        )
+    if "dataset_schema_version" not in columns:
+        connection.execute(
+            """ALTER TABLE storage_commits
+               ADD COLUMN dataset_schema_version INTEGER NOT NULL
+               DEFAULT 1 CHECK(dataset_schema_version > 0)"""
+        )
+    connection.execute(
+        """CREATE INDEX IF NOT EXISTS storage_commit_replica_pending
+           ON storage_commit_replicas(
+               provider_id, acknowledged, session_id, group_id, batch_id
+           )"""
+    )
+
+
+def _validate_acknowledgement_schema(connection: sqlite3.Connection) -> None:
+    if not _ack_table_exists(connection, "storage_commits") or not _ack_table_exists(
+        connection, "storage_commit_replicas"
+    ):
+        raise FederationValidationError(
+            "unsupported-acknowledgement-schema",
+            "schema",
+            "acknowledgement tables are missing",
+        )
+    missing_commits = (
+        _ACKNOWLEDGEMENT_BASE_COLUMNS | _ACKNOWLEDGEMENT_IDENTITY_COLUMNS
+    ).difference(_ack_columns(connection, "storage_commits"))
+    missing_replicas = _ACKNOWLEDGEMENT_REPLICA_COLUMNS.difference(
+        _ack_columns(connection, "storage_commit_replicas")
+    )
+    if missing_commits or missing_replicas or not _ack_pending_index_exists(connection):
+        raise FederationValidationError(
+            "unsupported-acknowledgement-schema",
+            "schema",
+            "acknowledgement schema is incomplete",
+        )
+
+
 class DurableAcknowledgementStore:
     """SQLite-backed acknowledgement state keyed by immutable logical batch identity."""
 
@@ -48,67 +233,17 @@ class DurableAcknowledgementStore:
         Path(self.database).parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
-            connection.executescript(
-                """
-                CREATE TABLE IF NOT EXISTS storage_commits (
-                    session_id TEXT NOT NULL,
-                    group_id TEXT NOT NULL,
-                    batch_id TEXT NOT NULL,
-                    idempotency_key TEXT NOT NULL,
-                    content_hash TEXT NOT NULL,
-                    dataset_id TEXT NOT NULL
-                        DEFAULT 'legacy-unknown-dataset',
-                    dataset_schema_name TEXT NOT NULL
-                        DEFAULT 'fcp.storage.dataset.opaque',
-                    dataset_schema_version INTEGER NOT NULL DEFAULT 1
-                        CHECK(dataset_schema_version > 0),
-                    required_replica_acks INTEGER NOT NULL CHECK(required_replica_acks >= 0),
-                    primary_committed INTEGER NOT NULL DEFAULT 0 CHECK(primary_committed IN (0,1)),
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL,
-                    PRIMARY KEY(session_id, group_id, batch_id),
-                    UNIQUE(session_id, group_id, idempotency_key)
-                );
-                CREATE TABLE IF NOT EXISTS storage_commit_replicas (
-                    session_id TEXT NOT NULL,
-                    group_id TEXT NOT NULL,
-                    batch_id TEXT NOT NULL,
-                    provider_id TEXT NOT NULL,
-                    acknowledged INTEGER NOT NULL DEFAULT 0 CHECK(acknowledged IN (0,1)),
-                    acknowledged_at TEXT,
-                    PRIMARY KEY(session_id, group_id, batch_id, provider_id),
-                    FOREIGN KEY(session_id, group_id, batch_id)
-                        REFERENCES storage_commits(session_id, group_id, batch_id)
-                        ON DELETE CASCADE
-                );
-                CREATE INDEX IF NOT EXISTS storage_commit_replica_pending
-                    ON storage_commit_replicas(provider_id, acknowledged, session_id, group_id, batch_id);
-                """
+            ensure_sqlite_schema(
+                connection,
+                schema_name=ACKNOWLEDGEMENT_SCHEMA_NAME,
+                target_version=ACKNOWLEDGEMENT_SCHEMA_VERSION,
+                migrations=(
+                    SQLiteMigration(1, _create_acknowledgement_v1),
+                    SQLiteMigration(2, _upgrade_acknowledgement_v2),
+                ),
+                detect_legacy_version=_detect_acknowledgement_version,
+                validate=_validate_acknowledgement_schema,
             )
-            columns = {
-                row["name"]
-                for row in connection.execute(
-                    "PRAGMA table_info(storage_commits)"
-                )
-            }
-            if "dataset_id" not in columns:
-                connection.execute(
-                    """ALTER TABLE storage_commits
-                       ADD COLUMN dataset_id TEXT NOT NULL
-                       DEFAULT 'legacy-unknown-dataset'"""
-                )
-            if "dataset_schema_name" not in columns:
-                connection.execute(
-                    """ALTER TABLE storage_commits
-                       ADD COLUMN dataset_schema_name TEXT NOT NULL
-                       DEFAULT 'fcp.storage.dataset.opaque'"""
-                )
-            if "dataset_schema_version" not in columns:
-                connection.execute(
-                    """ALTER TABLE storage_commits
-                       ADD COLUMN dataset_schema_version INTEGER NOT NULL
-                       DEFAULT 1 CHECK(dataset_schema_version > 0)"""
-                )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
@@ -128,10 +263,13 @@ class DurableAcknowledgementStore:
     ) -> StorageCommitStatus:
         replicas = tuple(dict.fromkeys(replica_provider_ids))
         if len(replicas) != len(replica_provider_ids) or any(
-            not isinstance(provider_id, str) or not provider_id for provider_id in replicas
+            not isinstance(provider_id, str) or not provider_id
+            for provider_id in replicas
         ):
             raise FederationValidationError(
-                "invalid-assignment", "replica_provider_ids", "replica providers must be unique non-empty IDs"
+                "invalid-assignment",
+                "replica_provider_ids",
+                "replica providers must be unique non-empty IDs",
             )
         required = policy.required_replica_acks(len(replicas))
         authority = request.authority
@@ -148,7 +286,11 @@ class DurableAcknowledgementStore:
                     by_key = connection.execute(
                         """SELECT batch_id, content_hash FROM storage_commits
                            WHERE session_id=? AND group_id=? AND idempotency_key=?""",
-                        (authority.session_id, authority.group_id, request.idempotency_key),
+                        (
+                            authority.session_id,
+                            authority.group_id,
+                            request.idempotency_key,
+                        ),
                     ).fetchone()
                     if by_key is not None:
                         raise FederationValidationError(
@@ -182,15 +324,19 @@ class DurableAcknowledgementStore:
                             """INSERT INTO storage_commit_replicas
                                (session_id, group_id, batch_id, provider_id, acknowledged)
                                VALUES (?, ?, ?, ?, 0)""",
-                            (authority.session_id, authority.group_id, request.batch_id, provider_id),
+                            (
+                                authority.session_id,
+                                authority.group_id,
+                                request.batch_id,
+                                provider_id,
+                            ),
                         )
                 else:
                     if (
                         row["idempotency_key"] != request.idempotency_key
                         or row["content_hash"] != request.content_hash
                         or row["dataset_id"] != request.dataset_id
-                        or row["dataset_schema_name"]
-                        != request.dataset_schema_name
+                        or row["dataset_schema_name"] != request.dataset_schema_name
                         or int(row["dataset_schema_version"])
                         != request.dataset_schema_version
                         or int(row["required_replica_acks"]) != required
@@ -206,7 +352,11 @@ class DurableAcknowledgementStore:
                             """SELECT provider_id FROM storage_commit_replicas
                                WHERE session_id=? AND group_id=? AND batch_id=?
                                ORDER BY provider_id""",
-                            (authority.session_id, authority.group_id, request.batch_id),
+                            (
+                                authority.session_id,
+                                authority.group_id,
+                                request.batch_id,
+                            ),
                         )
                     )
                     if existing != tuple(sorted(replicas)):
@@ -238,7 +388,9 @@ class DurableAcknowledgementStore:
                 (_time(now), session_id, group_id, batch_id),
             )
             if cursor.rowcount != 1:
-                raise FederationValidationError("commit-not-found", "batch_id", "commit state does not exist")
+                raise FederationValidationError(
+                    "commit-not-found", "batch_id", "commit state does not exist"
+                )
         status = self.status(session_id, group_id, batch_id)
         assert status is not None
         return status
@@ -253,7 +405,9 @@ class DurableAcknowledgementStore:
         now: datetime,
     ) -> StorageCommitStatus:
         if not isinstance(provider_id, str) or not provider_id:
-            raise FederationValidationError("invalid-id", "provider_id", "must be non-empty text")
+            raise FederationValidationError(
+                "invalid-id", "provider_id", "must be non-empty text"
+            )
         stamp = _time(now)
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -265,7 +419,9 @@ class DurableAcknowledgementStore:
             if row is None:
                 connection.rollback()
                 raise FederationValidationError(
-                    "unexpected-replica-ack", "provider_id", "provider is not assigned to this batch"
+                    "unexpected-replica-ack",
+                    "provider_id",
+                    "provider is not assigned to this batch",
                 )
             if not bool(row["acknowledged"]):
                 connection.execute(
@@ -284,7 +440,9 @@ class DurableAcknowledgementStore:
         assert status is not None
         return status
 
-    def status(self, session_id: str, group_id: str, batch_id: str) -> StorageCommitStatus | None:
+    def status(
+        self, session_id: str, group_id: str, batch_id: str
+    ) -> StorageCommitStatus | None:
         with self._connect() as connection:
             row = connection.execute(
                 """SELECT idempotency_key, content_hash, dataset_id,
@@ -329,7 +487,9 @@ class DurableAcknowledgementStore:
             acknowledged,
         )
 
-    def pending_for_provider(self, provider_id: str) -> tuple[tuple[str, str, str], ...]:
+    def pending_for_provider(
+        self, provider_id: str
+    ) -> tuple[tuple[str, str, str], ...]:
         with self._connect() as connection:
             return tuple(
                 (row["session_id"], row["group_id"], row["batch_id"])
