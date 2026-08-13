@@ -185,6 +185,7 @@ class AnalysisWorkService:
         self._lock = threading.Lock()
         self._scheduling = threading.Event()
         self._scheduler_wake = threading.Event()
+        self._scheduler_stop = threading.Event()
 
     # ------------------------------------------------------------------
 
@@ -251,6 +252,8 @@ class AnalysisWorkService:
         new discovery or browser request.
         """
 
+        if self._scheduler_stop.is_set():
+            return False
         with self._lock:
             if self._scheduling.is_set():
                 self._scheduler_wake.set()
@@ -269,9 +272,15 @@ class AnalysisWorkService:
             raise
         return True
 
+    def stop_scheduling(self) -> None:
+        """Fence a superseded runtime's background driver without touching jobs."""
+
+        self._scheduler_stop.set()
+        self._scheduler_wake.set()
+
     def _background_pass(self) -> None:
         try:
-            while True:
+            while not self._scheduler_stop.is_set():
                 self._scheduler_wake.clear()
                 try:
                     asyncio.run(self.schedule_pending())
@@ -279,14 +288,19 @@ class AnalysisWorkService:
                     # A transient scheduling/control failure is exactly the case
                     # the persistent driver exists to revisit.
                     pass
-                if not self.pending_job_ids():
+                if self._scheduler_stop.is_set() or not self.pending_job_ids():
                     return
                 self._scheduler_wake.wait(self.scheduler_poll_seconds)
         finally:
             self._scheduling.clear()
             # Close the race where work was submitted after the final pending
-            # check but before the scheduling flag cleared.
-            if self.pending_job_ids() and self._scheduler_wake.is_set():
+            # check but before the scheduling flag cleared. A deliberately
+            # stopped/superseded runtime must never resurrect its driver.
+            if (
+                not self._scheduler_stop.is_set()
+                and self.pending_job_ids()
+                and self._scheduler_wake.is_set()
+            ):
                 self.request_scheduling_pass()
 
     # ------------------------------------------------------------------
