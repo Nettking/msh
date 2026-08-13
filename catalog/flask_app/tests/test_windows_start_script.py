@@ -243,7 +243,14 @@ def test_start_cmd_fresh_mode_resets_and_verifies_authoritative_state() -> None:
 
     assert 'if /I "%~1"=="--fresh"' in script
     assert "Type RESET to continue" in script
-    assert "docker compose down --remove-orphans" in script
+    # The fresh-reset shutdown moved out of start.cmd into a bounded helper so a
+    # hung Compose call cannot stall the reset. start.cmd must still stop the
+    # project before any state is deleted, and it must fail closed if that does
+    # not succeed. That the shutdown stays project-scoped -- no Docker-wide
+    # prune, no volume deletion -- is asserted against the helper itself in
+    # test_windows_fresh_shutdown.py, next to the code that performs it.
+    assert "scripts\\windows\\stop_fcp_for_fresh_reset.ps1" in script
+    assert "FCP containers could not be stopped safely" in script
     assert (
         "python flask -m catalog.flask_app.services.device_state_reset" in script
     )

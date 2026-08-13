@@ -380,7 +380,7 @@ if /I not "%FCP_RESET_CONFIRM%"=="RESET" (
 
 echo.
 echo Stopping FCP before resetting device and Federation state...
-docker compose down --remove-orphans
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\stop_fcp_for_fresh_reset.ps1"
 if errorlevel 1 (
     echo FCP containers could not be stopped safely. Nothing else was removed.
     pause
