@@ -83,22 +83,118 @@ class UploadAnalysisJobService:
         connection.execute("PRAGMA synchronous=FULL")
         return connection
 
+    @staticmethod
+    def _create_links_table(connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS data_upload_analysis_jobs (
+                job_id TEXT NOT NULL,
+                batch_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                coordinator_id TEXT NOT NULL,
+                provider_id TEXT,
+                execution_id TEXT,
+                baseline_update_at TEXT,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY(job_id, batch_id)
+            )
+            """
+        )
+
+    @staticmethod
+    def _links_schema_is_current(connection: sqlite3.Connection) -> bool:
+        rows = connection.execute(
+            "PRAGMA table_info(data_upload_analysis_jobs)"
+        ).fetchall()
+        if not rows:
+            return False
+        by_name = {str(row["name"]): row for row in rows}
+        required = {
+            "job_id",
+            "batch_id",
+            "session_id",
+            "coordinator_id",
+            "provider_id",
+            "execution_id",
+            "baseline_update_at",
+            "created_at",
+        }
+        if not required.issubset(by_name):
+            return False
+        return (
+            int(by_name["job_id"]["pk"]) == 1
+            and int(by_name["batch_id"]["pk"]) == 2
+            and int(by_name["provider_id"]["notnull"]) == 0
+        )
+
+    def _migrate_legacy_links(self, connection: sqlite3.Connection) -> None:
+        """Replace the pre-federation one-job-per-batch link schema atomically."""
+
+        legacy = "data_upload_analysis_jobs_legacy"
+        connection.execute(f"DROP TABLE IF EXISTS {legacy}")
+        connection.execute(
+            f"ALTER TABLE data_upload_analysis_jobs RENAME TO {legacy}"
+        )
+        self._create_links_table(connection)
+        columns = {
+            str(row["name"])
+            for row in connection.execute(f"PRAGMA table_info({legacy})").fetchall()
+        }
+
+        def value(name: str, fallback: str = "NULL") -> str:
+            return name if name in columns else fallback
+
+        # Every released legacy schema had the first five identity columns and
+        # created_at. Optional tracking columns are copied when present. The old
+        # provider value remains useful history, while new rows may leave it null
+        # until F7 selection chooses an actual provider.
+        required = {
+            "job_id",
+            "batch_id",
+            "session_id",
+            "coordinator_id",
+            "provider_id",
+            "created_at",
+        }
+        if not required.issubset(columns):
+            raise sqlite3.OperationalError(
+                "legacy data_upload_analysis_jobs schema is missing required columns"
+            )
+        connection.execute(
+            f"""
+            INSERT OR IGNORE INTO data_upload_analysis_jobs(
+                job_id,batch_id,session_id,coordinator_id,provider_id,
+                execution_id,baseline_update_at,created_at
+            )
+            SELECT
+                job_id,batch_id,session_id,coordinator_id,provider_id,
+                {value('execution_id')},{value('baseline_update_at')},created_at
+            FROM {legacy}
+            """
+        )
+        connection.execute(f"DROP TABLE {legacy}")
+
     def _initialize_links(self) -> None:
         with self._connect() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
-            connection.execute("""
-                CREATE TABLE IF NOT EXISTS data_upload_analysis_jobs (
-                    job_id TEXT NOT NULL,
-                    batch_id TEXT NOT NULL,
-                    session_id TEXT NOT NULL,
-                    coordinator_id TEXT NOT NULL,
-                    provider_id TEXT,
-                    execution_id TEXT,
-                    baseline_update_at TEXT,
-                    created_at TEXT NOT NULL,
-                    PRIMARY KEY(job_id, batch_id)
-                )
-                """)
+            exists = connection.execute(
+                """
+                SELECT 1 FROM sqlite_master
+                WHERE type='table' AND name='data_upload_analysis_jobs'
+                """
+            ).fetchone()
+            if exists is None:
+                self._create_links_table(connection)
+                return
+            if self._links_schema_is_current(connection):
+                return
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._migrate_legacy_links(connection)
+                connection.commit()
+            except BaseException:
+                connection.rollback()
+                raise
 
     # ------------------------------------------------------------------
 
