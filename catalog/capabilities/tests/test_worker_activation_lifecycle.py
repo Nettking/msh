@@ -277,7 +277,7 @@ def test_default_activated_worker_refuses_cancellation_cleanly(tmp_path) -> None
 
 def test_lifecycle_factory_produces_a_cancellable_activated_worker(tmp_path) -> None:
     handler = _Handler()
-    authority, session_id, node_id = _authority(tmp_path, handler)
+    authority, _session_id, node_id = _authority(tmp_path, handler)
     binder = TrustedComputeWorkerBinder(
         authority,
         lambda provider_id: SQLiteLifecycleDispatchInbox(

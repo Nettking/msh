@@ -31,6 +31,7 @@ from ..jobs import AttemptStatus, JobContract, JobStatus
 from ..lifecycle_contracts import LifecycleAction
 from ..lifecycle_coordinator import (
     JobLifecycleCoordinator,
+    LifecycleTransport,
     ResilientDispatchCoordinator,
 )
 from ..lifecycle_store import SQLiteJobLifecycleStore

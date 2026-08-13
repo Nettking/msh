@@ -110,12 +110,24 @@ class RelayMessageClient(Protocol):
     async def receive_message(self, *, timeout: float | None = None): ...
 
 
+class RelayMessageSource(Protocol):
+    """An upstream relay reader that forwards the frames it does not own."""
+
+    async def receive_other(self, *, timeout: float | None = None): ...
+
+
 class RelayAnalysisArtifactEndpoint:
     """Request/serve authorized artifact frames over the authenticated relay.
 
     The relay authenticates actor, target and session. This endpoint repeats
     those bindings and then hands the request to the local artifact authority,
     which is the component that actually decides whether the caller may read.
+
+    A relay client has a single inbound message stream, so only one component
+    may consume it. Pass ``message_source`` (typically the node's
+    :class:`~catalog.capabilities.relay_lifecycle.RelayLifecycleEndpoint`) to
+    chain off its ``receive_other`` instead of competing for that stream. This
+    is the same composition the storage and recorder relays already use.
     """
 
     def __init__(
@@ -125,9 +137,11 @@ class RelayAnalysisArtifactEndpoint:
         *,
         clock,
         request_timeout: float = 30.0,
+        message_source: RelayMessageSource | None = None,
     ) -> None:
         self.relay_client = relay_client
         self.gateway = gateway
+        self.message_source = message_source
         self.clock = clock
         self.request_timeout = float(request_timeout)
         self._pending: dict[str, asyncio.Future[dict[str, Any]]] = {}
@@ -256,10 +270,15 @@ class RelayAnalysisArtifactEndpoint:
 
     # ------------------------------------------------------------------
 
+    async def _receive(self):
+        if self.message_source is not None:
+            return await self.message_source.receive_other()
+        return await self.relay_client.receive_message()
+
     async def _reader_loop(self) -> None:
         try:
             while not self._closed:
-                incoming = await self.relay_client.receive_message()
+                incoming = await self._receive()
                 payload = getattr(incoming, "payload", None)
                 if (
                     not isinstance(payload, dict)
@@ -349,4 +368,5 @@ __all__ = [
     "RELAY_ARTIFACT_KIND",
     "LocalAnalysisArtifactCarrier",
     "RelayAnalysisArtifactEndpoint",
+    "RelayMessageSource",
 ]

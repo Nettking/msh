@@ -87,8 +87,14 @@ class DeviceFederationAuthority:
         """Return the carrier for authorized F6 artifact frames."""
 
         if self.relay_client is not None:
+            transport = self.lifecycle_transport()
             return RelayAnalysisArtifactEndpoint(
-                self.relay_client, gateway, clock=self.clock
+                self.relay_client,
+                gateway,
+                clock=self.clock,
+                # One component may consume the relay client's inbound stream;
+                # the lifecycle endpoint owns it and forwards the rest.
+                message_source=transport,
             )
         return LocalAnalysisArtifactCarrier(
             gateway, local_node_id=self.data_owner_node_id, clock=self.clock

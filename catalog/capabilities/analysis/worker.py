@@ -31,6 +31,7 @@ from catalog.federation.errors import (
 from ..artifact_contracts import ArtifactInputReference
 from ..dispatch import ExecutionResult
 from ..jobs import ArtifactReference, JobContract, protocol_major
+from .content_store import LocalArtifactContentStore
 from .contracts import (
     ANALYSIS_CAPABILITY_TYPE,
     ANALYSIS_DATA_SLICE_SCHEMA,
@@ -44,7 +45,6 @@ from .contracts import (
     AnalysisPlan,
     analysis_grant_id,
 )
-from .content_store import LocalArtifactContentStore
 from .gateway import AnalysisArtifactTransport, retrieve_authorized_artifact
 from .packaging import extract_slice_archive
 
