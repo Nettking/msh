@@ -429,10 +429,12 @@ class ThreadsafeRelayLifecycleTransport:
         event_loop: asyncio.AbstractEventLoop,
         *,
         timeout_seconds: float = 120.0,
+        close_timeout_seconds: float = 10.0,
     ) -> None:
         self.endpoint = endpoint
         self.event_loop = event_loop
         self.timeout_seconds = float(timeout_seconds)
+        self.close_timeout_seconds = float(close_timeout_seconds)
         self.relay_client = endpoint.relay_client
 
     async def _await_remote(self, coroutine):
@@ -486,6 +488,33 @@ class ThreadsafeRelayLifecycleTransport:
                 replace_provider_ids=replace_provider_ids,
             )
         )
+
+    def close(self) -> None:
+        """Close the wrapped endpoint from a scheduler thread, bounded.
+
+        ``AnalysisRuntime.stop`` releases a superseded transport with a plain
+        ``getattr(transport, "close", None)``. Without this method that lookup
+        finds nothing, and the superseded endpoint's reader task stays parked on
+        the relay loop after a runtime replacement or reconnect.
+
+        ``RelayLifecycleEndpoint.close`` is a coroutine owned by the relay loop,
+        so it is scheduled there and awaited from here. Shutdown must never
+        block: a loop that is already gone is nothing to close, and a close that
+        does not finish inside the budget is abandoned rather than waited on.
+        """
+
+        loop = self.event_loop
+        if loop.is_closed() or not loop.is_running():
+            return
+        try:
+            future = asyncio.run_coroutine_threadsafe(self.endpoint.close(), loop)
+        except RuntimeError:
+            # The loop stopped between the check above and the submission.
+            return
+        try:
+            future.result(timeout=self.close_timeout_seconds)
+        except TimeoutError:
+            future.cancel()
 
 
 @dataclass

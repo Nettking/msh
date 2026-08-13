@@ -132,6 +132,69 @@ class RawBatchRef:
     last_sequence: int
     next_sequence: int
     observation_count: int
+    #: Schema declared by the manifest this reference was read from. Batches
+    #: written by this installation always carry the current schema; a capture
+    #: recorded before the product rename carries a supported legacy name. The
+    #: value is retained so a consumer can report which historical form it read
+    #: without reopening the manifest.
+    manifest_schema: str = "fcp.mtconnect.raw_batch_manifest.v1"
+    #: ``received_at`` recorded in the manifest, when the recorder captured it.
+    #: Used as the deterministic fallback for observations whose XML carries no
+    #: timestamp; never substituted with a wall-clock read at projection time.
+    received_at: str | None = None
+    #: ``source_name`` exactly as the recorder wrote it. The directory this
+    #: batch lives in is ``_slug(source_name)``, which is lossy: a name
+    #: containing characters the slug rewrites cannot be recovered from the
+    #: path. Keeping the recorded name means a consumer that discovered this
+    #: batch by walking directories still reports the original identity.
+    #:
+    #: Required in every supported manifest, so ``scan_raw_batches`` never
+    #: produces a reference without it — a manifest missing or blanking the
+    #: field is reported as malformed instead. The ``None`` default exists only
+    #: so the dataclass signature stays compatible for direct construction.
+    source_name: str | None = None
+
+
+@dataclass(frozen=True)
+class RawBatchIssue:
+    """One manifest that could not become a :class:`RawBatchRef`.
+
+    ``reason`` separates the two failures that must never be conflated: a
+    manifest that parses but declares a schema this build does not support, and
+    a manifest that is missing, unreadable, or structurally invalid.
+    """
+
+    manifest_path: Path
+    reason: str
+    detail: str
+    schema: str | None = None
+
+
+#: A manifest whose JSON parses and whose ``schema`` is a string this build does
+#: not implement. The batch is intact as far as the reader can tell; the reader
+#: simply does not know the format.
+RAW_BATCH_ISSUE_UNSUPPORTED_SCHEMA = "unsupported-manifest-schema"
+
+#: A manifest that could not be read, is not JSON, is not an object, or is
+#: missing or invalid in a field the supported schema requires. This is corruption
+#: or truncation, not a version difference.
+RAW_BATCH_ISSUE_MALFORMED = "malformed-manifest"
+
+#: A supported, structurally valid manifest whose compressed payload is absent.
+RAW_BATCH_ISSUE_RAW_MISSING = "raw-payload-missing"
+
+
+@dataclass(frozen=True)
+class RawBatchScan:
+    """Everything one raw-batch directory scan found, including what it skipped.
+
+    ``iter_raw_batches`` returns only ``refs``. Callers that must not silently
+    lose data — the canonical projection in particular — read ``issues`` so a
+    skipped batch is reported rather than disappearing.
+    """
+
+    refs: tuple[RawBatchRef, ...]
+    issues: tuple[RawBatchIssue, ...] = ()
 
 
 @dataclass(frozen=True)

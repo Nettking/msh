@@ -9,12 +9,16 @@ from pathlib import Path
 from typing import Any
 
 from .model import (
+    RAW_BATCH_ISSUE_MALFORMED,
+    RAW_BATCH_ISSUE_RAW_MISSING,
+    RAW_BATCH_ISSUE_UNSUPPORTED_SCHEMA,
     MtconnectProtocolError,
     ParsedBatch,
     ProbeModel,
+    RawBatchIssue,
     RawBatchRef,
+    RawBatchScan,
     StoredBatch,
-    _read_json,
     _slug,
     _utc_now,
     _write_bytes_atomic,
@@ -22,6 +26,13 @@ from .model import (
     _write_text_atomic,
 )
 from .parsing import parse_probe
+from .schema_compat import (
+    PROBE_MANIFEST_SCHEMA,
+    RAW_BATCH_MANIFEST_SCHEMA,
+    SCHEMA_UNSUPPORTED,
+    SUPPORTED_RAW_BATCH_MANIFEST_SCHEMAS,
+    classify_raw_batch_manifest_schema,
+)
 
 
 class DurableRecorderStore:
@@ -51,7 +62,7 @@ class DurableRecorderStore:
         )
         _write_bytes_atomic(path, gzip.compress(xml_text.encode("utf-8"), mtime=0))
         manifest = {
-            "schema": "fcp.mtconnect.probe_manifest.v1",
+            "schema": PROBE_MANIFEST_SCHEMA,
             "source_name": source_name,
             "agent_instance_id": instance_id,
             "probe_sha256": probe.sha256,
@@ -95,7 +106,7 @@ class DurableRecorderStore:
 
         manifest_path = raw_path.with_suffix(".manifest.json")
         raw_manifest = {
-            "schema": "fcp.mtconnect.raw_batch_manifest.v1",
+            "schema": RAW_BATCH_MANIFEST_SCHEMA,
             "source_name": source_name,
             "agent_instance_id": batch.header.instance_id,
             "requested_from": requested_from,
@@ -110,6 +121,7 @@ class DurableRecorderStore:
             "raw_file": str(raw_path),
         }
         _write_json_atomic(manifest_path, raw_manifest)
+        received_at = raw_manifest["received_at"]
         return RawBatchRef(
             raw_path=raw_path,
             manifest_path=manifest_path,
@@ -119,6 +131,9 @@ class DurableRecorderStore:
             last_sequence=last,
             next_sequence=batch.header.next_sequence,
             observation_count=len(batch.observations),
+            manifest_schema=RAW_BATCH_MANIFEST_SCHEMA,
+            received_at=str(received_at) if isinstance(received_at, str) else None,
+            source_name=source_name,
         )
 
     def _batch_location(
@@ -291,40 +306,180 @@ class DurableRecorderStore:
             latest_values=latest_values,
         )
 
+    @staticmethod
+    def _local_raw_candidates(manifest_path: Path) -> tuple[Path, ...]:
+        """Return the sibling payload names a manifest may describe.
+
+        ``store_raw_batch`` derives the manifest name with
+        ``Path.with_suffix('.manifest.json')``, which replaces only the final
+        ``.gz``. ``seq-...-<digest>.xml.gz`` therefore has the manifest
+        ``seq-...-<digest>.xml.manifest.json``, and stripping the manifest
+        suffix yields ``seq-...-<digest>.xml`` — a file that does not exist.
+
+        This matters whenever the recorded absolute ``raw_file`` path does not
+        resolve, which is exactly what happens when a capture is copied off the
+        machine that recorded it. Offer the compressed sibling first so a
+        relocated capture stays readable, and keep the uncompressed name for any
+        archive that genuinely stored one.
+        """
+
+        stem = manifest_path.name.removesuffix(".manifest.json")
+        return (
+            manifest_path.with_name(f"{stem}.gz"),
+            manifest_path.with_name(stem),
+        )
+
+    def _read_manifest_payload(
+        self, manifest_path: Path
+    ) -> tuple[dict[str, Any] | None, RawBatchIssue | None]:
+        """Parse one manifest, separating "cannot read" from "do not support"."""
+
+        try:
+            text = manifest_path.read_text(encoding="utf-8")
+        except OSError as exc:
+            return None, RawBatchIssue(
+                manifest_path=manifest_path,
+                reason=RAW_BATCH_ISSUE_MALFORMED,
+                detail=f"manifest could not be read: {exc.strerror or exc}",
+            )
+        try:
+            payload = json.loads(text)
+        except json.JSONDecodeError as exc:
+            return None, RawBatchIssue(
+                manifest_path=manifest_path,
+                reason=RAW_BATCH_ISSUE_MALFORMED,
+                detail=f"manifest is not valid JSON: {exc.msg}",
+            )
+        if not isinstance(payload, dict):
+            return None, RawBatchIssue(
+                manifest_path=manifest_path,
+                reason=RAW_BATCH_ISSUE_MALFORMED,
+                detail="manifest is not a JSON object",
+            )
+
+        declared = payload.get("schema")
+        if classify_raw_batch_manifest_schema(declared) == SCHEMA_UNSUPPORTED:
+            return None, RawBatchIssue(
+                manifest_path=manifest_path,
+                reason=RAW_BATCH_ISSUE_UNSUPPORTED_SCHEMA,
+                detail=(
+                    "manifest declares an unsupported schema; supported schemas are "
+                    + ", ".join(sorted(SUPPORTED_RAW_BATCH_MANIFEST_SCHEMAS))
+                ),
+                schema=declared if isinstance(declared, str) else None,
+            )
+        return payload, None
+
+    def scan_raw_batches(
+        self,
+        *,
+        source_name: str,
+        instance_id: int,
+    ) -> RawBatchScan:
+        """Return every readable raw batch plus a reason for each skipped one.
+
+        Current and pre-rename manifests both resolve here, and both go through
+        the same structural validation; only the declared schema string differs.
+        Nothing is rewritten — the capture on disk stays exactly as recorded.
+        """
+
+        root = self.raw_root / _slug(source_name) / str(instance_id)
+        refs: list[RawBatchRef] = []
+        issues: list[RawBatchIssue] = []
+        if not root.exists():
+            return RawBatchScan(refs=(), issues=())
+        for manifest_path in sorted(root.rglob("*.manifest.json")):
+            payload, issue = self._read_manifest_payload(manifest_path)
+            if payload is None:
+                if issue is not None:
+                    issues.append(issue)
+                continue
+            try:
+                declared_raw_file = str(payload["raw_file"])
+                raw_sha256 = str(payload["raw_sha256"])
+                requested_from = int(payload["requested_from"])
+                first_sequence = int(payload["first_observation_sequence"])
+                last_sequence = int(payload["last_observation_sequence"])
+                next_sequence = int(payload["next_sequence"])
+                observation_count = int(payload["observation_count"])
+                # Required, not optional. Every supported version of this
+                # manifest is v1 and every writer of it records the source
+                # name; the canonical projection depends on it as the only
+                # surviving evidence of the original identity, because the
+                # directory is a lossy slug of it. Accepting a blank here would
+                # silently reintroduce slug-derived identities.
+                declared_source = payload["source_name"]
+                if not isinstance(declared_source, str) or not declared_source.strip():
+                    raise ValueError("source_name must be non-empty text")
+                source_name = declared_source
+            except (KeyError, TypeError, ValueError) as exc:
+                issues.append(
+                    RawBatchIssue(
+                        manifest_path=manifest_path,
+                        reason=RAW_BATCH_ISSUE_MALFORMED,
+                        detail=f"manifest is missing or has an invalid field: {exc}",
+                        schema=str(payload.get("schema") or "") or None,
+                    )
+                )
+                continue
+
+            raw_path = Path(declared_raw_file)
+            if not raw_path.exists():
+                raw_path = next(
+                    (
+                        candidate
+                        for candidate in self._local_raw_candidates(manifest_path)
+                        if candidate.exists()
+                    ),
+                    raw_path,
+                )
+            if not raw_path.exists():
+                issues.append(
+                    RawBatchIssue(
+                        manifest_path=manifest_path,
+                        reason=RAW_BATCH_ISSUE_RAW_MISSING,
+                        detail=(
+                            "no compressed payload beside the manifest and "
+                            f"{declared_raw_file!r} does not exist"
+                        ),
+                        schema=str(payload.get("schema") or "") or None,
+                    )
+                )
+                continue
+
+            received_at = payload.get("received_at")
+            refs.append(
+                RawBatchRef(
+                    raw_path=raw_path,
+                    manifest_path=manifest_path,
+                    raw_sha256=raw_sha256,
+                    requested_from=requested_from,
+                    first_sequence=first_sequence,
+                    last_sequence=last_sequence,
+                    next_sequence=next_sequence,
+                    observation_count=observation_count,
+                    manifest_schema=str(payload["schema"]),
+                    received_at=(
+                        str(received_at) if isinstance(received_at, str) else None
+                    ),
+                    source_name=source_name,
+                )
+            )
+        refs.sort(key=lambda ref: (ref.first_sequence, ref.last_sequence, ref.raw_sha256))
+        return RawBatchScan(refs=tuple(refs), issues=tuple(issues))
+
     def iter_raw_batches(
         self,
         *,
         source_name: str,
         instance_id: int,
     ) -> list[RawBatchRef]:
-        root = self.raw_root / _slug(source_name) / str(instance_id)
-        refs: list[RawBatchRef] = []
-        if not root.exists():
-            return refs
-        for manifest_path in root.rglob("*.manifest.json"):
-            payload = _read_json(manifest_path)
-            if payload.get("schema") != "fcp.mtconnect.raw_batch_manifest.v1":
-                continue
-            try:
-                raw_path = Path(str(payload["raw_file"]))
-                if not raw_path.exists():
-                    candidate_name = manifest_path.name.removesuffix(".manifest.json")
-                    raw_path = manifest_path.with_name(candidate_name)
-                refs.append(
-                    RawBatchRef(
-                        raw_path=raw_path,
-                        manifest_path=manifest_path,
-                        raw_sha256=str(payload["raw_sha256"]),
-                        requested_from=int(payload["requested_from"]),
-                        first_sequence=int(payload["first_observation_sequence"]),
-                        last_sequence=int(payload["last_observation_sequence"]),
-                        next_sequence=int(payload["next_sequence"]),
-                        observation_count=int(payload["observation_count"]),
-                    )
-                )
-            except (KeyError, TypeError, ValueError):
-                continue
-        return sorted(refs, key=lambda ref: (ref.first_sequence, ref.last_sequence))
+        return list(
+            self.scan_raw_batches(
+                source_name=source_name,
+                instance_id=instance_id,
+            ).refs
+        )
 
     def read_raw_batch(self, ref: RawBatchRef) -> str:
         compressed = ref.raw_path.read_bytes()
