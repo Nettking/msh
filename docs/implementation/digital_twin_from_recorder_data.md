@@ -144,29 +144,30 @@ work, addressed by `raw_sha256` so it stays verifiable. Use it for recorder
 regression tests, Federation materialization tests, Monitor/playback demos, and
 as the input every later stage is measured on.
 
-**Blocker to fix first:** these manifests declare
-`msh.mtconnect.raw_batch_manifest.v1`, while `storage.py:306` accepts only
-`fcp.mtconnect.raw_batch_manifest.v1` and silently skips anything else. Any
-pre-rename capture is invisible to `iter_raw_batches` today. Either accept both
-schema strings on read or provide an explicit migration; silently skipping real
-data is the worse failure mode. `scripts/profile_mtconnect_raw_batches.py`
-accepts both.
+**Blocker, now fixed:** these manifests declare the pre-rename schema name,
+while `storage.py` accepted only the current `fcp.` name and silently skipped
+anything else, making any pre-rename capture invisible to `iter_raw_batches`.
+Both generations are now read through one explicit enumeration, and an
+unsupported schema is reported distinctly from corrupt data rather than being
+skipped in silence. See
+[Canonical MTConnect observations](canonical_mtconnect_observations.md).
 
 ### 2. Derive a canonical observation table
 
-One append-only, replayable projection from raw batches:
+**Delivered** — see
+[Canonical MTConnect observations](canonical_mtconnect_observations.md) for the
+schema, the identity invariant, and the projection's guarantees.
 
-```text
-(source, agent_instance, sequence, timestamp, component, data_item_id,
- observation_type, value)
-```
+One replayable projection from raw batches, keyed by
+`(source_key, agent_instance_id, sequence)`. Note the correction to the proposal
+above: `(agent_instance_id, sequence)` alone is **not** sufficient. `instanceId`
+is conventionally the Agent's start time in seconds, so two machines whose
+Agents started in the same second share it. The recorder's own source partition
+closes that gap.
 
-Keyed by `(agent_instance_id, sequence)`, which the capture shows is unique and
-gap-free, so the projection is idempotent and resumable — rebuild it from the
-raw batches at any time. This replaces ad-hoc XML parsing at every call site and
-gives the flat form the existing `example-data/*.jsonl` wide format cannot
-represent well (that format loses per-channel timestamps by flattening to a row
-per sequence).
+This replaces ad-hoc XML parsing at every call site and gives the flat form the
+existing `example-data/*.jsonl` wide format cannot represent well (that format
+loses per-channel timestamps by flattening to a row per sequence).
 
 ### 3. Segment into operations
 
