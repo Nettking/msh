@@ -42,6 +42,12 @@ class RelayMessageClient(Protocol):
     async def receive_message(self, *, timeout: float | None = None): ...
 
 
+class RelayMessageSource(Protocol):
+    """Upstream single-reader multiplexer forwarding frames it does not own."""
+
+    async def receive_other(self, *, timeout: float | None = None): ...
+
+
 @dataclass
 class _PendingDispatch:
     future: asyncio.Future[DispatchResponse]
@@ -64,7 +70,14 @@ class AuthenticatedHeartbeat:
 
 
 class RelayLifecycleEndpoint:
-    """Multiplex F7.5 dispatch, cancellation, and heartbeat traffic."""
+    """Multiplex F7.5 dispatch, cancellation, and heartbeat traffic.
+
+    A relay client has one inbound peer-message stream. ``message_source`` lets a
+    product compose this endpoint behind an existing owner of that stream (for
+    example remote-AI), while this endpoint in turn forwards non-lifecycle frames
+    through :meth:`receive_other` to artifact transport. Exactly one component
+    therefore calls ``relay_client.receive_message``.
+    """
 
     def __init__(
         self,
@@ -73,10 +86,12 @@ class RelayLifecycleEndpoint:
         *,
         request_timeout: float = 15.0,
         other_message_limit: int = 64,
+        message_source: RelayMessageSource | None = None,
     ) -> None:
         if request_timeout <= 0:
             raise ValueError("request_timeout must be positive")
         self.relay_client = relay_client
+        self.message_source = message_source
         self.workers = dict(workers or {})
         self.request_timeout = float(request_timeout)
         self._dispatches: dict[str, _PendingDispatch] = {}
@@ -342,6 +357,11 @@ class RelayLifecycleEndpoint:
             return await self._other.get()
         return await asyncio.wait_for(self._other.get(), timeout=timeout)
 
+    async def _receive(self):
+        if self.message_source is not None:
+            return await self.message_source.receive_other()
+        return await self.relay_client.receive_message()
+
     async def _deliver(
         self,
         *,
@@ -369,7 +389,7 @@ class RelayLifecycleEndpoint:
     async def _reader_loop(self) -> None:
         try:
             while not self._closed:
-                incoming = await self.relay_client.receive_message()
+                incoming = await self._receive()
                 payload = getattr(incoming, "payload", None)
                 if (
                     not isinstance(payload, dict)
