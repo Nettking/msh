@@ -106,7 +106,7 @@ def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
         coordinator_database=app.config["CAPABILITY_ONBOARDING_COORDINATOR_DATABASE"],
         device_name=device_name,
         discovery_sources=app.config.get(
-            "CAPABILITY_ONBOARDING_DISCOVERY_SOURCES"],
+            "CAPABILITY_ONBOARDING_DISCOVERY_SOURCES",
             (),
         ),
         remote_store=RemotePairingStore(remote_path),
@@ -444,7 +444,7 @@ class SavedFederationReconnectMonitor:
 
     def _sync_federated_analysis(
         self,
-        runtime_state: RemotePairingState,
+        _runtime_state: RemotePairingState,
         context: object,
     ) -> None:
         """Keep the analysis provider live even on a provider-only device."""
