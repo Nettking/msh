@@ -43,6 +43,7 @@ from catalog.capabilities.analysis.contracts import (
     ORIGIN_AUTOMATIC_DISCOVERY,
     SLICE_KIND_DATE,
 )
+from catalog.capabilities.analysis.provisioning import dispatched_data_owner_node_id
 from catalog.capabilities.analysis.scheduler import SubmissionOutcome
 from catalog.capabilities.artifact_secure_runtime import (
     SQLiteCapabilityArtifactAuthority,
@@ -69,7 +70,10 @@ _IDENTITY_LOCK = threading.Lock()
 #: manufacture a second standalone coordinator for that real session. The Flask
 #: product bridge registers this supplier once it owns an authenticated relay.
 _FEDERATION_SUPPLIER: (
-    Callable[["AnalysisIdentity", Path, Callable[[], datetime]], DeviceFederationAuthority | None]
+    Callable[
+        ["AnalysisIdentity", Path, Callable[[], datetime]],
+        DeviceFederationAuthority | None,
+    ]
     | None
 ) = None
 _FEDERATION_LOCK = threading.Lock()
@@ -402,7 +406,7 @@ class AnalysisRuntime:
             workspace_root=self.capability_root / "workspaces",
             content_store=self.content_store,
             clock=self.clock,
-            data_owner_node_id=lambda _job: self.federation.data_owner_node_id,
+            data_owner_node_id=dispatched_data_owner_node_id,
             max_slice_bytes=self.max_slice_bytes,
         )
         self.provisioner = AnalysisProviderProvisioner(
@@ -416,6 +420,7 @@ class AnalysisRuntime:
             clock=self.clock,
             max_concurrent_jobs=self.max_concurrent_jobs,
             active_jobs=self._local_active_jobs,
+            provider_generation=self.federation.provider_generation,
         )
         outcome = self.provisioner.provision(handler, self.transport)
         self.worker = outcome.worker
@@ -426,7 +431,12 @@ class AnalysisRuntime:
 
         if self.provisioner is None:
             return False
-        return self.provisioner.refresh()
+        refreshed = self.provisioner.refresh()
+        provisioned = getattr(self.provisioner, "_worker", None)
+        if self.worker is None and provisioned is not None:
+            self.worker = provisioned
+            self.provisioning_reason = "provider-active"
+        return refreshed
 
 
 class DiscoveryAnalysisGateway:
