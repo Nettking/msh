@@ -1,229 +1,310 @@
+"""Uploaded JSONL analysis uses the shared federated job path."""
+
 from __future__ import annotations
 
-import threading
-import time
+import sqlite3
+from datetime import date, datetime, timezone
 from pathlib import Path
 
-from catalog.capabilities.job_store import SQLiteJobStore
-from catalog.capabilities.jobs import AttemptStatus, JobStatus
+import pytest
+
+from catalog.capabilities.analysis.contracts import (
+    ANALYSIS_CAPABILITY_TYPE,
+    ORIGIN_AUTOMATIC_DISCOVERY,
+    ORIGIN_MANUAL_UPLOAD,
+)
+from catalog.capabilities.analysis.provisioning import analysis_capability_id
+from catalog.capabilities.jobs import JobStatus
 from catalog.federation.projections.storage_job_adapters import JobAuthorityAdapter
 from catalog.flask_app.services.upload_analysis_job_service import (
+    UploadAnalysisJobError,
     UploadAnalysisJobService,
 )
+from catalog.orchestrator.analysis_runtime import (
+    AnalysisIdentity,
+    AnalysisRuntime,
+    DiscoveryAnalysisGateway,
+)
+from catalog.runner.data_filtering import (
+    date_range_source_signature,
+    source_date_signatures,
+)
+
+NOW = datetime(2026, 8, 13, 9, 0, tzinfo=timezone.utc)
+SESSION = "session-upload-tests"
 
 
-class _Runtime:
-    def __init__(self) -> None:
-        self.state = {
-            "update_running": False,
-            "last_update_check_at": "2026-08-06T10:00:00Z",
-            "last_successful_refresh": None,
-            "last_failure": None,
-            "failed_scripts": [],
-            "current_processing_phase": "polling_new_data",
-            "completed_execution_id": None,
-            "completed_execution_succeeded": None,
-        }
+def _identity(tmp_path: Path) -> AnalysisIdentity:
+    """A real key-derived device identity, as F8 membership requires."""
 
-    def state_snapshot(self) -> dict[str, object]:
-        return dict(self.state)
+    from catalog.node.identity import IdentityStore
+
+    credentials = IdentityStore(
+        tmp_path / "results" / "capabilities" / "standalone_identity",
+        display_name="Upload test device",
+    ).load_or_create(now=NOW)
+    return AnalysisIdentity(
+        session_id=SESSION,
+        node_id=credentials.identity.node_id,
+        provider_id=analysis_capability_id(credentials.identity.node_id),
+        standalone=True,
+    )
 
 
-def _batch(batch_id: str = "upload-abc123") -> dict[str, object]:
-    return {
+def _runtime(tmp_path: Path) -> AnalysisRuntime:
+    return AnalysisRuntime(
+        root=tmp_path, identity=_identity(tmp_path), clock=lambda: NOW
+    )
+
+
+def _published(tmp_path: Path, batch_id: str, *, day: str = "2026-08-13") -> Path:
+    directory = tmp_path / "data" / "uploads" / batch_id
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / f"{day}.jsonl").write_text(
+        f'{{"timestamp":"{day}T10:00:00Z","machine":"A"}}\n', encoding="utf-8"
+    )
+    return directory
+
+
+def _batch(tmp_path: Path, batch_id: str = "upload-abc123", **overrides):
+    payload = {
         "batch_id": batch_id,
-        "file_count": 2,
-        "imported_records": 7,
-        "total_bytes": 512,
+        "file_count": 1,
+        "imported_records": 1,
+        "total_bytes": 64,
+        "published_path": str(_published(tmp_path, batch_id)),
     }
+    payload.update(overrides)
+    return payload
 
 
-def _service(
-    tmp_path: Path,
-    runtime: _Runtime,
-    *,
-    session_id: str = "session-upload-tests",
-    coordinator_id: str = "node-upload-tests",
-) -> UploadAnalysisJobService:
+def _service(tmp_path: Path, runtime: AnalysisRuntime) -> UploadAnalysisJobService:
     return UploadAnalysisJobService(
-        database=tmp_path / "uploads.sqlite3",
-        runtime_manager=runtime,
-        context_supplier=lambda: (session_id, coordinator_id),
-        poll_seconds=0.01,
-        monitor_timeout_seconds=5,
+        database=tmp_path / "imports" / "uploads.sqlite3",
+        gateway=DiscoveryAnalysisGateway(runtime),
+        data_dir=tmp_path / "data",
+        clock=lambda: NOW,
+        script_keys=("data_pr_day",),
     )
 
 
-def _wait_for_terminal(
-    service: UploadAnalysisJobService,
-    job_id: str,
-) -> object:
-    deadline = time.monotonic() + 5
-    while time.monotonic() < deadline:
-        snapshot = service.store.snapshot(job_id)
-        if snapshot.job.terminal:
-            return snapshot
-        time.sleep(0.01)
-    raise AssertionError("analysis job did not reach a terminal state")
-
-
-def test_upload_analysis_job_moves_from_queued_to_active_to_succeeded(
-    tmp_path: Path,
-) -> None:
-    runtime = _Runtime()
+def test_uploaded_batch_becomes_a_durable_queued_job(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
     service = _service(tmp_path, runtime)
 
-    job_id = service.submit_batch(_batch())
-    queued = service.store.snapshot(job_id)
+    job_id = service.submit_batch(_batch(tmp_path))
+    snapshot = runtime.store.snapshot(job_id)
 
-    assert queued.job.status is JobStatus.QUEUED
-    assert queued.ownership is None
-    assert service.snapshots("other-session") == ()
+    assert snapshot.job.status is JobStatus.QUEUED
+    assert snapshot.job.capability.capability_type == ANALYSIS_CAPABILITY_TYPE
+    assert service.job_ids(SESSION) == (job_id,)
 
-    service.start_tracking(job_id)
-    active = service.store.snapshot(job_id)
 
-    assert active.job.status is JobStatus.ACTIVE
-    assert active.job.attempts[-1].status is AttemptStatus.RUNNING
-    assert active.ownership is not None
+def test_no_synthetic_local_worker_claims_the_job(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    service = _service(tmp_path, runtime)
 
-    runtime.state.update(
-        {
-            "update_running": False,
-            "completed_execution_id": job_id,
-            "completed_execution_succeeded": True,
-        }
+    job_id = service.submit_batch(_batch(tmp_path))
+    snapshot = runtime.store.snapshot(job_id)
+
+    # Submission never grants ownership: a provider must be selected first.
+    assert snapshot.ownership is None
+    assert snapshot.job.attempts == ()
+    assert not hasattr(service, "_worker_id")
+
+
+def test_upload_and_discovery_converge_on_one_durable_job(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    service = _service(tmp_path, runtime)
+    data_dir = tmp_path / "data"
+    batch = _batch(tmp_path, "upload-shared")
+    day = date(2026, 8, 13)
+    signature = date_range_source_signature(
+        source_date_signatures(data_dir), day, day
     )
-    completed = _wait_for_terminal(service, job_id)
 
-    assert completed.job.status is JobStatus.SUCCEEDED
-    assert completed.job.attempts[-1].status is AttemptStatus.SUCCEEDED
-    assert completed.ownership is None
+    discovered = DiscoveryAnalysisGateway(runtime).submit_date_slice(
+        data_dir=data_dir,
+        target_day=day,
+        script_keys=("data_pr_day",),
+        runtime_namespace="default",
+        source_signature=signature,
+        origin=ORIGIN_AUTOMATIC_DISCOVERY,
+    )
+    uploaded = service.submit_batch(batch)
 
-    projected = JobAuthorityAdapter(
-        lambda: service.snapshots("session-upload-tests")
-    ).snapshot()
+    assert discovered.job_id == uploaded
+    assert len(runtime.service.registry.records()) == 1
+    assert runtime.service.registry.records()[0].origin == ORIGIN_AUTOMATIC_DISCOVERY
+
+
+def test_uploaded_job_is_eligible_for_federation_dispatch(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    service = _service(tmp_path, runtime)
+    executed: list[object] = []
+
+    class _Executor:
+        def execute(self, *, plan, data_dir, workspace):
+            from catalog.capabilities.analysis import AnalysisExecutionReport
+
+            executed.append(plan)
+            return AnalysisExecutionReport(
+                succeeded=True, processed_dates=plan.target_dates
+            )
+
+    runtime.federation.inventory.get("jsonl-analysis-handler").handler.executor = (
+        _Executor()
+    )
+    job_id = service.submit_batch(_batch(tmp_path))
+
+    outcomes = runtime.service.run_scheduling_pass()
+
+    assert [item.decision for item in outcomes] == ["dispatched"]
+    assert runtime.store.snapshot(job_id).job.status is JobStatus.SUCCEEDED
+    assert len(executed) == 1
+
+
+def test_batch_without_published_files_fails_closed(tmp_path: Path) -> None:
+    service = _service(tmp_path, _runtime(tmp_path))
+
+    with pytest.raises(UploadAnalysisJobError) as error:
+        service.submit_batch({"batch_id": "upload-missing", "published_path": None})
+    assert error.value.code == "analysis-batch-not-published"
+
+
+def test_batch_without_analysable_dates_fails_closed(tmp_path: Path) -> None:
+    service = _service(tmp_path, _runtime(tmp_path))
+    empty = tmp_path / "data" / "uploads" / "upload-empty"
+    empty.mkdir(parents=True)
+
+    with pytest.raises(UploadAnalysisJobError) as error:
+        service.submit_batch(
+            {"batch_id": "upload-empty", "published_path": str(empty)}
+        )
+    assert error.value.code == "analysis-batch-undated"
+
+
+def test_unidentified_batch_is_refused(tmp_path: Path) -> None:
+    service = _service(tmp_path, _runtime(tmp_path))
+
+    with pytest.raises(UploadAnalysisJobError) as error:
+        service.submit_batch({"batch_id": "  "})
+    assert error.value.code == "analysis-batch-required"
+
+
+def test_route_failure_never_terminalizes_distributed_work(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    service = _service(tmp_path, runtime)
+    job_id = service.submit_batch(_batch(tmp_path))
+
+    service.fail(job_id, "upload-not-ready")
+
+    assert runtime.store.snapshot(job_id).job.status is JobStatus.QUEUED
+
+
+def test_restart_preserves_the_queued_upload_job(tmp_path: Path) -> None:
+    original = _service(tmp_path, _runtime(tmp_path))
+    job_id = original.submit_batch(_batch(tmp_path, "upload-interrupted"))
+
+    restarted_runtime = _runtime(tmp_path)
+    restarted = _service(tmp_path, restarted_runtime)
+
+    assert restarted_runtime.store.snapshot(job_id).job.status is JobStatus.QUEUED
+    assert restarted.job_ids(SESSION) == (job_id,)
+
+
+def test_legacy_upload_job_links_are_migrated_without_data_loss(tmp_path: Path) -> None:
+    database = tmp_path / "imports" / "uploads.sqlite3"
+    database.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            CREATE TABLE data_upload_analysis_jobs (
+                job_id TEXT PRIMARY KEY,
+                batch_id TEXT NOT NULL UNIQUE,
+                session_id TEXT NOT NULL,
+                coordinator_id TEXT NOT NULL,
+                provider_id TEXT NOT NULL,
+                execution_id TEXT,
+                baseline_update_at TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO data_upload_analysis_jobs(
+                job_id,batch_id,session_id,coordinator_id,provider_id,
+                execution_id,baseline_update_at,created_at
+            ) VALUES(?,?,?,?,?,?,?,?)
+            """,
+            (
+                "legacy-job",
+                "legacy-batch",
+                SESSION,
+                "legacy-coordinator",
+                "legacy-provider",
+                "legacy-execution",
+                "2026-08-13T08:55:00Z",
+                "2026-08-13T09:00:00Z",
+            ),
+        )
+
+    _service(tmp_path, _runtime(tmp_path))
+
+    with sqlite3.connect(database) as connection:
+        connection.row_factory = sqlite3.Row
+        columns = {
+            row["name"]: row
+            for row in connection.execute(
+                "PRAGMA table_info(data_upload_analysis_jobs)"
+            ).fetchall()
+        }
+        rows = connection.execute(
+            "SELECT * FROM data_upload_analysis_jobs"
+        ).fetchall()
+        legacy_table = connection.execute(
+            """
+            SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='data_upload_analysis_jobs_legacy'
+            """
+        ).fetchone()
+
+    assert columns["job_id"]["pk"] == 1
+    assert columns["batch_id"]["pk"] == 2
+    assert columns["provider_id"]["notnull"] == 0
+    assert len(rows) == 1
+    assert rows[0]["job_id"] == "legacy-job"
+    assert rows[0]["batch_id"] == "legacy-batch"
+    assert rows[0]["provider_id"] == "legacy-provider"
+    assert legacy_table is None
+
+    # Reopening an already migrated database is idempotent.
+    reopened = _service(tmp_path, _runtime(tmp_path))
+    assert reopened.database == database
+
+
+def test_job_projection_still_renders_for_the_session(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
+    service = _service(tmp_path, runtime)
+    job_id = service.submit_batch(_batch(tmp_path))
+
+    projected = JobAuthorityAdapter(lambda: service.snapshots(SESSION)).snapshot()
+
     assert projected.available is True
-    assert len(projected.jobs) == 1
-    assert projected.jobs[0].job_id == job_id
-    assert projected.jobs[0].capability_type == "background-analysis"
-    assert projected.jobs[0].status == "succeeded"
-    assert projected.jobs[0].attempt_count == 1
+    assert [item.job_id for item in projected.jobs] == [job_id]
+    assert projected.jobs[0].capability_type == ANALYSIS_CAPABILITY_TYPE
+    assert projected.jobs[0].status == "queued"
+    assert service.snapshots("different-federation-session") == ()
 
 
-def test_runtime_failure_terminalizes_upload_analysis_job(
-    tmp_path: Path,
-) -> None:
-    runtime = _Runtime()
+def test_manual_upload_origin_is_recorded_for_product_views(tmp_path: Path) -> None:
+    runtime = _runtime(tmp_path)
     service = _service(tmp_path, runtime)
-    job_id = service.submit_batch(_batch("upload-failure"))
-    service.start_tracking(job_id)
 
-    runtime.state.update(
-        {
-            "update_running": False,
-            "completed_execution_id": job_id,
-            "completed_execution_succeeded": False,
-        }
-    )
-    completed = _wait_for_terminal(service, job_id)
+    job_id = service.submit_batch(_batch(tmp_path))
+    record = runtime.service.registry.record_for(job_id)
 
-    assert completed.job.status is JobStatus.FAILED
-    assert completed.job.attempts[-1].status is AttemptStatus.FAILED
-    assert completed.job.attempts[-1].error_code == "analysis-step-failed"
-
-
-def test_unrelated_runtime_completion_cannot_complete_job(tmp_path: Path) -> None:
-    runtime = _Runtime()
-    service = _service(tmp_path, runtime)
-    job_id = service.submit_batch(_batch("upload-owned"))
-    service.start_tracking(job_id)
-
-    runtime.state.update(
-        {
-            "completed_execution_id": "analysis-some-other-upload",
-            "completed_execution_succeeded": True,
-        }
-    )
-    time.sleep(0.05)
-    assert service.store.snapshot(job_id).job.status is JobStatus.ACTIVE
-
-    runtime.state.update(
-        {"completed_execution_id": job_id, "completed_execution_succeeded": True}
-    )
-    assert _wait_for_terminal(service, job_id).job.status is JobStatus.SUCCEEDED
-
-
-def test_restart_fails_interrupted_job_and_preserves_session_filter(
-    tmp_path: Path,
-) -> None:
-    runtime = _Runtime()
-    original = _service(tmp_path, runtime)
-    job_id = original.submit_batch(_batch("upload-interrupted"))
-    assert original.store.snapshot(job_id).job.status is JobStatus.QUEUED
-
-    restarted = _service(tmp_path, runtime)
-    recovered = restarted.store.snapshot(job_id)
-
-    assert recovered.job.status is JobStatus.FAILED
-    assert recovered.job.attempts[-1].error_code == "analysis-interrupted"
-    assert len(restarted.snapshots("session-upload-tests")) == 1
-    assert restarted.snapshots("different-federation-session") == ()
-
-
-def test_job_snapshot_uses_one_read_transaction_during_concurrent_completion(
-    tmp_path: Path, monkeypatch
-) -> None:
-    runtime = _Runtime()
-    service = _service(tmp_path, runtime)
-    job_id = service.submit_batch(_batch("upload-concurrent-snapshot"))
-    active = service._activate(job_id)
-    ownership = active.ownership
-    assert ownership is not None
-
-    row_loaded = threading.Event()
-    release_reader = threading.Event()
-    original_snapshot_from_row = service.store._snapshot_from_row
-
-    def paused_snapshot_from_row(connection, row):
-        row_loaded.set()
-        assert release_reader.wait(timeout=5)
-        return original_snapshot_from_row(connection, row)
-
-    monkeypatch.setattr(service.store, "_snapshot_from_row", paused_snapshot_from_row)
-    reader_result: list[object] = []
-    reader_errors: list[BaseException] = []
-
-    def read_snapshot() -> None:
-        try:
-            reader_result.append(service.store.snapshot(job_id))
-        except BaseException as exc:  # noqa: BLE001 - test records cross-thread failure
-            reader_errors.append(exc)
-
-    reader = threading.Thread(target=read_snapshot)
-    reader.start()
-    assert row_loaded.wait(timeout=5)
-
-    writer = SQLiteJobStore(service.database)
-    writer.complete(
-        job_id,
-        coordinator_id="node-upload-tests",
-        owner_provider_id=ownership.owner_provider_id,
-        attempt_id=ownership.attempt_id,
-        lease_id=ownership.lease_id,
-        command_id="complete-concurrent-snapshot",
-        expected_revision=active.revision,
-        terminal_status=AttemptStatus.SUCCEEDED,
-        error_code=None,
-        now=service.clock(),
-    )
-    release_reader.set()
-    reader.join(timeout=5)
-
-    assert not reader.is_alive()
-    assert reader_errors == []
-    assert len(reader_result) == 1
-    observed = reader_result[0]
-    assert observed.job.status is JobStatus.ACTIVE
-    assert observed.job.attempts[-1].status is AttemptStatus.RUNNING
-    assert writer.snapshot(job_id).job.status is JobStatus.SUCCEEDED
+    assert record is not None
+    assert record.origin == ORIGIN_MANUAL_UPLOAD
+    assert record.target_dates == ("2026-08-13",)

@@ -1,36 +1,36 @@
-"""Durable job lifecycle for user-requested JSONL background analysis."""
+"""Durable, federation-dispatched analysis for user-uploaded JSONL.
+
+The upload workflow used to create a durable job and then immediately claim it
+for a synthetic worker derived from the coordinator, which made the job a wrapper
+around local execution. It now submits the *same* work slices automatic discovery
+submits, through the same service, so an uploaded batch is scheduled onto
+whichever federation provider the scheduler selects.
+"""
 
 from __future__ import annotations
 
-import hashlib
 import sqlite3
 import threading
-import time
 from collections.abc import Callable, Mapping
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any
 
 from flask import current_app
 
-from catalog.capabilities.job_store import DurableJobSnapshot, SQLiteJobStore
-from catalog.capabilities.jobs import (
-    ArtifactReference,
-    AttemptStatus,
-    CapabilityRequirement,
-    JobContract,
-    JobStatus,
-    RetryPolicy,
-    TimeoutPolicy,
+from catalog.capabilities.analysis.contracts import (
+    ORIGIN_MANUAL_UPLOAD,
+    SLICE_KIND_DATE,
 )
-from catalog.orchestrator.pipeline import get_runtime_manager
+from catalog.capabilities.job_store import DurableJobSnapshot
+from catalog.orchestrator.analysis_runtime import DiscoveryAnalysisGateway
+from catalog.runner.data_filtering import (
+    date_range_source_signature,
+    discover_available_dates,
+    source_date_signatures,
+)
 from catalog.runner.script_catalog import repo_root
-
-_LOCAL_ANALYSIS_PROTOCOL = "fcp-background-analysis"
-_LOCAL_ANALYSIS_PROTOCOL_VERSION = "1.0"
-_LEASE_SECONDS = 45 * 60
-_RENEW_AFTER_SECONDS = 20 * 60
-_DEFAULT_MONITOR_SECONDS = 7 * 24 * 60 * 60
+from catalog.runner.session_store import AUTOMATIC_RUNTIME_SCRIPT_KEYS
 
 
 def _now() -> datetime:
@@ -51,29 +51,29 @@ class UploadAnalysisJobError(RuntimeError):
 
 
 class UploadAnalysisJobService:
-    """Bind local runtime refreshes to the existing durable job contracts."""
+    """Submit uploaded batches as federation analysis jobs and track them."""
 
     def __init__(
         self,
         *,
         database: Path | str,
-        runtime_manager: object,
-        context_supplier: Callable[[], tuple[str, str]],
+        gateway: DiscoveryAnalysisGateway | None = None,
+        data_dir: Path | str | None = None,
         clock: Callable[[], datetime] = _now,
-        poll_seconds: float = 0.25,
-        monitor_timeout_seconds: int = _DEFAULT_MONITOR_SECONDS,
+        script_keys: tuple[str, ...] = AUTOMATIC_RUNTIME_SCRIPT_KEYS,
+        runtime_namespace: str = "default",
     ) -> None:
         self.database = Path(database)
         self.database.parent.mkdir(parents=True, exist_ok=True)
-        self.store = SQLiteJobStore(self.database)
-        self.runtime_manager = runtime_manager
-        self.context_supplier = context_supplier
+        self.gateway = gateway if gateway is not None else DiscoveryAnalysisGateway()
+        self.data_dir = Path(data_dir) if data_dir is not None else repo_root() / "data"
         self.clock = clock
-        self.poll_seconds = max(float(poll_seconds), 0.01)
-        self.monitor_timeout_seconds = max(int(monitor_timeout_seconds), 1)
+        self.script_keys = tuple(script_keys)
+        self.runtime_namespace = runtime_namespace
         self._lock = threading.Lock()
         self._initialize_links()
-        self._recover_interrupted_jobs()
+
+    # ------------------------------------------------------------------
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
@@ -83,341 +83,254 @@ class UploadAnalysisJobService:
         connection.execute("PRAGMA synchronous=FULL")
         return connection
 
+    @staticmethod
+    def _create_links_table(connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS data_upload_analysis_jobs (
+                job_id TEXT NOT NULL,
+                batch_id TEXT NOT NULL,
+                session_id TEXT NOT NULL,
+                coordinator_id TEXT NOT NULL,
+                provider_id TEXT,
+                execution_id TEXT,
+                baseline_update_at TEXT,
+                created_at TEXT NOT NULL,
+                PRIMARY KEY(job_id, batch_id)
+            )
+            """
+        )
+
+    @staticmethod
+    def _links_schema_is_current(connection: sqlite3.Connection) -> bool:
+        rows = connection.execute(
+            "PRAGMA table_info(data_upload_analysis_jobs)"
+        ).fetchall()
+        if not rows:
+            return False
+        by_name = {str(row["name"]): row for row in rows}
+        required = {
+            "job_id",
+            "batch_id",
+            "session_id",
+            "coordinator_id",
+            "provider_id",
+            "execution_id",
+            "baseline_update_at",
+            "created_at",
+        }
+        if not required.issubset(by_name):
+            return False
+        return (
+            int(by_name["job_id"]["pk"]) == 1
+            and int(by_name["batch_id"]["pk"]) == 2
+            and int(by_name["provider_id"]["notnull"]) == 0
+        )
+
+    def _migrate_legacy_links(self, connection: sqlite3.Connection) -> None:
+        """Replace the pre-federation one-job-per-batch link schema atomically."""
+
+        legacy = "data_upload_analysis_jobs_legacy"
+        connection.execute(f"DROP TABLE IF EXISTS {legacy}")
+        connection.execute(
+            f"ALTER TABLE data_upload_analysis_jobs RENAME TO {legacy}"
+        )
+        self._create_links_table(connection)
+        columns = {
+            str(row["name"])
+            for row in connection.execute(f"PRAGMA table_info({legacy})").fetchall()
+        }
+
+        def value(name: str, fallback: str = "NULL") -> str:
+            return name if name in columns else fallback
+
+        # Every released legacy schema had the first five identity columns and
+        # created_at. Optional tracking columns are copied when present. The old
+        # provider value remains useful history, while new rows may leave it null
+        # until F7 selection chooses an actual provider.
+        required = {
+            "job_id",
+            "batch_id",
+            "session_id",
+            "coordinator_id",
+            "provider_id",
+            "created_at",
+        }
+        if not required.issubset(columns):
+            raise sqlite3.OperationalError(
+                "legacy data_upload_analysis_jobs schema is missing required columns"
+            )
+        connection.execute(
+            f"""
+            INSERT OR IGNORE INTO data_upload_analysis_jobs(
+                job_id,batch_id,session_id,coordinator_id,provider_id,
+                execution_id,baseline_update_at,created_at
+            )
+            SELECT
+                job_id,batch_id,session_id,coordinator_id,provider_id,
+                {value('execution_id')},{value('baseline_update_at')},created_at
+            FROM {legacy}
+            """
+        )
+        connection.execute(f"DROP TABLE {legacy}")
+
     def _initialize_links(self) -> None:
         with self._connect() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
-            connection.execute("""
-                CREATE TABLE IF NOT EXISTS data_upload_analysis_jobs (
-                    job_id TEXT PRIMARY KEY,
-                    batch_id TEXT NOT NULL UNIQUE,
-                    session_id TEXT NOT NULL,
-                    coordinator_id TEXT NOT NULL,
-                    provider_id TEXT NOT NULL,
-                    execution_id TEXT,
-                    baseline_update_at TEXT,
-                    created_at TEXT NOT NULL
-                )
-                """)
-            columns = {
-                str(row[1])
-                for row in connection.execute(
-                    "PRAGMA table_info(data_upload_analysis_jobs)"
-                )
-            }
-            if "execution_id" not in columns:
-                connection.execute(
-                    "ALTER TABLE data_upload_analysis_jobs ADD COLUMN execution_id TEXT"
-                )
+            exists = connection.execute(
+                """
+                SELECT 1 FROM sqlite_master
+                WHERE type='table' AND name='data_upload_analysis_jobs'
+                """
+            ).fetchone()
+            if exists is None:
+                self._create_links_table(connection)
+                return
+            if self._links_schema_is_current(connection):
+                return
+            connection.execute("BEGIN IMMEDIATE")
+            try:
+                self._migrate_legacy_links(connection)
+                connection.commit()
+            except BaseException:
+                connection.rollback()
+                raise
 
-    @staticmethod
-    def _worker_id(coordinator_id: str) -> str:
-        digest = hashlib.sha256(coordinator_id.encode("utf-8")).hexdigest()[:20]
-        return f"analysis-worker-{digest}"
+    # ------------------------------------------------------------------
 
-    @staticmethod
-    def _job_id(batch_id: str) -> str:
-        return f"analysis-{batch_id}"
-
-    def _runtime_snapshot(self) -> dict[str, Any]:
-        supplier = getattr(self.runtime_manager, "state_snapshot", None)
-        if not callable(supplier):
-            return {}
-        value = supplier()
-        return dict(value) if isinstance(value, Mapping) else {}
+    def _batch_dates(self, batch: Mapping[str, Any]) -> tuple[str, ...]:
+        published = batch.get("published_path")
+        if not published:
+            raise UploadAnalysisJobError(
+                "analysis-batch-not-published",
+                "The upload batch has not finished importing yet.",
+            )
+        directory = Path(str(published))
+        if not directory.is_dir():
+            raise UploadAnalysisJobError(
+                "analysis-batch-not-published",
+                "The imported upload files could not be located safely.",
+            )
+        dates = tuple(item.isoformat() for item in discover_available_dates(directory))
+        if not dates:
+            raise UploadAnalysisJobError(
+                "analysis-batch-undated",
+                "No analysable dates were found in the uploaded JSONL.",
+            )
+        return dates
 
     def submit_batch(self, batch: Mapping[str, Any]) -> str:
+        """Submit one job per uploaded date slice and return the primary job ID.
+
+        The identity of each job is derived from the data, not from the upload,
+        so an uploaded slice that automatic discovery already queued resolves to
+        the existing durable job instead of a duplicate.
+        """
+
         batch_id = str(batch.get("batch_id") or "").strip()
         if not batch_id:
             raise UploadAnalysisJobError(
                 "analysis-batch-required",
                 "The upload batch could not be identified safely.",
             )
-        try:
-            session_id, coordinator_id = self.context_supplier()
-        except UploadAnalysisJobError:
-            raise
-        except Exception as exc:
-            raise UploadAnalysisJobError(
-                "analysis-federation-required",
-                "Connect this device to its Federation before starting analysis.",
-            ) from exc
-        if not session_id or not coordinator_id:
-            raise UploadAnalysisJobError(
-                "analysis-federation-required",
-                "Connect this device to its Federation before starting analysis.",
-            )
-
-        provider_id = self._worker_id(coordinator_id)
-        job_id = self._job_id(batch_id)
-        request_id = f"request-{batch_id}"
-        identity = hashlib.sha256(f"{session_id}\0{batch_id}".encode()).hexdigest()
-        job = JobContract(
-            job_id=job_id,
-            session_id=session_id,
-            request_id=request_id,
-            idempotency_key=f"upload-analysis:{identity}",
-            capability=CapabilityRequirement(
-                capability_type="background-analysis",
-                protocol=_LOCAL_ANALYSIS_PROTOCOL,
-                protocol_version=_LOCAL_ANALYSIS_PROTOCOL_VERSION,
-                requirements={
-                    "batch_id": batch_id,
-                    "file_count": int(batch.get("file_count") or 0),
-                    "record_count": int(batch.get("imported_records") or 0),
-                    "total_bytes": int(batch.get("total_bytes") or 0),
-                },
-            ),
-            inputs=(
-                ArtifactReference(
-                    reference_id=f"input-{batch_id}",
-                    session_id=session_id,
-                    schema_name="fcp.jsonl-upload-batch.v1",
-                    media_type="application/x-ndjson",
-                ),
-            ),
-            outputs=(
-                ArtifactReference(
-                    reference_id=f"output-{batch_id}",
-                    session_id=session_id,
-                    schema_name="fcp.analysis-workflow.v1",
-                    media_type="application/json",
-                ),
-            ),
-            retry_policy=RetryPolicy(
-                max_attempts=1,
-                backoff_seconds=(),
-                retryable_error_codes=(),
-            ),
-            timeout_policy=TimeoutPolicy(
-                overall_timeout_seconds=_DEFAULT_MONITOR_SECONDS,
-                queue_timeout_seconds=60 * 60,
-                start_timeout_seconds=60 * 60,
-                run_timeout_seconds=_DEFAULT_MONITOR_SECONDS,
-                cancellation_grace_seconds=60,
-            ),
-        )
-        now = self.clock()
-        submitted = self.store.submit(job, coordinator_id=coordinator_id, now=now)
-        snapshot = submitted.snapshot
-        if snapshot.job.status is JobStatus.SUBMITTED:
-            snapshot = self.store.queue(
-                job_id,
-                coordinator_id=coordinator_id,
-                command_id=f"queue-{batch_id}",
-                expected_revision=snapshot.revision,
-                now=now,
-            ).snapshot
-        baseline = self._runtime_snapshot().get("last_update_check_at")
-        with self._connect() as connection:
-            connection.execute(
-                """
-                INSERT INTO data_upload_analysis_jobs(
-                    job_id,batch_id,session_id,coordinator_id,provider_id,
-                    baseline_update_at,created_at,execution_id
-                ) VALUES(?,?,?,?,?,?,?,?)
-                ON CONFLICT(job_id) DO NOTHING
-                """,
-                (
-                    job_id,
-                    batch_id,
-                    session_id,
-                    coordinator_id,
-                    provider_id,
-                    None if baseline is None else str(baseline),
-                    _stamp(now),
-                    job_id,
-                ),
-            )
-        return job_id
-
-    def _activate(self, job_id: str) -> DurableJobSnapshot:
+        dates = self._batch_dates(batch)
+        signatures = source_date_signatures(self.data_dir)
+        gateway = self.gateway
+        submitted: list[str] = []
         with self._lock:
-            snapshot = self.store.snapshot(job_id)
-            if snapshot.job.terminal:
-                return snapshot
-            link = self._link(job_id)
-            now = self.clock()
-            if snapshot.job.status is JobStatus.SUBMITTED:
-                snapshot = self.store.queue(
-                    job_id,
-                    coordinator_id=link["coordinator_id"],
-                    command_id=f"queue-{link['batch_id']}",
-                    expected_revision=snapshot.revision,
-                    now=now,
-                ).snapshot
-            if snapshot.job.status is JobStatus.QUEUED:
-                snapshot = self.store.claim(
-                    job_id,
-                    coordinator_id=link["coordinator_id"],
-                    owner_provider_id=link["provider_id"],
-                    attempt_id=f"attempt-{link['batch_id']}",
-                    lease_id=f"lease-{link['batch_id']}",
-                    command_id=f"claim-{link['batch_id']}",
-                    expected_revision=snapshot.revision,
-                    lease_expires_at=now + timedelta(seconds=_LEASE_SECONDS),
-                    now=now,
-                ).snapshot
-            ownership = snapshot.ownership
-            if ownership is None:
-                return snapshot
-            if snapshot.job.attempts[-1].status is AttemptStatus.ASSIGNED:
-                snapshot = self.store.record_attempt_status(
-                    job_id,
-                    coordinator_id=link["coordinator_id"],
-                    owner_provider_id=link["provider_id"],
-                    attempt_id=ownership.attempt_id,
-                    lease_id=ownership.lease_id,
-                    command_id=f"accept-{link['batch_id']}",
-                    expected_revision=snapshot.revision,
-                    target_status=AttemptStatus.ACCEPTED,
-                    now=now,
-                ).snapshot
-                ownership = snapshot.ownership
-            if (
-                ownership is not None
-                and snapshot.job.attempts[-1].status is AttemptStatus.ACCEPTED
-            ):
-                snapshot = self.store.record_attempt_status(
-                    job_id,
-                    coordinator_id=link["coordinator_id"],
-                    owner_provider_id=link["provider_id"],
-                    attempt_id=ownership.attempt_id,
-                    lease_id=ownership.lease_id,
-                    command_id=f"run-{link['batch_id']}",
-                    expected_revision=snapshot.revision,
-                    target_status=AttemptStatus.RUNNING,
-                    now=now,
-                ).snapshot
-            return snapshot
+            for iso_date in dates:
+                if iso_date not in signatures:
+                    continue
+                # The identical signature automatic discovery would compute, so
+                # both triggers resolve to one durable job for the same slice.
+                day = date.fromisoformat(iso_date)
+                signature = date_range_source_signature(signatures, day, day)
+                outcome = gateway.submit_slice(
+                    data_dir=self.data_dir,
+                    target_dates=(iso_date,),
+                    script_keys=self.script_keys,
+                    runtime_namespace=self.runtime_namespace,
+                    source_signature=signature,
+                    slice_kind=SLICE_KIND_DATE,
+                    slice_key=iso_date,
+                    origin=ORIGIN_MANUAL_UPLOAD,
+                )
+                if outcome is not None:
+                    submitted.append(outcome.job_id)
+        if not submitted:
+            raise UploadAnalysisJobError(
+                "analysis-batch-unschedulable",
+                "The uploaded JSONL could not be turned into analysis work.",
+            )
+        identity = gateway.runtime.identity
+        now = self.clock()
+        with self._connect() as connection:
+            for job_id in submitted:
+                connection.execute(
+                    """
+                    INSERT INTO data_upload_analysis_jobs(
+                        job_id,batch_id,session_id,coordinator_id,provider_id,
+                        baseline_update_at,created_at,execution_id
+                    ) VALUES(?,?,?,?,?,?,?,?)
+                    ON CONFLICT(job_id,batch_id) DO NOTHING
+                    """,
+                    (
+                        job_id,
+                        batch_id,
+                        identity.session_id,
+                        identity.coordinator_node_id,
+                        None,
+                        None,
+                        _stamp(now),
+                        job_id,
+                    ),
+                )
+        return submitted[0]
 
     def start_tracking(self, job_id: str) -> None:
-        snapshot = self._activate(job_id)
-        if snapshot.job.terminal:
-            return
-        threading.Thread(
-            target=self._monitor,
-            args=(job_id,),
-            name=f"fcp-upload-analysis-{job_id[-8:]}",
-            daemon=True,
-        ).start()
+        """Ask the federation scheduler to place the queued work.
+
+        The pass runs on its own thread: the upload request returns immediately
+        and the job progresses through the durable lifecycle.
+        """
+
+        self.gateway.request_scheduling_pass()
 
     def fail(self, job_id: str, error_code: str) -> None:
-        try:
-            snapshot = self._activate(job_id)
-            if snapshot.job.terminal:
-                return
-            self._complete(snapshot, success=False, error_code=error_code)
-        except Exception:  # noqa: BLE001 - original safe route error remains primary
-            return
+        """Record that the *upload route* could not complete after submission.
 
-    def _link(self, job_id: str) -> sqlite3.Row:
-        with self._connect() as connection:
-            row = connection.execute(
-                "SELECT * FROM data_upload_analysis_jobs WHERE job_id=?",
-                (job_id,),
-            ).fetchone()
-        if row is None:
-            raise UploadAnalysisJobError(
-                "analysis-job-not-found",
-                "The durable analysis job could not be found.",
-            )
-        return row
+        The durable job is owned by the federation lifecycle: a browser request
+        that fails afterwards must not terminalize work a selected provider may
+        already be executing. Timeouts, loss, and retries are decided by the
+        existing lifecycle coordinator instead.
+        """
 
-    def _complete(
-        self,
-        snapshot: DurableJobSnapshot,
-        *,
-        success: bool,
-        error_code: str | None = None,
-    ) -> None:
-        ownership = snapshot.ownership
-        if ownership is None or snapshot.job.terminal:
-            return
-        link = self._link(snapshot.job.job_id)
-        self.store.complete(
-            snapshot.job.job_id,
-            coordinator_id=link["coordinator_id"],
-            owner_provider_id=ownership.owner_provider_id,
-            attempt_id=ownership.attempt_id,
-            lease_id=ownership.lease_id,
-            command_id=f"complete-{link['batch_id']}",
-            expected_revision=snapshot.revision,
-            terminal_status=(
-                AttemptStatus.SUCCEEDED if success else AttemptStatus.FAILED
-            ),
-            error_code=None if success else (error_code or "analysis-runtime-failed"),
-            now=self.clock(),
-        )
+        return
 
-    def _monitor(self, job_id: str) -> None:
-        link = self._link(job_id)
-        deadline = time.monotonic() + self.monitor_timeout_seconds
-        last_renewal = time.monotonic()
-        while time.monotonic() < deadline:
-            state = self._runtime_snapshot()
-            if state.get("completed_execution_id") == link["execution_id"]:
-                snapshot = self.store.snapshot(job_id)
-                failed = not bool(state.get("completed_execution_succeeded"))
-                self._complete(
-                    snapshot,
-                    success=not failed,
-                    error_code="analysis-step-failed" if failed else None,
-                )
-                return
+    # ------------------------------------------------------------------
 
-            if time.monotonic() - last_renewal >= _RENEW_AFTER_SECONDS:
-                snapshot = self.store.snapshot(job_id)
-                ownership = snapshot.ownership
-                if ownership is None or snapshot.job.terminal:
-                    return
-                renewal_now = self.clock()
-                self.store.renew(
-                    job_id,
-                    coordinator_id=link["coordinator_id"],
-                    owner_provider_id=ownership.owner_provider_id,
-                    attempt_id=ownership.attempt_id,
-                    lease_id=ownership.lease_id,
-                    command_id=f"renew-{link['batch_id']}-{snapshot.revision}",
-                    expected_revision=snapshot.revision,
-                    lease_expires_at=renewal_now + timedelta(seconds=_LEASE_SECONDS),
-                    now=renewal_now,
-                )
-                last_renewal = time.monotonic()
-            time.sleep(self.poll_seconds)
-
-        self.fail(job_id, "analysis-monitor-timeout")
-
-    def snapshots(self, session_id: str) -> tuple[DurableJobSnapshot, ...]:
+    def job_ids(self, session_id: str) -> tuple[str, ...]:
         with self._connect() as connection:
             rows = connection.execute(
                 """
-                SELECT job_id FROM data_upload_analysis_jobs
-                WHERE session_id=? ORDER BY created_at DESC,job_id DESC
+                SELECT DISTINCT job_id FROM data_upload_analysis_jobs
+                WHERE session_id=? ORDER BY job_id
                 """,
                 (session_id,),
             ).fetchall()
-        snapshots: list[DurableJobSnapshot] = []
-        for row in rows:
-            try:
-                snapshots.append(self.store.snapshot(str(row["job_id"])))
-            except Exception:  # noqa: BLE001,S112 - one damaged job must not hide others
-                continue
-        return tuple(snapshots)
+        return tuple(str(row["job_id"]) for row in rows)
 
-    def _recover_interrupted_jobs(self) -> None:
-        with self._connect() as connection:
-            rows = connection.execute(
-                "SELECT job_id FROM data_upload_analysis_jobs"
-            ).fetchall()
-        for row in rows:
-            job_id = str(row["job_id"])
-            try:
-                snapshot = self.store.snapshot(job_id)
-                if snapshot.job.terminal:
-                    continue
-                self.fail(job_id, "analysis-interrupted")
-            except Exception:  # noqa: BLE001,S112 - startup remains available and fails closed
-                continue
+    def snapshots(self, session_id: str) -> tuple[DurableJobSnapshot, ...]:
+        """Return durable snapshots for every analysis job in this session."""
+
+        service = self.gateway.runtime.service
+        if service is None:  # pragma: no cover - constructed with the runtime
+            return ()
+        return service.snapshots(session_id)
+
+    @property
+    def store(self):
+        return self.gateway.runtime.store
 
 
 def _configured_database() -> Path:
@@ -432,15 +345,23 @@ def _configured_database() -> Path:
     return value if value.is_absolute() else repo_root() / value
 
 
-def _authorized_context() -> tuple[str, str]:
+def federation_analysis_identity() -> tuple[str, str] | None:
+    """Return this device's federation ``(session_id, node_id)`` when connected.
+
+    Registered with the analysis runtime during application startup so durable
+    analysis jobs are coordinated under the real federation session whenever one
+    exists. Without a binding the runtime keeps its own single-node session and
+    the identical authority checks still apply.
+    """
+
     from .capability_onboarding_service import get_capability_onboarding_service
 
-    context = get_capability_onboarding_service().authorized_context()
+    try:
+        context = get_capability_onboarding_service().authorized_context()
+    except Exception:  # noqa: BLE001 - identity resolution must never break startup
+        return None
     if context is None:
-        raise UploadAnalysisJobError(
-            "analysis-federation-required",
-            "Connect this device to its Federation before starting analysis.",
-        )
+        return None
     return (
         context.binding.internal_session_id,
         context.credentials.identity.node_id,
@@ -451,11 +372,7 @@ def get_upload_analysis_job_service() -> UploadAnalysisJobService:
     existing = current_app.extensions.get("upload_analysis_job_service")
     if isinstance(existing, UploadAnalysisJobService):
         return existing
-    service = UploadAnalysisJobService(
-        database=_configured_database(),
-        runtime_manager=get_runtime_manager(),
-        context_supplier=_authorized_context,
-    )
+    service = UploadAnalysisJobService(database=_configured_database())
     current_app.extensions["upload_analysis_job_service"] = service
     return service
 
@@ -463,5 +380,6 @@ def get_upload_analysis_job_service() -> UploadAnalysisJobService:
 __all__ = [
     "UploadAnalysisJobError",
     "UploadAnalysisJobService",
+    "federation_analysis_identity",
     "get_upload_analysis_job_service",
 ]

@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 import shutil
+from collections.abc import Iterable
 from datetime import date, datetime
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -102,6 +103,29 @@ def discover_available_dates(data_dir: Path) -> list[date]:
     _write_data_index(index_data)
 
     return sorted(dates)
+
+
+def source_files_for_dates(data_dir: Path, dates: Iterable[date | str]) -> tuple[Path, ...]:
+    """Return the source JSONL files that represent the requested dates.
+
+    The data index already knows which dates each file contains, so a caller that
+    needs to pack one slice of the source data (for example to publish it as a
+    job input artifact) can select exactly the relevant files instead of copying
+    the whole data directory.
+    """
+    wanted: set[date] = set()
+    for item in dates:
+        wanted.add(item if isinstance(item, date) else date.fromisoformat(str(item)))
+    index_data, root_entries, _stats = _refresh_data_index_for_root(data_dir)
+    _write_data_index(index_data)
+    selected: list[Path] = []
+    for relative_path, entry in sorted(root_entries.items()):
+        if not _deserialize_dates(entry.get("dates", [])) & wanted:
+            continue
+        candidate = data_dir / relative_path
+        if candidate.is_file():
+            selected.append(candidate)
+    return tuple(selected)
 
 
 def filter_data_by_date_range(

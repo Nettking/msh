@@ -42,6 +42,12 @@ class RelayMessageClient(Protocol):
     async def receive_message(self, *, timeout: float | None = None): ...
 
 
+class RelayMessageSource(Protocol):
+    """Upstream single-reader multiplexer forwarding frames it does not own."""
+
+    async def receive_other(self, *, timeout: float | None = None): ...
+
+
 @dataclass
 class _PendingDispatch:
     future: asyncio.Future[DispatchResponse]
@@ -64,7 +70,14 @@ class AuthenticatedHeartbeat:
 
 
 class RelayLifecycleEndpoint:
-    """Multiplex F7.5 dispatch, cancellation, and heartbeat traffic."""
+    """Multiplex F7.5 dispatch, cancellation, and heartbeat traffic.
+
+    A relay client has one inbound peer-message stream. ``message_source`` lets a
+    product compose this endpoint behind an existing owner of that stream (for
+    example remote-AI), while this endpoint in turn forwards non-lifecycle frames
+    through :meth:`receive_other` to artifact transport. Exactly one component
+    therefore calls ``relay_client.receive_message``.
+    """
 
     def __init__(
         self,
@@ -73,10 +86,12 @@ class RelayLifecycleEndpoint:
         *,
         request_timeout: float = 15.0,
         other_message_limit: int = 64,
+        message_source: RelayMessageSource | None = None,
     ) -> None:
         if request_timeout <= 0:
             raise ValueError("request_timeout must be positive")
         self.relay_client = relay_client
+        self.message_source = message_source
         self.workers = dict(workers or {})
         self.request_timeout = float(request_timeout)
         self._dispatches: dict[str, _PendingDispatch] = {}
@@ -89,7 +104,7 @@ class RelayLifecycleEndpoint:
         self._handler_tasks: set[asyncio.Task[None]] = set()
         self._closed = False
 
-    def register_worker(
+    def _validate_worker(
         self,
         provider_id: str,
         worker: CancellableCapabilityWorker,
@@ -108,7 +123,77 @@ class RelayLifecycleEndpoint:
                 "node_id",
                 "registration differs from the local node identity",
             )
+
+    def register_worker(
+        self,
+        provider_id: str,
+        worker: CancellableCapabilityWorker,
+    ) -> None:
+        self._validate_worker(provider_id, worker)
         self.workers[provider_id] = worker
+
+    def unregister_worker(
+        self,
+        provider_id: str,
+        *,
+        expected_worker: Any | None = None,
+    ) -> bool:
+        """Remove one exact local worker without affecting a replacement."""
+
+        if not isinstance(provider_id, str) or not provider_id:
+            raise ValueError("provider_id must be non-empty text")
+        current = self.workers.get(provider_id)
+        if current is None:
+            return False
+        if expected_worker is not None and current is not expected_worker:
+            raise FederationValidationError(
+                "worker-registration-changed",
+                "provider_id",
+                "registered worker differs from the expected activation",
+            )
+        self.workers.pop(provider_id)
+        return True
+
+    def replace_workers(
+        self,
+        workers: dict[str, CancellableCapabilityWorker],
+        *,
+        replace_provider_ids: tuple[str, ...],
+    ) -> dict[str, CancellableCapabilityWorker]:
+        """Atomically replace one explicit reconciler-owned worker subset.
+
+        Mirrors ``RelayDispatchEndpoint.replace_workers`` so F8.6 can retain the
+        exact pre-mutation mapping and restore it if checkpoint validation fails.
+        Validation therefore has no side effects before ``previous`` is captured.
+        """
+
+        replacement_ids = tuple(sorted(set(replace_provider_ids)))
+        if any(not isinstance(item, str) or not item for item in replacement_ids):
+            raise ValueError("replace_provider_ids must contain non-empty text")
+        replacement_set = set(replacement_ids)
+        normalized = dict(workers)
+        for provider_id, worker in normalized.items():
+            if provider_id not in replacement_set:
+                raise FederationValidationError(
+                    "unowned-worker-replacement",
+                    "provider_id",
+                    "replacement worker must be included in the explicit owned set",
+                )
+            self._validate_worker(provider_id, worker)
+        previous = {
+            provider_id: self.workers[provider_id]
+            for provider_id in replacement_ids
+            if provider_id in self.workers
+        }
+        if (
+            set(previous) == set(normalized)
+            and all(previous[key] is normalized[key] for key in normalized)
+        ):
+            return previous
+        for provider_id in replacement_ids:
+            self.workers.pop(provider_id, None)
+        self.workers.update(normalized)
+        return previous
 
     async def start(self) -> None:
         if self._closed:
@@ -272,6 +357,11 @@ class RelayLifecycleEndpoint:
             return await self._other.get()
         return await asyncio.wait_for(self._other.get(), timeout=timeout)
 
+    async def _receive(self):
+        if self.message_source is not None:
+            return await self.message_source.receive_other()
+        return await self.relay_client.receive_message()
+
     async def _deliver(
         self,
         *,
@@ -299,7 +389,7 @@ class RelayLifecycleEndpoint:
     async def _reader_loop(self) -> None:
         try:
             while not self._closed:
-                incoming = await self.relay_client.receive_message()
+                incoming = await self._receive()
                 payload = getattr(incoming, "payload", None)
                 if (
                     not isinstance(payload, dict)

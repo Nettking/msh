@@ -9,18 +9,18 @@ views to explain what is ready.
 
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import os
-import threading
-import csv
-from dataclasses import dataclass
 import re
+import threading
+import traceback
+import uuid
+from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
-import traceback
-import uuid
 
 from catalog.common.artifact_registry import configured_scan_dirs, scan_artifacts
 from catalog.common.basic_metrics import basic_metrics_path, build_basic_metrics_dataset
@@ -67,7 +67,11 @@ class OrchestrationResult:
 DATE_POLICY_BOOTSTRAP_LATEST_DAY = "latest_discovered_day_only"
 EXECUTION_POLICY_BEST_EFFORT = "best_effort_continue_on_failure"
 FLASK_HANDOFF_POLICY_ALWAYS = "always_handoff"
-UPDATE_POLICY_INCREMENTAL = "poll_for_new_data_then_process_new_slice"
+UPDATE_POLICY_INCREMENTAL = "poll_for_new_data_then_queue_new_slice"
+#: Discovery creates durable federation jobs. It never decides that this machine
+#: executes them; the federation scheduler selects a provider, which may or may
+#: not be this node.
+ANALYSIS_DISPATCH_POLICY = "federated_job_dispatch"
 HISTORICAL_CATCH_UP_POLICY = "reverse_chronological_one_day_per_cycle"
 BOOTSTRAP_REFRESH_POLICY = "always_refresh_latest_day_on_startup"
 AUTO_COVERAGE_CONTRACT = "runtime_playback_ready_outputs"
@@ -146,6 +150,40 @@ class RuntimeState:
     active_execution_id: str | None
     completed_execution_id: str | None
     completed_execution_succeeded: bool | None
+    # Federation job state. Discovery creates durable jobs; a provider selected by
+    # the federation scheduler executes them, so runtime progress is reconciled
+    # from durable job status rather than from an in-process return value.
+    analysis_dispatch_mode: str
+    pending_analysis_jobs: list[str]
+    pending_analysis_slices: dict[str, str]
+    completed_analysis_slices: dict[str, str]
+    last_analysis_job_id: str | None
+    last_analysis_job_status: str | None
+    last_analysis_provider_id: str | None
+    last_analysis_node_id: str | None
+
+
+def _text_list(value: Any) -> list[str]:
+    if not isinstance(value, list):
+        return []
+    return sorted({str(item) for item in value if isinstance(item, (str, int))})
+
+
+def _date_signature_map(value: Any) -> dict[str, str]:
+    """Return a persisted ``date -> source signature`` map, ignoring bad rows."""
+
+    if not isinstance(value, dict):
+        return {}
+    normalized: dict[str, str] = {}
+    for key, signature in value.items():
+        if not isinstance(key, str) or not isinstance(signature, str):
+            continue
+        try:
+            date.fromisoformat(key)
+        except ValueError:
+            continue
+        normalized[key] = signature
+    return normalized
 
 
 def _canonical_scan_roots() -> list[str]:
@@ -305,7 +343,11 @@ def _run_for_date_slice(
 ) -> OrchestrationResult:
     """Prepare one single-day automatic session and run the requested script contract.
 
-    The runtime uses this for both latest-day bootstrap and historical catch-up.
+    This is the *worker-side* analysis implementation. It is invoked by the
+    capability handler on whichever provider the federation scheduler selected,
+    against the data slice that provider was authorized to retrieve. Discovery
+    never calls it directly.
+
     It has side effects: creates/reuses session directories, filters data, writes
     derived metrics, updates script metadata, may create playback exports, and
     rescans artifacts. Individual script failures are captured and returned
@@ -437,18 +479,29 @@ def _run_for_date_slice(
 
 
 class RuntimeOrchestrator:
-    """Own the background runtime state machine used by Flask and /control.
+    """Own the background discovery state machine used by Flask and /control.
 
     The orchestrator persists progress to JSON so UI views can distinguish
     availability (Flask is up) from readiness (data/session/playback artifacts are
-    prepared). It is deliberately single-process and best-effort, not a durable
-    job queue.
+    prepared).
+
+    Discovery is deliberately *only* discovery. When a date slice needs analysis
+    the orchestrator creates a durable federation job and hands it to the
+    capability scheduler; it never decides that this machine executes the work.
+    Progress is then reconciled from durable job state.
     """
 
     def __init__(
-        self, *, poll_interval_seconds: int = DEFAULT_POLL_INTERVAL_SECONDS
+        self,
+        *,
+        poll_interval_seconds: int = DEFAULT_POLL_INTERVAL_SECONDS,
+        analysis_gateway: Any | None = None,
     ) -> None:
         self.status = StatusPrinter()
+        # Discovery only creates work. The gateway turns a discovered slice into a
+        # durable federation job; it is injected so tests and alternative
+        # deployments can supply their own without touching discovery logic.
+        self._analysis_gateway = analysis_gateway
         self.root = repo_root()
         self.data_dir = self.root / "data"
         self.workflows_root = self.root / "results" / "workflows"
@@ -532,6 +585,14 @@ class RuntimeOrchestrator:
             active_execution_id=None,
             completed_execution_id=None,
             completed_execution_succeeded=None,
+            analysis_dispatch_mode=ANALYSIS_DISPATCH_POLICY,
+            pending_analysis_jobs=[],
+            pending_analysis_slices={},
+            completed_analysis_slices={},
+            last_analysis_job_id=None,
+            last_analysis_job_status=None,
+            last_analysis_provider_id=None,
+            last_analysis_node_id=None,
         )
 
     def _load_state(self) -> RuntimeState:
@@ -562,6 +623,17 @@ class RuntimeOrchestrator:
         # worker. Persisted ownership cannot survive a process restart.
         state.update_running = False
         state.active_execution_id = None
+        # Federation job tracking is durable, but the JSON file is operator
+        # visible. Normalize it so a hand-edited or truncated file degrades to
+        # "nothing tracked" rather than crashing the discovery loop.
+        state.analysis_dispatch_mode = ANALYSIS_DISPATCH_POLICY
+        state.pending_analysis_jobs = _text_list(state.pending_analysis_jobs)
+        state.pending_analysis_slices = _date_signature_map(
+            state.pending_analysis_slices
+        )
+        state.completed_analysis_slices = _date_signature_map(
+            state.completed_analysis_slices
+        )
         return state
 
     def _startup_decision_context(self) -> dict[str, Any]:
@@ -749,7 +821,11 @@ class RuntimeOrchestrator:
         self._thread.start()
 
     def request_refresh(self, *, execution_id: str | None = None) -> bool:
-        """Request an asynchronous catch-up/new-data check from the control panel."""
+        """Request an asynchronous discovery pass from the control panel.
+
+        The pass discovers new data and queues durable analysis jobs. It does not
+        execute analysis: a federation provider selected by the scheduler does.
+        """
         with self._lock:
             if self._state.startup_mode == STARTUP_MODE_PENDING:
                 self.status.warn(
@@ -832,6 +908,38 @@ class RuntimeOrchestrator:
                     self._persist_state()
                 self.status.warn(f"background update loop failure: {exc}")
             self._stop.wait(1 if run_bootstrap_once else self.poll_interval_seconds)
+
+    def _processed_dates(
+        self,
+        *,
+        script_options,
+        source_signatures: dict[str, str] | None = None,
+    ) -> set[str]:
+        """Return dates that are complete on disk or through a succeeded job.
+
+        A day is complete when its analysis job succeeded — that is the durable
+        record, regardless of which provider ran it — or when this device's own
+        session outputs still satisfy the automatic contract for the current
+        source signature.
+        """
+
+        processed = self._verified_processed_dates(
+            script_options=script_options,
+            source_signatures=source_signatures,
+        )
+        if source_signatures is None:
+            return processed
+        with self._lock:
+            completed = dict(self._state.completed_analysis_slices)
+        for day, signature in completed.items():
+            try:
+                target = date.fromisoformat(day)
+            except ValueError:
+                continue
+            expected = date_range_source_signature(source_signatures, target, target)
+            if expected == signature:
+                processed.add(day)
+        return processed
 
     def _verified_processed_dates(
         self,
@@ -1062,7 +1170,11 @@ class RuntimeOrchestrator:
                 "none", self.workflows_root, artifacts, warnings, [], []
             )
 
-        verified_processed_dates = self._verified_processed_dates(
+        # Durable jobs are the unit of progress now, so fold any finished job into
+        # runtime state before deciding what still needs to be queued.
+        self._reconcile_analysis_jobs()
+
+        verified_processed_dates = self._processed_dates(
             script_options=script_options,
             source_signatures=current_source_signatures,
         )
@@ -1091,6 +1203,20 @@ class RuntimeOrchestrator:
                 + ", ".join(sorted(dropped_unverified, reverse=True))
             )
 
+        # A day whose current source signature already has a live durable job is
+        # scheduled work. Re-queueing is suppressed by job identity anyway, but
+        # skipping it lets catch-up advance instead of spinning on the same day.
+        # A changed signature is different work and is queued again.
+        def _slice_signature(day: date) -> str:
+            return date_range_source_signature(current_source_signatures, day, day)
+
+        with self._lock:
+            awaiting_jobs = {
+                day
+                for day, signature in self._state.pending_analysis_slices.items()
+                if signature == _slice_signature(date.fromisoformat(day))
+            }
+
         if bootstrap:
             # Latest-day first gives operators the freshest playback view quickly;
             # older source days are handled by the incremental catch-up loop.
@@ -1099,6 +1225,7 @@ class RuntimeOrchestrator:
                 script_options
             )
             with self._lock:
+                self._state.bootstrap_date = latest.isoformat()
                 self._state.bootstrap_full_analysis_started_at = (
                     self._state.bootstrap_full_analysis_started_at or _utc_now_iso()
                 )
@@ -1119,7 +1246,10 @@ class RuntimeOrchestrator:
         else:
             # Catch-up intentionally advances one day per cycle rather than doing a
             # full historical recompute on every poll.
-            target_days = [pending_desc[0]] if pending_desc else []
+            schedulable = [
+                day for day in pending_desc if day.isoformat() not in awaiting_jobs
+            ]
+            target_days = [schedulable[0]] if schedulable else []
             if target_days:
                 self.status.info(
                     "historical catch-up phase: processing one pending day "
@@ -1140,86 +1270,69 @@ class RuntimeOrchestrator:
         if target_days:
             self.status.info(
                 "date policy applied "
-                f"({DATE_POLICY_BOOTSTRAP_LATEST_DAY}): processing {', '.join(day.isoformat() for day in target_days)}"
+                f"({DATE_POLICY_BOOTSTRAP_LATEST_DAY}): queueing {', '.join(day.isoformat() for day in target_days)}"
             )
             final_result = OrchestrationResult(
                 "none", self.workflows_root, artifacts, warnings, [], []
             )
-            failed: list[str] = []
+            requested_script_keys = (
+                bootstrap_script_keys if bootstrap else AUTO_COVERAGE_SCRIPT_KEYS
+            )
+            submitted: list[str] = []
+            queued_dates: list[tuple[str, str]] = []
+            submission_failure: str | None = None
             for day in target_days:
                 with self._lock:
                     self._state.currently_processing_date = day.isoformat()
+                    namespace = str(self._state.active_runtime_namespace or "default")
                     self._persist_state()
-                final_result = _run_for_date_slice(
-                    status=self.status,
-                    workflows_root=self.workflows_root,
-                    data_dir=self.data_dir,
-                    script_options=script_options,
-                    target_day=day,
-                    script_keys=(
-                        bootstrap_script_keys
-                        if bootstrap
-                        else AUTO_COVERAGE_SCRIPT_KEYS
-                    ),
-                    run_label=(
-                        "bootstrap_latest_day_playback_ready_analysis"
-                        if bootstrap
-                        else "historical_catch_up_day"
-                    ),
-                    mark_bootstrap_full_analysis_complete=bootstrap,
+                try:
+                    job_id = self._submit_analysis_work(
+                        target_day=day,
+                        script_keys=requested_script_keys,
+                        runtime_namespace=namespace,
+                        source_signatures=current_source_signatures,
+                    )
+                except Exception as exc:  # noqa: BLE001 - discovery must stay alive
+                    submission_failure = f"{exc.__class__.__name__}: {exc}"
+                    self.status.warn(
+                        f"could not create an analysis job for {day.isoformat()}: "
+                        f"{submission_failure}"
+                    )
+                    continue
+                if job_id is not None:
+                    submitted.append(job_id)
+                    queued_dates.append((day.isoformat(), _slice_signature(day)))
+            with self._lock:
+                self._state.session_id = _auto_session_id(
+                    target_days[-1].isoformat(),
+                    target_days[-1].isoformat(),
                     runtime_namespace=str(
                         self._state.active_runtime_namespace or "default"
                     ),
-                    active_slice=day,
-                    remaining_slices=max(0, len(pending_desc) - 1),
                 )
-                failed.extend(final_result.failed_scripts)
-            with self._lock:
-                processed = set(self._state.processed_dates)
-                for day in target_days:
-                    processed.add(day.isoformat())
-                self._state.processed_dates = sorted(processed)
-                self._state.session_id = final_result.session_id
-                self._state.last_processed_date = target_days[-1].isoformat()
-                self._state.last_completed_date = target_days[-1].isoformat()
-                completed_scripts = ",".join(AUTO_COVERAGE_SCRIPT_KEYS) or "none"
-                self._state.last_completed_step = f"automatic_coverage[{completed_scripts}] for {target_days[-1].isoformat()}"
-                if bootstrap:
-                    self._state.bootstrap_date = target_days[-1].isoformat()
-                    self._state.last_bootstrap_date = target_days[-1].isoformat()
-                    self._state.bootstrap_complete = True
-                    self._state.bootstrap_full_analysis_complete_at = _utc_now_iso()
-                else:
-                    self._state.last_catchup_success_at = _utc_now_iso()
-                self._state.last_successful_refresh = _utc_now_iso()
-                self._state.failed_scripts = failed
-                self._state.last_failure = (
-                    None
-                    if not failed
-                    else f"Failed scripts: {', '.join(sorted(set(failed)))}"
+                self._state.next_queued_date = target_days[-1].isoformat()
+                self._state.last_analysis_job_id = (
+                    submitted[-1] if submitted else self._state.last_analysis_job_id
                 )
-                verified_processed_dates = self._verified_processed_dates(
-                    script_options=script_options,
-                    source_signatures=current_source_signatures,
+                self._state.pending_analysis_jobs = sorted(
+                    set(self._state.pending_analysis_jobs) | set(submitted)
                 )
-                _, pending_desc, _, dropped_unverified = self._apply_progress_state(
-                    available_dates=available_dates,
-                    verified_processed_dates=verified_processed_dates,
+                self._state.pending_analysis_slices = {
+                    **self._state.pending_analysis_slices,
+                    **dict(queued_dates),
+                }
+                completed_scripts = ",".join(requested_script_keys) or "none"
+                self._state.last_completed_step = (
+                    f"queued_analysis_job[{completed_scripts}] for "
+                    f"{target_days[-1].isoformat()}"
                 )
-                if dropped_unverified:
-                    self.status.warn(
-                        "post-run verification re-queued unverified day(s): "
-                        + ", ".join(sorted(dropped_unverified, reverse=True))
-                    )
-                self.status.info(
-                    "incremental progress: "
-                    f"processed={self._state.processed_days_count}/{self._state.total_available_days}, "
-                    f"remaining={len(pending_desc)}, next={self._state.next_planned_date or 'none'}"
-                )
-                if bootstrap:
-                    self.status.info(
-                        "bootstrap phase: playback-ready analysis complete; historical catch-up will continue in background"
-                    )
+                if submission_failure is not None:
+                    self._state.last_failure = submission_failure
+                self._persist_state()
+            # Scheduling and execution happen off this thread so discovery keeps
+            # polling and Flask stays responsive.
+            self._request_scheduling_pass()
         else:
             final_result = OrchestrationResult(
                 "none", self.workflows_root, artifacts, warnings, [], []
@@ -1259,6 +1372,124 @@ class RuntimeOrchestrator:
     def _bootstrap_full_analysis_script_keys(self, script_options) -> tuple[str, ...]:
         discovered = {item.key for item in script_options}
         return tuple(key for key in AUTO_COVERAGE_SCRIPT_KEYS if key in discovered)
+
+    # ------------------------------------------------------------------
+    # Federation job handoff
+    # ------------------------------------------------------------------
+
+    def analysis_gateway(self):
+        """Return the analysis work gateway, building the default one lazily."""
+
+        if self._analysis_gateway is None:
+            from .analysis_runtime import DiscoveryAnalysisGateway
+
+            self._analysis_gateway = DiscoveryAnalysisGateway()
+        return self._analysis_gateway
+
+    def _submit_analysis_work(
+        self,
+        *,
+        target_day: date,
+        script_keys: tuple[str, ...],
+        runtime_namespace: str,
+        source_signatures: dict[str, str],
+    ) -> str | None:
+        """Create (or recognize) the durable job for one discovered date slice."""
+
+        signature = date_range_source_signature(
+            source_signatures, target_day, target_day
+        )
+        outcome = self.analysis_gateway().submit_date_slice(
+            data_dir=self.data_dir,
+            target_day=target_day,
+            script_keys=script_keys,
+            runtime_namespace=runtime_namespace,
+            source_signature=signature,
+        )
+        if outcome is None:
+            return None
+        self.status.info(
+            f"analysis job {'created' if outcome.created else 'already durable'} for "
+            f"{target_day.isoformat()}: {outcome.job_id} ({outcome.status.value})"
+        )
+        return outcome.job_id
+
+    def _request_scheduling_pass(self) -> None:
+        try:
+            self.analysis_gateway().request_scheduling_pass()
+        except Exception as exc:  # noqa: BLE001 - scheduling never blocks discovery
+            self.status.warn(f"analysis scheduling pass could not start: {exc}")
+
+    def _reconcile_analysis_jobs(self) -> None:
+        """Fold durable job outcomes back into the runtime state the UI reads."""
+
+        with self._lock:
+            pending = list(self._state.pending_analysis_jobs)
+        if not pending:
+            return
+        try:
+            gateway = self.analysis_gateway()
+        except Exception as exc:  # noqa: BLE001 - runtime stays available
+            self.status.warn(f"analysis job reconciliation unavailable: {exc}")
+            return
+        still_pending: list[str] = []
+        finished_dates: set[str] = set()
+        succeeded_slices: dict[str, str] = {}
+        for job_id in pending:
+            view = gateway.job_view(job_id)
+            if view is None or not view.get("terminal"):
+                still_pending.append(job_id)
+                continue
+            completed = [str(item) for item in (view.get("target_dates") or [])]
+            finished_dates.update(completed)
+            signature = view.get("source_signature")
+            if view.get("succeeded") and signature:
+                succeeded_slices.update({item: str(signature) for item in completed})
+            with self._lock:
+                self._state.last_analysis_job_id = job_id
+                self._state.last_analysis_job_status = str(view.get("status"))
+                self._state.last_analysis_provider_id = view.get("provider_id")
+                self._state.last_analysis_node_id = view.get("node_id")
+                if view.get("succeeded"):
+                    processed = set(self._state.processed_dates) | set(completed)
+                    self._state.processed_dates = sorted(processed)
+                    if completed:
+                        self._state.last_processed_date = max(completed)
+                        self._state.last_completed_date = max(completed)
+                    self._state.last_successful_refresh = _utc_now_iso()
+                    if self._state.bootstrap_date in completed:
+                        self._state.bootstrap_complete = True
+                        self._state.last_bootstrap_date = self._state.bootstrap_date
+                        self._state.bootstrap_full_analysis_complete_at = _utc_now_iso()
+                    else:
+                        self._state.last_catchup_success_at = _utc_now_iso()
+                    self._state.failed_scripts = []
+                    self._state.last_failure = None
+                else:
+                    self._state.last_failure = (
+                        f"Analysis job {job_id} ended as {view.get('status')}"
+                        + (
+                            f" ({view['error_code']})"
+                            if view.get("error_code")
+                            else ""
+                        )
+                    )
+        with self._lock:
+            self._state.pending_analysis_jobs = sorted(set(still_pending))
+            # A day is only "awaiting scheduling" while it has a live durable job.
+            # A finished job releases it so catch-up can move on or retry it.
+            self._state.pending_analysis_slices = {
+                day: signature
+                for day, signature in self._state.pending_analysis_slices.items()
+                if day not in finished_dates
+            }
+            # A succeeded job is the durable record that the slice was analysed,
+            # wherever the selected provider ran it.
+            self._state.completed_analysis_slices = {
+                **self._state.completed_analysis_slices,
+                **succeeded_slices,
+            }
+            self._persist_state()
 
 
 _RUNTIME_MANAGER: RuntimeOrchestrator | None = None
