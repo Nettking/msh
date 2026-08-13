@@ -23,6 +23,7 @@ from catalog.orchestrator.analysis_runtime import (
 
 NOW = datetime(2026, 8, 13, 9, 0, tzinfo=timezone.utc)
 
+
 def _identity(tmp_path: Path, session_id: str):
     """Build an identity whose node ID is a real key-derived device identity.
 
@@ -42,7 +43,6 @@ def _identity(tmp_path: Path, session_id: str):
         provider_id=analysis_capability_id(credentials.identity.node_id),
         standalone=True,
     )
-
 
 
 def _runtime(tmp_path: Path) -> AnalysisRuntime:
@@ -97,6 +97,54 @@ def test_a_failing_supplier_falls_back_to_the_single_node_session(
     identity = resolve_analysis_identity(tmp_path / "identity.json")
 
     assert identity.standalone is True
+
+
+def test_same_identity_rebuilds_when_relay_binding_generation_changes(
+    tmp_path: Path, monkeypatch
+) -> None:
+    generation = {"value": 0}
+    created = []
+
+    class _Service:
+        def __init__(self) -> None:
+            self.stopped = False
+
+        def stop_scheduling(self) -> None:
+            self.stopped = True
+
+    class _RuntimeStub:
+        def __init__(self, *, root, identity) -> None:
+            self.root = root
+            self.identity = identity
+            self.federation_generation = generation["value"]
+            self.service = _Service()
+            created.append(self)
+
+        def stop(self) -> None:
+            self.service.stop_scheduling()
+
+    monkeypatch.setattr(analysis_runtime, "repo_root", lambda: tmp_path)
+    monkeypatch.setattr(analysis_runtime, "AnalysisRuntime", _RuntimeStub)
+    analysis_runtime.register_identity_supplier(
+        lambda: ("session-real-federation", "node-real-device")
+    )
+    analysis_runtime.register_federation_supplier(
+        lambda *_args: None,
+        generation_supplier=lambda: generation["value"],
+    )
+
+    first = analysis_runtime.get_analysis_runtime()
+    assert analysis_runtime.get_analysis_runtime() is first
+    assert len(created) == 1
+
+    generation["value"] = 1
+    rebound = analysis_runtime.get_analysis_runtime()
+
+    assert rebound is not first
+    assert rebound.identity == first.identity
+    assert rebound.federation_generation == 1
+    assert first.service.stopped is True
+    assert len(created) == 2
 
 
 def test_local_provider_is_advertised_as_an_ordinary_provider(tmp_path: Path) -> None:
