@@ -349,7 +349,7 @@ class AnalysisProviderProvisioner:
         )
 
     def refresh(self) -> bool:
-        """Refresh authority and activate after a later operator approval."""
+        """Refresh authority and rebind after approval or a health revision change."""
 
         try:
             state, _approved_here = self.ensure_enrollment()
@@ -358,7 +358,7 @@ class AnalysisProviderProvisioner:
         if state != "approved":
             return False
         published = self.publish_health()
-        if self._worker is None and self._endpoint is not None:
+        if self._endpoint is not None and (self._worker is None or published):
             self._worker = self.activate(self._endpoint)
         return published
 
