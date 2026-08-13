@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -202,6 +202,67 @@ def test_a_federation_of_one_schedules_and_runs_its_own_slice(tmp_path: Path) ->
     assert view["target_dates"] == ["2026-08-13"]
     assert len(executed) == 1
     assert executed[0]["files"]
+
+
+def test_health_refresh_rebinds_the_local_f84_worker(tmp_path: Path) -> None:
+    now = {"value": NOW}
+    runtime = AnalysisRuntime(
+        root=tmp_path,
+        identity=_identity(tmp_path, "session-health-refresh"),
+        clock=lambda: now["value"],
+    )
+    data_dir = tmp_path / "data"
+    _write_day(data_dir, "2026-08-13")
+    _write_day(data_dir, "2026-08-14")
+    gateway = DiscoveryAnalysisGateway(runtime)
+    executed: list[tuple[str, ...]] = []
+
+    class _Executor:
+        def execute(self, *, plan, data_dir, workspace):
+            from catalog.capabilities.analysis import AnalysisExecutionReport
+
+            executed.append(plan.target_dates)
+            return AnalysisExecutionReport(
+                succeeded=True,
+                processed_dates=plan.target_dates,
+                analysis_session_ids=("health-refresh",),
+            )
+
+    binding = runtime.federation.inventory.get("jsonl-analysis-handler")
+    binding.handler.executor = _Executor()
+    first = gateway.submit_date_slice(
+        data_dir=data_dir,
+        target_day=date(2026, 8, 13),
+        script_keys=("data_pr_day",),
+        runtime_namespace="default",
+        source_signature="a" * 64,
+    )
+    assert first is not None
+    assert [item.decision for item in gateway.run_scheduling_pass()] == ["dispatched"]
+    original_worker = runtime.worker
+    assert original_worker is not None
+    assert original_worker.snapshot.report_revision == 1
+
+    now["value"] += timedelta(seconds=400)
+    assert runtime.refresh_provider_health() is True
+    rebound_worker = runtime.worker
+    assert rebound_worker is not None
+    assert rebound_worker is not original_worker
+    assert rebound_worker.snapshot.report_revision == 2
+
+    second = gateway.submit_date_slice(
+        data_dir=data_dir,
+        target_day=date(2026, 8, 14),
+        script_keys=("data_pr_day",),
+        runtime_namespace="default",
+        source_signature="b" * 64,
+    )
+    assert second is not None
+    outcomes = gateway.run_scheduling_pass()
+
+    assert [item.decision for item in outcomes] == ["dispatched"]
+    assert gateway.job_view(second.job_id)["status"] == JobStatus.SUCCEEDED.value
+    assert executed == [("2026-08-13",), ("2026-08-14",)]
 
 
 def test_no_provider_means_the_job_waits_rather_than_running_locally(
