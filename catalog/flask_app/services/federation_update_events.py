@@ -15,6 +15,16 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from catalog.federation.control_commands import (
+    ControlCommandEnvelope,
+    ensure_bounded_json,
+)
+from catalog.federation.control_commands import (
+    correlated_event_request_id as _event_request_id,
+)
+from catalog.federation.control_commands import (
+    stamp_utc as _stamp,
+)
 from catalog.federation.software_update import (
     APPROVED_BRANCH,
     APPROVED_REPOSITORY,
@@ -35,29 +45,12 @@ MAX_TARGETS = 256
 MAX_EVENT_BYTES = 8192
 
 
-def _stamp(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
-
-
-def _parse_stamp(value: object) -> datetime:
-    if not isinstance(value, str):
-        raise TypeError("malformed_timestamp")
-    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    if parsed.tzinfo is None or parsed.utcoffset() is None:
-        raise ValueError("malformed_timestamp")
-    return parsed.astimezone(timezone.utc)
-
-
 def _bounded(value: object) -> None:
-    encoded = json.dumps(
+    ensure_bounded_json(
         value,
-        sort_keys=True,
-        separators=(",", ":"),
-        ensure_ascii=False,
-        allow_nan=False,
-    ).encode("utf-8")
-    if len(encoded) > MAX_EVENT_BYTES:
-        raise ValueError("update_event_too_large")
+        max_bytes=MAX_EVENT_BYTES,
+        error_code="update_event_too_large",
+    )
 
 
 def command_payload(
@@ -68,29 +61,22 @@ def command_payload(
     created_at: datetime,
     expires_at: datetime,
 ) -> dict[str, object]:
-    if not request_id or len(request_id) > 128:
-        raise ValueError("malformed_request_id")
+    envelope = ControlCommandEnvelope.issue(
+        request_id=request_id,
+        target_node_ids=target_node_ids,
+        created_at=created_at,
+        expires_at=expires_at,
+        max_lifetime=timedelta(minutes=15),
+        max_targets=MAX_TARGETS,
+    )
     if not OID_RE.fullmatch(target_commit):
         raise ValueError("malformed_target")
-    targets = tuple(dict.fromkeys(target_node_ids))
-    if not targets or len(targets) > MAX_TARGETS:
-        raise ValueError("malformed_targets")
-    if any(
-        not isinstance(item, str) or not item or len(item) > 512
-        for item in targets
-    ):
-        raise ValueError("malformed_targets")
-    if expires_at <= created_at or (expires_at - created_at).total_seconds() > 900:
-        raise ValueError("invalid_lifetime")
     value: dict[str, object] = {
         "schema": EVENT_SCHEMA,
-        "request_id": request_id,
+        **envelope.payload_fields(),
         "repository": APPROVED_REPOSITORY,
         "branch": APPROVED_BRANCH,
         "target_commit": target_commit,
-        "target_node_ids": list(targets),
-        "created_at": _stamp(created_at),
-        "expires_at": _stamp(expires_at),
     }
     _bounded(value)
     return value
@@ -99,11 +85,13 @@ def command_payload(
 def validate_command_payload(value: object) -> dict[str, object]:
     if not isinstance(value, dict) or value.get("schema") != EVENT_SCHEMA:
         raise ValueError("malformed_message")
-    request_id = value.get("request_id")
+    ControlCommandEnvelope.parse_payload(
+        value,
+        max_lifetime=timedelta(minutes=15),
+        max_targets=MAX_TARGETS,
+        require_unique_targets=False,
+    )
     target = value.get("target_commit")
-    targets = value.get("target_node_ids")
-    if not isinstance(request_id, str) or not request_id or len(request_id) > 128:
-        raise ValueError("malformed_request_id")
     if (
         value.get("repository") != APPROVED_REPOSITORY
         or value.get("branch") != APPROVED_BRANCH
@@ -111,24 +99,6 @@ def validate_command_payload(value: object) -> dict[str, object]:
         raise ValueError("unapproved_source")
     if not isinstance(target, str) or not OID_RE.fullmatch(target):
         raise ValueError("malformed_target")
-    if (
-        not isinstance(targets, list)
-        or not 1 <= len(targets) <= MAX_TARGETS
-        or any(
-            not isinstance(item, str) or not item or len(item) > 512
-            for item in targets
-        )
-    ):
-        raise ValueError("malformed_targets")
-    created = _parse_stamp(value.get("created_at"))
-    expires = _parse_stamp(value.get("expires_at"))
-    now = datetime.now(timezone.utc)
-    if (
-        created > now + timedelta(minutes=1)
-        or expires <= now
-        or (expires - created).total_seconds() > 900
-    ):
-        raise ValueError("expired_or_invalid_request")
     _bounded(value)
     return value
 
@@ -166,10 +136,7 @@ def inspection_from_report(
     request_id = value.get("request_id")
     node_id = value.get("node_id")
     state = value.get("state")
-    if not all(
-        isinstance(item, str) and item
-        for item in (request_id, node_id, state)
-    ):
+    if not all(isinstance(item, str) and item for item in (request_id, node_id, state)):
         return None
     commits: dict[str, str | None] = {}
     for field in ("current_commit", "target_commit", "running_commit"):
@@ -193,26 +160,15 @@ def inspection_from_report(
             target_commit=commits["target_commit"],
             code=value.get("code") if isinstance(value.get("code"), str) else None,
             message=(
-                value.get("message")
-                if isinstance(value.get("message"), str)
-                else None
+                value.get("message") if isinstance(value.get("message"), str) else None
             ),
             running_commit=commits["running_commit"],
         ),
     )
 
 
-def _event_request_id(prefix: str, request_id: str, node_id: str) -> str:
-    digest = hashlib.sha256(
-        f"{request_id}\0{node_id}".encode()
-    ).hexdigest()[:32]
-    return f"{prefix}-{digest}"
-
-
 def _host_request_id(request_id: str, node_id: str) -> str:
-    digest = hashlib.sha256(
-        f"host\0{request_id}\0{node_id}".encode()
-    ).hexdigest()[:40]
+    digest = hashlib.sha256(f"host\0{request_id}\0{node_id}".encode()).hexdigest()[:40]
     return f"fed-{digest}"
 
 
@@ -455,10 +411,7 @@ class FederationUpdateEventProcessor:
                             local_node,
                         )
                         existing = self._host_result(host_request_id)
-                        if (
-                            existing is not None
-                            and existing.target_commit == target
-                        ):
+                        if existing is not None and existing.target_commit == target:
                             self._report(
                                 context,
                                 event_type=APPLY_REPORT_EVENT,
