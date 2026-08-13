@@ -1,7 +1,7 @@
 """Compose the federated analysis job runtime for this device.
 
 This module is the only place that knows how the generic capability machinery is
-wired on a running MSH node:
+wired on a running FCP node:
 
 * which durable stores back jobs, artifacts, and the job index,
 * which identity this node uses as coordinator, data owner, and provider,
@@ -64,6 +64,16 @@ from .pipeline import StatusPrinter, _run_for_date_slice
 _IDENTITY_SUPPLIER: Callable[[], tuple[str, str] | None] | None = None
 _IDENTITY_LOCK = threading.Lock()
 
+#: Optional product composition seam for a *real* federation authority. Supplying
+#: only an identity is deliberately insufficient: a connected device must not
+#: manufacture a second standalone coordinator for that real session. The Flask
+#: product bridge registers this supplier once it owns an authenticated relay.
+_FEDERATION_SUPPLIER: (
+    Callable[["AnalysisIdentity", Path, Callable[[], datetime]], DeviceFederationAuthority | None]
+    | None
+) = None
+_FEDERATION_LOCK = threading.Lock()
+
 _RUNTIME: AnalysisRuntime | None = None
 _RUNTIME_LOCK = threading.Lock()
 
@@ -76,6 +86,19 @@ def register_identity_supplier(
     global _IDENTITY_SUPPLIER
     with _IDENTITY_LOCK:
         _IDENTITY_SUPPLIER = supplier
+
+
+def register_federation_supplier(
+    supplier: Callable[
+        ["AnalysisIdentity", Path, Callable[[], datetime]],
+        DeviceFederationAuthority | None,
+    ],
+) -> None:
+    """Register the product seam that supplies the authenticated federation path."""
+
+    global _FEDERATION_SUPPLIER
+    with _FEDERATION_LOCK:
+        _FEDERATION_SUPPLIER = supplier
 
 
 def _utc_now() -> datetime:
@@ -271,12 +294,28 @@ class AnalysisRuntime:
         self.provisioner: AnalysisProviderProvisioner | None = None
         self.worker: object | None = None
 
-        # F8 trust chain. Without a usable coordinator this device cannot enrol,
-        # publish health, or activate anything, so it advertises no provider at
-        # all and submitted work simply stays durably queued.
+        # F8 trust chain. A true standalone identity builds the device-local
+        # single-node authority. A real federation identity is never silently
+        # backed by that standalone database: it must receive the authenticated
+        # product authority through ``register_federation_supplier`` or remain
+        # safely without a provider until that binding is available.
         self.federation = federation
         self.provisioning_reason = "provider-active"
-        if self.federation is None:
+        if self.federation is None and not self.identity.standalone:
+            with _FEDERATION_LOCK:
+                federation_supplier = _FEDERATION_SUPPLIER
+            if federation_supplier is not None:
+                try:
+                    self.federation = federation_supplier(
+                        self.identity,
+                        self.capability_root,
+                        self.clock,
+                    )
+                except Exception as exc:  # noqa: BLE001 - startup stays available
+                    self.provisioning_reason = str(
+                        getattr(exc, "code", "federation-authority-unavailable")
+                    )
+        if self.federation is None and self.identity.standalone:
             try:
                 self.federation = DeviceFederationAuthority.for_device(
                     capability_root=self.capability_root,
@@ -284,15 +323,19 @@ class AnalysisRuntime:
                     clock=self.clock,
                 )
             except Exception as exc:  # noqa: BLE001 - startup must stay available
-                self.federation = DeviceFederationAuthority.without_authority(
-                    capability_root=self.capability_root,
-                    node_id=self.identity.node_id,
-                    clock=self.clock,
-                )
-                enable_local_provider = False
                 self.provisioning_reason = str(
                     getattr(exc, "code", "federation-authority-unavailable")
                 )
+        if self.federation is None:
+            self.federation = DeviceFederationAuthority.without_authority(
+                capability_root=self.capability_root,
+                node_id=self.identity.node_id,
+                clock=self.clock,
+            )
+            enable_local_provider = False
+            if self.provisioning_reason == "provider-active":
+                self.provisioning_reason = "federation-transport-unavailable"
+
         self.transport = self.federation.lifecycle_transport()
         self.artifact_carrier = self.federation.artifact_carrier(self.gateway)
         self.report_source = FederatedProviderReportSource(
@@ -542,11 +585,20 @@ class DiscoveryAnalysisGateway:
         return None
 
 
+def _identity_key(identity: AnalysisIdentity) -> tuple[str, str, bool]:
+    return identity.session_id, identity.node_id, identity.standalone
+
+
 def get_analysis_runtime() -> AnalysisRuntime:
+    """Return the singleton, rebuilding it when the trusted identity changes."""
+
     global _RUNTIME
+    root = repo_root()
+    state_path = root / "results" / "capabilities" / "analysis_identity.json"
+    desired = resolve_analysis_identity(state_path)
     with _RUNTIME_LOCK:
-        if _RUNTIME is None:
-            _RUNTIME = AnalysisRuntime()
+        if _RUNTIME is None or _identity_key(_RUNTIME.identity) != _identity_key(desired):
+            _RUNTIME = AnalysisRuntime(root=root, identity=desired)
         return _RUNTIME
 
 
@@ -564,6 +616,7 @@ __all__ = [
     "DiscoveryAnalysisGateway",
     "RunnerSliceAnalysisExecutor",
     "get_analysis_runtime",
+    "register_federation_supplier",
     "register_identity_supplier",
     "reset_analysis_runtime",
     "resolve_analysis_identity",
