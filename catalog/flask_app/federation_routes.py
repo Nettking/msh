@@ -33,8 +33,11 @@ from catalog.federation.projections import (
 from .capability_onboarding_routes import _CSRF_SESSION_KEY, _csrf_token
 from .services.capability_benchmark_service import get_capability_benchmark_service
 from .services.capability_onboarding_service import get_capability_onboarding_service
-from .services.federation_capability_requests import (
-    get_federation_capability_request_service,
+from .services.federation_active_leader_runtime import (
+    get_active_capability_request_service as get_federation_capability_request_service,
+)
+from .services.federation_active_leader_runtime import (
+    get_active_update_service as get_federation_update_service,
 )
 from .services.federation_device_names import (
     FederationDeviceNamingService,
@@ -46,7 +49,6 @@ from .services.federation_leader_authority import resolve_federation_leader
 from .services.federation_projection_service import (
     get_federation_projection_service,
 )
-from .services.federation_update_service import get_federation_update_service
 
 federation_web = Blueprint("federation_web", __name__)
 
@@ -198,14 +200,10 @@ def _page_response(page: FederationPage) -> Response:
     )
     projection = _safe_projection(page)
     item_actions = (
-        _benchmark_item_actions(projection)
-        if page is FederationPage.BENCHMARKS
-        else {}
+        _benchmark_item_actions(projection) if page is FederationPage.BENCHMARKS else {}
     )
     device_naming_available = (
-        local_device_naming_available()
-        if page is FederationPage.DEVICES
-        else False
+        local_device_naming_available() if page is FederationPage.DEVICES else False
     )
     self_naming_available = (
         local_device_self_naming_available()
@@ -213,9 +211,7 @@ def _page_response(page: FederationPage) -> Response:
         else False
     )
     current_device_name = (
-        current_federation_device_name()
-        if page is FederationPage.THIS_DEVICE
-        else None
+        current_federation_device_name() if page is FederationPage.THIS_DEVICE else None
     )
     update_status = None
     capability_request_status = None
@@ -294,10 +290,10 @@ def _page_response(page: FederationPage) -> Response:
 def _serve_read_only_federation_before_runtime_gate() -> Response | None:
     """Dispatch GET/HEAD before the legacy runtime gate without changing it."""
 
-    if (
-        request.blueprint != federation_web.name
-        or request.method not in {"GET", "HEAD"}
-    ):
+    if request.blueprint != federation_web.name or request.method not in {
+        "GET",
+        "HEAD",
+    }:
         return None
     endpoint = request.endpoint or ""
     view = current_app.view_functions.get(endpoint)
@@ -332,7 +328,9 @@ def rename_this_device() -> Response:
         name = FederationDeviceNamingService().rename_self(display_name)
         flash(f"This device is now named {name} across the Federation.", "success")
     except AuthorizationError:
-        flash("A trusted Federation membership is required to name this device.", "error")
+        flash(
+            "A trusted Federation membership is required to name this device.", "error"
+        )
     except FederationValidationError as exc:
         code = getattr(exc, "code", "invalid-device-name")
         flash(code.replace("-", " ").capitalize(), "error")
@@ -450,9 +448,7 @@ def apply_updates() -> Response:
             "error",
         )
     except Exception as exc:  # noqa: BLE001 - never expose process details
-        current_app.logger.warning(
-            "Federation update failed (%s)", type(exc).__name__
-        )
+        current_app.logger.warning("Federation update failed (%s)", type(exc).__name__)
         flash("The verified update rollout failed safely.", "error")
     return redirect(url_for("federation_web.overview"), code=303)
 
@@ -463,9 +459,7 @@ def detail(page_name: str) -> Response:
     if page is None:
         abort(404)
     if request.query_string:
-        return redirect(
-            url_for("federation_web.detail", page_name=page_name)
-        )
+        return redirect(url_for("federation_web.detail", page_name=page_name))
     return _page_response(page)
 
 

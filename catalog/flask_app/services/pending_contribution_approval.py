@@ -28,7 +28,6 @@ from catalog.capabilities.operator_surface import (
     ProviderOperatorSurface,
 )
 from catalog.capabilities.provider_enrollment import (
-    FederatedProviderEnrollmentService,
     ProviderEnrollmentRecord,
     ProviderEnrollmentState,
     SQLiteProviderEnrollmentStore,
@@ -44,6 +43,11 @@ from catalog.federation.errors import (
     FederationValidationError,
 )
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
+
+from .federation_active_leader_provider_runtime import (
+    ActiveLeaderProviderEnrollmentService,
+    ActiveLeaderProviderOperatorSurface,
+)
 
 _EXTENSION_KEY = "capability_first_provider_operator_surface"
 _DEFAULT_ENROLLMENT_NAME = "provider_enrollment.sqlite3"
@@ -70,7 +74,7 @@ def _is_capability_first_pending(announcement: CapabilityAnnouncement) -> bool:
     )
 
 
-class CapabilityFirstProviderEnrollmentService(FederatedProviderEnrollmentService):
+class CapabilityFirstProviderEnrollmentService(ActiveLeaderProviderEnrollmentService):
     """F8.1 enrollment with explicit approval of capability-first REGISTERING.
 
     The exception is intentionally narrower than generic provider enrollment:
@@ -183,7 +187,7 @@ class CapabilityFirstProviderEnrollmentService(FederatedProviderEnrollmentServic
             return record
 
 
-class CapabilityFirstProviderOperatorSurface(ProviderOperatorSurface):
+class CapabilityFirstProviderOperatorSurface(ActiveLeaderProviderOperatorSurface):
     """Present capability-first storage approval without inventing activation."""
 
     def _activation(

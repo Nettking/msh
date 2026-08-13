@@ -14,6 +14,9 @@ from catalog.federation.onboarding_models import (
     ContributionPolicyState,
 )
 from catalog.flask_app.services import federation_capability_requests as module
+from catalog.flask_app.services.federation_active_leader_runtime import (
+    ActiveLeaderFederationCapabilityRequestService,
+)
 from catalog.flask_app.services.federation_capability_requests import (
     REQUEST_EVENT,
     SESSION_CREATED_EVENT,
@@ -115,7 +118,9 @@ def test_request_all_requires_active_federation_leader(
 ) -> None:
     coordinator = _Coordinator(creator="another-node")
     _install_context(monkeypatch, coordinator, ())
-    service = FederationCapabilityRequestService(tmp_path / "capabilities.json")
+    service = ActiveLeaderFederationCapabilityRequestService(
+        tmp_path / "capabilities.json"
+    )
 
     with pytest.raises(PermissionError, match="federation_leader_required"):
         service.request_all()
@@ -200,7 +205,9 @@ def test_member_execution_runs_bounded_plan_and_enables_only_allowed_candidates(
             )
 
     contributions = _Contributions()
-    monkeypatch.setattr(module, "get_capability_benchmark_service", lambda: _Benchmarks())
+    monkeypatch.setattr(
+        module, "get_capability_benchmark_service", lambda: _Benchmarks()
+    )
     monkeypatch.setattr(
         module,
         "get_capability_contribution_service",

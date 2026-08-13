@@ -77,6 +77,18 @@ printf '%s\n' "$*" >> "$FAKE_PKG_LOG"
 exit 0
 """,
     )
+    # setup-phone.sh probes for git, ssh, curl and proot-distro before deciding
+    # whether a package refresh is needed. Only presence is checked, never
+    # behavior. Without a stub, the outcome depends on whether the host running
+    # the tests happens to have ssh installed: GitHub runners do, minimal
+    # containers do not, so the same assertion passed in CI and failed locally.
+    # Stub it so the test controls the prerequisite set it is asserting about.
+    _write_executable(
+        fake_bin / "ssh",
+        """#!/usr/bin/env bash
+exit 0
+""",
+    )
 
     state_dir = tmp_path / "setup-state"
     (state_dir / "data").mkdir(parents=True)
