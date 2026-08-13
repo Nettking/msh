@@ -247,3 +247,22 @@ def test_member_spoof_cannot_advance_processor_leader_term() -> None:
     assert authority == CREATOR
     assert state["authority_node_id"] == CREATOR
     assert state["authority_term"] == 1
+
+
+def test_active_runtime_import_does_not_rebind_base_modules() -> None:
+    assert (
+        active.update_service.FederationUpdateService
+        is not active.ActiveLeaderFederationUpdateService
+    )
+    assert (
+        active.update_events.FederationUpdateEventProcessor
+        is not active.ActiveLeaderFederationUpdateEventProcessor
+    )
+    assert (
+        active.capability_requests.FederationCapabilityRequestService
+        is not active.ActiveLeaderFederationCapabilityRequestService
+    )
+    assert (
+        active.capability_requests.FederationCapabilityRequestProcessor
+        is not active.ActiveLeaderFederationCapabilityRequestProcessor
+    )

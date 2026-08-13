@@ -14,14 +14,18 @@ from .federated_ai_product_bridge import FederatedAIProductBridge
 from .federated_data_runtime import FederatedDataPairingRelayRuntime
 from .federated_jsonl_product_bridge import FederatedJsonlProductBridge
 from .federated_telemetry_product_bridge import FederatedTelemetryProductBridge
-from .federation_capability_requests import FederationCapabilityRequestProcessor
+from .federation_active_leader_runtime import (
+    ActiveLeaderFederationCapabilityRequestProcessor as FederationCapabilityRequestProcessor,
+)
+from .federation_active_leader_runtime import (
+    ActiveLeaderFederationUpdateEventProcessor as FederationUpdateEventProcessor,
+)
 from .federation_contribution_publication import publish_local_contributions
 from .federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
     RemotePairingState,
     RemotePairingStore,
 )
-from .federation_update_events import FederationUpdateEventProcessor
 from .federation_update_handoff import HostUpdateHandoff
 from .recorder_federation_publication_install import (
     install_recorder_federation_publication,
@@ -69,12 +73,8 @@ def _utc_now() -> datetime:
 
 
 def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
-    identity_directory = Path(
-        app.config["CAPABILITY_ONBOARDING_IDENTITY_DIRECTORY"]
-    )
-    state_database = Path(
-        app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"]
-    )
+    identity_directory = Path(app.config["CAPABILITY_ONBOARDING_IDENTITY_DIRECTORY"])
+    state_database = Path(app.config["CAPABILITY_ONBOARDING_STATE_DATABASE"])
     remote_path = Path(
         app.config.get(
             "CAPABILITY_ONBOARDING_REMOTE_PAIRING_PATH",
@@ -89,9 +89,7 @@ def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
     return PairingAwareCapabilityOnboardingService(
         identity_directory=identity_directory,
         state_database=state_database,
-        coordinator_database=app.config[
-            "CAPABILITY_ONBOARDING_COORDINATOR_DATABASE"
-        ],
+        coordinator_database=app.config["CAPABILITY_ONBOARDING_COORDINATOR_DATABASE"],
         device_name=device_name,
         discovery_sources=app.config.get(
             "CAPABILITY_ONBOARDING_DISCOVERY_SOURCES",
@@ -358,10 +356,7 @@ class SavedFederationReconnectMonitor:
         # The app's one-shot startup reconciliation must run first. Otherwise a
         # persisted active intent with stale evidence could briefly be advertised
         # as ready before the existing fail-closed suspension path fences it.
-        if (
-            self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY)
-            is not True
-        ):
+        if self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY) is not True:
             return
         from .capability_contribution_service import (
             get_capability_contribution_service,
@@ -388,10 +383,7 @@ class SavedFederationReconnectMonitor:
         runtime_state: RemotePairingState,
         context: object,
     ) -> None:
-        if (
-            self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY)
-            is not True
-        ):
+        if self.app.extensions.get(_CONTRIBUTION_RECONCILE_EXTENSION_KEY) is not True:
             return
         self.ai_bridge.sync(runtime_state, context)
 
