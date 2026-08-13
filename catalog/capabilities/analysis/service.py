@@ -33,6 +33,7 @@ from .scheduler import (
 )
 
 DECISION_SCHEDULING_FAILED = "scheduling-failed"
+DEFAULT_SCHEDULER_POLL_SECONDS = 5.0
 
 _SCHEDULING_ERRORS = (
     FederationValidationError,
@@ -167,7 +168,7 @@ class AnalysisJobRegistry:
 
 
 class AnalysisWorkService:
-    """Submit analysis work and drive federation scheduling asynchronously."""
+    """Submit analysis work and continuously drive its durable lifecycle."""
 
     def __init__(
         self,
@@ -175,12 +176,15 @@ class AnalysisWorkService:
         scheduler: FederatedAnalysisScheduler,
         registry: AnalysisJobRegistry,
         session_id: str,
+        scheduler_poll_seconds: float = DEFAULT_SCHEDULER_POLL_SECONDS,
     ) -> None:
         self.scheduler = scheduler
         self.registry = registry
         self.session_id = session_id
+        self.scheduler_poll_seconds = max(float(scheduler_poll_seconds), 0.05)
         self._lock = threading.Lock()
         self._scheduling = threading.Event()
+        self._scheduler_wake = threading.Event()
 
     # ------------------------------------------------------------------
 
@@ -202,6 +206,7 @@ class AnalysisWorkService:
                 work, slice_files=slice_files, slice_root=slice_root
             )
             self.registry.record(work, created_at=self.scheduler.clock())
+        self._scheduler_wake.set()
         return outcome
 
     # ------------------------------------------------------------------
@@ -238,16 +243,20 @@ class AnalysisWorkService:
         return asyncio.run(self.schedule_pending())
 
     def request_scheduling_pass(self) -> bool:
-        """Start one background scheduling pass; never block the caller.
+        """Ensure the background lifecycle driver is running.
 
-        Flask startup and the discovery poll loop must stay responsive, so
-        scheduling and remote execution always happen off the calling thread.
+        The driver stays alive while durable work is pending. This is essential
+        for queue timeouts, provider appearance, retry backoff and lease-loss
+        evaluation: none of those transitions are guaranteed to coincide with a
+        new discovery or browser request.
         """
 
         with self._lock:
             if self._scheduling.is_set():
+                self._scheduler_wake.set()
                 return False
             self._scheduling.set()
+            self._scheduler_wake.set()
         thread = threading.Thread(
             target=self._background_pass,
             name="fcp-analysis-scheduler",
@@ -262,11 +271,23 @@ class AnalysisWorkService:
 
     def _background_pass(self) -> None:
         try:
-            asyncio.run(self.schedule_pending())
-        except _SCHEDULING_ERRORS:
-            return
+            while True:
+                self._scheduler_wake.clear()
+                try:
+                    asyncio.run(self.schedule_pending())
+                except _SCHEDULING_ERRORS:
+                    # A transient scheduling/control failure is exactly the case
+                    # the persistent driver exists to revisit.
+                    pass
+                if not self.pending_job_ids():
+                    return
+                self._scheduler_wake.wait(self.scheduler_poll_seconds)
         finally:
             self._scheduling.clear()
+            # Close the race where work was submitted after the final pending
+            # check but before the scheduling flag cleared.
+            if self.pending_job_ids() and self._scheduler_wake.is_set():
+                self.request_scheduling_pass()
 
     # ------------------------------------------------------------------
 
