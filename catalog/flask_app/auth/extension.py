@@ -22,6 +22,10 @@ from .federation import (
     redirect_member_password_change,
     sync_federated_human_user,
 )
+from .federation_enrollment import (
+    federation_enrollment,
+    fresh_discovered_federations,
+)
 from .models import Role, User, db
 from .policy import ROLE_PERMISSIONS, audit_route_policy, enforce_human_authorization
 from .routes import auth_users
@@ -30,7 +34,7 @@ security = Security()
 csrf = CSRFProtect()
 _UNSAFE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 _HUMAN_CSRF_BLUEPRINTS = frozenset(
-    {"security", "auth_users", "federated_human_auth"}
+    {"security", "auth_users", "federated_human_auth", "federation_enrollment"}
 )
 _LEGACY_PLACEHOLDERS = frozenset({"fcp-dev", "fcp-dev-change-me"})
 
@@ -224,11 +228,23 @@ def init_human_auth(app: Flask) -> None:
 
     @security.login_context_processor
     def federation_auth_login_context():
-        return {"federation_auth": federation_login_context()}
+        context = federation_login_context()
+        candidates = fresh_discovered_federations()
+        if context.get("mode") == "local" and candidates:
+            context = {
+                "mode": "discovered",
+                "authority": None,
+                "local_fallback": False,
+                "federations": candidates,
+            }
+        else:
+            context["federations"] = candidates
+        return {"federation_auth": context}
 
     csrf.init_app(app)
     app.register_blueprint(auth_users)
     app.register_blueprint(federated_human_auth)
+    app.register_blueprint(federation_enrollment)
 
     # Refresh a signed-in member's federated authorization before the normal
     # permission gate. Then prevent member-local passwords/change-password from

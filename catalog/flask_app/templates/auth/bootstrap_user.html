@@ -1,21 +1,16 @@
 {% extends 'security/_auth_base.html' %}
 
-{% block auth_title %}Set up human access · FCP{% endblock %}
+{% block auth_title %}Create first administrator · FCP{% endblock %}
 
 {% block auth_card %}
-  <h1 class="auth-title">Set up human access</h1>
-  <p class="auth-lede">If another FCP device already owns your Federation, join it and use the same human account. Create a new administrator only for the first device or a standalone installation.</p>
+  <h1 class="auth-title">Create the first administrator</h1>
+  <p class="auth-lede">Use this only for the first FCP device that owns a new Federation, or for a standalone installation. Devices joining an existing Federation use the human account that already exists there.</p>
 
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% for category, message in messages %}
       <p class="auth-alert" role="alert">{{ message }}</p>
     {% endfor %}
   {% endwith %}
-
-  <div class="auth-actions">
-    <a class="button-secondary auth-submit" href="/onboarding">Use an existing Federation account</a>
-  </div>
-  <p class="auth-note">FCP will identify and pair this device first. After the signed one-use pairing code is accepted, sign in with the account from the Federation authority; no second password is created here.</p>
 
   <form class="auth-form" method="post" action="{{ url_for('auth_users.bootstrap_user') }}">
     <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
@@ -35,8 +30,8 @@
       <input id="bootstrap-password-confirm" type="password" name="password_confirm" autocomplete="new-password" minlength="12" required>
     </div>
 
-    <button class="button-primary auth-submit" type="submit">Create administrator on this device</button>
+    <button class="button-primary auth-submit" type="submit">Create first administrator</button>
   </form>
 
-  <p class="auth-note">This local bootstrap path closes as soon as the first human account is created. Additional users are managed by the Federation's authenticated administrator.</p>
+  <p class="auth-note">If this device should join an existing Federation instead, <a href="{{ url_for('security.login') }}">return to Federation sign-in</a>. Do not create another administrator here.</p>
 {% endblock %}

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from flask import Blueprint, Flask
 
+from catalog.flask_app.auth import extension as auth_extension
 from catalog.flask_app.auth import policy as auth_policy
 from catalog.flask_app.auth import routes as auth_routes
 from catalog.flask_app.auth.extension import init_human_auth
@@ -59,7 +60,19 @@ def _empty_app(tmp_path, monkeypatch) -> Flask:
     return app
 
 
-def test_empty_installation_meets_user_with_human_access_choices(tmp_path, monkeypatch):
+def _discovered_candidate() -> tuple[dict[str, object], ...]:
+    return (
+        {
+            "federation_label": "Existing Federation",
+            "federation_fingerprint": "a" * 32,
+            "device_name": "Federation PC",
+            "tailscale_ip": "100.64.0.20",
+            "web_port": 5000,
+        },
+    )
+
+
+def test_empty_first_installation_meets_user_with_first_admin_setup(tmp_path, monkeypatch):
     app = _empty_app(tmp_path, monkeypatch)
     client = app.test_client()
 
@@ -70,10 +83,10 @@ def test_empty_installation_meets_user_with_human_access_choices(tmp_path, monke
     page = client.get("/admin/users/bootstrap")
     assert page.status_code == 200
     body = page.get_data(as_text=True)
-    assert "Set up human access" in body
-    assert "Use an existing Federation account" in body
-    assert 'href="/onboarding"' in body
-    assert "Create administrator on this device" in body
+    assert "Create the first administrator" in body
+    assert "first FCP device" in body
+    assert "Use an existing Federation account" not in body
+    assert "Create first administrator" in body
 
     created = client.post(
         "/admin/users/bootstrap",
@@ -117,6 +130,43 @@ def test_empty_installation_meets_user_with_human_access_choices(tmp_path, monke
     assert onboarding.status_code == 302
     assert "/login" in onboarding.headers["Location"]
     assert audit_route_policy(app) == []
+
+
+def test_discovered_federation_routes_fresh_device_to_existing_account_login(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(auth_routes, "fresh_discovered_federations", _discovered_candidate)
+    monkeypatch.setattr(auth_extension, "fresh_discovered_federations", _discovered_candidate)
+    app = _empty_app(tmp_path, monkeypatch)
+    client = app.test_client()
+
+    response = client.get("/")
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/admin/users/bootstrap")
+
+    # The bootstrap gate detects the existing Federation before rendering any
+    # local administrator form and sends the browser to the normal login surface.
+    bootstrap = client.get(response.headers["Location"])
+    assert bootstrap.status_code == 302
+    assert bootstrap.headers["Location"].endswith("/login")
+
+    page = client.get("/login")
+    assert page.status_code == 200
+    body = page.get_data(as_text=True)
+    assert "existing Federation was found through Tailscale" in body
+    assert "Sign in to Existing Federation" in body
+    assert "Create the first administrator" not in body
+    assert 'action="/federation-auth/enroll/start"' in body
+    assert "name=\"email\"" not in body
+
+    # First-device creation remains explicit instead of being offered as the
+    # normal second-device path.
+    local = client.get("/admin/users/bootstrap?local=1")
+    assert local.status_code == 200
+    assert "Create the first administrator" in local.get_data(as_text=True)
+
+    with app.app_context():
+        assert db.session.query(User).count() == 0
 
 
 def test_empty_installation_can_join_existing_federation_before_local_user(
@@ -181,7 +231,8 @@ def test_first_user_setup_validates_password_confirmation(tmp_path, monkeypatch)
         },
     )
     assert response.status_code == 302
-    assert response.headers["Location"].endswith("/admin/users/bootstrap")
+    assert "/admin/users/bootstrap" in response.headers["Location"]
+    assert "local=1" in response.headers["Location"]
     with app.app_context():
         assert db.session.query(User).count() == 0
         assert db.session.query(FirstUserBootstrapClaim).count() == 0

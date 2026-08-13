@@ -1,0 +1,34 @@
+{% extends 'security/_auth_base.html' %}
+
+{% block auth_title %}Connecting device · FCP{% endblock %}
+
+{% block auth_card %}
+  <h1 class="auth-title">Connecting device</h1>
+  <p class="auth-lede">The Federation approved this device. FCP is verifying the one-use enrollment grant locally.</p>
+
+  <form id="fcp-enrollment-complete" class="auth-form" method="post" action="{{ url_for('federation_enrollment.complete') }}">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input id="fcp-enrollment-state" type="hidden" name="state" value="">
+    <input id="fcp-enrollment-code" type="hidden" name="pairing_code" value="">
+    <button class="button-primary auth-submit" type="submit">Verify and continue</button>
+  </form>
+
+  <p id="fcp-enrollment-error" class="auth-alert" role="alert" hidden>The enrollment response is missing. Return to sign-in and try again.</p>
+  <p class="auth-note">The one-use grant is removed from the browser address before it is submitted to FCP.</p>
+
+  <script>
+    (() => {
+      const params = new URLSearchParams(window.location.hash.slice(1));
+      const state = params.get('state') || '';
+      const pairingCode = params.get('pairing_code') || '';
+      window.history.replaceState(null, document.title, window.location.pathname);
+      if (!state || !pairingCode) {
+        document.getElementById('fcp-enrollment-error').hidden = false;
+        return;
+      }
+      document.getElementById('fcp-enrollment-state').value = state;
+      document.getElementById('fcp-enrollment-code').value = pairingCode;
+      document.getElementById('fcp-enrollment-complete').submit();
+    })();
+  </script>
+{% endblock %}
