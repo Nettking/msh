@@ -76,6 +76,9 @@ _FEDERATION_SUPPLIER: (
     ]
     | None
 ) = None
+#: Monotonic process-local generation of the authenticated product relay binding.
+#: Identity alone cannot detect a reconnect to a newly created relay client.
+_FEDERATION_GENERATION_SUPPLIER: Callable[[], int] | None = None
 _FEDERATION_LOCK = threading.Lock()
 
 _RUNTIME: AnalysisRuntime | None = None
@@ -97,12 +100,15 @@ def register_federation_supplier(
         ["AnalysisIdentity", Path, Callable[[], datetime]],
         DeviceFederationAuthority | None,
     ],
+    *,
+    generation_supplier: Callable[[], int] | None = None,
 ) -> None:
-    """Register the product seam that supplies the authenticated federation path."""
+    """Register the authenticated federation path and its relay binding generation."""
 
-    global _FEDERATION_SUPPLIER
+    global _FEDERATION_SUPPLIER, _FEDERATION_GENERATION_SUPPLIER
     with _FEDERATION_LOCK:
         _FEDERATION_SUPPLIER = supplier
+        _FEDERATION_GENERATION_SUPPLIER = generation_supplier
 
 
 def _utc_now() -> datetime:
@@ -191,6 +197,24 @@ def resolve_analysis_identity(state_path: Path) -> AnalysisIdentity:
                 )
     session_id, node_id = _standalone_identity(state_path)
     return AnalysisIdentity(session_id, node_id, _provider_id(node_id), True)
+
+
+def _federation_generation(identity: AnalysisIdentity) -> int:
+    """Return the current authenticated relay binding generation, fail-closed."""
+
+    if identity.standalone:
+        return 0
+    with _FEDERATION_LOCK:
+        supplier = _FEDERATION_GENERATION_SUPPLIER
+    if supplier is None:
+        return 0
+    try:
+        generation = supplier()
+    except Exception:  # noqa: BLE001 - connectivity must not break app startup
+        return 0
+    if isinstance(generation, bool) or not isinstance(generation, int):
+        return 0
+    return max(generation, 0)
 
 
 class RunnerSliceAnalysisExecutor:
@@ -364,6 +388,9 @@ class AnalysisRuntime:
             ),
             session_id=self.identity.session_id,
         )
+        # Read this after federation construction: the supplier may have observed
+        # the first live relay client while building the authority.
+        self.federation_generation = _federation_generation(self.identity)
 
     # ------------------------------------------------------------------
 
@@ -427,16 +454,30 @@ class AnalysisRuntime:
         self.provisioning_reason = outcome.reason
 
     def refresh_provider_health(self) -> bool:
-        """Keep this node's provider report fresh before a scheduling pass."""
+        """Keep this node's provider report and F8.4 activation in sync."""
 
         if self.provisioner is None:
             return False
         refreshed = self.provisioner.refresh()
         provisioned = getattr(self.provisioner, "_worker", None)
-        if self.worker is None and provisioned is not None:
-            self.worker = provisioned
-            self.provisioning_reason = "provider-active"
+        self.worker = provisioned
+        self.provisioning_reason = (
+            "provider-active" if provisioned is not None else "activation-unavailable"
+        )
         return refreshed
+
+    def stop(self) -> None:
+        """Fence background scheduling and release a superseded relay reader."""
+
+        service = self.service
+        if service is not None:
+            service.stop_scheduling()
+        close_transport = getattr(self.transport, "close", None)
+        if callable(close_transport):
+            try:
+                close_transport()
+            except Exception:  # noqa: BLE001 - replacement must remain fail-safe
+                pass
 
 
 class DiscoveryAnalysisGateway:
@@ -600,24 +641,38 @@ def _identity_key(identity: AnalysisIdentity) -> tuple[str, str, bool]:
 
 
 def get_analysis_runtime() -> AnalysisRuntime:
-    """Return the singleton, rebuilding it when the trusted identity changes."""
+    """Return the singleton, rebuilding on identity or relay-binding changes."""
 
     global _RUNTIME
     root = repo_root()
     state_path = root / "results" / "capabilities" / "analysis_identity.json"
     desired = resolve_analysis_identity(state_path)
+    desired_generation = _federation_generation(desired)
+    superseded: AnalysisRuntime | None = None
     with _RUNTIME_LOCK:
-        if _RUNTIME is None or _identity_key(_RUNTIME.identity) != _identity_key(desired):
-            _RUNTIME = AnalysisRuntime(root=root, identity=desired)
-        return _RUNTIME
+        if (
+            _RUNTIME is None
+            or _identity_key(_RUNTIME.identity) != _identity_key(desired)
+            or _RUNTIME.federation_generation != desired_generation
+        ):
+            replacement = AnalysisRuntime(root=root, identity=desired)
+            superseded = _RUNTIME
+            _RUNTIME = replacement
+        current = _RUNTIME
+    if superseded is not None:
+        superseded.stop()
+    return current
 
 
 def reset_analysis_runtime() -> None:
-    """Drop the cached runtime (used by tests and identity rebinding)."""
+    """Drop the cached runtime and fence any background scheduling it owned."""
 
     global _RUNTIME
     with _RUNTIME_LOCK:
+        superseded = _RUNTIME
         _RUNTIME = None
+    if superseded is not None:
+        superseded.stop()
 
 
 __all__ = [
