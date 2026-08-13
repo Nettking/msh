@@ -17,6 +17,7 @@
 - [Federation implementation](federation/) — durable plans, acceptance documents, technical references, current update/rollout notes, and historical delivery evidence.
 - [OSL integration](osl_integration/) — active OSL planning package and authoritative execution order for that track.
 - [Federation sharing evaluation](federation_sharing_evaluation.md) — what the Federation shares today, what remains device-local, and the open inconsistencies between the shared model, the code, and the canonical documentation.
+- [Federated JSONL analysis jobs](federated_jsonl_analysis_jobs.md) — how discovered or uploaded JSONL becomes a durable federation-dispatched job: identity and deduplication, provider selection, ownership, artifact authorization, worker execution, and failure behaviour.
 
 ## Current status
 

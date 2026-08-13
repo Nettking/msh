@@ -12,6 +12,7 @@ from catalog.capabilities.benchmarking.policy import (
 from catalog.common.artifact_refresh import register_artifact_catalog_refresh
 from catalog.common.federation_paths import DEFAULT_COORDINATOR_DATABASE
 from catalog.federation.onboarding_models import ContributionDesiredState
+from catalog.orchestrator.analysis_runtime import register_identity_supplier
 from catalog.orchestrator.capability_startup import (
     prepare_capability_runtime,
     start_capability_runtime_background,
@@ -258,6 +259,9 @@ def create_app() -> Flask:
         lambda reason: catalog.start_background_rescan_if_idle(reason=reason)
     )
     catalog.start_background_rescan_if_idle(reason="startup")
+    # Bind durable analysis jobs to the real federation session when this device
+    # is connected. Resolution is lazy, so startup never waits on federation I/O.
+    register_identity_supplier(lambda: _federation_analysis_identity(app))
     get_runtime_manager().mark_app_started()
 
     @app.before_request
@@ -336,6 +340,18 @@ def create_app() -> Flask:
     app.register_blueprint(provider_federation_web)
     install_capability_product_routes(app)
     return app
+
+
+def _federation_analysis_identity(app: Flask) -> tuple[str, str] | None:
+    """Resolve the federation identity analysis jobs are coordinated under."""
+
+    from .services.upload_analysis_job_service import federation_analysis_identity
+
+    try:
+        with app.app_context():
+            return federation_analysis_identity()
+    except Exception:  # noqa: BLE001 - an unbound device stays standalone
+        return None
 
 
 def _start_runtime_from_capability_state(app: Flask) -> str:
