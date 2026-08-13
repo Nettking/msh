@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import threading
 from pathlib import Path
 
@@ -10,6 +11,20 @@ from catalog.flask_app.services.recorder_artifact_refresh import (
     RecorderArtifactRefreshMonitor,
     install_recorder_artifact_refresh,
 )
+
+
+def _write_checkpoint(path: Path, payload: str) -> None:
+    """Replace the checkpoint the way the recorder actually writes it.
+
+    ``Path.write_text`` truncates before writing, so a poll that lands inside
+    the write observes an intermediate state and reports two changes for one
+    logical update. The recorder writes checkpoints atomically
+    (``start_recorder.py`` ``_write_json_atomic``), so the tests must too.
+    """
+
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(payload, encoding="utf-8")
+    os.replace(temporary, path)
 
 
 class _RecordingCatalog:
@@ -45,7 +60,7 @@ def test_existing_checkpoint_reconciles_baseline_then_refreshes_one_change(
 ) -> None:
     checkpoint = tmp_path / "source_state" / "mtconnect_recorder_state.json"
     checkpoint.parent.mkdir(parents=True)
-    checkpoint.write_text('{"revision":0}', encoding="utf-8")
+    _write_checkpoint(checkpoint, '{"revision":0}')
     catalog = _RecordingCatalog()
     monitor = _monitor(catalog, checkpoint)
 
@@ -57,9 +72,9 @@ def test_existing_checkpoint_reconciles_baseline_then_refreshes_one_change(
         catalog.changed.clear()
         assert catalog.changed.wait(0.15) is False
 
-        checkpoint.write_text(
+        _write_checkpoint(
+            checkpoint,
             '{"revision":1,"new_records":3}',
-            encoding="utf-8",
         )
         assert catalog.changed.wait(1.0) is True
         catalog.changed.clear()
@@ -95,7 +110,7 @@ def test_missing_checkpoint_is_watched_and_restart_takes_a_fresh_baseline(
         assert catalog.changed.wait(0.15) is False
 
         checkpoint.parent.mkdir(parents=True)
-        checkpoint.write_text('{"revision":1}', encoding="utf-8")
+        _write_checkpoint(checkpoint, '{"revision":1}')
         assert catalog.changed.wait(1.0) is True
         assert catalog.call_count() == 1
         monitor.stop()
@@ -111,9 +126,9 @@ def test_missing_checkpoint_is_watched_and_restart_takes_a_fresh_baseline(
         catalog.changed.clear()
         assert catalog.changed.wait(0.15) is False
 
-        checkpoint.write_text(
+        _write_checkpoint(
+            checkpoint,
             '{"revision":2,"new_records":10}',
-            encoding="utf-8",
         )
         assert catalog.changed.wait(1.0) is True
         assert catalog.calls == [
@@ -131,7 +146,7 @@ def test_removing_existing_checkpoint_requests_catalog_refresh(
 ) -> None:
     checkpoint = tmp_path / "source_state" / "mtconnect_recorder_state.json"
     checkpoint.parent.mkdir(parents=True)
-    checkpoint.write_text('{"revision":1}', encoding="utf-8")
+    _write_checkpoint(checkpoint, '{"revision":1}')
     catalog = _RecordingCatalog()
     monitor = _monitor(catalog, checkpoint)
 
@@ -161,7 +176,7 @@ def test_transient_stat_error_clears_without_requiring_checkpoint_change(
 ) -> None:
     checkpoint = tmp_path / "source_state" / "mtconnect_recorder_state.json"
     checkpoint.parent.mkdir(parents=True)
-    checkpoint.write_text('{"revision":1}', encoding="utf-8")
+    _write_checkpoint(checkpoint, '{"revision":1}')
     catalog = _RecordingCatalog()
     monitor = _monitor(catalog, checkpoint)
     signature = (checkpoint.stat().st_mtime_ns, checkpoint.stat().st_size)
@@ -189,7 +204,7 @@ def test_declined_catalog_refresh_is_retained_as_one_pending_retry(
 ) -> None:
     checkpoint = tmp_path / "source_state" / "mtconnect_recorder_state.json"
     checkpoint.parent.mkdir(parents=True)
-    checkpoint.write_text('{"revision":1}', encoding="utf-8")
+    _write_checkpoint(checkpoint, '{"revision":1}')
 
     class DecliningCatalog(_RecordingCatalog):
         def __init__(self) -> None:
