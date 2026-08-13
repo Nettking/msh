@@ -106,7 +106,7 @@ def _build_service(app: Flask) -> PairingAwareCapabilityOnboardingService:
         coordinator_database=app.config["CAPABILITY_ONBOARDING_COORDINATOR_DATABASE"],
         device_name=device_name,
         discovery_sources=app.config.get(
-            "CAPABILITY_ONBOARDING_DISCOVERY_SOURCES",
+            "CAPABILITY_ONBOARDING_DISCOVERY_SOURCES"],
             (),
         ),
         remote_store=RemotePairingStore(remote_path),
@@ -390,9 +390,6 @@ class SavedFederationReconnectMonitor:
             if owner_node_id is None:
                 raise RuntimeError("analysis federation owner is unavailable")
 
-            # Remote-AI is the product's first owner of relay.message. Analysis
-            # lifecycle chains behind its receive_other(), and artifacts chain
-            # behind lifecycle, preserving exactly one inbound relay reader.
             upstream, event_loop = self.ai_bridge._transport_context(
                 runtime,
                 runtime_state,
@@ -445,6 +442,29 @@ class SavedFederationReconnectMonitor:
             return
         self.ai_bridge.sync(runtime_state, context)
 
+    def _sync_federated_analysis(
+        self,
+        runtime_state: RemotePairingState,
+        context: object,
+    ) -> None:
+        """Keep the analysis provider live even on a provider-only device."""
+
+        from catalog.orchestrator.analysis_runtime import get_analysis_runtime
+
+        runtime = get_analysis_runtime()
+        binding = getattr(context, "binding", None)
+        credentials = getattr(context, "credentials", None)
+        identity = getattr(credentials, "identity", None)
+        if (
+            runtime.identity.session_id != getattr(binding, "internal_session_id", None)
+            or runtime.identity.node_id != getattr(identity, "node_id", None)
+        ):
+            raise RuntimeError("analysis runtime is not bound to the live federation")
+        runtime.refresh_provider_health()
+        service = runtime.service
+        if service is not None and service.pending_job_ids():
+            service.request_scheduling_pass()
+
     def _sync_federated_telemetry(
         self,
         runtime_state: RemotePairingState,
@@ -484,6 +504,13 @@ class SavedFederationReconnectMonitor:
                     except Exception as exc:  # noqa: BLE001
                         self.app.logger.info(
                             "Federation remote AI authority refresh unavailable (%s)",
+                            type(exc).__name__,
+                        )
+                    try:
+                        self._sync_federated_analysis(runtime_state, context)
+                    except Exception as exc:  # noqa: BLE001
+                        self.app.logger.info(
+                            "Federation analysis provider refresh unavailable (%s)",
                             type(exc).__name__,
                         )
                     try:
@@ -558,9 +585,6 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
     app.extensions["federated_telemetry_product_bridge"] = monitor.telemetry_bridge
     app.extensions["federated_jsonl_product_bridge"] = monitor.jsonl_bridge
 
-    # Analysis resolves identity in the orchestrator, but its *authority* comes
-    # from this installed product relay. Register the composition seam here so a
-    # real federation identity can never fall back to a fabricated local session.
     from catalog.orchestrator.analysis_runtime import register_federation_supplier
 
     register_federation_supplier(monitor.analysis_authority)
