@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import hashlib
 from collections.abc import Callable
+from contextvars import ContextVar
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
@@ -49,6 +50,10 @@ from .contracts import (
 ANALYSIS_HANDLER_ID = "jsonl-analysis-handler"
 
 DEFAULT_REPORT_TTL_SECONDS = 300
+_ANALYSIS_DATA_OWNER_NODE_ID: ContextVar[str | None] = ContextVar(
+    "fcp_analysis_data_owner_node_id",
+    default=None,
+)
 
 
 def analysis_handler_descriptor(
@@ -72,6 +77,46 @@ def analysis_capability_id(node_id: str) -> str:
 
     digest = hashlib.sha256(f"analysis-capability\0{node_id}".encode()).hexdigest()
     return f"analysis-provider-{digest[:24]}"
+
+
+def dispatched_data_owner_node_id(_job) -> str:
+    """Return the authenticated coordinator that dispatched the current job.
+
+    F7.5 authenticates the relay actor before the worker reaches the capability
+    handler. The analysis worker carries that actor through a ``ContextVar`` so
+    F6 artifact retrieval is routed to the actual data owner instead of assuming
+    the executing provider also owns the JSONL.
+    """
+
+    value = _ANALYSIS_DATA_OWNER_NODE_ID.get()
+    if not isinstance(value, str) or not value:
+        raise FederationValidationError(
+            "analysis-data-owner-unavailable",
+            "data_owner_node_id",
+            "analysis execution is missing its authenticated dispatcher identity",
+        )
+    return value
+
+
+class AnalysisCancellableCapabilityWorker(CancellableCapabilityWorker):
+    """F7.5 worker that exposes the authenticated dispatcher to analysis only."""
+
+    async def handle(
+        self,
+        request,
+        *,
+        authenticated_actor: str,
+        authenticated_session: str,
+    ):
+        token = _ANALYSIS_DATA_OWNER_NODE_ID.set(authenticated_actor)
+        try:
+            return await super().handle(
+                request,
+                authenticated_actor=authenticated_actor,
+                authenticated_session=authenticated_session,
+            )
+        finally:
+            _ANALYSIS_DATA_OWNER_NODE_ID.reset(token)
 
 
 @dataclass(frozen=True)
@@ -105,7 +150,18 @@ class AnalysisProviderProvisioner:
         max_concurrent_jobs: int = 1,
         active_jobs: Callable[[], int] | None = None,
         report_ttl_seconds: int = DEFAULT_REPORT_TTL_SECONDS,
+        provider_generation: int = 1,
     ) -> None:
+        if (
+            isinstance(provider_generation, bool)
+            or not isinstance(provider_generation, int)
+            or provider_generation <= 0
+        ):
+            raise FederationValidationError(
+                "invalid-provider-generation",
+                "provider_generation",
+                "must be a positive integer",
+            )
         self.coordinator = coordinator
         self.enrollments = enrollments
         self.health = health
@@ -119,7 +175,10 @@ class AnalysisProviderProvisioner:
         self.max_concurrent_jobs = max(int(max_concurrent_jobs), 1)
         self._active_jobs = active_jobs or (lambda: 0)
         self.report_ttl_seconds = int(report_ttl_seconds)
+        self.provider_generation = provider_generation
         self._published_revision = 0
+        self._endpoint = None
+        self._worker: ActivatedComputeWorker | None = None
 
     # ------------------------------------------------------------------
 
@@ -216,13 +275,14 @@ class AnalysisProviderProvisioner:
 
         ``report_revision`` is durable F8.2 fencing state, not process-local
         sequence state. A restarted provisioner therefore resumes after the
-        persisted current revision instead of trying revision 1 again.
+        persisted current revision instead of trying revision 1 again when the
+        provider generation is intentionally stable.
         """
 
         record = self.health.store.get(
             session_id=self.session_id, capability_id=self.capability_id
         )
-        if record is not None:
+        if record is not None and record.provider_generation == self.provider_generation:
             self._published_revision = max(
                 self._published_revision,
                 int(record.report_revision),
@@ -234,8 +294,8 @@ class AnalysisProviderProvisioner:
             self.health.publish(
                 self._report(revision),
                 actor_node_id=self.node_id,
-                command_id=f"publish-{self.capability_id}-{revision}",
-                provider_generation=1,
+                command_id=f"publish-{self.capability_id}-{self.provider_generation}-{revision}",
+                provider_generation=self.provider_generation,
             )
         except (FederationValidationError, FederationOperationError):
             return False
@@ -256,6 +316,7 @@ class AnalysisProviderProvisioner:
         """Run the whole chain, stopping cleanly wherever authority stops."""
 
         self.install_handler(handler)
+        self._endpoint = endpoint
         announced = self.announce()
         if not announced:
             return ProvisioningOutcome(
@@ -276,34 +337,50 @@ class AnalysisProviderProvisioner:
                 "provider-awaiting-approval",
             )
         published = self.publish_health()
-        worker = self.activate(endpoint)
+        self._worker = self.activate(endpoint)
         return ProvisioningOutcome(
             self.capability_id,
             True,
             state,
             approved_here,
             published,
-            worker,
-            "provider-active" if worker is not None else "activation-unavailable",
+            self._worker,
+            "provider-active" if self._worker is not None else "activation-unavailable",
         )
 
     def refresh(self) -> bool:
-        """Keep the provider report fresh for scheduling passes."""
+        """Refresh authority and activate after a later operator approval."""
 
-        return self.publish_health()
+        try:
+            state, _approved_here = self.ensure_enrollment()
+        except (FederationValidationError, FederationOperationError):
+            return False
+        if state != "approved":
+            return False
+        published = self.publish_health()
+        if self._worker is None and self._endpoint is not None:
+            self._worker = self.activate(self._endpoint)
+        return published
 
 
 def lifecycle_worker_factory(registration, handler, inbox, *, clock):
     """Build the F7.5 cancellable worker F8.4 activation should wrap."""
 
-    return CancellableCapabilityWorker(registration, handler, inbox, clock=clock)
+    return AnalysisCancellableCapabilityWorker(
+        registration,
+        handler,
+        inbox,
+        clock=clock,
+    )
 
 
 __all__ = [
     "ANALYSIS_HANDLER_ID",
+    "AnalysisCancellableCapabilityWorker",
     "AnalysisProviderProvisioner",
     "ProvisioningOutcome",
     "analysis_capability_id",
     "analysis_handler_descriptor",
+    "dispatched_data_owner_node_id",
     "lifecycle_worker_factory",
 ]
