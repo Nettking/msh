@@ -288,6 +288,8 @@ class SavedFederationReconnectMonitor:
         self._stop = threading.Event()
         self._wake = threading.Event()
         self._thread: threading.Thread | None = None
+        self._analysis_relay_client: object | None = None
+        self._analysis_authority_generation = 0
         self._state: dict[str, object] = {
             "status": "not-started",
             "attempts": 0,
@@ -332,6 +334,24 @@ class SavedFederationReconnectMonitor:
         """Wake the monitor after contribution or provider authority changes."""
 
         self._wake.set()
+
+    def analysis_authority_generation(self) -> int:
+        """Return the generation of the currently observed authenticated relay client."""
+
+        with self._lock:
+            return self._analysis_authority_generation
+
+    def _observe_analysis_relay(self, runtime_state: RemotePairingState) -> int:
+        """Advance the binding generation exactly when the relay client changes."""
+
+        runtime = self.service.relay_runtime
+        runtime.ensure_connected(runtime_state)
+        client = runtime._connected_client()
+        with self._lock:
+            if client is not self._analysis_relay_client:
+                self._analysis_relay_client = client
+                self._analysis_authority_generation += 1
+            return self._analysis_authority_generation
 
     def _local_relay_url(self) -> str:
         for key in (_LOCAL_RELAY_CONFIG_KEY, _PAIRING_RELAY_CONFIG_KEY):
@@ -385,6 +405,7 @@ class SavedFederationReconnectMonitor:
                 raise RuntimeError("analysis federation identity changed during binding")
 
             runtime = self.service.relay_runtime
+            self._observe_analysis_relay(runtime_state)
             status = runtime.coordinator_status()
             owner_node_id = _session_owner(status, session_id)
             if owner_node_id is None:
@@ -444,13 +465,14 @@ class SavedFederationReconnectMonitor:
 
     def _sync_federated_analysis(
         self,
-        _runtime_state: RemotePairingState,
+        runtime_state: RemotePairingState,
         context: object,
     ) -> None:
         """Keep the analysis provider live even on a provider-only device."""
 
         from catalog.orchestrator.analysis_runtime import get_analysis_runtime
 
+        self._observe_analysis_relay(runtime_state)
         runtime = get_analysis_runtime()
         binding = getattr(context, "binding", None)
         credentials = getattr(context, "credentials", None)
@@ -587,7 +609,10 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
 
     from catalog.orchestrator.analysis_runtime import register_federation_supplier
 
-    register_federation_supplier(monitor.analysis_authority)
+    register_federation_supplier(
+        monitor.analysis_authority,
+        generation_supplier=monitor.analysis_authority_generation,
+    )
 
     install_recorder_federation_publication(
         app,
