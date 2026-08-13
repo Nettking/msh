@@ -212,13 +212,22 @@ class AnalysisProviderProvisioner:
         )
 
     def publish_health(self, *, force: bool = False) -> bool:
-        """Publish a fresh report through F8.2 when the current one is stale."""
+        """Publish a fresh report through F8.2 when the current one is stale.
 
-        if not force:
-            record = self.health.store.get(
-                session_id=self.session_id, capability_id=self.capability_id
+        ``report_revision`` is durable F8.2 fencing state, not process-local
+        sequence state. A restarted provisioner therefore resumes after the
+        persisted current revision instead of trying revision 1 again.
+        """
+
+        record = self.health.store.get(
+            session_id=self.session_id, capability_id=self.capability_id
+        )
+        if record is not None:
+            self._published_revision = max(
+                self._published_revision,
+                int(record.report_revision),
             )
-            if record is not None and record.is_fresh_at(self.clock()):
+            if not force and record.is_fresh_at(self.clock()):
                 return False
         revision = self._published_revision + 1
         try:
