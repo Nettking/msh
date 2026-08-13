@@ -99,6 +99,19 @@ jobs:
         if: runner.os == 'Linux'
         run: python -m pytest -o addopts= -q
 
+      - name: Repository stays clean after the suite
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          # Tests must not write into the tracked tree. A dirty worktree here
+          # means shared state escaped a tmp_path fixture, which is the same
+          # class of leak that makes suites order-dependent.
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree modified by the test suite:"
+            git status --porcelain
+            exit 1
+          fi
+
       - name: Windows capability and product release regressions
         if: runner.os == 'Windows'
         run: >-
@@ -292,10 +305,45 @@ jobs:
           python -m pytest -o addopts= -q
           catalog/federation/tests/test_phase_d2_postgres.py
 
+  suite-order-independence:
+    name: Clean-checkout suite order independence
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install release dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements.txt -c constraints-phase2.txt
+          python -m pip install pytest pytest-randomly
+
+      - name: Full suite in a fixed shuffled order
+        run: python -m pytest -o addopts= -q -p randomly --randomly-seed=20260813
+
+      - name: Full suite in a rotating shuffled order
+        run: >-
+          python -m pytest -o addopts= -q -p randomly
+          --randomly-seed=${{ github.run_number }}
+
+      - name: Repository stays clean after the suite
+        shell: bash
+        run: |
+          if [ -n "$(git status --porcelain)" ]; then
+            echo "Working tree modified by the test suite:"
+            git status --porcelain
+            exit 1
+          fi
+
   release-verdict:
     name: Federation v1 automated release verdict
     if: always()
-    needs: [release-matrix, postgres-storage]
+    needs: [release-matrix, postgres-storage, suite-order-independence]
     runs-on: ubuntu-latest
     steps:
       - name: Require every automated release job
@@ -303,3 +351,4 @@ jobs:
         run: |
           test "${{ needs.release-matrix.result }}" = "success"
           test "${{ needs.postgres-storage.result }}" = "success"
+          test "${{ needs.suite-order-independence.result }}" = "success"
