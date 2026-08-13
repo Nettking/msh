@@ -17,6 +17,7 @@ from pathlib import Path
 from typing import Protocol
 
 from .errors import FederationValidationError
+from .sqlite_schema import SQLiteMigration, ensure_sqlite_schema
 from .storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
@@ -47,7 +48,9 @@ class BatchStorageProvider(Protocol):
         batch_id: str,
     ) -> CommittedBatchIdentity | None: ...
 
-    def read(self, *, session_id: str, group_id: str, batch_id: str) -> object | None: ...
+    def read(
+        self, *, session_id: str, group_id: str, batch_id: str
+    ) -> object | None: ...
 
     def describe(self) -> dict[str, object]: ...
 
@@ -62,6 +65,112 @@ class CommittedBatchIdentity:
     batch_id: str
     idempotency_key: str
     content_hash: str
+
+
+STORAGE_INDEX_SCHEMA_NAME = "federation.filesystem_batch_storage"
+STORAGE_INDEX_SCHEMA_VERSION = 2
+_STORAGE_INDEX_BASE_COLUMNS = frozenset(
+    {
+        "session_id",
+        "group_id",
+        "dataset_id",
+        "batch_id",
+        "idempotency_key",
+        "content_hash",
+        "relative_path",
+        "created_at",
+    }
+)
+_STORAGE_INDEX_SCHEMA_COLUMNS = frozenset(
+    {"dataset_schema_name", "dataset_schema_version"}
+)
+
+
+def _storage_index_table_exists(connection: sqlite3.Connection) -> bool:
+    return (
+        connection.execute(
+            "SELECT 1 FROM sqlite_master WHERE type='table' AND name='committed_batches'"
+        ).fetchone()
+        is not None
+    )
+
+
+def _storage_index_columns(connection: sqlite3.Connection) -> set[str]:
+    return {
+        str(row[1])
+        for row in connection.execute("PRAGMA table_info(committed_batches)")
+    }
+
+
+def _detect_storage_index_version(connection: sqlite3.Connection) -> int:
+    if not _storage_index_table_exists(connection):
+        return 0
+    columns = _storage_index_columns(connection)
+    missing_base = _STORAGE_INDEX_BASE_COLUMNS.difference(columns)
+    if missing_base:
+        raise FederationValidationError(
+            "unsupported-storage-index-schema",
+            "schema",
+            f"legacy storage index is missing required columns: {sorted(missing_base)!r}",
+        )
+    return (
+        STORAGE_INDEX_SCHEMA_VERSION
+        if _STORAGE_INDEX_SCHEMA_COLUMNS.issubset(columns)
+        else 1
+    )
+
+
+def _create_storage_index_v1(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE committed_batches (
+            session_id TEXT NOT NULL,
+            group_id TEXT NOT NULL,
+            dataset_id TEXT NOT NULL,
+            batch_id TEXT NOT NULL,
+            idempotency_key TEXT NOT NULL,
+            content_hash TEXT NOT NULL,
+            relative_path TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            PRIMARY KEY (session_id, group_id, batch_id),
+            UNIQUE (session_id, group_id, idempotency_key)
+        )
+        """
+    )
+
+
+def _upgrade_storage_index_v2(connection: sqlite3.Connection) -> None:
+    columns = _storage_index_columns(connection)
+    if "dataset_schema_name" not in columns:
+        connection.execute(
+            """ALTER TABLE committed_batches
+               ADD COLUMN dataset_schema_name TEXT NOT NULL
+               DEFAULT 'fcp.storage.dataset.opaque'"""
+        )
+    if "dataset_schema_version" not in columns:
+        connection.execute(
+            """ALTER TABLE committed_batches
+               ADD COLUMN dataset_schema_version INTEGER NOT NULL
+               DEFAULT 1 CHECK(dataset_schema_version > 0)"""
+        )
+
+
+def _validate_storage_index(connection: sqlite3.Connection) -> None:
+    if not _storage_index_table_exists(connection):
+        raise FederationValidationError(
+            "unsupported-storage-index-schema",
+            "schema",
+            "committed_batches table is missing",
+        )
+    missing = (_STORAGE_INDEX_BASE_COLUMNS | _STORAGE_INDEX_SCHEMA_COLUMNS).difference(
+        _storage_index_columns(connection)
+    )
+    if missing:
+        raise FederationValidationError(
+            "unsupported-storage-index-schema",
+            "schema",
+            f"storage index is missing required columns: {sorted(missing)!r}",
+        )
 
 
 class FilesystemBatchStorageProvider:
@@ -89,44 +198,17 @@ class FilesystemBatchStorageProvider:
 
     def _initialize(self) -> None:
         with self._connect() as connection:
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS committed_batches (
-                    session_id TEXT NOT NULL,
-                    group_id TEXT NOT NULL,
-                    dataset_id TEXT NOT NULL,
-                    dataset_schema_name TEXT NOT NULL
-                        DEFAULT 'fcp.storage.dataset.opaque',
-                    dataset_schema_version INTEGER NOT NULL DEFAULT 1
-                        CHECK(dataset_schema_version > 0),
-                    batch_id TEXT NOT NULL,
-                    idempotency_key TEXT NOT NULL,
-                    content_hash TEXT NOT NULL,
-                    relative_path TEXT NOT NULL,
-                    created_at TEXT NOT NULL,
-                    PRIMARY KEY (session_id, group_id, batch_id),
-                    UNIQUE (session_id, group_id, idempotency_key)
-                )
-                """
+            ensure_sqlite_schema(
+                connection,
+                schema_name=STORAGE_INDEX_SCHEMA_NAME,
+                target_version=STORAGE_INDEX_SCHEMA_VERSION,
+                migrations=(
+                    SQLiteMigration(1, _create_storage_index_v1),
+                    SQLiteMigration(2, _upgrade_storage_index_v2),
+                ),
+                detect_legacy_version=_detect_storage_index_version,
+                validate=_validate_storage_index,
             )
-            columns = {
-                row["name"]
-                for row in connection.execute(
-                    "PRAGMA table_info(committed_batches)"
-                )
-            }
-            if "dataset_schema_name" not in columns:
-                connection.execute(
-                    """ALTER TABLE committed_batches
-                       ADD COLUMN dataset_schema_name TEXT NOT NULL
-                       DEFAULT 'fcp.storage.dataset.opaque'"""
-                )
-            if "dataset_schema_version" not in columns:
-                connection.execute(
-                    """ALTER TABLE committed_batches
-                       ADD COLUMN dataset_schema_version INTEGER NOT NULL
-                       DEFAULT 1 CHECK(dataset_schema_version > 0)"""
-                )
 
     def _relative_path(self, request: BatchIngestRequest) -> Path:
         # Storage identifiers are deliberately opaque protocol values. Recorder
@@ -190,7 +272,11 @@ class FilesystemBatchStorageProvider:
                       content_hash
                FROM committed_batches
                WHERE session_id = ? AND group_id = ? AND idempotency_key = ?""",
-            (request.authority.session_id, request.authority.group_id, request.idempotency_key),
+            (
+                request.authority.session_id,
+                request.authority.group_id,
+                request.idempotency_key,
+            ),
         ).fetchone()
         return (
             None
@@ -222,10 +308,8 @@ class FilesystemBatchStorageProvider:
                         "idempotency identity was previously committed to another dataset",
                     )
                 if (
-                    existing.dataset_schema_name
-                    != request.dataset_schema_name
-                    or existing.dataset_schema_version
-                    != request.dataset_schema_version
+                    existing.dataset_schema_name != request.dataset_schema_name
+                    or existing.dataset_schema_version != request.dataset_schema_version
                 ):
                     raise FederationValidationError(
                         StorageErrorCode.IDEMPOTENCY_CONFLICT.value,
@@ -238,14 +322,23 @@ class FilesystemBatchStorageProvider:
                     requested_batch_id=request.batch_id,
                     requested_content_hash=request.content_hash,
                 )
-                return BatchIngestResult(request.batch_id, request.idempotency_key, request.content_hash, state)
+                return BatchIngestResult(
+                    request.batch_id,
+                    request.idempotency_key,
+                    request.content_hash,
+                    state,
+                )
 
             by_batch = connection.execute(
                 """SELECT dataset_id, dataset_schema_name,
                           dataset_schema_version, idempotency_key, content_hash
                    FROM committed_batches
                    WHERE session_id = ? AND group_id = ? AND batch_id = ?""",
-                (request.authority.session_id, request.authority.group_id, request.batch_id),
+                (
+                    request.authority.session_id,
+                    request.authority.group_id,
+                    request.batch_id,
+                ),
             ).fetchone()
             if by_batch is not None:
                 field = (
@@ -268,7 +361,12 @@ class FilesystemBatchStorageProvider:
                     "was previously committed with different immutable batch identity",
                 )
 
-            payload = json.dumps(request.to_dict(), sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+            payload = json.dumps(
+                request.to_dict(),
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+            )
             fd, temporary_name = tempfile.mkstemp(
                 prefix=f".{final_path.stem}-",
                 suffix=".tmp",
@@ -389,7 +487,11 @@ class FilesystemBatchStorageProvider:
         return request.content
 
     def describe(self) -> dict[str, object]:
-        return {"protocol": STORAGE_PROTOCOL, "protocol_version": STORAGE_PROTOCOL_VERSION, "backend": "filesystem"}
+        return {
+            "protocol": STORAGE_PROTOCOL,
+            "protocol_version": STORAGE_PROTOCOL_VERSION,
+            "backend": "filesystem",
+        }
 
     def health(self) -> dict[str, object]:
         try:
@@ -434,7 +536,11 @@ class LocalStorageService:
                 protocol=STORAGE_PROTOCOL,
                 protocol_version=envelope.protocol_version,
                 ok=False,
-                error=StorageError(code=StorageErrorCode.INTERNAL_ERROR, message=str(exc), retryable=True),
+                error=StorageError(
+                    code=StorageErrorCode.INTERNAL_ERROR,
+                    message=str(exc),
+                    retryable=True,
+                ),
             )
 
     def _dispatch(self, envelope: StorageRequestEnvelope) -> dict[str, object]:
@@ -445,19 +551,44 @@ class LocalStorageService:
         if envelope.operation is StorageOperation.BATCH_INGEST:
             request = BatchIngestRequest.from_dict(envelope.payload)
             if request.authority.session_id != envelope.session_id:
-                raise FederationValidationError("invalid-request", "session_id", "envelope and authority session differ")
+                raise FederationValidationError(
+                    "invalid-request",
+                    "session_id",
+                    "envelope and authority session differ",
+                )
             if request.authority.actor_node_id != envelope.actor_node_id:
-                raise FederationValidationError("invalid-request", "actor_node_id", "envelope and authority actor differ")
+                raise FederationValidationError(
+                    "invalid-request",
+                    "actor_node_id",
+                    "envelope and authority actor differ",
+                )
             return self.provider.ingest(request).to_dict()
-        if envelope.operation in {StorageOperation.BATCH_EXISTS, StorageOperation.BATCH_READ}:
+        if envelope.operation in {
+            StorageOperation.BATCH_EXISTS,
+            StorageOperation.BATCH_READ,
+        }:
             group_id = str(envelope.payload.get("group_id", ""))
             batch_id = str(envelope.payload.get("batch_id", ""))
             if not group_id or not batch_id:
-                raise FederationValidationError("missing-field", "payload", "group_id and batch_id are required")
-            exists = self.provider.exists(session_id=envelope.session_id, group_id=group_id, batch_id=batch_id)
+                raise FederationValidationError(
+                    "missing-field", "payload", "group_id and batch_id are required"
+                )
+            exists = self.provider.exists(
+                session_id=envelope.session_id, group_id=group_id, batch_id=batch_id
+            )
             if envelope.operation is StorageOperation.BATCH_EXISTS:
                 return {"exists": exists}
             if not exists:
-                raise FederationValidationError(StorageErrorCode.BATCH_NOT_FOUND.value, "batch_id", "batch does not exist")
-            return {"content": self.provider.read(session_id=envelope.session_id, group_id=group_id, batch_id=batch_id)}
-        raise FederationValidationError("unsupported-operation", "operation", "operation is deferred beyond D1")
+                raise FederationValidationError(
+                    StorageErrorCode.BATCH_NOT_FOUND.value,
+                    "batch_id",
+                    "batch does not exist",
+                )
+            return {
+                "content": self.provider.read(
+                    session_id=envelope.session_id, group_id=group_id, batch_id=batch_id
+                )
+            }
+        raise FederationValidationError(
+            "unsupported-operation", "operation", "operation is deferred beyond D1"
+        )
