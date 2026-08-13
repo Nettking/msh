@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sqlite3
 from datetime import date, datetime, timezone
 from pathlib import Path
 
@@ -210,6 +211,77 @@ def test_restart_preserves_the_queued_upload_job(tmp_path: Path) -> None:
 
     assert restarted_runtime.store.snapshot(job_id).job.status is JobStatus.QUEUED
     assert restarted.job_ids(SESSION) == (job_id,)
+
+
+def test_legacy_upload_job_links_are_migrated_without_data_loss(tmp_path: Path) -> None:
+    database = tmp_path / "imports" / "uploads.sqlite3"
+    database.parent.mkdir(parents=True, exist_ok=True)
+    with sqlite3.connect(database) as connection:
+        connection.execute(
+            """
+            CREATE TABLE data_upload_analysis_jobs (
+                job_id TEXT PRIMARY KEY,
+                batch_id TEXT NOT NULL UNIQUE,
+                session_id TEXT NOT NULL,
+                coordinator_id TEXT NOT NULL,
+                provider_id TEXT NOT NULL,
+                execution_id TEXT,
+                baseline_update_at TEXT,
+                created_at TEXT NOT NULL
+            )
+            """
+        )
+        connection.execute(
+            """
+            INSERT INTO data_upload_analysis_jobs(
+                job_id,batch_id,session_id,coordinator_id,provider_id,
+                execution_id,baseline_update_at,created_at
+            ) VALUES(?,?,?,?,?,?,?,?)
+            """,
+            (
+                "legacy-job",
+                "legacy-batch",
+                SESSION,
+                "legacy-coordinator",
+                "legacy-provider",
+                "legacy-execution",
+                "2026-08-13T08:55:00Z",
+                "2026-08-13T09:00:00Z",
+            ),
+        )
+
+    _service(tmp_path, _runtime(tmp_path))
+
+    with sqlite3.connect(database) as connection:
+        connection.row_factory = sqlite3.Row
+        columns = {
+            row["name"]: row
+            for row in connection.execute(
+                "PRAGMA table_info(data_upload_analysis_jobs)"
+            ).fetchall()
+        }
+        rows = connection.execute(
+            "SELECT * FROM data_upload_analysis_jobs"
+        ).fetchall()
+        legacy_table = connection.execute(
+            """
+            SELECT 1 FROM sqlite_master
+            WHERE type='table' AND name='data_upload_analysis_jobs_legacy'
+            """
+        ).fetchone()
+
+    assert columns["job_id"]["pk"] == 1
+    assert columns["batch_id"]["pk"] == 2
+    assert columns["provider_id"]["notnull"] == 0
+    assert len(rows) == 1
+    assert rows[0]["job_id"] == "legacy-job"
+    assert rows[0]["batch_id"] == "legacy-batch"
+    assert rows[0]["provider_id"] == "legacy-provider"
+    assert legacy_table is None
+
+    # Reopening an already migrated database is idempotent.
+    reopened = _service(tmp_path, _runtime(tmp_path))
+    assert reopened.database == database
 
 
 def test_job_projection_still_renders_for_the_session(tmp_path: Path) -> None:
