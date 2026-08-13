@@ -149,6 +149,23 @@ source name for `machine_id`. A manifest whose `source_name` slugs to a
 different partition than the one it was found in is rejected as
 `source-key-mismatch`.
 
+`source_name` is **required** in every supported manifest, and the reader
+enforces it: absent, blank, or non-text is reported as `malformed-manifest`
+rather than becoming a reference with no name. There is deliberately no fallback
+to a caller-supplied name anywhere in the projection — a fallback would make the
+canonical identity depend on *how* the projection was invoked, reintroducing the
+configured-versus-archive divergence the recorded name exists to prevent.
+
+Treating the field as required is a claim about the manifest contract, so the
+evidence for it: both supported schema names are `raw_batch_manifest.v1` — the
+same version, hence the same required fields, with only the product prefix
+differing; `store_raw_batch` has no code path that omits it; other product
+readers already subscript it as mandatory (`filesystem_storage.py` reads
+`payload["source_name"]` directly, `recorder_payload.py` uses `_required_text`);
+and the pre-rename reference capture carried a real populated value for all 1315
+of its manifests, which is where the profiled source identity came from. No
+supported version is known to have omitted it.
+
 Probe-derived fields (`data_item_name`, `mtconnect_type`, `units`,
 `native_units`) are null for a capture with no archived `/probe`. Nothing that
 can be absent participates in identity. `component_path` is derived from the

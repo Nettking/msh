@@ -147,6 +147,11 @@ class RawBatchRef:
     #: containing characters the slug rewrites cannot be recovered from the
     #: path. Keeping the recorded name means a consumer that discovered this
     #: batch by walking directories still reports the original identity.
+    #:
+    #: Required in every supported manifest, so ``scan_raw_batches`` never
+    #: produces a reference without it — a manifest missing or blanking the
+    #: field is reported as malformed instead. The ``None`` default exists only
+    #: so the dataclass signature stays compatible for direct construction.
     source_name: str | None = None
 
 

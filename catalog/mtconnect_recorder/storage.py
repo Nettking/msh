@@ -402,6 +402,16 @@ class DurableRecorderStore:
                 last_sequence = int(payload["last_observation_sequence"])
                 next_sequence = int(payload["next_sequence"])
                 observation_count = int(payload["observation_count"])
+                # Required, not optional. Every supported version of this
+                # manifest is v1 and every writer of it records the source
+                # name; the canonical projection depends on it as the only
+                # surviving evidence of the original identity, because the
+                # directory is a lossy slug of it. Accepting a blank here would
+                # silently reintroduce slug-derived identities.
+                declared_source = payload["source_name"]
+                if not isinstance(declared_source, str) or not declared_source.strip():
+                    raise ValueError("source_name must be non-empty text")
+                source_name = declared_source
             except (KeyError, TypeError, ValueError) as exc:
                 issues.append(
                     RawBatchIssue(
@@ -438,7 +448,6 @@ class DurableRecorderStore:
                 continue
 
             received_at = payload.get("received_at")
-            declared_source = payload.get("source_name")
             refs.append(
                 RawBatchRef(
                     raw_path=raw_path,
@@ -453,11 +462,7 @@ class DurableRecorderStore:
                     received_at=(
                         str(received_at) if isinstance(received_at, str) else None
                     ),
-                    source_name=(
-                        str(declared_source)
-                        if isinstance(declared_source, str) and declared_source.strip()
-                        else None
-                    ),
+                    source_name=source_name,
                 )
             )
         refs.sort(key=lambda ref: (ref.first_sequence, ref.last_sequence, ref.raw_sha256))

@@ -207,6 +207,53 @@ def test_missing_required_field_is_malformed_for_both_generations(
     assert [issue.reason for issue in scan.issues] == [RAW_BATCH_ISSUE_MALFORMED]
 
 
+@pytest.mark.parametrize("legacy", [False, True])
+@pytest.mark.parametrize(
+    ("mutation", "label"),
+    [
+        ({}, "missing"),
+        ({"source_name": ""}, "blank"),
+        ({"source_name": "   "}, "whitespace"),
+        ({"source_name": 42}, "not-text"),
+    ],
+)
+def test_a_manifest_without_a_usable_source_name_is_malformed(
+    recorder_archive, legacy, mutation, label
+):
+    # source_name is required in every supported version of this manifest, and
+    # the canonical projection depends on it as the only surviving evidence of
+    # the original identity: the directory is a lossy slug. Accepting a blank
+    # would let a slug-derived identity back in through the reader.
+    _, manifest = _write(recorder_archive, legacy_manifest=legacy)
+    payload = recorder_archive.read_manifest(manifest)
+    if mutation:
+        payload.update(mutation)
+    else:
+        del payload["source_name"]
+    manifest.write_text(json.dumps(payload), encoding="utf-8")
+
+    scan = recorder_archive.store.scan_raw_batches(
+        source_name=SOURCE, instance_id=INSTANCE
+    )
+
+    assert scan.refs == (), f"{label} source_name must not produce a reference"
+    assert [issue.reason for issue in scan.issues] == [RAW_BATCH_ISSUE_MALFORMED]
+    # A required field being absent is corruption, not a version difference.
+    assert scan.issues[0].reason != RAW_BATCH_ISSUE_UNSUPPORTED_SCHEMA
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_a_readable_manifest_always_carries_its_source_name(recorder_archive, legacy):
+    _write(recorder_archive, legacy_manifest=legacy)
+
+    scan = recorder_archive.store.scan_raw_batches(
+        source_name=SOURCE, instance_id=INSTANCE
+    )
+
+    assert scan.refs
+    assert all(ref.source_name == SOURCE for ref in scan.refs)
+
+
 def test_missing_payload_is_distinct_from_a_bad_manifest(recorder_archive):
     _, manifest = _write(recorder_archive)
     recorder_archive.raw_payload_path(manifest).unlink()

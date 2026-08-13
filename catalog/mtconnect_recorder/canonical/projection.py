@@ -98,6 +98,12 @@ REJECT_OVERLAP_CONFLICT = "overlapping-observation-conflict"
 #: found in, so the recorded identity and the storage partition disagree.
 REJECT_SOURCE_KEY_MISMATCH = "source-key-mismatch"
 
+#: A reference reached the projection with no recorded source name. Manifests
+#: missing one are already reported as malformed by the reader, so this covers a
+#: directly constructed reference — and rejects rather than substituting a name,
+#: because any substitution would be the fallback this design removes.
+REJECT_MISSING_SOURCE_NAME = "manifest-source-name-missing"
+
 #: Advisory, not a rejection: the manifest's declared observation count differs
 #: from the number of observations actually parsed from the verified payload.
 NOTE_COUNT_MISMATCH = "manifest-observation-count-mismatch"
@@ -253,11 +259,14 @@ class CanonicalObservationProjection:
             if already.get(ref.raw_sha256) == BATCH_STATUS_PROJECTED:
                 skipped += 1
                 continue
-            # The manifest carries the source name exactly as recorded. The
-            # directory is only its slug, so a caller that discovered this
-            # batch by walking directories must not persist the slug as though
-            # it were the original identity.
-            recorded_name = ref.source_name or source_name
+            # The manifest is the only evidence of the original source name;
+            # the directory is a lossy slug of it. There is deliberately no
+            # fallback to the caller's name — falling back would make the
+            # canonical identity depend on how the projection was invoked,
+            # which is exactly the configured-versus-archive divergence the
+            # recorded name exists to prevent. A manifest without one never
+            # reaches here: scan_raw_batches reports it as malformed.
+            recorded_name = ref.source_name
             outcome = self._project_batch(
                 ref=ref,
                 source_name=recorded_name,
@@ -342,6 +351,12 @@ class CanonicalObservationProjection:
                 detail=detail,
             )
 
+        if not source_name:
+            return reject(
+                REJECT_MISSING_SOURCE_NAME,
+                "manifest records no source name, so the original identity "
+                "cannot be reconstructed from the archive",
+            )
         # The recorded name must belong to the partition the batch was found
         # in, or the identity written into every row would disagree with where
         # the evidence lives.
@@ -561,9 +576,11 @@ def rebuild_from_recorder_archive(
 def _discover_sources(store: DurableRecorderStore) -> list[str]:
     """Return the source directory names present in a recorder archive.
 
-    Directories are stored under ``_slug(source_name)``. When a capture is all
-    that is available, the slug is the only source identity there is, and it is
-    what the projection records.
+    Directories are named ``_slug(source_name)``, so these are partition keys
+    rather than source names. They are used only to locate archives: the
+    canonical ``source_name`` written into every observation comes from each
+    batch's manifest, so discovering an archive this way records exactly the
+    same identity as projecting it from a configured source list.
     """
 
     if not store.raw_root.exists():

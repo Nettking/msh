@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gzip
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,7 @@ from catalog.mtconnect_recorder.canonical import (
     REJECT_DIGEST_MISMATCH,
     REJECT_DUPLICATE_SEQUENCE,
     REJECT_INSTANCE_MISMATCH,
+    REJECT_MISSING_SOURCE_NAME,
     REJECT_OVERLAP_CONFLICT,
     REJECT_SOURCE_KEY_MISMATCH,
     REJECT_XML_INVALID,
@@ -635,6 +637,63 @@ def test_rebuild_from_scratch_reproduces_the_projection(recorder_archive, tmp_pa
         CanonicalObservationStore(first_path).content_fingerprint()
         == CanonicalObservationStore(second_path).content_fingerprint()
     )
+
+
+@pytest.mark.parametrize("legacy", [False, True])
+def test_archive_only_rebuild_preserves_the_recorded_name_for_both_schemas(
+    recorder_archive, tmp_path, legacy
+):
+    # The same guarantee has to hold for a pre-rename capture: those are the
+    # archives most likely to be rebuilt from disk alone, with no configured
+    # source list to supply the original name.
+    original = "Machine A 01"
+    assert _slug(original) != original
+
+    xml_text, _ = machine_batch(
+        instance_id=INSTANCE, start_sequence=1, device_uuid=""
+    )
+    recorder_archive.write_batch(
+        source_name=original, xml_text=xml_text, legacy_manifest=legacy
+    )
+
+    configured = CanonicalObservationStore(tmp_path / f"configured-{legacy}.sqlite3")
+    CanonicalObservationProjection(
+        store=recorder_archive.store, database=configured
+    ).project_instance(source_name=original, agent_instance_id=INSTANCE)
+
+    discovered_path = tmp_path / f"discovered-{legacy}.sqlite3"
+    rebuild_from_recorder_archive(
+        data_dir=recorder_archive.data_dir, database_path=discovered_path
+    )
+    discovered = CanonicalObservationStore(discovered_path)
+
+    assert configured.count_observations() == 6
+    assert configured.content_fingerprint() == discovered.content_fingerprint()
+    assert {row.source_name for row in discovered.query_observations()} == {original}
+
+
+def test_a_reference_without_a_recorded_name_is_rejected_not_substituted(
+    recorder_archive, projection
+):
+    # scan_raw_batches never emits such a reference, so this covers a directly
+    # constructed one: the projection must refuse rather than substitute the
+    # caller's name, which would be the fallback this design removes.
+    _write_run(recorder_archive, start=1, count=6)
+    scanned = recorder_archive.store.scan_raw_batches(
+        source_name=SOURCE, instance_id=INSTANCE
+    ).refs[0]
+    nameless = replace(scanned, source_name=None)
+
+    outcome = projection._project_batch(
+        ref=nameless,
+        source_name=nameless.source_name,
+        source_key=SOURCE,
+        agent_instance_id=INSTANCE,
+        probe=None,
+    )
+
+    assert outcome.reason == REJECT_MISSING_SOURCE_NAME
+    assert projection.database.count_observations() == 0
 
 
 def test_archive_only_rebuild_preserves_a_source_name_the_slug_rewrites(
