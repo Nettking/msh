@@ -36,13 +36,22 @@ from catalog.ai.runtime import LANGUAGE_MODEL_CAPABILITY, LANGUAGE_MODEL_PROTOCO
 from catalog.ai.runtime_contracts import AIRuntimeRequest, _logical_id, _text
 from catalog.ai.shared_capacity import SharedCapacityLanguageModelProvider
 from catalog.capabilities.operator_surface import ProviderOperatorSurface
-from catalog.capabilities.provider_health import ProviderHealthRecord
+from catalog.capabilities.provider_enrollment import SQLiteProviderEnrollmentStore
+from catalog.capabilities.provider_health import (
+    FederatedProviderHealthService,
+    ProviderHealthRecord,
+    SQLiteProviderHealthStore,
+)
 from catalog.capabilities.provider_reports import ProviderResourceReport, ProviderStatus
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import FederationOperationError
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
-from catalog.relay.provider_service import build_provider_authorities
+from catalog.relay.provider_service import provider_authority_paths
 
+from .federation_active_leader_provider_runtime import (
+    ActiveLeaderProviderEnrollmentService,
+    ActiveLeaderProviderOperatorSurface,
+)
 from .federation_pairing_service import RemotePairingState
 
 _PROVIDER_SURFACE_CONFIG_KEY = "PROVIDER_OPERATOR_SURFACE"
@@ -115,9 +124,7 @@ def _runtime_provider_id(node_id: str, capability_id: str) -> str:
 
 
 def _runtime_node_id(node_id: str, capability_id: str) -> str:
-    digest = hashlib.sha256(
-        f"runtime\0{node_id}\0{capability_id}".encode()
-    ).hexdigest()
+    digest = hashlib.sha256(f"runtime\0{node_id}\0{capability_id}".encode()).hexdigest()
     return f"node-federated-{digest[:32]}"
 
 
@@ -405,18 +412,28 @@ class FederatedAIProductBridge:
             ProviderOperatorSurface,
         ):
             return
-        enrollment, health = build_provider_authorities(coordinator)
+        enrollment_path, health_path = provider_authority_paths(coordinator)
+        enrollment = ActiveLeaderProviderEnrollmentService(
+            coordinator,
+            SQLiteProviderEnrollmentStore(enrollment_path),
+        )
+        health = FederatedProviderHealthService(
+            enrollment,
+            SQLiteProviderHealthStore(health_path),
+        )
         ai_authority = RemoteAIHealthAuthority(
             health,
             session_id=session_id,
             actor_node_id=node_id,
         )
-        self.app.config[_PROVIDER_SURFACE_CONFIG_KEY] = ProviderOperatorSurface(
-            enrollment,
-            health,
-            session_id=session_id,
-            actor_node_id=node_id,
-            ai_authority=ai_authority,
+        self.app.config[_PROVIDER_SURFACE_CONFIG_KEY] = (
+            ActiveLeaderProviderOperatorSurface(
+                enrollment,
+                health,
+                session_id=session_id,
+                actor_node_id=node_id,
+                ai_authority=ai_authority,
+            )
         )
         self._owner_session_id = session_id
 
@@ -525,9 +542,7 @@ class FederatedAIProductBridge:
                 "report": report.to_dict(),
                 "provider_generation": self._generation,
             },
-            request_id=(
-                f"provider-health-{self._generation}-{self._report_revision}"
-            ),
+            request_id=(f"provider-health-{self._generation}-{self._report_revision}"),
         )
         self._report_revision += 1
 
@@ -681,10 +696,7 @@ class FederatedAIProductBridge:
                 node_id=node_id,
                 capability_id=provider.capability_id,
             )
-            if (
-                candidate is not None
-                and candidate.type == LANGUAGE_MODEL_CAPABILITY
-            ):
+            if candidate is not None and candidate.type == LANGUAGE_MODEL_CAPABILITY:
                 local_announcement = candidate
                 break
         local_provider = self._local_provider(local_announcement)
