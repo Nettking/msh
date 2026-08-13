@@ -36,10 +36,10 @@ from catalog.federation.redaction import (
     contains_secret_material,
 )
 
-from .relay_dispatch import RelayDispatchEndpoint
 from .worker_activation import (
     ActivatedComputeWorker,
     ComputeWorkerActivationSnapshot,
+    ComputeWorkerEndpoint,
     TrustedComputeWorkerBinder,
 )
 
@@ -712,7 +712,11 @@ class TrustedProviderRuntimeReconciler:
         ai_binder: TrustedRemoteLanguageModelBinder | None = None,
         ai_runtime_manager: ConfiguredLanguageModelRuntimeManager | None = None,
         compute_binder: TrustedComputeWorkerBinder | None = None,
-        compute_endpoint: RelayDispatchEndpoint | None = None,
+        # F7.4 RelayDispatchEndpoint or the F7.5 RelayLifecycleEndpoint: both
+        # expose the same relay_client/workers/replace_workers surface this
+        # reconciler uses, so lifecycle-capable compute workers rebind after a
+        # restart through the same durable replay.
+        compute_endpoint: ComputeWorkerEndpoint | None = None,
         replay_page_size: int = DEFAULT_RECONCILIATION_REPLAY_PAGE,
         maximum_replay_events: int = MAX_RECONCILIATION_REPLAY_EVENTS,
         clock: Callable[[], datetime] = _utc_now,

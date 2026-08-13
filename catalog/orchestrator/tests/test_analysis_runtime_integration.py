@@ -13,6 +13,7 @@ from catalog.capabilities.analysis.contracts import (
 )
 from catalog.capabilities.jobs import JobStatus
 from catalog.orchestrator import analysis_runtime
+from catalog.capabilities.analysis.provisioning import analysis_capability_id
 from catalog.orchestrator.analysis_runtime import (
     AnalysisIdentity,
     AnalysisRuntime,
@@ -22,15 +23,34 @@ from catalog.orchestrator.analysis_runtime import (
 
 NOW = datetime(2026, 8, 13, 9, 0, tzinfo=timezone.utc)
 
+def _identity(tmp_path: Path, session_id: str):
+    """Build an identity whose node ID is a real key-derived device identity.
 
-def _runtime(tmp_path: Path) -> AnalysisRuntime:
-    identity = AnalysisIdentity(
-        session_id="session-standalone-tests",
-        node_id="node-standalone-tests",
-        provider_id="analysis-provider-standalone-tests",
+    F8 membership is only possible for a genuine node identity, so tests use the
+    same IdentityStore the product uses rather than inventing a node ID.
+    """
+
+    from catalog.node.identity import IdentityStore
+
+    credentials = IdentityStore(
+        tmp_path / "results" / "capabilities" / "standalone_identity",
+        display_name="Test device",
+    ).load_or_create(now=NOW)
+    return AnalysisIdentity(
+        session_id=session_id,
+        node_id=credentials.identity.node_id,
+        provider_id=analysis_capability_id(credentials.identity.node_id),
         standalone=True,
     )
-    return AnalysisRuntime(root=tmp_path, identity=identity, clock=lambda: NOW)
+
+
+
+def _runtime(tmp_path: Path) -> AnalysisRuntime:
+    return AnalysisRuntime(
+        root=tmp_path,
+        identity=_identity(tmp_path, "session-standalone-tests"),
+        clock=lambda: NOW,
+    )
 
 
 def _write_day(data_dir: Path, day: str) -> None:
@@ -82,7 +102,7 @@ def test_a_failing_supplier_falls_back_to_the_single_node_session(
 def test_local_provider_is_advertised_as_an_ordinary_provider(tmp_path: Path) -> None:
     runtime = _runtime(tmp_path)
 
-    reports = runtime.scheduler.report_source.reports(
+    reports = runtime.report_source.reports(
         session_id=runtime.identity.session_id,
         capability_type=ANALYSIS_CAPABILITY_TYPE,
     )
@@ -111,8 +131,8 @@ def test_a_federation_of_one_schedules_and_runs_its_own_slice(tmp_path: Path) ->
                 analysis_session_ids=("auto_default_20260813_20260813",),
             )
 
-    handler = runtime.transport.local_workers[runtime.identity.provider_id].handler
-    handler.executor = _Executor()
+    binding = runtime.federation.inventory.get("jsonl-analysis-handler")
+    binding.handler.executor = _Executor()
 
     outcome = gateway.submit_date_slice(
         data_dir=data_dir,
@@ -139,15 +159,9 @@ def test_a_federation_of_one_schedules_and_runs_its_own_slice(tmp_path: Path) ->
 def test_no_provider_means_the_job_waits_rather_than_running_locally(
     tmp_path: Path,
 ) -> None:
-    identity = AnalysisIdentity(
-        session_id="session-standalone-tests",
-        node_id="node-standalone-tests",
-        provider_id="analysis-provider-standalone-tests",
-        standalone=True,
-    )
     runtime = AnalysisRuntime(
         root=tmp_path,
-        identity=identity,
+        identity=_identity(tmp_path, "session-standalone-tests"),
         clock=lambda: NOW,
         enable_local_provider=False,
     )

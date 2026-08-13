@@ -154,6 +154,56 @@ class LocalArtifactContentStore:
                 "stored artifact content differs from its registered identity",
             )
 
+    def read_range(
+        self,
+        object_key: str,
+        *,
+        offset: int,
+        length: int,
+        content_hash: str,
+        size_bytes: int,
+    ) -> bytes:
+        """Return one bounded slice of a stored body for F6 chunk transfer.
+
+        Whole-object integrity is verified by the F6 receiver against the
+        manifest, so this only enforces that the stored body still has the
+        registered size and that the range stays inside it.
+        """
+
+        path = self.resolve(object_key)
+        if not path.is_file():
+            raise FederationValidationError(
+                "analysis-artifact-missing", "object_key", "artifact body is not stored"
+            )
+        if path.stat().st_size != size_bytes:
+            raise FederationValidationError(
+                "analysis-artifact-integrity-mismatch",
+                "size_bytes",
+                "stored artifact size differs from its registered identity",
+            )
+        if offset < 0 or length < 0 or offset + length > size_bytes:
+            raise FederationValidationError(
+                "analysis-artifact-range-invalid",
+                "offset",
+                "requested range is outside the registered artifact",
+            )
+        if length > self.chunk_size and length > DEFAULT_CHUNK_BYTES:
+            raise FederationValidationError(
+                "analysis-artifact-range-too-large",
+                "length",
+                "chunk length exceeds the configured transfer chunk size",
+            )
+        with path.open("rb") as handle:
+            handle.seek(offset)
+            data = handle.read(length)
+        if len(data) != length:
+            raise FederationValidationError(
+                "analysis-artifact-integrity-mismatch",
+                "object_key",
+                "stored artifact is shorter than its registered identity",
+            )
+        return data
+
     def read_bytes(
         self,
         object_key: str,

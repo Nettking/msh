@@ -17,7 +17,12 @@ from catalog.capabilities.analysis.contracts import (
     analysis_grant_id,
     build_analysis_job,
 )
-from catalog.capabilities.tests.analysis_harness import work_slice
+from catalog.capabilities.tests.analysis_harness import work_slice as _work_slice
+
+
+def work_slice(**overrides):
+    overrides.setdefault("session_id", "session-analysis-harness")
+    return _work_slice(**overrides)
 from catalog.federation.errors import (
     FederationValidationError,
     ProtocolCompatibilityError,

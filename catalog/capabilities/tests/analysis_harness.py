@@ -1,8 +1,10 @@
 """Shared fixtures for the federated analysis job tests.
 
-The harness wires the real capability stack (durable job store, artifact
-authority, provider selection, dispatch, lifecycle) around a fake analysis
-executor, so tests exercise the production scheduling and authorization paths.
+The harness wires the *real* stack: a device-local ``SessionCoordinator``,
+F8.1 enrollment, F8.2 health, F8.4 trusted activation, the F7.5 lifecycle store
+and coordinator, F7.6 artifact authority, and the F6 object-transfer contract.
+Only the analysis executor is a stand-in, so tests exercise production
+scheduling, authorization and dispatch rather than mocks around them.
 """
 
 from __future__ import annotations
@@ -21,40 +23,32 @@ from catalog.capabilities.analysis import (
     AnalysisWorkSlice,
     FederatedAnalysisHandler,
     FederatedAnalysisScheduler,
-    LocalAnalysisProviderSource,
+    FederatedProviderReportSource,
     LocalArtifactContentStore,
-    NodeRoutedDispatchTransport,
-    analysis_provider_attributes,
 )
+from catalog.capabilities.analysis.artifact_carrier import LocalAnalysisArtifactCarrier
 from catalog.capabilities.analysis.contracts import (
-    ANALYSIS_CAPABILITY_TYPE,
-    ANALYSIS_PROTOCOL,
-    ANALYSIS_PROTOCOL_VERSION,
     ORIGIN_AUTOMATIC_DISCOVERY,
     SLICE_KIND_DATE,
+)
+from catalog.capabilities.analysis.provisioning import (
+    AnalysisProviderProvisioner,
+    analysis_capability_id,
 )
 from catalog.capabilities.artifact_secure_runtime import (
     SQLiteCapabilityArtifactAuthority,
 )
-from catalog.capabilities.dispatch import (
-    CapabilityWorker,
-    DispatchRequest,
-    DispatchResponse,
-    SQLiteDispatchInbox,
-    WorkerRegistration,
-)
 from catalog.capabilities.lifecycle_store import SQLiteJobLifecycleStore
+from catalog.capabilities.local_lifecycle import LocalLifecycleTransport
 from catalog.capabilities.provider_reports import ProviderResourceReport, ProviderStatus
+from catalog.node.identity import IdentityStore
+from catalog.orchestrator.analysis_federation import DeviceFederationAuthority
 
 NOW = datetime(2026, 8, 13, 9, 0, tzinfo=timezone.utc)
-SESSION = "session-analysis-tests"
-COORDINATOR = "node-coordinator"
-WORKER_NODE = "node-worker"
-PROVIDER = "provider-analysis-worker"
 
 
 class Clock:
-    """A movable clock so lease and grant expiry can be exercised directly."""
+    """A movable clock so lease, grant and report expiry are directly testable."""
 
     def __init__(self, now: datetime = NOW) -> None:
         self.now = now
@@ -99,84 +93,22 @@ class RecordingExecutor:
         )
 
 
-class StaticReportSource:
-    """A provider report source under direct test control."""
+class FailingLifecycleTransport:
+    """Carrier that cannot reach the selected worker."""
 
-    def __init__(self, reports: tuple[ProviderResourceReport, ...] = ()) -> None:
-        self.reports_value = reports
+    def __init__(self, error: Exception) -> None:
+        self.error = error
 
-    def reports(
-        self, *, session_id: str, capability_type: str
-    ) -> tuple[ProviderResourceReport, ...]:
-        # Deliberately filtered only by session so provider selection, not the
-        # report source, is the component under test for capability mismatches.
-        return tuple(
-            report
-            for report in self.reports_value
-            if report.session_id == session_id
-        )
+    async def request(self, *, target_node_id, request):
+        raise self.error
 
-
-class DirectRelayTransport:
-    """Authenticated carrier double for dispatch to another federation node."""
-
-    def __init__(self, workers: dict[str, CapabilityWorker] | None = None) -> None:
-        self.workers = dict(workers or {})
-        self.delivered: list[DispatchRequest] = []
-        self.failure: Exception | None = None
-
-    async def request(
-        self, *, target_node_id: str, request: DispatchRequest
-    ) -> DispatchResponse:
-        if self.failure is not None:
-            raise self.failure
-        self.delivered.append(request)
-        worker = self.workers[target_node_id]
-        return await worker.handle(
-            request,
-            authenticated_actor=request.coordinator_node_id,
-            authenticated_session=request.session_id,
-        )
-
-
-def provider_report(
-    *,
-    capability_id: str = PROVIDER,
-    node_id: str = WORKER_NODE,
-    session_id: str = SESSION,
-    now: datetime = NOW,
-    capability_type: str = ANALYSIS_CAPABILITY_TYPE,
-    protocol: str = ANALYSIS_PROTOCOL,
-    protocol_version: str = ANALYSIS_PROTOCOL_VERSION,
-    attributes: dict[str, Any] | None = None,
-    status: ProviderStatus = ProviderStatus.READY,
-    max_concurrent_jobs: int = 2,
-    active_jobs: int = 0,
-) -> ProviderResourceReport:
-    return ProviderResourceReport(
-        capability_id=capability_id,
-        node_id=node_id,
-        session_id=session_id,
-        capability_type=capability_type,
-        protocol=protocol,
-        protocol_version=protocol_version,
-        status=status,
-        report_revision=1,
-        max_concurrent_jobs=max_concurrent_jobs,
-        active_jobs=active_jobs,
-        queue_depth=0,
-        utilization_millis=0,
-        attributes=(
-            analysis_provider_attributes() if attributes is None else attributes
-        ),
-        reported_at=now,
-        expires_at=now + timedelta(minutes=5),
-    )
+    async def cancel(self, *, target_node_id, request):
+        raise self.error
 
 
 def work_slice(
     *,
-    session_id: str = SESSION,
+    session_id: str,
     target_date: str = "2026-08-13",
     source_signature: str = "a" * 64,
     script_keys: tuple[str, ...] = ("data_pr_day",),
@@ -202,110 +134,193 @@ def source_files(root: Path, *, name: str = "day.jsonl", body: str | None = None
         body or '{"timestamp":"2026-08-13T10:00:00Z","machine":"A"}\n',
         encoding="utf-8",
     )
-    return (path,)
+    return tuple(sorted(root.glob("*.jsonl")))
+
+
+def provider_report(
+    *,
+    capability_id: str,
+    node_id: str,
+    session_id: str,
+    descriptor,
+    now: datetime,
+    capability_type: str | None = None,
+    protocol: str | None = None,
+    protocol_version: str | None = None,
+    attributes: dict[str, Any] | None = None,
+    status: ProviderStatus = ProviderStatus.READY,
+    max_concurrent_jobs: int = 2,
+    active_jobs: int = 0,
+) -> ProviderResourceReport:
+    """Build a provider report the way the provisioner does, for negative cases."""
+
+    from catalog.capabilities.worker_activation import ComputeHandlerActivationReference
+
+    return ProviderResourceReport(
+        capability_id=capability_id,
+        node_id=node_id,
+        session_id=session_id,
+        capability_type=capability_type or descriptor.capability_type,
+        protocol=protocol or descriptor.protocol,
+        protocol_version=protocol_version or descriptor.protocol_version,
+        status=status,
+        report_revision=1,
+        max_concurrent_jobs=max_concurrent_jobs,
+        active_jobs=active_jobs,
+        queue_depth=0,
+        utilization_millis=0,
+        attributes=(
+            attributes
+            if attributes is not None
+            else {
+                **descriptor.attributes,
+                "activation": ComputeHandlerActivationReference(
+                    descriptor.handler_id, descriptor.descriptor_fingerprint
+                ).to_dict(),
+            }
+        ),
+        reported_at=now,
+        expires_at=now + timedelta(minutes=5),
+    )
+
+
+class StaticReportSource:
+    """Report source under direct test control, for negative selection cases."""
+
+    def __init__(self, reports: tuple[ProviderResourceReport, ...] = ()) -> None:
+        self.reports_value = reports
+
+    def reports(
+        self, *, session_id: str, capability_type: str
+    ) -> tuple[ProviderResourceReport, ...]:
+        # Filtered only by session so provider selection, not the source, is the
+        # component under test for capability mismatches.
+        return tuple(
+            report for report in self.reports_value if report.session_id == session_id
+        )
 
 
 @dataclass
 class AnalysisStack:
-    """Everything one federation node needs to schedule and run analysis."""
+    """One device running the whole durable analysis architecture."""
 
     tmp_path: Path
     clock: Clock
+    federation: DeviceFederationAuthority
     store: SQLiteJobLifecycleStore
     authority: SQLiteCapabilityArtifactAuthority
     content_store: LocalArtifactContentStore
     gateway: AnalysisArtifactGateway
-    report_source: StaticReportSource
     scheduler: FederatedAnalysisScheduler
     service: AnalysisWorkService
     executor: RecordingExecutor
-    worker: CapabilityWorker
-    relay: DirectRelayTransport
+    transport: LocalLifecycleTransport
+    provisioner: AnalysisProviderProvisioner
     data_dir: Path
-    session_id: str = SESSION
-    coordinator_node_id: str = COORDINATOR
-    worker_node_id: str = WORKER_NODE
-    provider_id: str = PROVIDER
-    handlers: dict[str, FederatedAnalysisHandler] = field(default_factory=dict)
+    session_id: str
+    node_id: str
+    provider_id: str
+    worker: Any = None
+    extras: dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def coordinator_node_id(self) -> str:
+        return self.node_id
+
+    @property
+    def worker_node_id(self) -> str:
+        return self.node_id
 
     def submit(self, work: AnalysisWorkSlice | None = None, **kwargs):
-        work = work or work_slice(**kwargs)
+        work = work or work_slice(session_id=self.session_id, **kwargs)
         return self.service.submit_analysis_work(
             work,
             slice_files=source_files(self.data_dir),
             slice_root=self.data_dir,
         )
 
+    def use_report_source(self, source) -> None:
+        """Swap in a controlled report source for negative selection tests."""
+
+        self.scheduler.report_source = source
+
 
 def build_stack(
     tmp_path: Path,
     *,
-    session_id: str = SESSION,
-    coordinator_node_id: str = COORDINATOR,
-    worker_node_id: str = WORKER_NODE,
-    provider_id: str = PROVIDER,
     clock: Clock | None = None,
     succeed: bool = True,
-    with_provider_report: bool = True,
-    local_worker: bool = False,
+    activate_provider: bool = True,
 ) -> AnalysisStack:
-    """Build a coordinator with one worker, either remote or on its own node."""
+    """Build a device with the real F8 trust chain and F7.5 lifecycle stack."""
 
     clock = clock or Clock()
-    database = tmp_path / "capabilities" / "analysis_jobs.sqlite3"
-    store = SQLiteJobLifecycleStore(database)
+    capability_root = tmp_path / "capabilities"
+    capability_root.mkdir(parents=True, exist_ok=True)
+    credentials = IdentityStore(
+        capability_root / "standalone_identity", display_name="Harness device"
+    ).load_or_create(now=clock.now)
+    node_id = credentials.identity.node_id
+    session_id = "session-analysis-harness"
+
+    @dataclass(frozen=True)
+    class _Identity:
+        session_id: str
+        node_id: str
+
+    federation = DeviceFederationAuthority.for_device(
+        capability_root=capability_root,
+        identity=_Identity(session_id, node_id),
+        clock=clock,
+    )
+    store = SQLiteJobLifecycleStore(capability_root / "analysis_jobs.sqlite3")
     authority = SQLiteCapabilityArtifactAuthority(store)
-    content_store = LocalArtifactContentStore(tmp_path / "artifacts")
+    content_store = LocalArtifactContentStore(capability_root / "artifacts")
     gateway = AnalysisArtifactGateway(authority, content_store)
+    transport = federation.lifecycle_transport()
+    carrier = LocalAnalysisArtifactCarrier(gateway, local_node_id=node_id, clock=clock)
     executor = RecordingExecutor(succeed=succeed)
-    node_id = coordinator_node_id if local_worker else worker_node_id
+    provider_id = analysis_capability_id(node_id)
 
     handler = FederatedAnalysisHandler(
         session_id=session_id,
         node_id=node_id,
         provider_id=provider_id,
-        input_transport=gateway,
+        artifact_transport=carrier,
         executor=executor,
-        workspace_root=tmp_path / "workspaces",
+        workspace_root=capability_root / "workspaces",
         content_store=content_store,
         clock=clock,
+        data_owner_node_id=lambda _job: node_id,
     )
-    worker = CapabilityWorker(
-        WorkerRegistration(
-            session_id=session_id,
-            node_id=node_id,
-            provider_id=provider_id,
-            capability_type=ANALYSIS_CAPABILITY_TYPE,
-            protocol=ANALYSIS_PROTOCOL,
-            protocol_version=ANALYSIS_PROTOCOL_VERSION,
-            attributes=analysis_provider_attributes(),
-        ),
-        handler,
-        SQLiteDispatchInbox(tmp_path / "inbox.sqlite3"),
+    provisioner = AnalysisProviderProvisioner(
+        coordinator=federation.coordinator,
+        enrollments=federation.enrollments,
+        health=federation.health,
+        inventory=federation.inventory,
+        binder=federation.binder,
+        session_id=session_id,
+        node_id=node_id,
         clock=clock,
+        max_concurrent_jobs=2,
     )
-    relay = DirectRelayTransport({node_id: worker})
-    transport = NodeRoutedDispatchTransport(
-        local_node_id=coordinator_node_id,
-        local_workers={provider_id: worker} if local_worker else {},
-        remote=relay,
-    )
-    report_source = StaticReportSource(
-        (provider_report(capability_id=provider_id, node_id=node_id, now=clock.now),)
-        if with_provider_report
-        else ()
-    )
+    worker = None
+    if activate_provider:
+        worker = provisioner.provision(handler, transport).worker
+
     scheduler = FederatedAnalysisScheduler(
         store=store,
         gateway=gateway,
         transport=transport,
-        report_source=report_source,
-        coordinator_node_id=coordinator_node_id,
+        report_source=FederatedProviderReportSource(
+            federation.health, actor_node_id=node_id
+        ),
+        coordinator_node_id=node_id,
         clock=clock,
     )
     service = AnalysisWorkService(
         scheduler=scheduler,
-        registry=AnalysisJobRegistry(database),
+        registry=AnalysisJobRegistry(capability_root / "analysis_jobs.sqlite3"),
         session_id=session_id,
     )
     data_dir = tmp_path / "data"
@@ -313,35 +328,30 @@ def build_stack(
     return AnalysisStack(
         tmp_path=tmp_path,
         clock=clock,
+        federation=federation,
         store=store,
         authority=authority,
         content_store=content_store,
         gateway=gateway,
-        report_source=report_source,
         scheduler=scheduler,
         service=service,
         executor=executor,
-        worker=worker,
-        relay=relay,
+        transport=transport,
+        provisioner=provisioner,
         data_dir=data_dir,
         session_id=session_id,
-        coordinator_node_id=coordinator_node_id,
-        worker_node_id=node_id,
+        node_id=node_id,
         provider_id=provider_id,
-        handlers={provider_id: handler},
+        worker=worker,
+        extras={"handler": handler, "carrier": carrier},
     )
 
 
 __all__ = [
-    "COORDINATOR",
     "NOW",
-    "PROVIDER",
-    "SESSION",
-    "WORKER_NODE",
     "AnalysisStack",
     "Clock",
-    "DirectRelayTransport",
-    "LocalAnalysisProviderSource",
+    "FailingLifecycleTransport",
     "RecordingExecutor",
     "StaticReportSource",
     "build_stack",

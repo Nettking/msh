@@ -13,7 +13,6 @@ Nothing here re-implements analysis, scheduling, ownership, or authorization.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import threading
@@ -29,20 +28,17 @@ from catalog.capabilities.analysis import (
     AnalysisExecutionReport,
     AnalysisJobRegistry,
     AnalysisPlan,
+    AnalysisProviderProvisioner,
     AnalysisWorkService,
     AnalysisWorkSlice,
-    CompositeProviderReportSource,
     FederatedAnalysisHandler,
     FederatedAnalysisScheduler,
-    LocalAnalysisProviderSource,
+    FederatedProviderReportSource,
     LocalArtifactContentStore,
-    NodeRoutedDispatchTransport,
-    analysis_provider_attributes,
+    analysis_capability_id,
 )
 from catalog.capabilities.analysis.contracts import (
     ANALYSIS_CAPABILITY_TYPE,
-    ANALYSIS_PROTOCOL,
-    ANALYSIS_PROTOCOL_VERSION,
     DEFAULT_MAX_SLICE_BYTES,
     ORIGIN_AUTOMATIC_DISCOVERY,
     SLICE_KIND_DATE,
@@ -51,14 +47,11 @@ from catalog.capabilities.analysis.scheduler import SubmissionOutcome
 from catalog.capabilities.artifact_secure_runtime import (
     SQLiteCapabilityArtifactAuthority,
 )
-from catalog.capabilities.dispatch import (
-    CapabilityWorker,
-    SQLiteDispatchInbox,
-    WorkerRegistration,
-)
 from catalog.capabilities.jobs import JobStatus
 from catalog.capabilities.lifecycle_store import SQLiteJobLifecycleStore
 from catalog.capabilities.retry_claim import attempt_owner
+from catalog.node.identity import IdentityStore
+from catalog.orchestrator.analysis_federation import DeviceFederationAuthority
 from catalog.runner.data_filtering import source_files_for_dates
 from catalog.runner.script_catalog import discover_runnable_scripts, repo_root
 
@@ -110,30 +103,32 @@ def _provider_id(node_id: str) -> str:
     provider identity is deliberately distinct from the coordinator node ID.
     """
 
-    digest = hashlib.sha256(f"analysis-provider\0{node_id}".encode()).hexdigest()
-    return f"analysis-provider-{digest[:24]}"
+    return analysis_capability_id(node_id)
 
 
 def _standalone_identity(state_path: Path) -> tuple[str, str]:
     """Return the persisted single-node federation identity, creating it once.
 
-    Standalone installations are a supported product mode. They are modelled as a
-    federation of one: a real session, a real coordinator node, and a real
-    provider. Authority checks are enforced exactly as in a multi-node
-    federation; nothing is bypassed to make this mode work.
+    Standalone installations are a supported product mode modelled as a
+    federation of one. The node identity is a real device keypair from the
+    existing ``IdentityStore`` so the device can genuinely enrol itself in the
+    session it leads; nothing about the authority checks is bypassed.
     """
 
+    credentials = IdentityStore(
+        state_path.parent / "standalone_identity",
+        display_name="This device",
+    ).load_or_create()
+    node_id = credentials.identity.node_id
     if state_path.exists():
         try:
             payload = json.loads(state_path.read_text(encoding="utf-8"))
             session_id = str(payload["session_id"])
-            node_id = str(payload["node_id"])
-            if session_id and node_id:
+            if session_id and str(payload.get("node_id")) == node_id:
                 return session_id, node_id
         except (OSError, ValueError, KeyError):
             pass
     session_id = f"session-standalone-{uuid.uuid4().hex}"
-    node_id = f"node-standalone-{uuid.uuid4().hex}"
     state_path.parent.mkdir(parents=True, exist_ok=True)
     state_path.write_text(
         json.dumps(
@@ -246,6 +241,7 @@ class AnalysisRuntime:
         clock: Callable[[], datetime] = _utc_now,
         enable_local_provider: bool = True,
         max_slice_bytes: int | None = None,
+        federation: DeviceFederationAuthority | None = None,
     ) -> None:
         self.root = Path(root) if root is not None else repo_root()
         self.capability_root = self.root / "results" / "capabilities"
@@ -260,27 +256,57 @@ class AnalysisRuntime:
             else os.getenv("FCP_ANALYSIS_MAX_SLICE_BYTES", DEFAULT_MAX_SLICE_BYTES)
         )
 
-        self.store = SQLiteJobLifecycleStore(self.capability_root / "analysis_jobs.sqlite3")
+        self.store = SQLiteJobLifecycleStore(
+            self.capability_root / "analysis_jobs.sqlite3"
+        )
         self.artifact_authority = SQLiteCapabilityArtifactAuthority(self.store)
         self.content_store = LocalArtifactContentStore(
             self.capability_root / "artifacts", max_bytes=self.max_slice_bytes
         )
         self.gateway = AnalysisArtifactGateway(self.artifact_authority, self.content_store)
-        self.transport = NodeRoutedDispatchTransport(local_node_id=self.identity.node_id)
-        self._report_sources: list[object] = []
-        self.service: AnalysisWorkService | None = None
         self.max_concurrent_jobs = max(
             int(os.getenv("FCP_ANALYSIS_MAX_CONCURRENT_JOBS", "1")), 1
         )
+        self.service: AnalysisWorkService | None = None
+        self.provisioner: AnalysisProviderProvisioner | None = None
+        self.worker: object | None = None
+
+        # F8 trust chain. Without a usable coordinator this device cannot enrol,
+        # publish health, or activate anything, so it advertises no provider at
+        # all and submitted work simply stays durably queued.
+        self.federation = federation
+        self.provisioning_reason = "provider-active"
+        if self.federation is None:
+            try:
+                self.federation = DeviceFederationAuthority.for_device(
+                    capability_root=self.capability_root,
+                    identity=self.identity,
+                    clock=self.clock,
+                )
+            except Exception as exc:  # noqa: BLE001 - startup must stay available
+                self.federation = DeviceFederationAuthority.without_authority(
+                    capability_root=self.capability_root,
+                    node_id=self.identity.node_id,
+                    clock=self.clock,
+                )
+                enable_local_provider = False
+                self.provisioning_reason = str(
+                    getattr(exc, "code", "federation-authority-unavailable")
+                )
+        self.transport = self.federation.lifecycle_transport()
+        self.artifact_carrier = self.federation.artifact_carrier(self.gateway)
+        self.report_source = FederatedProviderReportSource(
+            self.federation.health, actor_node_id=self.identity.node_id
+        )
 
         if enable_local_provider:
-            self._install_local_provider()
+            self._provision_local_provider()
 
         self.scheduler = FederatedAnalysisScheduler(
             store=self.store,
             gateway=self.gateway,
             transport=self.transport,
-            report_source=CompositeProviderReportSource(self._report_sources),
+            report_source=self.report_source,
             coordinator_node_id=self.identity.coordinator_node_id,
             clock=self.clock,
         )
@@ -293,11 +319,6 @@ class AnalysisRuntime:
         )
 
     # ------------------------------------------------------------------
-
-    def register_report_source(self, source: object) -> None:
-        """Add another provider report source (for example provider health)."""
-
-        self._report_sources.append(source)
 
     def _local_active_jobs(self) -> int:
         """Count jobs this node's provider currently owns, for honest capacity."""
@@ -318,14 +339,19 @@ class AnalysisRuntime:
                 active += 1
         return active
 
-    def _install_local_provider(self) -> None:
-        """Offer this node's own compute as an ordinary federation provider."""
+    def _provision_local_provider(self) -> None:
+        """Offer this node's compute through the real F8 trust chain.
+
+        Installing the handler never approves a provider. The provisioner
+        announces the capability and requests enrollment; approval only happens
+        when this node is the authority for its own session.
+        """
 
         handler = FederatedAnalysisHandler(
             session_id=self.identity.session_id,
             node_id=self.identity.node_id,
-            provider_id=self.identity.provider_id,
-            input_transport=self.gateway,
+            provider_id=analysis_capability_id(self.identity.node_id),
+            artifact_transport=self.artifact_carrier,
             executor=RunnerSliceAnalysisExecutor(
                 workflows_root=self.root / "results" / "workflows",
                 catalog_root=self.root / "catalog",
@@ -333,33 +359,31 @@ class AnalysisRuntime:
             workspace_root=self.capability_root / "workspaces",
             content_store=self.content_store,
             clock=self.clock,
+            data_owner_node_id=lambda _job: self.federation.data_owner_node_id,
             max_slice_bytes=self.max_slice_bytes,
         )
-        worker = CapabilityWorker(
-            WorkerRegistration(
-                session_id=self.identity.session_id,
-                node_id=self.identity.node_id,
-                provider_id=self.identity.provider_id,
-                capability_type=ANALYSIS_CAPABILITY_TYPE,
-                protocol=ANALYSIS_PROTOCOL,
-                protocol_version=ANALYSIS_PROTOCOL_VERSION,
-                attributes=analysis_provider_attributes(),
-            ),
-            handler,
-            SQLiteDispatchInbox(self.capability_root / "analysis_dispatch_inbox.sqlite3"),
+        self.provisioner = AnalysisProviderProvisioner(
+            coordinator=self.federation.coordinator,
+            enrollments=self.federation.enrollments,
+            health=self.federation.health,
+            inventory=self.federation.inventory,
+            binder=self.federation.binder,
+            session_id=self.identity.session_id,
+            node_id=self.identity.node_id,
             clock=self.clock,
+            max_concurrent_jobs=self.max_concurrent_jobs,
+            active_jobs=self._local_active_jobs,
         )
-        self.transport.register_worker(self.identity.provider_id, worker)
-        self._report_sources.append(
-            LocalAnalysisProviderSource(
-                session_id=self.identity.session_id,
-                node_id=self.identity.node_id,
-                provider_id=self.identity.provider_id,
-                clock=self.clock,
-                max_concurrent_jobs=self.max_concurrent_jobs,
-                active_jobs=self._local_active_jobs,
-            )
-        )
+        outcome = self.provisioner.provision(handler, self.transport)
+        self.worker = outcome.worker
+        self.provisioning_reason = outcome.reason
+
+    def refresh_provider_health(self) -> bool:
+        """Keep this node's provider report fresh before a scheduling pass."""
+
+        if self.provisioner is None:
+            return False
+        return self.provisioner.refresh()
 
 
 class DiscoveryAnalysisGateway:
@@ -437,11 +461,15 @@ class DiscoveryAnalysisGateway:
         )
 
     def request_scheduling_pass(self) -> bool:
-        service = self.runtime.service
+        runtime = self.runtime
+        runtime.refresh_provider_health()
+        service = runtime.service
         return False if service is None else service.request_scheduling_pass()
 
     def run_scheduling_pass(self):
-        service = self.runtime.service
+        runtime = self.runtime
+        runtime.refresh_provider_health()
+        service = runtime.service
         return () if service is None else service.run_scheduling_pass()
 
     # ------------------------------------------------------------------
@@ -505,13 +533,12 @@ class DiscoveryAnalysisGateway:
         if provider_id is None:
             return None
         runtime = self.runtime
-        for source in runtime._report_sources:
-            for report in source.reports(  # type: ignore[attr-defined]
-                session_id=runtime.identity.session_id,
-                capability_type=ANALYSIS_CAPABILITY_TYPE,
-            ):
-                if report.capability_id == provider_id:
-                    return report.node_id
+        for report in runtime.report_source.reports(
+            session_id=runtime.identity.session_id,
+            capability_type=ANALYSIS_CAPABILITY_TYPE,
+        ):
+            if report.capability_id == provider_id:
+                return report.node_id
         return None
 
 

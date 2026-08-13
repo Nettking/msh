@@ -13,7 +13,7 @@ from __future__ import annotations
 import gzip
 import re
 import tarfile
-from collections.abc import Iterable, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 
 from catalog.federation.errors import FederationValidationError
@@ -98,26 +98,24 @@ def write_slice_archive(
 
 
 def extract_slice_archive(
-    chunks: Iterable[bytes],
-    *,
     archive_path: Path,
+    *,
     destination: Path,
     max_bytes: int = DEFAULT_MAX_SLICE_BYTES,
 ) -> tuple[Path, ...]:
-    """Materialize an authorized slice archive into an isolated directory."""
+    """Materialize an already-verified slice archive into an isolated directory.
 
-    archive_path.parent.mkdir(parents=True, exist_ok=True)
-    written = 0
-    with archive_path.open("wb") as handle:
-        for chunk in chunks:
-            written += len(chunk)
-            if written > max_bytes:
-                raise FederationValidationError(
-                    "analysis-slice-too-large",
-                    "size_bytes",
-                    f"packed analysis input must not exceed {max_bytes} bytes",
-                )
-            handle.write(chunk)
+    The archive itself is delivered and integrity-checked by the F6 object
+    transfer receiver; this function only parses it, and treats its contents as
+    hostile input.
+    """
+
+    if archive_path.stat().st_size > max_bytes:
+        raise FederationValidationError(
+            "analysis-slice-too-large",
+            "size_bytes",
+            f"packed analysis input must not exceed {max_bytes} bytes",
+        )
     destination.mkdir(parents=True, exist_ok=True)
     resolved_destination = destination.resolve()
     extracted: list[Path] = []

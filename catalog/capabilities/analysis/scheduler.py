@@ -26,7 +26,6 @@ from catalog.federation.errors import (
 )
 
 from ..artifact_contracts import ArtifactGrantScope, ArtifactInputReference
-from ..dispatch import DispatchTransport
 from ..job_store import DurableJobSnapshot
 from ..jobs import AttemptStatus, JobContract, JobStatus
 from ..lifecycle_contracts import LifecycleAction
@@ -105,7 +104,7 @@ class FederatedAnalysisScheduler:
         *,
         store: SQLiteJobLifecycleStore,
         gateway: AnalysisArtifactGateway,
-        transport: DispatchTransport,
+        transport: LifecycleTransport,
         report_source: ProviderReportSource,
         coordinator_node_id: str,
         clock,
@@ -122,9 +121,11 @@ class FederatedAnalysisScheduler:
         self.selection_policy = selection_policy or ProviderSelectionPolicy()
         self.lease_seconds = int(lease_seconds)
         self.grant_seconds = int(grant_seconds)
+        # F7.5 owns completion: the coordinator applies the worker response
+        # through the durable result fence, retry policy and stale-attempt rules.
         self.dispatcher = ResilientDispatchCoordinator(
             store,
-            transport,  # type: ignore[arg-type]
+            transport,
             coordinator_node_id=coordinator_node_id,
         )
         self.lifecycle = JobLifecycleCoordinator(

@@ -27,11 +27,15 @@ from .contracts import (
     analysis_provider_attributes,
     build_analysis_job,
 )
-from .gateway import AnalysisArtifactGateway, AnalysisInputTransport
-from .providers import (
-    CompositeProviderReportSource,
-    FederatedProviderReportSource,
-    LocalAnalysisProviderSource,
+from .gateway import AnalysisArtifactGateway, AnalysisArtifactTransport
+from .providers import FederatedProviderReportSource
+from .provisioning import (
+    ANALYSIS_HANDLER_ID,
+    AnalysisProviderProvisioner,
+    ProvisioningOutcome,
+    analysis_capability_id,
+    analysis_handler_descriptor,
+    lifecycle_worker_factory,
 )
 from .scheduler import (
     DECISION_DISPATCHED,
@@ -42,7 +46,6 @@ from .scheduler import (
     SubmissionOutcome,
 )
 from .service import AnalysisJobRecord, AnalysisJobRegistry, AnalysisWorkService
-from .transport import NodeRoutedDispatchTransport
 from .worker import (
     AnalysisExecutionReport,
     AnalysisSliceExecutor,
@@ -68,24 +71,27 @@ __all__ = [
     "SLICE_KIND_UPLOAD_BATCH",
     "AnalysisArtifactGateway",
     "AnalysisExecutionReport",
-    "AnalysisInputTransport",
+    "AnalysisArtifactTransport",
     "AnalysisJobRecord",
     "AnalysisJobRegistry",
     "AnalysisPlan",
     "AnalysisSliceExecutor",
     "AnalysisWorkService",
     "AnalysisWorkSlice",
-    "CompositeProviderReportSource",
+    "ANALYSIS_HANDLER_ID",
+    "AnalysisProviderProvisioner",
     "ContentIdentity",
     "FederatedAnalysisHandler",
     "FederatedAnalysisScheduler",
     "FederatedProviderReportSource",
-    "LocalAnalysisProviderSource",
+    "ProvisioningOutcome",
     "LocalArtifactContentStore",
-    "NodeRoutedDispatchTransport",
     "SchedulingOutcome",
     "SubmissionOutcome",
+    "analysis_capability_id",
     "analysis_capability_requirement",
+    "analysis_handler_descriptor",
+    "lifecycle_worker_factory",
     "analysis_grant_id",
     "analysis_provider_attributes",
     "build_analysis_job",

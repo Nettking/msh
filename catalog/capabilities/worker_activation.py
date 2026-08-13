@@ -824,7 +824,13 @@ class _ActivationFencedHandler:
 
 
 class ActivatedComputeWorker:
-    """F7.4-compatible worker proxy carrying immutable F8.4 activation evidence."""
+    """F7.4-compatible worker proxy carrying immutable F8.4 activation evidence.
+
+    When the binder was given a lifecycle-capable worker factory the wrapped
+    worker also answers F7.5 cancellation, and this proxy forwards it. The
+    activation evidence and fencing are identical in both cases; only the worker
+    contract the endpoint requires differs.
+    """
 
     def __init__(
         self,
@@ -835,6 +841,10 @@ class ActivatedComputeWorker:
         self.snapshot = snapshot
         self.registration = worker.registration
 
+    @property
+    def cancellable(self) -> bool:
+        return callable(getattr(self._worker, "cancel", None))
+
     async def handle(
         self,
         request: DispatchRequest,
@@ -843,6 +853,26 @@ class ActivatedComputeWorker:
         authenticated_session: str,
     ) -> DispatchResponse:
         return await self._worker.handle(
+            request,
+            authenticated_actor=authenticated_actor,
+            authenticated_session=authenticated_session,
+        )
+
+    async def cancel(
+        self,
+        request,
+        *,
+        authenticated_actor: str,
+        authenticated_session: str,
+    ):
+        cancel = getattr(self._worker, "cancel", None)
+        if not callable(cancel):
+            raise FederationOperationError(
+                "compute-worker-not-cancellable",
+                "activated worker was not bound with a lifecycle-capable factory",
+                "worker",
+            )
+        return await cancel(
             request,
             authenticated_actor=authenticated_actor,
             authenticated_session=authenticated_session,
@@ -869,6 +899,7 @@ class TrustedComputeWorkerBinder:
         inbox_factory: Callable[[str], SQLiteDispatchInbox],
         *,
         clock: Callable[[], datetime] = _utc_now,
+        worker_factory: Callable[..., CapabilityWorker] | None = None,
     ) -> None:
         if not callable(inbox_factory):
             raise FederationValidationError(
@@ -876,9 +907,19 @@ class TrustedComputeWorkerBinder:
                 "inbox_factory",
                 "must be callable",
             )
+        if worker_factory is not None and not callable(worker_factory):
+            raise FederationValidationError(
+                "invalid-compute-worker-factory",
+                "worker_factory",
+                "must be callable",
+            )
         self.authority = authority
         self._inbox_factory = inbox_factory
         self._clock = clock
+        # Default preserves the original F7.4 worker exactly. A caller that needs
+        # F7.5 cancellation supplies CancellableCapabilityWorker (with a matching
+        # lifecycle inbox); the activation fencing below is unchanged either way.
+        self._worker_factory = worker_factory or CapabilityWorker
 
     def activate(self, provider_id: str) -> ActivatedComputeWorker:
         snapshot = self.authority.current_snapshot(provider_id)
@@ -898,12 +939,18 @@ class TrustedComputeWorkerBinder:
                 "inbox_factory",
                 "must return SQLiteDispatchInbox",
             )
-        worker = CapabilityWorker(
+        worker = self._worker_factory(
             registration,
             _ActivationFencedHandler(self.authority, snapshot),
             inbox,
             clock=self._clock,
         )
+        if not isinstance(worker, CapabilityWorker):
+            raise FederationValidationError(
+                "invalid-compute-worker",
+                "worker_factory",
+                "must return a CapabilityWorker",
+            )
         return ActivatedComputeWorker(worker, snapshot)
 
     def activate_all(self) -> tuple[ActivatedComputeWorker, ...]:

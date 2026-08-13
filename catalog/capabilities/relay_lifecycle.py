@@ -110,6 +110,63 @@ class RelayLifecycleEndpoint:
             )
         self.workers[provider_id] = worker
 
+    def unregister_worker(
+        self,
+        provider_id: str,
+        *,
+        expected_worker: Any | None = None,
+    ) -> bool:
+        """Remove one exact local worker without affecting a replacement."""
+
+        if not isinstance(provider_id, str) or not provider_id:
+            raise ValueError("provider_id must be non-empty text")
+        current = self.workers.get(provider_id)
+        if current is None:
+            return False
+        if expected_worker is not None and current is not expected_worker:
+            raise FederationValidationError(
+                "worker-registration-changed",
+                "provider_id",
+                "registered worker differs from the expected activation",
+            )
+        self.workers.pop(provider_id)
+        return True
+
+    def replace_workers(
+        self,
+        workers: dict[str, CancellableCapabilityWorker],
+        *,
+        replace_provider_ids: tuple[str, ...],
+    ) -> dict[str, CancellableCapabilityWorker]:
+        """Atomically replace one explicit reconciler-owned worker subset.
+
+        Mirrors ``RelayDispatchEndpoint.replace_workers`` so F8.6 restart
+        reconciliation can rebind lifecycle-capable compute workers too.
+        """
+
+        replacement_ids = tuple(sorted(set(replace_provider_ids)))
+        if any(not isinstance(item, str) or not item for item in replacement_ids):
+            raise ValueError("replace_provider_ids must contain non-empty text")
+        replacement_set = set(replacement_ids)
+        normalized = dict(workers)
+        for provider_id, worker in normalized.items():
+            if provider_id not in replacement_set:
+                raise FederationValidationError(
+                    "unowned-worker-replacement",
+                    "provider_id",
+                    "replacement worker must be included in the explicit owned set",
+                )
+            self.register_worker(provider_id, worker)
+        previous = {
+            provider_id: self.workers[provider_id]
+            for provider_id in replacement_ids
+            if provider_id in self.workers
+        }
+        for provider_id in replacement_ids:
+            if provider_id not in normalized:
+                self.workers.pop(provider_id, None)
+        return previous
+
     async def start(self) -> None:
         if self._closed:
             raise RuntimeError("relay lifecycle endpoint is closed")

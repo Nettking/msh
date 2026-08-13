@@ -1,4 +1,9 @@
-"""Provider selection, ownership, dispatch, and lifecycle for analysis jobs."""
+"""Provider selection, ownership, dispatch, and lifecycle for analysis jobs.
+
+Every test drives the real components: F8.2 provider health feeds
+``select_provider``, the F7.5 lifecycle store owns attempts and leases, and
+``ResilientDispatchCoordinator`` applies the worker response.
+"""
 
 from __future__ import annotations
 
@@ -7,11 +12,8 @@ from datetime import timedelta
 
 import pytest
 
-from catalog.capabilities.analysis.contracts import (
-    ANALYSIS_PROTOCOL,
-    analysis_dispatch_id,
-    analysis_grant_id,
-)
+from catalog.capabilities.analysis.contracts import analysis_grant_id
+from catalog.capabilities.analysis.provisioning import analysis_handler_descriptor
 from catalog.capabilities.analysis.scheduler import (
     DECISION_DISPATCHED,
     DECISION_NO_PROVIDER,
@@ -22,17 +24,42 @@ from catalog.capabilities.jobs import AttemptStatus, JobStatus
 from catalog.capabilities.lifecycle_store import SQLiteJobLifecycleStore
 from catalog.capabilities.provider_reports import ProviderStatus
 from catalog.capabilities.tests.analysis_harness import (
-    PROVIDER,
     Clock,
+    FailingLifecycleTransport,
+    StaticReportSource,
     build_stack,
     provider_report,
-    work_slice,
 )
 from catalog.federation.errors import FederationValidationError
 
 
 def _schedule(stack, job_id):
     return asyncio.run(stack.scheduler.schedule(job_id))
+
+
+def _controlled_reports(stack, **overrides):
+    """Replace health reports with one report under direct test control."""
+
+    descriptor = analysis_handler_descriptor()
+    stack.use_report_source(
+        StaticReportSource(
+            (
+                provider_report(
+                    capability_id=stack.provider_id,
+                    node_id=stack.node_id,
+                    session_id=overrides.pop("session_id", stack.session_id),
+                    descriptor=descriptor,
+                    now=stack.clock.now,
+                    **overrides,
+                ),
+            )
+        )
+    )
+
+
+# ----------------------------------------------------------------------
+# Submission and deduplication
+# ----------------------------------------------------------------------
 
 
 def test_submission_queues_a_durable_job_without_owning_it(tmp_path) -> None:
@@ -70,7 +97,12 @@ def test_materially_changed_input_creates_new_work(tmp_path) -> None:
     assert len(stack.service.registry.records()) == 2
 
 
-def test_eligible_remote_provider_is_selected_and_executes(tmp_path) -> None:
+# ----------------------------------------------------------------------
+# Provider selection
+# ----------------------------------------------------------------------
+
+
+def test_an_activated_provider_is_selected_and_executes(tmp_path) -> None:
     stack = build_stack(tmp_path)
     job_id = stack.submit().job_id
 
@@ -78,29 +110,27 @@ def test_eligible_remote_provider_is_selected_and_executes(tmp_path) -> None:
     snapshot = stack.store.snapshot(job_id)
 
     assert outcome.decision == DECISION_DISPATCHED
-    assert outcome.provider_id == PROVIDER
-    assert outcome.node_id == stack.worker_node_id
+    assert outcome.provider_id == stack.provider_id
+    assert outcome.node_id == stack.node_id
     assert snapshot.job.status is JobStatus.SUCCEEDED
     assert len(stack.executor.calls) == 1
-    assert stack.relay.delivered[0].target_node_id == stack.worker_node_id
 
 
-def test_local_provider_is_selected_through_the_same_mechanism(tmp_path) -> None:
-    stack = build_stack(tmp_path, local_worker=True)
-    job_id = stack.submit().job_id
+def test_selection_uses_the_real_provider_health_authority(tmp_path) -> None:
+    stack = build_stack(tmp_path)
 
-    outcome = _schedule(stack, job_id)
+    reports = stack.scheduler.report_source.reports(
+        session_id=stack.session_id, capability_type="background-analysis"
+    )
 
-    assert outcome.decision == DECISION_DISPATCHED
-    assert outcome.node_id == stack.coordinator_node_id
-    assert stack.store.snapshot(job_id).job.status is JobStatus.SUCCEEDED
-    # Local execution went through dispatch, not a discovery shortcut.
-    assert stack.relay.delivered == []
-    assert len(stack.executor.calls) == 1
+    assert [item.capability_id for item in reports] == [stack.provider_id]
+    assert reports[0].node_id == stack.node_id
+    # The report carries the F8.4 activation reference, not an invented model.
+    assert "activation" in reports[0].attributes
 
 
-def test_no_provider_leaves_the_job_queued_and_never_runs_locally(tmp_path) -> None:
-    stack = build_stack(tmp_path, with_provider_report=False)
+def test_without_an_approved_provider_nothing_is_offered(tmp_path) -> None:
+    stack = build_stack(tmp_path, activate_provider=False)
     job_id = stack.submit().job_id
 
     outcome = _schedule(stack, job_id)
@@ -119,14 +149,16 @@ def test_no_provider_leaves_the_job_queued_and_never_runs_locally(tmp_path) -> N
         ({"capability_type": "language-model"}, "capability-type-mismatch"),
         ({"protocol_version": "2.0"}, "capability-protocol-version-incompatible"),
         ({"status": ProviderStatus.DRAINING}, "provider-status-draining"),
-        ({"attributes": {"analysis_contract": "something-else"}}, "requirement-mismatch"),
+        (
+            {"attributes": {"analysis_contract": "something-else"}},
+            "requirement-mismatch",
+        ),
+        ({"max_concurrent_jobs": 1, "active_jobs": 1}, "insufficient-available-slots"),
     ),
 )
 def test_incompatible_provider_is_rejected(tmp_path, override, reason) -> None:
-    stack = build_stack(tmp_path, with_provider_report=False)
-    stack.report_source.reports_value = (
-        provider_report(now=stack.clock.now, **override),
-    )
+    stack = build_stack(tmp_path)
+    _controlled_reports(stack, **override)
     job_id = stack.submit().job_id
 
     outcome = _schedule(stack, job_id)
@@ -141,10 +173,8 @@ def test_incompatible_provider_is_rejected(tmp_path, override, reason) -> None:
 
 
 def test_provider_from_another_federation_session_is_rejected(tmp_path) -> None:
-    stack = build_stack(tmp_path, with_provider_report=False)
-    stack.report_source.reports_value = (
-        provider_report(session_id="session-other-federation", now=stack.clock.now),
-    )
+    stack = build_stack(tmp_path)
+    _controlled_reports(stack, session_id="session-other-federation")
     job_id = stack.submit().job_id
 
     outcome = _schedule(stack, job_id)
@@ -165,12 +195,16 @@ def test_expired_provider_report_is_not_selectable(tmp_path) -> None:
     assert stack.executor.calls == []
 
 
+# ----------------------------------------------------------------------
+# Ownership, grants and dispatch
+# ----------------------------------------------------------------------
+
+
 def test_ownership_and_grant_exist_before_the_worker_is_reached(tmp_path) -> None:
     stack = build_stack(tmp_path)
     job_id = stack.submit().job_id
     observed: list[tuple[str, str]] = []
-
-    original = stack.relay.request
+    original = stack.transport.request
 
     async def observing(*, target_node_id, request):
         snapshot = stack.store.snapshot(request.job.job_id)
@@ -180,43 +214,36 @@ def test_ownership_and_grant_exist_before_the_worker_is_reached(tmp_path) -> Non
         )
         observed.append((snapshot.ownership.attempt_id, grant.grant_id))
         assert grant.expires_at <= snapshot.ownership.lease_expires_at
+        assert grant.lease_generation == snapshot.ownership.lease_generation
         return await original(target_node_id=target_node_id, request=request)
 
-    stack.relay.request = observing
+    stack.transport.request = observing
     _schedule(stack, job_id)
 
     assert len(observed) == 1
-    request = stack.relay.delivered[0]
-    assert request.session_id == stack.session_id
-    assert request.coordinator_node_id == stack.coordinator_node_id
-    assert request.attempt_id == observed[0][0]
-    assert request.lease_generation == request.attempt_number
 
 
 def test_duplicate_dispatch_of_one_attempt_executes_once(tmp_path) -> None:
     stack = build_stack(tmp_path)
     job_id = stack.submit().job_id
     _schedule(stack, job_id)
-    snapshot = stack.store.snapshot(job_id)
-    attempt_id = snapshot.job.attempts[-1].attempt_id
 
     replay = _schedule(stack, job_id)
 
     assert replay.decision == DECISION_TERMINAL
     assert len(stack.executor.calls) == 1
-    assert analysis_dispatch_id(job_id, attempt_id).startswith("analysis-dispatch-")
 
 
-def test_expired_lease_is_rejected_by_the_worker_and_never_executes(tmp_path) -> None:
+def test_expired_lease_is_rejected_by_the_worker(tmp_path) -> None:
     stack = build_stack(tmp_path)
     job_id = stack.submit().job_id
-    original = stack.relay.request
+    original = stack.transport.request
 
     async def slow(*, target_node_id, request):
         stack.clock.advance(hours=2)
         return await original(target_node_id=target_node_id, request=request)
 
-    stack.relay.request = slow
+    stack.transport.request = slow
     outcome = _schedule(stack, job_id)
 
     assert outcome.reason == "stale-ignored"
@@ -233,7 +260,7 @@ def test_a_second_coordinator_cannot_take_over_a_queued_job(tmp_path) -> None:
         stack.store.claim(
             job_id,
             coordinator_id="node-intruder",
-            owner_provider_id=PROVIDER,
+            owner_provider_id=stack.provider_id,
             attempt_id="attempt-intruder",
             lease_id="lease-intruder",
             command_id="intruder-claim",
@@ -249,13 +276,13 @@ def test_only_the_granting_coordinator_may_dispatch_or_authorize(tmp_path) -> No
     intruder = FederatedAnalysisScheduler(
         store=stack.store,
         gateway=stack.gateway,
-        transport=stack.scheduler.dispatcher.transport,
-        report_source=stack.report_source,
+        transport=stack.transport,
+        report_source=stack.scheduler.report_source,
         coordinator_node_id="node-intruder",
         clock=stack.clock,
     )
     captured: list[FederationValidationError] = []
-    original = stack.relay.request
+    original = stack.transport.request
 
     async def capture(*, target_node_id, request):
         snapshot = stack.store.snapshot(request.job.job_id)
@@ -263,7 +290,7 @@ def test_only_the_granting_coordinator_may_dispatch_or_authorize(tmp_path) -> No
             await intruder.dispatcher.dispatch(
                 request.job.job_id,
                 dispatch_id="hijacked-dispatch",
-                target_node_id=stack.worker_node_id,
+                target_node_id=stack.node_id,
                 now=stack.clock.now,
             )
         captured.append(dispatch_error.value)
@@ -274,7 +301,7 @@ def test_only_the_granting_coordinator_may_dispatch_or_authorize(tmp_path) -> No
         captured.append(grant_error.value)
         return await original(target_node_id=target_node_id, request=request)
 
-    stack.relay.request = capture
+    stack.transport.request = capture
     _schedule(stack, job_id)
 
     assert [item.code for item in captured] == [
@@ -283,7 +310,12 @@ def test_only_the_granting_coordinator_may_dispatch_or_authorize(tmp_path) -> No
     ]
 
 
-def test_worker_failure_marks_the_job_failed_and_records_the_reason(tmp_path) -> None:
+# ----------------------------------------------------------------------
+# Lifecycle
+# ----------------------------------------------------------------------
+
+
+def test_worker_failure_marks_the_attempt_failed(tmp_path) -> None:
     stack = build_stack(tmp_path, succeed=False)
     job_id = stack.submit().job_id
 
@@ -298,7 +330,9 @@ def test_worker_failure_marks_the_job_failed_and_records_the_reason(tmp_path) ->
 def test_unreachable_worker_releases_ownership_for_another_attempt(tmp_path) -> None:
     stack = build_stack(tmp_path)
     job_id = stack.submit().job_id
-    stack.relay.failure = TimeoutError("worker unreachable")
+    stack.scheduler.dispatcher.transport = FailingLifecycleTransport(
+        TimeoutError("worker unreachable")
+    )
 
     outcome = _schedule(stack, job_id)
     snapshot = stack.store.snapshot(job_id)
@@ -309,7 +343,7 @@ def test_unreachable_worker_releases_ownership_for_another_attempt(tmp_path) -> 
     assert stack.executor.calls == []
 
 
-def test_successful_execution_commits_a_durable_result_artifact(tmp_path) -> None:
+def test_successful_execution_commits_exactly_one_durable_result(tmp_path) -> None:
     stack = build_stack(tmp_path)
     job_id = stack.submit().job_id
 
@@ -318,10 +352,15 @@ def test_successful_execution_commits_a_durable_result_artifact(tmp_path) -> Non
     snapshot = stack.store.snapshot(job_id)
 
     assert committed is not None
-    assert committed.provider_id == PROVIDER
+    assert committed.provider_id == stack.provider_id
     assert committed.attempt_id == snapshot.job.attempts[-1].attempt_id
+    assert committed.lease_generation == snapshot.job.attempts[-1].attempt_number
     assert committed.reference.reference_id == snapshot.job.outputs[0].reference_id
     assert committed.reference.content_hash is not None
+
+    # Replaying the same dispatch cannot commit a competing result.
+    _schedule(stack, job_id)
+    assert stack.store.result_commit(job_id) == committed
 
 
 def test_restart_preserves_the_durable_job(tmp_path) -> None:
@@ -344,8 +383,8 @@ def test_stale_attempt_cannot_overwrite_a_newer_attempt(tmp_path) -> None:
     with pytest.raises(FederationValidationError):
         stack.store.record_attempt_status(
             job_id,
-            coordinator_id=stack.coordinator_node_id,
-            owner_provider_id=PROVIDER,
+            coordinator_id=stack.node_id,
+            owner_provider_id=stack.provider_id,
             attempt_id=stale.attempt_id,
             lease_id=f"{job_id}-lease-1",
             command_id="stale-running",
@@ -353,19 +392,6 @@ def test_stale_attempt_cannot_overwrite_a_newer_attempt(tmp_path) -> None:
             target_status=AttemptStatus.RUNNING,
             now=stack.clock.now,
         )
-
-
-def test_scheduler_serializes_work_when_the_provider_is_saturated(tmp_path) -> None:
-    stack = build_stack(tmp_path, with_provider_report=False)
-    stack.report_source.reports_value = (
-        provider_report(now=stack.clock.now, max_concurrent_jobs=1, active_jobs=1),
-    )
-    job_id = stack.submit().job_id
-
-    outcome = _schedule(stack, job_id)
-
-    assert outcome.decision == DECISION_NO_PROVIDER
-    assert "insufficient-available-slots" in str(outcome.selection.rejected)
 
 
 def test_scheduling_pass_reports_every_pending_job(tmp_path) -> None:
@@ -377,13 +403,10 @@ def test_scheduling_pass_reports_every_pending_job(tmp_path) -> None:
 
     assert {item.job_id for item in outcomes} == {first, second}
     assert all(item.decision == DECISION_DISPATCHED for item in outcomes)
-    assert stack.scheduler.dispatcher.transport is not None
-    assert ANALYSIS_PROTOCOL == "fcp-background-analysis"
 
 
 def test_clock_is_injected_rather_than_read_from_the_wall(tmp_path) -> None:
     clock = Clock()
     stack = build_stack(tmp_path, clock=clock)
-    stack.submit(work_slice())
 
     assert stack.scheduler.clock is clock

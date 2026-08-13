@@ -1,10 +1,14 @@
 """Worker-side execution of a dispatched analysis job.
 
 The handler is deliberately thin. It re-validates the capability contract,
-retrieves only the artifacts the coordinator explicitly authorized, materializes
-them inside an isolated workspace, and then hands the work to the existing
-analysis implementation through :class:`AnalysisSliceExecutor`. It duplicates no
-analysis logic and never reads the data owner's filesystem directly.
+retrieves only the artifacts the coordinator explicitly authorized — over the
+existing F6 object-transfer contract — materializes them inside an isolated
+workspace, and then hands the work to the existing analysis implementation
+through :class:`AnalysisSliceExecutor`.
+
+It duplicates no analysis logic, never reads the data owner's filesystem, and
+never accepts executable material: the plan may only name script keys that are
+already installed on this machine.
 """
 
 from __future__ import annotations
@@ -12,6 +16,7 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -26,7 +31,6 @@ from catalog.federation.errors import (
 from ..artifact_contracts import ArtifactInputReference
 from ..dispatch import ExecutionResult
 from ..jobs import ArtifactReference, JobContract, protocol_major
-from .content_store import LocalArtifactContentStore
 from .contracts import (
     ANALYSIS_CAPABILITY_TYPE,
     ANALYSIS_DATA_SLICE_SCHEMA,
@@ -40,7 +44,8 @@ from .contracts import (
     AnalysisPlan,
     analysis_grant_id,
 )
-from .gateway import AnalysisInputTransport
+from .content_store import LocalArtifactContentStore
+from .gateway import AnalysisArtifactTransport, retrieve_authorized_artifact
 from .packaging import extract_slice_archive
 
 MAX_REPORTED_SCRIPTS = 32
@@ -77,6 +82,10 @@ def _short(value: Any) -> str:
     return text if len(text) <= MAX_REPORTED_TEXT else text[:MAX_REPORTED_TEXT]
 
 
+def _stamp(value: datetime) -> str:
+    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
 class FederatedAnalysisHandler:
     """A :class:`~catalog.capabilities.dispatch.CapabilityHandler` for analysis."""
 
@@ -86,33 +95,30 @@ class FederatedAnalysisHandler:
         session_id: str,
         node_id: str,
         provider_id: str,
-        input_transport: AnalysisInputTransport,
+        artifact_transport: AnalysisArtifactTransport,
         executor: AnalysisSliceExecutor,
         workspace_root: Path,
         content_store: LocalArtifactContentStore,
-        clock,
+        clock: Callable[[], datetime],
+        data_owner_node_id: Callable[[JobContract], str],
         endpoint_id: str = ANALYSIS_ENDPOINT_ID,
         max_slice_bytes: int = DEFAULT_MAX_SLICE_BYTES,
     ) -> None:
         self.session_id = session_id
         self.node_id = node_id
         self.provider_id = provider_id
-        self.input_transport = input_transport
+        self.artifact_transport = artifact_transport
         self.executor = executor
         self.workspace_root = Path(workspace_root)
         self.content_store = content_store
         self.clock = clock
+        self.data_owner_node_id = data_owner_node_id
         self.endpoint_id = endpoint_id
         self.max_slice_bytes = int(max_slice_bytes)
 
     async def execute(self, job: JobContract) -> ExecutionResult:
-        return await asyncio.to_thread(self.run, job)
-
-    # ------------------------------------------------------------------
-
-    def run(self, job: JobContract) -> ExecutionResult:
         try:
-            return self._run(job)
+            return await self._execute(job)
         except (
             FederationValidationError,
             FederationOperationError,
@@ -123,24 +129,34 @@ class FederatedAnalysisHandler:
                 {"job_id": job.job_id},
                 _short(getattr(exc, "code", "analysis-worker-failed")),
             )
-        except OSError:
+        except (OSError, TimeoutError):
             return ExecutionResult(
-                False, {"job_id": job.job_id}, "analysis-workspace-failed"
+                False, {"job_id": job.job_id}, "analysis-input-unavailable"
             )
 
-    def _run(self, job: JobContract) -> ExecutionResult:
+    # ------------------------------------------------------------------
+
+    async def _execute(self, job: JobContract) -> ExecutionResult:
         self._validate_contract(job)
         attempt = self._active_attempt(job)
         grant_id = analysis_grant_id(job.job_id, attempt.attempt_id)
+        owner_node_id = self.data_owner_node_id(job)
         workspace = self.workspace_root / job.job_id / attempt.attempt_id
         if workspace.exists():
             shutil.rmtree(workspace, ignore_errors=True)
         workspace.mkdir(parents=True, exist_ok=True)
         try:
-            plan = self._resolve_plan(job, grant_id=grant_id)
-            data_dir = self._resolve_slice(job, grant_id=grant_id, workspace=workspace)
-            report = self.executor.execute(
-                plan=plan, data_dir=data_dir, workspace=workspace
+            plan = await self._resolve_plan(
+                job, grant_id=grant_id, owner=owner_node_id, workspace=workspace
+            )
+            data_dir = await self._resolve_slice(
+                job, grant_id=grant_id, owner=owner_node_id, workspace=workspace
+            )
+            report = await asyncio.to_thread(
+                self.executor.execute,
+                plan=plan,
+                data_dir=data_dir,
+                workspace=workspace,
             )
             if not isinstance(report, AnalysisExecutionReport):
                 return ExecutionResult(
@@ -200,8 +216,19 @@ class FederatedAnalysisHandler:
             "analysis-input-missing", "inputs", f"job has no {schema_name} input"
         )
 
-    def _fetch(self, job: JobContract, reference: ArtifactReference, *, grant_id: str):
-        return self.input_transport.fetch(
+    async def _retrieve(
+        self,
+        job: JobContract,
+        reference: ArtifactReference,
+        *,
+        grant_id: str,
+        owner: str,
+        workspace: Path,
+        name: str,
+    ) -> Path:
+        return await retrieve_authorized_artifact(
+            self.artifact_transport,
+            target_node_id=owner,
             grant_id=grant_id,
             reference=ArtifactInputReference(
                 artifact_id=reference.reference_id,
@@ -211,20 +238,25 @@ class FederatedAnalysisHandler:
                 schema_id=reference.schema_name,
                 endpoint_id=self.endpoint_id,
             ),
-            authenticated_session_id=self.session_id,
-            authenticated_worker_node_id=self.node_id,
+            worker_node_id=self.node_id,
             provider_id=self.provider_id,
-            now=self.clock(),
+            session_id=self.session_id,
+            staging_root=workspace / "staging" / name,
+            publication_root=workspace / "inputs" / name,
         )
 
-    def _resolve_plan(self, job: JobContract, *, grant_id: str) -> AnalysisPlan:
+    async def _resolve_plan(
+        self, job: JobContract, *, grant_id: str, owner: str, workspace: Path
+    ) -> AnalysisPlan:
         reference = self._input(job, ANALYSIS_PLAN_SCHEMA)
         if reference.size_bytes > MAX_PLAN_BYTES:
             raise FederationValidationError(
                 "analysis-plan-too-large", "plan", "declared plan exceeds the bound"
             )
-        payload = b"".join(self._fetch(job, reference, grant_id=grant_id))
-        plan = AnalysisPlan.from_bytes(payload)
+        path = await self._retrieve(
+            job, reference, grant_id=grant_id, owner=owner, workspace=workspace, name="plan"
+        )
+        plan = AnalysisPlan.from_bytes(path.read_bytes())
         if plan.job_id != job.job_id or plan.session_id != job.session_id:
             raise FederationValidationError(
                 "analysis-plan-context-mismatch",
@@ -233,22 +265,24 @@ class FederatedAnalysisHandler:
             )
         return plan
 
-    def _resolve_slice(
-        self, job: JobContract, *, grant_id: str, workspace: Path
+    async def _resolve_slice(
+        self, job: JobContract, *, grant_id: str, owner: str, workspace: Path
     ) -> Path:
         reference = self._input(job, ANALYSIS_DATA_SLICE_SCHEMA)
         if reference.size_bytes > self.max_slice_bytes:
             raise FederationValidationError(
                 "analysis-slice-too-large", "inputs", "declared slice exceeds the bound"
             )
+        archive = await self._retrieve(
+            job, reference, grant_id=grant_id, owner=owner, workspace=workspace, name="slice"
+        )
         data_dir = workspace / "data"
-        extract_slice_archive(
-            self._fetch(job, reference, grant_id=grant_id),
-            archive_path=workspace / "slice.tar.gz",
+        await asyncio.to_thread(
+            extract_slice_archive,
+            archive,
             destination=data_dir,
             max_bytes=self.max_slice_bytes,
         )
-        (workspace / "slice.tar.gz").unlink(missing_ok=True)
         return data_dir
 
     def _result(
@@ -322,10 +356,6 @@ class FederatedAnalysisHandler:
         return ExecutionResult(
             False, details, _short(report.reason_code or "analysis-execution-failed")
         )
-
-
-def _stamp(value: datetime) -> str:
-    return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
 
 
 __all__ = [

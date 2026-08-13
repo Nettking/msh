@@ -12,6 +12,7 @@ from catalog.capabilities.analysis.contracts import (
     ORIGIN_AUTOMATIC_DISCOVERY,
     ORIGIN_MANUAL_UPLOAD,
 )
+from catalog.capabilities.analysis.provisioning import analysis_capability_id
 from catalog.capabilities.jobs import JobStatus
 from catalog.federation.projections.storage_job_adapters import JobAuthorityAdapter
 from catalog.flask_app.services.upload_analysis_job_service import (
@@ -32,16 +33,26 @@ NOW = datetime(2026, 8, 13, 9, 0, tzinfo=timezone.utc)
 SESSION = "session-upload-tests"
 
 
+def _identity(tmp_path: Path) -> AnalysisIdentity:
+    """A real key-derived device identity, as F8 membership requires."""
+
+    from catalog.node.identity import IdentityStore
+
+    credentials = IdentityStore(
+        tmp_path / "results" / "capabilities" / "standalone_identity",
+        display_name="Upload test device",
+    ).load_or_create(now=NOW)
+    return AnalysisIdentity(
+        session_id=SESSION,
+        node_id=credentials.identity.node_id,
+        provider_id=analysis_capability_id(credentials.identity.node_id),
+        standalone=True,
+    )
+
+
 def _runtime(tmp_path: Path) -> AnalysisRuntime:
     return AnalysisRuntime(
-        root=tmp_path,
-        identity=AnalysisIdentity(
-            session_id=SESSION,
-            node_id="node-upload-tests",
-            provider_id="analysis-provider-upload-tests",
-            standalone=True,
-        ),
-        clock=lambda: NOW,
+        root=tmp_path, identity=_identity(tmp_path), clock=lambda: NOW
     )
 
 
@@ -140,9 +151,9 @@ def test_uploaded_job_is_eligible_for_federation_dispatch(tmp_path: Path) -> Non
                 succeeded=True, processed_dates=plan.target_dates
             )
 
-    runtime.transport.local_workers[
-        runtime.identity.provider_id
-    ].handler.executor = _Executor()
+    runtime.federation.inventory.get("jsonl-analysis-handler").handler.executor = (
+        _Executor()
+    )
     job_id = service.submit_batch(_batch(tmp_path))
 
     outcomes = runtime.service.run_scheduling_pass()
