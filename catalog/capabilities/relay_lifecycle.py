@@ -89,7 +89,7 @@ class RelayLifecycleEndpoint:
         self._handler_tasks: set[asyncio.Task[None]] = set()
         self._closed = False
 
-    def register_worker(
+    def _validate_worker(
         self,
         provider_id: str,
         worker: CancellableCapabilityWorker,
@@ -108,6 +108,13 @@ class RelayLifecycleEndpoint:
                 "node_id",
                 "registration differs from the local node identity",
             )
+
+    def register_worker(
+        self,
+        provider_id: str,
+        worker: CancellableCapabilityWorker,
+    ) -> None:
+        self._validate_worker(provider_id, worker)
         self.workers[provider_id] = worker
 
     def unregister_worker(
@@ -140,8 +147,9 @@ class RelayLifecycleEndpoint:
     ) -> dict[str, CancellableCapabilityWorker]:
         """Atomically replace one explicit reconciler-owned worker subset.
 
-        Mirrors ``RelayDispatchEndpoint.replace_workers`` so F8.6 restart
-        reconciliation can rebind lifecycle-capable compute workers too.
+        Mirrors ``RelayDispatchEndpoint.replace_workers`` so F8.6 can retain the
+        exact pre-mutation mapping and restore it if checkpoint validation fails.
+        Validation therefore has no side effects before ``previous`` is captured.
         """
 
         replacement_ids = tuple(sorted(set(replace_provider_ids)))
@@ -156,15 +164,20 @@ class RelayLifecycleEndpoint:
                     "provider_id",
                     "replacement worker must be included in the explicit owned set",
                 )
-            self.register_worker(provider_id, worker)
+            self._validate_worker(provider_id, worker)
         previous = {
             provider_id: self.workers[provider_id]
             for provider_id in replacement_ids
             if provider_id in self.workers
         }
+        if (
+            set(previous) == set(normalized)
+            and all(previous[key] is normalized[key] for key in normalized)
+        ):
+            return previous
         for provider_id in replacement_ids:
-            if provider_id not in normalized:
-                self.workers.pop(provider_id, None)
+            self.workers.pop(provider_id, None)
+        self.workers.update(normalized)
         return previous
 
     async def start(self) -> None:
