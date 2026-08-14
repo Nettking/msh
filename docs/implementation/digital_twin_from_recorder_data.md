@@ -208,12 +208,12 @@ with nothing measured behind it.
 
 ## Recommended next step
 
-Steps 1 and 2 are self-contained, testable against this exact capture, and
-unblock everything after them. Step 1 additionally fixes a real data-visibility
-defect. Suggested first delivery: accept both manifest schema prefixes on read,
-land the capture as a reference fixture, and add the observation projection with
-a test that rebuilds it from the fixture and asserts 79 758 rows over sequences
-1–79 758 with no gaps.
+Steps 1 and 2 were delivered in PR #284. Continue with **S1 — Semantic-role
+resolver** in the active
+[MTConnect operational segmentation implementation plan](mtconnect_operational_segmentation_plan.md).
+Keep that delivery device-scoped and limited to role resolution; timeline
+reconstruction, runs, cycles, episodes and durable segmentation remain later
+serial phases in that plan.
 
 ## Data handling note
 
