@@ -91,7 +91,10 @@ def test_required_federation_refuses_silent_local_only_start(monkeypatch) -> Non
     assert NoMembershipNode.instance.stopped is True
 
 
-def test_required_data_sharing_waits_for_ready_publication(monkeypatch) -> None:
+def test_required_data_sharing_waits_for_ready_publication(
+    monkeypatch,
+    capsys,
+) -> None:
     class SharingNode:
         instance = None
 
@@ -117,6 +120,7 @@ def test_required_data_sharing_waits_for_ready_publication(monkeypatch) -> None:
                 federation_id="federation-one",
                 session_id="session-one",
                 storage_group="telemetry",
+                jsonl_state="ready",
             )
 
         def stop(self) -> None:
@@ -136,6 +140,7 @@ def test_required_data_sharing_waits_for_ready_publication(monkeypatch) -> None:
 
     assert node is SharingNode.instance
     assert SharingNode.instance.waited == 7.0
+    assert "supported local data/**/*.jsonl (ready)" in capsys.readouterr().out
 
 
 def test_unexpected_sharing_failure_still_stops_federation_node(monkeypatch) -> None:

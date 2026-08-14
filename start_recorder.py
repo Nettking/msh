@@ -451,9 +451,12 @@ def _start_federation(
             print(f"  Data group: {args.storage_group} (waiting for authority)")
         else:
             print("  Data group: auto-select one ready logical-storage group")
+        jsonl_state = getattr(snapshot, "jsonl_state", None)
+        if isinstance(jsonl_state, str) and jsonl_state:
+            print(f"  JSONL:      supported local data/**/*.jsonl ({jsonl_state})")
         print(
-            "  Delivery:   local capture first; durable Federation backlog retries "
-            "independently"
+            "  Delivery:   recorder observations plus supported JSONL; durable "
+            "backlogs retry independently"
         )
         keep_node = True
         return node
