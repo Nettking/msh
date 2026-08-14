@@ -88,13 +88,15 @@ class LearningLifecycleTransport:
         ):
             # This is coordinator-observed evidence from the authenticated
             # dispatch path. The deterministic observation id makes a replay a
-            # no-op in the store.
+            # no-op in the store. DispatchRequest.sent_at is *not* the durable
+            # queue-entry time, so queue_millis is intentionally left unknown
+            # instead of teaching a fabricated queue latency.
             with contextlib.suppress(Exception):
                 self.recorder.record_dispatch(
                     request.job,
                     validated,
                     node_id=request.target_node_id,
-                    queued_at=request.sent_at,
+                    queued_at=None,
                     retries=max(0, request.attempt_number - 1),
                     environment=self._environment(request),
                 )
