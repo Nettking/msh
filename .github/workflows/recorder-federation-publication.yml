@@ -7,6 +7,9 @@ on:
       - ".ruff.toml"
       - "docker-compose.yml"
       - "start_recorder.py"
+      - "start-tailscale-recorder.cmd"
+      - "scripts/start_tailscale_recorder.py"
+      - "scripts/windows/start_tailscale_recorder.ps1"
       - "catalog/federation/recorder_control_events.py"
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
@@ -49,6 +52,9 @@ on:
       - ".ruff.toml"
       - "docker-compose.yml"
       - "start_recorder.py"
+      - "start-tailscale-recorder.cmd"
+      - "scripts/start_tailscale_recorder.py"
+      - "scripts/windows/start_tailscale_recorder.ps1"
       - "catalog/federation/recorder_control_events.py"
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
@@ -123,6 +129,7 @@ jobs:
         run: >-
           python -m compileall -q
           start_recorder.py
+          scripts/start_tailscale_recorder.py
           catalog/mtconnect_recorder
           catalog/node/storage_failover.py
           catalog/standalone-recorder_v2/standalone-recorder_v2.py
@@ -162,6 +169,7 @@ jobs:
           catalog/mtconnect_recorder/tests/test_federation_node.py
           catalog/mtconnect_recorder/tests/test_managed_service.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
+          catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py
           catalog/mtconnect_recorder/tests/test_upgrade_compat.py
           catalog/flask_app/tests/test_federation_recorder_control_service.py
           catalog/flask_app/tests/test_recorder_federation_publication_install.py
@@ -170,6 +178,7 @@ jobs:
         run: >-
           python -m ruff check
           start_recorder.py
+          scripts/start_tailscale_recorder.py
           catalog/federation/onboarding_compat.py
           catalog/federation/recorder_control_events.py
           catalog/federation/shared_file_storage.py
@@ -189,6 +198,7 @@ jobs:
           catalog/mtconnect_recorder/tests/test_federation_node.py
           catalog/mtconnect_recorder/tests/test_managed_service.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
+          catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py
           catalog/mtconnect_recorder/tests/test_upgrade_compat.py
           catalog/node/storage_failover.py
           catalog/standalone-recorder_v2/standalone-recorder_v2.py

@@ -169,6 +169,7 @@ class RecorderFederationPublicationMonitor:
             outbox=outbox,
             client=client,
             session_id=session_id,
+            destination_id=group_id,
         )
         reconciler = RecorderArchiveReconciler(
             store=DurableRecorderStore(data_dir),

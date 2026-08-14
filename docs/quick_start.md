@@ -259,6 +259,23 @@ to request a scan on a connected standalone recorder and add/remove recorder sou
 
 See [Standalone recorder](standalone_recorder.md) for details.
 
+### Windows recorder over Tailscale
+
+For the planned machine 4 recorder at Mekanisk Service Halden, sign the host in
+to the same Tailscale tailnet, generate the pairing code while the current
+leader is open through its numeric Tailscale `100.x.y.z` address, and run:
+
+```cmd
+start-tailscale-recorder.cmd --storage-group fcp-local-storage
+```
+
+Paste the fresh `FCP1-...` code into the hidden prompt on first start. The
+launcher requires Tailscale, Federation membership, and a usable recorder
+publication route; it never silently falls back to local-only capture. Later
+starts reuse the saved membership. See
+[Standalone recorder](standalone_recorder.md#maskin-4-over-tailscale-windows)
+for network, storage-group, JSONL-sharing, and verification details.
+
 ## Ask members to benchmark and contribute
 
 The **current Federation leader** can ask all currently reachable remote members to refresh local capability inspection, run eligible locally registered benchmarks, and request contribution for candidates allowed by each member's own local policy.

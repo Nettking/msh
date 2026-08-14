@@ -2,8 +2,12 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
 
 import start_recorder
+from catalog.federation.errors import FederationOperationError
 from catalog.flask_app.services.capability_config_service import (
     load_capability_config,
     parse_recorder_sources,
@@ -56,6 +60,138 @@ def test_pairing_key_can_be_the_only_positional_argument(monkeypatch) -> None:
 
     assert pairing_key == "FCP1-example-pairing-code"
     assert sources == []
+
+
+def test_required_federation_refuses_silent_local_only_start(monkeypatch) -> None:
+    class NoMembershipNode:
+        instance = None
+
+        def __init__(self, **_kwargs) -> None:
+            self.stopped = False
+            type(self).instance = self
+
+        def has_saved_membership(self) -> bool:
+            return False
+
+        def stop(self) -> None:
+            self.stopped = True
+
+    monkeypatch.setattr(start_recorder, "RecorderFederationNode", NoMembershipNode)
+    args = start_recorder.build_parser().parse_args(["--require-federation"])
+
+    with pytest.raises(FederationOperationError) as excinfo:
+        start_recorder._start_federation(
+            args=args,
+            pairing_key=None,
+            data_dir=Path("data"),
+            parsed_sources=[],
+        )
+
+    assert excinfo.value.code == "recorder-pairing-required"
+    assert NoMembershipNode.instance.stopped is True
+
+
+def test_required_data_sharing_waits_for_ready_publication(
+    monkeypatch,
+    capsys,
+) -> None:
+    class SharingNode:
+        instance = None
+
+        def __init__(self, **_kwargs) -> None:
+            self.waited = None
+            type(self).instance = self
+
+        def has_saved_membership(self) -> bool:
+            return True
+
+        def bootstrap(self, _pairing_key):
+            return SimpleNamespace(
+                node_id="node-recorder",
+                federation_id="federation-one",
+                session_id="session-one",
+                storage_group=None,
+            )
+
+        def wait_until_sharing_ready(self, *, timeout_seconds):
+            self.waited = timeout_seconds
+            return SimpleNamespace(
+                node_id="node-recorder",
+                federation_id="federation-one",
+                session_id="session-one",
+                storage_group="telemetry",
+                jsonl_state="ready",
+            )
+
+        def stop(self) -> None:
+            pass
+
+    monkeypatch.setattr(start_recorder, "RecorderFederationNode", SharingNode)
+    args = start_recorder.build_parser().parse_args(
+        ["--require-data-sharing", "--sharing-timeout", "7"]
+    )
+
+    node = start_recorder._start_federation(
+        args=args,
+        pairing_key=None,
+        data_dir=Path("data"),
+        parsed_sources=[],
+    )
+
+    assert node is SharingNode.instance
+    assert SharingNode.instance.waited == 7.0
+    assert "supported local data/**/*.jsonl (ready)" in capsys.readouterr().out
+
+
+def test_unexpected_sharing_failure_still_stops_federation_node(monkeypatch) -> None:
+    class FailingNode:
+        instance = None
+
+        def __init__(self, **_kwargs) -> None:
+            self.stopped = False
+            type(self).instance = self
+
+        def has_saved_membership(self) -> bool:
+            return True
+
+        def bootstrap(self, _pairing_key):
+            return SimpleNamespace(storage_group=None)
+
+        def wait_until_sharing_ready(self, *, timeout_seconds):
+            assert timeout_seconds == 45.0
+            raise ValueError("unexpected readiness defect")
+
+        def stop(self) -> None:
+            self.stopped = True
+
+    monkeypatch.setattr(start_recorder, "RecorderFederationNode", FailingNode)
+    args = start_recorder.build_parser().parse_args(["--require-data-sharing"])
+
+    with pytest.raises(ValueError, match="unexpected readiness defect"):
+        start_recorder._start_federation(
+            args=args,
+            pairing_key=None,
+            data_dir=Path("data"),
+            parsed_sources=[],
+        )
+
+    assert FailingNode.instance.stopped is True
+
+
+@pytest.mark.parametrize("timeout", ["nan", "inf", "601"])
+def test_start_recorder_rejects_unbounded_sharing_timeout(timeout: str) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        start_recorder.main(["--sharing-timeout", timeout])
+
+    assert excinfo.value.code == 2
+
+
+@pytest.mark.parametrize("timeout", ["nan", "inf", "121"])
+def test_start_recorder_rejects_unbounded_federation_timeout(timeout: str) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        start_recorder.main(["--federation-timeout", timeout])
+
+    assert excinfo.value.code == 2
 
 
 def test_first_start_auto_scan_selects_discovered_sources(

@@ -19,6 +19,7 @@ import sqlite3
 import tempfile
 import threading
 from collections.abc import Callable, Iterable, Mapping
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -27,7 +28,10 @@ from flask import Flask
 
 from catalog.common.artifact_refresh import request_artifact_catalog_refresh
 from catalog.common.data_loading import iter_jsonl_files
-from catalog.federation.errors import FederationOperationError, FederationValidationError
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.federation.shared_file_storage import (
     FEDERATED_JSONL_CHUNK_BYTES,
     FEDERATED_JSONL_CONTENT_SCHEMA,
@@ -41,7 +45,10 @@ from catalog.federation.shared_file_storage import (
     normalize_jsonl_relative_path,
     validate_federated_jsonl_ingest,
 )
-from catalog.federation.storage_catalog import CommittedBatchPage, CommittedBatchReference
+from catalog.federation.storage_catalog import (
+    CommittedBatchPage,
+    CommittedBatchReference,
+)
 from catalog.federation.storage_protocol import BatchIngestRequest
 from catalog.mtconnect_recorder.federation_node import select_storage_authority
 from catalog.orchestrator.pipeline import get_runtime_manager
@@ -84,6 +91,17 @@ _OPTIONAL_LOCAL_PREFIXES = {"uploads/": "FEDERATED_JSONL_PUBLISH_UPLOADS"}
 Clock = Callable[[], datetime]
 RefreshCallback = Callable[..., bool]
 RuntimeRefreshCallback = Callable[[], bool]
+
+
+@dataclass(frozen=True)
+class FederatedJsonlPublishResult:
+    """Result of one bounded, local-only JSONL publication pass."""
+
+    session_id: str
+    node_id: str
+    authority_node_id: str
+    group_id: str
+    published_chunks: int
 
 
 def _utc_now() -> datetime:
@@ -610,7 +628,7 @@ class FederatedJsonlProductBridge:
                 committed += 1
         return committed
 
-    def _publish_local(
+    def _publish_local_progress(
         self,
         runtime_state: object,
         *,
@@ -618,7 +636,7 @@ class FederatedJsonlProductBridge:
         node_id: str,
         authority_node_id: str,
         group_id: str,
-    ) -> int:
+    ) -> tuple[int, int]:
         self._prepare_local_rows(node_id)
         maximum = self._positive_bound(
             "FEDERATED_JSONL_MAX_PUBLISH_CHUNKS_PER_SYNC",
@@ -632,7 +650,7 @@ class FederatedJsonlProductBridge:
             maximum=maximum,
         )
         if not entries:
-            return 0
+            return 0, 0
         runtime = getattr(self.onboarding_service, "relay_runtime", None)
         publish = getattr(runtime, "publish_federated_batches", None)
         if not callable(publish):
@@ -651,7 +669,84 @@ class FederatedJsonlProductBridge:
                 "federated-jsonl-publication-response-invalid",
                 "generic Federation publication returned an invalid result count",
             )
-        return self._advance_published(entries, outcomes)
+        return self._advance_published(entries, outcomes), len(entries)
+
+    def _publish_local(
+        self,
+        runtime_state: object,
+        *,
+        session_id: str,
+        node_id: str,
+        authority_node_id: str,
+        group_id: str,
+    ) -> int:
+        committed, _attempted = self._publish_local_progress(
+            runtime_state,
+            session_id=session_id,
+            node_id=node_id,
+            authority_node_id=authority_node_id,
+            group_id=group_id,
+        )
+        return committed
+
+    def publish_local_once(
+        self,
+        runtime_state: object,
+        context: object,
+        *,
+        authority_node_id: str,
+        group_id: str,
+    ) -> FederatedJsonlPublishResult:
+        """Run one bounded publisher-only pass over local ``data/**/*.jsonl``.
+
+        This entry point is suitable for a headless lifecycle that already has
+        a trusted Federation context and a selected logical-storage route. It
+        deliberately does not discover, read, materialize, or refresh remote
+        data. Candidate filtering, durable progress, chunk schemas and
+        idempotency are shared with :meth:`sync`.
+        """
+
+        self._ensure_initialized()
+        if not self._sync_lock.acquire(blocking=False):
+            raise FederationOperationError(
+                "federated-jsonl-publication-busy",
+                "another Federation JSONL pass is already running",
+            )
+        try:
+            session_id, node_id = self._context_ids(runtime_state, context)
+            if not isinstance(authority_node_id, str) or not authority_node_id:
+                raise FederationValidationError(
+                    "invalid-federated-jsonl-authority",
+                    "authority_node_id",
+                    "must be non-empty text",
+                )
+            if not isinstance(group_id, str) or not group_id:
+                raise FederationValidationError(
+                    "invalid-federated-jsonl-group",
+                    "group_id",
+                    "must be non-empty text",
+                )
+            published, attempted = self._publish_local_progress(
+                runtime_state,
+                session_id=session_id,
+                node_id=node_id,
+                authority_node_id=authority_node_id,
+                group_id=group_id,
+            )
+            if published != attempted:
+                raise FederationOperationError(
+                    "federated-jsonl-publication-pending",
+                    "logical storage did not commit every pending JSONL chunk",
+                )
+            return FederatedJsonlPublishResult(
+                session_id=session_id,
+                node_id=node_id,
+                authority_node_id=authority_node_id,
+                group_id=group_id,
+                published_chunks=published,
+            )
+        finally:
+            self._sync_lock.release()
 
     @staticmethod
     def _validate_page(
@@ -1277,4 +1372,4 @@ class FederatedJsonlProductBridge:
             self._sync_lock.release()
 
 
-__all__ = ["FederatedJsonlProductBridge"]
+__all__ = ["FederatedJsonlProductBridge", "FederatedJsonlPublishResult"]

@@ -49,6 +49,7 @@ class DurableRecorderDeliveryQueue:
         outbox: SQLiteOutbox,
         client: RecorderStorageClient,
         session_id: str,
+        destination_id: str | None = None,
         clock=_now,
     ) -> None:
         if not isinstance(session_id, str) or not session_id.strip():
@@ -60,6 +61,17 @@ class DurableRecorderDeliveryQueue:
         self.outbox = outbox
         self.client = client
         self.session_id = session_id.strip()
+        if destination_id is not None and (
+            not isinstance(destination_id, str) or not destination_id.strip()
+        ):
+            raise FederationValidationError(
+                "invalid-recorder-delivery",
+                "destination_id",
+                "must identify a logical storage group when supplied",
+            )
+        self.destination_id = (
+            destination_id.strip() if isinstance(destination_id, str) else None
+        )
         self.clock = clock
 
     def enqueue(
@@ -80,6 +92,12 @@ class DurableRecorderDeliveryQueue:
                 "recorder-session-mismatch",
                 "session_id",
                 "must match the queue's authenticated Federation session",
+            )
+        if self.destination_id is not None and group_id != self.destination_id:
+            raise FederationValidationError(
+                "recorder-destination-mismatch",
+                "group_id",
+                "must match the queue's selected logical storage group",
             )
         content_hash = BatchIngestRequest.calculate_content_hash(content)
         return self.outbox.enqueue(
@@ -134,6 +152,13 @@ class DurableRecorderDeliveryQueue:
                     # Rows from prior sessions remain durable for a worker
                     # holding the matching authority; they are never sent here.
                     and entry.session_id == self.session_id
+                    # A relay client targets the authority selected for exactly
+                    # one logical group. Rows for a prior group remain durable
+                    # until a worker is started for that destination.
+                    and (
+                        self.destination_id is None
+                        or entry.destination_id == self.destination_id
+                    )
                 ),
                 key=lambda entry: entry.outbox_id,
             )

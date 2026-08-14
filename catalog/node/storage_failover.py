@@ -5,9 +5,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import math
 import os
 import secrets
 import sys
+from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -39,6 +42,90 @@ from .storage_agent import (
 )
 
 
+@dataclass(frozen=True)
+class StorageAuthoritySettings:
+    """Everything one logical-storage authority process needs to run.
+
+    The authority predates any in-process host, so its composition lived inside
+    an argparse handler and could only be started by hand. Field names match the
+    original option names exactly, which keeps the CLI a thin adapter and lets a
+    supervised host supply the same values without a second composition.
+    """
+
+    relay_control_database: str
+    storage_control_database: str
+    publication_database: str
+    failover_database: str
+    state_dir: str
+    relay: str
+    display_name: str
+    session_id: str
+    acknowledgements_database: str | None = None
+    allow_insecure_local: bool = False
+    heartbeat_interval: float = 10.0
+    request_timeout: float = 15.0
+    scan_interval: float = 2.0
+    lease_seconds: float = 300.0
+
+    def __post_init__(self) -> None:
+        for name in (
+            "relay_control_database",
+            "storage_control_database",
+            "publication_database",
+            "failover_database",
+            "state_dir",
+            "relay",
+            "display_name",
+            "session_id",
+        ):
+            value = getattr(self, name)
+            if not isinstance(value, str) or not value.strip():
+                raise FederationValidationError(
+                    "invalid-storage-authority-settings",
+                    name,
+                    "must be non-empty text",
+                )
+        for name in (
+            "heartbeat_interval",
+            "request_timeout",
+            "scan_interval",
+            "lease_seconds",
+        ):
+            value = getattr(self, name)
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(value)
+                or value <= 0
+            ):
+                raise FederationValidationError(
+                    "invalid-storage-authority-settings",
+                    name,
+                    "must be a finite positive number of seconds",
+                )
+
+    @classmethod
+    def from_namespace(
+        cls, arguments: argparse.Namespace
+    ) -> StorageAuthoritySettings:
+        return cls(
+            relay_control_database=arguments.relay_control_database,
+            storage_control_database=arguments.storage_control_database,
+            publication_database=arguments.publication_database,
+            failover_database=arguments.failover_database,
+            state_dir=arguments.state_dir,
+            relay=arguments.relay,
+            display_name=arguments.display_name,
+            session_id=arguments.session_id,
+            acknowledgements_database=arguments.acknowledgements_database,
+            allow_insecure_local=bool(arguments.allow_insecure_local),
+            heartbeat_interval=float(arguments.heartbeat_interval),
+            request_timeout=float(arguments.request_timeout),
+            scan_interval=float(arguments.scan_interval),
+            lease_seconds=float(arguments.lease_seconds),
+        )
+
+
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--relay-control-database", required=True)
@@ -66,7 +153,7 @@ def _parser() -> argparse.ArgumentParser:
 
 
 async def _connect_authority(
-    arguments: argparse.Namespace,
+    arguments: StorageAuthoritySettings,
 ) -> RelayNodeClient:
     client = RelayNodeClient(
         state_directory=Path(arguments.state_dir),
@@ -144,7 +231,7 @@ def _recorder_storage_capability(
     )
 
 
-def _acknowledgements_database(arguments: argparse.Namespace) -> Path:
+def _acknowledgements_database(arguments: StorageAuthoritySettings) -> Path:
     if arguments.acknowledgements_database:
         return Path(arguments.acknowledgements_database)
     return Path(arguments.storage_control_database).with_name(
@@ -152,7 +239,7 @@ def _acknowledgements_database(arguments: argparse.Namespace) -> Path:
     )
 
 
-def _catalog_cursor_secret(arguments: argparse.Namespace) -> bytes:
+def _catalog_cursor_secret(arguments: StorageAuthoritySettings) -> bytes:
     """Load or create the authority's restart-stable private cursor key."""
 
     directory = Path(arguments.state_dir).resolve()
@@ -243,7 +330,20 @@ def _federation_storage_read_authorizer(
     return authorize
 
 
-async def _run(arguments: argparse.Namespace) -> int:
+async def _run(
+    arguments: StorageAuthoritySettings,
+    *,
+    command: str,
+    stop: asyncio.Event | None = None,
+    on_announced: Callable[[CapabilityAnnouncement], None] | None = None,
+) -> list[dict[str, object]]:
+    """Compose and run the authority once, or until ``stop`` is set.
+
+    ``stop`` and ``on_announced`` exist so a supervised host can shut the
+    authority down cleanly and observe readiness without scraping stdout. The
+    CLI passes neither and behaves exactly as before.
+    """
+
     client: RelayNodeClient | None = None
     endpoint: RelayStorageEndpoint | None = None
     failover: StorageFailoverCoordinator | None = None
@@ -293,39 +393,38 @@ async def _run(arguments: argparse.Namespace) -> int:
             session_id=arguments.session_id,
             lease_seconds=arguments.lease_seconds,
         )
-        if arguments.command == "scan-once":
+        async def announce() -> None:
+            announcement = _recorder_storage_capability(
+                control,
+                client,
+                arguments.session_id,
+            )
+            await client.announce_capability(announcement)
+            if on_announced is not None:
+                on_announced(announcement)
+
+        if command == "scan-once":
             await failover.start()
             results = await failover.scan_once()
-            await client.announce_capability(
-                _recorder_storage_capability(
-                    control,
-                    client,
-                    arguments.session_id,
-                )
-            )
-            print(
-                json.dumps(
-                    [result.to_dict() for result in results],
-                    ensure_ascii=False,
-                    sort_keys=True,
-                )
-            )
-            return 0
+            await announce()
+            return [result.to_dict() for result in results]
         await failover.start()
-        while True:
+        while stop is None or not stop.is_set():
             await failover.scan_once()
             # Groups, grants and failover state can change after startup. Keep
             # discovery truthful so recorder publishers and federation readers
             # do not remain stuck on a stale unavailable/ready announcement.
-            await client.announce_capability(
-                _recorder_storage_capability(
-                    control,
-                    client,
-                    arguments.session_id,
-                )
-            )
-            await asyncio.sleep(arguments.scan_interval)
-        return 0
+            await announce()
+            if stop is None:
+                await asyncio.sleep(arguments.scan_interval)
+                continue
+            # A supervised host must be able to stop between scans rather than
+            # after a full interval, so shutdown is not delayed by the cadence.
+            try:
+                await asyncio.wait_for(stop.wait(), arguments.scan_interval)
+            except asyncio.TimeoutError:
+                continue
+        return []
     finally:
         if failover is not None:
             await failover.close()
@@ -335,10 +434,41 @@ async def _run(arguments: argparse.Namespace) -> int:
             await client.disconnect()
 
 
+async def run_storage_authority(
+    settings: StorageAuthoritySettings,
+    *,
+    stop: asyncio.Event | None = None,
+    on_announced: Callable[[CapabilityAnnouncement], None] | None = None,
+) -> None:
+    """Run the supervision loop until ``stop`` is set.
+
+    This is the seam a supervised in-process host uses instead of spawning the
+    CLI, so both paths compose the authority exactly once.
+    """
+
+    await _run(settings, command="run", stop=stop, on_announced=on_announced)
+
+
+async def scan_storage_authority_once(
+    settings: StorageAuthoritySettings,
+) -> list[dict[str, object]]:
+    """Compose the authority, scan once, announce, and shut down."""
+
+    return await _run(settings, command="scan-once")
+
+
 def main() -> int:
     arguments = _parser().parse_args()
     try:
-        return asyncio.run(_run(arguments))
+        results = asyncio.run(
+            _run(
+                StorageAuthoritySettings.from_namespace(arguments),
+                command=arguments.command,
+            )
+        )
+        if arguments.command == "scan-once":
+            print(json.dumps(results, ensure_ascii=False, sort_keys=True))
+        return 0
     except KeyboardInterrupt:
         return 130
     except (FederationValidationError, TimeoutError, OSError) as exc:
@@ -360,3 +490,11 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+
+__all__ = [
+    "StorageAuthoritySettings",
+    "main",
+    "run_storage_authority",
+    "scan_storage_authority_once",
+]

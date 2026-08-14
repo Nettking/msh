@@ -132,6 +132,15 @@ python start_recorder.py --storage-group telemetry
 
 If no ready logical-storage authority/group is available, the recorder can still identify, join, advertise itself, and capture locally. Delivery waits until storage authority appears.
 
+The headless Federation lifecycle also publishes other supported
+`data/**/*.jsonl` files through the generic authenticated JSONL contract. It
+excludes `data/federation/**` to prevent republish loops and excludes
+`data/sources/mtconnect_recorder/jsonl/**` because recorder telemetry already
+uses the stronger checkpoint-, sequence-, and hash-aware path above. This is a
+publisher-only companion: it does not mirror remote JSONL or start workbench
+analysis refreshes on the recorder host. Required data-sharing startup fails
+closed until both publication paths are ready.
+
 ## Software update note
 
 A standalone recorder launched directly with `python start_recorder.py` is not the normal Flask/Compose host-update agent. Federation **Update all devices** rebuilds the Compose-managed recorder on a normal FCP installation, but it does not currently restart an independently launched standalone recorder process. Update the standalone recorder checkout/process through its host administration path.
@@ -218,6 +227,8 @@ Federation mode additionally keeps stable identity, public-safe pairing state, r
 data/federation/device/
 data/federation/onboarding/
 data/federation/recorder_publication/
+data/federation/jsonl-sync.sqlite3
+data/federation/jsonl-cache/
 ```
 
 ## Useful launcher options
@@ -230,6 +241,8 @@ data/federation/recorder_publication/
 | `--storage-group` | Explicit logical Federation storage group. |
 | `--federation-timeout` | Federation request timeout. |
 | `--require-federation` | Stop if initial join/reconnect fails instead of recording locally. |
+| `--require-data-sharing` | Also require a ready logical-storage publication route before capture. |
+| `--sharing-timeout` | Bounded wait for required data sharing; defaults to 45 seconds. |
 | `--scan-cidr` | Explicit private IPv4 scan network. |
 | `--scan-port` | MTConnect discovery port; defaults to 5000. |
 | `--no-auto-scan` | Skip default startup discovery. |

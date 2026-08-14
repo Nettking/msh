@@ -24,6 +24,111 @@ On first configuration the launcher:
 5. starts managed loss-aware recording; and
 6. starts the Federation recorder-control worker and publication reconciler.
 
+## Maskin 4 over Tailscale (Windows)
+
+For the recorder at Mekanisk Service Halden, first install Tailscale and sign
+the host in to the same tailnet as the other Federation devices. Tailscale must
+already be running and signed in; the FCP launcher never changes tailnet login,
+routes, or ACL settings.
+
+### Leader prerequisite: enable the logical-storage authority
+
+Nothing can be published to a Federation that serves no logical-storage
+authority. Without it the leader advertises no storage capability, and a
+correctly fail-closed recorder on machine 4 refuses to start and reports
+`authority-unavailable`.
+
+The leader supervises the authority itself, but it is off by default so a device
+never opens an authority connection it was not asked to provide. Enable it on
+the **device that created the Federation** and restart it:
+
+```
+FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED=1
+FCP_FEDERATION_STORAGE_AUTHORITY_RELAY=ws://100.x.y.z:8765
+```
+
+The relay address falls back to `FCP_PAIRING_RELAY_URL` when it is already set.
+Everything else is derived from the existing device configuration: the
+coordinator database from `FCP_FEDERATION_COORDINATOR_DATABASE`, device state
+from `FCP_FEDERATION_NODE_STATE_DIR`, the display name from `FCP_DEVICE_NAME`,
+and the authority's own databases from `FCP_FEDERATION_STORAGE_AUTHORITY_DIR`
+(default `data/federation/storage`).
+
+It must be the session creator. A publisher accepts the storage capability only
+from the node that created the Federation, so enabling this elsewhere reports
+`not-session-creator` rather than advertising something nothing will select.
+
+To inspect the configuration without starting supervision, or to run the
+authority as its own process instead, the original command still works:
+
+```bash
+python -m catalog.node.storage_failover scan-once \
+  --relay-control-database data/federation/relay/control.sqlite3 \
+  --storage-control-database data/federation/storage/control.sqlite3 \
+  --publication-database data/federation/storage/publication.sqlite3 \
+  --failover-database data/federation/storage/failover.sqlite3 \
+  --state-dir data/federation/device \
+  --relay ws://100.x.y.z:8765 \
+  --display-name "FCP leader storage authority" \
+  --session-id <the leader's internal session id>
+```
+
+Under Docker Compose the relay control database is the mounted
+`/var/lib/fcp-relay/control.sqlite3` instead of the repository-relative path.
+
+On the current Federation leader, open FCP through the leader's numeric
+Tailscale `100.x.y.z` address (not `localhost`, a LAN name, or a DNS name) and
+generate a fresh `FCP1-...` pairing code. Then run this single command on
+machine 4:
+
+```cmd
+start-tailscale-recorder.cmd --storage-group fcp-local-storage
+```
+
+The command prompts for the pairing code without echo on first start. Do not
+put the code after the command: keeping it out of the command line also keeps it
+out of shell history and process listings. Later starts use the saved
+membership and do not prompt again.
+
+The command defaults the device label to
+`Maskin 4 recorder - Mekanisk Service Halden`, runs the normal bounded local
+MTConnect discovery, and refuses to start capture unless all of these checks
+pass:
+
+1. a signed-in Tailscale IPv4 address in `100.64.0.0/10` is present;
+2. the leader address answers a bounded `tailscale ping` as a peer in the same
+   tailnet and accepts TCP on the Federation relay port;
+3. a Python installation can load the recorder and its dependencies;
+4. the recorder joins or reconnects to the Federation; and
+5. the authenticated recorder publication worker resolves a writable storage
+   authority and completes a clean cycle, or a backlog cycle produces at least
+   one confirmed storage commit.
+
+That last check proves that the authenticated publication route is selected and
+the worker is healthy. On an empty first start it does not claim that an ingest
+has already been accepted. Once local checkpoint-committed observations exist,
+the same worker publishes them with durable retry while recording stays
+local-first. Keep the command window open; closing it stops the foreground
+recorder.
+
+`fcp-local-storage` is the standard storage group created by the normal FCP
+creator setup. If this Federation uses a different group, replace it with that
+group's logical ID and then keep that choice stable. If an operator changes the
+group while a backlog exists, old-group rows remain durable locally rather than
+being sent to the new authority. Restart against the old group to drain it; do
+not delete the durable outbox as a workaround. If the MTConnect Agent is on a
+private subnet that cannot be inferred from the recorder host, add `--scan-cidr`,
+for example:
+
+```cmd
+start-tailscale-recorder.cmd --storage-group fcp-local-storage --scan-cidr 192.168.10.0/24
+```
+
+The leader's Tailscale path and relay port `8765` must be allowed by the
+tailnet ACL and the leader host firewall. A failed preflight, pairing attempt,
+or sharing-readiness check exits non-zero instead of silently starting a
+local-only recorder.
+
 If the recorder cannot infer a suitable private IPv4 `/24`, it may still join the Federation. You can then request a scan remotely from another trusted Federation device or provide `--scan-cidr` explicitly.
 
 ## Later starts
@@ -119,6 +224,29 @@ python start_recorder.py --storage-group telemetry
 
 If no ready logical-storage authority exists, local capture still continues while publication waits safely.
 
+### Which JSONL data is shared
+
+The product uses two deliberate paths so recorder telemetry is not published
+and analyzed twice:
+
+| Local data | Federation path | Receiving workbench path |
+| --- | --- | --- |
+| `data/sources/mtconnect_recorder/jsonl/**` | checkpoint-, sequence-, and hash-verified recorder observations | `data/federation/shared/telemetry/*.jsonl` |
+| other supported `data/**/*.jsonl` on a full workbench or headless recorder | generic authenticated JSONL chunks | `data/federation/shared/jsonl-files/<producer>/**` |
+
+Every connected full workbench device therefore offers its supported
+non-recorder JSONL corpus on the recurring Federation synchronization pass.
+The headless machine-4 process now runs a publisher-only pass for the same
+supported non-recorder `data/**/*.jsonl` corpus. It does not download the
+Federation's JSONL corpus or start workbench analysis/refresh tasks. Recorder
+JSONL remains excluded from this generic pass and travels only through the
+stronger checkpointed recorder path, which prevents duplicate storage and
+duplicate analysis. Raw MTConnect XML/probe archives are local-only.
+
+`--require-data-sharing` waits for both publication paths. A rejected generic
+JSONL commit therefore prevents the launcher from reporting sharing as ready;
+the durable state retries it on the next pass.
+
 ## Useful options
 
 ```text
@@ -126,6 +254,8 @@ If no ready logical-storage authority exists, local capture still continues whil
 --storage-group ID            Explicit logical Federation storage group
 --federation-timeout SECONDS  Federation request timeout
 --require-federation          Stop instead of falling back to local capture when initial join/reconnect fails
+--require-data-sharing        Also require a ready/confirmed logical-storage publication route
+--sharing-timeout SECONDS     Bounded wait for required data sharing (default 45)
 --scan-cidr CIDR              Explicit private IPv4 scan network
 --scan-port PORT              MTConnect scan port (default 5000)
 --no-auto-scan                Skip startup discovery
@@ -147,6 +277,8 @@ data/source_state/mtconnect_recorder_autoconfig.json
 data/federation/device/
 data/federation/onboarding/
 data/federation/recorder_publication/
+data/federation/jsonl-sync.sqlite3
+data/federation/jsonl-cache/
 ```
 
 Do not delete these paths to fix a transient Federation or scan error. Use the product's explicit source controls, pairing/reconnect path, or documented reset/migration procedure.
