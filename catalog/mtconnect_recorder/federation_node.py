@@ -44,13 +44,13 @@ from catalog.federation.recorder_storage_relay import (
     STORAGE_CONTROL_CAPABILITY_TYPE,
     RelayRecorderStorageClient,
 )
+from catalog.flask_app.services.federated_data_runtime import (
+    FederatedDataPairingRelayRuntime,
+)
 from catalog.flask_app.services.federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
     RemotePairingState,
     RemotePairingStore,
-)
-from catalog.flask_app.services.resilient_pairing_runtime import (
-    ResilientPairingRelayRuntime,
 )
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
@@ -76,6 +76,8 @@ class RecorderFederationSnapshot:
     storage_authority_node_id: str | None = None
     pending_batches: int = 0
     last_committed_count: int = 0
+    jsonl_state: str = "not-started"
+    jsonl_last_published_count: int = 0
     last_error_code: str | None = None
 
 
@@ -211,6 +213,7 @@ class RecorderFederationNode:
         request_timeout: float = 15.0,
         publication_poll_seconds: float = 0.5,
         service: PairingAwareCapabilityOnboardingService | None = None,
+        jsonl_publisher: object | None = None,
     ) -> None:
         if (
             not math.isfinite(request_timeout)
@@ -244,7 +247,7 @@ class RecorderFederationNode:
         self.remote_store = RemotePairingStore(
             federation_root / "onboarding" / "remote_pairing.json"
         )
-        self.runtime = ResilientPairingRelayRuntime(
+        self.runtime = FederatedDataPairingRelayRuntime(
             state_directory=self.identity_directory,
             display_name=self.display_name,
             timeout_seconds=self.request_timeout,
@@ -260,10 +263,82 @@ class RecorderFederationNode:
         # Test-injected services may own their own runtime/store.
         self.runtime = getattr(self.service, "relay_runtime", self.runtime)
         self.remote_store = getattr(self.service, "remote_store", self.remote_store)
+        self.jsonl_publisher = (
+            jsonl_publisher
+            if jsonl_publisher is not None
+            else self._build_jsonl_publisher()
+        )
         self._lock = threading.RLock()
         self._stop = threading.Event()
         self._publication_future = None
         self._snapshot = RecorderFederationSnapshot(status="not-started")
+
+    def _build_jsonl_publisher(self) -> object:
+        # Import lazily because the full workbench bridge imports the shared
+        # storage-authority selector from this module. The headless recorder
+        # uses only its local publisher entry point, never the mirror path.
+        from flask import Flask
+
+        from catalog.flask_app.services.federated_jsonl_product_bridge import (
+            FederatedJsonlProductBridge,
+        )
+
+        federation_root = self.data_directory / "federation"
+        app = Flask(
+            "fcp-headless-recorder-jsonl-publisher",
+            static_folder=None,
+        )
+        return FederatedJsonlProductBridge(
+            app,
+            self.service,
+            data_root=self.data_directory,
+            database=federation_root / "jsonl-sync.sqlite3",
+            cache_root=federation_root / "jsonl-cache",
+            mirror_root=federation_root / "shared" / "jsonl-files",
+        )
+
+    def _publish_jsonl_sync(
+        self,
+        state: RemotePairingState,
+        *,
+        authority_node_id: str,
+        group_id: str,
+    ) -> object:
+        context = self.service.authorized_context()
+        if context is None:
+            raise FederationOperationError(
+                "trusted-federation-context-incomplete",
+                "headless JSONL publication requires the trusted paired context",
+            )
+        publish = getattr(self.jsonl_publisher, "publish_local_once", None)
+        if not callable(publish):
+            raise FederationOperationError(
+                "federated-jsonl-publisher-unavailable",
+                "headless JSONL publisher does not expose a local publication pass",
+            )
+        return publish(
+            state,
+            context,
+            authority_node_id=authority_node_id,
+            group_id=group_id,
+        )
+
+    async def _publish_jsonl_once(
+        self,
+        state: RemotePairingState,
+        *,
+        authority_node_id: str,
+        group_id: str,
+    ) -> object:
+        # The shared publisher performs bounded filesystem/SQLite work and its
+        # synchronous runtime seam submits storage calls back to this relay
+        # loop. Running it in a worker thread prevents blocking or self-deadlock.
+        return await asyncio.to_thread(
+            self._publish_jsonl_sync,
+            state,
+            authority_node_id=authority_node_id,
+            group_id=group_id,
+        )
 
     def snapshot(self) -> RecorderFederationSnapshot:
         with self._lock:
@@ -321,6 +396,17 @@ class RecorderFederationNode:
                 snapshot.storage_state == "publishing"
                 and snapshot.last_committed_count > 0
             ):
+                if snapshot.jsonl_state != "ready":
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        raise FederationOperationError(
+                            "recorder-sharing-not-ready",
+                            "Federation recorder storage is ready, but local JSONL "
+                            "publication did not become ready before the timeout "
+                            f"(state: {snapshot.jsonl_state or 'unknown'})",
+                        )
+                    self._stop.wait(min(0.1, remaining))
+                    continue
                 if (
                     self._stop.is_set()
                     or self._publication_future is not future
@@ -357,6 +443,10 @@ class RecorderFederationNode:
                 "storage_authority_node_id": current.storage_authority_node_id,
                 "pending_batches": current.pending_batches,
                 "last_committed_count": current.last_committed_count,
+                "jsonl_state": current.jsonl_state,
+                "jsonl_last_published_count": (
+                    current.jsonl_last_published_count
+                ),
                 "last_error_code": current.last_error_code,
             }
             values.update(changes)
@@ -410,6 +500,7 @@ class RecorderFederationNode:
             federation_id=binding.federation_id,
             session_id=binding.internal_session_id,
             storage_state="discovering",
+            jsonl_state="discovering",
             last_error_code=None,
         )
         self._start_publication(saved)
@@ -535,6 +626,7 @@ class RecorderFederationNode:
                         self._set_snapshot(
                             status="connected",
                             storage_state=selected.state,
+                            jsonl_state=selected.state,
                             storage_group=selected.group_id,
                             storage_authority_node_id=selected.authority_node_id,
                             last_error_code=None,
@@ -567,6 +659,11 @@ class RecorderFederationNode:
 
                     assert worker is not None and outbox is not None
                     cycle = await worker.run_cycle()
+                    jsonl_result = await self._publish_jsonl_once(
+                        state,
+                        authority_node_id=authority_node_id,
+                        group_id=group_id,
+                    )
                     storage_state, pending, delivery_error = (
                         _publication_cycle_status(
                             pending_entries=outbox.pending(),
@@ -582,6 +679,10 @@ class RecorderFederationNode:
                         storage_authority_node_id=authority_node_id,
                         pending_batches=pending,
                         last_committed_count=cycle.delivery.committed,
+                        jsonl_state="ready",
+                        jsonl_last_published_count=int(
+                            getattr(jsonl_result, "published_chunks", 0)
+                        ),
                         last_error_code=delivery_error,
                     )
                     failures = 0
@@ -598,6 +699,7 @@ class RecorderFederationNode:
                     self._set_snapshot(
                         status="retrying",
                         storage_state="backlogged",
+                        jsonl_state="backlogged",
                         pending_batches=(
                             0
                             if outbox is None

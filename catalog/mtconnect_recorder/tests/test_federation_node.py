@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import threading
 from concurrent.futures import Future
 from types import SimpleNamespace
@@ -183,6 +184,7 @@ def _sharing_node(
     storage_state: str,
     *,
     last_committed_count: int = 0,
+    jsonl_state: str = "ready",
 ) -> RecorderFederationNode:
     node = RecorderFederationNode.__new__(RecorderFederationNode)
     node._lock = threading.RLock()
@@ -193,6 +195,7 @@ def _sharing_node(
         storage_state=storage_state,
         storage_group="telemetry" if storage_state == "up-to-date" else None,
         last_committed_count=last_committed_count,
+        jsonl_state=jsonl_state,
     )
     return node
 
@@ -222,6 +225,16 @@ def test_pending_failed_outbox_is_not_mistaken_for_active_sharing() -> None:
         node.wait_until_sharing_ready(timeout_seconds=0.01)
 
     assert excinfo.value.code == "recorder-sharing-not-ready"
+
+
+def test_sharing_readiness_requires_headless_jsonl_publication() -> None:
+    node = _sharing_node("up-to-date", jsonl_state="backlogged")
+
+    with pytest.raises(FederationOperationError) as excinfo:
+        node.wait_until_sharing_ready(timeout_seconds=0.01)
+
+    assert excinfo.value.code == "recorder-sharing-not-ready"
+    assert "JSONL" in excinfo.value.message
 
 
 def test_committed_backlog_cycle_proves_active_sharing() -> None:
@@ -268,6 +281,53 @@ def test_sharing_readiness_rechecks_worker_after_ready_snapshot() -> None:
         node.wait_until_sharing_ready(timeout_seconds=0.1)
 
     assert excinfo.value.code == "recorder-publication-stopped"
+
+
+def test_headless_jsonl_publisher_uses_the_selected_storage_route() -> None:
+    context = object()
+    state = object()
+    calls: list[tuple[object, object, str, str]] = []
+
+    class Service:
+        @staticmethod
+        def authorized_context() -> object:
+            return context
+
+    class Publisher:
+        @staticmethod
+        def publish_local_once(
+            runtime_state: object,
+            trusted_context: object,
+            *,
+            authority_node_id: str,
+            group_id: str,
+        ) -> object:
+            calls.append(
+                (
+                    runtime_state,
+                    trusted_context,
+                    authority_node_id,
+                    group_id,
+                )
+            )
+            return SimpleNamespace(published_chunks=2)
+
+    node = RecorderFederationNode.__new__(RecorderFederationNode)
+    node.service = Service()
+    node.jsonl_publisher = Publisher()
+
+    result = asyncio.run(
+        node._publish_jsonl_once(
+            state,
+            authority_node_id="node-owner",
+            group_id="fcp-local-storage",
+        )
+    )
+
+    assert result.published_chunks == 2
+    assert calls == [
+        (state, context, "node-owner", "fcp-local-storage"),
+    ]
 
 
 def test_publication_cycle_status_is_session_scoped_and_failure_aware() -> None:

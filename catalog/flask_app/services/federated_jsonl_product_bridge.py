@@ -628,7 +628,7 @@ class FederatedJsonlProductBridge:
                 committed += 1
         return committed
 
-    def _publish_local(
+    def _publish_local_progress(
         self,
         runtime_state: object,
         *,
@@ -636,7 +636,7 @@ class FederatedJsonlProductBridge:
         node_id: str,
         authority_node_id: str,
         group_id: str,
-    ) -> int:
+    ) -> tuple[int, int]:
         self._prepare_local_rows(node_id)
         maximum = self._positive_bound(
             "FEDERATED_JSONL_MAX_PUBLISH_CHUNKS_PER_SYNC",
@@ -650,7 +650,7 @@ class FederatedJsonlProductBridge:
             maximum=maximum,
         )
         if not entries:
-            return 0
+            return 0, 0
         runtime = getattr(self.onboarding_service, "relay_runtime", None)
         publish = getattr(runtime, "publish_federated_batches", None)
         if not callable(publish):
@@ -669,7 +669,25 @@ class FederatedJsonlProductBridge:
                 "federated-jsonl-publication-response-invalid",
                 "generic Federation publication returned an invalid result count",
             )
-        return self._advance_published(entries, outcomes)
+        return self._advance_published(entries, outcomes), len(entries)
+
+    def _publish_local(
+        self,
+        runtime_state: object,
+        *,
+        session_id: str,
+        node_id: str,
+        authority_node_id: str,
+        group_id: str,
+    ) -> int:
+        committed, _attempted = self._publish_local_progress(
+            runtime_state,
+            session_id=session_id,
+            node_id=node_id,
+            authority_node_id=authority_node_id,
+            group_id=group_id,
+        )
+        return committed
 
     def publish_local_once(
         self,
@@ -708,13 +726,18 @@ class FederatedJsonlProductBridge:
                     "group_id",
                     "must be non-empty text",
                 )
-            published = self._publish_local(
+            published, attempted = self._publish_local_progress(
                 runtime_state,
                 session_id=session_id,
                 node_id=node_id,
                 authority_node_id=authority_node_id,
                 group_id=group_id,
             )
+            if published != attempted:
+                raise FederationOperationError(
+                    "federated-jsonl-publication-pending",
+                    "logical storage did not commit every pending JSONL chunk",
+                )
             return FederatedJsonlPublishResult(
                 session_id=session_id,
                 node_id=node_id,

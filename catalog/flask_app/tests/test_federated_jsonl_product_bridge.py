@@ -5,9 +5,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
 from flask import Flask
 
 from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
+from catalog.federation.errors import FederationOperationError
 from catalog.federation.models import CommitState
 from catalog.federation.shared_file_storage import (
     FEDERATED_JSONL_CONTENT_SCHEMA,
@@ -47,8 +49,9 @@ def _bridge(
 
 
 class _PublishingRuntime:
-    def __init__(self) -> None:
+    def __init__(self, *, committed: bool = True) -> None:
         self.calls: list[dict[str, object]] = []
+        self.committed = committed
 
     def publish_federated_batches(
         self,
@@ -67,7 +70,9 @@ class _PublishingRuntime:
                 "batches": entries,
             }
         )
-        return tuple(SimpleNamespace(committed=True) for _entry in entries)
+        return tuple(
+            SimpleNamespace(committed=self.committed) for _entry in entries
+        )
 
 
 def _trusted_scope(
@@ -223,6 +228,30 @@ def test_publisher_only_pass_excludes_recorder_and_federation_jsonl(tmp_path: Pa
 
     assert result.published_chunks == 0
     assert runtime.calls == []
+
+
+def test_publisher_only_pass_fails_closed_when_storage_does_not_commit(
+    tmp_path: Path,
+) -> None:
+    runtime = _PublishingRuntime(committed=False)
+    bridge = _bridge(tmp_path, "headless-pending", relay_runtime=runtime)
+    source = bridge.data_root / "uploads" / "pending.jsonl"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text('{"value":1}\n', encoding="utf-8")
+    runtime_state, context = _trusted_scope(
+        session_id="session-headless-pending",
+        node_id="node-headless",
+    )
+
+    with pytest.raises(FederationOperationError) as excinfo:
+        bridge.publish_local_once(
+            runtime_state,
+            context,
+            authority_node_id="node-storage",
+            group_id="storage-1",
+        )
+
+    assert excinfo.value.code == "federated-jsonl-publication-pending"
 
 
 def test_remote_upload_materializes_into_unchanged_legacy_jsonl_scanner(tmp_path: Path):
