@@ -20,6 +20,7 @@ import gzip
 import json
 import statistics
 import xml.etree.ElementTree as ET
+import zlib
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from hashlib import sha256
@@ -58,6 +59,17 @@ class Observation:
     observation_type: str
     component: str
     value: str
+    #: Which Agent buffer this observation came from. Sequence numbers restart
+    #: per agent instance, so anything ordered or differenced must stay inside
+    #: one stream. Defaults keep hand-built observations usable in tests.
+    source_name: str = ""
+    agent_instance_id: str = ""
+
+    @property
+    def channel(self) -> tuple[str, str, str]:
+        """Identify the one physical channel this observation belongs to."""
+
+        return (self.source_name, self.agent_instance_id, self.component)
 
 
 @dataclass
@@ -84,7 +96,12 @@ def _parse_timestamp(value: str) -> _dt.datetime | None:
         return None
 
 
-def _iter_observations(xml_text: str) -> list[Observation]:
+def _iter_observations(
+    xml_text: str,
+    *,
+    source_name: str = "",
+    agent_instance_id: str = "",
+) -> list[Observation]:
     root = ET.fromstring(xml_text)
     found: list[Observation] = []
     for device_stream in root.iter():
@@ -111,6 +128,8 @@ def _iter_observations(xml_text: str) -> list[Observation]:
                         observation_type=_local_name(element.tag),
                         component=component,
                         value=(element.text or "").strip(),
+                        source_name=source_name,
+                        agent_instance_id=agent_instance_id,
                     )
                 )
     return found
@@ -146,7 +165,11 @@ def profile_directory(directory: Path) -> Profile:
 
         try:
             raw_bytes = gzip.decompress(raw_path.read_bytes())
-        except (OSError, ValueError, EOFError):
+        except (OSError, ValueError, EOFError, zlib.error):
+            # Truncation raises EOFError and a bad header raises BadGzipFile,
+            # but corruption inside the deflate stream surfaces as a bare
+            # zlib.error, which is the most common single-byte damage. Profiling
+            # a directory must survive one damaged payload.
             profile.unreadable.append(str(raw_path))
             continue
 
@@ -156,7 +179,11 @@ def profile_directory(directory: Path) -> Profile:
 
         try:
             profile.observations.extend(
-                _iter_observations(raw_bytes.decode("utf-8", errors="replace"))
+                _iter_observations(
+                    raw_bytes.decode("utf-8", errors="replace"),
+                    source_name=str(payload.get("source_name")),
+                    agent_instance_id=str(payload.get("agent_instance_id")),
+                )
             )
         except (ET.ParseError, ValueError):
             profile.unreadable.append(str(raw_path))
@@ -213,6 +240,31 @@ def _cadence(observations: list[Observation]) -> dict[str, float]:
     }
 
 
+def _by_channel(observations: list[Observation]) -> list[list[Observation]]:
+    """Split one observation type into its independent physical channels.
+
+    Grouping is by (source, agent instance, component) because all three can
+    repeat inside one capture directory: two machines, one machine restarted so
+    its sequence numbers begin again, and one machine exposing the same type on
+    several Path or Controller components.
+    """
+
+    grouped: dict[tuple[str, str, str], list[Observation]] = defaultdict(list)
+    for observation in observations:
+        grouped[observation.channel].append(observation)
+    return [grouped[key] for key in sorted(grouped)]
+
+
+def _accumulate_dwell(dwell: Counter, series: list[Observation]) -> None:
+    """Add each state's duration within one channel to the running total."""
+
+    for current, following in pairwise(series):
+        started = _parse_timestamp(current.timestamp)
+        ended = _parse_timestamp(following.timestamp)
+        if started and ended:
+            dwell[current.value] += round((ended - started).total_seconds(), 3)
+
+
 def summarize(profile: Profile) -> dict:
     by_data_item: dict[str, list[Observation]] = defaultdict(list)
     by_observation_type: dict[str, list[Observation]] = defaultdict(list)
@@ -226,17 +278,27 @@ def summarize(profile: Profile) -> dict:
     state_timeline: dict[str, list[dict[str, str]]] = {}
     for output_name, observation_type in STATE_CHANNELS.items():
         series = by_observation_type.get(observation_type, [])
+        # A capture directory can hold several machines, several agent
+        # instances of one machine, and several Path/Controller components of
+        # one machine. They all publish the same observation type, so name the
+        # channel on every entry rather than presenting one merged series as if
+        # it described a single thing.
         state_timeline[output_name] = [
-            {"timestamp": item.timestamp, "value": item.value} for item in series
+            {
+                "timestamp": item.timestamp,
+                "value": item.value,
+                "component": item.component,
+            }
+            for item in series
         ]
 
     dwell: Counter = Counter()
-    execution = by_observation_type.get("Execution", [])
-    for current, following in pairwise(execution):
-        started = _parse_timestamp(current.timestamp)
-        ended = _parse_timestamp(following.timestamp)
-        if started and ended:
-            dwell[current.value] += round((ended - started).total_seconds(), 3)
+    # Dwell is a difference between consecutive states, so it is only defined
+    # inside one channel. Differencing the merged series attributes the gap
+    # between two machines to whichever state happened to come first, which
+    # silently produces plausible but wrong durations.
+    for channel_series in _by_channel(by_observation_type.get("Execution", [])):
+        _accumulate_dwell(dwell, channel_series)
 
     return {
         "batches": profile.batch_count,

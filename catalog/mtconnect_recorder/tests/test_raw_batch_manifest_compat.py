@@ -425,21 +425,47 @@ def test_profiler_uses_mtconnect_types_for_state_channels():
 
     summary = module.summarize(profile)
 
+    # Entries also name their channel, because one capture directory can carry
+    # the same observation type from several machines and components.
     assert summary["state_timeline"]["exec"] == [
-        {"timestamp": "2026-08-07T09:00:00Z", "value": "ACTIVE"},
-        {"timestamp": "2026-08-07T09:00:10Z", "value": "READY"},
+        {
+            "timestamp": "2026-08-07T09:00:00Z",
+            "value": "ACTIVE",
+            "component": "Controller/controller",
+        },
+        {
+            "timestamp": "2026-08-07T09:00:10Z",
+            "value": "READY",
+            "component": "Controller/controller",
+        },
     ]
     assert summary["state_timeline"]["mode"] == [
-        {"timestamp": "2026-08-07T09:00:05Z", "value": "AUTOMATIC"}
+        {
+            "timestamp": "2026-08-07T09:00:05Z",
+            "value": "AUTOMATIC",
+            "component": "Controller/controller",
+        }
     ]
     assert summary["state_timeline"]["pgm"] == [
-        {"timestamp": "2026-08-07T09:00:06Z", "value": "ANONYMISED-PROGRAM"}
+        {
+            "timestamp": "2026-08-07T09:00:06Z",
+            "value": "ANONYMISED-PROGRAM",
+            "component": "Path/path",
+        }
     ]
     assert summary["state_timeline"]["avail"] == [
-        {"timestamp": "2026-08-07T09:00:07Z", "value": "AVAILABLE"}
+        {
+            "timestamp": "2026-08-07T09:00:07Z",
+            "value": "AVAILABLE",
+            "component": "Device/MachineAlpha",
+        }
     ]
     assert summary["state_timeline"]["estop"] == [
-        {"timestamp": "2026-08-07T09:00:08Z", "value": "ARMED"}
+        {
+            "timestamp": "2026-08-07T09:00:08Z",
+            "value": "ARMED",
+            "component": "Device/MachineAlpha",
+        }
     ]
     assert summary["execution_dwell_seconds"] == {"ACTIVE": 10.0}
 
@@ -519,3 +545,177 @@ def test_one_bad_manifest_does_not_hide_its_healthy_neighbours(recorder_archive)
 
     assert [ref.first_sequence for ref in scan.refs] == [1, 13]
     assert [issue.reason for issue in scan.issues] == [RAW_BATCH_ISSUE_MALFORMED]
+
+
+def test_profiler_records_a_corrupted_gzip_and_continues(recorder_archive):
+    # Truncation raises EOFError, but damage inside the deflate stream raises a
+    # bare zlib.error. That is the more common corruption and it used to abort
+    # the whole run, so a directory with one damaged payload profiled nothing.
+    first_xml, _ = machine_batch(instance_id=INSTANCE, start_sequence=1)
+    first_manifest = recorder_archive.write_batch(
+        source_name=SOURCE, xml_text=first_xml
+    )
+    second_xml, _ = machine_batch(instance_id=INSTANCE, start_sequence=7)
+    recorder_archive.write_batch(source_name=SOURCE, xml_text=second_xml)
+
+    payload = recorder_archive.raw_payload_path(first_manifest)
+    damaged = bytearray(payload.read_bytes())
+    damaged[len(damaged) // 2] ^= 0xFF
+    payload.write_bytes(bytes(damaged))
+
+    module = _load_profile_script()
+    profile = module.profile_directory(recorder_archive.store.raw_root)
+
+    assert profile.batch_count == 1
+    assert [item.sequence for item in profile.observations] == list(range(7, 13))
+    assert profile.unreadable == [str(payload)]
+
+
+def test_dwell_is_never_measured_across_two_machines():
+    # Sequence numbers restart per agent instance, so a merged, sequence-sorted
+    # series interleaves machines. Differencing that attributes the gap between
+    # two machines to whichever state came first.
+    module = _load_profile_script()
+
+    def execution(sequence, component, value, timestamp, source, instance):
+        return module.Observation(
+            sequence=sequence,
+            timestamp=timestamp,
+            data_item_id=f"{component}-exec",
+            name=None,
+            observation_type="Execution",
+            component=component,
+            value=value,
+            source_name=source,
+            agent_instance_id=instance,
+        )
+
+    profile = module.Profile(
+        observations=[
+            execution(1, "Path/A", "ACTIVE", "2026-08-07T09:00:00Z", "MACH-A", "1"),
+            execution(1, "Path/B", "STOPPED", "2026-08-07T09:00:01Z", "MACH-B", "2"),
+            execution(2, "Path/A", "READY", "2026-08-07T09:10:00Z", "MACH-A", "1"),
+            execution(2, "Path/B", "READY", "2026-08-07T09:10:01Z", "MACH-B", "2"),
+        ]
+    )
+    profile.observations.sort(key=lambda item: item.sequence)
+
+    summary = module.summarize(profile)
+
+    # Each machine held its state for a full ten minutes.
+    assert summary["execution_dwell_seconds"] == {"ACTIVE": 600.0, "STOPPED": 600.0}
+
+
+def test_dwell_is_never_measured_across_two_paths_of_one_machine():
+    # A mill-turn exposes Execution on more than one Path, so a single-source
+    # capture merges too.
+    module = _load_profile_script()
+
+    def execution(sequence, component, value, timestamp):
+        return module.Observation(
+            sequence=sequence,
+            timestamp=timestamp,
+            data_item_id=f"{component}-exec",
+            name=None,
+            observation_type="Execution",
+            component=component,
+            value=value,
+            source_name=SOURCE,
+            agent_instance_id=str(INSTANCE),
+        )
+
+    profile = module.Profile(
+        observations=[
+            execution(1, "Path/main", "ACTIVE", "2026-08-07T09:00:00Z"),
+            execution(2, "Path/sub", "STOPPED", "2026-08-07T09:00:02Z"),
+            execution(3, "Path/main", "READY", "2026-08-07T09:00:30Z"),
+            execution(4, "Path/sub", "READY", "2026-08-07T09:00:42Z"),
+        ]
+    )
+
+    summary = module.summarize(profile)
+
+    assert summary["execution_dwell_seconds"] == {"ACTIVE": 30.0, "STOPPED": 40.0}
+
+
+def test_a_restarted_agent_does_not_merge_with_its_earlier_instance():
+    module = _load_profile_script()
+
+    def execution(sequence, value, timestamp, instance):
+        return module.Observation(
+            sequence=sequence,
+            timestamp=timestamp,
+            data_item_id="exec",
+            name=None,
+            observation_type="Execution",
+            component="Controller/controller",
+            value=value,
+            source_name=SOURCE,
+            agent_instance_id=instance,
+        )
+
+    profile = module.Profile(
+        observations=[
+            execution(1, "ACTIVE", "2026-08-07T09:00:00Z", "1"),
+            execution(2, "READY", "2026-08-07T09:00:20Z", "1"),
+            execution(1, "ACTIVE", "2026-08-07T10:00:00Z", "2"),
+            execution(2, "READY", "2026-08-07T10:00:05Z", "2"),
+        ]
+    )
+    profile.observations.sort(key=lambda item: item.sequence)
+
+    summary = module.summarize(profile)
+
+    # 20 s before the restart plus 5 s after it; never the hour-long gap between.
+    assert summary["execution_dwell_seconds"] == {"ACTIVE": 25.0}
+
+
+def test_state_timeline_entries_name_the_channel_they_came_from():
+    module = _load_profile_script()
+    profile = module.Profile(
+        observations=[
+            module.Observation(
+                sequence=1,
+                timestamp="2026-08-07T09:00:00Z",
+                data_item_id="a",
+                name=None,
+                observation_type="Execution",
+                component="Path/main",
+                value="ACTIVE",
+                source_name=SOURCE,
+                agent_instance_id=str(INSTANCE),
+            ),
+            module.Observation(
+                sequence=2,
+                timestamp="2026-08-07T09:00:01Z",
+                data_item_id="b",
+                name=None,
+                observation_type="Execution",
+                component="Path/sub",
+                value="STOPPED",
+                source_name=SOURCE,
+                agent_instance_id=str(INSTANCE),
+            ),
+        ]
+    )
+
+    summary = module.summarize(profile)
+
+    assert [entry["component"] for entry in summary["state_timeline"]["exec"]] == [
+        "Path/main",
+        "Path/sub",
+    ]
+
+
+def test_profiled_observations_carry_the_stream_they_were_read_from(recorder_archive):
+    xml_text, _ = machine_batch(instance_id=INSTANCE, start_sequence=1)
+    recorder_archive.write_batch(source_name=SOURCE, xml_text=xml_text)
+
+    module = _load_profile_script()
+    profile = module.profile_directory(recorder_archive.store.raw_root)
+
+    assert profile.observations
+    assert {item.source_name for item in profile.observations} == {SOURCE}
+    assert {item.agent_instance_id for item in profile.observations} == {
+        str(INSTANCE)
+    }
