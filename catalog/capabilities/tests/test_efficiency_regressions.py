@@ -10,6 +10,7 @@ from catalog.capabilities.efficiency import (
     LearnedProviderRanker,
     PerformanceEstimator,
     ProfileKey,
+    default_workload_descriptor,
 )
 from catalog.capabilities.provider_reports import ProviderSelectionPolicy
 from catalog.capabilities.provider_selection import select_provider
@@ -24,9 +25,6 @@ from catalog.capabilities.tests.efficiency_harness import (
 
 
 def _profile_key(node_id: str) -> ProfileKey:
-    workload = build_job().capability
-    from catalog.capabilities.efficiency import default_workload_descriptor
-
     descriptor = default_workload_descriptor(build_job())
     return ProfileKey(
         capability_type=CAPABILITY_TYPE,
@@ -38,8 +36,6 @@ def _profile_key(node_id: str) -> ProfileKey:
 
 
 def _teach(store, node_id: str, *, total_millis: int, count: int = 8) -> None:
-    from catalog.capabilities.efficiency import default_workload_descriptor
-
     workload = default_workload_descriptor(build_job())
     environment = ExecutionEnvironment(model_id="qwen3:4b")
     for index in range(count):
@@ -149,9 +145,7 @@ def test_retention_pruning_removes_samples_from_derived_profiles(tmp_path) -> No
     profile = store.profile(_profile_key("node-a"))
     assert profile is not None
     assert profile.observation_count == 5
-    before = {
-        item.key.canonical(): item.to_dict() for item in store.profiles()
-    }
+    before = {item.key.canonical(): item.to_dict() for item in store.profiles()}
     store.rebuild_profiles()
     after = {item.key.canonical(): item.to_dict() for item in store.profiles()}
     assert after == before
