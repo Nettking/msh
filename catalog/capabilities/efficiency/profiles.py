@@ -151,22 +151,46 @@ class DecayedStatistic:
     def update(
         self, value: float, *, at: datetime, half_life_seconds: float
     ) -> DecayedStatistic:
-        """Fold one measurement in, decaying prior evidence to ``at``."""
+        """Fold one measurement in without making arrival order semantic.
+
+        ``last_at`` is the statistic's current time anchor. A newer observation
+        decays the existing sufficient statistics forward to its timestamp. A
+        delayed/older observation is instead decayed forward to the existing
+        anchor before it is added. Because exponential weights compose this
+        yields the same logical statistic as chronological replay.
+        """
 
         observed = _number(value, "value")
         moment = _utc(at, "at")
-        retained = 0.0
-        if self.last_at is not None:
+        if self.last_at is None:
+            prior_weight = 0.0
+            sample_weight = 1.0
+            anchor = moment
+        elif moment >= self.last_at:
             elapsed = (moment - self.last_at).total_seconds()
-            retained = self.weight * decay_factor(
+            prior_weight = self.weight * decay_factor(
                 elapsed_seconds=elapsed, half_life_seconds=half_life_seconds
             )
-        total = retained + 1.0
+            sample_weight = 1.0
+            anchor = moment
+        else:
+            elapsed = (self.last_at - moment).total_seconds()
+            prior_weight = self.weight
+            sample_weight = decay_factor(
+                elapsed_seconds=elapsed, half_life_seconds=half_life_seconds
+            )
+            anchor = self.last_at
+        total = prior_weight + sample_weight
+        if total <= 0:
+            return DecayedStatistic(last_at=anchor)
         return DecayedStatistic(
             weight=total,
-            mean=(self.mean * retained + observed) / total,
-            mean_square=(self.mean_square * retained + observed * observed) / total,
-            last_at=max(moment, self.last_at) if self.last_at else moment,
+            mean=(self.mean * prior_weight + observed * sample_weight) / total,
+            mean_square=(
+                self.mean_square * prior_weight + observed * observed * sample_weight
+            )
+            / total,
+            last_at=anchor,
         )
 
     @property
