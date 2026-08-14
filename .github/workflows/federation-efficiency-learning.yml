@@ -4,6 +4,9 @@ on:
   pull_request:
     paths:
       - "catalog/capabilities/**"
+      - "catalog/orchestrator/analysis_runtime.py"
+      - "catalog/orchestrator/tests/test_analysis_runtime_integration.py"
+      - "catalog/orchestrator/tests/test_federated_discovery.py"
       - "catalog/flask_app/federation_routes.py"
       - "catalog/flask_app/tests/test_federation_efficiency_route.py"
       - "docs/implementation/federation_execution_efficiency_learning.md"
@@ -12,6 +15,9 @@ on:
     branches: [main]
     paths:
       - "catalog/capabilities/**"
+      - "catalog/orchestrator/analysis_runtime.py"
+      - "catalog/orchestrator/tests/test_analysis_runtime_integration.py"
+      - "catalog/orchestrator/tests/test_federated_discovery.py"
       - "catalog/flask_app/federation_routes.py"
       - "catalog/flask_app/tests/test_federation_efficiency_route.py"
       - "docs/implementation/federation_execution_efficiency_learning.md"
@@ -47,6 +53,7 @@ jobs:
         run: >-
           python -m compileall
           catalog/capabilities
+          catalog/orchestrator/analysis_runtime.py
       - name: Efficiency learning contracts, store, ranking and simulation
         run: >-
           python -m pytest -o addopts= -q
@@ -54,18 +61,26 @@ jobs:
           catalog/capabilities/tests/test_efficiency_store.py
           catalog/capabilities/tests/test_efficiency_ranking.py
           catalog/capabilities/tests/test_efficiency_recorder.py
+          catalog/capabilities/tests/test_efficiency_regressions.py
+          catalog/capabilities/tests/test_efficiency_runtime.py
           catalog/capabilities/tests/test_efficiency_learning_simulation.py
           catalog/flask_app/tests/test_federation_efficiency_route.py
+      - name: Production analysis integration
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/orchestrator/tests/test_analysis_runtime_integration.py
+          catalog/orchestrator/tests/test_federated_discovery.py
       - name: Existing scheduling behaviour is unchanged
         run: >-
           python -m pytest -o addopts= -q
           catalog/capabilities/tests
           catalog/ai
           catalog/federation/tests/test_phase_e4_selection.py
-      - name: Ruff capability domain
+      - name: Ruff capability and production integration
         run: >-
           python -m ruff check
           catalog/capabilities
+          catalog/orchestrator/analysis_runtime.py
           catalog/flask_app/federation_routes.py
           catalog/flask_app/tests/test_federation_efficiency_route.py
           --ignore I001,RUF022,B008,C408,PLC0206
