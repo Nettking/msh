@@ -31,6 +31,36 @@ the host in to the same tailnet as the other Federation devices. Tailscale must
 already be running and signed in; the FCP launcher never changes tailnet login,
 routes, or ACL settings.
 
+### Leader prerequisite: the logical-storage authority must be running
+
+A normal leader start does **not** launch the logical-storage authority. That
+authority is a separate long-running process on the leader, and without it the
+leader advertises no storage capability, so a correctly fail-closed recorder on
+machine 4 refuses to start and reports `authority-unavailable`.
+
+Start it on the leader before pairing machine 4:
+
+```bash
+python -m catalog.node.storage_failover run \
+  --relay-control-database data/federation/relay/control.sqlite3 \
+  --storage-control-database data/federation/storage/control.sqlite3 \
+  --publication-database data/federation/storage/publication.sqlite3 \
+  --failover-database data/federation/storage/failover.sqlite3 \
+  --state-dir data/federation/device \
+  --relay ws://100.x.y.z:8765 \
+  --display-name "FCP leader storage authority" \
+  --session-id <the leader's internal session id>
+```
+
+Under Docker Compose the relay control database is the mounted
+`/var/lib/fcp-relay/control.sqlite3` instead of the repository-relative path.
+Use `scan-once` in place of `run` to check the configuration without starting
+the supervision loop.
+
+Keep this process running for as long as machine 4 should be able to publish.
+Wiring it into normal leader startup is tracked as follow-up work; until then it
+is a manual prerequisite.
+
 On the current Federation leader, open FCP through the leader's numeric
 Tailscale `100.x.y.z` address (not `localhost`, a LAN name, or a DNS name) and
 generate a fresh `FCP1-...` pairing code. Then run this single command on

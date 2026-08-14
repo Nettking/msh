@@ -200,6 +200,52 @@ def select_storage_authority(
     )
 
 
+#: What an operator can actually do about each unready sharing state.
+#:
+#: A headless recorder reports a machine-readable state, but the person standing
+#: at the machine needs the next action. Two of these states are not recorder
+#: faults at all: the logical-storage authority runs as its own process on the
+#: leader, so a leader that was started normally advertises no authority and a
+#: correctly fail-closed recorder looks broken until someone says why.
+SHARING_STATE_REMEDIES: dict[str, str] = {
+    "status-unavailable": (
+        "the Federation leader did not return a usable status; confirm the "
+        "leader is running and reachable on its relay address"
+    ),
+    "owner-unavailable": (
+        "this Federation session has no reachable owner in the leader's status; "
+        "confirm the leader is signed in to the same tailnet and connected"
+    ),
+    "authority-unavailable": (
+        "the Federation leader advertises no ready logical-storage authority. "
+        "That authority is a separate leader-side process: start it on the "
+        "leader with 'python -m catalog.node.storage_failover run' (see "
+        "docs/standalone_recorder.md for the exact arguments). A normal leader "
+        "start does not launch it"
+    ),
+    "storage-group-unavailable": (
+        "the leader's storage authority does not advertise the requested group; "
+        "drop --storage-group to auto-select, or pass a group the leader lists"
+    ),
+    "storage-group-required": (
+        "the leader advertises more than one storage group; pass "
+        "--storage-group with one advertised group ID"
+    ),
+    "discovering": (
+        "the recorder is still looking for the leader's storage authority; if "
+        "this persists, confirm the leader is running that authority process"
+    ),
+}
+
+
+def sharing_state_detail(state: str | None) -> str:
+    """Return an operator-actionable description of an unready sharing state."""
+
+    detail = state or "unknown"
+    remedy = SHARING_STATE_REMEDIES.get(detail)
+    return f"{detail}; {remedy}" if remedy else detail
+
+
 class RecorderFederationNode:
     """Create/reuse identity, pair, advertise, and publish recorder data."""
 
@@ -420,9 +466,7 @@ class RecorderFederationNode:
                 return snapshot
             remaining = deadline - time.monotonic()
             if remaining <= 0:
-                detail = snapshot.storage_state or "unknown"
-                if detail == "storage-group-required":
-                    detail += "; pass --storage-group with one advertised group ID"
+                detail = sharing_state_detail(snapshot.storage_state)
                 raise FederationOperationError(
                     "recorder-sharing-not-ready",
                     "Federation membership connected, but recorder data sharing "
@@ -733,8 +777,10 @@ class RecorderFederationNode:
 
 
 __all__ = [
+    "SHARING_STATE_REMEDIES",
     "RecorderFederationNode",
     "RecorderFederationSnapshot",
     "StorageAuthoritySelection",
     "select_storage_authority",
+    "sharing_state_detail",
 ]
