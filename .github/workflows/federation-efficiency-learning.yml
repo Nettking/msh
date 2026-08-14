@@ -84,6 +84,7 @@ jobs:
           catalog/flask_app/federation_routes.py
           catalog/flask_app/tests/test_federation_efficiency_route.py
           --ignore I001,RUF022,B008,C408,PLC0206
+          --output-format=github
 
   repository-hygiene:
     runs-on: ubuntu-latest
