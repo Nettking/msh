@@ -1,13 +1,8 @@
 """Durable federation execution-learning state.
 
-Raw observations and derived profiles are stored separately and deliberately:
-observations are the append-only truth, profiles are a cache of decayed
-sufficient statistics that :meth:`SQLiteExecutionLearningStore.rebuild_profiles`
-can regenerate at any time. A future estimator can therefore be recomputed from
-history without changing how jobs execute.
-
-The store owns no authority. It does not decide who may report an observation
-(see :mod:`.federation`), and it never schedules anything.
+Raw observations are the retained source of truth. Learned profiles are a
+rebuildable cache and must always be equivalent to replaying the retained
+observations in chronological order.
 """
 
 from __future__ import annotations
@@ -16,7 +11,7 @@ import json
 import sqlite3
 from collections.abc import Iterator
 from contextlib import contextmanager
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Self
 
@@ -25,12 +20,7 @@ from catalog.federation.sqlite_schema import SQLiteMigration, ensure_sqlite_sche
 
 from .contracts import ExecutionObservation, canonical_json, stamp
 from .policy import EfficiencyPolicy
-from .profiles import (
-    ANY,
-    LearnedProfile,
-    ProfileKey,
-    observation_profile_keys,
-)
+from .profiles import ANY, LearnedProfile, ProfileKey, observation_profile_keys
 
 EFFICIENCY_SCHEMA_NAME = "capabilities.execution_efficiency"
 EFFICIENCY_SCHEMA_VERSION = 1
@@ -195,10 +185,6 @@ class SQLiteExecutionLearningStore:
                 validate=_validate_schema,
             )
 
-    # ------------------------------------------------------------------
-    # connection handling
-    # ------------------------------------------------------------------
-
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
         connection.row_factory = sqlite3.Row
@@ -208,8 +194,6 @@ class SQLiteExecutionLearningStore:
 
     @contextmanager
     def _session(self) -> Iterator[sqlite3.Connection]:
-        """One read connection, always closed."""
-
         connection = self._connect()
         try:
             yield connection
@@ -218,8 +202,6 @@ class SQLiteExecutionLearningStore:
 
     @contextmanager
     def _transaction(self) -> Iterator[sqlite3.Connection]:
-        """One serialized write transaction, matching the repository style."""
-
         connection = self._connect()
         try:
             connection.execute("BEGIN IMMEDIATE")
@@ -249,21 +231,21 @@ class SQLiteExecutionLearningStore:
     def record(
         self, observation: ExecutionObservation, *, now: datetime | None = None
     ) -> bool:
-        """Persist one observation and fold it into every derived profile.
+        """Persist one observation and update the rebuildable profile cache.
 
-        Returns ``False`` when the same ``(session, job, attempt)`` was already
-        recorded. Replays are therefore harmless and one node cannot inflate
-        its own evidence by resending the same execution.
+        Delayed federation delivery may insert an observation older than the
+        newest retained sample. Incrementally folding such a sample would make
+        exponential decay depend on arrival order. In that case the cache is
+        rebuilt in chronological order inside the same transaction.
         """
 
         if not isinstance(observation, ExecutionObservation):
             raise FederationValidationError(
-                "invalid-observation",
-                "observation",
-                "must be an ExecutionObservation",
+                "invalid-observation", "observation", "must be an ExecutionObservation"
             )
         recorded_at = observation.observed_at if now is None else now
         payload = observation.to_json()
+        observed_stamp = stamp(observation.observed_at)
         with self._transaction() as connection:
             duplicate = connection.execute(
                 """SELECT observation_id FROM capability_execution_observations
@@ -276,6 +258,11 @@ class SQLiteExecutionLearningStore:
             ).fetchone()
             if duplicate is not None:
                 return False
+            latest_row = connection.execute(
+                "SELECT MAX(observed_at) AS latest FROM capability_execution_observations"
+            ).fetchone()
+            latest = None if latest_row is None else latest_row["latest"]
+            out_of_order = latest is not None and observed_stamp < str(latest)
             connection.execute(
                 """INSERT INTO capability_execution_observations(
                        observation_id, session_id, job_id, attempt_id,
@@ -294,13 +281,20 @@ class SQLiteExecutionLearningStore:
                     observation.workload.class_key("exact"),
                     observation.environment_fingerprint,
                     1 if observation.measurements.succeeded else 0,
-                    stamp(observation.observed_at),
+                    observed_stamp,
                     stamp(recorded_at),
                     payload,
                 ),
             )
-            self._apply_profiles(connection, observation)
-            self._prune_observations(connection)
+            if out_of_order:
+                self._rebuild_profiles(connection)
+            else:
+                self._apply_profiles(connection, observation)
+            removed = self._prune_observations(connection)
+            if removed:
+                # Retained observations are authoritative. Once history is
+                # pruned, removed samples must disappear from learned state too.
+                self._rebuild_profiles(connection)
         return True
 
     def _apply_profiles(
@@ -317,30 +311,46 @@ class SQLiteExecutionLearningStore:
             updated = current.update(
                 observation, half_life_seconds=self.half_life_seconds
             )
-            connection.execute(
-                """INSERT INTO capability_execution_profiles(
-                       profile_key, capability_type, workload_class, node_id,
-                       capability_id, environment_fingerprint,
-                       observation_count, profile_json, updated_at)
-                   VALUES(?,?,?,?,?,?,?,?,?)
-                   ON CONFLICT(profile_key) DO UPDATE SET
-                       observation_count=excluded.observation_count,
-                       profile_json=excluded.profile_json,
-                       updated_at=excluded.updated_at""",
-                (
-                    canonical,
-                    key.capability_type,
-                    key.workload_class,
-                    key.node_id,
-                    key.capability_id,
-                    key.environment_fingerprint,
-                    updated.observation_count,
-                    canonical_json(updated.to_dict(), "profile"),
-                    stamp(observation.observed_at),
-                ),
-            )
+            self._write_profile(connection, canonical, updated)
 
-    def _prune_observations(self, connection: sqlite3.Connection) -> None:
+    @staticmethod
+    def _write_profile(
+        connection: sqlite3.Connection,
+        canonical: str,
+        profile: LearnedProfile,
+    ) -> None:
+        updated_at = profile.last_observed_at or profile.first_observed_at
+        if updated_at is None:
+            raise FederationValidationError(
+                "empty-efficiency-profile",
+                "profile",
+                "a persisted profile requires at least one observation",
+            )
+        key = profile.key
+        connection.execute(
+            """INSERT INTO capability_execution_profiles(
+                   profile_key, capability_type, workload_class, node_id,
+                   capability_id, environment_fingerprint,
+                   observation_count, profile_json, updated_at)
+               VALUES(?,?,?,?,?,?,?,?,?)
+               ON CONFLICT(profile_key) DO UPDATE SET
+                   observation_count=excluded.observation_count,
+                   profile_json=excluded.profile_json,
+                   updated_at=excluded.updated_at""",
+            (
+                canonical,
+                key.capability_type,
+                key.workload_class,
+                key.node_id,
+                key.capability_id,
+                key.environment_fingerprint,
+                profile.observation_count,
+                canonical_json(profile.to_dict(), "profile"),
+                stamp(updated_at),
+            ),
+        )
+
+    def _prune_observations(self, connection: sqlite3.Connection) -> int:
         total = int(
             connection.execute(
                 "SELECT COUNT(*) AS total FROM capability_execution_observations"
@@ -348,15 +358,25 @@ class SQLiteExecutionLearningStore:
         )
         excess = total - self.max_observations
         if excess <= 0:
-            return
-        connection.execute(
+            return 0
+        # Small limits are used by exact retention tests. For production-sized
+        # histories leave a small reserve below the ceiling so cache rebuilds
+        # are amortized rather than occurring on every subsequent insert.
+        reserve = (
+            0
+            if self.max_observations < 1_000
+            else min(1_000, max(1, self.max_observations // 100))
+        )
+        remove_count = min(total, excess + reserve)
+        cursor = connection.execute(
             """DELETE FROM capability_execution_observations
                WHERE observation_id IN (
                    SELECT observation_id FROM capability_execution_observations
                    ORDER BY observed_at, observation_id LIMIT ?
                )""",
-            (excess,),
+            (remove_count,),
         )
+        return int(cursor.rowcount or 0)
 
     def observation_count(self) -> int:
         with self._session() as connection:
@@ -413,12 +433,6 @@ class SQLiteExecutionLearningStore:
     # ------------------------------------------------------------------
 
     def profile(self, key: ProfileKey) -> LearnedProfile | None:
-        """Return one profile, or ``None`` when absent or undecodable.
-
-        A corrupt row is treated as missing so that scheduling degrades to a
-        lower evidence tier instead of failing.
-        """
-
         with self._session() as connection:
             row = connection.execute(
                 "SELECT profile_json FROM capability_execution_profiles "
@@ -464,50 +478,28 @@ class SQLiteExecutionLearningStore:
             item for item in (_decode_profile(row) for row in rows) if item is not None
         )
 
-    def rebuild_profiles(self) -> int:
-        """Recompute every profile from the raw observation history.
-
-        This is the recovery path for a corrupt cache and the migration path
-        for a changed statistic: history is authoritative, profiles are not.
-        """
-
+    def _rebuild_profiles(self, connection: sqlite3.Connection) -> int:
         rebuilt: dict[str, LearnedProfile] = {}
-        with self._transaction() as connection:
-            for observation in self._iter_observations(connection):
-                for key in observation_profile_keys(observation):
-                    canonical = key.canonical()
-                    current = rebuilt.get(canonical) or LearnedProfile(key=key)
-                    rebuilt[canonical] = current.update(
-                        observation, half_life_seconds=self.half_life_seconds
-                    )
-            connection.execute("DELETE FROM capability_execution_profiles")
-            for canonical, profile in sorted(rebuilt.items()):
-                connection.execute(
-                    """INSERT INTO capability_execution_profiles(
-                           profile_key, capability_type, workload_class,
-                           node_id, capability_id, environment_fingerprint,
-                           observation_count, profile_json, updated_at)
-                       VALUES(?,?,?,?,?,?,?,?,?)""",
-                    (
-                        canonical,
-                        profile.key.capability_type,
-                        profile.key.workload_class,
-                        profile.key.node_id,
-                        profile.key.capability_id,
-                        profile.key.environment_fingerprint,
-                        profile.observation_count,
-                        canonical_json(profile.to_dict(), "profile"),
-                        stamp(
-                            profile.last_observed_at
-                            or profile.first_observed_at
-                            or datetime.now(timezone.utc)
-                        ),
-                    ),
+        for observation in self._iter_observations(connection):
+            for key in observation_profile_keys(observation):
+                canonical = key.canonical()
+                current = rebuilt.get(canonical) or LearnedProfile(key=key)
+                rebuilt[canonical] = current.update(
+                    observation, half_life_seconds=self.half_life_seconds
                 )
+        connection.execute("DELETE FROM capability_execution_profiles")
+        for canonical, profile in sorted(rebuilt.items()):
+            self._write_profile(connection, canonical, profile)
         return len(rebuilt)
 
+    def rebuild_profiles(self) -> int:
+        """Recompute every profile from retained observations atomically."""
+
+        with self._transaction() as connection:
+            return self._rebuild_profiles(connection)
+
     def forget_before(self, cutoff: datetime) -> int:
-        """Drop observations older than ``cutoff`` and rebuild profiles."""
+        """Drop observations older than ``cutoff`` and rebuild atomically."""
 
         with self._transaction() as connection:
             cursor = connection.execute(
@@ -515,9 +507,9 @@ class SQLiteExecutionLearningStore:
                 (stamp(cutoff),),
             )
             removed = int(cursor.rowcount or 0)
-        if removed:
-            self.rebuild_profiles()
-        return removed
+            if removed:
+                self._rebuild_profiles(connection)
+            return removed
 
     def expire_stale_observations(self, *, now: datetime) -> int:
         cutoff = now - timedelta(seconds=self.policy.max_observation_age_seconds)
@@ -528,8 +520,6 @@ class SQLiteExecutionLearningStore:
     # ------------------------------------------------------------------
 
     def record_decision(self, decision: Any) -> None:
-        """Persist one scheduling explanation, keeping only the recent window."""
-
         payload = decision.to_dict() if hasattr(decision, "to_dict") else decision
         if not isinstance(payload, dict):
             raise FederationValidationError(
@@ -627,7 +617,7 @@ def _decode_profile(row: sqlite3.Row | None) -> LearnedProfile | None:
         return None
     try:
         return LearnedProfile.from_dict(json.loads(row["profile_json"]))
-    except Exception:  # noqa: BLE001 - a corrupt row degrades the evidence tier
+    except Exception:  # noqa: BLE001 - corrupt cache degrades to lower evidence
         return None
 
 
