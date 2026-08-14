@@ -18,6 +18,7 @@
 - [OSL integration](osl_integration/) — active OSL planning package and authoritative execution order for that track.
 - [MTConnect operational segmentation](mtconnect_operational_segmentation_plan.md) — **active authoritative execution order** from canonical MTConnect observations through semantic roles, state/context timelines, MachineRun, ProductionCycle, OperationalEpisode, durable projection, and reference-shape validation. This track explicitly stops before features, baselines, anomaly detection, prediction, recommendations, OSL/SysML integration, and dashboards.
 - [Federation sharing evaluation](federation_sharing_evaluation.md) — what the Federation shares today, what remains device-local, and the open inconsistencies between the shared model, the code, and the canonical documentation.
+- [Federation execution efficiency learning](federation_execution_efficiency_learning.md) — how completed executions become observations, how learned per-node/workload profiles are maintained, and how they rank already-eligible providers without changing capability or authority constraints.
 - [Federated JSONL analysis jobs](federated_jsonl_analysis_jobs.md) — how discovered or uploaded JSONL becomes a durable federation-dispatched job: identity and deduplication, provider selection, ownership, artifact authorization, worker execution, and failure behaviour.
 
 ## Current status

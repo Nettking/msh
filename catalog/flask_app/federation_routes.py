@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+from datetime import datetime, timezone
 
 from flask import (
     Blueprint,
@@ -10,6 +11,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    jsonify,
     make_response,
     redirect,
     render_template,
@@ -18,6 +20,7 @@ from flask import (
     url_for,
 )
 
+from catalog.capabilities.efficiency import learning_snapshot
 from catalog.federation.errors import (
     AuthorizationError,
     FederationOperationError,
@@ -453,6 +456,64 @@ def apply_updates() -> Response:
     return redirect(url_for("federation_web.overview"), code=303)
 
 
+#: Optional explicit application binding for tests/alternate compositions.
+EFFICIENCY_STORE_CONFIG_KEY = "FEDERATION_EFFICIENCY_LEARNING_STORE"
+
+
+def _efficiency_learning_store():
+    """Resolve the store for the live authenticated federation session.
+
+    Tests and alternate products may still bind a store explicitly through
+    ``EFFICIENCY_STORE_CONFIG_KEY``. In the supported product, the durable
+    analysis runtime owns the session-scoped learning store, so the route reads
+    that exact store rather than a parallel database.
+    """
+
+    configured = current_app.config.get(EFFICIENCY_STORE_CONFIG_KEY)
+    if configured is not None:
+        return configured
+    try:
+        context = get_capability_onboarding_service().authorized_context()
+        if context is None:
+            return None
+        binding = getattr(context, "binding", None)
+        credentials = getattr(context, "credentials", None)
+        identity = getattr(credentials, "identity", None)
+        session_id = getattr(binding, "internal_session_id", None)
+        node_id = getattr(identity, "node_id", None)
+        if not isinstance(session_id, str) or not isinstance(node_id, str):
+            return None
+
+        # Lazy import avoids coupling Flask route import order to orchestrator
+        # composition and creates no second runtime: get_analysis_runtime is the
+        # existing singleton/rebind boundary used by analysis scheduling.
+        from catalog.orchestrator.analysis_runtime import get_analysis_runtime
+
+        runtime = get_analysis_runtime()
+        if runtime.identity.session_id != session_id or runtime.identity.node_id != node_id:
+            return None
+        return runtime.efficiency.store
+    except Exception as exc:  # noqa: BLE001 - observability must fail safely
+        current_app.logger.warning(
+            "Federation efficiency learning unavailable (%s)", type(exc).__name__
+        )
+        return None
+
+
+@federation_web.get("/federation/efficiency.json", strict_slashes=False)
+def efficiency_learning() -> Response:
+    """Read-only view of what the Federation has learned about execution."""
+
+    snapshot = learning_snapshot(
+        _efficiency_learning_store(),
+        now=datetime.now(timezone.utc),
+    )
+    response = jsonify(snapshot)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 @federation_web.get("/federation/<page_name>", strict_slashes=False)
 def detail(page_name: str) -> Response:
     page = _PAGE_BY_PATH.get(page_name)
@@ -463,4 +524,4 @@ def detail(page_name: str) -> Response:
     return _page_response(page)
 
 
-__all__ = ["federation_web"]
+__all__ = ["EFFICIENCY_STORE_CONFIG_KEY", "federation_web"]

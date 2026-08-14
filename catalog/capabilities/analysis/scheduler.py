@@ -1,20 +1,15 @@
 """Federation scheduling for analysis jobs.
 
 This is the smallest orchestration layer that can sit on top of the existing
-capability primitives. It owns no policy of its own: eligibility and ranking come
-from :mod:`catalog.capabilities.provider_selection`, ownership from the durable
-job store, authorization from the artifact authority, and delivery from the
-existing dispatch contracts.
-
-Discovering data never implies executing it. The node that holds the JSONL is the
-data owner; it becomes the worker only when it advertises the capability and the
-same selection pass picks it.
+capability primitives. Eligibility and ranking come from provider_selection,
+ownership from the durable job store, authorization from the artifact authority,
+and delivery from the existing dispatch contracts.
 """
 
 from __future__ import annotations
 
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Protocol
@@ -36,7 +31,7 @@ from ..lifecycle_coordinator import (
 )
 from ..lifecycle_store import SQLiteJobLifecycleStore
 from ..provider_reports import ProviderResourceReport, ProviderSelectionPolicy
-from ..provider_selection import ProviderSelection, select_provider
+from ..provider_selection import CandidateRanker, ProviderSelection, select_provider
 from .content_store import ContentIdentity
 from .contracts import (
     ANALYSIS_CAPABILITY_TYPE,
@@ -110,6 +105,7 @@ class FederatedAnalysisScheduler:
         coordinator_node_id: str,
         clock,
         selection_policy: ProviderSelectionPolicy | None = None,
+        ranker: CandidateRanker | None = None,
         lease_seconds: int = ANALYSIS_LEASE_SECONDS,
         grant_seconds: int = ANALYSIS_GRANT_SECONDS,
         heartbeat_timeout_seconds: int = DEFAULT_HEARTBEAT_TIMEOUT_SECONDS,
@@ -120,10 +116,9 @@ class FederatedAnalysisScheduler:
         self.coordinator_node_id = coordinator_node_id
         self.clock = clock
         self.selection_policy = selection_policy or ProviderSelectionPolicy()
+        self.ranker = ranker
         self.lease_seconds = int(lease_seconds)
         self.grant_seconds = int(grant_seconds)
-        # F7.5 owns completion: the coordinator applies the worker response
-        # through the durable result fence, retry policy and stale-attempt rules.
         self.dispatcher = ResilientDispatchCoordinator(
             store,
             transport,
@@ -146,12 +141,7 @@ class FederatedAnalysisScheduler:
         slice_files: Sequence[Path],
         slice_root: Path,
     ) -> SubmissionOutcome:
-        """Register the input artifacts and submit/queue the durable job.
-
-        Submission is idempotent: the same logical work produces the same job
-        identity, so repeated discovery recognizes the existing job instead of
-        creating another one.
-        """
+        """Register the input artifacts and submit/queue the durable job."""
 
         now = self.clock()
         prefix = work.object_key_prefix
@@ -244,8 +234,6 @@ class FederatedAnalysisScheduler:
     # ------------------------------------------------------------------
 
     def evaluate(self, job_id: str) -> LifecycleAction:
-        """Apply the existing timeout/loss lifecycle rules to one job."""
-
         decision = self.lifecycle.evaluate(
             job_id,
             now=self.clock(),
@@ -254,8 +242,6 @@ class FederatedAnalysisScheduler:
         return decision.action
 
     async def schedule(self, job_id: str) -> SchedulingOutcome:
-        """Run one scheduling pass for one durable job."""
-
         self.evaluate(job_id)
         snapshot = self.store.snapshot(job_id)
         if snapshot.job.terminal:
@@ -298,10 +284,9 @@ class FederatedAnalysisScheduler:
             self._reports(snapshot.job),
             evaluated_at=now,
             policy=self.selection_policy,
+            ranker=self.ranker,
         )
         if selection.selected_capability_id is None or selection.selected_node_id is None:
-            # Explicit and safe: the job stays queued and visible. There is no
-            # undocumented local fallback.
             return SchedulingOutcome(
                 job_id,
                 DECISION_NO_PROVIDER,
@@ -329,15 +314,63 @@ class FederatedAnalysisScheduler:
             selection=selection,
         )
 
+    def _retry_policy(
+        self,
+        snapshot: DurableJobSnapshot,
+        reports: tuple[ProviderResourceReport, ...],
+        *,
+        now: datetime,
+    ) -> tuple[ProviderSelectionPolicy, ProviderSelection | None]:
+        """Let learned ranking choose the retry target without duplicating F7.5.
+
+        F7.5 still owns the retry claim. We feed its existing selector a
+        preferred node equal to the learned final choice, after applying the
+        same source-provider exclusion F7.5 will enforce itself. This keeps the
+        durable claim/fencing code single-sourced while making retry placement
+        use the same evidence as first attempts.
+        """
+
+        if self.ranker is None:
+            return self.selection_policy, None
+        retry = self.store.retry_state(snapshot.job.job_id)
+        if retry is None:
+            return self.selection_policy, None
+        policy = replace(
+            self.selection_policy,
+            excluded_capability_ids=tuple(
+                sorted(
+                    set(self.selection_policy.excluded_capability_ids)
+                    | {retry.source_provider_id}
+                )
+            ),
+        )
+        learned = select_provider(
+            snapshot.job,
+            reports,
+            evaluated_at=now,
+            policy=policy,
+            ranker=self.ranker,
+        )
+        if learned.selected_node_id is None:
+            return self.selection_policy, learned
+        return replace(
+            self.selection_policy,
+            preferred_node_id=learned.selected_node_id,
+        ), learned
+
     async def _reassign(self, snapshot: DurableJobSnapshot) -> SchedulingOutcome:
         job_id = snapshot.job.job_id
         now = self.clock()
         generation = snapshot.attempt_generation + 1
+        reports = self._reports(snapshot.job)
+        retry_policy, learned_selection = self._retry_policy(
+            snapshot, reports, now=now
+        )
         try:
             outcome = self.lifecycle.reassign(
                 job_id,
-                reports=self._reports(snapshot.job),
-                policy=self.selection_policy,
+                reports=reports,
+                policy=retry_policy,
                 attempt_id=f"{job_id}-attempt-{generation}",
                 lease_id=f"{job_id}-lease-{generation}",
                 lease_expires_at=now + timedelta(seconds=self.lease_seconds),
@@ -349,12 +382,20 @@ class FederatedAnalysisScheduler:
                 job_id,
                 DECISION_WAITING,
                 getattr(exc, "code", "retry-not-ready"),
+                selection=learned_selection,
                 snapshot=snapshot,
             )
+        selection = (
+            learned_selection
+            if learned_selection is not None
+            and learned_selection.selected_capability_id
+            == outcome.selection.selected_capability_id
+            else outcome.selection
+        )
         return await self._dispatch(
             outcome.snapshot,
             target_node_id=outcome.target_node_id,
-            selection=outcome.selection,
+            selection=selection,
         )
 
     def _grant_input_access(
@@ -367,7 +408,7 @@ class FederatedAnalysisScheduler:
         """Issue the narrowest grant that lets the selected worker read inputs."""
 
         ownership = snapshot.ownership
-        assert ownership is not None  # callers dispatch only owned jobs
+        assert ownership is not None
         grant_id = analysis_grant_id(snapshot.job.job_id, ownership.attempt_id)
         references = tuple(
             ArtifactInputReference(
@@ -460,8 +501,6 @@ class FederatedAnalysisScheduler:
         return None
 
     def _record_dispatch_failure(self, job_id: str, *, reason: str) -> SchedulingOutcome:
-        """Release a failed delivery through the existing retry semantics."""
-
         snapshot = self.store.snapshot(job_id)
         ownership = snapshot.ownership
         if ownership is None or snapshot.job.terminal:

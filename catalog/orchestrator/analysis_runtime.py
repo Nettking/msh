@@ -1,18 +1,15 @@
 """Compose the federated analysis job runtime for this device.
 
 This module is the only place that knows how the generic capability machinery is
-wired on a running FCP node:
-
-* which durable stores back jobs, artifacts, and the job index,
-* which identity this node uses as coordinator, data owner, and provider,
-* which local handler executes analysis (the existing runner pipeline),
-* how dispatch reaches a local worker or a remote federation node.
-
-Nothing here re-implements analysis, scheduling, ownership, or authorization.
+wired on a running FCP node: durable stores, identity, trusted providers,
+dispatch transport, and the existing analysis executor. Execution-efficiency
+learning is composed here as an observer/ranker around those existing paths; it
+does not create a second scheduler, worker, or transport protocol.
 """
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import threading
@@ -45,9 +42,8 @@ from catalog.capabilities.analysis.contracts import (
 )
 from catalog.capabilities.analysis.provisioning import dispatched_data_owner_node_id
 from catalog.capabilities.analysis.scheduler import SubmissionOutcome
-from catalog.capabilities.artifact_secure_runtime import (
-    SQLiteCapabilityArtifactAuthority,
-)
+from catalog.capabilities.artifact_secure_runtime import SQLiteCapabilityArtifactAuthority
+from catalog.capabilities.efficiency import ExecutionEfficiencyRuntime
 from catalog.capabilities.jobs import JobStatus
 from catalog.capabilities.lifecycle_store import SQLiteJobLifecycleStore
 from catalog.capabilities.retry_claim import attempt_owner
@@ -58,17 +54,9 @@ from catalog.runner.script_catalog import discover_runnable_scripts, repo_root
 
 from .pipeline import StatusPrinter, _run_for_date_slice
 
-#: The supplier that binds this runtime to a real federation identity. The Flask
-#: application registers one during startup; without it the device runs the same
-#: architecture inside its own single-node federation session. One slot, so a
-#: restarted application replaces the binding instead of accumulating closures.
 _IDENTITY_SUPPLIER: Callable[[], tuple[str, str] | None] | None = None
 _IDENTITY_LOCK = threading.Lock()
 
-#: Optional product composition seam for a *real* federation authority. Supplying
-#: only an identity is deliberately insufficient: a connected device must not
-#: manufacture a second standalone coordinator for that real session. The Flask
-#: product bridge registers this supplier once it owns an authenticated relay.
 _FEDERATION_SUPPLIER: (
     Callable[
         ["AnalysisIdentity", Path, Callable[[], datetime]],
@@ -76,8 +64,6 @@ _FEDERATION_SUPPLIER: (
     ]
     | None
 ) = None
-#: Monotonic process-local generation of the authenticated product relay binding.
-#: Identity alone cannot detect a reconnect to a newly created relay client.
 _FEDERATION_GENERATION_SUPPLIER: Callable[[], int] | None = None
 _FEDERATION_LOCK = threading.Lock()
 
@@ -130,23 +116,13 @@ class AnalysisIdentity:
 
 
 def _provider_id(node_id: str) -> str:
-    """Derive this node's analysis provider identity.
-
-    Ownership may never be granted by the provider that receives it, so the
-    provider identity is deliberately distinct from the coordinator node ID.
-    """
+    """Derive this node's analysis provider identity."""
 
     return analysis_capability_id(node_id)
 
 
 def _standalone_identity(state_path: Path) -> tuple[str, str]:
-    """Return the persisted single-node federation identity, creating it once.
-
-    Standalone installations are a supported product mode modelled as a
-    federation of one. The node identity is a real device keypair from the
-    existing ``IdentityStore`` so the device can genuinely enrol itself in the
-    session it leads; nothing about the authority checks is bypassed.
-    """
+    """Return the persisted single-node federation identity, creating it once."""
 
     credentials = IdentityStore(
         state_path.parent / "standalone_identity",
@@ -192,9 +168,7 @@ def resolve_analysis_identity(state_path: Path) -> AnalysisIdentity:
         if resolved is not None:
             session_id, node_id = (str(item).strip() for item in resolved)
             if session_id and node_id:
-                return AnalysisIdentity(
-                    session_id, node_id, _provider_id(node_id), False
-                )
+                return AnalysisIdentity(session_id, node_id, _provider_id(node_id), False)
     session_id, node_id = _standalone_identity(state_path)
     return AnalysisIdentity(session_id, node_id, _provider_id(node_id), True)
 
@@ -215,6 +189,13 @@ def _federation_generation(identity: AnalysisIdentity) -> int:
     if isinstance(generation, bool) or not isinstance(generation, int):
         return 0
     return max(generation, 0)
+
+
+def _efficiency_database(capability_root: Path, session_id: str) -> Path:
+    """Keep learned profiles isolated between federation sessions."""
+
+    digest = hashlib.sha256(session_id.encode("utf-8")).hexdigest()[:20]
+    return capability_root / "efficiency" / f"analysis-{digest}.sqlite3"
 
 
 class RunnerSliceAnalysisExecutor:
@@ -240,8 +221,6 @@ class RunnerSliceAnalysisExecutor:
     ) -> AnalysisExecutionReport:
         script_options = discover_runnable_scripts(self.catalog_root)
         discovered = {item.key for item in script_options}
-        # Only locally discovered scripts may run. A plan can never name an
-        # executable, a path, or a command; unknown keys are simply skipped.
         script_keys = tuple(key for key in plan.script_keys if key in discovered)
         if not script_keys:
             return AnalysisExecutionReport(
@@ -307,9 +286,7 @@ class AnalysisRuntime:
             else os.getenv("FCP_ANALYSIS_MAX_SLICE_BYTES", DEFAULT_MAX_SLICE_BYTES)
         )
 
-        self.store = SQLiteJobLifecycleStore(
-            self.capability_root / "analysis_jobs.sqlite3"
-        )
+        self.store = SQLiteJobLifecycleStore(self.capability_root / "analysis_jobs.sqlite3")
         self.artifact_authority = SQLiteCapabilityArtifactAuthority(self.store)
         self.content_store = LocalArtifactContentStore(
             self.capability_root / "artifacts", max_bytes=self.max_slice_bytes
@@ -322,11 +299,6 @@ class AnalysisRuntime:
         self.provisioner: AnalysisProviderProvisioner | None = None
         self.worker: object | None = None
 
-        # F8 trust chain. A true standalone identity builds the device-local
-        # single-node authority. A real federation identity is never silently
-        # backed by that standalone database: it must receive the authenticated
-        # product authority through ``register_federation_supplier`` or remain
-        # safely without a provider until that binding is available.
         self.federation = federation
         self.provisioning_reason = "provider-active"
         if self.federation is None and not self.identity.standalone:
@@ -335,9 +307,7 @@ class AnalysisRuntime:
             if federation_supplier is not None:
                 try:
                     self.federation = federation_supplier(
-                        self.identity,
-                        self.capability_root,
-                        self.clock,
+                        self.identity, self.capability_root, self.clock
                     )
                 except Exception as exc:  # noqa: BLE001 - startup stays available
                     self.provisioning_reason = str(
@@ -350,7 +320,7 @@ class AnalysisRuntime:
                     identity=self.identity,
                     clock=self.clock,
                 )
-            except Exception as exc:  # noqa: BLE001 - startup must stay available
+            except Exception as exc:  # noqa: BLE001 - startup stays available
                 self.provisioning_reason = str(
                     getattr(exc, "code", "federation-authority-unavailable")
                 )
@@ -364,10 +334,21 @@ class AnalysisRuntime:
             if self.provisioning_reason == "provider-active":
                 self.provisioning_reason = "federation-transport-unavailable"
 
+        # The raw transport is retained for F8 provider activation. The
+        # scheduler receives a thin observing wrapper; no second transport or
+        # reader is created.
         self.transport = self.federation.lifecycle_transport()
         self.artifact_carrier = self.federation.artifact_carrier(self.gateway)
         self.report_source = FederatedProviderReportSource(
             self.federation.health, actor_node_id=self.identity.node_id
+        )
+        self.efficiency = ExecutionEfficiencyRuntime(
+            _efficiency_database(self.capability_root, self.identity.session_id),
+            node_id=self.identity.node_id,
+        )
+        self.scheduler_transport = self.efficiency.wrap_transport(
+            self.transport,
+            report_source=self.report_source,
         )
 
         if enable_local_provider:
@@ -376,23 +357,18 @@ class AnalysisRuntime:
         self.scheduler = FederatedAnalysisScheduler(
             store=self.store,
             gateway=self.gateway,
-            transport=self.transport,
+            transport=self.scheduler_transport,
             report_source=self.report_source,
             coordinator_node_id=self.identity.coordinator_node_id,
             clock=self.clock,
+            ranker=self.efficiency.ranker,
         )
         self.service = AnalysisWorkService(
             scheduler=self.scheduler,
-            registry=AnalysisJobRegistry(
-                self.capability_root / "analysis_jobs.sqlite3"
-            ),
+            registry=AnalysisJobRegistry(self.capability_root / "analysis_jobs.sqlite3"),
             session_id=self.identity.session_id,
         )
-        # Read this after federation construction: the supplier may have observed
-        # the first live relay client while building the authority.
         self.federation_generation = _federation_generation(self.identity)
-
-    # ------------------------------------------------------------------
 
     def _local_active_jobs(self) -> int:
         """Count jobs this node's provider currently owns, for honest capacity."""
@@ -407,19 +383,12 @@ class AnalysisRuntime:
             except Exception:  # noqa: BLE001,S112 - one unreadable job must not hide load
                 continue
             ownership = snapshot.ownership
-            if ownership is not None and (
-                ownership.owner_provider_id == self.identity.provider_id
-            ):
+            if ownership is not None and ownership.owner_provider_id == self.identity.provider_id:
                 active += 1
         return active
 
     def _provision_local_provider(self) -> None:
-        """Offer this node's compute through the real F8 trust chain.
-
-        Installing the handler never approves a provider. The provisioner
-        announces the capability and requests enrollment; approval only happens
-        when this node is the authority for its own session.
-        """
+        """Offer this node's compute through the real F8 trust chain."""
 
         handler = FederatedAnalysisHandler(
             session_id=self.identity.session_id,
@@ -481,11 +450,7 @@ class AnalysisRuntime:
 
 
 class DiscoveryAnalysisGateway:
-    """Turn discovered or uploaded data slices into durable federation jobs.
-
-    Automatic discovery and the manual upload workflow both call this gateway, so
-    there is exactly one path from "new JSONL exists" to "a durable job exists".
-    """
+    """Turn discovered or uploaded data slices into durable federation jobs."""
 
     def __init__(self, runtime: AnalysisRuntime | None = None) -> None:
         self._runtime = runtime
@@ -493,8 +458,6 @@ class DiscoveryAnalysisGateway:
     @property
     def runtime(self) -> AnalysisRuntime:
         return self._runtime if self._runtime is not None else get_analysis_runtime()
-
-    # ------------------------------------------------------------------
 
     def submit_slice(
         self,
@@ -529,9 +492,7 @@ class DiscoveryAnalysisGateway:
         service = runtime.service
         if service is None:  # pragma: no cover - constructed with the runtime
             return None
-        return service.submit_analysis_work(
-            work, slice_files=files, slice_root=data_dir
-        )
+        return service.submit_analysis_work(work, slice_files=files, slice_root=data_dir)
 
     def submit_date_slice(
         self,
@@ -565,8 +526,6 @@ class DiscoveryAnalysisGateway:
         runtime.refresh_provider_health()
         service = runtime.service
         return () if service is None else service.run_scheduling_pass()
-
-    # ------------------------------------------------------------------
 
     def job_view(self, job_id: str) -> dict[str, Any] | None:
         """Return the durable job facts product views need, or ``None``."""
