@@ -24,7 +24,15 @@ function Test-RecorderPython {
         [pscustomobject]$Candidate
     )
 
-    $ProbeArguments = @($Candidate.Prefix) + @("-c", '"import start_recorder"')
+    $ProbeCode = (
+        "import scripts.start_tailscale_recorder as launcher; " +
+        "import catalog.mtconnect_recorder as recorder; " +
+        "import catalog.mtconnect_recorder.runtime; " +
+        "import requests; " +
+        "raise SystemExit(0 if callable(launcher.main) and " +
+        "callable(recorder.run) else 1)"
+    )
+    $ProbeArguments = @($Candidate.Prefix) + @("-c", ('"{0}"' -f $ProbeCode))
     $Process = $null
     try {
         $Process = Start-Process `

@@ -3,6 +3,7 @@ from __future__ import annotations
 import ipaddress
 import os
 import subprocess
+import sys
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -38,7 +39,10 @@ def test_tailscale_recorder_command_uses_same_process_secret_prompt() -> None:
 
     assert "start_tailscale_recorder.ps1" in command
     assert "scripts.start_tailscale_recorder" in powershell
-    assert "import start_recorder" in powershell
+    assert "import scripts.start_tailscale_recorder as launcher" in powershell
+    assert "import catalog.mtconnect_recorder as recorder" in powershell
+    assert "import catalog.mtconnect_recorder.runtime" in powershell
+    assert "import requests" in powershell
     assert "Remove-Item Env:FCP_RECORDER_FEDERATION_KEY" in powershell
     assert '"--require-federation"' in python
     assert '"--require-data-sharing"' in python
@@ -313,6 +317,72 @@ def test_relay_preflight_requires_literal_tailnet_ip_and_tcp_reachability(
     )
     with pytest.raises(RuntimeError, match="not a reachable peer"):
         launcher._require_tailnet_relay("ws://100.90.1.3:8765")
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows launcher execution")
+def test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint(
+    tmp_path: Path,
+) -> None:
+    blocker_directory = tmp_path / "blocked-runtime"
+    blocker_directory.mkdir()
+    (blocker_directory / "sitecustomize.py").write_text(
+        "import importlib.abc\n"
+        "import sys\n"
+        "\n"
+        "class ExactEntrypointBlocker(importlib.abc.MetaPathFinder):\n"
+        "    def find_spec(self, fullname, path, target=None):\n"
+        "        if fullname == 'scripts.start_tailscale_recorder':\n"
+        "            raise ModuleNotFoundError('blocked exact recorder entrypoint')\n"
+        "        return None\n"
+        "\n"
+        "sys.meta_path.insert(0, ExactEntrypointBlocker())\n",
+        encoding="utf-8",
+    )
+    blocked_python = tmp_path / "blocked-python.cmd"
+    invocation_log = tmp_path / "blocked-python-invocations.txt"
+    blocked_python.write_text(
+        "@echo off\n"
+        "setlocal\n"
+        '>> "%FCP_TEST_BLOCKED_RUNTIME_LOG%" echo ARGS=%*\n'
+        'set "PYTHONPATH=%FCP_TEST_BLOCKER_DIRECTORY%"\n'
+        '"%FCP_TEST_REAL_PYTHON%" %*\n'
+        "exit /b %ERRORLEVEL%\n",
+        encoding="utf-8",
+    )
+    environment = dict(os.environ)
+    environment.pop("FCP_RECORDER_FEDERATION_KEY", None)
+    environment.update(
+        {
+            "FCP_RECORDER_PYTHON": str(blocked_python),
+            "FCP_TEST_BLOCKED_RUNTIME_LOG": str(invocation_log),
+            "FCP_TEST_BLOCKER_DIRECTORY": str(blocker_directory),
+            "FCP_TEST_REAL_PYTHON": sys.executable,
+        }
+    )
+
+    completed = subprocess.run(
+        [
+            "powershell.exe",
+            "-NoLogo",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            str(_powershell_script()),
+            "--help",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        env=environment,
+    )
+
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+    invocations = invocation_log.read_text(encoding="utf-8").splitlines()
+    assert len(invocations) == 1
+    assert "ARGS=-c" in invocations[0]
+    assert "import scripts.start_tailscale_recorder as launcher" in invocations[0]
+    assert "-m scripts.start_tailscale_recorder" not in invocations[0]
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows launcher execution")
