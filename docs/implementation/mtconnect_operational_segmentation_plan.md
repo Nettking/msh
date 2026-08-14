@@ -827,7 +827,7 @@ If the agent discovers that a rule in this plan is contradicted by the MTConnect
 Use this when assigning a phase:
 
 ```text
-Work on Nettking/msh.
+Work on the current repository.
 
 Implement ONLY phase S<N> of:
   docs/implementation/mtconnect_operational_segmentation_plan.md
