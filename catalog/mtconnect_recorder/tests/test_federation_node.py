@@ -1,6 +1,15 @@
 from __future__ import annotations
 
-from catalog.mtconnect_recorder.federation_node import select_storage_authority
+import threading
+
+import pytest
+
+from catalog.federation.errors import FederationOperationError
+from catalog.mtconnect_recorder.federation_node import (
+    RecorderFederationNode,
+    RecorderFederationSnapshot,
+    select_storage_authority,
+)
 from start_recorder import build_parser
 
 
@@ -108,6 +117,9 @@ def test_start_recorder_parser_accepts_first_join_and_storage_arguments() -> Non
             "--storage-group",
             "telemetry",
             "--require-federation",
+            "--require-data-sharing",
+            "--sharing-timeout",
+            "30",
         ]
     )
 
@@ -116,6 +128,8 @@ def test_start_recorder_parser_accepts_first_join_and_storage_arguments() -> Non
     assert args.device_name == "Machine recorder"
     assert args.storage_group == "telemetry"
     assert args.require_federation is True
+    assert args.require_data_sharing is True
+    assert args.sharing_timeout == 30.0
 
 
 def test_start_recorder_parser_accepts_pairing_key_as_only_input() -> None:
@@ -132,3 +146,34 @@ def test_start_recorder_parser_remains_backward_compatible_local_only() -> None:
     assert args.federation_key is None
     assert args.storage_group is None
     assert args.require_federation is False
+    assert args.require_data_sharing is False
+
+
+def _sharing_node(storage_state: str) -> RecorderFederationNode:
+    node = RecorderFederationNode.__new__(RecorderFederationNode)
+    node._lock = threading.RLock()
+    node._stop = threading.Event()
+    node._snapshot = RecorderFederationSnapshot(
+        status="connected",
+        storage_state=storage_state,
+        storage_group="telemetry" if storage_state == "up-to-date" else None,
+    )
+    return node
+
+
+def test_sharing_readiness_accepts_only_an_active_storage_path() -> None:
+    node = _sharing_node("up-to-date")
+
+    snapshot = node.wait_until_sharing_ready(timeout_seconds=0.1)
+
+    assert snapshot.storage_group == "telemetry"
+
+
+def test_sharing_readiness_fails_closed_with_actionable_group_state() -> None:
+    node = _sharing_node("storage-group-required")
+
+    with pytest.raises(FederationOperationError) as excinfo:
+        node.wait_until_sharing_ready(timeout_seconds=0.01)
+
+    assert excinfo.value.code == "recorder-sharing-not-ready"
+    assert "--storage-group" in excinfo.value.message

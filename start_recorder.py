@@ -13,13 +13,13 @@ available for explicit deployments.
 
 from __future__ import annotations
 
-from argparse import ArgumentParser, Namespace
-from collections.abc import Mapping
 import json
 import os
-from pathlib import Path
 import runpy
 import sys
+from argparse import ArgumentParser, Namespace
+from collections.abc import Mapping
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlsplit
 
@@ -172,6 +172,23 @@ def build_parser() -> ArgumentParser:
         help=(
             "Exit instead of recording locally when initial Federation "
             "join/reconnect fails."
+        ),
+    )
+    parser.add_argument(
+        "--require-data-sharing",
+        action="store_true",
+        help=(
+            "Require the authenticated recorder publication path to reach a "
+            "ready logical-storage group before capture starts."
+        ),
+    )
+    parser.add_argument(
+        "--sharing-timeout",
+        type=float,
+        default=45.0,
+        help=(
+            "Seconds to wait for required Federation data sharing "
+            "(default: 45)."
         ),
     )
     parser.add_argument(
@@ -365,10 +382,17 @@ def _start_federation(
         requested_storage_group=args.storage_group,
         request_timeout=args.federation_timeout,
     )
-    if pairing_key is None and not node.has_saved_membership():
-        print("Federation: local-only (pass an FCP1-... key to join).")
-        return None
     try:
+        if pairing_key is None and not node.has_saved_membership():
+            if args.require_federation or args.require_data_sharing:
+                raise FederationOperationError(
+                    "recorder-pairing-required",
+                    "required Federation startup needs a saved membership or a "
+                    "fresh FCP1 pairing code",
+                    "pairing_key",
+                )
+            print("Federation: local-only (pass an FCP1-... key to join).")
+            return None
         snapshot = node.bootstrap(pairing_key)
     except (
         AuthenticationError,
@@ -384,7 +408,8 @@ def _start_federation(
             f"Federation bootstrap unavailable ({code}): {message}",
             file=sys.stderr,
         )
-        if args.require_federation:
+        node.stop()
+        if args.require_federation or args.require_data_sharing:
             raise
         print(
             "Recording will continue locally. No pairing key or Federation "
@@ -393,12 +418,34 @@ def _start_federation(
         )
         return None
 
+    if args.require_data_sharing:
+        try:
+            snapshot = node.wait_until_sharing_ready(
+                timeout_seconds=args.sharing_timeout,
+            )
+        except (
+            FederationOperationError,
+            OSError,
+            RuntimeError,
+            TimeoutError,
+        ) as exc:
+            code = str(getattr(exc, "code", type(exc).__name__))
+            message = str(getattr(exc, "message", str(exc) or type(exc).__name__))
+            print(
+                f"Federation data sharing unavailable ({code}): {message}",
+                file=sys.stderr,
+            )
+            node.stop()
+            raise
+
     print("Federation: connected")
     print(f"  Device:     {snapshot.node_id}")
     print(f"  Federation: {snapshot.federation_id}")
     print(f"  Session:    {snapshot.session_id}")
-    if args.storage_group:
-        print(f"  Data group: {args.storage_group}")
+    if snapshot.storage_group:
+        print(f"  Data group: {snapshot.storage_group}")
+    elif args.storage_group:
+        print(f"  Data group: {args.storage_group} (waiting for authority)")
     else:
         print("  Data group: auto-select one ready logical-storage group")
     print(
@@ -423,6 +470,8 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--timeout must be greater than zero.")
     if args.federation_timeout <= 0:
         parser.error("--federation-timeout must be greater than zero.")
+    if args.sharing_timeout <= 0:
+        parser.error("--sharing-timeout must be greater than zero.")
     if not 1 <= args.scan_port <= 65535:
         parser.error("--scan-port must be between 1 and 65535.")
 

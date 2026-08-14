@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+import time
 import uuid
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -34,9 +35,9 @@ from catalog.federation.recorder_publication import (
 )
 from catalog.federation.recorder_storage_relay import (
     RECORDER_RELAY_SAFE_CONTENT_BYTES,
-    RelayRecorderStorageClient,
     STORAGE_CONTROL_CAPABILITY_PROTOCOL,
     STORAGE_CONTROL_CAPABILITY_TYPE,
+    RelayRecorderStorageClient,
 )
 from catalog.flask_app.services.federation_pairing_service import (
     PairingAwareCapabilityOnboardingService,
@@ -205,6 +206,38 @@ class RecorderFederationNode:
     def snapshot(self) -> RecorderFederationSnapshot:
         with self._lock:
             return self._snapshot
+
+    def wait_until_sharing_ready(
+        self,
+        *,
+        timeout_seconds: float,
+    ) -> RecorderFederationSnapshot:
+        """Wait until the authenticated recorder publication path is usable.
+
+        Joining a Federation and having a writable logical-storage route are
+        separate states.  Launchers that promise data sharing use this bounded
+        gate so they cannot report success while publication is still waiting
+        for an authority or an explicit group choice.
+        """
+
+        if timeout_seconds <= 0:
+            raise ValueError("sharing readiness timeout must be positive")
+        deadline = time.monotonic() + float(timeout_seconds)
+        while True:
+            snapshot = self.snapshot()
+            if snapshot.storage_state in {"publishing", "up-to-date"}:
+                return snapshot
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                detail = snapshot.storage_state or "unknown"
+                if detail == "storage-group-required":
+                    detail += "; pass --storage-group with one advertised group ID"
+                raise FederationOperationError(
+                    "recorder-sharing-not-ready",
+                    "Federation membership connected, but recorder data sharing "
+                    f"did not become ready before the timeout (state: {detail})",
+                )
+            self._stop.wait(min(0.1, remaining))
 
     def _set_snapshot(self, **changes: Any) -> None:
         with self._lock:
