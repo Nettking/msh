@@ -76,10 +76,20 @@ jobs:
           catalog/capabilities/tests
           catalog/ai
           catalog/federation/tests/test_phase_e4_selection.py
-      - name: Ruff capability and production integration
+      - name: Ruff efficiency learning and production integration
         run: >-
           python -m ruff check
-          catalog/capabilities
+          catalog/capabilities/efficiency
+          catalog/capabilities/provider_selection.py
+          catalog/capabilities/analysis/scheduler.py
+          catalog/capabilities/tests/efficiency_harness.py
+          catalog/capabilities/tests/test_efficiency_contracts.py
+          catalog/capabilities/tests/test_efficiency_store.py
+          catalog/capabilities/tests/test_efficiency_ranking.py
+          catalog/capabilities/tests/test_efficiency_recorder.py
+          catalog/capabilities/tests/test_efficiency_regressions.py
+          catalog/capabilities/tests/test_efficiency_runtime.py
+          catalog/capabilities/tests/test_efficiency_learning_simulation.py
           catalog/orchestrator/analysis_runtime.py
           catalog/flask_app/federation_routes.py
           catalog/flask_app/tests/test_federation_efficiency_route.py
