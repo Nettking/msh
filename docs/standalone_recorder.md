@@ -187,15 +187,20 @@ and analyzed twice:
 | Local data | Federation path | Receiving workbench path |
 | --- | --- | --- |
 | `data/sources/mtconnect_recorder/jsonl/**` | checkpoint-, sequence-, and hash-verified recorder observations | `data/federation/shared/telemetry/*.jsonl` |
-| other supported `data/**/*.jsonl` on a normal FCP workbench | generic authenticated JSONL chunks | `data/federation/shared/jsonl-files/<producer>/**` |
+| other supported `data/**/*.jsonl` on a full workbench or headless recorder | generic authenticated JSONL chunks | `data/federation/shared/jsonl-files/<producer>/**` |
 
 Every connected full workbench device therefore offers its supported
 non-recorder JSONL corpus on the recurring Federation synchronization pass.
-The headless machine-4 process offers its recorder corpus through the stronger
-recorder path. It does not copy raw MTConnect XML/probe archives or unrelated
-ad-hoc JSONL files placed on that headless host; those would require a separate
-sharing contract. The recorder JSONL exclusion in the generic path is
-intentional and prevents duplicate storage and duplicate analysis.
+The headless machine-4 process now runs a publisher-only pass for the same
+supported non-recorder `data/**/*.jsonl` corpus. It does not download the
+Federation's JSONL corpus or start workbench analysis/refresh tasks. Recorder
+JSONL remains excluded from this generic pass and travels only through the
+stronger checkpointed recorder path, which prevents duplicate storage and
+duplicate analysis. Raw MTConnect XML/probe archives are local-only.
+
+`--require-data-sharing` waits for both publication paths. A rejected generic
+JSONL commit therefore prevents the launcher from reporting sharing as ready;
+the durable state retries it on the next pass.
 
 ## Useful options
 
@@ -227,6 +232,8 @@ data/source_state/mtconnect_recorder_autoconfig.json
 data/federation/device/
 data/federation/onboarding/
 data/federation/recorder_publication/
+data/federation/jsonl-sync.sqlite3
+data/federation/jsonl-cache/
 ```
 
 Do not delete these paths to fix a transient Federation or scan error. Use the product's explicit source controls, pairing/reconnect path, or documented reset/migration procedure.
