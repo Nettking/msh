@@ -51,7 +51,7 @@ def observation_id_for(
     """Stable identity so a replayed report is the same observation."""
 
     digest = hashlib.sha256(
-        "|".join((session_id, job_id, attempt_id)).encode("utf-8")
+        f"{session_id}|{job_id}|{attempt_id}".encode()
     ).hexdigest()
     return f"obs-{digest[:32]}"
 
@@ -62,7 +62,7 @@ def _millis(start: datetime | None, end: datetime | None) -> int | None:
     delta = (end - start).total_seconds() * 1000.0
     if delta < 0:
         return None
-    return int(round(delta))
+    return round(delta)
 
 
 def _optional_metrics(details: Any) -> dict[str, Any]:
@@ -80,7 +80,7 @@ def _optional_metrics(details: Any) -> dict[str, Any]:
             continue
         # Bounds are enforced again by ExecutionMeasurements; rounding here
         # keeps a float report from being rejected outright.
-        values[name] = int(round(raw))
+        values[name] = round(raw)
     for name in _FLOAT_METRIC_FIELDS:
         raw = metrics.get(name)
         if isinstance(raw, bool) or not isinstance(raw, (int, float)):

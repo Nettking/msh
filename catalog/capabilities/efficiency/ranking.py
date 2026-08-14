@@ -15,6 +15,7 @@ number in a decision can be printed back to an operator.
 
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import math
 from collections.abc import Callable
@@ -146,7 +147,7 @@ def exploration_slot(job_id: str, *, policy: EfficiencyPolicy) -> bool:
     if not policy.exploration_enabled:
         return False
     digest = hashlib.sha256(
-        f"{policy.exploration_seed}:{job_id}".encode("utf-8")
+        f"{policy.exploration_seed}:{job_id}".encode()
     ).digest()
     bucket = int.from_bytes(digest[:4], "big") % EXPLORATION_BUCKETS
     return bucket < int(policy.exploration_ratio * EXPLORATION_BUCKETS)
@@ -411,10 +412,9 @@ class LearnedProviderRanker:
             explanation=explanation,
         )
         if self.decision_sink is not None:
-            try:
+            # Recording an explanation must never block a scheduling decision.
+            with contextlib.suppress(Exception):
                 self.decision_sink(record)
-            except Exception:  # noqa: BLE001 - recording must not block ranking
-                pass
         return CandidateRanking(
             ordered_capability_ids=ordered_ids,
             reason=REASON_EXPLORATION if changed else REASON_EVIDENCE,

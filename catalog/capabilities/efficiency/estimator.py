@@ -18,6 +18,7 @@ job, and how they are ranked is the ranker's.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Sequence
 from dataclasses import replace
 from datetime import datetime
@@ -81,7 +82,7 @@ class AdvertisedHardwareHeuristics:
         if isinstance(raw, bool) or not isinstance(raw, (int, float)):
             return 1.0
         value = float(raw)
-        if value != value or value <= 0.0:  # NaN or non-positive
+        if math.isnan(value) or value <= 0.0:
             return 1.0
         return min(MAX_HEURISTIC_FACTOR, max(MIN_HEURISTIC_FACTOR, value))
 
@@ -122,7 +123,9 @@ class BenchmarkResultEvidence:
             if isinstance(raw, bool) or not isinstance(raw, (int, float)):
                 return None
             value = float(raw)
-            return value if value == value and value >= 0.0 else None
+            if math.isnan(value) or value < 0.0:
+                return None
+            return value
 
         for name in cls._DURATION_MILLIS:
             value = _number(name)

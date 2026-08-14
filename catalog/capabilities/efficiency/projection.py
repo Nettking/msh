@@ -29,6 +29,7 @@ def _profile_view(
         half_life_seconds=policy.half_life_seconds,
         tier=EvidenceTier.MEASURED_EXACT,
     )
+    cost = expected_completion_millis(estimate, policy=policy)
     return {
         "capability_type": profile.key.capability_type,
         "workload_class": profile.key.workload_class,
@@ -43,9 +44,7 @@ def _profile_view(
             if estimate.expected_total_millis is None
             else round(estimate.expected_total_millis, 1)
         ),
-        "expected_cost_millis": (
-            lambda cost: None if cost is None else round(cost, 1)
-        )(expected_completion_millis(estimate, policy=policy)),
+        "expected_cost_millis": None if cost is None else round(cost, 1),
         "last_observed_at": (
             None
             if profile.last_observed_at is None

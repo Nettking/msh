@@ -66,6 +66,9 @@ WORKLOAD_CLASS_TIERS = ("exact", "family", "kind", "capability")
 _SCHEMA_RE = re.compile(r"^(?P<name>fcp\.[a-z0-9.-]+)\.v(?P<major>[0-9]+)$")
 _FEATURE_KEY_RE = re.compile(r"^[a-z][a-z0-9_]*$")
 
+#: Scalar types a workload feature may take. ``float`` subsumes ``int``.
+FeatureValue = str | bool | float
+
 
 def _text(value: Any, field_name: str, *, maximum: int = MAX_TEXT_BYTES) -> str:
     if (
@@ -280,7 +283,7 @@ def requirements_fingerprint(requirements: Any) -> str:
     return fingerprint(_safe_object(requirements, "requirements"), prefix="req")
 
 
-def _feature_value(value: Any, field_name: str) -> str | bool | int | float:
+def _feature_value(value: Any, field_name: str) -> FeatureValue:
     if isinstance(value, bool):
         return value
     if isinstance(value, int):
@@ -317,12 +320,12 @@ def _bucket(value: float) -> str:
     magnitude = abs(float(value))
     if magnitude < 1e-9:
         return "0"
-    exponent = int(math.floor(math.log2(magnitude)))
+    exponent = math.floor(math.log2(magnitude))
     sign = "-" if value < 0 else ""
     return f"{sign}2^{exponent}"
 
 
-def _feature_token(value: str | bool | int | float) -> str:
+def _feature_token(value: FeatureValue) -> str:
     if isinstance(value, bool):
         return "true" if value else "false"
     if isinstance(value, (int, float)):
@@ -338,7 +341,7 @@ class WorkloadDescriptor:
 
     capability_type: str
     job_kind: str
-    features: dict[str, str | bool | int | float] = field(default_factory=dict)
+    features: dict[str, FeatureValue] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         for name in ("capability_type", "job_kind"):
@@ -354,7 +357,7 @@ class WorkloadDescriptor:
                 "features",
                 f"must not exceed {MAX_FEATURES} entries",
             )
-        validated: dict[str, str | bool | int | float] = {}
+        validated: dict[str, FeatureValue] = {}
         for key in sorted(features):
             if not isinstance(key, str) or _FEATURE_KEY_RE.fullmatch(key) is None:
                 raise FederationValidationError(

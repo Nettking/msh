@@ -208,7 +208,7 @@ def test_the_federation_learns_where_to_send_each_workload(tmp_path) -> None:
     learned_millis, learned_choices = _run(ranker=ranker, store=store)
 
     # 1. The default scheduler is workload-blind: one node takes everything.
-    assert len(set(node for _workload, node in baseline_choices)) == 1
+    assert len({node for _workload, node in baseline_choices}) == 1
 
     # 2. It starts out no better than the default and ends up much better.
     early = _share_on_best(learned_choices[:50])
