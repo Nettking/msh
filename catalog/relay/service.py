@@ -53,6 +53,7 @@ from catalog.federation.protocol import (
     utc_now,
 )
 from catalog.federation.redaction import redact_secrets
+from catalog.federation.shared_file_storage import mask_public_jsonl_chunk_paths
 
 from .authentication import (
     create_authentication_nonce,
@@ -225,7 +226,11 @@ def _ensure_bounded_json(value: object, *, field: str) -> None:
             field,
             f"exceeds the relay command bound of {MAX_COMMAND_PAYLOAD_BYTES} bytes",
         )
-    if redact_secrets(value) != value:
+    # A federated JSONL chunk must name the file it carries, and every key
+    # ending in ``_path`` is redacted by the generic pass. Comparing against an
+    # expectation in which only that already-validated schema field is masked
+    # admits exactly one field of one schema; everything else still fails.
+    if redact_secrets(value) != mask_public_jsonl_chunk_paths(value):
         raise FederationValidationError(
             "nonpublic-payload",
             field,

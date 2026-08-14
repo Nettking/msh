@@ -25,6 +25,7 @@ from .recorder_storage_relay import (
     _text,
     _utc,
 )
+from .redaction import REDACTED, contains_nonpublic_location
 from .storage_protocol import StorageOperation
 
 FEDERATED_JSONL_DATASET_SCHEMA_NAME = "fcp.federation.jsonl-file-chunk"
@@ -122,6 +123,54 @@ def normalize_jsonl_relative_path(value: Any) -> str:
             "content.relative_path",
             "must be a normalized relative .jsonl path without traversal",
         )
+    if contains_nonpublic_location(value):
+        raise FederationValidationError(
+            "invalid-federated-jsonl-path",
+            "content.relative_path",
+            "must not be an absolute, drive-qualified, URL, or address-bearing path",
+        )
+    return value
+
+
+def is_federated_jsonl_chunk_content(value: Any) -> bool:
+    """Return whether ``value`` is exactly one federated JSONL chunk body."""
+
+    return (
+        isinstance(value, dict)
+        and value.get("schema") == FEDERATED_JSONL_CONTENT_SCHEMA
+    )
+
+
+def mask_public_jsonl_chunk_paths(value: Any) -> Any:
+    """Mask only the chunk paths the relay's location filter may safely pass.
+
+    The relay rejects any payload the generic redaction pass would alter, and
+    that pass redacts every key ending in ``_path``. A federated JSONL chunk
+    must name the file it carries, and ``relative_path`` is already constrained
+    by :func:`normalize_jsonl_relative_path` to a normalized, traversal-free,
+    relative ``.jsonl`` name that is not an absolute, drive-qualified, URL, or
+    address-bearing location.
+
+    Returning that one field pre-masked lets the relay compare against an
+    expected redaction instead of relaxing the filter. Every other ``*_path``
+    key, and any ``relative_path`` outside this exact schema, keeps failing.
+    A chunk whose path does not validate is left untouched, so the ordinary
+    filter still rejects it.
+    """
+
+    if isinstance(value, dict):
+        masked = {
+            key: mask_public_jsonl_chunk_paths(item) for key, item in value.items()
+        }
+        if is_federated_jsonl_chunk_content(value) and "relative_path" in value:
+            try:
+                normalize_jsonl_relative_path(value["relative_path"])
+            except FederationValidationError:
+                return masked
+            masked["relative_path"] = REDACTED
+        return masked
+    if isinstance(value, (list, tuple)):
+        return [mask_public_jsonl_chunk_paths(item) for item in value]
     return value
 
 
@@ -414,6 +463,8 @@ __all__ = [
     "federated_jsonl_batch_id",
     "federated_jsonl_dataset_id",
     "federated_jsonl_idempotency_key",
+    "is_federated_jsonl_chunk_content",
+    "mask_public_jsonl_chunk_paths",
     "normalize_jsonl_relative_path",
     "validate_federated_jsonl_ingest",
 ]
