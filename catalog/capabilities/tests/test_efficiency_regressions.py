@@ -5,6 +5,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 from catalog.capabilities.efficiency import (
+    DecayedStatistic,
     EfficiencyPolicy,
     ExecutionEnvironment,
     LearnedProviderRanker,
@@ -86,6 +87,32 @@ def test_persisted_decision_matches_operator_preferred_final_selection(tmp_path)
     stored = store.recent_decisions(limit=1)
     assert stored[0]["selected_node_id"] == "node-a"
     assert stored[0]["operator_preference_applied"] is True
+
+
+def test_decayed_statistic_is_independent_of_arrival_order() -> None:
+    half_life = 60 * 60
+    chronological = DecayedStatistic()
+    chronological = chronological.update(1.0, at=NOW, half_life_seconds=half_life)
+    chronological = chronological.update(
+        7.0, at=NOW + timedelta(hours=1), half_life_seconds=half_life
+    )
+    chronological = chronological.update(
+        3.0, at=NOW + timedelta(hours=2), half_life_seconds=half_life
+    )
+
+    delayed = DecayedStatistic()
+    delayed = delayed.update(1.0, at=NOW, half_life_seconds=half_life)
+    delayed = delayed.update(
+        3.0, at=NOW + timedelta(hours=2), half_life_seconds=half_life
+    )
+    delayed = delayed.update(
+        7.0, at=NOW + timedelta(hours=1), half_life_seconds=half_life
+    )
+
+    assert delayed.last_at == chronological.last_at
+    assert delayed.weight == chronological.weight
+    assert delayed.mean == chronological.mean
+    assert delayed.mean_square == chronological.mean_square
 
 
 def test_out_of_order_delivery_matches_chronological_rebuild(tmp_path) -> None:
