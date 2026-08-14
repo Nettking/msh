@@ -154,3 +154,51 @@ def test_own_published_file_is_not_mirrored_back_as_a_duplicate(tmp_path: Path):
         )
 
     assert list(bridge.mirror_root.rglob("*.jsonl")) == []
+
+
+def test_same_relative_path_from_two_producers_is_materialized_without_collision(
+    tmp_path: Path,
+):
+    first = _bridge(tmp_path, "first")
+    second = _bridge(tmp_path, "second")
+    target = _bridge(tmp_path, "target")
+    session_id = "session-two-jsonl-producers"
+    relative_path = Path("exports") / "shared.jsonl"
+    payloads = {
+        "node-first": b'{"machine_id":"first","sequence":1}\n',
+        "node-second": b'{"machine_id":"second","sequence":1}\n',
+    }
+
+    for bridge, (node_id, payload) in zip(
+        (first, second), payloads.items(), strict=True
+    ):
+        source = bridge.data_root / relative_path
+        source.parent.mkdir(parents=True, exist_ok=True)
+        source.write_bytes(payload)
+        bridge._prepare_local_rows(node_id)
+        entries = bridge._pending_publish_entries(
+            session_id=session_id,
+            node_id=node_id,
+            group_id="storage-1",
+            maximum=128,
+        )
+        assert len(entries) == 1
+        batch, published_path, _index = entries[0]
+        assert published_path == relative_path.as_posix()
+        assert target._ingest_remote(
+            _reference(batch, session_id=session_id),
+            batch["content"],
+            local_node_id="node-target",
+        )
+
+    mirrored = sorted(target.mirror_root.rglob("shared.jsonl"))
+    assert len(mirrored) == 2
+    assert {path.read_bytes() for path in mirrored} == set(payloads.values())
+    producer_directories = {
+        path.relative_to(target.mirror_root).parts[0] for path in mirrored
+    }
+    assert len(producer_directories) == 2
+    assert all(
+        path.relative_to(target.mirror_root).parts[1:] == relative_path.parts
+        for path in mirrored
+    )

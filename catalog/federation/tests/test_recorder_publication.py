@@ -384,6 +384,55 @@ def test_delivery_skips_rows_from_a_different_federation_session(tmp_path):
     assert remaining[0].session_id == "session-old"
 
 
+def test_delivery_skips_rows_for_a_previous_storage_group(tmp_path):
+    now = datetime(2026, 8, 9, 3, 0, tzinfo=timezone.utc)
+    client = RecordingClient()
+    outbox = SQLiteOutbox(tmp_path / "group-bound-outbox.sqlite3")
+    old_group_queue = DurableRecorderDeliveryQueue(
+        outbox=outbox,
+        client=client,
+        session_id="session-current",
+        destination_id="storage-old",
+        clock=lambda: now,
+    )
+    current_group_queue = DurableRecorderDeliveryQueue(
+        outbox=outbox,
+        client=client,
+        session_id="session-current",
+        destination_id="storage-current",
+        clock=lambda: now,
+    )
+    old_group_queue.enqueue(
+        session_id="session-current",
+        group_id="storage-old",
+        dataset_id="mtconnect:node-1:Mazak",
+        batch_id="Mazak:77:10:10:old-group",
+        idempotency_key="session-current:old-group:batch-10",
+        content={"sequence": 10},
+        created_at=now,
+    )
+    current_group_queue.enqueue(
+        session_id="session-current",
+        group_id="storage-current",
+        dataset_id="mtconnect:node-1:Mazak",
+        batch_id="Mazak:77:11:11:current-group",
+        idempotency_key="session-current:current-group:batch-11",
+        content={"sequence": 11},
+        created_at=now,
+    )
+
+    result = asyncio.run(current_group_queue.run_once())
+
+    assert result.attempted == 1
+    assert result.committed == 1
+    assert [call["batch_id"] for call in client.calls] == [
+        "Mazak:77:11:11:current-group"
+    ]
+    remaining = outbox.pending()
+    assert len(remaining) == 1
+    assert remaining[0].destination_id == "storage-old"
+
+
 def test_large_committed_batch_is_split_at_observation_boundaries(tmp_path):
     client = RecordingClient()
     store, checkpoint_file, outbox, _queue, reconciler = _build_reconciler(

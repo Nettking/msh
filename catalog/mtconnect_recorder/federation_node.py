@@ -12,6 +12,7 @@ storage-control authority.
 from __future__ import annotations
 
 import asyncio
+import math
 import threading
 import time
 import uuid
@@ -27,7 +28,11 @@ from catalog.federation.errors import (
 )
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 from catalog.federation.outbox import SQLiteOutbox
-from catalog.federation.recorder_delivery import DurableRecorderDeliveryQueue
+from catalog.federation.recorder_delivery import (
+    RECORDER_STORAGE_SCHEMA,
+    DurableRecorderDeliveryQueue,
+    RecorderDeliveryRunResult,
+)
 from catalog.federation.recorder_publication import (
     RecorderArchiveReconciler,
     RecorderFederationDeliveryWorker,
@@ -49,6 +54,9 @@ from catalog.flask_app.services.resilient_pairing_runtime import (
 )
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
+MAX_SHARING_READY_SECONDS = 600.0
+MAX_FEDERATION_REQUEST_SECONDS = 120.0
+
 
 @dataclass(frozen=True)
 class StorageAuthoritySelection:
@@ -69,6 +77,46 @@ class RecorderFederationSnapshot:
     pending_batches: int = 0
     last_committed_count: int = 0
     last_error_code: str | None = None
+
+
+def _current_recorder_pending(
+    pending_entries: tuple[object, ...],
+    *,
+    session_id: str,
+    group_id: str,
+) -> tuple[object, ...]:
+    return tuple(
+        entry
+        for entry in pending_entries
+        if getattr(entry, "session_id", None) == session_id
+        and getattr(entry, "schema_id", None) == RECORDER_STORAGE_SCHEMA
+        and getattr(entry, "destination_id", None) == group_id
+    )
+
+
+def _publication_cycle_status(
+    *,
+    pending_entries: tuple[object, ...],
+    session_id: str,
+    group_id: str,
+    delivery: RecorderDeliveryRunResult,
+) -> tuple[str, int, str | None]:
+    """Classify only deliverable rows owned by this authenticated session."""
+
+    current = _current_recorder_pending(
+        pending_entries,
+        session_id=session_id,
+        group_id=group_id,
+    )
+    pending = len(current)
+    failed = delivery.pending > 0 or any(
+        getattr(entry, "last_error", None) for entry in current
+    )
+    if failed:
+        return "backlogged", pending, "recorder-delivery-pending"
+    if pending:
+        return "publishing", pending, None
+    return "up-to-date", 0, None
 
 
 def select_storage_authority(
@@ -164,8 +212,22 @@ class RecorderFederationNode:
         publication_poll_seconds: float = 0.5,
         service: PairingAwareCapabilityOnboardingService | None = None,
     ) -> None:
-        if request_timeout <= 0 or publication_poll_seconds <= 0:
-            raise ValueError("Federation timeouts must be positive")
+        if (
+            not math.isfinite(request_timeout)
+            or not 0 < request_timeout <= MAX_FEDERATION_REQUEST_SECONDS
+        ):
+            raise ValueError(
+                "Federation request timeout must be finite, positive, and at "
+                f"most {MAX_FEDERATION_REQUEST_SECONDS:g} seconds"
+            )
+        if (
+            not math.isfinite(publication_poll_seconds)
+            or not 0 < publication_poll_seconds <= 60.0
+        ):
+            raise ValueError(
+                "Federation publication poll interval must be finite, positive, "
+                "and at most 60 seconds"
+            )
         self.data_directory = Path(data_directory).resolve()
         self.display_name = display_name.strip() or "FCP MTConnect recorder"
         self.source_names = tuple(sorted(dict.fromkeys(source_names)))
@@ -220,12 +282,55 @@ class RecorderFederationNode:
         for an authority or an explicit group choice.
         """
 
-        if timeout_seconds <= 0:
-            raise ValueError("sharing readiness timeout must be positive")
+        if (
+            not math.isfinite(timeout_seconds)
+            or not 0 < timeout_seconds <= MAX_SHARING_READY_SECONDS
+        ):
+            raise ValueError(
+                "sharing readiness timeout must be finite, positive, and at "
+                f"most {MAX_SHARING_READY_SECONDS:g} seconds"
+            )
         deadline = time.monotonic() + float(timeout_seconds)
         while True:
+            if self._stop.is_set():
+                raise FederationOperationError(
+                    "recorder-publication-stopped",
+                    "recorder publication stopped before data sharing became ready",
+                )
+            future = self._publication_future
+            if future is None:
+                raise FederationOperationError(
+                    "recorder-publication-not-started",
+                    "recorder publication was not started",
+                )
+            if future.done():
+                if future.cancelled():
+                    suffix = " (cancelled)"
+                else:
+                    failure = future.exception()
+                    suffix = (
+                        "" if failure is None else f" ({type(failure).__name__})"
+                    )
+                raise FederationOperationError(
+                    "recorder-publication-stopped",
+                    "recorder publication stopped before data sharing became ready"
+                    + suffix,
+                )
             snapshot = self.snapshot()
-            if snapshot.storage_state in {"publishing", "up-to-date"}:
+            if snapshot.storage_state == "up-to-date" or (
+                snapshot.storage_state == "publishing"
+                and snapshot.last_committed_count > 0
+            ):
+                if (
+                    self._stop.is_set()
+                    or self._publication_future is not future
+                    or future.done()
+                ):
+                    raise FederationOperationError(
+                        "recorder-publication-stopped",
+                        "recorder publication changed state while data sharing "
+                        "readiness was being checked",
+                    )
                 return snapshot
             remaining = deadline - time.monotonic()
             if remaining <= 0:
@@ -366,6 +471,7 @@ class RecorderFederationNode:
             outbox=outbox,
             client=storage_client,
             session_id=state.binding.internal_session_id,
+            destination_id=group_id,
         )
         reconciler = RecorderArchiveReconciler(
             store=DurableRecorderStore(self.data_directory),
@@ -461,15 +567,22 @@ class RecorderFederationNode:
 
                     assert worker is not None and outbox is not None
                     cycle = await worker.run_cycle()
-                    pending = len(outbox.pending())
+                    storage_state, pending, delivery_error = (
+                        _publication_cycle_status(
+                            pending_entries=outbox.pending(),
+                            session_id=state.binding.internal_session_id,
+                            group_id=group_id,
+                            delivery=cycle.delivery,
+                        )
+                    )
                     self._set_snapshot(
                         status="connected",
-                        storage_state="publishing" if pending else "up-to-date",
+                        storage_state=storage_state,
                         storage_group=group_id,
                         storage_authority_node_id=authority_node_id,
                         pending_batches=pending,
                         last_committed_count=cycle.delivery.committed,
-                        last_error_code=None,
+                        last_error_code=delivery_error,
                     )
                     failures = 0
                     await asyncio.sleep(self.publication_poll_seconds)
@@ -486,7 +599,15 @@ class RecorderFederationNode:
                         status="retrying",
                         storage_state="backlogged",
                         pending_batches=(
-                            0 if outbox is None else len(outbox.pending())
+                            0
+                            if outbox is None
+                            else len(
+                                _current_recorder_pending(
+                                    outbox.pending(),
+                                    session_id=state.binding.internal_session_id,
+                                    group_id=group_id or "",
+                                )
+                            )
                         ),
                         last_error_code=str(
                             getattr(exc, "code", type(exc).__name__)

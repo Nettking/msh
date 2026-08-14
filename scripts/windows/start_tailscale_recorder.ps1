@@ -24,16 +24,28 @@ function Test-RecorderPython {
         [pscustomobject]$Candidate
     )
 
-    Push-Location $RepositoryRoot
+    $ProbeArguments = @($Candidate.Prefix) + @("-c", '"import start_recorder"')
+    $Process = $null
     try {
-        & $Candidate.Executable @($Candidate.Prefix) -c "import start_recorder" 2>$null
-        return $LASTEXITCODE -eq 0
+        $Process = Start-Process `
+            -FilePath $Candidate.Executable `
+            -ArgumentList $ProbeArguments `
+            -WorkingDirectory $RepositoryRoot `
+            -WindowStyle Hidden `
+            -PassThru
+        if (-not $Process.WaitForExit(10000)) {
+            Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
+            return $false
+        }
+        return $Process.ExitCode -eq 0
     }
     catch {
         return $false
     }
     finally {
-        Pop-Location
+        if ($null -ne $Process) {
+            $Process.Dispose()
+        }
     }
 }
 
@@ -88,13 +100,21 @@ function Resolve-RecorderPython {
     )
 }
 
+$PairingKey = $env:FCP_RECORDER_FEDERATION_KEY
+Remove-Item Env:FCP_RECORDER_FEDERATION_KEY -ErrorAction SilentlyContinue
 $PythonCommand = Resolve-RecorderPython
 
 Push-Location $RepositoryRoot
 try {
+    if (-not [string]::IsNullOrWhiteSpace($PairingKey)) {
+        $env:FCP_RECORDER_FEDERATION_KEY = $PairingKey
+    }
     & $PythonCommand.Executable @($PythonCommand.Prefix) -m scripts.start_tailscale_recorder @RecorderArguments
-    exit $LASTEXITCODE
+    $LauncherExitCode = $LASTEXITCODE
 }
 finally {
+    Remove-Item Env:FCP_RECORDER_FEDERATION_KEY -ErrorAction SilentlyContinue
+    $PairingKey = $null
     Pop-Location
 }
+exit $LauncherExitCode

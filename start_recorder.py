@@ -14,6 +14,7 @@ available for explicit deployments.
 from __future__ import annotations
 
 import json
+import math
 import os
 import runpy
 import sys
@@ -47,7 +48,11 @@ from catalog.mtconnect_recorder.federation_control import (
     RecorderFederationControlWorker,
     infer_private_scan_cidr,
 )
-from catalog.mtconnect_recorder.federation_node import RecorderFederationNode
+from catalog.mtconnect_recorder.federation_node import (
+    MAX_FEDERATION_REQUEST_SECONDS,
+    MAX_SHARING_READY_SECONDS,
+    RecorderFederationNode,
+)
 from catalog.mtconnect_recorder.upgrade_compat import ensure_recorder_upgrade_config
 
 _AUTO_CONFIG_SCHEMA = "fcp.mtconnect_recorder.autoconfig.v1"
@@ -96,6 +101,7 @@ def _write_json_atomic(path: Path, value: Mapping[str, Any]) -> None:
 def build_parser() -> ArgumentParser:
     parser = ArgumentParser(
         description="Start the loss-aware FCP MTConnect recorder.",
+        allow_abbrev=False,
     )
     parser.add_argument(
         "inputs",
@@ -382,49 +388,24 @@ def _start_federation(
         requested_storage_group=args.storage_group,
         request_timeout=args.federation_timeout,
     )
+    keep_node = False
     try:
-        if pairing_key is None and not node.has_saved_membership():
-            if args.require_federation or args.require_data_sharing:
-                raise FederationOperationError(
-                    "recorder-pairing-required",
-                    "required Federation startup needs a saved membership or a "
-                    "fresh FCP1 pairing code",
-                    "pairing_key",
-                )
-            print("Federation: local-only (pass an FCP1-... key to join).")
-            return None
-        snapshot = node.bootstrap(pairing_key)
-    except (
-        AuthenticationError,
-        FederationOperationError,
-        FederationValidationError,
-        OSError,
-        RuntimeError,
-        TimeoutError,
-    ) as exc:
-        code = str(getattr(exc, "code", type(exc).__name__))
-        message = str(getattr(exc, "message", str(exc) or type(exc).__name__))
-        print(
-            f"Federation bootstrap unavailable ({code}): {message}",
-            file=sys.stderr,
-        )
-        node.stop()
-        if args.require_federation or args.require_data_sharing:
-            raise
-        print(
-            "Recording will continue locally. No pairing key or Federation "
-            "credential was persisted by the failed attempt.",
-            file=sys.stderr,
-        )
-        return None
-
-    if args.require_data_sharing:
         try:
-            snapshot = node.wait_until_sharing_ready(
-                timeout_seconds=args.sharing_timeout,
-            )
+            if pairing_key is None and not node.has_saved_membership():
+                if args.require_federation or args.require_data_sharing:
+                    raise FederationOperationError(
+                        "recorder-pairing-required",
+                        "required Federation startup needs a saved membership or a "
+                        "fresh FCP1 pairing code",
+                        "pairing_key",
+                    )
+                print("Federation: local-only (pass an FCP1-... key to join).")
+                return None
+            snapshot = node.bootstrap(pairing_key)
         except (
+            AuthenticationError,
             FederationOperationError,
+            FederationValidationError,
             OSError,
             RuntimeError,
             TimeoutError,
@@ -432,27 +413,56 @@ def _start_federation(
             code = str(getattr(exc, "code", type(exc).__name__))
             message = str(getattr(exc, "message", str(exc) or type(exc).__name__))
             print(
-                f"Federation data sharing unavailable ({code}): {message}",
+                f"Federation bootstrap unavailable ({code}): {message}",
                 file=sys.stderr,
             )
-            node.stop()
-            raise
+            if args.require_federation or args.require_data_sharing:
+                raise
+            print(
+                "Recording will continue locally. No pairing key or Federation "
+                "credential was persisted by the failed attempt.",
+                file=sys.stderr,
+            )
+            return None
 
-    print("Federation: connected")
-    print(f"  Device:     {snapshot.node_id}")
-    print(f"  Federation: {snapshot.federation_id}")
-    print(f"  Session:    {snapshot.session_id}")
-    if snapshot.storage_group:
-        print(f"  Data group: {snapshot.storage_group}")
-    elif args.storage_group:
-        print(f"  Data group: {args.storage_group} (waiting for authority)")
-    else:
-        print("  Data group: auto-select one ready logical-storage group")
-    print(
-        "  Delivery:   local capture first; durable Federation backlog retries "
-        "independently"
-    )
-    return node
+        if args.require_data_sharing:
+            try:
+                snapshot = node.wait_until_sharing_ready(
+                    timeout_seconds=args.sharing_timeout,
+                )
+            except Exception as exc:
+                code = str(getattr(exc, "code", type(exc).__name__))
+                message = str(
+                    getattr(exc, "message", str(exc) or type(exc).__name__)
+                )
+                print(
+                    f"Federation data sharing unavailable ({code}): {message}",
+                    file=sys.stderr,
+                )
+                raise
+
+        print("Federation: connected")
+        print(f"  Device:     {snapshot.node_id}")
+        print(f"  Federation: {snapshot.federation_id}")
+        print(f"  Session:    {snapshot.session_id}")
+        if snapshot.storage_group:
+            print(f"  Data group: {snapshot.storage_group}")
+        elif args.storage_group:
+            print(f"  Data group: {args.storage_group} (waiting for authority)")
+        else:
+            print("  Data group: auto-select one ready logical-storage group")
+        print(
+            "  Delivery:   local capture first; durable Federation backlog retries "
+            "independently"
+        )
+        keep_node = True
+        return node
+    finally:
+        if not keep_node:
+            try:
+                node.stop()
+            except Exception:  # noqa: BLE001, S110 - preserve startup failure
+                pass
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -468,10 +478,22 @@ def main(argv: list[str] | None = None) -> int:
         parser.error("--max-batches-per-cycle must be greater than zero.")
     if args.timeout <= 0:
         parser.error("--timeout must be greater than zero.")
-    if args.federation_timeout <= 0:
-        parser.error("--federation-timeout must be greater than zero.")
-    if args.sharing_timeout <= 0:
-        parser.error("--sharing-timeout must be greater than zero.")
+    if (
+        not math.isfinite(args.federation_timeout)
+        or not 0 < args.federation_timeout <= MAX_FEDERATION_REQUEST_SECONDS
+    ):
+        parser.error(
+            "--federation-timeout must be finite, greater than zero, and at most "
+            f"{MAX_FEDERATION_REQUEST_SECONDS:g} seconds."
+        )
+    if (
+        not math.isfinite(args.sharing_timeout)
+        or not 0 < args.sharing_timeout <= MAX_SHARING_READY_SECONDS
+    ):
+        parser.error(
+            "--sharing-timeout must be finite, greater than zero, and at most "
+            f"{MAX_SHARING_READY_SECONDS:g} seconds."
+        )
     if not 1 <= args.scan_port <= 65535:
         parser.error("--scan-port must be between 1 and 65535.")
 

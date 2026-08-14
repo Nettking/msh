@@ -24,6 +24,66 @@ On first configuration the launcher:
 5. starts managed loss-aware recording; and
 6. starts the Federation recorder-control worker and publication reconciler.
 
+## Maskin 4 over Tailscale (Windows)
+
+For the recorder at Mekanisk Service Halden, first install Tailscale and sign
+the host in to the same tailnet as the other Federation devices. Tailscale must
+already be running and signed in; the FCP launcher never changes tailnet login,
+routes, or ACL settings.
+
+On the current Federation leader, open FCP through the leader's numeric
+Tailscale `100.x.y.z` address (not `localhost`, a LAN name, or a DNS name) and
+generate a fresh `FCP1-...` pairing code. Then run this single command on
+machine 4:
+
+```cmd
+start-tailscale-recorder.cmd --storage-group fcp-local-storage
+```
+
+The command prompts for the pairing code without echo on first start. Do not
+put the code after the command: keeping it out of the command line also keeps it
+out of shell history and process listings. Later starts use the saved
+membership and do not prompt again.
+
+The command defaults the device label to
+`Maskin 4 recorder - Mekanisk Service Halden`, runs the normal bounded local
+MTConnect discovery, and refuses to start capture unless all of these checks
+pass:
+
+1. a signed-in Tailscale IPv4 address in `100.64.0.0/10` is present;
+2. the leader address answers a bounded `tailscale ping` as a peer in the same
+   tailnet and accepts TCP on the Federation relay port;
+3. a Python installation can load the recorder and its dependencies;
+4. the recorder joins or reconnects to the Federation; and
+5. the authenticated recorder publication worker resolves a writable storage
+   authority and completes a clean cycle, or a backlog cycle produces at least
+   one confirmed storage commit.
+
+That last check proves that the authenticated publication route is selected and
+the worker is healthy. On an empty first start it does not claim that an ingest
+has already been accepted. Once local checkpoint-committed observations exist,
+the same worker publishes them with durable retry while recording stays
+local-first. Keep the command window open; closing it stops the foreground
+recorder.
+
+`fcp-local-storage` is the standard storage group created by the normal FCP
+creator setup. If this Federation uses a different group, replace it with that
+group's logical ID and then keep that choice stable. If an operator changes the
+group while a backlog exists, old-group rows remain durable locally rather than
+being sent to the new authority. Restart against the old group to drain it; do
+not delete the durable outbox as a workaround. If the MTConnect Agent is on a
+private subnet that cannot be inferred from the recorder host, add `--scan-cidr`,
+for example:
+
+```cmd
+start-tailscale-recorder.cmd --storage-group fcp-local-storage --scan-cidr 192.168.10.0/24
+```
+
+The leader's Tailscale path and relay port `8765` must be allowed by the
+tailnet ACL and the leader host firewall. A failed preflight, pairing attempt,
+or sharing-readiness check exits non-zero instead of silently starting a
+local-only recorder.
+
 If the recorder cannot infer a suitable private IPv4 `/24`, it may still join the Federation. You can then request a scan remotely from another trusted Federation device or provide `--scan-cidr` explicitly.
 
 ## Later starts
@@ -119,6 +179,24 @@ python start_recorder.py --storage-group telemetry
 
 If no ready logical-storage authority exists, local capture still continues while publication waits safely.
 
+### Which JSONL data is shared
+
+The product uses two deliberate paths so recorder telemetry is not published
+and analyzed twice:
+
+| Local data | Federation path | Receiving workbench path |
+| --- | --- | --- |
+| `data/sources/mtconnect_recorder/jsonl/**` | checkpoint-, sequence-, and hash-verified recorder observations | `data/federation/shared/telemetry/*.jsonl` |
+| other supported `data/**/*.jsonl` on a normal FCP workbench | generic authenticated JSONL chunks | `data/federation/shared/jsonl-files/<producer>/**` |
+
+Every connected full workbench device therefore offers its supported
+non-recorder JSONL corpus on the recurring Federation synchronization pass.
+The headless machine-4 process offers its recorder corpus through the stronger
+recorder path. It does not copy raw MTConnect XML/probe archives or unrelated
+ad-hoc JSONL files placed on that headless host; those would require a separate
+sharing contract. The recorder JSONL exclusion in the generic path is
+intentional and prevents duplicate storage and duplicate analysis.
+
 ## Useful options
 
 ```text
@@ -126,6 +204,8 @@ If no ready logical-storage authority exists, local capture still continues whil
 --storage-group ID            Explicit logical Federation storage group
 --federation-timeout SECONDS  Federation request timeout
 --require-federation          Stop instead of falling back to local capture when initial join/reconnect fails
+--require-data-sharing        Also require a ready/confirmed logical-storage publication route
+--sharing-timeout SECONDS     Bounded wait for required data sharing (default 45)
 --scan-cidr CIDR              Explicit private IPv4 scan network
 --scan-port PORT              MTConnect scan port (default 5000)
 --no-auto-scan                Skip startup discovery

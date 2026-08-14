@@ -230,6 +230,8 @@ data/federation/recorder_publication/
 | `--storage-group` | Explicit logical Federation storage group. |
 | `--federation-timeout` | Federation request timeout. |
 | `--require-federation` | Stop if initial join/reconnect fails instead of recording locally. |
+| `--require-data-sharing` | Also require a ready logical-storage publication route before capture. |
+| `--sharing-timeout` | Bounded wait for required data sharing; defaults to 45 seconds. |
 | `--scan-cidr` | Explicit private IPv4 scan network. |
 | `--scan-port` | MTConnect discovery port; defaults to 5000. |
 | `--no-auto-scan` | Skip default startup discovery. |

@@ -138,6 +138,57 @@ def test_required_data_sharing_waits_for_ready_publication(monkeypatch) -> None:
     assert SharingNode.instance.waited == 7.0
 
 
+def test_unexpected_sharing_failure_still_stops_federation_node(monkeypatch) -> None:
+    class FailingNode:
+        instance = None
+
+        def __init__(self, **_kwargs) -> None:
+            self.stopped = False
+            type(self).instance = self
+
+        def has_saved_membership(self) -> bool:
+            return True
+
+        def bootstrap(self, _pairing_key):
+            return SimpleNamespace(storage_group=None)
+
+        def wait_until_sharing_ready(self, *, timeout_seconds):
+            assert timeout_seconds == 45.0
+            raise ValueError("unexpected readiness defect")
+
+        def stop(self) -> None:
+            self.stopped = True
+
+    monkeypatch.setattr(start_recorder, "RecorderFederationNode", FailingNode)
+    args = start_recorder.build_parser().parse_args(["--require-data-sharing"])
+
+    with pytest.raises(ValueError, match="unexpected readiness defect"):
+        start_recorder._start_federation(
+            args=args,
+            pairing_key=None,
+            data_dir=Path("data"),
+            parsed_sources=[],
+        )
+
+    assert FailingNode.instance.stopped is True
+
+
+@pytest.mark.parametrize("timeout", ["nan", "inf", "601"])
+def test_start_recorder_rejects_unbounded_sharing_timeout(timeout: str) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        start_recorder.main(["--sharing-timeout", timeout])
+
+    assert excinfo.value.code == 2
+
+
+@pytest.mark.parametrize("timeout", ["nan", "inf", "121"])
+def test_start_recorder_rejects_unbounded_federation_timeout(timeout: str) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        start_recorder.main(["--federation-timeout", timeout])
+
+    assert excinfo.value.code == 2
+
+
 def test_first_start_auto_scan_selects_discovered_sources(
     tmp_path: Path,
     monkeypatch,
