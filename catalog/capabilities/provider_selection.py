@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field, replace
 from datetime import datetime
-from typing import Any
+from typing import Any, Protocol
 
 from catalog.federation.errors import FederationValidationError
 
@@ -64,6 +64,32 @@ class ProviderCandidate:
 
 
 @dataclass(frozen=True)
+class CandidateRanking:
+    """One ranker's ordering of the already-eligible candidates.
+
+    A ranker may only reorder. It never sees rejected providers, never adds a
+    candidate, and never relaxes a hard constraint. ``details`` carries the
+    ranker's own explanation and is treated as opaque JSON-safe data here.
+    """
+
+    ordered_capability_ids: tuple[str, ...]
+    reason: str
+    details: dict[str, Any] = field(default_factory=dict)
+
+
+class CandidateRanker(Protocol):
+    """Optional evidence-based ordering over eligible provider candidates."""
+
+    def rank(
+        self,
+        job: JobContract,
+        candidates: tuple[ProviderCandidate, ...],
+        *,
+        evaluated_at: datetime,
+    ) -> CandidateRanking | None: ...
+
+
+@dataclass(frozen=True)
 class ProviderSelection:
     decision: str
     selected_capability_id: str | None
@@ -72,6 +98,50 @@ class ProviderSelection:
     rejected: dict[str, tuple[str, ...]]
     reason: str
     evaluated_at: datetime
+    ranking: CandidateRanking | None = None
+
+
+def _apply_ranking(
+    job: JobContract,
+    candidates: list[ProviderCandidate],
+    *,
+    ranker: CandidateRanker | None,
+    evaluated_at: datetime,
+    policy: ProviderSelectionPolicy,
+) -> tuple[list[ProviderCandidate], CandidateRanking | None]:
+    """Reorder eligible candidates, or keep the deterministic order.
+
+    Every failure mode - no ranker, no opinion, a malformed ordering, or a
+    raising ranker - falls back to the existing deterministic ranking. Learned
+    scheduling can therefore never make the scheduler unavailable.
+    """
+
+    if ranker is None or len(candidates) < 2:
+        return candidates, None
+    try:
+        ranking = ranker.rank(job, tuple(candidates), evaluated_at=evaluated_at)
+    except Exception:  # noqa: BLE001 - ranking must never block scheduling
+        return candidates, None
+    if not isinstance(ranking, CandidateRanking):
+        return candidates, None
+    ordered = tuple(ranking.ordered_capability_ids)
+    eligible = {candidate.capability_id for candidate in candidates}
+    if len(ordered) != len(candidates) or set(ordered) != eligible:
+        return candidates, None
+    position = {capability_id: index for index, capability_id in enumerate(ordered)}
+    preferred = policy.preferred_node_id
+
+    def _key(candidate: ProviderCandidate) -> tuple[int, int]:
+        # An explicit operator node preference is a constraint, not evidence:
+        # learned ordering applies inside each preference group only.
+        group = (
+            0
+            if preferred is None or candidate.report.node_id == preferred
+            else 1
+        )
+        return (group, position[candidate.capability_id])
+
+    return sorted(candidates, key=_key), ranking
 
 
 def evaluate_provider_candidate(
@@ -165,6 +235,7 @@ def select_provider(
     *,
     evaluated_at: datetime,
     policy: ProviderSelectionPolicy | None = None,
+    ranker: CandidateRanker | None = None,
 ) -> ProviderSelection:
     """Return a deterministic recommendation, never an ownership grant."""
 
@@ -203,6 +274,25 @@ def select_provider(
         else:
             rejected[candidate.capability_id] = candidate.reasons
     candidates.sort(key=lambda candidate: candidate.rank)
+    candidates, ranking = _apply_ranking(
+        job,
+        candidates,
+        ranker=ranker,
+        evaluated_at=observed_at,
+        policy=policy,
+    )
+    if ranking is not None:
+        # Hard-constraint rejections belong to the same explanation as the
+        # learned comparison, but a ranker never sees them.
+        ranking = replace(
+            ranking,
+            details={
+                **ranking.details,
+                "rejected": {
+                    key: list(value) for key, value in sorted(rejected.items())
+                },
+            },
+        )
     eligible_ids = tuple(candidate.capability_id for candidate in candidates)
     if not candidates:
         return ProviderSelection(
@@ -228,7 +318,12 @@ def select_provider(
         reason=(
             "preferred-node-provider-selected"
             if preferred
-            else "highest-ranked-eligible-provider"
+            else (
+                ranking.reason
+                if ranking is not None
+                else "highest-ranked-eligible-provider"
+            )
         ),
         evaluated_at=observed_at,
+        ranking=ranking,
     )

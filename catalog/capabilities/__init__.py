@@ -160,6 +160,8 @@ from .provider_reports import (
     validate_provider_report_protocol,
 )
 from .provider_selection import (
+    CandidateRanker,
+    CandidateRanking,
     ProviderCandidate,
     ProviderSelection,
     evaluate_provider_candidate,
@@ -270,6 +272,8 @@ __all__ = [
     "ArtifactTransferPlan",
     "AttemptStatus",
     "CallableDispatchTransport",
+    "CandidateRanker",
+    "CandidateRanking",
     "CancellationRequest",
     "CancellationResponse",
     "CancellationState",

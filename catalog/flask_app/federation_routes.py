@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hmac
+from datetime import datetime, timezone
 
 from flask import (
     Blueprint,
@@ -10,6 +11,7 @@ from flask import (
     abort,
     current_app,
     flash,
+    jsonify,
     make_response,
     redirect,
     render_template,
@@ -17,6 +19,8 @@ from flask import (
     session,
     url_for,
 )
+
+from catalog.capabilities.efficiency import learning_snapshot
 
 from catalog.federation.errors import (
     AuthorizationError,
@@ -453,6 +457,31 @@ def apply_updates() -> Response:
     return redirect(url_for("federation_web.overview"), code=303)
 
 
+#: Optional application binding for the coordinator-owned learning store.
+EFFICIENCY_STORE_CONFIG_KEY = "FEDERATION_EFFICIENCY_LEARNING_STORE"
+
+
+@federation_web.get("/federation/efficiency.json", strict_slashes=False)
+def efficiency_learning() -> Response:
+    """Read-only view of what the Federation has learned about execution.
+
+    The route is deliberately small: counts, learned per-node performance,
+    current preferences with their evidence, and the most recent scheduling
+    decisions. It reads the store and never writes to it, and it returns an
+    explicit unavailable snapshot rather than failing when learning is not
+    configured on this device.
+    """
+
+    snapshot = learning_snapshot(
+        current_app.config.get(EFFICIENCY_STORE_CONFIG_KEY),
+        now=datetime.now(timezone.utc),
+    )
+    response = jsonify(snapshot)
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
+
+
 @federation_web.get("/federation/<page_name>", strict_slashes=False)
 def detail(page_name: str) -> Response:
     page = _PAGE_BY_PATH.get(page_name)
@@ -463,4 +492,4 @@ def detail(page_name: str) -> Response:
     return _page_response(page)
 
 
-__all__ = ["federation_web"]
+__all__ = ["EFFICIENCY_STORE_CONFIG_KEY", "federation_web"]
