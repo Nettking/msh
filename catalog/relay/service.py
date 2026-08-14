@@ -226,11 +226,17 @@ def _ensure_bounded_json(value: object, *, field: str) -> None:
             field,
             f"exceeds the relay command bound of {MAX_COMMAND_PAYLOAD_BYTES} bytes",
         )
+    redacted = redact_secrets(value)
     # A federated JSONL chunk must name the file it carries, and every key
     # ending in ``_path`` is redacted by the generic pass. Comparing against an
     # expectation in which only that already-validated schema field is masked
     # admits exactly one field of one schema; everything else still fails.
-    if redact_secrets(value) != mask_public_jsonl_chunk_paths(value):
+    #
+    # Only pay for that second walk when the generic pass actually changed
+    # something. Every payload the relay routes goes through here, including
+    # storage batch traffic that has no redactable field at all, so the clean
+    # case must cost exactly one walk as it did before the allowance existed.
+    if redacted != value and redacted != mask_public_jsonl_chunk_paths(value):
         raise FederationValidationError(
             "nonpublic-payload",
             field,
