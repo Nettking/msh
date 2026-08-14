@@ -28,6 +28,9 @@ from .federation_pairing_service import (
     RemotePairingState,
     RemotePairingStore,
 )
+from .federation_storage_authority_install import (
+    install_federation_storage_authority,
+)
 from .federation_update_handoff import HostUpdateHandoff
 from .recorder_federation_publication_install import (
     install_recorder_federation_publication,
@@ -615,6 +618,13 @@ def install_federation_pairing(app: Flask) -> LazyPairingOnboardingService:
     )
 
     install_recorder_federation_publication(
+        app,
+        onboarding_service=service,
+    )
+    # Publication has nowhere to go unless this Federation also serves a
+    # logical-storage authority, so the two are installed against the same
+    # onboarding service and share its authorized context.
+    install_federation_storage_authority(
         app,
         onboarding_service=service,
     )
