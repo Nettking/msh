@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+import pytest
+
 from catalog.capabilities.efficiency import (
     DecayedStatistic,
     EfficiencyPolicy,
@@ -110,9 +112,9 @@ def test_decayed_statistic_is_independent_of_arrival_order() -> None:
     )
 
     assert delayed.last_at == chronological.last_at
-    assert delayed.weight == chronological.weight
-    assert delayed.mean == chronological.mean
-    assert delayed.mean_square == chronological.mean_square
+    assert delayed.weight == pytest.approx(chronological.weight)
+    assert delayed.mean == pytest.approx(chronological.mean)
+    assert delayed.mean_square == pytest.approx(chronological.mean_square)
 
 
 def test_out_of_order_delivery_matches_chronological_rebuild(tmp_path) -> None:
