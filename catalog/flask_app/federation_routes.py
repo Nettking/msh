@@ -21,7 +21,6 @@ from flask import (
 )
 
 from catalog.capabilities.efficiency import learning_snapshot
-
 from catalog.federation.errors import (
     AuthorizationError,
     FederationOperationError,
