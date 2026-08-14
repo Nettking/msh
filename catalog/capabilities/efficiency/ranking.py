@@ -1,16 +1,8 @@
 """Evidence-based ranking of already-eligible provider candidates.
 
-This module is the only place that turns learned state into a scheduling
-preference, and it is deliberately replaceable: it implements the
-:class:`~catalog.capabilities.provider_selection.CandidateRanker` protocol and
-nothing else in the job path knows how it works.
-
-The algorithm is a contextual multi-armed bandit in its simplest auditable
-form. The *context* is the workload class; each eligible provider is an arm;
-the reward model is the decayed statistics already stored per arm; and
-exploration is an explicit, bounded, deterministic UCB-style bonus. Nothing
-here is trained, so there is no model to serve, version, or debug, and every
-number in a decision can be printed back to an operator.
+This module turns learned state into a scheduling preference without owning
+eligibility or authority. Hard compatibility remains in provider_selection;
+this ranker may only permute the candidates that survived those checks.
 """
 
 from __future__ import annotations
@@ -28,12 +20,7 @@ from catalog.federation.errors import FederationValidationError
 from ..jobs import JobContract
 from ..provider_reports import ProviderResourceReport
 from ..provider_selection import CandidateRanking, ProviderCandidate
-from .contracts import (
-    MAX_FEATURES,
-    ExecutionEnvironment,
-    WorkloadDescriptor,
-    stamp,
-)
+from .contracts import MAX_FEATURES, ExecutionEnvironment, WorkloadDescriptor, stamp
 from .estimator import PerformanceEstimator
 from .policy import (
     EXPLORATION_BUCKETS,
@@ -53,16 +40,11 @@ WorkloadResolver = Callable[[JobContract], "WorkloadDescriptor | None"]
 EnvironmentResolver = Callable[
     [JobContract, ProviderResourceReport], ExecutionEnvironment
 ]
-DecisionSink = Callable[["SchedulingDecisionRecord"], None]
+DecisionSink = Callable[[Any], None]
 
 
 def default_workload_descriptor(job: JobContract) -> WorkloadDescriptor:
-    """Derive a workload descriptor from an existing job contract.
-
-    Only scalar requirement values become features, so the descriptor stays
-    bounded. Deployments that know more about their jobs can pass their own
-    resolver; the observation schema does not need to change for that.
-    """
+    """Derive a bounded workload descriptor from an existing job contract."""
 
     requirement = job.capability
     requirements = requirement.requirements
@@ -76,9 +58,7 @@ def default_workload_descriptor(job: JobContract) -> WorkloadDescriptor:
         value = requirements[name]
         if isinstance(value, (str, bool, int, float)):
             features[name] = value
-    input_bytes = sum(
-        reference.size_bytes or 0 for reference in job.inputs
-    )
+    input_bytes = sum(reference.size_bytes or 0 for reference in job.inputs)
     if input_bytes > 0:
         features["input_bytes"] = input_bytes
     try:
@@ -98,11 +78,7 @@ def default_workload_descriptor(job: JobContract) -> WorkloadDescriptor:
 def default_environment(
     job: JobContract, report: ProviderResourceReport
 ) -> ExecutionEnvironment:
-    """Derive the execution environment a candidate would run this job in.
-
-    The model comes from the job requirement because that is what will
-    actually be used; everything else comes from what the provider advertises.
-    """
+    """Derive the environment a candidate would use for this job."""
 
     attributes = report.attributes if isinstance(report.attributes, dict) else {}
     advertised = attributes.get("environment")
@@ -136,26 +112,18 @@ def default_environment(
 
 
 def exploration_slot(job_id: str, *, policy: EfficiencyPolicy) -> bool:
-    """Whether this job may be used to gather evidence.
-
-    Derived from the job identity rather than a global random source, so a
-    replayed scheduling pass makes the same choice, the exploration share is
-    bounded by ``exploration_ratio``, and ``exploration_ratio == 0`` makes
-    ranking fully deterministic.
-    """
+    """Return whether this job falls in the bounded deterministic probe budget."""
 
     if not policy.exploration_enabled:
         return False
-    digest = hashlib.sha256(
-        f"{policy.exploration_seed}:{job_id}".encode()
-    ).digest()
+    digest = hashlib.sha256(f"{policy.exploration_seed}:{job_id}".encode()).digest()
     bucket = int.from_bytes(digest[:4], "big") % EXPLORATION_BUCKETS
     return bucket < int(policy.exploration_ratio * EXPLORATION_BUCKETS)
 
 
 @dataclass(frozen=True)
 class CandidateEvaluation:
-    """Everything that was predicted about one candidate, for the record."""
+    """Everything predicted about one candidate, retained for explanation."""
 
     SCHEMA: ClassVar[str] = CANDIDATE_EVALUATION_SCHEMA
 
@@ -247,19 +215,21 @@ def _explain(
     workload_class: str,
     objective: SchedulingObjective,
     exploration: bool,
+    operator_preference: bool = False,
 ) -> str:
     if not evaluations:
         return "No eligible candidate was ranked."
-    best = evaluations[0]
+    selected = next((item for item in evaluations if item.selected), evaluations[0])
+    others = tuple(item for item in evaluations if item.capability_id != selected.capability_id)
     lead = (
-        f"{best.node_id} was selected for {workload_class} "
-        f"[{objective.value}]: {best.observation_count} comparable executions "
-        f"averaged {_seconds(best.expected_total_millis)} "
-        f"at a {best.success_probability:.0%} success rate "
-        f"({best.tier.value} evidence)"
+        f"{selected.node_id} was selected for {workload_class} "
+        f"[{objective.value}]: {selected.observation_count} comparable executions "
+        f"averaged {_seconds(selected.expected_total_millis)} "
+        f"at a {selected.success_probability:.0%} success rate "
+        f"({selected.tier.value} evidence)"
     )
-    if len(evaluations) > 1:
-        runner = evaluations[1]
+    if others:
+        runner = others[0]
         lead += (
             f", versus {_seconds(runner.expected_total_millis)} over "
             f"{runner.observation_count} executions on {runner.node_id} "
@@ -267,7 +237,31 @@ def _explain(
         )
     if exploration:
         lead += "; this decision was an exploration probe"
+    if operator_preference:
+        lead += "; an explicit operator node preference determined the final selection"
     return lead + "."
+
+
+def _evaluation_from_payload(value: Any) -> CandidateEvaluation:
+    if not isinstance(value, dict):
+        raise FederationValidationError(
+            "invalid-candidate-evaluation", "candidate", "must be an object"
+        )
+    return CandidateEvaluation(
+        capability_id=value["capability_id"],
+        node_id=value["node_id"],
+        tier=EvidenceTier(value["tier"]),
+        evidence=float(value.get("evidence", 0.0)),
+        observation_count=int(value.get("observation_count", 0)),
+        success_probability=float(value.get("success_probability", 0.5)),
+        expected_total_millis=value.get("expected_total_millis"),
+        cost=value.get("cost"),
+        normalized_cost=float(value.get("normalized_cost", 1.0)),
+        exploration_bonus=float(value.get("exploration_bonus", 0.0)),
+        environment_fingerprint=str(value.get("environment_fingerprint") or ""),
+        queue_depth=int(value.get("queue_depth", 0)),
+        selected=bool(value.get("selected", False)),
+    )
 
 
 class LearnedProviderRanker:
@@ -287,8 +281,6 @@ class LearnedProviderRanker:
         self.workload_resolver = workload_resolver
         self.environment_resolver = environment_resolver
         self.decision_sink = decision_sink
-
-    # ------------------------------------------------------------------
 
     def _evaluate(
         self,
@@ -325,38 +317,41 @@ class LearnedProviderRanker:
         *,
         evaluated_at: datetime,
     ) -> CandidateRanking | None:
-        """Return a learned ordering, or ``None`` to keep existing behaviour."""
+        """Return a provisional learned ordering, with no persistence side effect.
+
+        The actual selected provider is not known until provider_selection has
+        applied the operator preference group. Durable decision recording is
+        therefore deferred to :meth:`finalize_selection`.
+        """
 
         workload = self.workload_resolver(job)
         if workload is None or len(candidates) < 2:
             return None
 
-        estimates: list[tuple[ProviderCandidate, PerformanceEstimate, float | None, str]] = []
+        estimates: list[
+            tuple[ProviderCandidate, PerformanceEstimate, float | None, str]
+        ] = []
         for candidate in candidates:
             estimate, cost, fingerprint = self._evaluate(
                 job, candidate, workload, evaluated_at=evaluated_at
             )
             estimates.append((candidate, estimate, cost, fingerprint))
 
-        scored = [cost for _c, _e, cost, _f in estimates if cost is not None]
+        scored = [cost for _candidate, _estimate, cost, _fingerprint in estimates if cost is not None]
         if not scored:
-            # Cold start: nothing is known about any candidate, so the
-            # existing deterministic scheduler behaviour stands unchanged.
             return None
 
-        # Costs are normalised so the exploration bonus is scale-free and can
-        # be reasoned about as a fraction of the worst candidate.
         worst = max(scored)
         scale = worst if worst > 0 else 1.0
-        total_evidence = sum(estimate.evidence for _c, estimate, _cost, _f in estimates)
+        total_evidence = sum(
+            estimate.evidence for _candidate, estimate, _cost, _fingerprint in estimates
+        )
         exploring = exploration_slot(job.job_id, policy=self.policy)
 
-        rows: list[tuple[float, float, int, ProviderCandidate, CandidateEvaluation]] = []
+        rows: list[
+            tuple[float, float, int, ProviderCandidate, CandidateEvaluation]
+        ] = []
         for index, (candidate, estimate, cost, fingerprint) in enumerate(estimates):
-            # An unmeasured candidate is treated pessimistically when
-            # exploiting and optimistically when exploring. That is what keeps
-            # a new node from silently absorbing production traffic while
-            # still guaranteeing it gets measured.
             normalized = 1.0 if cost is None else min(1.0, cost / scale)
             bonus = 0.0
             if self.policy.exploration_enabled:
@@ -384,19 +379,12 @@ class LearnedProviderRanker:
             sorted(rows, key=lambda row: (row[1], row[2])) if exploring else exploit_order
         )
         changed = exploring and chosen_order[0][3] is not exploit_order[0][3]
-
         ordered_ids = tuple(row[3].capability_id for row in chosen_order)
         evaluations = tuple(
             replace(row[4], selected=True) if position == 0 else row[4]
             for position, row in enumerate(chosen_order)
         )
         workload_class = workload.class_key("exact")
-        explanation = _explain(
-            evaluations,
-            workload_class=workload_class,
-            objective=self.policy.objective,
-            exploration=changed,
-        )
         record = SchedulingDecisionRecord(
             decision_id=f"{job.job_id}:{int(evaluated_at.timestamp() * 1000)}",
             session_id=job.session_id,
@@ -409,17 +397,80 @@ class LearnedProviderRanker:
             candidates=evaluations,
             exploration=exploring,
             exploration_changed_selection=changed,
-            explanation=explanation,
+            explanation=_explain(
+                evaluations,
+                workload_class=workload_class,
+                objective=self.policy.objective,
+                exploration=changed,
+            ),
         )
-        if self.decision_sink is not None:
-            # Recording an explanation must never block a scheduling decision.
-            with contextlib.suppress(Exception):
-                self.decision_sink(record)
         return CandidateRanking(
             ordered_capability_ids=ordered_ids,
             reason=REASON_EXPLORATION if changed else REASON_EVIDENCE,
             details=record.to_dict(),
         )
+
+    def finalize_selection(
+        self,
+        job: JobContract,
+        ranking: CandidateRanking,
+        *,
+        candidates: tuple[ProviderCandidate, ...],
+        selected: ProviderCandidate,
+        rejected: dict[str, tuple[str, ...]],
+        evaluated_at: datetime,
+    ) -> CandidateRanking:
+        """Record the provider that provider_selection will actually return."""
+
+        del job, evaluated_at
+        payload = dict(ranking.details)
+        raw_candidates = payload.get("candidates")
+        if not isinstance(raw_candidates, list):
+            return ranking
+        parsed = {
+            item.capability_id: item
+            for item in (_evaluation_from_payload(value) for value in raw_candidates)
+        }
+        if any(candidate.capability_id not in parsed for candidate in candidates):
+            return ranking
+        previous_selected = payload.get("selected_capability_id")
+        evaluations = tuple(
+            replace(
+                parsed[candidate.capability_id],
+                selected=candidate.capability_id == selected.capability_id,
+            )
+            for candidate in candidates
+        )
+        operator_preference = previous_selected != selected.capability_id
+        payload.update(
+            {
+                "selected_capability_id": selected.capability_id,
+                "selected_node_id": selected.report.node_id,
+                "candidates": [item.to_dict() for item in evaluations],
+                "rejected": {
+                    key: list(value) for key, value in sorted(rejected.items())
+                },
+                "operator_preference_applied": operator_preference,
+                "explanation": _explain(
+                    evaluations,
+                    workload_class=str(payload.get("workload_class") or "unknown"),
+                    objective=self.policy.objective,
+                    exploration=bool(payload.get("exploration_changed_selection")),
+                    operator_preference=operator_preference,
+                ),
+            }
+        )
+        finalized = replace(
+            ranking,
+            ordered_capability_ids=tuple(
+                candidate.capability_id for candidate in candidates
+            ),
+            details=payload,
+        )
+        if self.decision_sink is not None:
+            with contextlib.suppress(Exception):
+                self.decision_sink(payload)
+        return finalized
 
 
 __all__ = [
