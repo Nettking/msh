@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from types import SimpleNamespace
 
 from catalog.capabilities.efficiency import (
     EfficiencyPolicy,
@@ -13,6 +14,7 @@ from catalog.capabilities.efficiency import (
     WorkloadDescriptor,
     observation_id_for,
 )
+from catalog.flask_app import federation_routes
 from catalog.flask_app.app import create_app
 from catalog.flask_app.auth.policy import permission_for
 from catalog.flask_app.federation_routes import EFFICIENCY_STORE_CONFIG_KEY
@@ -76,6 +78,36 @@ def test_the_route_reports_learned_preferences(tmp_path) -> None:
     assert {item["node_id"] for item in payload["nodes"]} == {"node-a", "node-b"}
     assert payload["preferred"][0]["preferred_node_id"] == "node-b"
     assert payload["policy"]["objective"] == "fastest-completion"
+
+
+def test_live_product_binding_reads_the_current_analysis_learning_store(
+    tmp_path, monkeypatch
+) -> None:
+    store = SQLiteExecutionLearningStore(tmp_path / "live-efficiency.sqlite3")
+    store.record(_observation("node-a", 0, 2_000))
+    context = SimpleNamespace(
+        binding=SimpleNamespace(internal_session_id=SESSION),
+        credentials=SimpleNamespace(identity=SimpleNamespace(node_id="node-local")),
+    )
+    onboarding = SimpleNamespace(authorized_context=lambda: context)
+    runtime = SimpleNamespace(
+        identity=SimpleNamespace(session_id=SESSION, node_id="node-local"),
+        efficiency=SimpleNamespace(store=store),
+    )
+    monkeypatch.setattr(
+        federation_routes,
+        "get_capability_onboarding_service",
+        lambda: onboarding,
+    )
+    monkeypatch.setattr(
+        "catalog.orchestrator.analysis_runtime.get_analysis_runtime",
+        lambda: runtime,
+    )
+
+    app = create_app()
+    app.config.update(TESTING=True)
+    with app.test_request_context("/federation/efficiency.json"):
+        assert federation_routes._efficiency_learning_store() is store
 
 
 def test_the_route_is_covered_by_the_existing_read_permission() -> None:
