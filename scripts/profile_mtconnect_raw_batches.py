@@ -23,6 +23,7 @@ import xml.etree.ElementTree as ET
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from hashlib import sha256
+from itertools import pairwise
 from pathlib import Path
 
 MANIFEST_SUFFIX = ".manifest.json"
@@ -39,7 +40,13 @@ ACCEPTED_MANIFEST_SCHEMAS = frozenset(
     }
 )
 OBSERVATION_CONTAINERS = frozenset({"Samples", "Events", "Condition"})
-STATE_DATA_ITEMS = ("exec", "mode", "pgm", "avail", "estop")
+STATE_CHANNELS = {
+    "exec": "Execution",
+    "mode": "ControllerMode",
+    "pgm": "Program",
+    "avail": "Availability",
+    "estop": "EmergencyStop",
+}
 
 
 @dataclass
@@ -139,7 +146,7 @@ def profile_directory(directory: Path) -> Profile:
 
         try:
             raw_bytes = gzip.decompress(raw_path.read_bytes())
-        except (OSError, ValueError):
+        except (OSError, ValueError, EOFError):
             profile.unreadable.append(str(raw_path))
             continue
 
@@ -195,7 +202,7 @@ def _cadence(observations: list[Observation]) -> dict[str, float]:
         if parsed is not None
     ]
     deltas = sorted(
-        (later - earlier).total_seconds() for earlier, later in zip(stamps, stamps[1:])
+        (later - earlier).total_seconds() for earlier, later in pairwise(stamps)
     )
     if not deltas:
         return {}
@@ -208,22 +215,24 @@ def _cadence(observations: list[Observation]) -> dict[str, float]:
 
 def summarize(profile: Profile) -> dict:
     by_data_item: dict[str, list[Observation]] = defaultdict(list)
+    by_observation_type: dict[str, list[Observation]] = defaultdict(list)
     for observation in profile.observations:
         by_data_item[observation.data_item_id].append(observation)
+        by_observation_type[observation.observation_type].append(observation)
 
     timestamps = [
         item.timestamp for item in profile.observations if item.timestamp
     ]
     state_timeline: dict[str, list[dict[str, str]]] = {}
-    for data_item_id in STATE_DATA_ITEMS:
-        series = by_data_item.get(data_item_id, [])
-        state_timeline[data_item_id] = [
+    for output_name, observation_type in STATE_CHANNELS.items():
+        series = by_observation_type.get(observation_type, [])
+        state_timeline[output_name] = [
             {"timestamp": item.timestamp, "value": item.value} for item in series
         ]
 
     dwell: Counter = Counter()
-    execution = by_data_item.get("exec", [])
-    for current, following in zip(execution, execution[1:]):
+    execution = by_observation_type.get("Execution", [])
+    for current, following in pairwise(execution):
         started = _parse_timestamp(current.timestamp)
         ended = _parse_timestamp(following.timestamp)
         if started and ended:

@@ -362,6 +362,106 @@ def test_profiler_still_reports_a_real_gap_within_one_buffer(recorder_archive):
     assert profile.sequence_gaps == [(7, 13)]
 
 
+def test_profiler_uses_mtconnect_types_for_state_channels():
+    module = _load_profile_script()
+    profile = module.Profile(
+        observations=[
+            module.Observation(
+                sequence=1,
+                timestamp="2026-08-07T09:00:00Z",
+                data_item_id="controller-status-custom",
+                name=None,
+                observation_type="Execution",
+                component="Controller/controller",
+                value="ACTIVE",
+            ),
+            module.Observation(
+                sequence=2,
+                timestamp="2026-08-07T09:00:05Z",
+                data_item_id="controller-mode-custom",
+                name=None,
+                observation_type="ControllerMode",
+                component="Controller/controller",
+                value="AUTOMATIC",
+            ),
+            module.Observation(
+                sequence=3,
+                timestamp="2026-08-07T09:00:06Z",
+                data_item_id="program-custom",
+                name=None,
+                observation_type="Program",
+                component="Path/path",
+                value="ANONYMISED-PROGRAM",
+            ),
+            module.Observation(
+                sequence=4,
+                timestamp="2026-08-07T09:00:07Z",
+                data_item_id="availability-custom",
+                name=None,
+                observation_type="Availability",
+                component="Device/MachineAlpha",
+                value="AVAILABLE",
+            ),
+            module.Observation(
+                sequence=5,
+                timestamp="2026-08-07T09:00:08Z",
+                data_item_id="emergency-stop-custom",
+                name=None,
+                observation_type="EmergencyStop",
+                component="Device/MachineAlpha",
+                value="ARMED",
+            ),
+            module.Observation(
+                sequence=6,
+                timestamp="2026-08-07T09:00:10Z",
+                data_item_id="controller-status-custom",
+                name=None,
+                observation_type="Execution",
+                component="Controller/controller",
+                value="READY",
+            ),
+        ]
+    )
+
+    summary = module.summarize(profile)
+
+    assert summary["state_timeline"]["exec"] == [
+        {"timestamp": "2026-08-07T09:00:00Z", "value": "ACTIVE"},
+        {"timestamp": "2026-08-07T09:00:10Z", "value": "READY"},
+    ]
+    assert summary["state_timeline"]["mode"] == [
+        {"timestamp": "2026-08-07T09:00:05Z", "value": "AUTOMATIC"}
+    ]
+    assert summary["state_timeline"]["pgm"] == [
+        {"timestamp": "2026-08-07T09:00:06Z", "value": "ANONYMISED-PROGRAM"}
+    ]
+    assert summary["state_timeline"]["avail"] == [
+        {"timestamp": "2026-08-07T09:00:07Z", "value": "AVAILABLE"}
+    ]
+    assert summary["state_timeline"]["estop"] == [
+        {"timestamp": "2026-08-07T09:00:08Z", "value": "ARMED"}
+    ]
+    assert summary["execution_dwell_seconds"] == {"ACTIVE": 10.0}
+
+
+def test_profiler_records_a_truncated_gzip_and_continues(recorder_archive):
+    first_xml, _ = machine_batch(instance_id=INSTANCE, start_sequence=1)
+    first_manifest = recorder_archive.write_batch(
+        source_name=SOURCE, xml_text=first_xml
+    )
+    second_xml, _ = machine_batch(instance_id=INSTANCE, start_sequence=7)
+    recorder_archive.write_batch(source_name=SOURCE, xml_text=second_xml)
+    first_payload = recorder_archive.raw_payload_path(first_manifest)
+    first_payload.write_bytes(first_payload.read_bytes()[:-8])
+
+    module = _load_profile_script()
+    profile = module.profile_directory(recorder_archive.store.raw_root)
+
+    assert profile.batch_count == 1
+    assert [item.sequence for item in profile.observations] == list(range(7, 13))
+    assert profile.unreadable == [str(first_payload)]
+
+
 def test_the_profiling_script_accepts_the_same_schemas():
     import importlib.util
     from pathlib import Path
