@@ -54,8 +54,8 @@ def test_a_leader_without_a_storage_authority_names_the_missing_process():
 
     detail = sharing_state_detail(selection.state)
 
-    assert "catalog.node.storage_failover" in detail
-    assert "normal leader start does not launch it" in detail
+    assert "FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED" in detail
+    assert "created the Federation" in detail
 
 
 @pytest.mark.parametrize("state", sorted(SHARING_STATE_REMEDIES))

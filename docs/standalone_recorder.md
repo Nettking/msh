@@ -31,17 +31,38 @@ the host in to the same tailnet as the other Federation devices. Tailscale must
 already be running and signed in; the FCP launcher never changes tailnet login,
 routes, or ACL settings.
 
-### Leader prerequisite: the logical-storage authority must be running
+### Leader prerequisite: enable the logical-storage authority
 
-A normal leader start does **not** launch the logical-storage authority. That
-authority is a separate long-running process on the leader, and without it the
-leader advertises no storage capability, so a correctly fail-closed recorder on
-machine 4 refuses to start and reports `authority-unavailable`.
+Nothing can be published to a Federation that serves no logical-storage
+authority. Without it the leader advertises no storage capability, and a
+correctly fail-closed recorder on machine 4 refuses to start and reports
+`authority-unavailable`.
 
-Start it on the leader before pairing machine 4:
+The leader supervises the authority itself, but it is off by default so a device
+never opens an authority connection it was not asked to provide. Enable it on
+the **device that created the Federation** and restart it:
+
+```
+FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED=1
+FCP_FEDERATION_STORAGE_AUTHORITY_RELAY=ws://100.x.y.z:8765
+```
+
+The relay address falls back to `FCP_PAIRING_RELAY_URL` when it is already set.
+Everything else is derived from the existing device configuration: the
+coordinator database from `FCP_FEDERATION_COORDINATOR_DATABASE`, device state
+from `FCP_FEDERATION_NODE_STATE_DIR`, the display name from `FCP_DEVICE_NAME`,
+and the authority's own databases from `FCP_FEDERATION_STORAGE_AUTHORITY_DIR`
+(default `data/federation/storage`).
+
+It must be the session creator. A publisher accepts the storage capability only
+from the node that created the Federation, so enabling this elsewhere reports
+`not-session-creator` rather than advertising something nothing will select.
+
+To inspect the configuration without starting supervision, or to run the
+authority as its own process instead, the original command still works:
 
 ```bash
-python -m catalog.node.storage_failover run \
+python -m catalog.node.storage_failover scan-once \
   --relay-control-database data/federation/relay/control.sqlite3 \
   --storage-control-database data/federation/storage/control.sqlite3 \
   --publication-database data/federation/storage/publication.sqlite3 \
@@ -54,12 +75,6 @@ python -m catalog.node.storage_failover run \
 
 Under Docker Compose the relay control database is the mounted
 `/var/lib/fcp-relay/control.sqlite3` instead of the repository-relative path.
-Use `scan-once` in place of `run` to check the configuration without starting
-the supervision loop.
-
-Keep this process running for as long as machine 4 should be able to publish.
-Wiring it into normal leader startup is tracked as follow-up work; until then it
-is a manual prerequisite.
 
 On the current Federation leader, open FCP through the leader's numeric
 Tailscale `100.x.y.z` address (not `localhost`, a LAN name, or a DNS name) and

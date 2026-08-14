@@ -218,10 +218,9 @@ SHARING_STATE_REMEDIES: dict[str, str] = {
     ),
     "authority-unavailable": (
         "the Federation leader advertises no ready logical-storage authority. "
-        "That authority is a separate leader-side process: start it on the "
-        "leader with 'python -m catalog.node.storage_failover run' (see "
-        "docs/standalone_recorder.md for the exact arguments). A normal leader "
-        "start does not launch it"
+        "It is off by default: set FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED=1 "
+        "and FCP_FEDERATION_STORAGE_AUTHORITY_RELAY on the device that created "
+        "the Federation, then restart it (see docs/standalone_recorder.md)"
     ),
     "storage-group-unavailable": (
         "the leader's storage authority does not advertise the requested group; "
