@@ -52,16 +52,63 @@ class RoleCandidate:
 
     @property
     def binding(self) -> tuple[str, str, str | None]:
-        """Return the semantic binding used to detect incompatible channels."""
+        """Return the semantic binding used to detect incompatible channels.
+
+        Component identity is deliberately excluded. Several components can
+        carry the same role compatibly - per-axis ``LOAD`` is the clearest case
+        - and treating those as a conflict would make an ordinary machine
+        unresolvable. The cost is that component identity alone never makes a
+        role ambiguous; see :class:`RoleResolution`.
+        """
 
         return (self.category, self.semantic_type, self.sub_type)
 
 
 @dataclass(frozen=True)
 class RoleResolution:
+    """One role's outcome for one device scope.
+
+    ``RESOLVED`` means every candidate agrees on category, semantic type and
+    sub type. It does **not** mean there is exactly one channel: because
+    :attr:`RoleCandidate.binding` excludes component identity, a device that
+    publishes the same role from several components resolves with several
+    candidates.
+
+    That is intended for genuinely multi-channel roles such as ``LOAD`` and
+    ``AXIS_FEEDRATE``, where each axis is its own channel. It also applies to
+    roles that are conceptually single-valued per device: a multi-path machine
+    (mill-turn, twin-spindle) publishes ``EXECUTION_STATE``, ``CONTROLLER_MODE``,
+    ``PROGRAM``, ``PROGRAM_COMMENT`` and ``LINE`` once per ``Path`` component,
+    and all of those resolve with one candidate per path.
+
+    Consumers must therefore treat ``candidates`` as a set, not as a single
+    answer with extras. Taking ``candidates[0]`` silently picks one path on such
+    a machine. Use ``component_path`` to select or to fan out deliberately.
+    """
+
     role: SemanticRole
     status: RoleResolutionStatus
     candidates: tuple[RoleCandidate, ...]
+
+    @property
+    def component_paths(self) -> tuple[str | None, ...]:
+        """Return the distinct component paths this role resolved to."""
+
+        seen: list[str | None] = []
+        for candidate in self.candidates:
+            if candidate.component_path not in seen:
+                seen.append(candidate.component_path)
+        return tuple(seen)
+
+    @property
+    def is_single_channel(self) -> bool:
+        """Return whether exactly one component supplies this role.
+
+        A consumer that needs one authoritative value should check this rather
+        than assuming ``RESOLVED`` implies it.
+        """
+
+        return len(self.component_paths) == 1
 
 
 @dataclass(frozen=True)

@@ -374,3 +374,114 @@ def test_rotary_axis_velocity_is_not_assumed_to_be_spindle_velocity():
         .status
         is RoleResolutionStatus.RESOLVED
     )
+
+
+# ---------------------------------------------------------------------------
+# Multi-channel roles
+#
+# RoleCandidate.binding excludes component identity so that per-axis LOAD stays
+# resolvable. The consequence is that a multi-path machine also resolves roles
+# that are conceptually single-valued per device. These tests pin that
+# consequence so it stays a deliberate contract rather than an accident, and so
+# that changing it has to be a decision.
+# ---------------------------------------------------------------------------
+
+
+def _path_scoped(role_type: str, *, component_id: str, sequence: int):
+    return _observation(
+        sequence=sequence,
+        data_item_id=f"{component_id}-{role_type.lower()}",
+        observation_type=role_type.title().replace("_", ""),
+        mtconnect_type=role_type,
+        component_type="Path",
+        component_id=component_id,
+        component_name=component_id.upper(),
+    )
+
+
+@pytest.mark.parametrize(
+    ("mtconnect_type", "role"),
+    [
+        ("EXECUTION", SemanticRole.EXECUTION_STATE),
+        ("CONTROLLER_MODE", SemanticRole.CONTROLLER_MODE),
+        ("PROGRAM", SemanticRole.PROGRAM),
+        ("LINE", SemanticRole.LINE),
+    ],
+)
+def test_a_multi_path_machine_resolves_one_candidate_per_path(mtconnect_type, role):
+    first = _path_scoped(mtconnect_type, component_id="path-1", sequence=1)
+    second = _path_scoped(mtconnect_type, component_id="path-2", sequence=2)
+
+    result = resolve_device_roles([first, second])[0].role(role)
+
+    # Two physically distinct channels, reported as resolved rather than
+    # ambiguous, because component identity is not part of the binding.
+    assert result.status is RoleResolutionStatus.RESOLVED
+    assert len(result.candidates) == 2
+    assert result.component_paths == ("Path/PATH-1", "Path/PATH-2")
+    assert result.is_single_channel is False
+
+
+def test_a_single_path_machine_reports_one_channel():
+    only = _path_scoped("EXECUTION", component_id="path-1", sequence=1)
+
+    result = resolve_device_roles([only])[0].role(SemanticRole.EXECUTION_STATE)
+
+    assert result.status is RoleResolutionStatus.RESOLVED
+    assert result.is_single_channel is True
+    assert result.component_paths == ("Path/PATH-1",)
+
+
+def test_multi_axis_load_is_the_case_this_rule_exists_for():
+    def axis_load(component_id: str, sequence: int):
+        return _observation(
+            sequence=sequence,
+            data_item_id=f"{component_id}-load",
+            category=CATEGORY_SAMPLE,
+            observation_type="Load",
+            mtconnect_type="LOAD",
+            sub_type="ACTUAL",
+            component_type="Linear",
+            component_id=component_id,
+            component_name=component_id.upper(),
+        )
+
+    result = resolve_device_roles(
+        [axis_load("x-axis", 1), axis_load("y-axis", 2)]
+    )[0].role(SemanticRole.LOAD)
+
+    assert result.status is RoleResolutionStatus.RESOLVED
+    assert result.is_single_channel is False
+    assert len(result.component_paths) == 2
+
+
+def test_an_unavailable_role_has_no_channels():
+    resolution = _single(_observation(data_item_id="nothing-semantic"))
+    result = resolution.role(SemanticRole.EXECUTION_STATE)
+
+    assert result.status is RoleResolutionStatus.UNAVAILABLE
+    assert result.component_paths == ()
+    assert result.is_single_channel is False
+
+
+def test_incompatible_bindings_stay_ambiguous_regardless_of_channel_count():
+    # Ambiguity is still about incompatible semantics, not about how many
+    # components are involved.
+    active = _observation(
+        data_item_id="program-active",
+        observation_type="Program",
+        mtconnect_type="PROGRAM",
+        sub_type="ACTIVE",
+    )
+    main = _observation(
+        sequence=2,
+        data_item_id="program-main",
+        observation_type="Program",
+        mtconnect_type="PROGRAM",
+        sub_type="MAIN",
+    )
+
+    result = resolve_device_roles([active, main])[0].role(SemanticRole.PROGRAM)
+
+    assert result.status is RoleResolutionStatus.AMBIGUOUS
+    assert result.is_single_channel is True
