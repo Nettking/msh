@@ -1,29 +1,8 @@
 """Federation-wide job efficiency learning.
 
 Every useful execution teaches the federation something about how to execute
-the next comparable job more efficiently.
-
-The package is layered so that no part of job execution depends on a
-particular learning algorithm:
-
-``contracts``
-    versioned observation, workload and environment schemas.
-``profiles``
-    recency-weighted sufficient statistics derived from observations.
-``policy``
-    the objective being optimised and the bounded learning knobs.
-``store``
-    durable raw observations plus a rebuildable derived-profile cache.
-``estimator``
-    the cold-start hierarchy from measured evidence down to no evidence.
-``ranking``
-    the replaceable ranker plugged into ``select_provider``.
-``recorder``
-    completed executions to observations.
-``federation``
-    who may report what, and how observations reach the coordinator.
-``projection``
-    a small read model for operators.
+the next comparable job more efficiently. Learning never grants authority: it
+only ranks candidates that the existing scheduler has already found eligible.
 """
 
 from .contracts import (
@@ -73,11 +52,7 @@ from .profiles import (
     ProfileKey,
     observation_profile_keys,
 )
-from .projection import (
-    LEARNING_SNAPSHOT_SCHEMA,
-    learning_snapshot,
-    preferred_nodes,
-)
+from .projection import LEARNING_SNAPSHOT_SCHEMA, learning_snapshot, preferred_nodes
 from .ranking import (
     SCHEDULING_DECISION_SCHEMA,
     CandidateEvaluation,
@@ -92,6 +67,7 @@ from .recorder import (
     measurements_from_dispatch,
     observation_id_for,
 )
+from .runtime import ExecutionEfficiencyRuntime, LearningLifecycleTransport
 from .store import (
     EFFICIENCY_SCHEMA_NAME,
     EFFICIENCY_SCHEMA_VERSION,
@@ -123,6 +99,7 @@ __all__ = [
     "DecayedStatistic",
     "EfficiencyPolicy",
     "EvidenceTier",
+    "ExecutionEfficiencyRuntime",
     "ExecutionEnvironment",
     "ExecutionMeasurements",
     "ExecutionObservation",
@@ -131,6 +108,7 @@ __all__ = [
     "HardwareHeuristicSource",
     "LearnedProfile",
     "LearnedProviderRanker",
+    "LearningLifecycleTransport",
     "ObservationIngestOutcome",
     "PerformanceEstimate",
     "PerformanceEstimator",
