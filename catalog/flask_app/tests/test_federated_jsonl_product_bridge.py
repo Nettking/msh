@@ -9,21 +9,34 @@ from flask import Flask
 
 from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
 from catalog.federation.models import CommitState
+from catalog.federation.shared_file_storage import (
+    FEDERATED_JSONL_CONTENT_SCHEMA,
+    FEDERATED_JSONL_DATASET_SCHEMA_NAME,
+    FEDERATED_JSONL_DATASET_SCHEMA_VERSION,
+    federated_jsonl_dataset_id,
+    federated_jsonl_idempotency_key,
+)
 from catalog.federation.storage_catalog import CommittedBatchReference
 from catalog.federation.storage_protocol import BatchIngestRequest
 from catalog.flask_app.services.federated_jsonl_product_bridge import (
     FederatedJsonlProductBridge,
+    FederatedJsonlPublishResult,
 )
 
 _MANIFEST_HASH = "sha256:" + "a" * 64
 
 
-def _bridge(tmp_path: Path, name: str) -> FederatedJsonlProductBridge:
+def _bridge(
+    tmp_path: Path,
+    name: str,
+    *,
+    relay_runtime: object | None = None,
+) -> FederatedJsonlProductBridge:
     data_root = tmp_path / name / "data"
     app = Flask(name)
     bridge = FederatedJsonlProductBridge(
         app,
-        SimpleNamespace(relay_runtime=None),
+        SimpleNamespace(relay_runtime=relay_runtime),
         data_root=data_root,
         database=tmp_path / name / "state.sqlite3",
         cache_root=tmp_path / name / "cache",
@@ -31,6 +44,45 @@ def _bridge(tmp_path: Path, name: str) -> FederatedJsonlProductBridge:
     )
     bridge._ensure_initialized()
     return bridge
+
+
+class _PublishingRuntime:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+
+    def publish_federated_batches(
+        self,
+        runtime_state: object,
+        *,
+        session_id: str,
+        authority_node_id: str,
+        batches: list[dict[str, object]],
+    ) -> tuple[object, ...]:
+        entries = tuple(batches)
+        self.calls.append(
+            {
+                "runtime_state": runtime_state,
+                "session_id": session_id,
+                "authority_node_id": authority_node_id,
+                "batches": entries,
+            }
+        )
+        return tuple(SimpleNamespace(committed=True) for _entry in entries)
+
+
+def _trusted_scope(
+    *,
+    session_id: str,
+    node_id: str,
+) -> tuple[object, object]:
+    runtime_state = SimpleNamespace(
+        binding=SimpleNamespace(internal_session_id=session_id)
+    )
+    context = SimpleNamespace(
+        binding=SimpleNamespace(internal_session_id=session_id),
+        credentials=SimpleNamespace(identity=SimpleNamespace(node_id=node_id)),
+    )
+    return runtime_state, context
 
 
 def _reference(batch: dict[str, object], *, session_id: str) -> CommittedBatchReference:
@@ -62,6 +114,115 @@ def _reference(batch: dict[str, object], *, session_id: str) -> CommittedBatchRe
         manifest_revision=1,
         manifest_hash=_MANIFEST_HASH,
     )
+
+
+def test_publisher_only_pass_commits_normal_jsonl_with_existing_contract(
+    tmp_path: Path,
+):
+    runtime = _PublishingRuntime()
+    bridge = _bridge(tmp_path, "headless", relay_runtime=runtime)
+    session_id = "session-headless-jsonl"
+    node_id = "node-headless"
+    authority_node_id = "node-storage"
+    group_id = "storage-1"
+    relative_path = Path("sources") / "observer_phoenix" / "jsonl" / "day.jsonl"
+    source = bridge.data_root / relative_path
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text('{"machine_id":"observer-a","value":1}\n', encoding="utf-8")
+    runtime_state, context = _trusted_scope(
+        session_id=session_id,
+        node_id=node_id,
+    )
+
+    result = bridge.publish_local_once(
+        runtime_state,
+        context,
+        authority_node_id=authority_node_id,
+        group_id=group_id,
+    )
+
+    assert result == FederatedJsonlPublishResult(
+        session_id=session_id,
+        node_id=node_id,
+        authority_node_id=authority_node_id,
+        group_id=group_id,
+        published_chunks=1,
+    )
+    assert len(runtime.calls) == 1
+    call = runtime.calls[0]
+    assert call["runtime_state"] is runtime_state
+    assert call["session_id"] == session_id
+    assert call["authority_node_id"] == authority_node_id
+    batches = call["batches"]
+    assert isinstance(batches, tuple) and len(batches) == 1
+    batch = batches[0]
+    assert isinstance(batch, dict)
+    content = batch["content"]
+    assert isinstance(content, dict)
+    expected_dataset_id = federated_jsonl_dataset_id(
+        node_id,
+        relative_path.as_posix(),
+    )
+    assert batch["group_id"] == group_id
+    assert batch["dataset_id"] == expected_dataset_id
+    assert batch["dataset_schema_name"] == FEDERATED_JSONL_DATASET_SCHEMA_NAME
+    assert batch["dataset_schema_version"] == FEDERATED_JSONL_DATASET_SCHEMA_VERSION
+    assert batch["idempotency_key"] == federated_jsonl_idempotency_key(
+        session_id,
+        expected_dataset_id,
+        str(batch["batch_id"]),
+    )
+    assert content["schema"] == FEDERATED_JSONL_CONTENT_SCHEMA
+    assert content["producer_node_id"] == node_id
+    assert content["relative_path"] == relative_path.as_posix()
+
+    repeated = bridge.publish_local_once(
+        runtime_state,
+        context,
+        authority_node_id=authority_node_id,
+        group_id=group_id,
+    )
+
+    assert repeated.published_chunks == 0
+    assert len(runtime.calls) == 1
+
+
+def test_publisher_only_pass_excludes_recorder_and_federation_jsonl(tmp_path: Path):
+    runtime = _PublishingRuntime()
+    bridge = _bridge(tmp_path, "headless-exclusions", relay_runtime=runtime)
+    recorder = (
+        bridge.data_root
+        / "sources"
+        / "mtconnect_recorder"
+        / "jsonl"
+        / "machine-a"
+        / "recorder.jsonl"
+    )
+    mirrored = (
+        bridge.data_root
+        / "federation"
+        / "shared"
+        / "jsonl-files"
+        / "node-peer"
+        / "mirrored.jsonl"
+    )
+    for path in (recorder, mirrored):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text('{"value":1}\n', encoding="utf-8")
+    runtime_state, context = _trusted_scope(
+        session_id="session-headless-exclusions",
+        node_id="node-headless",
+    )
+
+    result = bridge.publish_local_once(
+        runtime_state,
+        context,
+        authority_node_id="node-storage",
+        group_id="storage-1",
+    )
+
+    assert result.published_chunks == 0
+    assert runtime.calls == []
 
 
 def test_remote_upload_materializes_into_unchanged_legacy_jsonl_scanner(tmp_path: Path):
