@@ -159,6 +159,8 @@ export FCP_BUILD_COMMIT="$(git rev-parse --verify HEAD^{commit})"
 docker compose up -d --build relay ollama recorder flask
 ```
 
+Direct Compose is also loopback-only by default for both the Flask workbench and Federation relay. If another trusted LAN/VPN device must reach the workbench, explicitly set `FCP_WEB_BIND` to that trusted interface before starting Compose; pairing additionally requires an explicit reachable `FCP_RELAY_BIND`. Do not publish either surface to an untrusted network or the public Internet.
+
 However, **Federation -> Update all devices** requires the host-owned update agent. If you deliberately bypass `start.sh`, run the agent separately from the same checkout and data directory:
 
 ```bash

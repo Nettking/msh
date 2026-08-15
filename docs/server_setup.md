@@ -66,6 +66,8 @@ export FCP_BUILD_COMMIT="$(git rev-parse --verify HEAD^{commit})"
 docker compose up -d --build relay ollama recorder flask
 ```
 
+Direct Compose keeps both the Flask workbench and Federation relay on host loopback unless you deliberately set reachable bind addresses. For trusted LAN/VPN access, set `FCP_WEB_BIND` explicitly; pairing also requires `FCP_RELAY_BIND`. Never publish these surfaces directly to the public Internet.
+
 If you bypass `start.sh`, Federation-wide updates will not have their normal host-owned activation boundary unless you start the update agent separately.
 
 ## First human administrator

@@ -97,7 +97,7 @@ def _interactive_plan() -> tuple[CommandDeploymentPlan, str, str, bool, bool]:
     except (ValueError, IndexError):
         raise SystemExit(f"Unknown profile selection: {selected}")
 
-    web_bind = "0.0.0.0"
+    web_bind = "127.0.0.1"
     web_port = "5000"
     if profile in {"workbench", "web-only", "recorder"}:
         web_bind = _prompt("Web bind address", web_bind)
@@ -316,8 +316,8 @@ def parse_args() -> argparse.Namespace:
     )
     parser.add_argument(
         "--web-bind",
-        default="0.0.0.0",
-        help="Web bind address for Docker Compose.",
+        default="127.0.0.1",
+        help="Web bind address for Docker Compose; expose a trusted interface explicitly when needed.",
     )
     parser.add_argument(
         "--web-port",

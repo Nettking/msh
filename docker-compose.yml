@@ -6,7 +6,7 @@ services:
       args:
         FCP_BUILD_COMMIT: ${FCP_BUILD_COMMIT:-unknown}
     ports:
-      - "${FCP_WEB_BIND:-0.0.0.0}:${FCP_WEB_PORT:-5000}:5000"
+      - "${FCP_WEB_BIND:-127.0.0.1}:${FCP_WEB_PORT:-5000}:5000"
     environment:
       - FCP_SCAN_DIRS=${FCP_SCAN_DIRS:-results,data}
       - FCP_SKIP_ORCHESTRATION=${FCP_SKIP_ORCHESTRATION:-0}
