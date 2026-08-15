@@ -254,7 +254,7 @@ def test_incompatible_same_device_bindings_are_ambiguous():
     assert [candidate.sub_type for candidate in result.candidates] == ["ACTIVE", "MAIN"]
 
 
-def test_compatible_multi_axis_channels_remain_resolved():
+def test_compatible_multi_axis_channels_are_not_a_contradiction():
     x_load = _observation(
         data_item_id="x-load",
         category=CATEGORY_SAMPLE,
@@ -279,7 +279,11 @@ def test_compatible_multi_axis_channels_remain_resolved():
 
     result = resolve_device_roles([y_load, x_load])[0].role(SemanticRole.LOAD)
 
-    assert result.status is RoleResolutionStatus.RESOLVED
+    # Two axes agree on meaning, so this is never AMBIGUOUS - but it is also
+    # not one value, so it is not RESOLVED either.
+    assert result.status is RoleResolutionStatus.MULTI_CHANNEL
+    assert result.is_semantically_coherent is True
+    assert result.is_usable_as_one_value is False
     assert [candidate.data_item_id for candidate in result.candidates] == [
         "x-load",
         "y-load",
@@ -377,13 +381,12 @@ def test_rotary_axis_velocity_is_not_assumed_to_be_spindle_velocity():
 
 
 # ---------------------------------------------------------------------------
-# Multi-channel roles
+# Component count is a separate question from semantic agreement
 #
-# RoleCandidate.binding excludes component identity so that per-axis LOAD stays
-# resolvable. The consequence is that a multi-path machine also resolves roles
-# that are conceptually single-valued per device. These tests pin that
-# consequence so it stays a deliberate contract rather than an accident, and so
-# that changing it has to be a decision.
+# RESOLVED must mean "safe to read as one value", because that is what a
+# consumer will assume it means. A machine with two Paths or two axes is
+# healthy, so it must not be reported as AMBIGUOUS either. Those are two
+# different questions and the status answers both.
 # ---------------------------------------------------------------------------
 
 
@@ -408,80 +411,115 @@ def _path_scoped(role_type: str, *, component_id: str, sequence: int):
         ("LINE", SemanticRole.LINE),
     ],
 )
-def test_a_multi_path_machine_resolves_one_candidate_per_path(mtconnect_type, role):
+def test_a_multi_path_machine_is_multi_channel_not_resolved(mtconnect_type, role):
     first = _path_scoped(mtconnect_type, component_id="path-1", sequence=1)
     second = _path_scoped(mtconnect_type, component_id="path-2", sequence=2)
 
     result = resolve_device_roles([first, second])[0].role(role)
 
-    # Two physically distinct channels, reported as resolved rather than
-    # ambiguous, because component identity is not part of the binding.
-    assert result.status is RoleResolutionStatus.RESOLVED
-    assert len(result.candidates) == 2
+    # Reading candidates[0] here would silently pick one path, so the status
+    # must not invite it.
+    assert result.status is RoleResolutionStatus.MULTI_CHANNEL
+    assert result.is_usable_as_one_value is False
+    assert result.is_semantically_coherent is True
     assert result.component_paths == ("Path/PATH-1", "Path/PATH-2")
-    assert result.is_single_channel is False
+    assert len(result.candidates) == 2
 
 
-def test_a_single_path_machine_reports_one_channel():
+def test_a_single_path_machine_is_resolved():
     only = _path_scoped("EXECUTION", component_id="path-1", sequence=1)
 
     result = resolve_device_roles([only])[0].role(SemanticRole.EXECUTION_STATE)
 
     assert result.status is RoleResolutionStatus.RESOLVED
-    assert result.is_single_channel is True
+    assert result.is_usable_as_one_value is True
     assert result.component_paths == ("Path/PATH-1",)
 
 
-def test_multi_axis_load_is_the_case_this_rule_exists_for():
-    def axis_load(component_id: str, sequence: int):
+def test_two_channels_on_one_component_stay_resolved():
+    # Several data items on the same component are still one place to read
+    # from, so component count is what matters, not candidate count.
+    first = _observation(
+        data_item_id="exec-primary",
+        observation_type="Execution",
+        mtconnect_type="EXECUTION",
+    )
+    second = _observation(
+        sequence=2,
+        data_item_id="exec-mirror",
+        observation_type="Execution",
+        mtconnect_type="EXECUTION",
+    )
+
+    result = resolve_device_roles([first, second])[0].role(
+        SemanticRole.EXECUTION_STATE
+    )
+
+    assert result.status is RoleResolutionStatus.RESOLVED
+    assert len(result.candidates) == 2
+    assert len(result.component_paths) == 1
+
+
+def test_a_twin_spindle_machine_is_multi_channel():
+    def spindle(component_id: str, sequence: int):
         return _observation(
             sequence=sequence,
-            data_item_id=f"{component_id}-load",
+            data_item_id=f"{component_id}-speed",
             category=CATEGORY_SAMPLE,
-            observation_type="Load",
-            mtconnect_type="LOAD",
-            sub_type="ACTUAL",
-            component_type="Linear",
+            observation_type="RotaryVelocity",
+            mtconnect_type="ROTARY_VELOCITY",
+            component_type="Spindle",
             component_id=component_id,
             component_name=component_id.upper(),
         )
 
-    result = resolve_device_roles(
-        [axis_load("x-axis", 1), axis_load("y-axis", 2)]
-    )[0].role(SemanticRole.LOAD)
+    result = resolve_device_roles([spindle("s1", 1), spindle("s2", 2)])[0].role(
+        SemanticRole.SPINDLE_VELOCITY
+    )
 
-    assert result.status is RoleResolutionStatus.RESOLVED
-    assert result.is_single_channel is False
+    assert result.status is RoleResolutionStatus.MULTI_CHANNEL
     assert len(result.component_paths) == 2
 
 
-def test_an_unavailable_role_has_no_channels():
-    resolution = _single(_observation(data_item_id="nothing-semantic"))
-    result = resolution.role(SemanticRole.EXECUTION_STATE)
+def test_an_unavailable_role_is_neither_coherent_nor_usable():
+    result = _single(_observation(data_item_id="nothing-semantic")).role(
+        SemanticRole.EXECUTION_STATE
+    )
 
     assert result.status is RoleResolutionStatus.UNAVAILABLE
     assert result.component_paths == ()
-    assert result.is_single_channel is False
+    assert result.is_usable_as_one_value is False
+    assert result.is_semantically_coherent is False
 
 
-def test_incompatible_bindings_stay_ambiguous_regardless_of_channel_count():
-    # Ambiguity is still about incompatible semantics, not about how many
-    # components are involved.
-    active = _observation(
-        data_item_id="program-active",
-        observation_type="Program",
-        mtconnect_type="PROGRAM",
-        sub_type="ACTIVE",
-    )
+def test_a_contradiction_outranks_component_count():
+    # Incompatible sub types across two components must report the
+    # contradiction, not merely that there are several channels.
+    active = _path_scoped("PROGRAM", component_id="path-1", sequence=1)
     main = _observation(
         sequence=2,
-        data_item_id="program-main",
+        data_item_id="path-2-program",
         observation_type="Program",
         mtconnect_type="PROGRAM",
         sub_type="MAIN",
+        component_type="Path",
+        component_id="path-2",
+        component_name="PATH-2",
     )
 
     result = resolve_device_roles([active, main])[0].role(SemanticRole.PROGRAM)
 
     assert result.status is RoleResolutionStatus.AMBIGUOUS
-    assert result.is_single_channel is True
+    assert result.is_semantically_coherent is False
+    assert result.is_usable_as_one_value is False
+
+
+def test_every_status_is_reachable_and_distinct():
+    # A four-valued status is only worth its cost if each value can occur.
+    assert len(set(RoleResolutionStatus)) == 4
+    assert {
+        RoleResolutionStatus.RESOLVED,
+        RoleResolutionStatus.MULTI_CHANNEL,
+        RoleResolutionStatus.UNAVAILABLE,
+        RoleResolutionStatus.AMBIGUOUS,
+    } == set(RoleResolutionStatus)

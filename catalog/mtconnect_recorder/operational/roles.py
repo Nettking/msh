@@ -32,8 +32,24 @@ class SemanticRole(str, Enum):
 
 
 class RoleResolutionStatus(str, Enum):
+    """How usable one role is on one device.
+
+    ``RESOLVED`` and ``MULTI_CHANNEL`` are both successful outcomes; they differ
+    only in whether the consumer still has a choice to make. ``AMBIGUOUS`` is
+    reserved for a device that contradicts itself, so a perfectly healthy
+    multi-path or multi-axis machine is never reported as a problem.
+    """
+
+    #: Exactly one component supplies this role. Safe to use as one value.
     RESOLVED = "RESOLVED"
+    #: Several components supply it compatibly - per-axis LOAD, or a mill-turn
+    #: publishing EXECUTION_STATE once per Path. The consumer must select a
+    #: component or fan out across them; there is no single answer.
+    MULTI_CHANNEL = "MULTI_CHANNEL"
+    #: No candidate at all.
     UNAVAILABLE = "UNAVAILABLE"
+    #: Candidates disagree on category, semantic type or sub type. This is a
+    #: contradiction in the device's own metadata, not a topology.
     AMBIGUOUS = "AMBIGUOUS"
 
 
@@ -52,13 +68,13 @@ class RoleCandidate:
 
     @property
     def binding(self) -> tuple[str, str, str | None]:
-        """Return the semantic binding used to detect incompatible channels.
+        """Return the semantic binding used to detect contradictory channels.
 
-        Component identity is deliberately excluded. Several components can
-        carry the same role compatibly - per-axis ``LOAD`` is the clearest case
-        - and treating those as a conflict would make an ordinary machine
-        unresolvable. The cost is that component identity alone never makes a
-        role ambiguous; see :class:`RoleResolution`.
+        Component identity is deliberately excluded, because several components
+        can carry the same role compatibly - per-axis ``LOAD`` is the clearest
+        case - and treating those as a conflict would make an ordinary machine
+        look misconfigured. Component count is answered separately, by
+        :attr:`RoleResolution.status`.
         """
 
         return (self.category, self.semantic_type, self.sub_type)
@@ -68,22 +84,26 @@ class RoleCandidate:
 class RoleResolution:
     """One role's outcome for one device scope.
 
-    ``RESOLVED`` means every candidate agrees on category, semantic type and
-    sub type. It does **not** mean there is exactly one channel: because
-    :attr:`RoleCandidate.binding` excludes component identity, a device that
-    publishes the same role from several components resolves with several
-    candidates.
+    The status answers two independent questions in one value:
 
-    That is intended for genuinely multi-channel roles such as ``LOAD`` and
-    ``AXIS_FEEDRATE``, where each axis is its own channel. It also applies to
-    roles that are conceptually single-valued per device: a multi-path machine
-    (mill-turn, twin-spindle) publishes ``EXECUTION_STATE``, ``CONTROLLER_MODE``,
-    ``PROGRAM``, ``PROGRAM_COMMENT`` and ``LINE`` once per ``Path`` component,
-    and all of those resolve with one candidate per path.
+    * do the candidates agree on what they mean? Disagreement is ``AMBIGUOUS``.
+    * does exactly one component supply it? If not, ``MULTI_CHANNEL``.
 
-    Consumers must therefore treat ``candidates`` as a set, not as a single
-    answer with extras. Taking ``candidates[0]`` silently picks one path on such
-    a machine. Use ``component_path`` to select or to fan out deliberately.
+    ``RESOLVED`` therefore means both: one coherent meaning, from one component,
+    safe to use as a single value. Anything a consumer can read directly is
+    ``RESOLVED``; everything else needs a decision first.
+
+    ``MULTI_CHANNEL`` is a success, not a defect. It covers roles that are
+    multi-channel by nature - ``LOAD`` and ``AXIS_FEEDRATE`` per axis,
+    ``SPINDLE_VELOCITY`` on a twin-spindle machine - and roles that are
+    single-valued per path but appear once per ``Path`` on a mill-turn:
+    ``EXECUTION_STATE``, ``CONTROLLER_MODE``, ``PROGRAM``, ``PROGRAM_COMMENT``,
+    ``LINE``. Both need the consumer to select a component or fan out across
+    :attr:`component_paths`; neither is a device that contradicts itself.
+
+    The distinction matters because the obvious next step from ``RESOLVED`` is
+    to read ``candidates[0]``, which on a multi-path machine silently picks one
+    path and produces a plausible but wrong result downstream.
     """
 
     role: SemanticRole
@@ -101,14 +121,23 @@ class RoleResolution:
         return tuple(seen)
 
     @property
-    def is_single_channel(self) -> bool:
-        """Return whether exactly one component supplies this role.
+    def is_usable_as_one_value(self) -> bool:
+        """Return whether this role can be read without choosing a component."""
 
-        A consumer that needs one authoritative value should check this rather
-        than assuming ``RESOLVED`` implies it.
+        return self.status is RoleResolutionStatus.RESOLVED
+
+    @property
+    def is_semantically_coherent(self) -> bool:
+        """Return whether the candidates agree on meaning.
+
+        True for both ``RESOLVED`` and ``MULTI_CHANNEL``: a machine with two
+        spindles is not a machine that disagrees with itself.
         """
 
-        return len(self.component_paths) == 1
+        return self.status in (
+            RoleResolutionStatus.RESOLVED,
+            RoleResolutionStatus.MULTI_CHANNEL,
+        )
 
 
 @dataclass(frozen=True)
@@ -246,10 +275,16 @@ def _resolve_role(
     unique = tuple(sorted(set(candidates), key=_candidate_sort_key))
     if not unique:
         status = RoleResolutionStatus.UNAVAILABLE
-    elif len({candidate.binding for candidate in unique}) == 1:
-        status = RoleResolutionStatus.RESOLVED
-    else:
+    elif len({candidate.binding for candidate in unique}) > 1:
         status = RoleResolutionStatus.AMBIGUOUS
+    elif len({candidate.component_path for candidate in unique}) > 1:
+        # Compatible semantics from several components. Not a contradiction, but
+        # not one value either, so it must not be reported as RESOLVED - the
+        # obvious next step from RESOLVED is to read candidates[0], which on a
+        # mill-turn silently picks one path.
+        status = RoleResolutionStatus.MULTI_CHANNEL
+    else:
+        status = RoleResolutionStatus.RESOLVED
     return RoleResolution(role=role, status=status, candidates=unique)
 
 
