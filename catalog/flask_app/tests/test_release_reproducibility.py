@@ -9,6 +9,10 @@ PYTHON_IMAGE = (
     "python:3.12.13-slim@"
     "sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de"
 )
+OLLAMA_IMAGE = (
+    "ollama/ollama:0.32.6@"
+    "sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42"
+)
 
 
 def test_release_container_inputs_are_immutable_by_default() -> None:
@@ -21,7 +25,8 @@ def test_release_container_inputs_are_immutable_by_default() -> None:
 
     compose = (ROOT / "docker-compose.yml").read_text(encoding="utf-8")
     assert "ollama/ollama:latest" not in compose
-    assert compose.count("ollama/ollama:0.32.6") == 4
+    assert compose.count(f"image: {OLLAMA_IMAGE}") == 4
+    assert "image: ollama/ollama:0.32.6\n" not in compose
 
 
 def test_release_constraint_file_is_exact() -> None:
@@ -70,9 +75,36 @@ def test_release_workflow_uses_locked_inputs_and_covers_build_files() -> None:
         assert text.count(required) >= 2
 
 
-def test_changelog_does_not_claim_v1_is_released() -> None:
-    text = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
-    assert "## [Unreleased]" in text
-    assert "Candidate for v1.0.0" in text
-    assert "not a published release" in text
-    assert "no `v1.0.0` tag exists yet" in text
+def test_release_image_metadata_gate_checks_exact_digests() -> None:
+    text = (ROOT / ".github/workflows/release-image-metadata.yml").read_text(
+        encoding="utf-8"
+    )
+    assert "docker buildx imagetools inspect" in text
+    assert PYTHON_IMAGE in text
+    assert OLLAMA_IMAGE in text
+    assert "linux/amd64" in text
+    assert "linux/arm64" in text
+
+
+def test_v1_release_finalization_does_not_require_a_follow_up_source_commit() -> None:
+    changelog = (ROOT / "CHANGELOG.md").read_text(encoding="utf-8")
+    assert "## [1.0.0]" in changelog
+    assert "publication status and release date" in changelog
+    assert "before" in changelog and "physical release acceptance" in changelog
+    assert "same accepted\ncommit" in changelog
+    assert "Do not create a source-only commit" in changelog
+    assert "no `v1.0.0` tag exists yet" not in changelog
+
+    procedure = (ROOT / "docs/release_process.md").read_text(encoding="utf-8")
+    normalized_procedure = " ".join(procedure.split())
+    for required in (
+        "source tree is finalized **before** physical acceptance",
+        "Record `C` in the physical acceptance evidence",
+        "create the Git tag `v1.0.0` **at `C`**",
+        "GitHub Release from tag `v1.0.0`",
+        "must not require another source commit",
+    ):
+        assert required in normalized_procedure
+
+    docs_index = (ROOT / "docs/index.md").read_text(encoding="utf-8")
+    assert "[FCP v1 release process](release_process.md)" in docs_index
