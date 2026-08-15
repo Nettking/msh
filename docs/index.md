@@ -52,6 +52,7 @@ The installed product is capability-first. Retained legacy setup state and old c
 - [Federated network reference](federated_session_network.md) — identity, membership, control-plane, transport, storage, capability, and failure behavior.
 - [Data contract](data_contract.md) — telemetry inputs, normalization, derived artifacts, and playback-ready requirements.
 - [Federation v1 scope](releases/federation_v1_scope.md) — intended trusted release boundary and required evidence.
+- [FCP v1 release process](release_process.md) — finalize one candidate commit, bind physical acceptance to it, and publish the `v1.0.0` tag and GitHub Release without a follow-up source commit.
 
 ## Development and implementation
 
@@ -87,10 +88,9 @@ Current track entry points:
 - Verified manual Federation-wide runtime updates: merged.
 - Standalone recorder Federation bootstrap, logical-storage publication, startup scan, and remote source control: merged.
 - Tailscale-based Federation reachability discovery for onboarding: merged.
-- Complete physical CF7 acceptance: not accepted.
-- Complete Federation v1 end-to-end acceptance: not accepted.
+- Physical CF7 and Federation v1 release acceptance must be tied to one exact candidate commit; use the active acceptance evidence and the [v1 release process](release_process.md) rather than inferring publication status from this page.
 - OSL production implementation: not started.
-- Federation v1 release tag: not created.
+- Release publication status is defined by the `v1.0.0` Git tag and GitHub Release metadata, not by a source-only status edit.
 
 The machine-readable acceptance source remains `catalog/federation/tests/cf7_acceptance/scenarios.json`.
 

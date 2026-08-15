@@ -43,7 +43,7 @@ services:
     restart: unless-stopped
 
   ollama:
-    image: ollama/ollama:0.32.6
+    image: ollama/ollama:0.32.6@sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42
     volumes:
       - type: volume
         source: ollama_models
@@ -58,7 +58,7 @@ services:
 
   ollama-pull:
     profiles: ["model-install"]
-    image: ollama/ollama:0.32.6
+    image: ollama/ollama:0.32.6@sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42
     depends_on:
       ollama:
         condition: service_healthy
@@ -69,7 +69,7 @@ services:
 
   model-provider:
     profiles: ["provider"]
-    image: ollama/ollama:0.32.6
+    image: ollama/ollama:0.32.6@sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42
     ports:
       - "${FCP_PROVIDER_BIND:-0.0.0.0}:${FCP_PROVIDER_PORT:-11434}:11434"
     environment:
@@ -91,7 +91,7 @@ services:
 
   model-provider-install:
     profiles: ["provider"]
-    image: ollama/ollama:0.32.6
+    image: ollama/ollama:0.32.6@sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42
     depends_on:
       model-provider:
         condition: service_healthy

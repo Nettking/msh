@@ -1,0 +1,53 @@
+name: Release image metadata
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/release-image-metadata.yml"
+      - "Dockerfile"
+      - "Dockerfile.cli"
+      - "docker-compose.yml"
+      - "catalog/flask_app/tests/test_release_reproducibility.py"
+      - "CHANGELOG.md"
+      - "docs/release_process.md"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/release-image-metadata.yml"
+      - "Dockerfile"
+      - "Dockerfile.cli"
+      - "docker-compose.yml"
+      - "catalog/flask_app/tests/test_release_reproducibility.py"
+      - "CHANGELOG.md"
+      - "docs/release_process.md"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-release-images:
+    name: Verify immutable release image metadata
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verify Python runtime image digest
+        shell: bash
+        run: |
+          image="python:3.12.13-slim@sha256:57cd7c3a7a273101a6485ba99423ee568157882804b1124b4dd04266317710de"
+          test "$(head -n 1 Dockerfile)" = "FROM ${image}"
+          test "$(head -n 1 Dockerfile.cli)" = "FROM ${image}"
+          docker buildx imagetools inspect "${image}" >/tmp/python-image.txt
+          grep -q "linux/amd64" /tmp/python-image.txt
+          grep -q "linux/arm64" /tmp/python-image.txt
+
+      - name: Verify Ollama runtime image digest
+        shell: bash
+        run: |
+          image="ollama/ollama:0.32.6@sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42"
+          test "$(grep -Fc "image: ${image}" docker-compose.yml)" -eq 4
+          docker buildx imagetools inspect "${image}" >/tmp/ollama-image.txt
+          grep -q "linux/amd64" /tmp/ollama-image.txt
+          grep -q "linux/arm64" /tmp/ollama-image.txt
