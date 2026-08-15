@@ -48,7 +48,7 @@ def test_tailscale_recorder_command_uses_same_process_secret_prompt() -> None:
     assert '"--require-data-sharing"' in python
     assert "100.64.0.0/10" in python
     assert "getpass.getpass" in python
-    assert "Maskin 4 recorder - Mekanisk Service Halden" in python
+    assert "FCP MTConnect recorder" in python
     assert "tailscale up" in python
     assert "start-tailscale.cmd" not in command
     assert "WaitForExit(10000)" in powershell
@@ -130,7 +130,7 @@ def test_first_start_keeps_pairing_key_out_of_arguments_and_clears_it(
     assert isinstance(arguments, list)
     assert "--require-federation" in arguments
     assert "--require-data-sharing" in arguments
-    assert "Maskin 4 recorder - Mekanisk Service Halden" in arguments
+    assert "FCP MTConnect recorder" in arguments
     assert "FCP1-private-test-key" not in arguments
     assert captured["key"] == "FCP1-private-test-key"
     assert "FCP_RECORDER_FEDERATION_KEY" not in os.environ

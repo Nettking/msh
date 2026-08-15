@@ -19,7 +19,7 @@ from catalog.flask_app.services.federation_pairing_service import (
     RemotePairingStore,
 )
 
-DEFAULT_DEVICE_NAME: Final = "Maskin 4 recorder - Mekanisk Service Halden"
+DEFAULT_DEVICE_NAME: Final = "FCP MTConnect recorder"
 PAIRING_STATE_RELATIVE: Final = Path(
     "federation/onboarding/remote_pairing.json"
 )

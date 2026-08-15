@@ -48,7 +48,7 @@ inspect those changes. Do not use a hard reset on a recorder machine.
 
 1. During first-time setup choose **Recorder station** (or **Full server**).
 2. In the Recorder step, enter the private machine subnet,
-   such as `192.168.200.0/24`, and port `5000`.
+   such as `192.168.10.0/24`, and port `5000`.
 3. Click **Scan network**.
 4. Keep the required MTConnect Agents checked, continue, and save setup.
 
@@ -68,13 +68,13 @@ generic name `Mazak`.
 2. Confirm at least one recorder source is configured, for example:
 
    ```text
-   MAZAK-M7ZDA13010Z=http://192.168.200.249:5000
+   MAZAK-M7ZDA13010Z=http://192.168.10.20:5000
    ```
 
    Multiple sources use semicolons:
 
    ```text
-   MAZAK-M7ZDA13010Z=http://192.168.200.249:5000;IG500-UUID=http://192.168.200.251:5000
+   MAZAK-M7ZDA13010Z=http://192.168.10.20:5000;MachineB-UUID=http://192.168.10.21:5000
    ```
 
 3. Click **Start recording** on Recorder status.
@@ -163,7 +163,7 @@ the Flask container because it uses the same Docker networking environment as th
 recorder:
 
 ```powershell
-docker compose exec flask python -c "import requests; u='http://192.168.200.251:5000/current'; r=requests.get(u, timeout=5); print(r.status_code, len(r.text)); print(r.text[:200])"
+docker compose exec flask python -c "import requests; u='http://192.168.10.21:5000/current'; r=requests.get(u, timeout=5); print(r.status_code, len(r.text)); print(r.text[:200])"
 ```
 
 Expected result: HTTP `200` and MTConnect XML.

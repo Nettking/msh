@@ -51,7 +51,7 @@ Use `Ctrl+C` for a clean stop. The checkpoint is committed after each batch, so 
 For a controlled local-only or explicit deployment:
 
 ```bash
-python start_recorder.py Mazak=http://192.168.200.249:5000
+python start_recorder.py Mazak=http://192.168.10.20:5000
 ```
 
 The URL may be the Agent root or may end in `/current`, `/sample`, or `/probe`; the launcher normalizes it automatically.
@@ -60,21 +60,21 @@ Record several Agents in the same process:
 
 ```bash
 python start_recorder.py \
-  QuickTurn=http://192.168.200.249:5000 \
-  IG500=http://192.168.200.251:5000 \
-  VTC=http://192.168.200.252:5000
+  MachineA=http://192.168.10.20:5000 \
+  MachineB=http://192.168.10.21:5000 \
+  MachineC=http://192.168.10.22:5000
 ```
 
 Run one catch-up cycle and exit:
 
 ```bash
-python start_recorder.py Mazak=http://192.168.200.249:5000 --once
+python start_recorder.py Mazak=http://192.168.10.20:5000 --once
 ```
 
 Use an explicit scan range when auto-inference is not appropriate:
 
 ```bash
-python start_recorder.py FCP1-... --scan-cidr 192.168.200.0/24
+python start_recorder.py FCP1-... --scan-cidr 192.168.10.0/24
 ```
 
 Use `--no-auto-scan` only when startup discovery should be skipped deliberately.

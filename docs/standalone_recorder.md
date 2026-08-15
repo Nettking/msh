@@ -24,9 +24,9 @@ On first configuration the launcher:
 5. starts managed loss-aware recording; and
 6. starts the Federation recorder-control worker and publication reconciler.
 
-## Maskin 4 over Tailscale (Windows)
+## Windows recorder over Tailscale
 
-For the recorder at Mekanisk Service Halden, first install Tailscale and sign
+For a headless recorder on Windows, first install Tailscale and sign
 the host in to the same tailnet as the other Federation devices. Tailscale must
 already be running and signed in; the FCP launcher never changes tailnet login,
 routes, or ACL settings.
@@ -35,7 +35,7 @@ routes, or ACL settings.
 
 Nothing can be published to a Federation that serves no logical-storage
 authority. Without it the leader advertises no storage capability, and a
-correctly fail-closed recorder on machine 4 refuses to start and reports
+correctly fail-closed recorder refuses to start and reports
 `authority-unavailable`.
 
 The leader supervises the authority itself, but it is off by default so a device
@@ -79,7 +79,7 @@ Under Docker Compose the relay control database is the mounted
 On the current Federation leader, open FCP through the leader's numeric
 Tailscale `100.x.y.z` address (not `localhost`, a LAN name, or a DNS name) and
 generate a fresh `FCP1-...` pairing code. Then run this single command on
-machine 4:
+the recorder host:
 
 ```cmd
 start-tailscale-recorder.cmd --storage-group fcp-local-storage
@@ -91,7 +91,7 @@ out of shell history and process listings. Later starts use the saved
 membership and do not prompt again.
 
 The command defaults the device label to
-`Maskin 4 recorder - Mekanisk Service Halden`, runs the normal bounded local
+`FCP MTConnect recorder`, runs the normal bounded local
 MTConnect discovery, and refuses to start capture unless all of these checks
 pass:
 
@@ -144,13 +144,13 @@ The recorder reuses its stable identity, saved trusted Federation binding, and s
 Explicit source configuration remains available:
 
 ```bash
-python start_recorder.py Mazak=http://192.168.200.249:5000
+python start_recorder.py Mazak=http://192.168.10.20:5000
 ```
 
 Explicit scan network:
 
 ```bash
-python start_recorder.py FCP1-... --scan-cidr 192.168.200.0/24
+python start_recorder.py FCP1-... --scan-cidr 192.168.10.0/24
 ```
 
 Use `--no-auto-scan` only when you deliberately want to skip startup discovery.
@@ -236,7 +236,7 @@ and analyzed twice:
 
 Every connected full workbench device therefore offers its supported
 non-recorder JSONL corpus on the recurring Federation synchronization pass.
-The headless machine-4 process now runs a publisher-only pass for the same
+The headless recorder process now runs a publisher-only pass for the same
 supported non-recorder `data/**/*.jsonl` corpus. It does not download the
 Federation's JSONL corpus or start workbench analysis/refresh tasks. Recorder
 JSONL remains excluded from this generic pass and travels only through the

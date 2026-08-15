@@ -261,7 +261,7 @@ See [Standalone recorder](standalone_recorder.md) for details.
 
 ### Windows recorder over Tailscale
 
-For the planned machine 4 recorder at Mekanisk Service Halden, sign the host in
+For a headless recorder on Windows, sign the host in
 to the same Tailscale tailnet, generate the pairing code while the current
 leader is open through its numeric Tailscale `100.x.y.z` address, and run:
 

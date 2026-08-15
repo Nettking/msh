@@ -13,11 +13,7 @@ from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 from xml.etree import ElementTree as ET
 
-DEFAULT_SOURCES = {
-    "QuickTurn": "http://192.168.200.249:5000",
-    "IG500": "http://192.168.200.251:5000",
-    "VTC": "http://192.168.200.252:5000",
-}
+DEFAULT_SOURCES: dict[str, str] = {}
 
 
 class MtconnectProtocolError(RuntimeError):
