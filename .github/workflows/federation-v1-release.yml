@@ -4,29 +4,55 @@ on:
   pull_request:
     paths:
       - ".github/workflows/**"
+      - ".env.example"
+      - "CHANGELOG.md"
+      - "Dockerfile"
+      - "Dockerfile.cli"
       - "README.md"
       - "catalog/**"
       - "cmd/fcp-peer-sidecar/**"
       - "constraints-phase2.txt"
+      - "constraints-release.txt"
       - "docker-compose.yml"
       - "docs/**"
+      - "migrate.cmd"
       - "requirements.txt"
+      - "requirements-dev.txt"
       - "scripts/**"
+      - "setup_fcp.py"
       - "start.cmd"
+      - "start.sh"
+      - "start-tailscale.cmd"
+      - "start-tailscale.sh"
+      - "start_recorder.py"
+      - "termux/**"
       - "update.cmd"
   push:
     branches: [main]
     paths:
       - ".github/workflows/**"
+      - ".env.example"
+      - "CHANGELOG.md"
+      - "Dockerfile"
+      - "Dockerfile.cli"
       - "README.md"
       - "catalog/**"
       - "cmd/fcp-peer-sidecar/**"
       - "constraints-phase2.txt"
+      - "constraints-release.txt"
       - "docker-compose.yml"
       - "docs/**"
+      - "migrate.cmd"
       - "requirements.txt"
+      - "requirements-dev.txt"
       - "scripts/**"
+      - "setup_fcp.py"
       - "start.cmd"
+      - "start.sh"
+      - "start-tailscale.cmd"
+      - "start-tailscale.sh"
+      - "start_recorder.py"
+      - "termux/**"
       - "update.cmd"
   workflow_dispatch:
 
@@ -43,7 +69,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            python: "3.12.13"
+          - os: windows-latest
+            python: "3.12.10"
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
 
@@ -54,7 +84,7 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: ${{ matrix.python }}
           cache: pip
 
       - uses: actions/setup-go@v5
@@ -64,9 +94,9 @@ jobs:
 
       - name: Install release dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt -c constraints-phase2.txt
-          python -m pip install pytest ruff
+          python -m pip install --upgrade pip==26.2.1
+          python -m pip install -r requirements.txt -c constraints-release.txt
+          python -m pip install pytest==9.1.1 ruff==0.16.3 -c constraints-release.txt
 
       - name: Compile maintained product packages
         run: python -m compileall -q catalog
@@ -145,6 +175,7 @@ jobs:
           catalog/flask_app/tests/test_federation_auto_reconnect.py
           catalog/flask_app/tests/test_existing_setup_resume.py
           catalog/flask_app/tests/test_run_once_capability_evidence.py
+          catalog/flask_app/tests/test_release_reproducibility.py
           catalog/flask_app/tests/test_windows_start_script.py
           catalog/flask_app/tests/test_windows_update_script.py
           catalog/flask_app/tests/test_windows_volume_name_selection.py
@@ -239,6 +270,7 @@ jobs:
           catalog/flask_app/tests/test_federation_auto_reconnect.py
           catalog/flask_app/tests/test_local_capability_candidates.py
           catalog/flask_app/tests/test_provider_federation_surface.py
+          catalog/flask_app/tests/test_release_reproducibility.py
           catalog/flask_app/tests/test_run_once_capability_evidence.py
           catalog/flask_app/tests/test_upload_analysis_jobs.py
           catalog/flask_app/tests/test_windows_start_script.py
@@ -293,13 +325,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.13"
           cache: pip
       - name: Install dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt -c constraints-phase2.txt
-          python -m pip install pytest
+          python -m pip install --upgrade pip==26.2.1
+          python -m pip install -r requirements.txt -c constraints-release.txt
+          python -m pip install pytest==9.1.1 -c constraints-release.txt
       - name: PostgreSQL storage authority regression
         run: >-
           python -m pytest -o addopts= -q
@@ -314,14 +346,14 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.12"
+          python-version: "3.12.13"
           cache: pip
 
       - name: Install release dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt -c constraints-phase2.txt
-          python -m pip install pytest pytest-randomly
+          python -m pip install --upgrade pip==26.2.1
+          python -m pip install -r requirements.txt -c constraints-release.txt
+          python -m pip install pytest==9.1.1 pytest-randomly==4.1.0 -c constraints-release.txt
 
       - name: Full suite in a fixed shuffled order
         run: python -m pytest -o addopts= -q -p randomly --randomly-seed=20260813
