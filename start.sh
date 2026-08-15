@@ -37,12 +37,13 @@ docker info >/dev/null 2>&1 || { echo "Docker is not running." >&2; exit 1; }
 docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2 was not found." >&2; exit 1; }
 
 : "${FCP_WEB_BIND:=127.0.0.1}"
+: "${FCP_RELAY_BIND:=127.0.0.1}"
 : "${FCP_WEB_PORT:=5000}"
 : "${COMPOSE_PROJECT_NAME:=fcp}"
 : "${FCP_DATA_DIR:=$ROOT/data}"
 : "${FCP_RESULTS_DIR:=$ROOT/results}"
 : "${FCP_AI_MODEL:=llama3.2:3b}"
-export FCP_WEB_BIND FCP_WEB_PORT COMPOSE_PROJECT_NAME FCP_DATA_DIR FCP_RESULTS_DIR FCP_AI_MODEL
+export FCP_WEB_BIND FCP_RELAY_BIND FCP_WEB_PORT COMPOSE_PROJECT_NAME FCP_DATA_DIR FCP_RESULTS_DIR FCP_AI_MODEL
 
 FCP_BUILD_COMMIT=$(git rev-parse --verify 'HEAD^{commit}')
 case "$FCP_BUILD_COMMIT" in

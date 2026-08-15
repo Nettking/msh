@@ -60,7 +60,7 @@ After successful pairing, the joining device persists its stable identity and pu
 
 ### Reachable address requirement
 
-When another physical machine must connect, the issuing FCP installation must be reachable through a trusted LAN/VPN address rather than only `localhost`.
+When another physical machine must connect, the issuing FCP installation must be reachable through a trusted LAN/VPN address rather than only `localhost`. Normal launchers publish both the web interface and Federation relay to loopback only. Use `start-tailscale.cmd`/`start-tailscale.sh`, or deliberately set both `FCP_WEB_BIND` and `FCP_RELAY_BIND` to trusted reachable interfaces before normal startup. Setting only the web bind is not enough because the relay remains loopback-only by default.
 
 Do not expose the Flask workbench, relay, Ollama, or recorder control directly to the public internet.
 

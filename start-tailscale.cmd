@@ -21,6 +21,7 @@ if not defined FCP_TAILSCALE_IP (
 )
 
 if not defined FCP_WEB_BIND set "FCP_WEB_BIND=%FCP_TAILSCALE_IP%"
+if not defined FCP_RELAY_BIND set "FCP_RELAY_BIND=%FCP_TAILSCALE_IP%"
 if not defined FCP_DATA_DIR for %%I in ("%~dp0data") do set "FCP_DATA_DIR=%%~fI"
 
 rem Discovery probes the normal peer web port without forcing the local launcher

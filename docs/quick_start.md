@@ -48,11 +48,21 @@ The launcher builds and starts the current core services:
 
 It checks that the configured Ollama model is installed and downloads it when necessary. Existing identity, Federation, inspection, benchmark, recorder, human-auth, model, and data state are preserved during normal starts. The launcher bakes the exact Git commit into the FCP runtime images and starts the bounded host-owned update agent used by **Federation -> Update all devices**.
 
-The web interface is limited to the local FCP computer by default. Open:
+The web interface and Federation relay are limited to the local FCP computer by default. Open:
 
 ```text
 http://localhost:5000
 ```
+
+The relay host port is also bound to `127.0.0.1` by default. For cross-device pairing, prefer the Tailscale launcher below. On a trusted private LAN, deliberately expose both surfaces for that start:
+
+```cmd
+set FCP_WEB_BIND=0.0.0.0
+set FCP_RELAY_BIND=0.0.0.0
+start.cmd
+```
+
+On Linux/macOS use the equivalent `export` commands before `bash start.sh`. Do not use this LAN exposure on an untrusted network or the public Internet.
 
 On a fresh local authority, create the first human administrator in the browser before completing device onboarding. See **Create the first human administrator** below. After signing in, a device without completed onboarding uses:
 
