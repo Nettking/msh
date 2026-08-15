@@ -24,6 +24,7 @@ Use the guides below for the current FCP product. Start from the task or product
 - [One-command setup](one_command_setup.md) — use the supported Windows or POSIX launcher.
 - [Getting started](getting_started.md) — understand human sign-in, devices, Federations, inspection, contributions, authority, and the workbench mental model.
 - [Server setup](server_setup.md) — administer network access, recorder configuration, model installation, migration, and advanced deployments.
+- [Backup and recovery](backup_recovery.md) — protect device/Federation/authentication state, understand Windows DPAPI identity limits, recover the same installation safely, and replace a lost member without cloning its authority.
 - [Termux phone setup](termux_phone.md) — Android development and operation.
 
 The required first-run product path is:
