@@ -54,7 +54,8 @@ def test_live_route_renders_with_no_data(monkeypatch) -> None:
     assert "Live analysis (recorded stream)" in body
     assert "Latest recorded telemetry per machine" in body
     assert "not a direct machine connection check" in body
-    assert body.count("no data") >= 1
+    assert "No recorded machine telemetry is available yet." in body
+    assert "Configure and record an MTConnect source to populate this view." in body
     assert "Recent candidate events" in body
     assert "No recent candidate events detected" in body
 
