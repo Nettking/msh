@@ -24,6 +24,7 @@ goto :usage_error
 
 :arguments_ready
 if not defined FCP_WEB_BIND set "FCP_WEB_BIND=127.0.0.1"
+if not defined FCP_RELAY_BIND set "FCP_RELAY_BIND=127.0.0.1"
 if not defined COMPOSE_PROJECT_NAME set "COMPOSE_PROJECT_NAME=fcp"
 set "FCP_WEB_PORT_EXPLICIT=1"
 if not defined FCP_WEB_PORT (
@@ -220,8 +221,10 @@ echo Device data:           %FCP_DATA_DIR%
 echo Federation state:      %FCP_RELAY_VOLUME_NAME%
 echo Running build commit:  %FCP_BUILD_COMMIT%
 echo.
-echo Web access is limited to this FCP machine by default.
-echo To pair another device, open FCP using this machine's LAN or VPN address.
+echo Web and Federation relay access are limited to this FCP machine by default.
+echo For Tailscale pairing, use start-tailscale.cmd.
+echo For a trusted LAN, explicitly set both FCP_WEB_BIND and FCP_RELAY_BIND
+echo to reachable private interfaces before start.cmd, then open FCP through that LAN address.
 echo Setup, Federation identity, pairing state, recording state, checkpoints,
 echo downloaded Ollama models, and recorded data are preserved between normal starts.
 echo.

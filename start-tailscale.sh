@@ -17,9 +17,10 @@ if [ -z "$FCP_TAILSCALE_IP" ]; then
 fi
 
 : "${FCP_WEB_BIND:=$FCP_TAILSCALE_IP}"
+: "${FCP_RELAY_BIND:=$FCP_TAILSCALE_IP}"
 : "${FCP_DATA_DIR:=$ROOT/data}"
 FCP_TAILSCALE_DISCOVERY_PORT=${FCP_WEB_PORT:-5000}
-export FCP_WEB_BIND FCP_DATA_DIR
+export FCP_WEB_BIND FCP_RELAY_BIND FCP_DATA_DIR
 
 # Keep the public-safe discovery snapshot outside data/federation. A --fresh
 # reset intentionally removes data/federation, but a fresh second device still

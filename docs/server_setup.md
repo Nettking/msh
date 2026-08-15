@@ -45,7 +45,7 @@ start.cmd
 - starts one bounded host-owned update agent; and
 - opens the workbench after readiness checks pass.
 
-Windows web access is local-only by default through `127.0.0.1`. The launcher prints the resolved URL and may select a different host port if `5000` is occupied.
+Windows web access is local-only by default through `127.0.0.1`, and the Federation relay host port is independently local-only through `127.0.0.1`. The launcher prints the resolved web URL and may select a different host web port if `5000` is occupied. Cross-device LAN pairing therefore requires an explicit relay bind as well as a reachable web bind; the Tailscale wrappers do this automatically using only the host's Tailscale address.
 
 ### Linux or macOS
 
@@ -110,7 +110,7 @@ The installed product is capability-first. The former role-first runtime path is
 
 Generate a signed `FCP1-...` code on the **current Federation leader**. Browser-generated codes are one-use and valid for up to 10 minutes. A new code can be generated whenever another attempt is required.
 
-Before generating the code, access the issuing FCP installation through a LAN/VPN address that the joining machine can reach. A `localhost` relay address is not reachable from another physical device.
+Before generating the code, access the issuing FCP installation through a LAN/VPN address that the joining machine can reach. A `localhost` relay address is not reachable from another physical device. Normal `start.cmd`/`start.sh` keeps both web and relay host ports on loopback; use the Tailscale wrapper or explicitly set both `FCP_WEB_BIND` and `FCP_RELAY_BIND` to trusted reachable interfaces for LAN pairing.
 
 After pairing, the joining installation persists a stable identity and public-safe reconnect binding. The pairing code itself is not a persistent credential.
 
