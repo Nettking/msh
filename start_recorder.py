@@ -63,7 +63,7 @@ def _source(value: str) -> tuple[str, str]:
     if "=" not in value:
         raise ValueError(
             "Use NAME=http://host:port, for example "
-            "Mazak=http://192.168.200.249:5000"
+            "Mazak=http://192.168.10.20:5000"
         )
     name, url = value.split("=", 1)
     name = name.strip()

@@ -11,6 +11,7 @@
 </section>
 
 <section class="live-grid">
+  {% if live.machines %}
   {% for machine in live.machines %}
   <article class="section-block live-card">
     <div class="live-card__header">
@@ -39,6 +40,12 @@
     </dl>
   </article>
   {% endfor %}
+  {% else %}
+  <article class="section-block live-card">
+    <h3>No recorded machine telemetry is available yet.</h3>
+    <p>Configure and record an MTConnect source to populate this view.</p>
+  </article>
+  {% endif %}
 </section>
 
 <section class="section-block">

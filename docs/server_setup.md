@@ -343,13 +343,13 @@ The source selection persists. A deliberately emptied source set is not automati
 Use an explicit scan network when needed:
 
 ```bash
-python start_recorder.py FCP1-... --scan-cidr 192.168.200.0/24
+python start_recorder.py FCP1-... --scan-cidr 192.168.10.0/24
 ```
 
 or explicit sources for a controlled deployment:
 
 ```bash
-python start_recorder.py Mazak=http://192.168.200.249:5000
+python start_recorder.py Mazak=http://192.168.10.20:5000
 ```
 
 ### Remote recorder administration

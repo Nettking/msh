@@ -139,13 +139,13 @@ The normal web-workbench already starts background orchestration. The explicit p
 The recorder requires a real MTConnect `/current` endpoint reachable from the phone. Run it in the foreground with one or more semicolon-separated sources:
 
 ```bash
-bash termux/fcp-phone.sh recorder 'IG500=http://192.168.200.251:5000/current'
+bash termux/fcp-phone.sh recorder 'MachineB=http://192.168.10.21:5000/current'
 ```
 
 Multiple sources:
 
 ```bash
-bash termux/fcp-phone.sh recorder 'IG500=http://host-a:5000/current;VTC=http://host-b:5000/current'
+bash termux/fcp-phone.sh recorder 'MachineB=http://host-a:5000/current;MachineC=http://host-b:5000/current'
 ```
 
 Stop it with `Ctrl+C`. Recorded data is stored in the persistent phone data directory.

@@ -16,7 +16,7 @@ from catalog.common.telemetry_cache import CacheStatus, TelemetryCache, cached_c
 
 from .catalog_service import ArtifactCatalog
 
-DEFAULT_MACHINES = ("QuickTurn", "IG500", "VTC")
+DEFAULT_MACHINES: tuple[str, ...] = ()
 TIMESTAMP_FIELDS = ("timestamp", "source_timestamp")
 LIVE_COLUMNS = (
     "execution",
