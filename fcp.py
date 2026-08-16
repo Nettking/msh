@@ -35,6 +35,7 @@ TAILSCALE_NETWORK = ipaddress.IPv4Network("100.64.0.0/10")
 AUTO_PAIR_SCHEMA = "fcp.federation.tailscale-auto-pair.v1"
 FEDERATION_CLI = "catalog.flask_app.services.headless_federation_cli"
 CAPABILITY_CLI = "catalog.flask_app.services.headless_capability_cli"
+HUMAN_AUTH_CLI = "catalog.flask_app.services.headless_human_auth_cli"
 
 
 class FCPCLIError(RuntimeError):
@@ -101,6 +102,10 @@ def _runtime_env(*, device_name: str | None = None) -> dict[str, str]:
     return env
 
 
+def _web_url(env: dict[str, str]) -> str:
+    return f"http://{env['FCP_WEB_BIND']}:5000"
+
+
 def _factory_reset(env: dict[str, str]) -> None:
     print("Factory-resetting FCP (machine recordings are preserved)...")
     _run([sys.executable, str(ROOT / "reset_fcp.py"), "--yes"], env=env)
@@ -130,9 +135,8 @@ def _create_admin(env: dict[str, str]) -> None:
     username = input("Username: ").strip()
     if not username:
         raise FCPCLIError("Username must not be empty.")
-    # The current human-auth schema names this login identifier `email`.
-    # Keep the product prompt as Username; the existing Flask command provides
-    # hidden Password/Repeat Password prompts and validation.
+    # Human identities are currently normalized email identifiers internally.
+    # The existing Flask command supplies hidden Password/Repeat Password prompts.
     command = [
         "docker",
         "compose",
@@ -260,10 +264,18 @@ def command_init(args: argparse.Namespace) -> int:
     _create_admin(env)
     print("Creating device identity and Federation...")
     _container_command(FEDERATION_CLI, "create", env=env)
+    print("Publishing Federation sign-in authority...")
+    _container_command(
+        HUMAN_AUTH_CLI,
+        "authority",
+        "--base-url",
+        _web_url(env),
+        env=env,
+    )
     print("Inspecting, benchmarking, and enabling this device's capabilities...")
     _container_command(CAPABILITY_CLI, *_capability_arguments(args), env=env)
     print("\nFederation ready.")
-    print(f"Web: http://{env['FCP_WEB_BIND']}:5000/")
+    print(f"Web: {_web_url(env)}/")
     return 0
 
 
@@ -285,10 +297,19 @@ def command_join(args: argparse.Namespace) -> int:
             input_text=token + "\n",
         )
     finally:
-        token = ""  # do not retain authority beyond redemption
+        token = ""
+    print("Connecting this device to Federation sign-in...")
+    _container_command(
+        HUMAN_AUTH_CLI,
+        "member",
+        "--base-url",
+        _web_url(env),
+        env=env,
+    )
     print("Benchmarking and enabling all eligible contributions...")
     _container_command(CAPABILITY_CLI, *_capability_arguments(args), env=env)
     print("\nDevice connected and contributing.")
+    print(f"Web: {_web_url(env)}/")
     return 0
 
 
