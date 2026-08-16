@@ -1,5 +1,11 @@
 """Machine-neutral operational semantics over canonical MTConnect evidence."""
 
+from .model import (
+    BoundaryConfidence,
+    BoundaryReason,
+    OperationalBoundary,
+    canonical_sha256,
+)
 from .policy import SEGMENTATION_POLICY, device_key
 from .roles import (
     DeviceRoleResolution,
@@ -8,6 +14,13 @@ from .roles import (
     RoleResolutionStatus,
     SemanticRole,
     resolve_device_roles,
+)
+from .runs import (
+    MachineRun,
+    MachineRunError,
+    build_machine_runs,
+    segment_machine_runs,
+    segment_machine_runs_from_reports,
 )
 from .timeline import (
     AgentSequenceDiscontinuity,
@@ -33,6 +46,8 @@ __all__ = [
     "AgentSequenceDiscontinuity",
     "AgentStreamError",
     "AgentStreamReport",
+    "BoundaryConfidence",
+    "BoundaryReason",
     "ContextSnapshot",
     "ContextTransition",
     "ContextValue",
@@ -40,6 +55,9 @@ __all__ = [
     "DeviceStreamPartition",
     "DeviceTimelineReport",
     "ExecutionStateSpan",
+    "MachineRun",
+    "MachineRunError",
+    "OperationalBoundary",
     "RoleCandidate",
     "RoleResolution",
     "RoleResolutionStatus",
@@ -49,8 +67,12 @@ __all__ = [
     "build_agent_stream_reports",
     "build_device_timeline",
     "build_device_timeline_reports",
+    "build_machine_runs",
+    "canonical_sha256",
     "device_key",
     "partition_agent_stream",
     "partition_agent_streams",
     "resolve_device_roles",
+    "segment_machine_runs",
+    "segment_machine_runs_from_reports",
 ]
