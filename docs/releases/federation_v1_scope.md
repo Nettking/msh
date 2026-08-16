@@ -2,7 +2,7 @@
 
 Status: **pre-release scope definition**
 
-Reviewed: **2026-08-12 Europe/Oslo**
+Reviewed: **2026-08-16 Europe/Oslo**
 
 This document defines the intended trusted Federation v1 boundary. It does not declare that a release tag exists or that end-to-end physical acceptance has passed.
 
@@ -17,6 +17,7 @@ Current release state:
 - automated foundation and product-composition evidence: implemented;
 - verified manual Federation-wide runtime-update capability: merged;
 - standalone recorder Federation bootstrap/publication and bounded remote recorder control: merged;
+- MTConnect operational segmentation S1-S7 and read-only closeout validation: merged;
 - Federation-scoped human sign-in with leader-held credentials and signed member assertions: implemented;
 - complete physical CF7 evidence: not accepted;
 - Federation v1 end-to-end acceptance: false;
@@ -122,6 +123,44 @@ The user-facing `federation_id` maps to the existing internal `session_id` compa
 - bounded Federation recorder control from any trusted member, where scans execute on the recorder host and additions select only IDs returned by that recorder's latest scan.
 
 Recorder control does not provide arbitrary shell execution, unrestricted network scanning, or remote arbitrary URL/credential injection.
+
+### MTConnect operational segmentation
+
+Federation v1 includes a synchronous, machine-neutral interpretation layer over
+canonical MTConnect observations. The accepted v1 pipeline is:
+
+```text
+immutable recorder evidence
+  -> canonical observations
+  -> semantic roles
+  -> per-device execution/context timeline
+  -> MachineRun
+  -> ProductionCycle
+  -> OperationalEpisode
+  -> durable derived projection
+```
+
+The operational segmentation boundary includes:
+
+- Agent-wide sequence continuity established before device partitioning;
+- device-isolated execution and manufacturing context reconstruction;
+- deterministic `MachineRun` boundaries and exact duration accounting;
+- conservative `ProductionCycle` classification using explicit process-motion and manufacturing-context evidence rather than `ACTIVE == production`;
+- deterministic `OperationalEpisode` segmentation at cycle edges and direct concrete resolved tool transitions;
+- explicit partial/gap/timestamp-regression semantics instead of silent continuity repair;
+- deterministic identities, content fingerprints, provenance, and rebuild behaviour;
+- a disposable derived SQLite projection separate from canonical/raw recorder evidence;
+- bounded queries for runs, cycles, episodes, context transitions, boundaries, provenance, and projection/device status; and
+- read-only end-to-end/reference-shape validation through the existing raw-to-canonical pipeline.
+
+The v1 interpretation is deliberately conservative. Ambiguous or multi-channel
+execution authority fails closed. Unknown tool context does not fabricate a
+precise tool change. Process motion is evidence of process activity, not proof of
+cutting or material removal. Full multi-path operational lanes, a separate
+inferred subprogram role, activity phases, learned feature vectors, behavioural
+baselines, anomaly detection, prediction, operator recommendations, OSL/SysML
+integration, and new scheduling/Federation semantics remain outside this release
+boundary.
 
 ### Manual Federation-wide software updates
 

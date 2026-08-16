@@ -13,8 +13,24 @@ GitHub Release, not by a follow-up source edit.
 Release scope includes capability-first Federation onboarding, persistent device
 identity, authenticated membership and pairing, storage authority and recovery,
 trusted AI/compute contribution, durable federated analysis jobs, recorder
-capture/publication/control, human authentication/RBAC, and bounded manual
-Federation-wide updates.
+capture/publication/control, deterministic MTConnect operational segmentation,
+human authentication/RBAC, and bounded manual Federation-wide updates.
+
+### MTConnect operational segmentation
+
+The v1 recorder pipeline includes a machine-neutral operational interpretation
+layer over canonical MTConnect observations. It reconstructs sequence-safe,
+device-partitioned execution/context timelines and derives deterministic
+`MachineRun`, conservatively classified `ProductionCycle`, and tool-tenure
+`OperationalEpisode` history with explicit boundary confidence, duration
+accounting, provenance, and a disposable SQLite projection/query boundary.
+
+The interpretation remains evidence-conservative: `ACTIVE` is not equated with
+production, process motion is not claimed to prove cutting or material removal,
+unknown tool context does not fabricate tool-change points, and ambiguous or
+multi-channel execution fails closed. Full multi-path operational lanes,
+behavioural baselines, anomaly detection, prediction, recommendations, and
+OSL/SysML integration are outside this v1 scope.
 
 ### Release finalization contract
 
