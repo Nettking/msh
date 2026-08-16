@@ -23,7 +23,17 @@ function Invoke-BoundedDocker {
 
     try {
         if ($process.WaitForExit($TimeoutSeconds * 1000)) {
-            return $process.ExitCode
+            # On Windows/PowerShell, reading ExitCode immediately after the
+            # timeout overload of WaitForExit() can yield an unset value even
+            # though the process has exited.  Complete the parameterless wait
+            # and refresh the Process object before reading ExitCode.
+            $process.WaitForExit()
+            $process.Refresh()
+            $exitCode = $process.ExitCode
+            if ($null -eq $exitCode) {
+                throw "$Description completed but did not expose an exit code."
+            }
+            return [int]$exitCode
         }
 
         Write-Warning "$Description timed out after $TimeoutSeconds seconds. Terminating only that Docker CLI process tree."
