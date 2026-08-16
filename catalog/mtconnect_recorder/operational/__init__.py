@@ -26,6 +26,16 @@ from .model import (
     canonical_sha256,
 )
 from .policy import SEGMENTATION_POLICY, device_key
+from .projection import (
+    AgentSegmentationBundle,
+    SegmentationProjectionError,
+    SegmentationProjectionResult,
+    build_agent_segmentation_bundle,
+    project_agent_instance,
+    project_agent_instance_from_canonical_store,
+    rebuild_from_canonical_store,
+    rebuild_operational_segmentation,
+)
 from .roles import (
     DeviceRoleResolution,
     RoleCandidate,
@@ -40,6 +50,21 @@ from .runs import (
     build_machine_runs,
     segment_machine_runs,
     segment_machine_runs_from_reports,
+)
+from .store import (
+    PROJECTION_STATUS_BLOCKED,
+    PROJECTION_STATUS_PARTIAL,
+    PROJECTION_STATUS_READY,
+    SEGMENTATION_SCHEMA_NAME,
+    SEGMENTATION_SCHEMA_VERSION,
+    OperationalSegmentationStore,
+    SegmentationBoundaryRecord,
+    SegmentationContextTransitionRecord,
+    SegmentationCycleRecord,
+    SegmentationDeviceStatusRecord,
+    SegmentationEpisodeRecord,
+    SegmentationProjectionRecord,
+    SegmentationRunRecord,
 )
 from .timeline import (
     AgentSequenceDiscontinuity,
@@ -61,7 +86,13 @@ from .timeline import (
 )
 
 __all__ = [
+    "PROJECTION_STATUS_BLOCKED",
+    "PROJECTION_STATUS_PARTIAL",
+    "PROJECTION_STATUS_READY",
     "SEGMENTATION_POLICY",
+    "SEGMENTATION_SCHEMA_NAME",
+    "SEGMENTATION_SCHEMA_VERSION",
+    "AgentSegmentationBundle",
     "AgentSequenceDiscontinuity",
     "AgentStreamError",
     "AgentStreamReport",
@@ -83,6 +114,7 @@ __all__ = [
     "OperationalBoundary",
     "OperationalEpisode",
     "OperationalEpisodeError",
+    "OperationalSegmentationStore",
     "ProductionClassification",
     "ProductionCycle",
     "ProductionCycleError",
@@ -91,9 +123,19 @@ __all__ = [
     "RoleCandidate",
     "RoleResolution",
     "RoleResolutionStatus",
+    "SegmentationBoundaryRecord",
+    "SegmentationContextTransitionRecord",
+    "SegmentationCycleRecord",
+    "SegmentationDeviceStatusRecord",
+    "SegmentationEpisodeRecord",
+    "SegmentationProjectionError",
+    "SegmentationProjectionRecord",
+    "SegmentationProjectionResult",
+    "SegmentationRunRecord",
     "SemanticRole",
     "TimelineStatus",
     "TimestampDiscontinuity",
+    "build_agent_segmentation_bundle",
     "build_agent_stream_reports",
     "build_device_timeline",
     "build_device_timeline_reports",
@@ -105,6 +147,10 @@ __all__ = [
     "infer_production_cycles",
     "partition_agent_stream",
     "partition_agent_streams",
+    "project_agent_instance",
+    "project_agent_instance_from_canonical_store",
+    "rebuild_from_canonical_store",
+    "rebuild_operational_segmentation",
     "resolve_device_roles",
     "segment_machine_runs",
     "segment_machine_runs_from_reports",
