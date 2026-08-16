@@ -1,4 +1,4 @@
-"""S2 sequence continuity before MTConnect device partitioning."""
+"""S2 sequence continuity and device partitioning for MTConnect evidence."""
 
 from __future__ import annotations
 
@@ -12,7 +12,10 @@ from catalog.mtconnect_recorder.canonical.observation import (
 )
 from catalog.mtconnect_recorder.operational.timeline import (
     AgentStreamError,
+    AgentStreamReport,
     build_agent_stream_reports,
+    partition_agent_stream,
+    partition_agent_streams,
 )
 
 SOURCE = "MACHINE-ALPHA-0001"
@@ -24,7 +27,7 @@ def _observation(
     sequence: int,
     source: str = SOURCE,
     instance: int = INSTANCE,
-    device_uuid: str = "device-alpha",
+    device_uuid: str | None = "device-alpha",
     machine_id: str = "machine-alpha",
     timestamp: str | None = None,
 ) -> CanonicalObservation:
@@ -182,5 +185,122 @@ def test_sequence_preparation_does_not_mutate_canonical_evidence():
     snapshot = deepcopy(rows)
 
     build_agent_stream_reports(rows)
+
+    assert rows == snapshot
+
+
+# ---------------------------------------------------------------------------
+# S2.2: device partitioning happens only after Agent-wide gap detection.
+# ---------------------------------------------------------------------------
+
+
+def test_checked_agent_stream_partitions_interleaved_devices_without_local_gaps():
+    report = build_agent_stream_reports(
+        [
+            _observation(sequence=1, device_uuid="device-a", machine_id="machine-a"),
+            _observation(sequence=2, device_uuid="device-b", machine_id="machine-b"),
+            _observation(sequence=3, device_uuid="device-a", machine_id="machine-a"),
+            _observation(sequence=4, device_uuid="device-b", machine_id="machine-b"),
+            _observation(sequence=5, device_uuid="device-a", machine_id="machine-a"),
+        ]
+    )[0]
+
+    partitions = partition_agent_stream(report)
+    by_device = {item.device_key: item for item in partitions}
+
+    assert [row.sequence for row in by_device["uuid:device-a"].observations] == [
+        1,
+        3,
+        5,
+    ]
+    assert [row.sequence for row in by_device["uuid:device-b"].observations] == [2, 4]
+    assert all(not item.agent_sequence_discontinuities for item in partitions)
+
+
+def test_device_partition_uses_the_same_namespaced_identity_as_s1():
+    report = build_agent_stream_reports(
+        [
+            _observation(sequence=1, device_uuid="same", machine_id="machine-a"),
+            _observation(sequence=2, device_uuid=None, machine_id="same"),
+        ]
+    )[0]
+
+    assert [item.device_key for item in partition_agent_stream(report)] == [
+        "machine:same",
+        "uuid:same",
+    ]
+
+
+def test_real_agent_gap_is_carried_to_every_device_partition_as_agent_evidence():
+    report = build_agent_stream_reports(
+        [
+            _observation(sequence=1, device_uuid="device-a", machine_id="machine-a"),
+            _observation(sequence=2, device_uuid="device-b", machine_id="machine-b"),
+            _observation(sequence=4, device_uuid="device-a", machine_id="machine-a"),
+            _observation(sequence=5, device_uuid="device-b", machine_id="machine-b"),
+        ]
+    )[0]
+
+    partitions = partition_agent_stream(report)
+
+    assert len(report.sequence_discontinuities) == 1
+    assert len(partitions) == 2
+    assert all(
+        item.agent_sequence_discontinuities == report.sequence_discontinuities
+        for item in partitions
+    )
+    assert report.sequence_discontinuities[0].missing_start_sequence == 3
+
+
+def test_partitioning_multiple_agent_reports_keeps_agent_scopes_separate():
+    reports = build_agent_stream_reports(
+        [
+            _observation(sequence=1, instance=INSTANCE, device_uuid="device-a"),
+            _observation(sequence=1, instance=INSTANCE + 1, device_uuid="device-a"),
+        ]
+    )
+
+    partitions = partition_agent_streams(reports)
+
+    assert [(item.agent_instance_id, item.device_key) for item in partitions] == [
+        (INSTANCE, "uuid:device-a"),
+        (INSTANCE + 1, "uuid:device-a"),
+    ]
+
+
+def test_partition_rejects_an_observation_outside_the_report_scope():
+    valid = _observation(sequence=1)
+    foreign = _observation(sequence=2, instance=INSTANCE + 1)
+    invalid_report = AgentStreamReport(
+        source_key=valid.source_key,
+        agent_instance_id=valid.agent_instance_id,
+        observations=(valid, foreign),
+        sequence_discontinuities=(),
+    )
+
+    with pytest.raises(AgentStreamError, match="outside AgentStreamReport scope"):
+        partition_agent_stream(invalid_report)
+
+
+def test_partition_rejects_a_manually_unsorted_agent_report():
+    invalid_report = AgentStreamReport(
+        source_key=_observation(sequence=1).source_key,
+        agent_instance_id=INSTANCE,
+        observations=(_observation(sequence=2), _observation(sequence=1)),
+        sequence_discontinuities=(),
+    )
+
+    with pytest.raises(AgentStreamError, match="not strictly sequence ordered"):
+        partition_agent_stream(invalid_report)
+
+
+def test_device_partitioning_does_not_mutate_canonical_evidence():
+    rows = [
+        _observation(sequence=1, device_uuid="device-a"),
+        _observation(sequence=2, device_uuid="device-b"),
+    ]
+    snapshot = deepcopy(rows)
+
+    partition_agent_stream(build_agent_stream_reports(rows)[0])
 
     assert rows == snapshot
