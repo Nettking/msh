@@ -21,6 +21,7 @@ services:
       - FCP_DEVICE_NAME=${FCP_DEVICE_NAME:-This FCP device}
       - FCP_RELAY_PORT=${FCP_RELAY_PORT:-8765}
       - FCP_PAIRING_RELAY_URL=${FCP_PAIRING_RELAY_URL:-}
+      - FCP_TAILSCALE_AUTO_JOIN=${FCP_TAILSCALE_AUTO_JOIN:-0}
       - FCP_RECORDER_STATE_FILE=${FCP_RECORDER_STATE_FILE:-data/source_state/mtconnect_recorder_state.json}
       - FCP_RECORDER_STORAGE_GROUP=${FCP_RECORDER_STORAGE_GROUP:-}
       - FCP_FEDERATION_STORAGE_GROUP=${FCP_FEDERATION_STORAGE_GROUP:-}
@@ -131,9 +132,10 @@ services:
     restart: unless-stopped
 
   relay:
-    # Authenticated development relay for copy-and-paste pairing on a trusted
-    # private LAN or VPN. The pairing code is signed, expires quickly and uses
-    # one-use enrollment/invitation tokens. Configure WSS for untrusted networks.
+    # Authenticated development relay for a trusted private LAN or VPN. In
+    # explicit Tailscale auto-join mode, the signed one-use pairing token is
+    # exchanged in-band rather than copied by a human. Configure WSS for
+    # untrusted networks.
     build:
       context: .
       dockerfile: Dockerfile.cli
