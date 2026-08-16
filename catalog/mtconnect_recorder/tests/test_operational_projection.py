@@ -163,9 +163,6 @@ def test_rebuild_is_deterministic_idempotent_and_queryable(tmp_path):
     ]
 
     transitions = store.context_transitions_for_episode(episodes[0].segment_id)
-    assert [item.role for item in transitions] == [
-        "PROGRAM_STOPPED" if False else item.role for item in transitions
-    ]
     assert {item.role for item in transitions} >= {"LINE", "PROGRAM_COMMENT"}
 
     boundaries = store.boundaries_for_segment(run.segment_id, segment_type="run")
