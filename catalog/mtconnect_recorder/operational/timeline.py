@@ -77,7 +77,6 @@ class DeviceStreamPartition:
     agent_sequence_discontinuities: tuple[AgentSequenceDiscontinuity, ...]
 
 
-
 def build_agent_stream_reports(
     observations: Iterable[CanonicalObservation],
 ) -> tuple[AgentStreamReport, ...]:
@@ -142,7 +141,6 @@ def build_agent_stream_reports(
     return tuple(reports)
 
 
-
 def partition_agent_stream(
     report: AgentStreamReport,
 ) -> tuple[DeviceStreamPartition, ...]:
@@ -166,7 +164,10 @@ def partition_agent_stream(
                 f"observation=({observation.source_key!r}, "
                 f"{observation.agent_instance_id}, {observation.sequence})"
             )
-        if previous_sequence is not None and observation.sequence <= previous_sequence:
+        if (
+            previous_sequence is not None
+            and observation.sequence <= previous_sequence
+        ):
             raise AgentStreamError(
                 "AgentStreamReport observations are not strictly sequence ordered"
             )
@@ -183,7 +184,6 @@ def partition_agent_stream(
         )
         for canonical_device in sorted(grouped)
     )
-
 
 
 def partition_agent_streams(
