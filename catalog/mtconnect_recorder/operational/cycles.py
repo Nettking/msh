@@ -51,6 +51,7 @@ class ProductionReasonCode(str, Enum):
     MANUFACTURING_CONTEXT_PRESENT = "MANUFACTURING_CONTEXT_PRESENT"
     AVAILABLE_MOTION_NO_PROCESS_MOTION = "AVAILABLE_MOTION_NO_PROCESS_MOTION"
     MOTION_SEMANTICS_INSUFFICIENT = "MOTION_SEMANTICS_INSUFFICIENT"
+    MOTION_EVIDENCE_INSUFFICIENT = "MOTION_EVIDENCE_INSUFFICIENT"
     MANUFACTURING_CONTEXT_INSUFFICIENT = "MANUFACTURING_CONTEXT_INSUFFICIENT"
 
 
@@ -85,6 +86,7 @@ class ProductionCycle:
     reason_codes: tuple[ProductionReasonCode, ...]
     evidence_witnesses: tuple[CycleEvidenceWitness, ...]
     available_motion_roles: tuple[SemanticRole, ...]
+    observed_motion_roles: tuple[SemanticRole, ...]
     ambiguous_motion_roles: tuple[SemanticRole, ...]
     available_context_roles: tuple[SemanticRole, ...]
     wall_duration_us: int
@@ -105,6 +107,7 @@ class _EvidenceSummary:
     reason_codes: tuple[ProductionReasonCode, ...]
     witnesses: tuple[CycleEvidenceWitness, ...]
     available_motion_roles: tuple[SemanticRole, ...]
+    observed_motion_roles: tuple[SemanticRole, ...]
     ambiguous_motion_roles: tuple[SemanticRole, ...]
     available_context_roles: tuple[SemanticRole, ...]
 
@@ -275,9 +278,11 @@ def _motion_and_load_evidence(
     dict[ProductionEvidenceFlag, CycleEvidenceWitness],
     tuple[SemanticRole, ...],
     tuple[SemanticRole, ...],
+    tuple[SemanticRole, ...],
 ]:
     witnesses: dict[ProductionEvidenceFlag, CycleEvidenceWitness] = {}
     available_motion_roles: list[SemanticRole] = []
+    observed_motion_roles: list[SemanticRole] = []
     ambiguous_motion_roles: list[SemanticRole] = []
 
     roles_to_scan = (*_MOTION_FLAGS, SemanticRole.LOAD)
@@ -303,6 +308,7 @@ def _motion_and_load_evidence(
             if role in _MOTION_FLAGS
             else ProductionEvidenceFlag.HAS_LOAD_TELEMETRY
         )
+        saw_numeric_motion = False
         for observation in observations:
             if not _in_interval(
                 observation.sequence,
@@ -318,11 +324,17 @@ def _motion_and_load_evidence(
                 continue
             if observation.value_kind != VALUE_NUMBER:
                 continue
-            if role in _MOTION_FLAGS and not (
-                observation.value_number is not None
-                and observation.value_number > 0
-            ):
-                continue
+
+            if role in _MOTION_FLAGS:
+                if not saw_numeric_motion:
+                    observed_motion_roles.append(role)
+                    saw_numeric_motion = True
+                if not (
+                    observation.value_number is not None
+                    and observation.value_number > 0
+                ):
+                    continue
+
             witnesses.setdefault(
                 target_flag,
                 CycleEvidenceWitness(
@@ -339,6 +351,7 @@ def _motion_and_load_evidence(
     return (
         witnesses,
         tuple(available_motion_roles),
+        tuple(observed_motion_roles),
         tuple(ambiguous_motion_roles),
     )
 
@@ -351,14 +364,17 @@ def _classify_interval(
     end_sequence: int,
     include_end: bool,
 ) -> _EvidenceSummary:
-    motion_witnesses, available_motion, ambiguous_motion = (
-        _motion_and_load_evidence(
-            report,
-            observations,
-            start_sequence=start_sequence,
-            end_sequence=end_sequence,
-            include_end=include_end,
-        )
+    (
+        motion_witnesses,
+        available_motion,
+        observed_motion,
+        ambiguous_motion,
+    ) = _motion_and_load_evidence(
+        report,
+        observations,
+        start_sequence=start_sequence,
+        end_sequence=end_sequence,
+        include_end=include_end,
     )
     context_witnesses, available_context = _context_evidence(
         report,
@@ -379,7 +395,7 @@ def _classify_interval(
         )
     elif (
         not motion_present
-        and available_motion
+        and observed_motion
         and not ambiguous_motion
     ):
         classification = ProductionClassification.NON_PRODUCTION
@@ -390,7 +406,14 @@ def _classify_interval(
         classification = ProductionClassification.UNCERTAIN
         reasons: list[ProductionReasonCode] = []
         if not motion_present:
-            reasons.append(ProductionReasonCode.MOTION_SEMANTICS_INSUFFICIENT)
+            if not available_motion or ambiguous_motion:
+                reasons.append(
+                    ProductionReasonCode.MOTION_SEMANTICS_INSUFFICIENT
+                )
+            else:
+                reasons.append(
+                    ProductionReasonCode.MOTION_EVIDENCE_INSUFFICIENT
+                )
         else:
             reasons.append(ProductionReasonCode.PROCESS_MOTION_PRESENT)
         if not context_present and motion_present:
@@ -409,6 +432,7 @@ def _classify_interval(
         reason_codes=reason_codes,
         witnesses=evidence_witnesses,
         available_motion_roles=available_motion,
+        observed_motion_roles=observed_motion,
         ambiguous_motion_roles=ambiguous_motion,
         available_context_roles=available_context,
     )
@@ -509,6 +533,9 @@ def _make_cycle(
         "available_motion_roles": [
             role.value for role in summary.available_motion_roles
         ],
+        "observed_motion_roles": [
+            role.value for role in summary.observed_motion_roles
+        ],
         "ambiguous_motion_roles": [
             role.value for role in summary.ambiguous_motion_roles
         ],
@@ -532,6 +559,7 @@ def _make_cycle(
         reason_codes=summary.reason_codes,
         evidence_witnesses=summary.witnesses,
         available_motion_roles=summary.available_motion_roles,
+        observed_motion_roles=summary.observed_motion_roles,
         ambiguous_motion_roles=summary.ambiguous_motion_roles,
         available_context_roles=summary.available_context_roles,
         wall_duration_us=wall_duration_us,
