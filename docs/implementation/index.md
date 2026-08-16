@@ -8,7 +8,7 @@
 | Authority | This index classifies tracks; current status comes from this index/current handoff, while each track identifies its durable decisions and acceptance source |
 | Entry point | [Current task handoff](current_task_handoff.md) |
 | Parent | [FCP documentation](../index.md) |
-| Reviewed | 2026-08-14 Europe/Oslo |
+| Reviewed | 2026-08-16 Europe/Oslo |
 | Retention | Permanent while implementation planning remains in this repository |
 
 ## Current tracks
@@ -16,7 +16,7 @@
 - [Current task handoff](current_task_handoff.md) — current merged baseline, blockers, resume safety, and next acceptance/documentation work.
 - [Federation implementation](federation/) — durable plans, acceptance documents, technical references, current update/rollout notes, and historical delivery evidence.
 - [OSL integration](osl_integration/) — active OSL planning package and authoritative execution order for that track.
-- [MTConnect operational segmentation](mtconnect_operational_segmentation_plan.md) — **active authoritative execution order** from canonical MTConnect observations through semantic roles, state/context timelines, MachineRun, ProductionCycle, OperationalEpisode, durable projection, and reference-shape validation. This track explicitly stops before features, baselines, anomaly detection, prediction, recommendations, OSL/SysML integration, and dashboards.
+- [MTConnect operational segmentation](mtconnect_operational_segmentation_plan.md) — **at the S7 STOP-AND-REVIEW gate on an owner-authorized stacked implementation**. S2-S7 are represented by stacked draft PRs #298-#303 on top of the S1 work; merge truth remains PR-dependent and these changes are not claimed to be on `main`. No activity phases, features, baselines, anomaly detection, prediction, recommendations, OSL/SysML integration, or dashboards may begin from this track until a separate post-S7 design/review gate is opened.
 - [Federation sharing evaluation](federation_sharing_evaluation.md) — what the Federation shares today, what remains device-local, and the open inconsistencies between the shared model, the code, and the canonical documentation.
 - [Federation execution efficiency learning](federation_execution_efficiency_learning.md) — how completed executions become observations, how learned per-node/workload profiles are maintained, and how they rank already-eligible providers without changing capability or authority constraints.
 - [Federated JSONL analysis jobs](federated_jsonl_analysis_jobs.md) — how discovered or uploaded JSONL becomes a durable federation-dispatched job: identity and deduplication, provider selection, ownership, artifact authorization, worker execution, and failure behaviour.
@@ -27,7 +27,9 @@
 - CF8 retirement of the role-first installed-product runtime is merged. Retained legacy state/readers are migration/compatibility seams only.
 - Verified manual Federation-wide software update support is merged, including host-owned Windows/POSIX activation and exact running-commit verification.
 - Standalone recorder Federation bootstrap, checkpoint-gated logical-storage publication, startup discovery, and Federation-wide recorder source control are merged.
-- Canonical MTConnect observations are merged via PR #284. The operational-segmentation track is active; its next permitted implementation phase is **S1 Semantic-role resolver**.
+- Canonical MTConnect observations are merged via PR #284.
+- MTConnect operational segmentation has reached its **implementation closeout/review boundary** as an owner-authorized stacked series: S1 semantic roles were introduced in PR #289 and refined for multi-channel semantics in PR #291; S2-S7 are draft PRs #298, #299, #300, #301, #302, and #303. This statement records implementation/review state only; it does not claim the stacked PRs are merged into `main`.
+- The operational track's next action is **STOP AND REVIEW**: review the stacked semantics, local private-reference validation evidence, and merge/rebase order. No post-S7 behavioural-DT layer is implicitly authorized.
 - Complete physical CF7 acceptance is **not accepted**.
 - Complete Federation v1 end-to-end acceptance remains **false**.
 - Federation v1 release tag is not created.
@@ -37,7 +39,9 @@ The machine-readable Federation acceptance source is `catalog/federation/tests/c
 
 ## Status reconciliation rule
 
-Several long-lived implementation plans describe the sequencing that was correct before CF8 and the August 2026 runtime/update/recorder deliveries merged. Keep their durable product and authority decisions, but do not treat an old `current baseline`, `CF8 blocked`, or old commit hash inside those documents as newer than this index and the [Current task handoff](current_task_handoff.md).
+Several long-lived implementation plans describe the sequencing that was correct before CF8 and the August 2026 runtime/update/recorder deliveries merged. Keep their durable product and authority decisions, but do not treat an old `current baseline`, `CF8 blocked`, or old commit hash inside those documents as newer than this active index and the [Current task handoff](current_task_handoff.md).
+
+For MTConnect operational segmentation, distinguish **merge status** from **stacked implementation status**. The implementation plan's merge-only status table remains authoritative about what has actually landed, while this index may record owner-authorized stacked draft work that is ready for review. A stacked PR is not merged evidence.
 
 Acceptance flags are different: only the named machine-readable/reviewed acceptance source can change an acceptance claim. A merged feature, green CI workflow, or successful live rollout does not by itself change the false CF7/Federation-v1 acceptance flags.
 
