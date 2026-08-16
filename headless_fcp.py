@@ -10,7 +10,7 @@ The goal is deliberately small:
   Federation through the existing pairing service;
 * recorders use ``connect_recorder.py`` instead and are join-only.
 
-This is not a second Federation implementation.  Docker Compose starts the same
+This is not a second Federation implementation. Docker Compose starts the same
 services as the supported launchers and all identity/pairing mutations are
 performed inside the Flask container by
 ``catalog.flask_app.services.headless_federation_cli``.
@@ -21,7 +21,6 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import os
-import platform
 import re
 import subprocess
 import sys
@@ -144,7 +143,9 @@ def _require_host_tools(env: dict[str, str]) -> None:
         try:
             _run(command, env=env, capture=True)
         except OSError as exc:
-            raise HeadlessStartError(f"required command not found: {command[0]}") from exc
+            raise HeadlessStartError(
+                f"required command not found: {command[0]}"
+            ) from exc
     _run(["docker", "info"], env=env, capture=True)
     _run(["docker", "compose", "version"], env=env, capture=True)
 
@@ -170,7 +171,7 @@ def _start_update_agent(env: dict[str, str]) -> None:
             str(data_dir),
         ]
         creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0)
-        subprocess.Popen(  # noqa: S603 - fixed local script and arguments
+        subprocess.Popen(
             command,
             cwd=ROOT,
             env=env,
@@ -184,7 +185,7 @@ def _start_update_agent(env: dict[str, str]) -> None:
     log_path = log_dir / "agent.log"
     stream = log_path.open("a", encoding="utf-8")
     try:
-        subprocess.Popen(  # noqa: S603 - fixed local script and arguments
+        subprocess.Popen(
             [
                 sys.executable,
                 str(ROOT / "scripts" / "posix" / "fcp_update_agent.py"),
@@ -204,13 +205,31 @@ def _start_update_agent(env: dict[str, str]) -> None:
         stream.close()
 
 
-def _compose(env: dict[str, str], *args: str, capture: bool = False) -> subprocess.CompletedProcess[str]:
-    return _run(["docker", "compose", *args], env=env, capture=capture)
+def _compose(
+    env: dict[str, str],
+    *args: str,
+    check: bool = True,
+    capture: bool = False,
+) -> subprocess.CompletedProcess[str]:
+    return _run(
+        ["docker", "compose", *args],
+        env=env,
+        check=check,
+        capture=capture,
+    )
 
 
 def _fresh_reset(env: dict[str, str]) -> None:
     print("Resetting bounded device/Federation state for a fresh acceptance start...")
-    _compose(env, "stop", "flask", "recorder", "relay", capture=True)
+    _compose(
+        env,
+        "stop",
+        "flask",
+        "recorder",
+        "relay",
+        check=False,
+        capture=True,
+    )
     _compose(
         env,
         "run",
@@ -234,6 +253,7 @@ def _ensure_model(env: dict[str, str]) -> None:
         "ollama",
         "show",
         model,
+        check=False,
         capture=True,
     )
     if existing.returncode == 0:
@@ -248,6 +268,7 @@ def _ensure_model(env: dict[str, str]) -> None:
         "ollama",
         "show",
         model,
+        check=False,
         capture=True,
     )
     if verified.returncode != 0:
@@ -275,7 +296,7 @@ def _wait_for_flask(env: dict[str, str], *, seconds: int = 90) -> None:
         if result.returncode == 0:
             return
         time.sleep(1)
-    _compose(env, "logs", "--tail", "80", "flask", capture=False)
+    _compose(env, "logs", "--tail", "80", "flask", check=False)
     raise HeadlessStartError("FCP Flask service did not become ready")
 
 
@@ -304,7 +325,11 @@ def _start_runtime(env: dict[str, str], *, fresh: bool) -> None:
         )
 
 
-def _inside_flask(env: dict[str, str], *args: str, capture: bool = False) -> subprocess.CompletedProcess[str]:
+def _inside_flask(
+    env: dict[str, str],
+    *args: str,
+    capture: bool = False,
+) -> subprocess.CompletedProcess[str]:
     return _compose(
         env,
         "exec",
@@ -380,8 +405,7 @@ def _connect_command(args: argparse.Namespace) -> int:
         return 0
 
     # No code means "mint a code on the existing first/local-authority node".
-    # Starting the runtime is idempotent and makes the command convenient after
-    # a reboot without creating a Federation or replacing any binding.
+    # Starting the runtime is idempotent and makes this usable after a reboot.
     _start_runtime(env, fresh=False)
     relay_url = _reachable_relay_url(env, args.relay_url)
     if relay_url is None:
@@ -413,31 +437,49 @@ def build_parser() -> argparse.ArgumentParser:
     start.add_argument(
         "--fresh",
         action="store_true",
-        help="Reset bounded local FCP/Federation setup state before creating the first node.",
+        help=(
+            "Reset bounded local FCP/Federation setup state before creating "
+            "the first node."
+        ),
     )
     start.add_argument(
         "--bind",
-        help="Trusted host/VPN IP to bind both web and relay services. Auto-uses Tailscale when available.",
+        help=(
+            "Trusted host/VPN IP to bind both web and relay services. "
+            "Auto-uses Tailscale when available."
+        ),
     )
     start.add_argument(
         "--relay-url",
-        help="Explicit reachable ws:// or wss:// relay URL advertised in the first pairing code.",
+        help=(
+            "Explicit reachable ws:// or wss:// relay URL advertised in the "
+            "first pairing code."
+        ),
     )
     start.set_defaults(handler=_start_command)
 
     connect = subparsers.add_parser(
         "connect",
-        help="Without a code, mint one on the first node; with FCP1-..., start and join this normal node.",
+        help=(
+            "Without a code, mint one on the first node; with FCP1-..., "
+            "start and join this normal node."
+        ),
     )
     connect.add_argument("pairing_code", nargs="?", metavar="FCP1-...")
     connect.add_argument(
         "--fresh",
         action="store_true",
-        help="Reset this joining installation before redeeming the code. Never used when only minting a code.",
+        help=(
+            "Reset this joining installation before redeeming the code. "
+            "Never used when only minting a code."
+        ),
     )
     connect.add_argument(
         "--bind",
-        help="Trusted host/VPN IP for this FCP runtime. Auto-uses Tailscale when available.",
+        help=(
+            "Trusted host/VPN IP for this FCP runtime. Auto-uses Tailscale "
+            "when available."
+        ),
     )
     connect.add_argument(
         "--relay-url",
@@ -445,7 +487,10 @@ def build_parser() -> argparse.ArgumentParser:
     )
     connect.set_defaults(handler=_connect_command)
 
-    status = subparsers.add_parser("status", help="Print the saved/revalidated Federation state as JSON.")
+    status = subparsers.add_parser(
+        "status",
+        help="Print the saved/revalidated Federation state as JSON.",
+    )
     status.add_argument("--bind", help=argparse.SUPPRESS)
     status.set_defaults(handler=_status_command)
     return parser
