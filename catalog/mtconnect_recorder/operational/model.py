@@ -2,7 +2,7 @@
 
 The operational layer keeps boundary semantics explicit so later phases can
 consume observed and inferred intervals without reverse-engineering why a
-segment starts or ends.  These values are part of the segmentation policy and
+segment starts or ends. These values are part of the segmentation policy and
 therefore must not be silently reinterpreted under the same policy identifier.
 """
 
@@ -17,7 +17,7 @@ from typing import Any
 
 
 class BoundaryReason(str, Enum):
-    """Named reasons allowed to create a MachineRun boundary in S3."""
+    """Named reasons allowed to create operational segment boundaries."""
 
     EXECUTION_ACTIVE = "EXECUTION_ACTIVE"
     EXECUTION_READY = "EXECUTION_READY"
@@ -26,6 +26,7 @@ class BoundaryReason(str, Enum):
     SEQUENCE_GAP = "SEQUENCE_GAP"
     AGENT_INSTANCE_END = "AGENT_INSTANCE_END"
     TIMESTAMP_REGRESSION = "TIMESTAMP_REGRESSION"
+    PALLET_CONTEXT_CHANGE = "PALLET_CONTEXT_CHANGE"
 
 
 class BoundaryConfidence(str, Enum):
