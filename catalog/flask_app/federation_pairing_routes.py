@@ -1,4 +1,4 @@
-"""Browser routes for signed, short-lived Federation pairing codes."""
+"""Browser and machine routes for authenticated Federation pairing."""
 
 from __future__ import annotations
 
@@ -59,6 +59,15 @@ def _require_csrf() -> None:
         )
 
 
+def _tailscale_auto_join_enabled() -> bool:
+    return str(os.getenv("FCP_TAILSCALE_AUTO_JOIN", "0")).strip().casefold() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
+
+
 def _relay_url() -> str:
     configured = str(
         current_app.config.get("CAPABILITY_ONBOARDING_PAIRING_RELAY_URL")
@@ -80,7 +89,7 @@ def _relay_url() -> str:
 
 
 def _discovery_response() -> Response:
-    """Advertise public-safe identity only; never mint or expose join authority."""
+    """Advertise public-safe Federation identity and Tailscale join mode."""
 
     try:
         service = _pairing_service()
@@ -105,6 +114,7 @@ def _discovery_response() -> Response:
                 + context.binding.federation_id
             ).encode("utf-8")
         ).hexdigest()[:32]
+        auto_join = _tailscale_auto_join_enabled()
         response = jsonify(
             {
                 "schema": ADVERTISEMENT_SCHEMA,
@@ -112,7 +122,11 @@ def _discovery_response() -> Response:
                 "federation_fingerprint": fingerprint,
                 "device_name": context.credentials.identity.display_name,
                 "relay_port": relay_port,
-                "pairing_required": True,
+                # Pairing authority still uses the signed one-use token
+                # internally. In Tailscale auto-join mode the CLI obtains it
+                # directly, so no human pairing ceremony is required.
+                "pairing_required": not auto_join,
+                "auto_join": auto_join,
             }
         )
     except Exception as exc:  # noqa: BLE001 - discovery endpoint fails closed
@@ -143,6 +157,47 @@ def _dispatch_before_legacy_setup_gate() -> Response | None:
 @federation_pairing_web.get("/onboarding/federation/discovery.json")
 def federation_discovery():
     return _discovery_response()
+
+
+@federation_pairing_web.post("/onboarding/federation/auto-pair")
+def auto_pair_device():
+    """Mint an in-band one-use token for explicit Tailscale auto-join mode.
+
+    This route is deliberately unavailable in the normal/LAN runtime. The
+    canonical ``fcp init`` command binds the web/relay surfaces to the local
+    Tailscale address and opts the Federation into this trust model. The token
+    retains the existing signature, TTL and one-use replay protection and is
+    never persisted by the joining host CLI.
+    """
+
+    if not _tailscale_auto_join_enabled():
+        return Response(status=404)
+    try:
+        code = _pairing_service().create_pairing_code(
+            relay_url=_relay_url(),
+            ttl_seconds=MAX_PAIRING_TTL_SECONDS,
+        )
+        if not code:
+            raise FederationOperationError(
+                "pairing-code-unavailable",
+                "the pairing code could not be created",
+            )
+        response = jsonify(
+            {
+                "schema": "fcp.federation.tailscale-auto-pair.v1",
+                "pairing_code": code,
+            }
+        )
+    except Exception as exc:  # noqa: BLE001 - never leak authority details
+        current_app.logger.warning(
+            "Tailscale auto-pair failed (%s)",
+            type(exc).__name__,
+        )
+        return jsonify({"accepted": False, "error": "auto-pair-unavailable"}), 503
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @federation_pairing_web.post("/onboarding/federation/pairing-code")
