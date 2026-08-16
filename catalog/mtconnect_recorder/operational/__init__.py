@@ -10,6 +10,15 @@ from .cycles import (
     build_production_cycles,
     infer_production_cycles,
 )
+from .episodes import (
+    EpisodeBoundary,
+    EpisodeBoundaryReason,
+    EpisodeEntryContext,
+    OperationalEpisode,
+    OperationalEpisodeError,
+    build_operational_episodes,
+    segment_operational_episodes,
+)
 from .model import (
     BoundaryConfidence,
     BoundaryReason,
@@ -65,10 +74,15 @@ __all__ = [
     "DeviceRoleResolution",
     "DeviceStreamPartition",
     "DeviceTimelineReport",
+    "EpisodeBoundary",
+    "EpisodeBoundaryReason",
+    "EpisodeEntryContext",
     "ExecutionStateSpan",
     "MachineRun",
     "MachineRunError",
     "OperationalBoundary",
+    "OperationalEpisode",
+    "OperationalEpisodeError",
     "ProductionClassification",
     "ProductionCycle",
     "ProductionCycleError",
@@ -84,6 +98,7 @@ __all__ = [
     "build_device_timeline",
     "build_device_timeline_reports",
     "build_machine_runs",
+    "build_operational_episodes",
     "build_production_cycles",
     "canonical_sha256",
     "device_key",
@@ -93,4 +108,5 @@ __all__ = [
     "resolve_device_roles",
     "segment_machine_runs",
     "segment_machine_runs_from_reports",
+    "segment_operational_episodes",
 ]
