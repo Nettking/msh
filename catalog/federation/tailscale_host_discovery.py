@@ -1,9 +1,10 @@
 """Best-effort host-side Federation discovery through an existing Tailscale client.
 
 This module intentionally uses only the local ``tailscale`` CLI. It never accepts,
-reads, stores, or forwards a Tailscale auth/API key. Tailnet membership is only a
-reachability/discovery signal: the returned descriptors contain no enrollment or
-invitation material and therefore grant no Federation authority.
+reads, stores, or forwards a Tailscale auth/API key.  In explicit FCP Tailscale
+mode, a discovered Federation may advertise ``auto_join``.  That flag only says
+the peer can request the existing signed, short-lived one-use Federation token
+in-band; the discovery document itself contains no join authority.
 """
 
 from __future__ import annotations
@@ -123,6 +124,8 @@ def _validate_advertisement(payload: object) -> dict[str, object] | None:
     fingerprint = payload.get("federation_fingerprint")
     device_name = payload.get("device_name")
     relay_port = payload.get("relay_port")
+    pairing_required = payload.get("pairing_required")
+    auto_join = payload.get("auto_join", False)
     if (
         not isinstance(label, str)
         or not label.strip()
@@ -134,17 +137,20 @@ def _validate_advertisement(payload: object) -> dict[str, object] | None:
         or isinstance(relay_port, bool)
         or not isinstance(relay_port, int)
         or not 1 <= relay_port <= 65_535
-        or payload.get("pairing_required") is not True
+        or not isinstance(pairing_required, bool)
+        or not isinstance(auto_join, bool)
+        or auto_join == pairing_required
     ):
+        # Exactly one onboarding mode is advertised: interactive pairing or
+        # Tailscale auto-join. This prevents ambiguous/mixed authority surfaces.
         return None
-    # Deliberately copy only the public-safe allowlist. Unknown fields from a
-    # remote peer never enter the persisted snapshot.
     return {
         "federation_label": label.strip(),
         "federation_fingerprint": fingerprint,
         "device_name": device_name.strip(),
         "relay_port": relay_port,
-        "pairing_required": True,
+        "pairing_required": pairing_required,
+        "auto_join": auto_join,
     }
 
 
@@ -283,12 +289,7 @@ def discover(
 
 
 def load_snapshot(path: Path | str) -> dict[str, object]:
-    """Load a persisted host snapshot through the same bounded allowlist.
-
-    The bind-mounted data directory is treated as untrusted input. Malformed,
-    oversized, non-Tailscale, or unexpectedly shaped content collapses to an
-    empty unavailable snapshot rather than reaching the browser view model.
-    """
+    """Load a persisted host snapshot through the same bounded allowlist."""
 
     target = Path(path)
     try:
@@ -378,30 +379,41 @@ def build_parser() -> argparse.ArgumentParser:
         description=(
             "Discover FCP Federations through the already logged-in Tailscale client."
         ),
+        allow_abbrev=False,
     )
-    parser.add_argument("--output", required=True)
-    parser.add_argument("--web-port", type=int, action="append", dest="web_ports")
-    parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT_SECONDS)
+    parser.add_argument(
+        "--web-port",
+        action="append",
+        type=int,
+        dest="web_ports",
+        help="FCP web port to probe (repeatable; defaults to 5000).",
+    )
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=DEFAULT_TIMEOUT_SECONDS,
+        help="Per-peer HTTP timeout in seconds.",
+    )
+    parser.add_argument(
+        "--output",
+        type=Path,
+        help="Write the bounded discovery snapshot atomically to this path.",
+    )
     return parser
 
 
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
-    timeout = args.timeout
-    if not isinstance(timeout, float) or not 0.05 <= timeout <= 5.0:
-        raise SystemExit("--timeout must be between 0.05 and 5 seconds")
     payload = discover(
-        web_ports=tuple(args.web_ports or (DEFAULT_WEB_PORT,)),
-        timeout_seconds=timeout,
+        web_ports=args.web_ports or (DEFAULT_WEB_PORT,),
+        timeout_seconds=max(0.05, min(float(args.timeout), 5.0)),
     )
-    write_snapshot(args.output, payload)
+    if args.output is not None:
+        write_snapshot(args.output, payload)
     count = len(payload["federations"])
-    if payload["tailscale_available"]:
-        print(f"Tailscale discovery found {count} FCP Federation(s).")
-    else:
-        print("Tailscale discovery unavailable; normal onboarding remains available.")
+    print(f"Tailscale discovery found {count} FCP Federation(s).")
     return 0
 
 
-if __name__ == "__main__":  # pragma: no cover - exercised through launcher integration
+if __name__ == "__main__":
     raise SystemExit(main())
