@@ -19,7 +19,12 @@ from .model import BoundaryConfidence, BoundaryReason, OperationalBoundary, cano
 from .policy import SEGMENTATION_POLICY, device_key
 from .roles import RoleResolutionStatus, SemanticRole
 from .runs import MachineRun, segment_machine_runs_from_reports
-from .timeline import ContextTransition, DeviceTimelineReport, ExecutionStateSpan, build_device_timeline_reports
+from .timeline import (
+    ContextTransition,
+    DeviceTimelineReport,
+    ExecutionStateSpan,
+    build_device_timeline_reports,
+)
 
 
 class OperationalEpisodeError(ValueError):
@@ -308,6 +313,30 @@ def _duration_buckets(
     return wall, active, program_stopped, feed_hold, other, unknown
 
 
+def _execution_spans_for_episode(
+    report: DeviceTimelineReport,
+    *,
+    first_sequence: int,
+    last_sequence: int,
+) -> tuple[ExecutionStateSpan, ...]:
+    """Return spans whose canonical evidence intersects one episode by sequence.
+
+    Sequence is the ordering authority. In particular, a timestamp regression can
+    make a later span's wall-clock interval overlap an earlier span. Selecting
+    spans by time alone would therefore reconnect evidence that S2 deliberately
+    split at the regression. A span is eligible only when its canonical sequence
+    range intersects the episode's evidence range; time clipping happens only
+    after that sequence-safe selection.
+    """
+
+    return tuple(
+        span
+        for span in report.execution_spans
+        if span.end_sequence >= first_sequence
+        and span.start_sequence <= last_sequence
+    )
+
+
 def _boundary_payload(boundary: EpisodeBoundary) -> dict[str, object]:
     return {
         "source_key": boundary.source_key,
@@ -402,8 +431,13 @@ def _make_episode(
     )
     entry = _entry_context(report, start_boundary.trigger_sequence)
     partial_tool = _tool_context_is_partial(entry, transitions, tool_role)
+    episode_spans = _execution_spans_for_episode(
+        report,
+        first_sequence=first_sequence,
+        last_sequence=last_sequence,
+    )
     wall, active, program_stopped, feed_hold, other, unknown = _duration_buckets(
-        report.execution_spans,
+        episode_spans,
         start_us=start_boundary.observed_at_us,
         end_us=end_boundary.observed_at_us,
     )
