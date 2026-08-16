@@ -13,7 +13,10 @@ from .timeline import (
     AgentSequenceDiscontinuity,
     AgentStreamError,
     AgentStreamReport,
+    DeviceStreamPartition,
     build_agent_stream_reports,
+    partition_agent_stream,
+    partition_agent_streams,
 )
 
 __all__ = [
@@ -22,11 +25,14 @@ __all__ = [
     "AgentStreamError",
     "AgentStreamReport",
     "DeviceRoleResolution",
+    "DeviceStreamPartition",
     "RoleCandidate",
     "RoleResolution",
     "RoleResolutionStatus",
     "SemanticRole",
     "build_agent_stream_reports",
     "device_key",
+    "partition_agent_stream",
+    "partition_agent_streams",
     "resolve_device_roles",
 ]
