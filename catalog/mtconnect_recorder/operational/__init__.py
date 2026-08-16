@@ -1,5 +1,15 @@
 """Machine-neutral operational semantics over canonical MTConnect evidence."""
 
+from .cycles import (
+    CycleEvidenceWitness,
+    ProductionClassification,
+    ProductionCycle,
+    ProductionCycleError,
+    ProductionEvidenceFlag,
+    ProductionReasonCode,
+    build_production_cycles,
+    infer_production_cycles,
+)
 from .model import (
     BoundaryConfidence,
     BoundaryReason,
@@ -51,6 +61,7 @@ __all__ = [
     "ContextSnapshot",
     "ContextTransition",
     "ContextValue",
+    "CycleEvidenceWitness",
     "DeviceRoleResolution",
     "DeviceStreamPartition",
     "DeviceTimelineReport",
@@ -58,6 +69,11 @@ __all__ = [
     "MachineRun",
     "MachineRunError",
     "OperationalBoundary",
+    "ProductionClassification",
+    "ProductionCycle",
+    "ProductionCycleError",
+    "ProductionEvidenceFlag",
+    "ProductionReasonCode",
     "RoleCandidate",
     "RoleResolution",
     "RoleResolutionStatus",
@@ -68,8 +84,10 @@ __all__ = [
     "build_device_timeline",
     "build_device_timeline_reports",
     "build_machine_runs",
+    "build_production_cycles",
     "canonical_sha256",
     "device_key",
+    "infer_production_cycles",
     "partition_agent_stream",
     "partition_agent_streams",
     "resolve_device_roles",
