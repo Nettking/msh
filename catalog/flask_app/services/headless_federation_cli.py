@@ -1,21 +1,10 @@
-"""Local headless Federation onboarding commands for acceptance and operators.
+"""Local headless Federation onboarding commands for operators and acceptance.
 
-This module is intentionally a thin local CLI over the installed Flask
-onboarding/pairing services.  It does not add a second Federation protocol,
-remote shell, or alternate authority source.
-
-Run it inside the Flask service, normally through ``headless_fcp.py``::
-
-    python -m catalog.flask_app.services.headless_federation_cli create
-    python -m catalog.flask_app.services.headless_federation_cli pairing-code \
-        --relay-url ws://100.64.0.10:8765
-    python -m catalog.flask_app.services.headless_federation_cli join FCP1-...
-    python -m catalog.flask_app.services.headless_federation_cli status
-
-``create`` is for the first normal FCP installation only.  ``join`` consumes the
-same signed one-use FCP1 pairing bundle as the browser route.  A recorder never
-uses ``create``; standalone recorders use ``connect_recorder.py`` and are
-join-only.
+This module is intentionally a thin CLI over the installed Flask onboarding and
+pairing services. It does not add a second Federation protocol or authority
+source. The canonical host ``fcp`` CLI uses ``join-stdin`` so an automatically
+obtained Tailscale pairing token never appears in a process argument or shell
+history.
 """
 
 from __future__ import annotations
@@ -52,8 +41,6 @@ class HeadlessFederationResult:
 
     def public_dict(self) -> dict[str, Any]:
         value = asdict(self)
-        # Pairing codes are intentionally returned only for the explicit
-        # pairing-code action.  No join input is ever echoed back.
         if self.action != "pairing-code":
             value.pop("pairing_code", None)
         return value
@@ -88,13 +75,6 @@ def _result_from_binding(
 
 
 def create_first_federation() -> HeadlessFederationResult:
-    """Create/reuse the first local Federation without browser onboarding.
-
-    The method preserves the current CFI-2 safety rule.  ``service.connect``
-    performs normal discovery first; if an existing candidate must be selected,
-    local creation fails closed rather than silently creating a split Federation.
-    """
-
     service = _service()
     credentials = service.create_identity()
     existing = service.binding_or_none()
@@ -131,14 +111,12 @@ def create_first_federation() -> HeadlessFederationResult:
 
 
 def join_existing_federation(code: str) -> HeadlessFederationResult:
-    """Redeem one signed FCP1 bundle without permitting binding replacement."""
-
     normalized = str(code or "").strip()
     if not normalized.startswith("FCP1-"):
         raise FederationValidationError(
             "headless-pairing-code-required",
             "pairing_code",
-            "a signed FCP1 pairing code is required",
+            "a signed FCP1 pairing token is required",
         )
 
     service = _service()
@@ -146,7 +124,7 @@ def join_existing_federation(code: str) -> HeadlessFederationResult:
     if existing is not None:
         raise FederationOperationError(
             "headless-existing-binding-preserved",
-            "this installation already has a Federation binding; headless join will not replace it",
+            "this installation already has a Federation binding; join will not replace it",
             "binding",
         )
 
@@ -167,8 +145,6 @@ def join_existing_federation(code: str) -> HeadlessFederationResult:
 
 
 def create_pairing_code(relay_url: str) -> HeadlessFederationResult:
-    """Mint one signed one-use code from the existing local Federation authority."""
-
     service = _service()
     context = service.authorized_context()
     if context is None:
@@ -234,15 +210,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print one deterministic JSON object instead of human-readable lines.",
     )
     subparsers = parser.add_subparsers(dest="command", required=True)
-    subparsers.add_parser(
-        "create",
-        help="Create/reuse the first local Federation on a normal FCP installation.",
-    )
+    subparsers.add_parser("create", help="Create/reuse the first local Federation.")
     join = subparsers.add_parser(
         "join",
-        help="Join an existing Federation with a signed one-use FCP1 code.",
+        help="Join with an explicitly supplied signed one-use FCP1 token.",
     )
     join.add_argument("pairing_code", metavar="FCP1-...")
+    subparsers.add_parser(
+        "join-stdin",
+        help="Join with a signed one-use FCP1 token read from standard input.",
+    )
     code = subparsers.add_parser(
         "pairing-code",
         help="Create a one-use pairing code from the local Federation authority.",
@@ -280,6 +257,8 @@ def main(argv: list[str] | None = None) -> int:
                 result = create_first_federation()
             elif args.command == "join":
                 result = join_existing_federation(args.pairing_code)
+            elif args.command == "join-stdin":
+                result = join_existing_federation(sys.stdin.readline())
             elif args.command == "pairing-code":
                 result = create_pairing_code(args.relay_url)
             else:
