@@ -251,7 +251,7 @@ def test_canonical_store_is_read_only_input_for_s6(tmp_path):
             agent_instance_id=INSTANCE,
             manifest_path="manifest.json",
             raw_path="batch.xml.gz",
-            manifest_schema="msh.mtconnect.raw-batch.v1",
+            manifest_schema="fcp.mtconnect.raw-batch.v1",
             first_sequence=1,
             last_sequence=11,
             manifest_observation_count=len(rows),
