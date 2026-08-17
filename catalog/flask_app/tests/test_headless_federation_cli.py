@@ -41,8 +41,10 @@ class FakeService:
         self.connected = []
         self.redeemed = []
         self.codes = []
+        self.identity_creations = 0
 
     def create_identity(self):
+        self.identity_creations += 1
         return self.credentials
 
     def identity_or_none(self):
@@ -71,6 +73,44 @@ class FakeService:
         return "FCP1-issued"
 
 
+@pytest.fixture(autouse=True)
+def _human_admin_exists(monkeypatch):
+    """Existing behavioral tests exercise the post-bootstrap CLI paths."""
+
+    monkeypatch.setattr(cli, "_has_human_admin", lambda: True)
+
+
+def test_mutating_headless_commands_fail_before_service_when_admin_is_missing(
+    monkeypatch,
+) -> None:
+    service_calls: list[str] = []
+    monkeypatch.setattr(cli, "_has_human_admin", lambda: False)
+    monkeypatch.setattr(cli, "_service", lambda: service_calls.append("service"))
+
+    for operation in (
+        cli.create_first_federation,
+        lambda: cli.join_existing_federation("FCP1-one-use"),
+        lambda: cli.create_pairing_code("ws://100.64.0.10:8765"),
+    ):
+        with pytest.raises(FederationOperationError) as excinfo:
+            operation()
+        assert excinfo.value.code == "headless-admin-bootstrap-required"
+
+    assert service_calls == []
+
+
+def test_status_remains_available_before_admin_bootstrap(monkeypatch) -> None:
+    service = FakeService()
+    service.credentials = None
+    monkeypatch.setattr(cli, "_has_human_admin", lambda: False)
+    monkeypatch.setattr(cli, "_service", lambda: service)
+
+    result = cli.federation_status()
+
+    assert result.state == "identity-missing"
+    assert result.node_id is None
+
+
 def test_create_first_federation_uses_existing_onboarding_authority(monkeypatch) -> None:
     service = FakeService()
     monkeypatch.setattr(cli, "_service", lambda: service)
@@ -80,6 +120,7 @@ def test_create_first_federation_uses_existing_onboarding_authority(monkeypatch)
     assert result.state == "created"
     assert result.node_id == "node-a"
     assert result.federation_id == "federation-a"
+    assert service.identity_creations == 1
     assert len(service.connected) == 1
     assert service.connected[0].startswith("headless-create-")
 
