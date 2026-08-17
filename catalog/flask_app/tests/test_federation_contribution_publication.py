@@ -217,8 +217,9 @@ def test_auto_enrollment_attestation_requires_current_green_benchmark(monkeypatc
         node_id="node-a",
         now=NOW,
     )
-    assert evidence["candidate-ai"]["benchmark_state"] == "green"
-    assert evidence["candidate-ai"]["benchmark_run_ids"] == ["benchmark-green-1"]
+    attested = evidence["candidate-ai"][publication.AUTO_ENROLLMENT_PROPERTY]
+    assert attested["benchmark_state"] == "green"
+    assert attested["benchmark_run_ids"] == ["benchmark-green-1"]
 
     result.state = BenchmarkState.FAILED
     assert publication._auto_enrollment_attestations(

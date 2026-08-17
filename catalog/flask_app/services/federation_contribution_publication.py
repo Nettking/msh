@@ -3,9 +3,10 @@
 This bridge publishes only public-safe capability metadata for an already trusted
 Federation member. A capability announcement is metadata only: it does not grant
 provider enrollment, storage assignment, compute execution, job, artifact, or
-membership authority.  A narrow versioned auto-enrollment attestation may be
-included when current local evidence proves an enabled, allowed, GREEN
-non-storage contribution; the relay still owns the enrollment decision.
+membership authority.  A narrow versioned attestation may be included when current
+local evidence proves an enabled, allowed, GREEN contribution: non-storage
+contributions carry the F8.1 auto-enrollment attestation, storage carries the
+separate storage-authority attestation.  The relay still owns both decisions.
 """
 
 from __future__ import annotations
@@ -20,6 +21,12 @@ from catalog.capabilities.benchmarking import evaluate_result
 from catalog.capabilities.provider_auto_enrollment import (
     AUTO_ENROLLMENT_PROPERTY,
     AUTO_ENROLLMENT_SCHEMA,
+)
+from catalog.capabilities.storage_authority_enrollment import (
+    DEFAULT_STORAGE_GROUP_ID,
+    STORAGE_AUTHORITY_PROPERTY,
+    STORAGE_AUTHORITY_SCHEMA,
+    federation_storage_provider_id,
 )
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 from catalog.federation.onboarding_models import BenchmarkRecommendation, BenchmarkState
@@ -71,7 +78,7 @@ def _protocol_version(candidate: object, existing: dict[str, Any] | None) -> str
 
 def _properties(
     candidate: object,
-    auto_enrollment: dict[str, Any] | None = None,
+    attestation: dict[str, dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     label = getattr(candidate, "display_label", None)
     candidate_id = getattr(candidate, "candidate_id", None)
@@ -83,8 +90,8 @@ def _properties(
         payload["candidate_id"] = candidate_id.strip()
     if isinstance(label, str) and label.strip():
         payload["label"] = label.strip()
-    if auto_enrollment is not None:
-        payload[AUTO_ENROLLMENT_PROPERTY] = dict(auto_enrollment)
+    for property_name, block in (attestation or {}).items():
+        payload[property_name] = dict(block)
     return payload
 
 
@@ -231,8 +238,13 @@ def _auto_enrollment_attestations(
     intents: tuple[object, ...],
     node_id: str,
     now: datetime,
-) -> dict[str, dict[str, Any]]:
-    """Build stable attestations only from current, strict GREEN local evidence."""
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Build stable attestations only from current, strict GREEN local evidence.
+
+    Non-storage contributions carry the F8.1 auto-enrollment attestation.  Storage
+    carries its own attestation instead, because storage authority is granted by
+    the separate storage control plane rather than by provider enrollment.
+    """
 
     snapshot_loader = getattr(contribution_service, "_authorized_snapshot", None)
     if not callable(snapshot_loader):
@@ -261,7 +273,7 @@ def _auto_enrollment_attestations(
         if isinstance(getattr(intent, "candidate_id", None), str)
         and getattr(intent, "device_id", node_id) == node_id
     }
-    evidence: dict[str, dict[str, Any]] = {}
+    evidence: dict[str, dict[str, dict[str, Any]]] = {}
     for candidate in candidates:
         candidate_id = getattr(candidate, "candidate_id", None)
         if not isinstance(candidate_id, str):
@@ -269,8 +281,7 @@ def _auto_enrollment_attestations(
         intent = intent_by_id.get(candidate_id)
         if intent is None:
             continue
-        if _enum_text(getattr(candidate, "capability_type", None)) == "storage":
-            continue
+        is_storage = _enum_text(getattr(candidate, "capability_type", None)) == "storage"
         if _enum_text(getattr(intent, "desired_state", None)) != "enabled":
             continue
         if _enum_text(getattr(intent, "policy_state", None)) != "allowed":
@@ -306,8 +317,7 @@ def _auto_enrollment_attestations(
         )
         if len(run_ids) != len(raw_run_ids) or not set(run_ids) <= green_run_ids:
             continue
-        evidence[candidate_id] = {
-            "schema": AUTO_ENROLLMENT_SCHEMA,
+        attested = {
             "eligible": True,
             "benchmark_state": "green",
             "inspection_revision": inspection_revision,
@@ -315,6 +325,34 @@ def _auto_enrollment_attestations(
             "decision_revision": decision_revision,
             "desired_state": "enabled",
             "policy_state": "allowed",
+        }
+        if not is_storage:
+            evidence[candidate_id] = {
+                AUTO_ENROLLMENT_PROPERTY: {
+                    "schema": AUTO_ENROLLMENT_SCHEMA,
+                    **attested,
+                }
+            }
+            continue
+        envelope = getattr(candidate, "capacity_envelope", None)
+        local_provider_id = (
+            envelope.get("provider_id") if isinstance(envelope, dict) else None
+        )
+        if not isinstance(local_provider_id, str) or not local_provider_id.strip():
+            continue
+        evidence[candidate_id] = {
+            STORAGE_AUTHORITY_PROPERTY: {
+                "schema": STORAGE_AUTHORITY_SCHEMA,
+                # Scope the local candidate to this member so two devices that
+                # detect the same storage candidate stay distinct providers.
+                "provider_id": federation_storage_provider_id(
+                    node_id,
+                    local_provider_id.strip(),
+                ),
+                "group_id": DEFAULT_STORAGE_GROUP_ID,
+                "role": "primary",
+                **attested,
+            }
         }
     return evidence
 
@@ -327,7 +365,7 @@ def plan_contribution_publications(
     intents: tuple[object, ...],
     authorized_status: dict[str, Any],
     now: datetime,
-    auto_enrollment_by_candidate_id: dict[str, dict[str, Any]] | None = None,
+    attestation_by_candidate_id: dict[str, dict[str, dict[str, Any]]] | None = None,
 ) -> tuple[ContributionPublication, ...]:
     """Plan only metadata changes needed to make member views converge.
 
@@ -341,7 +379,7 @@ def plan_contribution_publications(
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("now must be timezone-aware")
     now = now.astimezone(timezone.utc)
-    auto_enrollment_by_candidate_id = auto_enrollment_by_candidate_id or {}
+    attestation_by_candidate_id = attestation_by_candidate_id or {}
 
     intent_by_id = {
         str(intent.candidate_id): intent
@@ -398,7 +436,7 @@ def plan_contribution_publications(
             status=status,
             properties=_properties(
                 candidate,
-                auto_enrollment_by_candidate_id.get(candidate_id),
+                attestation_by_candidate_id.get(candidate_id),
             ),
             announced_at=announced_at,
         )
@@ -503,7 +541,7 @@ def publish_local_contributions(
         intents=intents,
         authorized_status=status,
         now=now,
-        auto_enrollment_by_candidate_id=attestations,
+        attestation_by_candidate_id=attestations,
     )
     for publication in publications:
         announce(

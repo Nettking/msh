@@ -14,6 +14,9 @@ from catalog.capabilities.benchmarking import (
     register_concrete_adapters,
 )
 from catalog.capabilities.contributions import ContributionCandidateGenerator
+from catalog.capabilities.storage_authority_enrollment import (
+    federation_storage_provider_id,
+)
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.onboarding_models import (
     BenchmarkState,
@@ -177,7 +180,14 @@ def test_federation_creator_bootstraps_initial_local_storage_assignment(
     assert first.authority_confirmed is True
     assert second.activation_state is ContributionActivationState.ACTIVE
     assert repeated.revision == revision
-    provider = snapshot.providers["fcp-local-data-storage"]
+    # The control-plane identity is scoped to this member so that two devices
+    # detecting the same local candidate cannot collide on one provider.
+    scoped_provider_id = federation_storage_provider_id(
+        credentials.identity.node_id,
+        "fcp-local-data-storage",
+    )
+    assert scoped_provider_id != "fcp-local-data-storage"
+    provider = snapshot.providers[scoped_provider_id]
     assert provider.node_id == credentials.identity.node_id
     assert provider.protocol == STORAGE_PROTOCOL
     assert provider.protocol_version == STORAGE_PROTOCOL_VERSION
@@ -186,7 +196,7 @@ def test_federation_creator_bootstraps_initial_local_storage_assignment(
     assert provider.assignable is True
     assert (
         snapshot.groups["fcp-local-storage"].primary_provider_id
-        == "fcp-local-data-storage"
+        == scoped_provider_id
     )
 
 

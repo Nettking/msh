@@ -8,8 +8,10 @@ services beside the coordinator database.
 Generic capability announcements remain metadata and retain explicit enrollment.
 A narrowly versioned capability-first GREEN contribution attestation may be
 auto-enrolled only after the base relay has authenticated the member and accepted
-the exact current announcement. Storage remains outside this policy. Health,
-resource binding and execution keep their existing independent gates.
+the exact current announcement. Storage stays outside F8.1 enrollment and is
+reconciled separately into its own control-plane authority under an equivalent
+trust and GREEN-evidence gate. Health, resource binding and execution keep their
+existing independent gates.
 """
 
 from __future__ import annotations
@@ -37,18 +39,24 @@ from catalog.capabilities.provider_health import (
     SQLiteProviderHealthStore,
 )
 from catalog.capabilities.provider_reports import ProviderResourceReport
+from catalog.capabilities.storage_authority_enrollment import (
+    TrustedGreenStorageAuthority,
+)
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import (
     FederationOperationError,
     FederationValidationError,
 )
 from catalog.federation.models import CapabilityAnnouncement
+from catalog.federation.phase_d_control import PhaseDControlPlane
 from catalog.relay.service import (
     RelayConfigurationError,
     RelayServer,
     _bounded_number,
     _build_parser,
     _payload_text,
+)
+from catalog.relay.service import (
     main as phase2_main,
 )
 
@@ -95,6 +103,12 @@ class ProviderAuthorityRelayServer(RelayServer):
             coordinator,
             self.provider_enrollment.store,
         )
+        # Storage keeps its own control-plane authority, so it is reconciled by a
+        # separate policy rather than through F8.1 provider enrollment.
+        self.storage_authority = TrustedGreenStorageAuthority(
+            coordinator,
+            PhaseDControlPlane(coordinator.store.database),
+        )
 
     async def _accepted(
         self,
@@ -130,6 +144,7 @@ class ProviderAuthorityRelayServer(RelayServer):
         try:
             announcement = CapabilityAnnouncement.from_dict(value)
             self.provider_auto_enrollment.reconcile(announcement)
+            self.storage_authority.reconcile(announcement)
         except (
             FederationOperationError,
             FederationValidationError,
