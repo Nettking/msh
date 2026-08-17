@@ -2,24 +2,61 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = (Resolve-Path (Join-Path $PSScriptRoot '..\..\..')).Path
 $helper = Join-Path $repoRoot 'scripts\windows\stop_fcp_for_fresh_reset.ps1'
-$tempRoot = Join-Path $env:RUNNER_TEMP ('fcp-fresh-shutdown-' + [Guid]::NewGuid().ToString('N'))
+$baseTemp = if ([string]::IsNullOrWhiteSpace($env:RUNNER_TEMP)) { [IO.Path]::GetTempPath() } else { $env:RUNNER_TEMP }
+$tempRoot = Join-Path $baseTemp ('fcp-fresh-shutdown-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tempRoot | Out-Null
 
 try {
-    $fakeDocker = Join-Path $tempRoot 'docker.cmd'
-    @'
-@echo off
-setlocal EnableExtensions
-if not defined FCP_FAKE_DOCKER_LOG exit /b 90
-echo %*>>"%FCP_FAKE_DOCKER_LOG%"
-if "%*"=="compose down --remove-orphans --timeout 10" goto primary
-if "%*"=="compose kill" exit /b %FCP_FAKE_DOCKER_KILL_EXIT%
-if "%*"=="compose down --remove-orphans --timeout 5" exit /b %FCP_FAKE_DOCKER_CLEANUP_EXIT%
-exit /b 91
-:primary
-if "%FCP_FAKE_DOCKER_PRIMARY_DELAY%"=="1" ping 127.0.0.1 -n 8 >nul
-exit /b %FCP_FAKE_DOCKER_PRIMARY_EXIT%
-'@ | Set-Content -LiteralPath $fakeDocker -Encoding Ascii
+    # Use a native executable rather than a .cmd shim. The production helper
+    # launches Docker Desktop's native docker.exe, and Start-Process can expose
+    # different process/exit-code semantics for batch files through cmd.exe.
+    # FAIL-1 is specifically about native Windows process exit-state handling.
+    $fakeDocker = Join-Path $tempRoot 'docker.exe'
+    $fakeDockerSource = @'
+using System;
+using System.IO;
+using System.Threading;
+
+public static class FakeDocker
+{
+    private static int ReadExit(string name, int fallback)
+    {
+        int value;
+        return Int32.TryParse(Environment.GetEnvironmentVariable(name), out value) ? value : fallback;
+    }
+
+    public static int Main(string[] args)
+    {
+        string log = Environment.GetEnvironmentVariable("FCP_FAKE_DOCKER_LOG");
+        if (String.IsNullOrWhiteSpace(log))
+        {
+            return 90;
+        }
+
+        string command = String.Join(" ", args);
+        File.AppendAllText(log, command + Environment.NewLine);
+
+        if (command == "compose down --remove-orphans --timeout 10")
+        {
+            if (Environment.GetEnvironmentVariable("FCP_FAKE_DOCKER_PRIMARY_DELAY") == "1")
+            {
+                Thread.Sleep(8000);
+            }
+            return ReadExit("FCP_FAKE_DOCKER_PRIMARY_EXIT", 92);
+        }
+        if (command == "compose kill")
+        {
+            return ReadExit("FCP_FAKE_DOCKER_KILL_EXIT", 93);
+        }
+        if (command == "compose down --remove-orphans --timeout 5")
+        {
+            return ReadExit("FCP_FAKE_DOCKER_CLEANUP_EXIT", 94);
+        }
+        return 91;
+    }
+}
+'@
+    Add-Type -TypeDefinition $fakeDockerSource -OutputAssembly $fakeDocker -OutputType ConsoleApplication
 
     function Invoke-Case {
         param(
