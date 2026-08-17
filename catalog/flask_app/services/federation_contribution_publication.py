@@ -213,7 +213,7 @@ def _current_green_run_ids(
                 item.dependency_inputs,
                 now=now,
             )
-        except Exception:  # noqa: BLE001 - malformed evidence cannot attest GREEN
+        except Exception:  # noqa: BLE001,S112 - malformed evidence fails closed
             continue
         if (
             validity.current
