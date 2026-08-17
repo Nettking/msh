@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import gc
 import gzip
 import hashlib
 import json
@@ -395,6 +396,12 @@ def test_fresh_reset_clears_storage_authority_but_keeps_recordings(
         b"<MTConnectStreams>immutable raw payload</MTConnectStreams>",
     )
     recording_snapshot = _snapshot_tree(recordings)
+
+    # --fresh runs with the services stopped, so nothing holds the authority
+    # databases open. Release the handles here too: Windows refuses to unlink a
+    # file while any process still has it open.
+    del coordinator, control_plane, before
+    gc.collect()
 
     environ = {"FCP_FEDERATION_COORDINATOR_DATABASE": str(coordinator_database)}
     reset_device_state(
