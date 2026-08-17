@@ -243,23 +243,37 @@ def test_start_cmd_fresh_mode_resets_and_verifies_authoritative_state() -> None:
 
     assert 'if /I "%~1"=="--fresh"' in script
     assert "Type RESET to continue" in script
-    # The fresh-reset shutdown moved out of start.cmd into a bounded helper so a
-    # hung Compose call cannot stall the reset. start.cmd must still stop the
-    # project before any state is deleted, and it must fail closed if that does
-    # not succeed. That the shutdown stays project-scoped -- no Docker-wide
-    # prune, no volume deletion -- is asserted against the helper itself in
-    # test_windows_fresh_shutdown.py, next to the code that performs it.
+    # The fresh-reset shutdown stays in a bounded helper. Reset and verification
+    # then run in isolated one-shot containers while every long-running FCP
+    # service is still stopped, so no new runtime state can race verification.
     assert "scripts\\windows\\stop_fcp_for_fresh_reset.ps1" in script
     assert "FCP containers could not be stopped safely" in script
-    assert (
-        "python flask -m catalog.flask_app.services.device_state_reset" in script
+
+    reset_command = (
+        "docker compose run --rm --no-deps --build --entrypoint python flask -m "
+        "catalog.flask_app.services.device_state_reset"
     )
+    verify_command = (
+        "docker compose run --rm --no-deps --entrypoint python flask -m "
+        "catalog.flask_app.services.device_state_reset --verify-fresh"
+    )
+    assert reset_command in script
+    assert verify_command in script
     assert (
         "docker compose exec -T flask python -m "
         "catalog.flask_app.services.device_state_reset --verify-fresh"
-        in script
+        not in script
     )
-    assert "its authoritative setup state is not fresh" in script
+
+    reset_block = script.split("\n:reset_device_state", maxsplit=1)[1].split(
+        "\n:show_help", maxsplit=1
+    )[0]
+    main_body = script.split("\n:resolve_build_commit", maxsplit=1)[0]
+    assert reset_block.index(reset_command) < reset_block.index(verify_command)
+    assert main_body.index("call :reset_device_state") < main_body.index(
+        "docker compose up -d relay ollama recorder"
+    )
+    assert "Fresh factory reset could not be verified" in script
     assert "?fresh=1&reset=%RANDOM%%RANDOM%" in script
     assert "start.cmd --fresh" in script
 
