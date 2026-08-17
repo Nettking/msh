@@ -4,7 +4,10 @@ from types import SimpleNamespace
 
 import pytest
 
-from catalog.federation.errors import FederationOperationError, FederationValidationError
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.flask_app.services import headless_federation_cli as cli
 
 
