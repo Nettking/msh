@@ -268,7 +268,9 @@ def test_trusted_green_contribution_needs_no_manual_owner_approval(
             assert record is not None
             assert record.eligible_for_resource_binding is False
 
-            current[0] += timedelta(seconds=1)
+            # The status transition itself changes the authoritative fingerprint;
+            # the clock need not be advanced. Keeping it at the actual current
+            # time also exercises the health authority's future-report guard.
             ready = CapabilityAnnouncement(
                 capability_id=CAPABILITY_ID,
                 node_id=provider.node_id,
