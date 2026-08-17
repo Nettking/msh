@@ -48,12 +48,67 @@ def test_federation_owns_sources_recorders_and_this_device_diagnostics() -> None
         "{%- endmacro %}", maxsplit=1
     )[0]
 
+    recorder = template.split("{% macro recorder_link", maxsplit=1)[1].split(
+        "{%- endmacro %}", maxsplit=1
+    )[0]
+
     assert ">This device</a>" in federation
     assert ">↳ Diagnostics</a>" in federation
     assert ">Sources</a>" in federation
-    assert ">Recorders</a>" in federation
+    # Recorders is rendered through a shared macro so both the data-driven and
+    # the fallback navigation place it in the same position, after Services.
+    assert ">Recorders</a>" in recorder
+    assert "{{ recorder_link(current_endpoint) }}" in federation
     assert "Device onboarding" not in federation
     assert "Device setup" not in federation
+
+
+def test_federation_navigation_puts_devices_before_contribution_surfaces() -> None:
+    """A Federation is its devices first, then what those devices contribute."""
+
+    template = _base()
+    federation = template.split("{% macro federation_links", maxsplit=1)[1].split(
+        "{%- endmacro %}", maxsplit=1
+    )[0]
+    fallback = federation.split("{% else %}", maxsplit=1)[1]
+
+    order = [
+        label
+        for label in (
+            ">Overview</a>",
+            ">Devices</a>",
+            ">This device</a>",
+            ">Services</a>",
+            ">Benchmarks</a>",
+        )
+        if label in fallback
+    ]
+    positions = [fallback.index(label) for label in order]
+    assert positions == sorted(positions)
+    assert fallback.index(">Devices</a>") < fallback.index(">Services</a>")
+    assert fallback.index(">Devices</a>") < fallback.index(">Benchmarks</a>")
+
+
+def test_approvals_is_a_demoted_exception_surface() -> None:
+    """Trusted, green contributions enroll automatically, so this is not a queue."""
+
+    template = _base()
+    federation = template.split("{% macro federation_links", maxsplit=1)[1].split(
+        "{%- endmacro %}", maxsplit=1
+    )[0]
+
+    assert "admin-subnav__link--exception" in federation
+    assert federation.index(">Approvals</a>") > federation.index(">Settings</a>")
+
+
+def test_federation_section_model_leads_with_devices() -> None:
+    from catalog.federation.projections.service_core import _SECTION_LINKS
+
+    keys = [link.key for link in _SECTION_LINKS]
+    assert keys[0] == "overview"
+    assert keys[1] == "devices"
+    assert keys.index("devices") < keys.index("services")
+    assert keys.index("devices") < keys.index("this-device")
 
 
 def test_sources_diagnostics_and_ai_are_classified_under_their_new_sections() -> None:
@@ -75,3 +130,21 @@ def test_this_device_page_links_to_diagnostics() -> None:
     )[0]
     assert "Open diagnostics" in section
     assert "url_for('web.status')" in section
+
+
+def test_overview_shows_member_devices_before_contribution_panels() -> None:
+    """Members come immediately after the Federation header, not below services."""
+
+    template = (TEMPLATES / "federation_overview.html").read_text(encoding="utf-8")
+
+    devices = template.index('federation-panel--devices')
+    this_device = template.index('federation-panel--device"')
+    benchmarks = template.index('federation-panel--benchmarks')
+    contributions = template.index('<span class="federation-eyebrow">Contributions</span>')
+
+    assert devices < this_device
+    assert devices < benchmarks
+    assert devices < contributions
+    # Each member row carries its name, its role, and its live health.
+    assert "device.role_label" in template
+    assert "status_badge(device.state, device.state_label)" in template

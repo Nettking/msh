@@ -183,6 +183,15 @@
     {% endif %}
   </section>
 
+  <section class="federation-panel federation-panel--devices">
+    <header class="federation-panel__header"><div><span class="federation-eyebrow">Devices</span><h3>{{ vm.devices.title }}</h3><p>{{ vm.devices.summary }}</p></div><a class="federation-text-link" href="{{ vm.devices.detail_url }}">View all</a></header>
+    {% if vm.devices['items'] %}
+    <ul class="federation-entity-list">
+      {% for device in vm.devices['items'] %}<li><div><strong>{{ device.label }}</strong><span>{{ device.detail }}</span></div><span class="federation-device-role">{{ device.role_label|default('Member') }}</span>{{ status_badge(device.state, device.state_label) }}</li>{% endfor %}
+    </ul>
+    {% else %}<p class="federation-muted">No other trusted device is connected.</p>{% endif %}
+  </section>
+
   <div class="federation-dashboard-grid">
     <section class="federation-panel federation-panel--device">
       <header class="federation-panel__header">
@@ -228,15 +237,6 @@
   </section>
 
   <div class="federation-dashboard-grid federation-dashboard-grid--lower">
-    <section class="federation-panel">
-      <header class="federation-panel__header"><div><span class="federation-eyebrow">Devices</span><h3>{{ vm.devices.title }}</h3><p>{{ vm.devices.summary }}</p></div><a class="federation-text-link" href="{{ vm.devices.detail_url }}">View all</a></header>
-      {% if vm.devices['items'] %}
-      <ul class="federation-entity-list">
-        {% for device in vm.devices['items'] %}<li><div><strong>{{ device.label }}</strong><span>{{ device.detail }}</span></div>{{ status_badge(device.state, device.state_label) }}</li>{% endfor %}
-      </ul>
-      {% else %}<p class="federation-muted">No other trusted device is connected.</p>{% endif %}
-    </section>
-
     <section class="federation-panel">
       <header class="federation-panel__header"><div><span class="federation-eyebrow">Activity</span><h3>Recent changes</h3><p>Safe operational events from this federation.</p></div><a class="federation-text-link" href="{{ vm.activity.detail_url }}">View activity</a></header>
       {% if vm.activity['items'] %}
