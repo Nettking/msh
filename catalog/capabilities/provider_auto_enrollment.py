@@ -19,7 +19,7 @@ import hashlib
 import json
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from typing import Any, Callable
+from typing import Callable
 
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
