@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -170,6 +171,35 @@ def test_ready_refresh_is_idempotent_and_becomes_bindable(tmp_path: Path) -> Non
     assert replay_ready == refreshed
     stored = store.get(session_id="session-auto", capability_id="candidate-ai")
     assert stored == refreshed
+
+
+def test_leader_term_change_between_request_and_approval_fails_closed(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    coordinator, store, policy, _owner, provider, _current = _fixture(tmp_path)
+    announcement = _announcement(provider, status=CapabilityStatus.REGISTERING)
+    _publish(coordinator, announcement, "announce-term-fence")
+    leadership = coordinator.session_leadership("session-auto")
+    calls = 0
+
+    def changing_leadership(_announcement: CapabilityAnnouncement):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            return leadership
+        return replace(leadership, term=leadership.term + 1)
+
+    monkeypatch.setattr(policy, "_leadership", changing_leadership)
+
+    enrolled = policy.reconcile(announcement)
+
+    assert enrolled is not None
+    assert enrolled.state is ProviderEnrollmentState.PENDING
+    assert enrolled.approved_by_node_id is None
+    stored = store.get(session_id="session-auto", capability_id="candidate-ai")
+    assert stored is not None
+    assert stored.state is ProviderEnrollmentState.PENDING
 
 
 def test_missing_or_malformed_attestation_never_creates_enrollment(
