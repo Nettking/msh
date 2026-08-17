@@ -3,15 +3,30 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
 
+from catalog.capabilities.storage_authority_enrollment import (
+    DEFAULT_STORAGE_GROUP_ID,
+    STORAGE_AUTHORITY_SCHEMA,
+    TrustedGreenStorageAuthority,
+    federation_storage_provider_id,
+)
+from catalog.federation.coordinator import SessionCoordinator
+from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
+from catalog.federation.phase_d_control import PhaseDControlPlane
+from catalog.federation.storage_protocol import (
+    STORAGE_PROTOCOL,
+    STORAGE_PROTOCOL_VERSION,
+)
 from catalog.flask_app.services.device_state_reset import (
     planned_reset_targets,
     reset_device_state,
     verify_fresh_application_state,
 )
+from catalog.node.identity import IdentityStore
 
 
 def _write(path: Path, content: str = "state") -> None:
@@ -268,3 +283,142 @@ def test_reset_rejects_mutable_state_configured_inside_recording_corpus(
             app_root=app_root,
             relay_root=relay_root,
         )
+
+
+def test_fresh_reset_clears_storage_authority_but_keeps_recordings(
+    tmp_path: Path,
+) -> None:
+    """Storage Authority is mutable control-plane state, not recorded evidence."""
+
+    app_root = tmp_path / "app"
+    data_root = app_root / "data"
+    relay_root = tmp_path / "relay-state"
+    coordinator_database = relay_root / "control.sqlite3"
+
+    clock = [datetime(2026, 8, 17, 1, 0, tzinfo=timezone.utc)]
+    coordinator = SessionCoordinator(coordinator_database, clock=lambda: clock[0])
+    owner = IdentityStore(
+        tmp_path / "identity-owner",
+        display_name="Owner",
+    ).create(now=clock[0])
+    member = IdentityStore(
+        tmp_path / "identity-member",
+        display_name="Member",
+    ).create(now=clock[0])
+    for node in (owner, member):
+        token = coordinator.create_enrollment_token(ttl_seconds=60, max_uses=1)["token"]
+        coordinator.enroll_node(node.identity, token=token)
+    coordinator.create_session(
+        actor_node_id=owner.identity.node_id,
+        display_name="Storage authority",
+        request_id="create-session",
+        session_id="session-fresh",
+    )
+    invitation = coordinator.create_invitation(
+        session_id="session-fresh",
+        actor_node_id=owner.identity.node_id,
+        ttl_seconds=60,
+        max_uses=1,
+        request_id="invite-member",
+    )
+    coordinator.join_session(
+        node_id=member.identity.node_id,
+        token=invitation["token"],
+        request_id="join-member",
+        expected_session_id="session-fresh",
+    )
+    for name, node in (("owner", owner), ("member", member)):
+        coordinator.connected(
+            node_id=node.identity.node_id,
+            connection_id=f"{name}-live",
+        )
+
+    provider_id = federation_storage_provider_id(
+        member.identity.node_id,
+        "fcp-local-data-storage",
+    )
+    announcement = CapabilityAnnouncement(
+        capability_id="storage-capability",
+        node_id=member.identity.node_id,
+        session_id="session-fresh",
+        type="storage",
+        protocol=STORAGE_PROTOCOL,
+        protocol_version=STORAGE_PROTOCOL_VERSION,
+        status=CapabilityStatus.READY,
+        properties={
+            "kind": "capability-first-candidate",
+            "candidate_id": "fcp-local-data-storage",
+            "storage_authority": {
+                "schema": STORAGE_AUTHORITY_SCHEMA,
+                "eligible": True,
+                "benchmark_state": "green",
+                "provider_id": provider_id,
+                "group_id": DEFAULT_STORAGE_GROUP_ID,
+                "role": "primary",
+                "inspection_revision": 2,
+                "benchmark_run_ids": ["benchmark-storage-green-1"],
+                "decision_revision": 3,
+                "desired_state": "enabled",
+                "policy_state": "allowed",
+            },
+        },
+        announced_at=clock[0],
+    )
+    coordinator.announce_capability(
+        announcement,
+        actor_node_id=announcement.node_id,
+        request_id="announce-storage",
+    )
+    control_plane = PhaseDControlPlane(coordinator_database)
+    decision = TrustedGreenStorageAuthority(
+        coordinator,
+        control_plane,
+        clock=lambda: clock[0],
+    ).reconcile(announcement)
+
+    # Prove the state we are about to reset really existed.
+    assert decision.outcome == "active"
+    before = control_plane.snapshot("session-fresh")
+    assert before.groups[DEFAULT_STORAGE_GROUP_ID].primary_provider_id == provider_id
+    assert before.leader_grants[DEFAULT_STORAGE_GROUP_ID]["provider_id"] == provider_id
+    assert before.providers[provider_id].assignable is True
+
+    recordings = data_root / "sources"
+    _write_raw_recording(
+        recordings
+        / "mtconnect_recorder"
+        / "raw"
+        / "machine-a"
+        / "instance-a"
+        / "2026-08-07"
+        / "seq-1-2-deadbeef.xml.gz",
+        b"<MTConnectStreams>immutable raw payload</MTConnectStreams>",
+    )
+    recording_snapshot = _snapshot_tree(recordings)
+
+    environ = {"FCP_FEDERATION_COORDINATOR_DATABASE": str(coordinator_database)}
+    reset_device_state(
+        environ=environ,
+        app_root=app_root,
+        relay_root=relay_root,
+    )
+
+    # The durable control plane that carried the authority is gone entirely.
+    assert not coordinator_database.exists()
+
+    # Recordings and their integrity metadata are untouched and still verifiable.
+    assert _snapshot_tree(recordings) == recording_snapshot
+    assert verify_fresh_application_state(
+        environ=environ,
+        app_root=app_root,
+        relay_root=relay_root,
+    ) == ()
+
+    # Rebuilding the control plane at the same location yields no authority:
+    # no provider registration, no group assignment, no leader grant survives.
+    # (This recreates the database file, so it must run after --verify-fresh.)
+    after = PhaseDControlPlane(coordinator_database).snapshot("session-fresh")
+    assert after.revision == 0
+    assert after.providers == {}
+    assert after.groups == {}
+    assert after.leader_grants == {}
