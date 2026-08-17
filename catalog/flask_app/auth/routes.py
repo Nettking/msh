@@ -19,14 +19,12 @@ from flask_security import current_user, hash_password
 from sqlalchemy.exc import IntegrityError
 
 from .federation import get_federated_human_auth_service, saved_remote_member
-from .federation_enrollment import fresh_discovered_federations
 from .models import FirstUserBootstrapClaim, Role, User, db
-from .policy import PRE_AUTH_FEDERATION_BOOTSTRAP_ENDPOINTS, ROLE_SUMMARIES
+from .policy import ROLE_SUMMARIES
 
 auth_users = Blueprint("auth_users", __name__, url_prefix="/admin/users")
 _BOOTSTRAP_ENDPOINT = "auth_users.bootstrap_user"
 _BOOTSTRAP_CLAIM_ID = 1
-_DISCOVERY_ENDPOINT = "federation_pairing_web.federation_discovery"
 
 
 def _active_admin_count() -> int:
@@ -111,38 +109,23 @@ def _commit_first_user(user: User) -> bool:
 
 @auth_users.before_app_request
 def first_user_bootstrap_gate():
-    """Choose first-authority bootstrap or existing-Federation human sign-in.
+    """Require first-human-admin bootstrap before any local onboarding mutation.
 
-    If Tailscale has already discovered an existing Federation, a fresh device
-    goes to the normal sign-in surface.  Human authentication on the authority
-    then approves device enrollment.  Local administrator creation remains only
-    the explicit first-device/standalone path.
+    A saved remote member is an already-established installation and retains its
+    Federation sign-in flow.  A truly fresh installation, including one where
+    Tailscale can already see another Federation, must first create its local
+    human administrator.  This keeps browser and headless first-run lifecycle
+    ordering identical: admin -> device identity -> discover/create/join.
     """
 
     if saved_remote_member() or _has_users():
         return None
 
-    # The login page is a valid fresh-device surface.  With a discovered
-    # Federation it offers authenticated enrollment; without one it remains a
-    # harmless sign-in page and the default bootstrap redirect still points at
-    # first-user creation.
-    if request.endpoint == "security.login":
-        return None
-
-    if (
-        request.endpoint == _BOOTSTRAP_ENDPOINT
-        and request.method == "GET"
-        and request.args.get("local") != "1"
-        and fresh_discovered_federations()
-    ):
-        return redirect(url_for("security.login"))
-
     if request.endpoint in {
         _BOOTSTRAP_ENDPOINT,
-        _DISCOVERY_ENDPOINT,
         "static",
         "security.static",
-    } or request.endpoint in PRE_AUTH_FEDERATION_BOOTSTRAP_ENDPOINTS:
+    }:
         return None
     if request.is_json or request.path.startswith("/api/"):
         abort(503)
