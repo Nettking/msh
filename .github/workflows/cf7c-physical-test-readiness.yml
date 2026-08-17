@@ -18,6 +18,7 @@ on:
       - "catalog/flask_app/tests/test_device_state_reset.py"
       - "catalog/flask_app/tests/test_first_user_bootstrap.py"
       - "catalog/flask_app/tests/test_headless_federation_cli.py"
+      - "catalog/flask_app/tests/test_fresh_start_contract.py"
       - "catalog/flask_app/tests/test_windows_start_script.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_readiness.py"
       - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
@@ -44,6 +45,7 @@ on:
       - "catalog/flask_app/tests/test_device_state_reset.py"
       - "catalog/flask_app/tests/test_first_user_bootstrap.py"
       - "catalog/flask_app/tests/test_headless_federation_cli.py"
+      - "catalog/flask_app/tests/test_fresh_start_contract.py"
       - "catalog/flask_app/tests/test_windows_start_script.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_readiness.py"
       - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
@@ -101,6 +103,7 @@ jobs:
           catalog/flask_app/tests/test_device_state_reset.py
           catalog/flask_app/tests/test_first_user_bootstrap.py
           catalog/flask_app/tests/test_headless_federation_cli.py
+          catalog/flask_app/tests/test_fresh_start_contract.py
           catalog/flask_app/tests/test_windows_start_script.py
 
       - name: Validate Linux wrapper syntax
@@ -142,6 +145,7 @@ jobs:
           catalog/flask_app/services/headless_federation_cli.py
           catalog/flask_app/tests/test_device_state_reset.py
           catalog/flask_app/tests/test_headless_federation_cli.py
+          catalog/flask_app/tests/test_fresh_start_contract.py
           catalog/federation/tests/cf7_acceptance/test_physical_readiness.py
 
       - name: Diff hygiene
