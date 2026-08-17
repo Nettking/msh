@@ -33,28 +33,50 @@ function Invoke-BoundedDocker {
     )
 
     Write-Host $Description
-    $process = Start-Process -FilePath $Executable -ArgumentList $Arguments -NoNewWindow -PassThru
+
+    # Use System.Diagnostics.Process directly rather than Start-Process. During
+    # physical acceptance, Windows PowerShell returned a blank ExitCode from the
+    # Start-Process object after a completed Docker invocation. Casting that blank
+    # value to [int] silently produced 0 and could falsely authorize a fresh reset.
+    $process = New-Object System.Diagnostics.Process
+    $startInfo = New-Object System.Diagnostics.ProcessStartInfo
+    $startInfo.FileName = $Executable
+    # All arguments used by this helper are fixed tokens without whitespace.
+    $startInfo.Arguments = ($Arguments -join " ")
+    $startInfo.UseShellExecute = $false
+    $startInfo.CreateNoWindow = $true
+    $process.StartInfo = $startInfo
 
     try {
+        $started = $process.Start()
+        if (-not $started) {
+            Write-Warning "$Description could not start Docker. Failing closed."
+            return 125
+        }
+
         $completed = $process.WaitForExit($TimeoutSeconds * 1000)
         if ($completed) {
-            # On Windows PowerShell/.NET the timed WaitForExit overload can return
-            # before all Process state has been refreshed. Complete the wait and
-            # refresh the process before reading ExitCode. The physical acceptance
-            # failure that motivated this helper returned a blank ExitCode here.
+            # Complete the wait before reading ExitCode. If Windows cannot provide
+            # a trustworthy code, never coerce null/blank to zero.
             $process.WaitForExit()
-            $process.Refresh()
             if (-not $process.HasExited) {
                 Write-Warning "$Description reported completion but the process is still running. Failing closed."
                 return 125
             }
+
             try {
-                return [int]$process.ExitCode
+                $exitCode = $process.ExitCode
             }
             catch {
                 Write-Warning "$Description completed but its exit code could not be read. Failing closed."
                 return 125
             }
+
+            if ($null -eq $exitCode) {
+                Write-Warning "$Description completed but returned no exit code. Failing closed."
+                return 125
+            }
+            return [int]$exitCode
         }
 
         Write-Warning "$Description timed out after $TimeoutSeconds seconds. Terminating only that Docker CLI process tree."
