@@ -134,8 +134,6 @@ def test_fresh_reset_removes_all_mutable_state_and_preserves_recordings_only(
     )
     recording_snapshot = _snapshot_tree(recordings)
 
-    # Deployment/source files are outside the mounted application-state roots and
-    # are not part of the reset surface.
     _write(app_root / ".env", "deployment-config")
     external_model = tmp_path / "ollama-model-volume" / "model.bin"
     _write(external_model, "model")
@@ -160,7 +158,7 @@ def test_fresh_reset_removes_all_mutable_state_and_preserves_recordings_only(
 
     assert removed
     assert _snapshot_tree(recordings) == recording_snapshot
-    assert set(path.name for path in data_root.iterdir()) == {"sources"}
+    assert {path.name for path in data_root.iterdir()} == {"sources"}
     assert results_root.exists()
     assert list(results_root.iterdir()) == []
     assert relay_root.exists()
