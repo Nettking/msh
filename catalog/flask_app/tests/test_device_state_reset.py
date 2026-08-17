@@ -53,6 +53,14 @@ def _snapshot_tree(root: Path) -> dict[str, bytes]:
     }
 
 
+def _isolated_environ(relay_root: Path) -> dict[str, str]:
+    """Keep unit tests independent from FCP_* variables on the CI runner."""
+
+    return {
+        "FCP_FEDERATION_COORDINATOR_DATABASE": str(relay_root / "control.sqlite3")
+    }
+
+
 def test_fresh_reset_removes_all_mutable_state_and_preserves_recordings_only(
     tmp_path: Path,
 ) -> None:
@@ -106,8 +114,14 @@ def test_fresh_reset_removes_all_mutable_state_and_preserves_recordings_only(
         _write(path)
 
     recordings = data_root / "sources"
-    _write(recordings / "legacy-machine" / "jsonl" / "telemetry.jsonl", "legacy-recording")
-    _write(recordings / "legacy-machine" / "observations" / "batch.jsonl", "normalized-recording")
+    _write(
+        recordings / "legacy-machine" / "jsonl" / "telemetry.jsonl",
+        "legacy-recording",
+    )
+    _write(
+        recordings / "legacy-machine" / "observations" / "batch.jsonl",
+        "normalized-recording",
+    )
     _write_raw_recording(
         recordings
         / "mtconnect_recorder"
@@ -164,12 +178,16 @@ def test_fresh_reset_removes_all_mutable_state_and_preserves_recordings_only(
 def test_verify_fresh_detects_any_mutable_residue(tmp_path: Path) -> None:
     app_root = tmp_path / "app"
     relay_root = tmp_path / "relay-state"
-    _write(app_root / "data" / "sources" / "machine" / "jsonl" / "telemetry.jsonl", "recording")
+    _write(
+        app_root / "data" / "sources" / "machine" / "jsonl" / "telemetry.jsonl",
+        "recording",
+    )
     _write(app_root / "data" / "auth" / "users.sqlite3", "old-user")
     _write(app_root / "results" / "analysis.json", "old-analysis")
     _write(relay_root / "control.sqlite3", "old-federation")
 
     problems = verify_fresh_application_state(
+        environ=_isolated_environ(relay_root),
         app_root=app_root,
         relay_root=relay_root,
     )
@@ -205,7 +223,11 @@ def test_corrupt_recording_blocks_reset_before_any_mutable_state_is_deleted(
     manifest.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(RuntimeError, match="digest mismatch"):
-        reset_device_state(app_root=app_root, relay_root=relay_root)
+        reset_device_state(
+            environ=_isolated_environ(relay_root),
+            app_root=app_root,
+            relay_root=relay_root,
+        )
 
     assert mutable.read_text(encoding="utf-8") == "must-survive-failed-reset"
     assert raw_path.exists()
@@ -220,10 +242,12 @@ def test_reset_rejects_configured_paths_outside_bounded_mounts_before_deletion(
     outside = tmp_path / "outside" / "identity"
     mutable = app_root / "data" / "auth" / "users.sqlite3"
     _write(mutable, "keep-on-validation-failure")
+    environ = _isolated_environ(relay_root)
+    environ["FCP_FEDERATION_NODE_STATE_DIR"] = str(outside)
 
     with pytest.raises(RuntimeError, match="Refusing to remove"):
         planned_reset_targets(
-            environ={"FCP_FEDERATION_NODE_STATE_DIR": str(outside)},
+            environ=environ,
             app_root=app_root,
             relay_root=relay_root,
         )
@@ -237,10 +261,12 @@ def test_reset_rejects_mutable_state_configured_inside_recording_corpus(
     app_root = tmp_path / "app"
     relay_root = tmp_path / "relay-state"
     collision = app_root / "data" / "sources" / "auth.sqlite3"
+    environ = _isolated_environ(relay_root)
+    environ["FCP_AUTH_DATABASE"] = str(collision)
 
     with pytest.raises(RuntimeError, match="overlaps preserved recordings"):
         planned_reset_targets(
-            environ={"FCP_AUTH_DATABASE": str(collision)},
+            environ=environ,
             app_root=app_root,
             relay_root=relay_root,
         )
