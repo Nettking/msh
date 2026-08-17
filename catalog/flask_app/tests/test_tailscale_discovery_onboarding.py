@@ -14,9 +14,9 @@ from catalog.federation.tailscale_host_discovery import (
 from catalog.flask_app import capability_startup_transition_routes as transition_routes
 from catalog.flask_app import federation_pairing_routes as pairing_routes
 from catalog.flask_app.auth.policy import PUBLIC_ENDPOINTS
-from catalog.flask_app.auth.routes import _DISCOVERY_ENDPOINT
 
 APP_ROOT = Path(__file__).resolve().parents[1]
+_DISCOVERY_ADVERTISEMENT_ENDPOINT = "federation_pairing_web.federation_discovery"
 
 
 def _snapshot() -> dict[str, object]:
@@ -57,9 +57,11 @@ def test_transition_view_model_reads_host_snapshot_without_join_authority(
     assert "FCP1-never-expose-this" not in json.dumps(discovery)
 
 
-def test_tailscale_discovery_endpoint_is_the_only_public_pairing_exception() -> None:
-    assert _DISCOVERY_ENDPOINT == "federation_pairing_web.federation_discovery"
-    assert _DISCOVERY_ENDPOINT in PUBLIC_ENDPOINTS
+def test_discovery_advertisement_is_the_only_public_pairing_exception() -> None:
+    # The advertisement remains unauthenticated so trusted peers can discover a
+    # coordinator. On a truly fresh local installation the first-user gate still
+    # requires human-admin bootstrap before local onboarding can mutate state.
+    assert _DISCOVERY_ADVERTISEMENT_ENDPOINT in PUBLIC_ENDPOINTS
     assert "federation_pairing_web.create_pairing_code" not in PUBLIC_ENDPOINTS
     assert "federation_pairing_web.pair_device" not in PUBLIC_ENDPOINTS
 
