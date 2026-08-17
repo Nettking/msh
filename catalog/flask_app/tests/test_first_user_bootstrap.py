@@ -2,7 +2,6 @@ from __future__ import annotations
 
 from flask import Blueprint, Flask
 
-from catalog.flask_app.auth import extension as auth_extension
 from catalog.flask_app.auth import policy as auth_policy
 from catalog.flask_app.auth import routes as auth_routes
 from catalog.flask_app.auth.extension import init_human_auth
@@ -99,9 +98,6 @@ def test_empty_first_installation_meets_user_with_first_admin_setup(tmp_path, mo
     assert created.status_code == 302
     assert created.headers["Location"].endswith("/login")
 
-    # The signed-out authentication shell intentionally does not consume normal
-    # workbench flashes. Keep this success queued so it appears after sign-in,
-    # where the operator continues setup, and ensure the stale instruction is gone.
     login_page = client.get(created.headers["Location"])
     login_body = login_page.get_data(as_text=True)
     assert "Administrator created." not in login_body
@@ -124,19 +120,21 @@ def test_empty_first_installation_meets_user_with_first_admin_setup(tmp_path, mo
     assert normal.status_code == 302
     assert "/login" in normal.headers["Location"]
 
-    # The anonymous pairing exception closes when this installation owns a human
-    # account. Normal role-based permissions apply from this point onward.
     onboarding = client.get("/onboarding")
     assert onboarding.status_code == 302
     assert "/login" in onboarding.headers["Location"]
     assert audit_route_policy(app) == []
 
 
-def test_discovered_federation_routes_fresh_device_to_existing_account_login(
+def test_discovered_federation_does_not_bypass_first_admin_bootstrap(
     tmp_path, monkeypatch
 ):
-    monkeypatch.setattr(auth_routes, "fresh_discovered_federations", _discovered_candidate)
-    monkeypatch.setattr(auth_extension, "fresh_discovered_federations", _discovered_candidate)
+    # Discovery may already be running in the background, but it cannot become
+    # human/Federation authority before this installation has its first admin.
+    monkeypatch.setattr(
+        "catalog.flask_app.auth.extension.fresh_discovered_federations",
+        _discovered_candidate,
+    )
     app = _empty_app(tmp_path, monkeypatch)
     client = app.test_client()
 
@@ -144,54 +142,35 @@ def test_discovered_federation_routes_fresh_device_to_existing_account_login(
     assert response.status_code == 302
     assert response.headers["Location"].endswith("/admin/users/bootstrap")
 
-    # The bootstrap gate detects the existing Federation before rendering any
-    # local administrator form and sends the browser to the normal login surface.
     bootstrap = client.get(response.headers["Location"])
-    assert bootstrap.status_code == 302
-    assert bootstrap.headers["Location"].endswith("/login")
+    assert bootstrap.status_code == 200
+    body = bootstrap.get_data(as_text=True)
+    assert "Create the first administrator" in body
 
-    page = client.get("/login")
-    assert page.status_code == 200
-    body = page.get_data(as_text=True)
-    assert "existing Federation was found through Tailscale" in body
-    assert "Sign in to Existing Federation" in body
-    assert "Create the first administrator" not in body
-    assert 'action="/federation-auth/enroll/start"' in body
-    assert "name=\"email\"" not in body
-
-    # First-device creation remains explicit instead of being offered as the
-    # normal second-device path.
-    local = client.get("/admin/users/bootstrap?local=1")
-    assert local.status_code == 200
-    assert "Create the first administrator" in local.get_data(as_text=True)
+    login = client.get("/login")
+    assert login.status_code == 302
+    assert login.headers["Location"].endswith("/admin/users/bootstrap")
 
     with app.app_context():
         assert db.session.query(User).count() == 0
 
 
-def test_empty_installation_can_join_existing_federation_before_local_user(
+def test_empty_installation_blocks_all_federation_onboarding_before_local_user(
     tmp_path, monkeypatch
 ):
     app = _empty_app(tmp_path, monkeypatch)
     client = app.test_client()
 
-    assert client.get("/onboarding").get_data(as_text=True) == "onboarding"
-    assert (
-        client.post("/onboarding/identity").get_data(as_text=True)
-        == "identity-created"
-    )
-    assert client.post("/onboarding/federation/pair").get_data(as_text=True) == "paired"
-
-    # Broader onboarding mutation remains closed. In particular, an anonymous
-    # browser cannot use federation_action to create a local Federation or join
-    # through a different authority path, and it cannot mint pairing grants.
-    federation_action = client.post("/onboarding/federation")
-    assert federation_action.status_code == 302
-    assert federation_action.headers["Location"].endswith("/admin/users/bootstrap")
-
-    pairing_code = client.post("/onboarding/federation/pairing-code")
-    assert pairing_code.status_code == 302
-    assert pairing_code.headers["Location"].endswith("/admin/users/bootstrap")
+    for method, path in (
+        (client.get, "/onboarding"),
+        (client.post, "/onboarding/identity"),
+        (client.post, "/onboarding/federation/pair"),
+        (client.post, "/onboarding/federation"),
+        (client.post, "/onboarding/federation/pairing-code"),
+    ):
+        response = method(path)
+        assert response.status_code == 302
+        assert response.headers["Location"].endswith("/admin/users/bootstrap")
 
     with app.app_context():
         assert db.session.query(User).count() == 0
