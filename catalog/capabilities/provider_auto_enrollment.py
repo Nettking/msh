@@ -17,9 +17,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
-from typing import Callable
 
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
