@@ -1889,6 +1889,43 @@ class CoordinatorStore:
                     "scoped capability identity belongs to another node or type",
                     "capability_id",
                 )
+            # A refresh that carries no material change is liveness, not history.
+            # Recording an event for it floods Activity and hides real changes,
+            # so only the heartbeat is updated and no event is appended.
+            if existing is not None and (
+                existing["protocol"] == capability.protocol
+                and existing["protocol_version"] == capability.protocol_version
+                and existing["status"] == capability.status.value
+                and existing["properties_json"] == properties_json
+            ):
+                database.execute(
+                    """
+                    UPDATE capabilities
+                    SET last_heartbeat_at=?
+                    WHERE session_id=? AND capability_id=?
+                    """,
+                    (
+                        _time(now),
+                        capability.session_id,
+                        capability.capability_id,
+                    ),
+                )
+                self._audit(
+                    database,
+                    now=now,
+                    action="capability.announce",
+                    outcome="accepted",
+                    reason="capability-unchanged",
+                    actor_node_id=actor_node_id,
+                    session_id=capability.session_id,
+                    request_id=request_id,
+                    details={
+                        "capability_id": capability.capability_id,
+                        "type": capability.type,
+                        "event_created": False,
+                    },
+                )
+                return capability, False
             if created:
                 database.execute(
                     """
