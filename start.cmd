@@ -154,19 +154,6 @@ if "%FCP_FRESH_INSTALL%"=="1" (
     set "FCP_OPEN_URL=%FCP_ONBOARDING_URL%"
 )
 
-if "%FCP_FRESH_INSTALL%"=="1" (
-    echo Verifying fresh state inside the started Flask container...
-    docker compose exec -T flask python -m catalog.flask_app.services.device_state_reset --verify-fresh
-    if errorlevel 1 (
-        echo.
-        echo FCP started, but its authoritative setup state is not fresh.
-        echo The browser will not be opened because old identity or Federation state remains.
-        echo Review the specific verification failure above.
-        pause
-        exit /b 1
-    )
-)
-
 echo Waiting for the FCP webapp...
 powershell -NoProfile -Command "$deadline = (Get-Date).AddSeconds(90); do { try { $response = Invoke-WebRequest -UseBasicParsing -Uri '%FCP_BASE_URL%/onboarding' -TimeoutSec 2; if ($response.StatusCode -ge 200 -and $response.StatusCode -lt 500) { exit 0 } } catch {}; Start-Sleep -Seconds 1 } while ((Get-Date) -lt $deadline); exit 1"
 if errorlevel 1 (
@@ -363,16 +350,16 @@ goto :pull_ollama_model
 :reset_device_state
 echo.
 echo FRESH DEVICE INSTALL
-echo This permanently removes this checkout's:
+echo This permanently removes this checkout's mutable FCP application state:
+echo   - human administrators, passwords, authentication secrets, and login sessions
 echo   - FCP device identity and keys
-echo   - Federation membership, pairing, onboarding, inspection, and benchmark state
-echo   - current and retained legacy Federation state layouts
-echo   - all local Federation relay authority state
-echo   - all saved server role and device setup choices
-echo   - saved browser onboarding-step progress on the page opened afterward
+echo   - Federation membership, trust, pairing, discovery, onboarding, and authority state
+echo   - capability, contribution, benchmark, provider, Activity, and job state
+echo   - source configuration and recorder configuration, checkpoints, status, and runtime state
+echo   - analyses, results, digital-twin projections, and retained legacy setup state
 echo.
-echo It preserves recorded telemetry, source configuration, recorder checkpoints,
-echo analysis results, Docker images, and downloaded Ollama models.
+echo It preserves the machine recording corpus and its integrity metadata.
+echo Docker images, downloaded model volumes, source code, and deployment settings are not application state and are not reset.
 echo.
 set "FCP_RESET_CONFIRM="
 set /p "FCP_RESET_CONFIRM=Type RESET to continue: "
@@ -382,7 +369,7 @@ if /I not "%FCP_RESET_CONFIRM%"=="RESET" (
 )
 
 echo.
-echo Stopping FCP before resetting device and Federation state...
+echo Stopping FCP before resetting mutable application state...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\stop_fcp_for_fresh_reset.ps1"
 if errorlevel 1 (
     echo FCP containers could not be stopped safely. Nothing else was removed.
@@ -390,17 +377,27 @@ if errorlevel 1 (
     exit /b 1
 )
 
-echo Resolving and clearing current plus retained state paths...
+echo Resolving and clearing mutable FCP state while preserving recordings...
 docker compose run --rm --no-deps --build --entrypoint python flask -m catalog.flask_app.services.device_state_reset
 if errorlevel 1 (
     echo.
-    echo Fresh device reset did not complete. Review the specific path error above.
-    echo Recorded data, recorder checkpoints, results, and Ollama models were not targeted.
+    echo Fresh factory reset did not complete. Review the specific path or recording-integrity error above.
+    echo No FCP service will be started from an unverified reset.
     pause
     exit /b 1
 )
 
-echo Fresh device reset completed. FCP will now start and verify empty state.
+echo Verifying factory-reset state before any FCP service can recreate runtime state...
+docker compose run --rm --no-deps --entrypoint python flask -m catalog.flask_app.services.device_state_reset --verify-fresh
+if errorlevel 1 (
+    echo.
+    echo Fresh factory reset could not be verified.
+    echo No FCP service will be started. Review the specific verification failure above.
+    pause
+    exit /b 1
+)
+
+echo Fresh factory reset completed and verified. FCP will now start with first-administrator bootstrap.
 echo.
 exit /b 0
 
@@ -408,15 +405,15 @@ exit /b 0
 echo Usage:
 echo   start.cmd            Start FCP and preserve all existing state.
 echo   start.cmd --resume   Reconnect, reuse saved capability evidence, then start FCP.
-echo   start.cmd --fresh    Reset device/Federation setup, verify it, then start FCP.
+echo   start.cmd --fresh    Factory-reset mutable FCP state, verify it, then start FCP.
 echo.
 echo Normal and resume modes preserve identity, Federation membership, recordings,
 echo source configuration, recorder checkpoints, results, and downloaded models.
 echo Resume mode never runs inspection or benchmarks and never replaces Federation authority.
 echo All modes install and verify the exact configured Ollama benchmark model.
 echo The supported launcher also keeps a bounded local host update agent running.
-echo The --fresh option requires typing RESET and preserves recordings,
-echo source configuration, recorder checkpoints, results, and Ollama models.
+echo The --fresh option requires typing RESET. Only the machine recording corpus
+echo and its integrity metadata survive within FCP application data.
 exit /b 0
 
 :usage_error
