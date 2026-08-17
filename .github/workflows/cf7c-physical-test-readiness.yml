@@ -5,12 +5,20 @@ on:
     paths:
       - ".github/workflows/cf7c-physical-test-readiness.yml"
       - ".gitignore"
+      - "start.cmd"
       - "ops/cf7_physical_readiness.py"
       - "ops/cf7_physical_topology.template.json"
       - "ops/cf7_prepare_windows.ps1"
       - "ops/cf7_prepare_linux.sh"
       - "scripts/windows/stop_fcp_for_fresh_reset.ps1"
       - "scripts/windows/tests/stop_fcp_for_fresh_reset_smoke.ps1"
+      - "catalog/flask_app/services/device_state_reset.py"
+      - "catalog/flask_app/services/headless_federation_cli.py"
+      - "catalog/flask_app/auth/routes.py"
+      - "catalog/flask_app/tests/test_device_state_reset.py"
+      - "catalog/flask_app/tests/test_first_user_bootstrap.py"
+      - "catalog/flask_app/tests/test_headless_federation_cli.py"
+      - "catalog/flask_app/tests/test_windows_start_script.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_readiness.py"
       - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
@@ -23,12 +31,20 @@ on:
     paths:
       - ".github/workflows/cf7c-physical-test-readiness.yml"
       - ".gitignore"
+      - "start.cmd"
       - "ops/cf7_physical_readiness.py"
       - "ops/cf7_physical_topology.template.json"
       - "ops/cf7_prepare_windows.ps1"
       - "ops/cf7_prepare_linux.sh"
       - "scripts/windows/stop_fcp_for_fresh_reset.ps1"
       - "scripts/windows/tests/stop_fcp_for_fresh_reset_smoke.ps1"
+      - "catalog/flask_app/services/device_state_reset.py"
+      - "catalog/flask_app/services/headless_federation_cli.py"
+      - "catalog/flask_app/auth/routes.py"
+      - "catalog/flask_app/tests/test_device_state_reset.py"
+      - "catalog/flask_app/tests/test_first_user_bootstrap.py"
+      - "catalog/flask_app/tests/test_headless_federation_cli.py"
+      - "catalog/flask_app/tests/test_windows_start_script.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_readiness.py"
       - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
@@ -64,6 +80,8 @@ jobs:
         run: >-
           python -m compileall -q
           ops/cf7_physical_readiness.py
+          catalog/flask_app/services/device_state_reset.py
+          catalog/flask_app/services/headless_federation_cli.py
           catalog/federation/tests/cf7_acceptance/test_physical_readiness.py
 
       - name: Validate topology template
@@ -76,6 +94,14 @@ jobs:
           python -m pytest -o addopts= -q
           catalog/federation/tests/cf7_acceptance/test_physical_readiness.py
           catalog/federation/tests/cf7_acceptance/test_physical_evidence.py
+
+      - name: Run factory-reset and admin-first lifecycle tests
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_device_state_reset.py
+          catalog/flask_app/tests/test_first_user_bootstrap.py
+          catalog/flask_app/tests/test_headless_federation_cli.py
+          catalog/flask_app/tests/test_windows_start_script.py
 
       - name: Validate Linux wrapper syntax
         if: runner.os == 'Linux'
@@ -112,6 +138,10 @@ jobs:
         run: >-
           ruff check
           ops/cf7_physical_readiness.py
+          catalog/flask_app/services/device_state_reset.py
+          catalog/flask_app/services/headless_federation_cli.py
+          catalog/flask_app/tests/test_device_state_reset.py
+          catalog/flask_app/tests/test_headless_federation_cli.py
           catalog/federation/tests/cf7_acceptance/test_physical_readiness.py
 
       - name: Diff hygiene
