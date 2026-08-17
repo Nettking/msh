@@ -9,6 +9,8 @@ on:
       - "ops/cf7_physical_topology.template.json"
       - "ops/cf7_prepare_windows.ps1"
       - "ops/cf7_prepare_linux.sh"
+      - "scripts/windows/stop_fcp_for_fresh_reset.ps1"
+      - "scripts/windows/tests/stop_fcp_for_fresh_reset_smoke.ps1"
       - "catalog/federation/tests/cf7_acceptance/test_physical_readiness.py"
       - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
@@ -17,6 +19,7 @@ on:
   push:
     branches:
       - agent/cf7c-physical-test-readiness
+      - fix/v1-physical-acceptance-blockers
     paths:
       - ".github/workflows/cf7c-physical-test-readiness.yml"
       - ".gitignore"
@@ -24,6 +27,8 @@ on:
       - "ops/cf7_physical_topology.template.json"
       - "ops/cf7_prepare_windows.ps1"
       - "ops/cf7_prepare_linux.sh"
+      - "scripts/windows/stop_fcp_for_fresh_reset.ps1"
+      - "scripts/windows/tests/stop_fcp_for_fresh_reset_smoke.ps1"
       - "catalog/federation/tests/cf7_acceptance/test_physical_readiness.py"
       - "catalog/federation/tests/cf7_acceptance/physical_evidence.py"
       - "catalog/federation/tests/cf7_acceptance/test_physical_evidence.py"
@@ -77,21 +82,31 @@ jobs:
         shell: bash
         run: bash -n ops/cf7_prepare_linux.sh
 
-      - name: Validate Windows wrapper syntax
+      - name: Validate Windows wrapper and fresh-shutdown helper
         if: runner.os == 'Windows'
-        shell: pwsh
+        shell: powershell
         run: |
-          $tokens = $null
-          $errors = $null
-          [System.Management.Automation.Language.Parser]::ParseFile(
-            (Resolve-Path "ops/cf7_prepare_windows.ps1"),
-            [ref]$tokens,
-            [ref]$errors
-          ) | Out-Null
-          if ($errors.Count -gt 0) {
-            $errors | ForEach-Object { Write-Error $_.Message }
-            exit 1
+          foreach ($script in @(
+            'ops/cf7_prepare_windows.ps1',
+            'scripts/windows/stop_fcp_for_fresh_reset.ps1',
+            'scripts/windows/tests/stop_fcp_for_fresh_reset_smoke.ps1'
+          )) {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile(
+              (Resolve-Path $script),
+              [ref]$tokens,
+              [ref]$errors
+            ) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              exit 1
+            }
           }
+
+          powershell -NoProfile -ExecutionPolicy Bypass `
+            -File .\scripts\windows\tests\stop_fcp_for_fresh_reset_smoke.ps1
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Ruff readiness tooling
         run: >-
