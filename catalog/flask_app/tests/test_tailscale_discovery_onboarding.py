@@ -140,3 +140,91 @@ def test_onboarding_copy_keeps_tailscale_discovery_separate_from_pairing() -> No
     assert "FCP1 code" in template
     assert 'name="pairing_code"' in template
     assert "Open discovered FCP device" in template
+
+
+def test_discovered_federation_is_never_reported_as_no_federation_found(
+    tmp_path, monkeypatch
+) -> None:
+    """The badge and the panel must never contradict each other.
+
+    Physical acceptance showed "No federation found" in the status badge while
+    the panel below it listed a Tailscale-discovered Federation on the same page.
+    """
+
+    path = tmp_path / "tailscale_discovery.json"
+    write_snapshot(path, _snapshot())
+    monkeypatch.setenv("FCP_TAILSCALE_DISCOVERY_FILE", str(path))
+
+    view_model = transition_routes._attach_tailscale_discovery(
+        {"federation": {"state": "empty", "state_label": "No federation found"}}
+    )
+
+    federation = view_model["federation"]
+    assert federation["state"] != "empty"
+    assert federation["state_label"] == "Federation found"
+    assert view_model["tailscale_discovery"]["federations"]
+
+
+def test_failed_local_discovery_still_reports_a_discovered_federation(
+    tmp_path, monkeypatch
+) -> None:
+    path = tmp_path / "tailscale_discovery.json"
+    write_snapshot(path, _snapshot())
+    monkeypatch.setenv("FCP_TAILSCALE_DISCOVERY_FILE", str(path))
+
+    view_model = transition_routes._attach_tailscale_discovery(
+        {"federation": {"state": "unavailable", "state_label": "Discovery unavailable"}}
+    )
+
+    assert view_model["federation"]["state_label"] == "Federation found"
+
+
+def test_connected_and_repair_states_outrank_discovery(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "tailscale_discovery.json"
+    write_snapshot(path, _snapshot())
+    monkeypatch.setenv("FCP_TAILSCALE_DISCOVERY_FILE", str(path))
+
+    for state, label in (("connected", "Connected"), ("repair", "Reconnect required")):
+        view_model = transition_routes._attach_tailscale_discovery(
+            {"federation": {"state": state, "state_label": label}}
+        )
+        assert view_model["federation"]["state"] == state
+        assert view_model["federation"]["state_label"] == label
+
+
+def test_no_discovered_federation_keeps_the_empty_state(tmp_path, monkeypatch) -> None:
+    path = tmp_path / "tailscale_discovery.json"
+    payload = _snapshot()
+    payload["federations"] = []
+    write_snapshot(path, payload)
+    monkeypatch.setenv("FCP_TAILSCALE_DISCOVERY_FILE", str(path))
+
+    view_model = transition_routes._attach_tailscale_discovery(
+        {"federation": {"state": "empty", "state_label": "No federation found"}}
+    )
+
+    assert view_model["federation"]["state_label"] == "No federation found"
+
+
+def test_discovered_candidate_card_stays_readable_at_desktop_widths() -> None:
+    """The fingerprint must not wrap one character per line.
+
+    The discovered card carries no radio input, so the three-column candidate
+    grid collapsed its middle column. It needs a full-width single column.
+    """
+
+    template = (
+        APP_ROOT / "templates" / "federation" / "onboarding" / "_federation.html"
+    ).read_text(encoding="utf-8")
+    stylesheet = (APP_ROOT / "static" / "css" / "federation.css").read_text(
+        encoding="utf-8"
+    )
+
+    assert "federation-candidate--discovered" in template
+    assert (
+        ".federation-candidate--discovered{grid-template-columns:minmax(0,1fr)}"
+        in stylesheet
+    )
+    assert ".federation-candidate--discovered>*{grid-column:1/-1;min-width:0}" in stylesheet
+    # The fingerprint itself must still be allowed to break inside a long hash.
+    assert "overflow-wrap:anywhere" in stylesheet

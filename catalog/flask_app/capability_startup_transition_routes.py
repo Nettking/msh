@@ -217,12 +217,38 @@ def _reconcile_contributions_once() -> None:
         )
 
 
+def _reconcile_discovery_state(view_model: dict[str, object]) -> None:
+    """Keep one authoritative discovery state across every discovery transport.
+
+    The onboarding view model computes its state before Tailscale discovery is
+    attached, so a Tailscale-discovered Federation used to leave the page saying
+    "No federation found" in the badge while the panel below it listed a
+    discovered candidate. A discovered candidate always outranks the empty and
+    discovery-unavailable states; connected and repair still outrank discovery.
+    """
+
+    discovery = view_model.get("tailscale_discovery")
+    federation = view_model.get("federation")
+    if not isinstance(discovery, dict) or not isinstance(federation, dict):
+        return
+    if not discovery.get("tailscale_available"):
+        return
+    federations = discovery.get("federations")
+    if not isinstance(federations, list) or not federations:
+        return
+    if federation.get("state") not in {"empty", "unavailable"}:
+        return
+    federation["state"] = "verification-required"
+    federation["state_label"] = "Federation found"
+
+
 def _attach_tailscale_discovery(view_model: dict[str, object]) -> dict[str, object]:
     path = os.getenv(
         "FCP_TAILSCALE_DISCOVERY_FILE",
         "data/federation/onboarding/tailscale_discovery.json",
     )
     view_model["tailscale_discovery"] = load_snapshot(path)
+    _reconcile_discovery_state(view_model)
     return view_model
 
 

@@ -31,7 +31,7 @@
             <span>FCP used the Tailscale login already present on this machine. Discovery proves reachability only; it does not grant Federation membership and no Tailscale auth or API key is stored by FCP.</span>
             <div class="federation-candidate-grid">
               {% for federation in tailscale_federations %}
-              <article class="federation-candidate">
+              <article class="federation-candidate federation-candidate--discovered">
                 <span class="federation-candidate__main">
                   <strong>{{ federation.federation_label }}</strong>
                   <small>{{ federation.device_name|default(federation.tailscale_host_name)|default(federation.tailscale_ip) }}</small>
