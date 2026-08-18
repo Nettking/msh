@@ -86,10 +86,10 @@ def test_full_tailscale_start_requests_creator_storage_authority() -> None:
     assert "FCP_FEDERATION_STORAGE_AUTHORITY_RELAY:=ws://relay:8765" in posix
 
 
-def test_normal_start_reconciles_zero_touch_state_instead_of_rebenchmarking_in_launcher() -> None:
-    for script in (_windows(), _posix()):
-        assert "automatic_capability_bootstrap" not in script
-        assert "zero_touch_federation_start.py" in script
-        # The idempotence decision lives in the capability bootstrap service,
-        # not in shell code that could drift from evidence semantics.
-        assert "benchmark" not in script.lower() or "benchmark" in script.lower()
+def test_normal_start_delegates_idempotence_to_the_zero_touch_service() -> None:
+    windows = _windows()
+    posix = _posix()
+    assert "automatic_capability_bootstrap" not in windows
+    assert "automatic_capability_bootstrap" not in posix
+    assert ZERO_TOUCH.replace("/", "\\") in windows
+    assert ZERO_TOUCH in posix
