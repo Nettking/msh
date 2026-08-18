@@ -9,29 +9,34 @@ from catalog.federation.errors import FederationOperationError
 from catalog.flask_app.services import zero_touch_federation_cli as cli
 
 
-def test_initializer_accepts_email_but_never_a_password_argument() -> None:
-    args = cli.build_parser().parse_args(
-        ["initialize", "--email", "admin@example.com"]
-    )
-    assert args.email == "admin@example.com"
+def test_initializer_accepts_no_human_credential_arguments() -> None:
+    args = cli.build_parser().parse_args(["initialize"])
+    assert not hasattr(args, "email")
     assert not hasattr(args, "password")
 
     with pytest.raises(SystemExit):
         cli.build_parser().parse_args(
-            [
-                "initialize",
-                "--email",
-                "admin@example.com",
-                "--password",
-                "do-not-accept-this",
-            ]
+            ["initialize", "--email", "admin@example.com"]
+        )
+    with pytest.raises(SystemExit):
+        cli.build_parser().parse_args(
+            ["initialize", "--password", "do-not-accept-this"]
         )
 
 
-def test_noninteractive_initializer_reads_password_only_from_stdin(monkeypatch) -> None:
-    monkeypatch.setattr(cli.sys, "stdin", io.StringIO("private password value\n"))
+def test_noninteractive_initializer_reads_both_credentials_only_from_stdin(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(
+        cli.sys,
+        "stdin",
+        io.StringIO("admin@example.com\nprivate password value\n"),
+    )
 
-    assert cli._read_password() == "private password value"
+    assert cli._read_admin_credentials() == (
+        "admin@example.com",
+        "private password value",
+    )
 
 
 def test_auto_join_clears_one_use_grant_before_redemption(monkeypatch) -> None:

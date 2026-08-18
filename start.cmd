@@ -58,6 +58,17 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem A previous interrupted --fresh from an older build may have removed these
+rem four Git-tracked runtime-root scaffolding files. They are immutable checkout
+rem content, not FCP application state. Restore only missing canonical copies.
+call :repair_checkout_scaffolding
+if errorlevel 1 (
+    echo.
+    echo FCP could not restore immutable checkout scaffolding safely.
+    pause
+    exit /b 1
+)
+
 call :resolve_runtime_state
 if errorlevel 1 (
     echo.
@@ -69,6 +80,15 @@ if errorlevel 1 (
 if "%FCP_FRESH_INSTALL%"=="1" (
     call :reset_device_state
     if errorlevel 1 exit /b 1
+    rem The reset image intentionally empties the mounted data/results roots.
+    rem Put the Git-tracked immutable scaffolding back before the clean-checkout gate.
+    call :repair_checkout_scaffolding
+    if errorlevel 1 (
+        echo.
+        echo Fresh reset completed, but immutable checkout scaffolding could not be restored.
+        pause
+        exit /b 1
+    )
 )
 
 call :resolve_build_commit
@@ -217,6 +237,21 @@ echo downloaded Ollama models, and recorded data are preserved between normal st
 echo.
 
 start "" "%FCP_OPEN_URL%"
+exit /b 0
+
+:repair_checkout_scaffolding
+for %%F in ("data\.gitkeep" "data\README.md" "results\.gitkeep" "results\README.md") do (
+    if not exist "%~dp0%%~F" (
+        git cat-file -e "HEAD:%%~F" >nul 2>&1
+        if not errorlevel 1 (
+            git restore --source=HEAD --worktree -- "%%~F" >nul 2>&1
+            if errorlevel 1 (
+                echo Could not restore immutable checkout scaffolding: %%~F
+                exit /b 1
+            )
+        )
+    )
+)
 exit /b 0
 
 :resolve_build_commit

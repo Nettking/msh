@@ -5,7 +5,7 @@ no existing Federation is discovered and asks for the sole initial human admin.
 Every later device is join-only and refuses to create a split Federation when
 discovery/authorization fails.
 
-Device enrollment itself never uses human credentials.  It uses the existing
+Device enrollment itself never uses human credentials. It uses the existing
 same-tailnet/same-owner responder and ordinary one-use pairing grant, then runs
 the installed capability bootstrap inside the Flask container.
 """
@@ -140,23 +140,32 @@ def _auto_join(snapshot: dict[str, object]) -> None:
     )
 
 
-def _initialize_first_federation() -> None:
-    if not sys.stdin.isatty():
-        raise ZeroTouchStartError(
-            "first Federation initialization requires an interactive terminal"
-        )
-    email = input("Federation administrator email: ").strip()
-    if not email:
-        raise ZeroTouchStartError("administrator email is required")
-    password = getpass.getpass("Federation administrator password: ")
+def _initialize_first_federation(
+    credentials: tuple[str, str] | None = None,
+) -> None:
+    if credentials is None:
+        if not sys.stdin.isatty():
+            raise ZeroTouchStartError(
+                "first Federation initialization requires an interactive terminal"
+            )
+        email = input("Federation administrator email: ").strip()
+        if not email:
+            raise ZeroTouchStartError("administrator email is required")
+        password = getpass.getpass("Federation administrator password: ")
+    else:
+        email, password = credentials
+        email = email.strip()
+        if not email:
+            raise ZeroTouchStartError("administrator email is required")
+        if not password:
+            raise ZeroTouchStartError("administrator password is required")
+
     try:
         _inside_flask(
             "catalog.flask_app.services.zero_touch_federation_cli",
             "--json",
             "initialize",
-            "--email",
-            email,
-            input_text=password + "\n",
+            input_text=email + "\n" + password + "\n",
         )
     finally:
         password = ""
@@ -176,7 +185,12 @@ def _bootstrap_capabilities() -> dict[str, object]:
     return payload
 
 
-def zero_touch_start(*, initialize_federation: bool, web_port: int) -> dict[str, object]:
+def zero_touch_start(
+    *,
+    initialize_federation: bool,
+    web_port: int,
+    first_admin_credentials: tuple[str, str] | None = None,
+) -> dict[str, object]:
     """Join or initialize once, then self-configure the trusted full FCP device."""
 
     status = _status()
@@ -186,7 +200,10 @@ def zero_touch_start(*, initialize_federation: bool, web_port: int) -> dict[str,
         if federations:
             _auto_join(snapshot)
         elif initialize_federation:
-            _initialize_first_federation()
+            if first_admin_credentials is None:
+                _initialize_first_federation()
+            else:
+                _initialize_first_federation(first_admin_credentials)
         else:
             raise ZeroTouchStartError(
                 "no Federation was discovered. This device is join-only; initialize the Federation only on the first device."

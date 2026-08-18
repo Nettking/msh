@@ -22,7 +22,7 @@ for argument in "$@"; do
       cat <<'EOF'
 Usage:
   sh start-tailscale.sh --fresh --initialize-federation
-      First device only: reset, initialize the Federation, prompt once for admin credentials.
+      First device only: enter RESET and the first admin credentials up front, then reset and initialize the Federation.
   sh start-tailscale.sh --fresh
       New trusted device: reset, discover, join, benchmark, and activate services automatically.
   sh start-tailscale.sh
@@ -38,6 +38,12 @@ EOF
       ;;
   esac
 done
+
+if [ "$INITIALIZE_FEDERATION" = "1" ] && [ "$START_MODE" != "--fresh" ]; then
+  echo "First Federation initialization requires --fresh." >&2
+  echo "Use: sh start-tailscale.sh --fresh --initialize-federation" >&2
+  exit 2
+fi
 
 if ! command -v tailscale >/dev/null 2>&1; then
   echo "Tailscale was not found. Zero-touch Federation startup requires Tailscale." >&2
@@ -65,11 +71,18 @@ fi
 : "${FCP_HUMAN_AUTH_BASE_URL:=http://$FCP_TAILSCALE_IP:$FCP_WEB_PORT}"
 FCP_TAILSCALE_DISCOVERY_PORT=$FCP_WEB_PORT
 FCP_AUTO_JOIN_APP_URL="http://$FCP_TAILSCALE_IP:$FCP_WEB_PORT"
+export FCP_TAILSCALE_IP
 export FCP_WEB_BIND FCP_RELAY_BIND FCP_DATA_DIR
 export FCP_WEB_PORT FCP_AUTO_JOIN_PORT
 export FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED FCP_FEDERATION_STORAGE_AUTHORITY_RELAY
 export FCP_PAIRING_RELAY_URL FCP_HUMAN_AUTH_BASE_URL
 export FCP_TAILSCALE_DISCOVERY_PORT FCP_AUTO_JOIN_APP_URL
+
+# The explicit first-device path collects RESET + admin email + hidden password
+# before the long reset/build work and keeps the password only in host memory.
+if [ "$INITIALIZE_FEDERATION" = "1" ]; then
+  exec python3 "$ROOT/scripts/first_federation_start.py"
+fi
 
 # Factory reset happens first. Discovery/enrollment afterwards prevents --fresh
 # from deleting the snapshot or one-use grant before it can be redeemed.
@@ -88,14 +101,8 @@ python3 "$ROOT/scripts/federation_host_runner.py" tailnet_join_responder \
   --port "$FCP_AUTO_JOIN_PORT" \
   --app-url "$FCP_AUTO_JOIN_APP_URL" &
 
-if [ "$INITIALIZE_FEDERATION" = "1" ]; then
-  python3 "$ROOT/scripts/zero_touch_federation_start.py" \
-    --initialize-federation \
-    --web-port "$FCP_TAILSCALE_DISCOVERY_PORT"
-else
-  python3 "$ROOT/scripts/zero_touch_federation_start.py" \
-    --web-port "$FCP_TAILSCALE_DISCOVERY_PORT"
-fi
+python3 "$ROOT/scripts/zero_touch_federation_start.py" \
+  --web-port "$FCP_TAILSCALE_DISCOVERY_PORT"
 
 echo "FCP Tailscale address: $FCP_TAILSCALE_IP"
 echo "Zero-touch startup is complete."
