@@ -5,6 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
+from catalog.federation.errors import FederationOperationError
 from catalog.flask_app.services import zero_touch_federation_cli as cli
 
 
@@ -73,7 +74,7 @@ def test_missing_host_grant_fails_instead_of_creating_membership(monkeypatch) ->
     monkeypatch.setattr(cli, "grant_path", lambda: "grant.json")
     monkeypatch.setattr(cli, "load_grant", lambda _path: "")
 
-    with pytest.raises(Exception) as caught:
+    with pytest.raises(FederationOperationError) as caught:
         cli.redeem_pending_tailnet_grant()
 
-    assert getattr(caught.value, "code", None) == "zero-touch-auto-join-grant-required"
+    assert caught.value.code == "zero-touch-auto-join-grant-required"
