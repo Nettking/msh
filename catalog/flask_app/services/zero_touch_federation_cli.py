@@ -16,7 +16,6 @@ import getpass
 import json
 import sys
 import uuid
-from dataclasses import asdict
 
 from flask_security import hash_password
 
@@ -171,7 +170,7 @@ def redeem_pending_tailnet_grant() -> HeadlessFederationResult:
             "binding",
         )
 
-    # The grant is one-use.  Clear it before redemption so an exception, process
+    # The grant is one-use. Clear it before redemption so an exception, process
     # crash, or retry can never turn it into a reusable local credential.
     clear_grant(path)
     binding = service.redeem_pairing_code(code)
@@ -266,7 +265,10 @@ def main(argv: list[str] | None = None) -> int:
                 file=sys.stderr,
             )
         else:
-            print(f"Zero-touch Federation setup failed ({code}): {message}", file=sys.stderr)
+            print(
+                f"Zero-touch Federation setup failed ({code}): {message}",
+                file=sys.stderr,
+            )
         return 2
     finally:
         password = None
