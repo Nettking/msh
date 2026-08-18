@@ -1,6 +1,6 @@
 # Quick start
 
-Status: **current user guide**  
+Status: **current user guide**
 Reviewed: **2026-08-18**
 
 FCP is capability-first: devices are not assigned one permanent role. The normal multi-device v1 setup is **initialize one Federation once, then let trusted Tailscale devices discover, join, benchmark, and activate their available services automatically**.
