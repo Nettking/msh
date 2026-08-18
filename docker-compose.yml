@@ -16,6 +16,7 @@ services:
       - FCP_AUTH_SECRET_DIR=${FCP_AUTH_SECRET_DIR:-/app/data/auth}
       - FCP_HTTPS=${FCP_HTTPS:-0}
       - FCP_DEVELOPMENT=${FCP_DEVELOPMENT:-0}
+      - FCP_HUMAN_AUTH_BASE_URL=${FCP_HUMAN_AUTH_BASE_URL:-}
       - FCP_AI_MODEL=${FCP_AI_MODEL:-llama3.2:3b}
       - OLLAMA_BASE_URL=${OLLAMA_BASE_URL:-http://ollama:11434}
       - FCP_DEVICE_NAME=${FCP_DEVICE_NAME:-This FCP device}
