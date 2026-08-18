@@ -5,8 +5,9 @@ They are never used as device-enrollment credentials. Later devices redeem only
 the existing short-lived pairing grant produced by the verified Tailscale host
 responder.
 
-The password accepted by ``initialize`` is read from stdin (or a hidden local
-TTY prompt) and is never accepted as an argument or environment variable.
+Both administrator email and password accepted by ``initialize`` are read from
+stdin (or prompted locally on a TTY). Neither credential is accepted as a
+command argument or environment variable.
 """
 
 from __future__ import annotations
@@ -71,17 +72,41 @@ def _has_active_admin() -> bool:
     )
 
 
-def _read_password() -> str:
+def _read_admin_credentials() -> tuple[str, str]:
     if sys.stdin.isatty():
-        return getpass.getpass("Federation administrator password: ")
-    value = sys.stdin.readline()
-    if value == "":
+        email = input("Federation administrator email: ").strip()
+        password = getpass.getpass("Federation administrator password: ")
+    else:
+        email_value = sys.stdin.readline()
+        password_value = sys.stdin.readline()
+        if email_value == "":
+            raise FederationValidationError(
+                "zero-touch-email-required",
+                "email",
+                "an administrator email must be supplied on stdin",
+            )
+        if password_value == "":
+            raise FederationValidationError(
+                "zero-touch-password-required",
+                "password",
+                "a password must be supplied on stdin",
+            )
+        email = email_value.rstrip("\r\n").strip()
+        password = password_value.rstrip("\r\n")
+
+    if not email:
+        raise FederationValidationError(
+            "zero-touch-email-required",
+            "email",
+            "an administrator email is required",
+        )
+    if not password:
         raise FederationValidationError(
             "zero-touch-password-required",
             "password",
-            "a password must be supplied on stdin",
+            "an administrator password is required",
         )
-    return value.rstrip("\r\n")
+    return email, password
 
 
 def _publish_human_auth_state() -> None:
@@ -232,11 +257,10 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--json", action="store_true")
     commands = parser.add_subparsers(dest="command", required=True)
 
-    initialize = commands.add_parser(
+    commands.add_parser(
         "initialize",
         help="Create the first Federation administrator and initialize the first Federation.",
     )
-    initialize.add_argument("--email", required=True)
     commands.add_parser(
         "redeem-auto-join",
         help="Redeem a verified Tailscale host grant through the existing pairing flow.",
@@ -262,13 +286,14 @@ def _emit(result: HeadlessFederationResult, *, as_json: bool) -> None:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     app = create_app()
+    email: str | None = None
     password: str | None = None
     try:
         with app.app_context():
             if args.command == "initialize":
-                password = _read_password()
+                email, password = _read_admin_credentials()
                 result = initialize_first_federation(
-                    email=args.email,
+                    email=email,
                     password=password,
                 )
             elif args.command == "redeem-auto-join":
@@ -305,6 +330,7 @@ def main(argv: list[str] | None = None) -> int:
             )
         return 2
     finally:
+        email = None
         password = None
 
     _emit(result, as_json=args.json)
