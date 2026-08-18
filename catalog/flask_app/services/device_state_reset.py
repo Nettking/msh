@@ -2,10 +2,11 @@
 
 This module is executed inside the Flask Compose service for ``start.cmd --fresh``.
 A fresh reset removes mutable state beneath the mounted FCP data, results, and
-relay-state roots.  The recording corpus beneath ``data/sources`` is the sole
-application-data exception and is never traversed for deletion.
+relay-state roots. The recording corpus beneath ``data/sources`` and the
+Git-tracked root scaffolding files in ``data``/``results`` are immutable checkout
+content and are never traversed for deletion.
 
-All configured mutable-state paths are validated before the first deletion.  A
+All configured mutable-state paths are validated before the first deletion. A
 path that escapes the mounted roots, collides with the recording corpus, or a
 recording corpus with broken raw MTConnect integrity causes the reset to fail
 closed before any mutable state is removed.
@@ -30,6 +31,7 @@ from catalog.common.federation_paths import (
 
 _SQLITE_SIDECARS = ("-wal", "-shm", "-journal")
 _RAW_MANIFEST_SUFFIX = ".manifest.json"
+_ROOT_SCAFFOLDING_NAMES = frozenset({".gitkeep", "README.md"})
 
 
 @dataclass(frozen=True)
@@ -321,11 +323,17 @@ def _remove_path(path: Path) -> bool:
     return False
 
 
-def _clear_contents(root: Path) -> tuple[Path, ...]:
+def _clear_contents(
+    root: Path,
+    *,
+    preserve_names: frozenset[str] = frozenset(),
+) -> tuple[Path, ...]:
     if not root.exists():
         return ()
     removed: list[Path] = []
     for child in tuple(root.iterdir()):
+        if child.name in preserve_names:
+            continue
         if _remove_path(child):
             removed.append(child)
     return tuple(removed)
@@ -336,7 +344,7 @@ def _prune_data_except_recordings(paths: ResolvedStatePaths) -> tuple[Path, ...]
         return ()
     removed: list[Path] = []
     for child in tuple(paths.data_root.iterdir()):
-        if child == paths.recordings:
+        if child == paths.recordings or child.name in _ROOT_SCAFFOLDING_NAMES:
             continue
         if _remove_path(child):
             removed.append(child)
@@ -397,7 +405,7 @@ def reset_device_state(
     app_root: Path | str | None = None,
     relay_root: Path | str = DEFAULT_RELAY_STATE_ROOT,
 ) -> tuple[Path, ...]:
-    """Factory-reset mutable FCP state while leaving recordings byte-for-byte alone."""
+    """Factory-reset mutable FCP state while preserving immutable checkout content."""
 
     paths = resolved_state_paths(
         environ=environ,
@@ -410,7 +418,7 @@ def reset_device_state(
         relay_root=relay_root,
     )
 
-    # Validate recording integrity before the first deletion.  A broken recording
+    # Validate recording integrity before the first deletion. A broken recording
     # must never leave the installation half-reset simply because post-reset
     # verification discovers it too late.
     recording_problems = _raw_recording_integrity_problems(paths.recordings)
@@ -421,6 +429,11 @@ def reset_device_state(
     for target in targets:
         if target.kind == "data-contents":
             target_removed = _prune_data_except_recordings(paths)
+        elif target.path == paths.results_root:
+            target_removed = _clear_contents(
+                target.path,
+                preserve_names=_ROOT_SCAFFOLDING_NAMES,
+            )
         else:
             target_removed = _clear_contents(target.path)
         if target_removed:
@@ -438,20 +451,24 @@ def _unexpected_children(root: Path, *, allowed: frozenset[Path] = frozenset()) 
     return [child for child in root.iterdir() if child not in allowed]
 
 
+def _root_scaffolding(root: Path) -> frozenset[Path]:
+    return frozenset(root / name for name in _ROOT_SCAFFOLDING_NAMES)
+
+
 def verify_fresh_application_state(
     *,
     environ: Mapping[str, str] | None = None,
     app_root: Path | str | None = None,
     relay_root: Path | str = DEFAULT_RELAY_STATE_ROOT,
 ) -> tuple[str, ...]:
-    """Verify that only the immutable recording corpus survives a fresh reset."""
+    """Verify that only recordings and immutable checkout scaffolding survive."""
 
     paths = resolved_state_paths(
         environ=environ,
         app_root=app_root,
         relay_root=relay_root,
     )
-    # Re-run all path-boundary checks.  Verification must not silently accept a
+    # Re-run all path-boundary checks. Verification must not silently accept a
     # custom mutable-state path that reset could not safely reach.
     planned_reset_targets(
         environ=environ,
@@ -462,10 +479,13 @@ def verify_fresh_application_state(
     problems: list[str] = []
     for child in _unexpected_children(
         paths.data_root,
-        allowed=frozenset({paths.recordings}),
+        allowed=frozenset({paths.recordings}) | _root_scaffolding(paths.data_root),
     ):
         problems.append(f"mutable data still exists after fresh reset: {child}")
-    for child in _unexpected_children(paths.results_root):
+    for child in _unexpected_children(
+        paths.results_root,
+        allowed=_root_scaffolding(paths.results_root),
+    ):
         problems.append(f"analysis/job/result state still exists after fresh reset: {child}")
     for child in _unexpected_children(paths.relay_root):
         problems.append(f"relay/Federation authority still exists after fresh reset: {child}")
@@ -490,7 +510,10 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--verify-fresh",
         action="store_true",
-        help="Verify that only immutable machine recordings remain as application state.",
+        help=(
+            "Verify that only immutable machine recordings and checkout scaffolding "
+            "remain as application-root content."
+        ),
     )
     return parser.parse_args()
 
@@ -516,7 +539,7 @@ def main() -> int:
         return 1
     print(
         "fresh reset completed: mutable application state was removed; "
-        "machine recordings were preserved"
+        "machine recordings and immutable checkout scaffolding were preserved"
     )
     return 0
 
