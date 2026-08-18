@@ -42,7 +42,8 @@ def test_fresh_help_matches_factory_reset_contract() -> None:
     assert "source configuration and recorder configuration, checkpoints" in reset_block
     assert "analyses, results, digital-twin projections" in reset_block
     assert "preserves the machine recording corpus and its integrity metadata" in reset_block
-    assert "Only the machine recording corpus" in help_block
+    assert "Machine recordings, integrity metadata" in help_block
+    assert "immutable checkout scaffolding survive" in help_block
     assert "source configuration, recorder checkpoints, results, and Ollama models" not in help_block.split(
         "The --fresh option", maxsplit=1
     )[1]
