@@ -108,21 +108,19 @@ function Resolve-RecorderPython {
     )
 }
 
-$PairingKey = $env:FCP_RECORDER_FEDERATION_KEY
+# The zero-touch Tailscale path never consumes a pairing code from the host
+# environment. Remove any inherited legacy value before both the import probe
+# and the real process so it cannot become an accidental enrollment bypass.
 Remove-Item Env:FCP_RECORDER_FEDERATION_KEY -ErrorAction SilentlyContinue
 $PythonCommand = Resolve-RecorderPython
 
 Push-Location $RepositoryRoot
 try {
-    if (-not [string]::IsNullOrWhiteSpace($PairingKey)) {
-        $env:FCP_RECORDER_FEDERATION_KEY = $PairingKey
-    }
     & $PythonCommand.Executable @($PythonCommand.Prefix) -m scripts.start_tailscale_recorder @RecorderArguments
     $LauncherExitCode = $LASTEXITCODE
 }
 finally {
     Remove-Item Env:FCP_RECORDER_FEDERATION_KEY -ErrorAction SilentlyContinue
-    $PairingKey = $null
     Pop-Location
 }
 exit $LauncherExitCode
