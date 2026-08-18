@@ -27,12 +27,15 @@ import argparse
 import http.server
 import json
 import os
+import signal
 import socketserver
+import subprocess
 import sys
 import threading
 import urllib.error
 import urllib.request
 from collections.abc import Callable
+from contextlib import suppress
 from pathlib import Path
 
 from .tailnet_join_bridge import (
@@ -40,6 +43,7 @@ from .tailnet_join_bridge import (
     SECRET_HEADER,
     auto_join_port,
     ensure_secret,
+    pid_path,
     secret_path,
 )
 from .tailscale_peer_identity import (
@@ -234,6 +238,64 @@ def serve(
         server.serve_forever(poll_interval=0.5)
 
 
+def process_is_running(pid: int) -> bool:
+    """Return whether a process with this id currently exists."""
+
+    if pid <= 0:
+        return False
+    if os.name == "nt":
+        completed = subprocess.run(
+            ("tasklist", "/FI", f"PID eq {pid}", "/NH"),
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        return str(pid) in (completed.stdout or "")
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def stop_previous_instance(pid_file: Path) -> int | None:
+    """Terminate a responder left over from an earlier start.
+
+    Without this, a stale responder keeps the port and the replacement cannot
+    bind, which on Windows previously left the launcher announcing a listener
+    that was never there.
+    """
+
+    try:
+        raw = Path(pid_file).read_text(encoding="utf-8").strip()
+    except (OSError, UnicodeDecodeError):
+        return None
+    try:
+        pid = int(raw)
+    except ValueError:
+        return None
+    if pid == os.getpid() or not process_is_running(pid):
+        return None
+    if os.name == "nt":
+        subprocess.run(
+            ("taskkill", "/PID", str(pid), "/F"),
+            capture_output=True,
+            check=False,
+        )
+    else:
+        with suppress(ProcessLookupError, PermissionError, OSError):
+            os.kill(pid, signal.SIGTERM)
+    return pid
+
+
+def write_pid_file(pid_file: Path) -> None:
+    path = Path(pid_file)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(str(os.getpid()), encoding="utf-8")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
@@ -249,6 +311,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--port", type=int, default=0)
     parser.add_argument("--app-url", default="")
     parser.add_argument("--secret-file", default="")
+    parser.add_argument("--pid-file", default="")
     parser.add_argument(
         "--check",
         action="store_true",
@@ -303,25 +366,47 @@ def main(argv: list[str] | None = None) -> int:
     secret_file = Path(arguments.secret_file) if arguments.secret_file else secret_path()
     ensure_secret(secret_file)
     app_url = arguments.app_url or application_url()
-    print(
-        f"tailnet-join responder: listening on {bind_host}:{port}",
-        file=sys.stderr,
-    )
+    pid_file = Path(arguments.pid_file) if arguments.pid_file else pid_path()
+
+    # A responder from an earlier start still owns the port. Replace it rather
+    # than failing to bind behind a launcher that already claimed success.
+    replaced = stop_previous_instance(pid_file)
+    if replaced is not None:
+        print(
+            f"tailnet-join responder: replaced earlier instance (pid {replaced})",
+            file=sys.stderr,
+        )
+
     try:
-        serve(
+        server = build_server(
             bind_host=bind_host,
             port=port,
             app_url=app_url,
             secret_file=secret_file,
         )
-    except KeyboardInterrupt:
-        return 0
     except OSError as error:
         print(
-            f"tailnet-join responder: could not listen on {bind_host}:{port} ({error})",
+            f"tailnet-join responder: could not listen on {bind_host}:{port} "
+            f"({error}). Automatic Federation joining is unavailable; manual "
+            "pairing codes still work.",
             file=sys.stderr,
         )
         return 1
+
+    # Only now is the listener real, so this is the first honest success line.
+    write_pid_file(pid_file)
+    print(
+        f"tailnet-join responder: listening on {bind_host}:{port}",
+        file=sys.stderr,
+    )
+    try:
+        with server:
+            server.serve_forever(poll_interval=0.5)
+    except KeyboardInterrupt:
+        return 0
+    finally:
+        with suppress(OSError):
+            Path(pid_file).unlink(missing_ok=True)
     return 0
 
 

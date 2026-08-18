@@ -301,3 +301,108 @@ def test_the_secret_is_reread_after_a_fresh_reset_removes_it(tmp_path: Path) -> 
     assert first and second
     assert first != second
     assert seen == [first, second]
+
+
+def test_a_stale_responder_is_replaced_instead_of_blocking_the_port(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A responder from an earlier start must not keep the port.
+
+    The launcher runs on every start, including the restart after --fresh. If
+    the previous instance survives, the replacement cannot bind and automatic
+    joining is silently dead while the console says it is listening.
+    """
+
+    pid_file = tmp_path / "responder.pid"
+    pid_file.write_text("4242", encoding="utf-8")
+    killed: list[int] = []
+
+    monkeypatch.setattr(responder, "process_is_running", lambda pid: pid == 4242)
+    monkeypatch.setattr(responder.os, "name", "posix")
+    monkeypatch.setattr(
+        responder.os,
+        "kill",
+        lambda pid, sig: killed.append(pid),
+    )
+
+    replaced = responder.stop_previous_instance(pid_file)
+
+    assert replaced == 4242
+    assert killed == [4242]
+
+
+def test_a_dead_or_missing_pid_is_not_treated_as_a_running_responder(
+    tmp_path: Path, monkeypatch
+) -> None:
+    monkeypatch.setattr(responder, "process_is_running", lambda pid: False)
+
+    missing = tmp_path / "absent.pid"
+    assert responder.stop_previous_instance(missing) is None
+
+    dead = tmp_path / "dead.pid"
+    dead.write_text("4242", encoding="utf-8")
+    assert responder.stop_previous_instance(dead) is None
+
+    garbage = tmp_path / "garbage.pid"
+    garbage.write_text("not-a-pid", encoding="utf-8")
+    assert responder.stop_previous_instance(garbage) is None
+
+
+def test_the_responder_never_terminates_itself(tmp_path: Path) -> None:
+    import os as _os
+
+    pid_file = tmp_path / "self.pid"
+    pid_file.write_text(str(_os.getpid()), encoding="utf-8")
+
+    assert responder.stop_previous_instance(pid_file) is None
+
+
+def test_the_pid_file_records_the_live_responder(tmp_path: Path) -> None:
+    import os as _os
+
+    pid_file = tmp_path / "nested" / "responder.pid"
+    responder.write_pid_file(pid_file)
+
+    assert pid_file.read_text(encoding="utf-8") == str(_os.getpid())
+
+
+def test_a_port_already_in_use_is_reported_instead_of_announced_as_listening(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """The success line must come after the socket exists, never before."""
+
+    holder = responder.build_server(
+        bind_host="127.0.0.1",
+        port=0,
+        app_url="http://127.0.0.1:1",
+        secret_file=tmp_path / "secret",
+    )
+    port = holder.server_address[1]
+    try:
+        monkeypatch.setattr(responder, "local_tailnet_identity", lambda: PEER)
+        printed: list[str] = []
+        monkeypatch.setattr(
+            "builtins.print",
+            lambda *args, **kwargs: printed.append(" ".join(str(a) for a in args)),
+        )
+
+        code = responder.main(
+            [
+                "--bind",
+                "127.0.0.1",
+                "--port",
+                str(port),
+                "--secret-file",
+                str(tmp_path / "secret"),
+                "--pid-file",
+                str(tmp_path / "responder.pid"),
+            ]
+        )
+    finally:
+        holder.server_close()
+
+    assert code == 1
+    joined = "\n".join(printed)
+    assert "could not listen" in joined
+    assert "manual pairing codes still work" in joined
+    assert "listening on" not in joined

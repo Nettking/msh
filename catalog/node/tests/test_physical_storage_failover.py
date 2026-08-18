@@ -24,10 +24,14 @@ from catalog.node.client import RelayNodeClient
 from catalog.node.live_storage_agent import LiveStorageNodeAgent
 from catalog.node.storage_deployment import (
     EVIDENCE_SCHEMA as F51_EVIDENCE_SCHEMA,
+)
+from catalog.node.storage_deployment import (
     DeploymentNode,
     ThreeMachineDeployment,
     ensure_initial_control,
     render_storage_config,
+)
+from catalog.node.storage_deployment import (
     verify_evidence as verify_f51_evidence,
 )
 from catalog.node.storage_failover_drill import (
@@ -43,6 +47,11 @@ NOW = datetime(2026, 7, 31, 14, 0, tzinfo=timezone.utc)
 # Match the product's bounded relay/storage timeout. Five seconds is too tight for
 # loaded Windows hosted runners and can expire while the local relay is healthy.
 TIMEOUT = 15.0
+# Reaching the control-waiting state is observed, not timed. Reusing the product
+# TIMEOUT above as a wall-clock deadline made a correct run fail whenever a
+# loaded CI runner was slower than that budget. This ceiling exists only so a
+# genuine hang still ends the test, and is far outside normal scheduling noise.
+BOOTSTRAP_OBSERVATION_TIMEOUT = 120.0
 
 
 async def _wait_for_control_waiting(
@@ -53,7 +62,7 @@ async def _wait_for_control_waiting(
     try:
         done, _pending = await asyncio.wait(
             {waiter, bootstrap},
-            timeout=TIMEOUT,
+            timeout=BOOTSTRAP_OBSERVATION_TIMEOUT,
             return_when=asyncio.FIRST_COMPLETED,
         )
         if bootstrap in done:

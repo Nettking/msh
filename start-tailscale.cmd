@@ -49,18 +49,29 @@ rem a connecting peer really is. Docker Desktop rewrites the source address, so
 rem the container sees the gateway and could never verify a peer. Both steps are
 rem best effort: manual pairing codes keep working if either fails.
 if not defined FCP_AUTO_JOIN_PORT set "FCP_AUTO_JOIN_PORT=5151"
-set "FCP_RESPONDER_PID_FILE=%FCP_DATA_DIR%\tailnet_join_responder.pid"
-if exist "%FCP_RESPONDER_PID_FILE%" (
-    for /f "usebackq delims=" %%P in ("%FCP_RESPONDER_PID_FILE%") do taskkill /pid %%P /f >nul 2>&1
-    del /q "%FCP_RESPONDER_PID_FILE%" >nul 2>&1
+
+rem The web and relay ports reach the tailnet because Docker Desktop creates its
+rem own firewall rules. The responder is an ordinary host process and gets none,
+rem so inbound joins would be dropped. Adding the rule needs elevation; without
+rem it the responder still starts and the reason is printed rather than left as
+rem an unexplained timeout on the joining device.
+netsh advfirewall firewall show rule name="FCP tailnet join responder" >nul 2>&1
+if errorlevel 1 (
+    netsh advfirewall firewall add rule name="FCP tailnet join responder" dir=in action=allow protocol=TCP localport=%FCP_AUTO_JOIN_PORT% >nul 2>&1
+    if errorlevel 1 (
+        echo Could not open port %FCP_AUTO_JOIN_PORT% in Windows Firewall automatically.
+        echo Run this once in an elevated prompt if the other device cannot join:
+        echo   netsh advfirewall firewall add rule name="FCP tailnet join responder" dir=in action=allow protocol=TCP localport=%FCP_AUTO_JOIN_PORT%
+    )
 )
 
 python "%~dp0catalog\federation\tailnet_join_responder.py" --check
 if errorlevel 1 (
     echo Automatic Federation joining is unavailable; manual pairing codes still work.
 ) else (
+    rem The responder replaces any earlier instance, writes its own pid file, and
+    rem prints its own listening line only once the socket really exists.
     start "FCP tailnet join responder" /b python "%~dp0catalog\federation\tailnet_join_responder.py" --bind %FCP_TAILSCALE_IP% --port %FCP_AUTO_JOIN_PORT%
-    echo Automatic Federation joining is listening on %FCP_TAILSCALE_IP%:%FCP_AUTO_JOIN_PORT%
 )
 
 rem If another Federation was discovered and this device is not a member yet,
