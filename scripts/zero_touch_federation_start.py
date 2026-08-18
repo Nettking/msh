@@ -140,16 +140,6 @@ def _auto_join(snapshot: dict[str, object]) -> None:
     )
 
 
-def _read_first_admin_stdin() -> tuple[str, str]:
-    email = sys.stdin.readline().rstrip("\r\n").strip()
-    password = sys.stdin.readline().rstrip("\r\n")
-    if not email:
-        raise ZeroTouchStartError("administrator email is required")
-    if not password:
-        raise ZeroTouchStartError("administrator password is required")
-    return email, password
-
-
 def _initialize_first_federation(
     credentials: tuple[str, str] | None = None,
 ) -> None:
@@ -212,7 +202,10 @@ def zero_touch_start(
         if federations:
             _auto_join(snapshot)
         elif initialize_federation:
-            _initialize_first_federation(first_admin_credentials)
+            if first_admin_credentials is None:
+                _initialize_first_federation()
+            else:
+                _initialize_first_federation(first_admin_credentials)
         else:
             raise ZeroTouchStartError(
                 "no Federation was discovered. This device is join-only; initialize the Federation only on the first device."
@@ -241,14 +234,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Permit first-Federation creation when discovery finds none.",
     )
     parser.add_argument(
-        "--first-admin-stdin",
-        action="store_true",
-        help=(
-            "Read a precollected first-admin email and password from stdin. "
-            "Internal launcher boundary; credentials are never command arguments."
-        ),
-    )
-    parser.add_argument(
         "--web-port",
         type=int,
         default=int(os.environ.get("FCP_TAILSCALE_DISCOVERY_PORT") or "5000"),
@@ -261,28 +246,14 @@ def main(argv: list[str] | None = None) -> int:
     if not 1 <= args.web_port <= 65_535:
         print("Zero-touch FCP startup failed: invalid discovery web port", file=sys.stderr)
         return 2
-    if args.first_admin_stdin and not args.initialize_federation:
-        print(
-            "Zero-touch FCP startup failed: --first-admin-stdin requires --initialize-federation",
-            file=sys.stderr,
-        )
-        return 2
-
-    first_admin_credentials: tuple[str, str] | None = None
     try:
-        if args.first_admin_stdin:
-            first_admin_credentials = _read_first_admin_stdin()
         result = zero_touch_start(
             initialize_federation=args.initialize_federation,
             web_port=args.web_port,
-            first_admin_credentials=first_admin_credentials,
         )
     except (OSError, RuntimeError, ValueError, ZeroTouchStartError) as exc:
         print(f"Zero-touch FCP startup failed: {exc}", file=sys.stderr)
         return 2
-    finally:
-        if first_admin_credentials is not None:
-            first_admin_credentials = (first_admin_credentials[0], "")
 
     capability = result["capability"]
     assert isinstance(capability, dict)
