@@ -47,12 +47,13 @@ if not defined FCP_TAILSCALE_IP (
 
 if not defined FCP_WEB_BIND set "FCP_WEB_BIND=%FCP_TAILSCALE_IP%"
 if not defined FCP_RELAY_BIND set "FCP_RELAY_BIND=%FCP_TAILSCALE_IP%"
+if not defined FCP_WEB_PORT set "FCP_WEB_PORT=5000"
 if not defined FCP_DATA_DIR for %%I in ("%~dp0data") do set "FCP_DATA_DIR=%%~fI"
 if not defined FCP_AUTO_JOIN_PORT set "FCP_AUTO_JOIN_PORT=5151"
 if not defined FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED set "FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED=1"
 if not defined FCP_FEDERATION_STORAGE_AUTHORITY_RELAY set "FCP_FEDERATION_STORAGE_AUTHORITY_RELAY=ws://relay:8765"
 set "FCP_TAILSCALE_DISCOVERY_PORT=%FCP_WEB_PORT%"
-if not defined FCP_TAILSCALE_DISCOVERY_PORT set "FCP_TAILSCALE_DISCOVERY_PORT=5000"
+set "FCP_AUTO_JOIN_APP_URL=http://%FCP_TAILSCALE_IP%:%FCP_WEB_PORT%"
 
 where python >nul 2>&1
 if errorlevel 1 (
@@ -87,7 +88,7 @@ if errorlevel 1 (
     echo Automatic Federation joining is unavailable; refusing zero-touch startup.
     exit /b 2
 )
-start "FCP tailnet join responder" /b python "%~dp0scripts\federation_host_runner.py" tailnet_join_responder --bind %FCP_TAILSCALE_IP% --port %FCP_AUTO_JOIN_PORT%
+start "FCP tailnet join responder" /b python "%~dp0scripts\federation_host_runner.py" tailnet_join_responder --bind %FCP_TAILSCALE_IP% --port %FCP_AUTO_JOIN_PORT% --app-url %FCP_AUTO_JOIN_APP_URL%
 
 set "FCP_ZERO_TOUCH_ARGS="
 if defined FCP_INITIALIZE_FEDERATION set "FCP_ZERO_TOUCH_ARGS=--initialize-federation"
@@ -108,13 +109,13 @@ exit /b 0
 :show_help
 echo Usage:
 echo   start-tailscale.cmd --fresh --initialize-federation
- echo      First device only: reset, create the Federation, and prompt once for the first admin.
+echo      First device only: reset, create the Federation, and prompt once for the first admin.
 echo   start-tailscale.cmd --fresh
- echo      New trusted device: reset, discover, join, benchmark, and activate services automatically.
+echo      New trusted device: reset, discover, join, benchmark, and activate services automatically.
 echo   start-tailscale.cmd
- echo      Normal restart: reuse membership and current capability evidence.
+echo      Normal restart: reuse membership and current capability evidence.
 echo   start-tailscale.cmd --resume
- echo      Explicit saved-state reconnect before normal zero-touch reconciliation.
+echo      Explicit saved-state reconnect before normal zero-touch reconciliation.
 exit /b 0
 
 :usage_error
