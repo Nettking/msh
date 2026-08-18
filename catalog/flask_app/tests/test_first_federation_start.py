@@ -182,13 +182,15 @@ def test_windows_fresh_start_repairs_only_missing_git_tracked_scaffolding() -> N
         "call :reset_device_state"
     )
     for path in (
-        "data\\.gitkeep",
-        "data\\README.md",
-        "results\\.gitkeep",
-        "results\\README.md",
+        "data/.gitkeep",
+        "data/README.md",
+        "results/.gitkeep",
+        "results/README.md",
     ):
         assert path in repair
+    assert 'git cat-file -e "HEAD:%%~F"' in repair
     assert 'git restore --source=HEAD --worktree -- "%%~F"' in repair
+    assert "Immutable checkout scaffolding is missing from HEAD" in repair
     assert "git reset --hard" not in repair
     assert "git clean" not in repair
 
