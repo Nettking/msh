@@ -176,3 +176,27 @@ def test_a_malformed_grant_file_is_ignored(tmp_path: Path) -> None:
 
     grant_file.write_text(json.dumps({"schema": "other", "pairing_code": GRANT}))
     assert load_grant(grant_file) == ""
+
+
+def test_host_and_container_resolve_the_same_shared_files() -> None:
+    """A custom data directory must not split the two sides apart.
+
+    The container never sets FCP_DATA_DIR and resolves against its own working
+    directory, where the volume is mounted. The host may point the same volume
+    somewhere else, and must follow it or the two would authenticate against
+    different files and every automatic join would fail.
+    """
+
+    from catalog.federation.tailnet_join_bridge import grant_path, secret_path
+
+    container = secret_path({})
+    assert str(container) == "data/federation/onboarding/auto_join_secret"
+
+    host = secret_path({"FCP_DATA_DIR": "/srv/fcp-data"})
+    assert str(host) == "/srv/fcp-data/federation/onboarding/auto_join_secret"
+    # Same suffix beneath the mounted directory, so both sides meet in the volume.
+    assert str(host).endswith(str(container).split("data/", 1)[1])
+
+    assert str(grant_path({"FCP_DATA_DIR": "/srv/fcp-data"})).startswith("/srv/fcp-data/")
+    # An explicit override still wins on either side.
+    assert str(secret_path({"FCP_AUTO_JOIN_SECRET_FILE": "/x/y"})) == "/x/y"

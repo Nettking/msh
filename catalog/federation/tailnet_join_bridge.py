@@ -30,8 +30,10 @@ from pathlib import Path
 SECRET_ENV = "FCP_AUTO_JOIN_SECRET_FILE"
 GRANT_ENV = "FCP_AUTO_JOIN_GRANT_FILE"
 PORT_ENV = "FCP_AUTO_JOIN_PORT"
-DEFAULT_SECRET_FILE = "data/federation/onboarding/auto_join_secret"
-DEFAULT_GRANT_FILE = "data/federation/onboarding/auto_join_grant.json"
+SECRET_RELATIVE = "federation/onboarding/auto_join_secret"
+GRANT_RELATIVE = "federation/onboarding/auto_join_grant.json"
+DEFAULT_SECRET_FILE = f"data/{SECRET_RELATIVE}"
+DEFAULT_GRANT_FILE = f"data/{GRANT_RELATIVE}"
 DEFAULT_AUTO_JOIN_PORT = 5151
 SECRET_HEADER = "X-FCP-Auto-Join-Secret"
 GRANT_SCHEMA = "fcp.federation.tailnet-auto-join-grant.v1"
@@ -54,14 +56,40 @@ def auto_join_port(environ: dict[str, str] | None = None) -> int:
     return port
 
 
+def _data_relative(
+    values: dict[str, str],
+    relative: str,
+    default: str,
+) -> Path:
+    """Resolve a path both the host and the container agree on.
+
+    The container never sets ``FCP_DATA_DIR``; it resolves ``data/...`` against
+    its own working directory, which is where the data volume is mounted. The
+    host may point ``FCP_DATA_DIR`` somewhere else entirely, and that same
+    directory is what gets bind-mounted, so the host must follow it or the two
+    sides would authenticate against different files.
+    """
+
+    data_dir = str(values.get("FCP_DATA_DIR", "") or "").strip()
+    if data_dir:
+        return Path(data_dir) / relative
+    return Path(default)
+
+
 def secret_path(environ: dict[str, str] | None = None) -> Path:
     values = os.environ if environ is None else environ
-    return Path(values.get(SECRET_ENV) or DEFAULT_SECRET_FILE)
+    configured = str(values.get(SECRET_ENV, "") or "").strip()
+    if configured:
+        return Path(configured)
+    return _data_relative(values, SECRET_RELATIVE, DEFAULT_SECRET_FILE)
 
 
 def grant_path(environ: dict[str, str] | None = None) -> Path:
     values = os.environ if environ is None else environ
-    return Path(values.get(GRANT_ENV) or DEFAULT_GRANT_FILE)
+    configured = str(values.get(GRANT_ENV, "") or "").strip()
+    if configured:
+        return Path(configured)
+    return _data_relative(values, GRANT_RELATIVE, DEFAULT_GRANT_FILE)
 
 
 def read_secret(path: Path | str) -> str:
