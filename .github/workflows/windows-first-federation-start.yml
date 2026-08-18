@@ -1,0 +1,51 @@
+name: Windows first-Federation bootstrap
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/windows-first-federation-start.yml"
+      - "scripts/first_federation_start.py"
+      - "scripts/zero_touch_federation_start.py"
+      - "start.cmd"
+      - "start-tailscale.cmd"
+      - "catalog/flask_app/tests/test_first_federation_start.py"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/windows-first-federation-start.yml"
+      - "scripts/first_federation_start.py"
+      - "scripts/zero_touch_federation_start.py"
+      - "start.cmd"
+      - "start-tailscale.cmd"
+      - "catalog/flask_app/tests/test_first_federation_start.py"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-first-federation-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bootstrap:
+    name: Real Windows batch bootstrap boundary
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12.10"
+          cache: pip
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip==26.2.1
+          python -m pip install -r requirements.txt -c constraints-release.txt
+          python -m pip install pytest==9.1.1 -c constraints-release.txt
+      - name: Exercise first-Federation bootstrap on real Windows cmd.exe
+        run: >-
+          python -m pytest -o addopts= -q
+          catalog/flask_app/tests/test_first_federation_start.py
+      - name: Diff hygiene
+        shell: bash
+        run: git diff --check "origin/${{ github.base_ref }}...HEAD"
