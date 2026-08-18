@@ -162,8 +162,10 @@ function Get-IdentityNodeId {
 
 function Find-ProbeImage {
     foreach ($image in @("fcp-relay:latest", "fcp-flask:latest", "fcp-recorder:latest")) {
-        & docker image inspect $image *> $null
-        if ($LASTEXITCODE -eq 0) {
+        $matches = @(
+            & docker image ls --quiet --filter "reference=$image" 2>$null
+        ) | Where-Object { -not [string]::IsNullOrWhiteSpace($_) }
+        if ($LASTEXITCODE -eq 0 -and @($matches).Count -gt 0) {
             return $image
         }
     }

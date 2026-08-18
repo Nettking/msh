@@ -33,6 +33,18 @@ def test_relay_probe_uses_encoded_python_across_native_boundary() -> None:
     assert "-c $probeCode" not in script
 
 
+def test_probe_image_lookup_does_not_fail_when_images_are_absent() -> None:
+    script = _resolver_script()
+    section = script.split("function Find-ProbeImage", 1)[1].split(
+        "function Get-RelayVolumeProbe", 1
+    )[0]
+
+    assert "docker image inspect" not in section
+    assert 'docker image ls --quiet --filter "reference=$image"' in section
+    assert "$LASTEXITCODE -eq 0" in section
+    assert "@($matches).Count -gt 0" in section
+
+
 def test_relay_selection_does_not_guess_between_ambiguous_volumes() -> None:
     script = _resolver_script()
 
