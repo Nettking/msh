@@ -65,6 +65,7 @@ def test_discovery_uses_existing_tailscale_login_without_credentials() -> None:
                 "device_name": "Coordinator PC",
                 "relay_port": 8765,
                 "pairing_required": True,
+                "auto_join_port": 5151,
                 "enrollment_token": "must-never-be-copied",
             }
         )
@@ -80,6 +81,7 @@ def test_discovery_uses_existing_tailscale_login_without_credentials() -> None:
             "device_name": "Coordinator PC",
             "relay_port": 8765,
             "pairing_required": True,
+            "auto_join_port": 5151,
             "tailscale_ip": "100.64.0.10",
             "tailscale_dns_name": "coordinator.example.ts.net",
             "tailscale_host_name": "coordinator",
@@ -164,6 +166,7 @@ def test_same_federation_advertised_by_multiple_peers_is_deduplicated() -> None:
                 "device_name": "Coordinator",
                 "relay_port": 8765,
                 "pairing_required": True,
+                "auto_join_port": 5151,
             }
         )
 
@@ -187,6 +190,7 @@ def test_snapshot_loader_revalidates_and_drops_unknown_sensitive_fields(tmp_path
                     "device_name": "Coordinator PC",
                     "relay_port": 8765,
                     "pairing_required": True,
+                    "auto_join_port": 5151,
                     "tailscale_ip": "100.100.10.20",
                     "tailscale_dns_name": "coordinator.example.ts.net",
                     "tailscale_host_name": "coordinator",
@@ -201,6 +205,7 @@ def test_snapshot_loader_revalidates_and_drops_unknown_sensitive_fields(tmp_path
                     "device_name": "Not Tailscale",
                     "relay_port": 8765,
                     "pairing_required": True,
+                    "auto_join_port": 5151,
                     "tailscale_ip": "192.168.10.20",
                     "tailscale_dns_name": "",
                     "tailscale_host_name": "",
@@ -222,6 +227,7 @@ def test_snapshot_loader_revalidates_and_drops_unknown_sensitive_fields(tmp_path
                 "device_name": "Coordinator PC",
                 "relay_port": 8765,
                 "pairing_required": True,
+                "auto_join_port": 5151,
                 "tailscale_ip": "100.100.10.20",
                 "tailscale_dns_name": "coordinator.example.ts.net",
                 "tailscale_host_name": "coordinator",

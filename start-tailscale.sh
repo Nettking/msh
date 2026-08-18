@@ -40,5 +40,37 @@ else
   echo "python3 was not found, so pre-start Tailscale discovery is skipped." >&2
 fi
 
+# Automatic joining runs on the host because only here can tailscaled say who a
+# connecting peer really is. The container sees the Docker gateway instead, so
+# the identity check has to live outside it. Both steps are best effort: if
+# either fails, manual pairing codes still work exactly as before.
+FCP_AUTO_JOIN_PORT=${FCP_AUTO_JOIN_PORT:-5151}
+export FCP_AUTO_JOIN_PORT
+RESPONDER_PID_FILE="$FCP_DATA_DIR/tailnet_join_responder.pid"
+if command -v python3 >/dev/null 2>&1; then
+  if [ -f "$RESPONDER_PID_FILE" ]; then
+    OLD_PID=$(cat "$RESPONDER_PID_FILE" 2>/dev/null || true)
+    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
+      kill "$OLD_PID" 2>/dev/null || true
+    fi
+    rm -f "$RESPONDER_PID_FILE"
+  fi
+
+  if ! python3 "$ROOT/catalog/federation/tailnet_join_responder.py" --check; then
+    echo "Automatic Federation joining is unavailable; manual pairing codes still work." >&2
+  else
+    python3 "$ROOT/catalog/federation/tailnet_join_responder.py" \
+      --bind "$FCP_TAILSCALE_IP" \
+      --port "$FCP_AUTO_JOIN_PORT" &
+    echo $! > "$RESPONDER_PID_FILE"
+    echo "Automatic Federation joining is listening on $FCP_TAILSCALE_IP:$FCP_AUTO_JOIN_PORT"
+  fi
+
+  # If another Federation was discovered and this device is not a member yet,
+  # ask it to authorize this device. Nothing is written unless it agrees.
+  python3 "$ROOT/catalog/federation/tailnet_join_client.py" \
+    --snapshot "$DISCOVERY_FILE" || true
+fi
+
 echo "FCP Tailscale address: $FCP_TAILSCALE_IP"
 exec sh "$ROOT/start.sh" "$@"

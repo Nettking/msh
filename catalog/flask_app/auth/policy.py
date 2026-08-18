@@ -69,6 +69,12 @@ PUBLIC_ENDPOINTS = frozenset(
         # exposes only bounded public-safe metadata and never enrollment,
         # invitation, pairing, human-auth, or session authority.
         "federation_pairing_web.federation_discovery",
+        # The host responder has no browser session. This endpoint is not
+        # unauthenticated: it requires a secret written into the mounted data
+        # directory, which a tailnet peer that can merely reach the port
+        # cannot read. It mints nothing itself and delegates to the existing
+        # pairing authority.
+        "federation_pairing_web.tailnet_join_grant",
         # A member starts sign-in before it has a human session, and the signed
         # assertion returns to an anonymous browser. The authority endpoint is
         # intentionally not public: the leader must already authenticate the

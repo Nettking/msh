@@ -26,6 +26,11 @@ from catalog.federation.errors import (
     FederationValidationError,
     ProtocolCompatibilityError,
 )
+from catalog.federation.tailnet_join_bridge import (
+    clear_grant,
+    grant_path,
+    load_grant,
+)
 from catalog.federation.tailscale_host_discovery import load_snapshot
 from catalog.node.identity import NodeIdentityStateError
 
@@ -40,6 +45,9 @@ from .capability_onboarding_routes import (
 )
 from .services.capability_contribution_service import (
     get_capability_contribution_service,
+)
+from .services.capability_onboarding_service import (
+    get_capability_onboarding_service,
 )
 from .services.capability_startup_transition_service import (
     get_capability_startup_transition_service,
@@ -252,7 +260,43 @@ def _attach_tailscale_discovery(view_model: dict[str, object]) -> dict[str, obje
     return view_model
 
 
+def _redeem_pending_auto_join_grant() -> None:
+    """Redeem a grant the host responder already authorized for this device.
+
+    The joining host obtained this grant over the tailnet after the other device
+    verified our identity. Redemption goes through the ordinary pairing flow; the
+    grant is one-use, so it is cleared whether or not redemption succeeds.
+    """
+
+    path = grant_path()
+    code = load_grant(path)
+    if not code:
+        return
+    try:
+        service = get_capability_onboarding_service()
+        redeem = getattr(service, "redeem_pairing_code", None)
+        remote_store = getattr(service, "remote_store", None)
+        if not callable(redeem):
+            return
+        if remote_store is not None and remote_store.load() is not None:
+            # Already a member; the grant is stale and must not be replayed.
+            clear_grant(path)
+            return
+        clear_grant(path)
+        redeem(code)
+        current_app.logger.info(
+            "Joined the discovered Federation through verified tailnet identity",
+        )
+    except Exception as exc:  # noqa: BLE001 - onboarding must still render
+        clear_grant(path)
+        current_app.logger.warning(
+            "Automatic Federation join could not be completed (%s)",
+            type(exc).__name__,
+        )
+
+
 def _build_view_model() -> dict[str, object]:
+    _redeem_pending_auto_join_grant()
     _reconcile_contributions_once()
     view_model, _benchmark_complete = (
         _build_onboarding_with_contributions_view_model()

@@ -922,6 +922,7 @@ class PairingAwareCapabilityOnboardingService(CapabilityOnboardingService):
         *,
         relay_url: str,
         ttl_seconds: int = DEFAULT_PAIRING_TTL_SECONDS,
+        remember: bool = True,
     ) -> str:
         if self.remote_store.load() is not None:
             raise FederationOperationError(
@@ -956,7 +957,10 @@ class PairingAwareCapabilityOnboardingService(CapabilityOnboardingService):
             invitation_token=str(invitation["token"]),
             ttl_seconds=ttl_seconds,
         )
-        self._last_pairing_code = code
+        # An automatically issued grant is consumed by the joining host and must
+        # not surface in this device's UI as a code for a human to copy.
+        if remember:
+            self._last_pairing_code = code
         return code
 
     def last_pairing_code(self) -> str | None:

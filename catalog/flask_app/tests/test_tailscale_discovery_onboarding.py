@@ -31,6 +31,7 @@ def _snapshot() -> dict[str, object]:
                 "device_name": "Coordinator PC",
                 "relay_port": 8765,
                 "pairing_required": True,
+                "auto_join_port": 5151,
                 "tailscale_ip": "100.90.80.70",
                 "tailscale_dns_name": "coordinator.example.ts.net",
                 "tailscale_host_name": "coordinator",
@@ -106,6 +107,7 @@ def test_discovery_advertisement_contains_no_enrollment_or_pairing_material(
         "device_name": "Coordinator PC",
         "relay_port": 8765,
         "pairing_required": True,
+        "auto_join_port": 5151,
     }
     assert len(payload["federation_fingerprint"]) == 32
     serialized = json.dumps(payload)

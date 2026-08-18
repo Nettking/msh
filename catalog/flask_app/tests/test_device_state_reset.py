@@ -22,6 +22,12 @@ from catalog.federation.storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
 )
+from catalog.federation.tailnet_join_bridge import (
+    ensure_secret,
+    load_grant,
+    read_secret,
+    store_grant,
+)
 from catalog.flask_app.services.device_state_reset import (
     planned_reset_targets,
     reset_device_state,
@@ -429,3 +435,56 @@ def test_fresh_reset_clears_storage_authority_but_keeps_recordings(
     assert after.providers == {}
     assert after.groups == {}
     assert after.leader_grants == {}
+
+
+def test_fresh_reset_removes_auto_join_secret_and_any_pending_grant(
+    tmp_path: Path,
+) -> None:
+    """Auto-join material is mutable installation state, not recorded evidence.
+
+    A surviving secret would let a previous installation's host bridge keep
+    minting grants, and a surviving grant would try to rejoin the old Federation
+    after a factory reset.
+    """
+
+    app_root = tmp_path / "app"
+    data_root = app_root / "data"
+    relay_root = tmp_path / "relay-state"
+
+    secret_file = data_root / "federation" / "onboarding" / "auto_join_secret"
+    grant_file = data_root / "federation" / "onboarding" / "auto_join_grant.json"
+    ensure_secret(secret_file)
+    store_grant(grant_file, "FCP1-stale-grant-not-real")
+    assert read_secret(secret_file)
+    assert load_grant(grant_file)
+
+    recordings = data_root / "sources"
+    _write_raw_recording(
+        recordings
+        / "mtconnect_recorder"
+        / "raw"
+        / "machine-a"
+        / "instance-a"
+        / "2026-08-07"
+        / "seq-1-2-deadbeef.xml.gz",
+        b"<MTConnectStreams>immutable raw payload</MTConnectStreams>",
+    )
+    recording_snapshot = _snapshot_tree(recordings)
+
+    environ = _isolated_environ(relay_root)
+    reset_device_state(
+        environ=environ,
+        app_root=app_root,
+        relay_root=relay_root,
+    )
+
+    assert not secret_file.exists()
+    assert not grant_file.exists()
+    assert read_secret(secret_file) == ""
+    assert load_grant(grant_file) == ""
+    assert _snapshot_tree(recordings) == recording_snapshot
+    assert verify_fresh_application_state(
+        environ=environ,
+        app_root=app_root,
+        relay_root=relay_root,
+    ) == ()
