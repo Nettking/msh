@@ -1,20 +1,13 @@
-"""Flask lifecycle integration for the leader's logical-storage authority.
+"""Flask lifecycle integration for the creator's logical-storage authority.
 
 The authority is what makes a Federation able to accept recorder and JSONL
-publication at all, but it has only ever existed as a hand-started CLI. A leader
-brought up the normal way therefore advertised no storage capability, so every
-correctly fail-closed publisher refused to start and looked broken.
+publication at all. Normal full FCP startup supervises it automatically, while
+the existing creator-only check prevents a joined member from self-promoting.
 
-Supervising it here closes that gap without changing its authority model: the
-same composition runs, membership and grant checks are untouched, and the
-capability is still announced READY only for groups this device actually holds a
-leader grant for.
-
-Two boundaries are deliberate. Publication is opt-in, matching recorder
-publication, because a device should not open an authority connection it was
-never asked to provide. And the authority is only useful on the session creator,
-because a publisher accepts the storage capability only from that node; running
-it elsewhere is reported rather than silently doing nothing.
+The supervised runtime uses the same reviewed trusted-network relay client as
+physical pairing and reconciles only the creator's own relay/session state from
+the local coordinator database. It does not add a new enrollment authority or
+weaken the generic node transport policy.
 """
 
 from __future__ import annotations
@@ -33,10 +26,9 @@ from catalog.federation.errors import (
     FederationValidationError,
 )
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
-from catalog.node.storage_failover import (
-    StorageAuthoritySettings,
-    run_storage_authority,
-)
+from catalog.node.storage_failover import StorageAuthoritySettings
+
+from .trusted_storage_authority_runtime import run_trusted_storage_authority
 
 _EXTENSION_KEY = "federation_storage_authority"
 _RETRY_SECONDS = 5.0
@@ -223,7 +215,7 @@ class FederationStorageAuthorityMonitor:
         with self._lock:
             self._async_stop = stop
         self._set_snapshot("starting", enabled=True)
-        await run_storage_authority(
+        await run_trusted_storage_authority(
             settings,
             stop=stop,
             on_announced=self._on_announced,
@@ -308,7 +300,7 @@ def install_federation_storage_authority(
     *,
     onboarding_service: object,
 ) -> FederationStorageAuthorityMonitor:
-    """Install opt-in supervision of the leader's logical-storage authority."""
+    """Install supervision of the creator's logical-storage authority."""
 
     app.config.setdefault(
         "FEDERATION_STORAGE_AUTHORITY_ENABLED",
