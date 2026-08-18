@@ -34,6 +34,11 @@ from catalog.relay.service import RelayServer
 
 NOW = datetime(2026, 7, 31, 8, 0, tzinfo=timezone.utc)
 TIMEOUT = 5.0
+# Reaching the control-waiting state is observed, not timed. Reusing the product
+# TIMEOUT above as a wall-clock deadline made a correct run fail whenever a
+# loaded CI runner was slower than that budget. This ceiling exists only so a
+# genuine hang still ends the test, and is far outside normal scheduling noise.
+BOOTSTRAP_OBSERVATION_TIMEOUT = 120.0
 
 
 def _write_config(
@@ -101,7 +106,7 @@ async def _wait_for_control_waiting(
     try:
         done, _pending = await asyncio.wait(
             {waiter, bootstrap},
-            timeout=TIMEOUT,
+            timeout=BOOTSTRAP_OBSERVATION_TIMEOUT,
             return_when=asyncio.FIRST_COMPLETED,
         )
         if bootstrap in done:
