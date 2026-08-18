@@ -7,8 +7,8 @@ from flask import Flask
 
 from catalog.capabilities.benchmarking import (
     BenchmarkRegistry,
-    BenchmarkRunRequest,
     BenchmarkRunner,
+    BenchmarkRunRequest,
     DeviceInspector,
     SQLiteBenchmarkResultStore,
     register_concrete_adapters,

@@ -68,8 +68,22 @@ if command -v python3 >/dev/null 2>&1; then
 
   # If another Federation was discovered and this device is not a member yet,
   # ask it to authorize this device. Nothing is written unless it agrees.
-  python3 "$ROOT/catalog/federation/tailnet_join_client.py" \
-    --snapshot "$DISCOVERY_FILE" || true
+  #
+  # Skipped for --fresh: the factory reset runs after this point and clears the
+  # whole data directory, so a grant fetched now would be destroyed before it
+  # could be redeemed. The next normal start joins automatically.
+  FCP_FRESH_REQUESTED=0
+  for argument in "$@"; do
+    if [ "$argument" = "--fresh" ]; then
+      FCP_FRESH_REQUESTED=1
+    fi
+  done
+  if [ "$FCP_FRESH_REQUESTED" = "1" ]; then
+    echo "Factory reset requested; automatic Federation joining runs on the next normal start."
+  else
+    python3 "$ROOT/catalog/federation/tailnet_join_client.py" \
+      --snapshot "$DISCOVERY_FILE" || true
+  fi
 fi
 
 echo "FCP Tailscale address: $FCP_TAILSCALE_IP"

@@ -5,7 +5,9 @@ from types import SimpleNamespace
 
 from catalog.federation.models import CapabilityStatus
 from catalog.federation.onboarding_models import BenchmarkRecommendation, BenchmarkState
-from catalog.flask_app.services import federation_contribution_publication as publication
+from catalog.flask_app.services import (
+    federation_contribution_publication as publication,
+)
 from catalog.flask_app.services.federation_contribution_publication import (
     plan_contribution_publications,
 )

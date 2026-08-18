@@ -31,12 +31,12 @@ PEER = TailnetPeer(
 GRANT = "FCP1-test-grant-not-real"
 
 
-def _serve(verifier, grant_requester):
+def _serve(verifier, grant_requester, secret_file=None):
     server = responder.build_server(
         bind_host="127.0.0.1",
         port=0,
         app_url="http://127.0.0.1:1",
-        secret="unused-in-this-test",
+        secret_file=secret_file,
         verifier=verifier,
         grant_requester=grant_requester,
     )
@@ -265,3 +265,39 @@ def test_preflight_fails_without_a_tailnet_bind_address(monkeypatch) -> None:
 
     assert code == 1
     assert any("bind address" in line and "FAIL" in line for line in lines)
+
+
+def test_the_secret_is_reread_after_a_fresh_reset_removes_it(tmp_path: Path) -> None:
+    """A --fresh reset deletes the secret while this responder keeps running.
+
+    A value cached at startup would make every later grant fail until someone
+    restarted the host, which is exactly the launch where joining matters.
+    """
+
+    secret_file = tmp_path / "auto_join_secret"
+    seen: list[str] = []
+
+    def grant(*, app_url, secret, peer_node_name):
+        seen.append(secret)
+        return GRANT, "granted"
+
+    server, port = _serve(
+        lambda _address: PeerVerification(PEER, "verified"),
+        grant,
+        secret_file=secret_file,
+    )
+    try:
+        assert _post(port)[0] == 200
+        first = read_secret(secret_file)
+
+        # The factory reset removes the whole data directory beneath us.
+        secret_file.unlink()
+
+        assert _post(port)[0] == 200
+        second = read_secret(secret_file)
+    finally:
+        server.shutdown()
+
+    assert first and second
+    assert first != second
+    assert seen == [first, second]

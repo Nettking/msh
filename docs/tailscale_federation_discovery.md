@@ -89,6 +89,14 @@ The responder listens on the host's Tailscale address on port `5151` by default.
 
 `--fresh` removes the responder secret and any stored grant along with the rest of the mutable installation state, so a factory-reset device cannot rejoin the old Federation with old material.
 
+Because that reset runs after the launcher's host steps, a `--fresh` start deliberately skips the automatic join and says so:
+
+```
+Factory reset requested; automatic Federation joining runs on the next normal start.
+```
+
+Start the device again normally and it joins by itself. The responder keeps running through a reset on the coordinator side, because it re-reads its secret on every request.
+
 ### Checking automatic joining before a test
 
 ```bash

@@ -65,7 +65,17 @@ if errorlevel 1 (
 
 rem If another Federation was discovered and this device is not a member yet,
 rem ask it to authorize this device. Nothing is written unless it agrees.
-python "%~dp0catalog\federation\tailnet_join_client.py" --snapshot "%FCP_DISCOVERY_FILE%"
+rem
+rem Skipped for --fresh: the factory reset runs after this point and clears the
+rem whole data directory, so a grant fetched now would be destroyed before it
+rem could be redeemed. The next normal start joins automatically.
+set "FCP_FRESH_REQUESTED="
+for %%A in (%*) do if /i "%%~A"=="--fresh" set "FCP_FRESH_REQUESTED=1"
+if defined FCP_FRESH_REQUESTED (
+    echo Factory reset requested; automatic Federation joining runs on the next normal start.
+) else (
+    python "%~dp0catalog\federation\tailnet_join_client.py" --snapshot "%FCP_DISCOVERY_FILE%"
+)
 
 goto :start_fcp
 

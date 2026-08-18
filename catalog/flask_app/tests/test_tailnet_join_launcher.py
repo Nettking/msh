@@ -72,3 +72,30 @@ def test_the_responder_never_blocks_normal_startup() -> None:
     # Startup still hands off to the normal launcher.
     assert posix.rstrip().endswith('exec sh "$ROOT/start.sh" "$@"')
     assert _windows().rstrip().endswith("exit /b %ERRORLEVEL%")
+
+
+def test_a_fresh_launch_defers_the_join_instead_of_losing_the_grant() -> None:
+    """--fresh wipes the data directory after these host steps run.
+
+    A grant fetched before that reset would be deleted before it could ever be
+    redeemed, so the join must be deferred to the next normal start rather than
+    silently discarded.
+    """
+
+    for script in (_windows(), _posix()):
+        assert "--fresh" in script
+        assert "automatic federation joining runs on the next normal start" in script.lower()
+
+
+def test_the_responder_is_started_even_on_a_fresh_launch() -> None:
+    """The coordinator still answers joins after its own factory reset.
+
+    The responder re-reads its secret per request, so the reset removing that
+    file does not stop it serving; only the joining side has to wait.
+    """
+
+    windows = _windows()
+    posix = _posix()
+    # The responder start is not inside the fresh-mode branch.
+    assert windows.index("--bind %FCP_TAILSCALE_IP%") < windows.index("FCP_FRESH_REQUESTED")
+    assert posix.index('--bind "$FCP_TAILSCALE_IP"') < posix.index("FCP_FRESH_REQUESTED")

@@ -112,7 +112,7 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
     # Injected by the server factory.
     app_url = DEFAULT_APP_URL
-    secret = ""
+    secret_file: Path | None = None
     verifier: Callable[[object], PeerVerification] = staticmethod(verify_tailnet_peer)
     grant_requester = staticmethod(request_grant)
 
@@ -165,9 +165,13 @@ class _Handler(http.server.BaseHTTPRequestHandler):
             self._json(403, {"accepted": False, "error": verification.reason_code})
             return
 
+        # Resolve the secret per request: a --fresh factory reset deletes it
+        # while this responder keeps running, and a value cached at startup
+        # would refuse every later grant until someone restarted the host.
+        secret = ensure_secret(self.secret_file or secret_path())
         code, reason = self.grant_requester(
             app_url=self.app_url,
-            secret=self.secret,
+            secret=secret,
             peer_node_name=verification.peer.node_name,
         )
         if not code:
@@ -193,7 +197,7 @@ def build_server(
     bind_host: str,
     port: int,
     app_url: str,
-    secret: str,
+    secret_file: Path | None = None,
     verifier: Callable[[object], PeerVerification] = verify_tailnet_peer,
     grant_requester: Callable[..., tuple[str, str]] = request_grant,
 ) -> _Server:
@@ -202,7 +206,7 @@ def build_server(
         (_Handler,),
         {
             "app_url": app_url.rstrip("/"),
-            "secret": secret,
+            "secret_file": secret_file,
             "verifier": staticmethod(verifier),
             "grant_requester": staticmethod(grant_requester),
         },
@@ -215,14 +219,14 @@ def serve(
     bind_host: str,
     port: int,
     app_url: str,
-    secret: str,
+    secret_file: Path | None = None,
     ready: threading.Event | None = None,
 ) -> None:
     server = build_server(
         bind_host=bind_host,
         port=port,
         app_url=app_url,
-        secret=secret,
+        secret_file=secret_file,
     )
     with server:
         if ready is not None:
@@ -297,14 +301,19 @@ def main(argv: list[str] | None = None) -> int:
         return 1
     port = arguments.port or auto_join_port()
     secret_file = Path(arguments.secret_file) if arguments.secret_file else secret_path()
-    secret = ensure_secret(secret_file)
+    ensure_secret(secret_file)
     app_url = arguments.app_url or application_url()
     print(
         f"tailnet-join responder: listening on {bind_host}:{port}",
         file=sys.stderr,
     )
     try:
-        serve(bind_host=bind_host, port=port, app_url=app_url, secret=secret)
+        serve(
+            bind_host=bind_host,
+            port=port,
+            app_url=app_url,
+            secret_file=secret_file,
+        )
     except KeyboardInterrupt:
         return 0
     except OSError as error:
