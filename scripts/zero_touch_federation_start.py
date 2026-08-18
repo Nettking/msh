@@ -165,9 +165,7 @@ def _initialize_first_federation(
             "catalog.flask_app.services.zero_touch_federation_cli",
             "--json",
             "initialize",
-            "--email",
-            email,
-            input_text=password + "\n",
+            input_text=email + "\n" + password + "\n",
         )
     finally:
         password = ""
