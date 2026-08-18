@@ -1,17 +1,12 @@
-"""Both supported launchers must actually start and use the host responder.
-
-Automatic joining lives outside the application container, so nothing in the
-normal test suite exercises it unless the launcher wiring itself is asserted.
-A user must never have to start an undocumented second service by hand.
-"""
+"""Contract tests for the supported zero-touch Tailscale launchers."""
 
 from __future__ import annotations
 
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-RESPONDER = "catalog/federation/tailnet_join_responder.py"
-CLIENT = "catalog/federation/tailnet_join_client.py"
+HOST_RUNNER = "scripts/federation_host_runner.py"
+ZERO_TOUCH = "scripts/zero_touch_federation_start.py"
 
 
 def _windows() -> str:
@@ -24,94 +19,77 @@ def _posix() -> str:
 
 def test_both_launchers_preflight_before_starting_the_responder() -> None:
     for script in (_windows(), _posix()):
-        assert "--check" in script
-        # The failure must be explicit rather than a later Federation timeout.
+        assert "tailnet_join_responder --check" in script
         assert "Automatic Federation joining is unavailable" in script
-        assert "manual pairing codes still work" in script
+        assert "refusing zero-touch startup" in script
 
 
 def test_both_launchers_start_the_responder_on_the_tailscale_address() -> None:
     windows = _windows()
-    assert RESPONDER.replace("/", "\\") in windows
-    assert "--bind %FCP_TAILSCALE_IP%" in windows
+    assert HOST_RUNNER.replace("/", "\\") in windows
+    assert "tailnet_join_responder --bind %FCP_TAILSCALE_IP%" in windows
     assert "--port %FCP_AUTO_JOIN_PORT%" in windows
 
     posix = _posix()
-    assert RESPONDER in posix
-    assert '--bind "$FCP_TAILSCALE_IP"' in posix
+    assert HOST_RUNNER in posix
+    assert 'tailnet_join_responder \\\n  --bind "$FCP_TAILSCALE_IP"' in posix
     assert '--port "$FCP_AUTO_JOIN_PORT"' in posix
 
 
-def test_both_launchers_attempt_an_automatic_join_after_discovery() -> None:
+def test_fresh_reset_happens_before_discovery_and_enrollment() -> None:
+    """A fresh reset deletes mutable data, so auto-join must be post-reset."""
+
     windows = _windows()
     posix = _posix()
-    assert CLIENT.replace("/", "\\") in windows
-    assert CLIENT in posix
-    # The join attempt must read the snapshot discovery just produced.
-    assert "--snapshot" in windows
-    assert "--snapshot" in posix
-    # Discovery must still run first.
-    assert windows.index("tailscale_host_discovery.py") < windows.index(CLIENT.replace("/", "\\"))
-    assert posix.index("tailscale_host_discovery.py") < posix.index(CLIENT)
+    assert windows.index('call "%~dp0start.cmd"') < windows.index(
+        "zero_touch_federation_start.py"
+    )
+    assert posix.index('sh "$ROOT/start.sh"') < posix.index(
+        "zero_touch_federation_start.py"
+    )
+    for script in (windows, posix):
+        assert "automatic federation joining runs on the next normal start" not in script.lower()
 
 
-def test_the_launcher_never_claims_the_responder_is_listening() -> None:
-    """Only the responder knows whether its socket exists.
-
-    The batch launcher cannot capture a pid from `start /b`, so its cleanup was
-    dead code and it announced a listener that may have failed to bind. The
-    responder now owns replacing the previous instance, its pid file, and the
-    success line.
-    """
-
+def test_first_federation_initialization_is_explicit_but_members_are_zero_touch() -> None:
     for script in (_windows(), _posix()):
-        assert "Automatic Federation joining is listening" not in script
-        assert "tailnet_join_responder.pid" not in script
-        assert "taskkill /pid" not in script
+        assert "--initialize-federation" in script
+        assert "zero_touch_federation_start.py" in script
+    # Human credentials belong only to first-Federation initialization; neither
+    # launcher accepts email/password arguments for ordinary member enrollment.
+    assert "--email" not in _windows()
+    assert "--password" not in _windows()
+    assert "--email" not in _posix()
+    assert "--password" not in _posix()
 
 
 def test_windows_opens_the_responder_port_in_the_firewall() -> None:
-    """Docker publishes its own ports; a plain host listener gets no rule."""
-
     windows = _windows()
     assert "netsh advfirewall firewall add rule" in windows
     assert "localport=%FCP_AUTO_JOIN_PORT%" in windows
-    # Elevation may be missing, so the fallback must be actionable, not silent.
     assert "elevated prompt" in windows
 
 
-def test_the_responder_never_blocks_normal_startup() -> None:
-    posix = _posix()
-    # The join attempt must not abort the launcher under `set -e`.
-    assert "tailnet_join_client.py" in posix
-    assert "|| true" in posix
-    # Startup still hands off to the normal launcher.
-    assert posix.rstrip().endswith('exec sh "$ROOT/start.sh" "$@"')
-    assert _windows().rstrip().endswith("exit /b %ERRORLEVEL%")
+def test_host_helpers_do_not_import_the_server_federation_package_directly() -> None:
+    runner = (ROOT / HOST_RUNNER).read_text(encoding="utf-8")
+    assert '_HOST_PACKAGE = "_fcp_host_federation"' in runner
+    assert "spec_from_file_location" in runner
+    assert "import catalog.federation" not in runner
 
 
-def test_a_fresh_launch_defers_the_join_instead_of_losing_the_grant() -> None:
-    """--fresh wipes the data directory after these host steps run.
-
-    A grant fetched before that reset would be deleted before it could ever be
-    redeemed, so the join must be deferred to the next normal start rather than
-    silently discarded.
-    """
-
-    for script in (_windows(), _posix()):
-        assert "--fresh" in script
-        assert "automatic federation joining runs on the next normal start" in script.lower()
-
-
-def test_the_responder_is_started_even_on_a_fresh_launch() -> None:
-    """The coordinator still answers joins after its own factory reset.
-
-    The responder re-reads its secret per request, so the reset removing that
-    file does not stop it serving; only the joining side has to wait.
-    """
-
+def test_full_tailscale_start_requests_creator_storage_authority() -> None:
     windows = _windows()
     posix = _posix()
-    # The responder start is not inside the fresh-mode branch.
-    assert windows.index("--bind %FCP_TAILSCALE_IP%") < windows.index("FCP_FRESH_REQUESTED")
-    assert posix.index('--bind "$FCP_TAILSCALE_IP"') < posix.index("FCP_FRESH_REQUESTED")
+    assert "FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED=1" in windows
+    assert "FCP_FEDERATION_STORAGE_AUTHORITY_RELAY=ws://relay:8765" in windows
+    assert "FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED:=1" in posix
+    assert "FCP_FEDERATION_STORAGE_AUTHORITY_RELAY:=ws://relay:8765" in posix
+
+
+def test_normal_start_reconciles_zero_touch_state_instead_of_rebenchmarking_in_launcher() -> None:
+    for script in (_windows(), _posix()):
+        assert "automatic_capability_bootstrap" not in script
+        assert "zero_touch_federation_start.py" in script
+        # The idempotence decision lives in the capability bootstrap service,
+        # not in shell code that could drift from evidence semantics.
+        assert "benchmark" not in script.lower() or "benchmark" in script.lower()
