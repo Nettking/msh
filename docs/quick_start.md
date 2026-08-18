@@ -203,6 +203,16 @@ The responder owns its PID lifecycle, replaces a stale previous responder, and p
 
 `start.cmd` / `start.sh` remain supported for deliberately local/manual deployments. They preserve normal saved state and do not silently opt a machine into the reviewed Tailscale trust path.
 
+Direct Compose is also loopback-only by default. For an explicit trusted-LAN/manual deployment on Windows, expose both the web workbench and relay deliberately for that start:
+
+```cmd
+set FCP_WEB_BIND=0.0.0.0
+set FCP_RELAY_BIND=0.0.0.0
+start.cmd
+```
+
+On Linux/macOS use the equivalent `export FCP_WEB_BIND=0.0.0.0` and `export FCP_RELAY_BIND=0.0.0.0` before `sh start.sh`. `0.0.0.0` publishes on every host interface, so use this only on a trusted private network with the intended firewall policy. The normal Tailscale zero-touch launcher does not use this broad bind; it binds the workbench and relay to the host's numeric Tailscale address.
+
 Manual signed `FCP1-...` pairing remains available as an explicit recovery/manual-network mechanism.
 
 ## Federation-wide updates
