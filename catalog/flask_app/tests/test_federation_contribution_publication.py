@@ -4,6 +4,10 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from catalog.federation.models import CapabilityStatus
+from catalog.federation.onboarding_models import BenchmarkRecommendation, BenchmarkState
+from catalog.flask_app.services import (
+    federation_contribution_publication as publication,
+)
 from catalog.flask_app.services.federation_contribution_publication import (
     plan_contribution_publications,
 )
@@ -149,3 +153,113 @@ def test_missing_previously_published_candidate_fails_closed() -> None:
     assert len(publications) == 1
     assert publications[0].announcement.capability_id == "candidate-ai"
     assert publications[0].announcement.status is CapabilityStatus.UNAVAILABLE
+
+
+def _attestation_fixture(*, capability_type: str = "language-model"):
+    snapshot = SimpleNamespace(device_id="node-a", revision=7)
+    benchmark_result = SimpleNamespace(
+        device_id="node-a",
+        run_id="benchmark-green-1",
+        benchmark_id="benchmark-ai",
+        target_service_id="candidate-ai",
+        state=BenchmarkState.PASSED,
+        recommendation=BenchmarkRecommendation.RECOMMENDED,
+    )
+    benchmark_item = SimpleNamespace(
+        benchmark_id="benchmark-ai",
+        target_service_id="candidate-ai",
+        runnable=True,
+        definition=object(),
+        dependency_inputs={},
+    )
+    benchmark_service = SimpleNamespace(
+        plan=lambda _snapshot: (benchmark_item,),
+        list_results=lambda: (benchmark_result,),
+    )
+    contribution_service = SimpleNamespace(
+        benchmark_service=benchmark_service,
+        _authorized_snapshot=lambda **_kwargs: (snapshot, True),
+    )
+    candidate = SimpleNamespace(
+        candidate_id="candidate-ai",
+        device_id="node-a",
+        capability_type=capability_type,
+        capability_protocol="fcp-ai",
+        display_label="Language model",
+        capacity_envelope={"protocol_version": "1.0"},
+        inspection_revision=7,
+        benchmark_run_ids=("benchmark-green-1",),
+        missing_prerequisites=(),
+        policy_state="allowed",
+    )
+    intent = SimpleNamespace(
+        candidate_id="candidate-ai",
+        device_id="node-a",
+        activation_state="pending",
+        desired_state="enabled",
+        policy_state="allowed",
+        decision_revision=5,
+        decided_at=NOW,
+    )
+    return contribution_service, candidate, intent, benchmark_result
+
+
+def test_auto_enrollment_attestation_requires_current_green_benchmark(monkeypatch) -> None:
+    service, candidate, intent, result = _attestation_fixture()
+    monkeypatch.setattr(
+        publication,
+        "evaluate_result",
+        lambda *_args, **_kwargs: SimpleNamespace(current=True),
+    )
+
+    evidence = publication._auto_enrollment_attestations(
+        contribution_service=service,
+        candidates=(candidate,),
+        intents=(intent,),
+        node_id="node-a",
+        now=NOW,
+    )
+    attested = evidence["candidate-ai"][publication.AUTO_ENROLLMENT_PROPERTY]
+    assert attested["benchmark_state"] == "green"
+    assert attested["benchmark_run_ids"] == ["benchmark-green-1"]
+
+    result.state = BenchmarkState.FAILED
+    assert publication._auto_enrollment_attestations(
+        contribution_service=service,
+        candidates=(candidate,),
+        intents=(intent,),
+        node_id="node-a",
+        now=NOW,
+    ) == {}
+
+    result.state = BenchmarkState.PASSED
+    monkeypatch.setattr(
+        publication,
+        "evaluate_result",
+        lambda *_args, **_kwargs: SimpleNamespace(current=False),
+    )
+    assert publication._auto_enrollment_attestations(
+        contribution_service=service,
+        candidates=(candidate,),
+        intents=(intent,),
+        node_id="node-a",
+        now=NOW,
+    ) == {}
+
+
+def test_storage_never_receives_auto_enrollment_attestation(monkeypatch) -> None:
+    service, candidate, intent, _result = _attestation_fixture(
+        capability_type="storage"
+    )
+    monkeypatch.setattr(
+        publication,
+        "evaluate_result",
+        lambda *_args, **_kwargs: SimpleNamespace(current=True),
+    )
+    assert publication._auto_enrollment_attestations(
+        contribution_service=service,
+        candidates=(candidate,),
+        intents=(intent,),
+        node_id="node-a",
+        now=NOW,
+    ) == {}

@@ -55,14 +55,18 @@ class ProjectionSnapshot:
     jobs: JobAuthoritySnapshot
 
 
+# A Federation is its member devices first, and only then what those devices
+# contribute. Devices therefore lead the navigation, ahead of this device's own
+# page and ahead of services, so the mental model reads Federation -> Devices ->
+# contributions rather than starting from a contribution control panel.
 _SECTION_LINKS = (
     SectionLink("overview", "Overview", "/federation"),
-    SectionLink("this-device", "This device", "/federation/device"),
     SectionLink("devices", "Devices", "/federation/devices"),
+    SectionLink("this-device", "This device", "/federation/device"),
     SectionLink("services", "Services", "/federation/services"),
-    SectionLink("benchmarks", "Benchmarks", "/federation/benchmarks"),
     SectionLink("storage", "Storage", "/federation/storage"),
     SectionLink("jobs", "Jobs", "/federation/jobs"),
+    SectionLink("benchmarks", "Benchmarks", "/federation/benchmarks"),
     SectionLink("activity", "Activity", "/federation/activity"),
     SectionLink("settings", "Settings", "/federation/settings"),
 )

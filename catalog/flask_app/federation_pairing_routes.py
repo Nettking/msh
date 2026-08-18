@@ -1,4 +1,10 @@
-"""Browser routes for signed, short-lived Federation pairing codes."""
+"""Browser and host-bridge routes for signed, short-lived pairing codes.
+
+The host responder cannot mint membership; it can only ask this application
+for one ordinary pairing grant after it has verified, through the local
+tailscaled, that the connecting peer is a same-tailnet, same-owner device.
+The grant itself is produced by the existing pairing authority.
+"""
 
 from __future__ import annotations
 
@@ -20,6 +26,13 @@ from flask import (
 )
 
 from catalog.federation.errors import FederationOperationError
+from catalog.federation.tailnet_join_bridge import (
+    GRANT_SCHEMA,
+    SECRET_HEADER,
+    auto_join_port,
+    read_secret,
+    secret_path,
+)
 from catalog.federation.tailscale_host_discovery import ADVERTISEMENT_SCHEMA
 
 from .capability_onboarding_routes import _CSRF_SESSION_KEY
@@ -113,6 +126,9 @@ def _discovery_response() -> Response:
                 "device_name": context.credentials.identity.display_name,
                 "relay_port": relay_port,
                 "pairing_required": True,
+                # Where a joining host asks this device's responder. Routing
+                # information only; the responder still verifies identity.
+                "auto_join_port": auto_join_port(),
             }
         )
     except Exception as exc:  # noqa: BLE001 - discovery endpoint fails closed
@@ -143,6 +159,60 @@ def _dispatch_before_legacy_setup_gate() -> Response | None:
 @federation_pairing_web.get("/onboarding/federation/discovery.json")
 def federation_discovery():
     return _discovery_response()
+
+
+def _auto_join_secret_matches() -> bool:
+    """Authenticate the host responder by a secret only this host can read."""
+
+    expected = read_secret(secret_path())
+    supplied = request.headers.get(SECRET_HEADER, "")
+    if not expected or not isinstance(supplied, str) or not supplied:
+        return False
+    return hmac.compare_digest(expected, supplied)
+
+
+@federation_pairing_web.post("/internal/federation/tailnet-join-grant")
+def tailnet_join_grant():
+    """Issue one pairing grant to the verified host responder.
+
+    Peer identity was established host-side before this call. This endpoint only
+    proves the caller is the local responder, then delegates entirely to the
+    existing pairing authority.
+    """
+
+    if not _auto_join_secret_matches():
+        current_app.logger.info("Auto-join grant request rejected: unauthenticated")
+        return jsonify({"accepted": False, "error": "unauthenticated"}), 403
+    try:
+        service = _pairing_service()
+        if service.remote_store.load() is not None:
+            return jsonify({"accepted": False, "error": "not-the-coordinator"}), 409
+        code = service.create_pairing_code(
+            relay_url=_relay_url(),
+            ttl_seconds=MAX_PAIRING_TTL_SECONDS,
+            remember=False,
+        )
+        if not code:
+            raise FederationOperationError(
+                "pairing-code-unavailable",
+                "the pairing code could not be created",
+            )
+    except FederationOperationError as exc:
+        current_app.logger.info("Auto-join grant unavailable (%s)", exc.code)
+        return jsonify({"accepted": False, "error": exc.code}), 503
+    except Exception as exc:  # noqa: BLE001 - never leak authority details
+        current_app.logger.warning(
+            "Auto-join grant failed (%s)",
+            type(exc).__name__,
+        )
+        return jsonify({"accepted": False, "error": "auto-join-unavailable"}), 503
+    # The grant is deliberately absent from this log line.
+    current_app.logger.info("Auto-join grant issued to the local host responder")
+    response = jsonify({"schema": GRANT_SCHEMA, "accepted": True, "pairing_code": code})
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @federation_pairing_web.post("/onboarding/federation/pairing-code")

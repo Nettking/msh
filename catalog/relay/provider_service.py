@@ -3,9 +3,15 @@
 The Phase 2 relay remains authoritative for identity, membership, capability
 announcements and authenticated routing. This supported product wrapper adds
 only the already-defined F8.1 provider-enrollment and F8.2 provider-health
-services beside the coordinator database. A READY capability announcement is
-still metadata: it must be explicitly enrolled/approved before health can be
-published or a remote provider can become executable.
+services beside the coordinator database.
+
+Generic capability announcements remain metadata and retain explicit enrollment.
+A narrowly versioned capability-first GREEN contribution attestation may be
+auto-enrolled only after the base relay has authenticated the member and accepted
+the exact current announcement. Storage stays outside F8.1 enrollment and is
+reconciled separately into its own control-plane authority under an equivalent
+trust and GREEN-evidence gate. Health, resource binding and execution keep their
+existing independent gates.
 """
 
 from __future__ import annotations
@@ -20,6 +26,9 @@ from contextlib import suppress
 from pathlib import Path
 from typing import Any
 
+from catalog.capabilities.provider_auto_enrollment import (
+    TrustedGreenProviderAutoEnrollment,
+)
 from catalog.capabilities.provider_enrollment import (
     FederatedProviderEnrollmentService,
     SQLiteProviderEnrollmentStore,
@@ -30,17 +39,24 @@ from catalog.capabilities.provider_health import (
     SQLiteProviderHealthStore,
 )
 from catalog.capabilities.provider_reports import ProviderResourceReport
+from catalog.capabilities.storage_authority_enrollment import (
+    TrustedGreenStorageAuthority,
+)
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import (
     FederationOperationError,
     FederationValidationError,
 )
+from catalog.federation.models import CapabilityAnnouncement
+from catalog.federation.phase_d_control import PhaseDControlPlane
 from catalog.relay.service import (
     RelayConfigurationError,
     RelayServer,
     _bounded_number,
     _build_parser,
     _payload_text,
+)
+from catalog.relay.service import (
     main as phase2_main,
 )
 
@@ -83,6 +99,16 @@ class ProviderAuthorityRelayServer(RelayServer):
         self.provider_enrollment, self.provider_health = build_provider_authorities(
             coordinator
         )
+        self.provider_auto_enrollment = TrustedGreenProviderAutoEnrollment(
+            coordinator,
+            self.provider_enrollment.store,
+        )
+        # Storage keeps its own control-plane authority, so it is reconciled by a
+        # separate policy rather than through F8.1 provider enrollment.
+        self.storage_authority = TrustedGreenStorageAuthority(
+            coordinator,
+            PhaseDControlPlane(coordinator.store.database),
+        )
 
     async def _accepted(
         self,
@@ -106,8 +132,50 @@ class ProviderAuthorityRelayServer(RelayServer):
             ),
         )
 
+    def _auto_enroll_accepted_announcement(
+        self,
+        *,
+        record,
+        request,
+    ) -> None:
+        value = request.payload.get("announcement")
+        if not isinstance(value, dict):
+            return
+        try:
+            announcement = CapabilityAnnouncement.from_dict(value)
+            self.provider_auto_enrollment.reconcile(announcement)
+            self.storage_authority.reconcile(announcement)
+        except (
+            FederationOperationError,
+            FederationValidationError,
+            sqlite3.Error,
+            RuntimeError,
+        ) as error:
+            # The authenticated capability announcement has already been accepted.
+            # Auto-enrollment is an additional bounded authority gate: failures
+            # therefore fail closed to pending/manual state instead of turning an
+            # otherwise valid capability publication into a transport failure.
+            code = getattr(error, "code", "provider-auto-enrollment-failed")
+            self.coordinator.audit_rejection(
+                action="provider.auto-enrollment",
+                reason=code,
+                actor_node_id=record.node_id,
+                session_id=request.session_id,
+                request_id=request.request_id,
+            )
+            LOGGER.warning(
+                "trusted provider auto-enrollment skipped after %s",
+                code,
+            )
+
     async def _dispatch(self, record, request) -> None:
         message_type = request.message_type
+        if message_type == "capability.announce":
+            # Base dispatch first proves authenticated identity/membership, checks
+            # session scope, and persists the exact authoritative announcement.
+            await super()._dispatch(record, request)
+            self._auto_enroll_accepted_announcement(record=record, request=request)
+            return
         if not message_type.startswith("provider."):
             await super()._dispatch(record, request)
             return

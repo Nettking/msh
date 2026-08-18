@@ -31,6 +31,7 @@ class DeviceRecord:
     state: str
     last_seen_at: datetime | None
     capability_count: int
+    role: str = "member"
 
 
 @dataclass(frozen=True)
@@ -279,7 +280,12 @@ class FederationAuthorityAdapter:
                 device_names[node_id] = display_name
                 effective_labels[node_id] = display_name
 
-            devices = self._devices(raw_status, member_ids, device_names)
+            devices = self._devices(
+                raw_status,
+                member_ids,
+                device_names,
+                leader_node_id=leader_node_id,
+            )
             capabilities = self._capabilities(raw_status, member_ids)
             activity = tuple(
                 self._activity_record(event)
@@ -362,6 +368,8 @@ class FederationAuthorityAdapter:
         raw_status: object,
         member_ids: set[str],
         device_names: dict[str, str] | None = None,
+        *,
+        leader_node_id: str | None = None,
     ) -> tuple[DeviceRecord, ...]:
         capability_counts: dict[str, int] = {}
         for capability in _sequence(_value(raw_status, "capabilities", ())):
@@ -413,6 +421,9 @@ class FederationAuthorityAdapter:
                         )
                     ),
                     capability_count=capability_counts.get(raw_node_id, 0),
+                    role=(
+                        "leader" if node_id == leader_node_id else "member"
+                    ),
                 )
             )
         return tuple(sorted(devices, key=lambda item: (item.label, item.node_id)))

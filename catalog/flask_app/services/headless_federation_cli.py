@@ -12,10 +12,9 @@ Run it inside the Flask service, normally through ``headless_fcp.py``::
     python -m catalog.flask_app.services.headless_federation_cli join FCP1-...
     python -m catalog.flask_app.services.headless_federation_cli status
 
-``create`` is for the first normal FCP installation only.  ``join`` consumes the
-same signed one-use FCP1 pairing bundle as the browser route.  A recorder never
-uses ``create``; standalone recorders use ``connect_recorder.py`` and are
-join-only.
+Mutating commands follow the same first-run lifecycle as the browser: a human
+administrator must already exist before device identity or Federation state can
+be created. ``status`` remains read-only and is available before bootstrap.
 """
 
 from __future__ import annotations
@@ -35,6 +34,7 @@ from catalog.federation.errors import (
     ProtocolCompatibilityError,
 )
 from catalog.flask_app.app import create_app
+from catalog.flask_app.auth.models import Role, User, db
 from catalog.node.identity import NodeIdentityStateError
 
 from .capability_onboarding_service import get_capability_onboarding_service
@@ -69,6 +69,27 @@ def _service() -> PairingAwareCapabilityOnboardingService:
     return service
 
 
+def _has_human_admin() -> bool:
+    return (
+        db.session.query(User.id)
+        .join(User.roles)
+        .filter(User.active.is_(True), Role.name == "admin")
+        .limit(1)
+        .first()
+        is not None
+    )
+
+
+def _require_human_admin() -> None:
+    if _has_human_admin():
+        return
+    raise FederationOperationError(
+        "headless-admin-bootstrap-required",
+        "create the first human administrator before Federation onboarding",
+        "human_admin",
+    )
+
+
 def _result_from_binding(
     *,
     action: str,
@@ -88,13 +109,14 @@ def _result_from_binding(
 
 
 def create_first_federation() -> HeadlessFederationResult:
-    """Create/reuse the first local Federation without browser onboarding.
+    """Create/reuse the first local Federation after human-admin bootstrap.
 
-    The method preserves the current CFI-2 safety rule.  ``service.connect``
+    The method preserves the current CFI-2 safety rule. ``service.connect``
     performs normal discovery first; if an existing candidate must be selected,
     local creation fails closed rather than silently creating a split Federation.
     """
 
+    _require_human_admin()
     service = _service()
     credentials = service.create_identity()
     existing = service.binding_or_none()
@@ -133,6 +155,7 @@ def create_first_federation() -> HeadlessFederationResult:
 def join_existing_federation(code: str) -> HeadlessFederationResult:
     """Redeem one signed FCP1 bundle without permitting binding replacement."""
 
+    _require_human_admin()
     normalized = str(code or "").strip()
     if not normalized.startswith("FCP1-"):
         raise FederationValidationError(
@@ -169,6 +192,7 @@ def join_existing_federation(code: str) -> HeadlessFederationResult:
 def create_pairing_code(relay_url: str) -> HeadlessFederationResult:
     """Mint one signed one-use code from the existing local Federation authority."""
 
+    _require_human_admin()
     service = _service()
     context = service.authorized_context()
     if context is None:
@@ -236,11 +260,11 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser(
         "create",
-        help="Create/reuse the first local Federation on a normal FCP installation.",
+        help="Create/reuse the first local Federation after first-admin bootstrap.",
     )
     join = subparsers.add_parser(
         "join",
-        help="Join an existing Federation with a signed one-use FCP1 code.",
+        help="Join an existing Federation with a signed one-use FCP1 code after first-admin bootstrap.",
     )
     join.add_argument("pairing_code", metavar="FCP1-...")
     code = subparsers.add_parser(

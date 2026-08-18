@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from catalog.federation.tailscale_host_discovery import (
+    DEFAULT_AUTO_JOIN_PORT,
     DISCOVERY_SCHEMA,
     load_snapshot,
     write_snapshot,
@@ -32,4 +33,11 @@ def test_discovery_output_roundtrips_into_browser_snapshot(tmp_path) -> None:
     write_snapshot(path, discovered)
     loaded = load_snapshot(path)
 
-    assert loaded == discovered
+    # A snapshot written before automatic joining existed still loads; the
+    # responder port is filled in with its default rather than rejecting the
+    # advertisement, so an older peer keeps being discoverable.
+    expected = dict(discovered)
+    expected["federations"] = [
+        {**discovered["federations"][0], "auto_join_port": DEFAULT_AUTO_JOIN_PORT}
+    ]
+    assert loaded == expected

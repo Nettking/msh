@@ -38,6 +38,10 @@ from catalog.capabilities.contributions import (
     StorageContributionAdapter,
 )
 from catalog.capabilities.dispatch import ExecutionResult
+from catalog.capabilities.storage_authority_enrollment import (
+    DEFAULT_STORAGE_GROUP_ID,
+    federation_storage_provider_id,
+)
 from catalog.capabilities.worker_activation import (
     LocalComputeHandlerDescriptor,
     LocalComputeHandlerInventory,
@@ -61,7 +65,7 @@ from catalog.federation.storage_protocol import (
 _EXTENSION_KEY = "capability_local_candidate_bundle"
 _COMPUTE_HANDLER_ID = "fcp-system-summary"
 _STORAGE_PROVIDER_ID = "fcp-local-data-storage"
-_STORAGE_GROUP_ID = "fcp-local-storage"
+_STORAGE_GROUP_ID = DEFAULT_STORAGE_GROUP_ID
 _STORAGE_FINGERPRINT = "sha256:" + hashlib.sha256(
     b"fcp-local-data-storage-candidate-v1"
 ).hexdigest()
@@ -203,9 +207,12 @@ class CreatorBootstrapStorageContributionAdapter:
         )
 
     def enable(self, candidate: ContributionCandidate) -> AdapterOutcome:
-        provider_id = self._provider_id(candidate)
+        local_provider_id = self._provider_id(candidate)
         context, session = self._context_and_session()
         node_id = context.credentials.identity.node_id
+        # Every device detects the same local candidate id, so the control-plane
+        # identity must be scoped to this member.
+        provider_id = federation_storage_provider_id(node_id, local_provider_id)
         creator_node_id = getattr(session, "created_by_node_id", None)
         if creator_node_id != node_id:
             return AdapterOutcome(
@@ -278,8 +285,8 @@ class CreatorBootstrapStorageContributionAdapter:
         )
 
     def disable(self, candidate: ContributionCandidate) -> AdapterOutcome:
-        provider_id = self._provider_id(candidate)
-        self._probe.fence(provider_id)
+        local_provider_id = self._provider_id(candidate)
+        self._probe.fence(local_provider_id)
         try:
             context, session = self._context_and_session()
         except FederationOperationError:
@@ -289,6 +296,7 @@ class CreatorBootstrapStorageContributionAdapter:
             )
 
         node_id = context.credentials.identity.node_id
+        provider_id = federation_storage_provider_id(node_id, local_provider_id)
         if getattr(session, "created_by_node_id", None) == node_id:
             control = PhaseDControlPlane(context.coordinator.store.database)
             snapshot = control.snapshot(session.session_id)

@@ -3,7 +3,10 @@
 This bridge publishes only public-safe capability metadata for an already trusted
 Federation member. A capability announcement is metadata only: it does not grant
 provider enrollment, storage assignment, compute execution, job, artifact, or
-membership authority.
+membership authority.  A narrow versioned attestation may be included when current
+local evidence proves an enabled, allowed, GREEN contribution: non-storage
+contributions carry the F8.1 auto-enrollment attestation, storage carries the
+separate storage-authority attestation.  The relay still owns both decisions.
 """
 
 from __future__ import annotations
@@ -14,9 +17,24 @@ from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
 
+from catalog.capabilities.benchmarking import evaluate_result
+from catalog.capabilities.provider_auto_enrollment import (
+    AUTO_ENROLLMENT_PROPERTY,
+    AUTO_ENROLLMENT_SCHEMA,
+)
+from catalog.capabilities.storage_authority_enrollment import (
+    DEFAULT_STORAGE_GROUP_ID,
+    STORAGE_AUTHORITY_PROPERTY,
+    STORAGE_AUTHORITY_SCHEMA,
+    federation_storage_provider_id,
+)
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
+from catalog.federation.onboarding_models import BenchmarkRecommendation, BenchmarkState
 
 _PUBLICATION_KIND = "capability-first-candidate"
+_GREEN_RECOMMENDATIONS = frozenset(
+    {BenchmarkRecommendation.RECOMMENDED, BenchmarkRecommendation.USABLE}
+)
 
 
 @dataclass(frozen=True)
@@ -58,7 +76,10 @@ def _protocol_version(candidate: object, existing: dict[str, Any] | None) -> str
     return "1.0"
 
 
-def _properties(candidate: object) -> dict[str, Any]:
+def _properties(
+    candidate: object,
+    attestation: dict[str, dict[str, Any]] | None = None,
+) -> dict[str, Any]:
     label = getattr(candidate, "display_label", None)
     candidate_id = getattr(candidate, "candidate_id", None)
     payload: dict[str, Any] = {"kind": _PUBLICATION_KIND}
@@ -69,6 +90,8 @@ def _properties(candidate: object) -> dict[str, Any]:
         payload["candidate_id"] = candidate_id.strip()
     if isinstance(label, str) and label.strip():
         payload["label"] = label.strip()
+    for property_name, block in (attestation or {}).items():
+        payload[property_name] = dict(block)
     return payload
 
 
@@ -155,6 +178,185 @@ def _request_id(
     return "capability-first-sync-" + hashlib.sha256(encoded).hexdigest()
 
 
+def _current_green_run_ids(
+    *,
+    contribution_service: object,
+    snapshot: object,
+    node_id: str,
+    now: datetime,
+) -> frozenset[str]:
+    benchmark_service = getattr(contribution_service, "benchmark_service", None)
+    plan_loader = getattr(benchmark_service, "plan", None)
+    results_loader = getattr(benchmark_service, "list_results", None)
+    if not callable(plan_loader) or not callable(results_loader):
+        return frozenset()
+    try:
+        plan = tuple(plan_loader(snapshot))
+        results = tuple(results_loader())
+    except Exception:  # noqa: BLE001 - auto-enrollment evidence fails closed
+        return frozenset()
+
+    plan_by_key = {
+        (getattr(item, "benchmark_id", None), getattr(item, "target_service_id", None)): item
+        for item in plan
+        if getattr(item, "runnable", False)
+    }
+    green: set[str] = set()
+    for result in results:
+        if getattr(result, "device_id", None) != node_id:
+            continue
+        run_id = getattr(result, "run_id", None)
+        key = (
+            getattr(result, "benchmark_id", None),
+            getattr(result, "target_service_id", None),
+        )
+        item = plan_by_key.get(key)
+        if not isinstance(run_id, str) or item is None:
+            continue
+        try:
+            validity = evaluate_result(
+                result,
+                item.definition,
+                item.dependency_inputs,
+                now=now,
+            )
+        except Exception:  # noqa: BLE001,S112 - malformed evidence fails closed
+            continue
+        if (
+            validity.current
+            and getattr(result, "state", None) is BenchmarkState.PASSED
+            and getattr(result, "recommendation", None) in _GREEN_RECOMMENDATIONS
+        ):
+            green.add(run_id)
+    return frozenset(green)
+
+
+def _auto_enrollment_attestations(
+    *,
+    contribution_service: object,
+    candidates: tuple[object, ...],
+    intents: tuple[object, ...],
+    node_id: str,
+    now: datetime,
+) -> dict[str, dict[str, dict[str, Any]]]:
+    """Build stable attestations only from current, strict GREEN local evidence.
+
+    Non-storage contributions carry the F8.1 auto-enrollment attestation.  Storage
+    carries its own attestation instead, because storage authority is granted by
+    the separate storage control plane rather than by provider enrollment.
+    """
+
+    snapshot_loader = getattr(contribution_service, "_authorized_snapshot", None)
+    if not callable(snapshot_loader):
+        return {}
+    try:
+        snapshot, _benchmark_complete = snapshot_loader(
+            require_benchmark_review=False
+        )
+    except Exception:  # noqa: BLE001 - trust/evidence failures must fail closed
+        return {}
+    if getattr(snapshot, "device_id", None) != node_id:
+        return {}
+
+    green_run_ids = _current_green_run_ids(
+        contribution_service=contribution_service,
+        snapshot=snapshot,
+        node_id=node_id,
+        now=now,
+    )
+    if not green_run_ids:
+        return {}
+
+    intent_by_id = {
+        str(intent.candidate_id): intent
+        for intent in intents
+        if isinstance(getattr(intent, "candidate_id", None), str)
+        and getattr(intent, "device_id", node_id) == node_id
+    }
+    evidence: dict[str, dict[str, dict[str, Any]]] = {}
+    for candidate in candidates:
+        candidate_id = getattr(candidate, "candidate_id", None)
+        if not isinstance(candidate_id, str):
+            continue
+        intent = intent_by_id.get(candidate_id)
+        if intent is None:
+            continue
+        is_storage = _enum_text(getattr(candidate, "capability_type", None)) == "storage"
+        if _enum_text(getattr(intent, "desired_state", None)) != "enabled":
+            continue
+        if _enum_text(getattr(intent, "policy_state", None)) != "allowed":
+            continue
+        candidate_policy = getattr(candidate, "policy_state", None)
+        if candidate_policy is not None and _enum_text(candidate_policy) != "allowed":
+            continue
+        missing = getattr(candidate, "missing_prerequisites", ())
+        if missing:
+            continue
+        inspection_revision = getattr(candidate, "inspection_revision", None)
+        if (
+            isinstance(inspection_revision, bool)
+            or not isinstance(inspection_revision, int)
+            or inspection_revision <= 0
+            or inspection_revision != getattr(snapshot, "revision", None)
+        ):
+            continue
+        decision_revision = getattr(intent, "decision_revision", None)
+        if (
+            isinstance(decision_revision, bool)
+            or not isinstance(decision_revision, int)
+            or decision_revision <= 0
+        ):
+            continue
+        raw_run_ids = getattr(candidate, "benchmark_run_ids", ())
+        if not isinstance(raw_run_ids, tuple) or not raw_run_ids:
+            continue
+        run_ids = tuple(
+            run_id
+            for run_id in raw_run_ids
+            if isinstance(run_id, str) and run_id
+        )
+        if len(run_ids) != len(raw_run_ids) or not set(run_ids) <= green_run_ids:
+            continue
+        attested = {
+            "eligible": True,
+            "benchmark_state": "green",
+            "inspection_revision": inspection_revision,
+            "benchmark_run_ids": list(run_ids),
+            "decision_revision": decision_revision,
+            "desired_state": "enabled",
+            "policy_state": "allowed",
+        }
+        if not is_storage:
+            evidence[candidate_id] = {
+                AUTO_ENROLLMENT_PROPERTY: {
+                    "schema": AUTO_ENROLLMENT_SCHEMA,
+                    **attested,
+                }
+            }
+            continue
+        envelope = getattr(candidate, "capacity_envelope", None)
+        local_provider_id = (
+            envelope.get("provider_id") if isinstance(envelope, dict) else None
+        )
+        if not isinstance(local_provider_id, str) or not local_provider_id.strip():
+            continue
+        evidence[candidate_id] = {
+            STORAGE_AUTHORITY_PROPERTY: {
+                "schema": STORAGE_AUTHORITY_SCHEMA,
+                # Scope the local candidate to this member so two devices that
+                # detect the same storage candidate stay distinct providers.
+                "provider_id": federation_storage_provider_id(
+                    node_id,
+                    local_provider_id.strip(),
+                ),
+                "group_id": DEFAULT_STORAGE_GROUP_ID,
+                "role": "primary",
+                **attested,
+            }
+        }
+    return evidence
+
+
 def plan_contribution_publications(
     *,
     session_id: str,
@@ -163,6 +365,7 @@ def plan_contribution_publications(
     intents: tuple[object, ...],
     authorized_status: dict[str, Any],
     now: datetime,
+    attestation_by_candidate_id: dict[str, dict[str, dict[str, Any]]] | None = None,
 ) -> tuple[ContributionPublication, ...]:
     """Plan only metadata changes needed to make member views converge.
 
@@ -176,6 +379,7 @@ def plan_contribution_publications(
     if now.tzinfo is None or now.utcoffset() is None:
         raise ValueError("now must be timezone-aware")
     now = now.astimezone(timezone.utc)
+    attestation_by_candidate_id = attestation_by_candidate_id or {}
 
     intent_by_id = {
         str(intent.candidate_id): intent
@@ -230,7 +434,10 @@ def plan_contribution_publications(
             ),
             protocol_version=_protocol_version(candidate, existing),
             status=status,
-            properties=_properties(candidate),
+            properties=_properties(
+                candidate,
+                attestation_by_candidate_id.get(candidate_id),
+            ),
             announced_at=announced_at,
         )
         if _existing_matches(existing, announcement):
@@ -320,6 +527,13 @@ def publish_local_contributions(
     if not isinstance(status, dict):
         raise TypeError("coordinator status must be an object")
 
+    attestations = _auto_enrollment_attestations(
+        contribution_service=contribution_service,
+        candidates=candidates,
+        intents=intents,
+        node_id=node_id,
+        now=now.astimezone(timezone.utc),
+    )
     publications = plan_contribution_publications(
         session_id=session_id,
         node_id=node_id,
@@ -327,6 +541,7 @@ def publish_local_contributions(
         intents=intents,
         authorized_status=status,
         now=now,
+        attestation_by_candidate_id=attestations,
     )
     for publication in publications:
         announce(

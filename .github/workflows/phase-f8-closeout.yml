@@ -5,13 +5,17 @@ on:
     paths:
       - "catalog/capabilities/**"
       - "catalog/ai/**"
+      - "catalog/relay/provider_service.py"
+      - "catalog/relay/tests/test_provider_authority_relay.py"
       - "catalog/relay/tests/test_phase_f74_capability_dispatch.py"
       - "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
       - "catalog/relay/tests/test_phase_f83_remote_ai_binding.py"
       - "catalog/relay/tests/test_phase_f84_compute_worker_activation.py"
       - "catalog/relay/tests/test_phase_f86_reconciliation.py"
       - "catalog/relay/tests/test_phase_f87_trusted_provider_closeout.py"
+      - "catalog/flask_app/services/federation_contribution_publication.py"
       - "catalog/flask_app/provider_federation_routes.py"
+      - "catalog/flask_app/tests/test_federation_contribution_publication.py"
       - "catalog/flask_app/tests/test_provider_federation_surface.py"
       - "catalog/flask_app/tests/test_ai_runtime_integration.py"
       - "catalog/flask_app/tests/test_connected_ai_provider.py"
@@ -26,13 +30,17 @@ on:
     paths:
       - "catalog/capabilities/**"
       - "catalog/ai/**"
+      - "catalog/relay/provider_service.py"
+      - "catalog/relay/tests/test_provider_authority_relay.py"
       - "catalog/relay/tests/test_phase_f74_capability_dispatch.py"
       - "catalog/relay/tests/test_phase_f75_retry_cancellation.py"
       - "catalog/relay/tests/test_phase_f83_remote_ai_binding.py"
       - "catalog/relay/tests/test_phase_f84_compute_worker_activation.py"
       - "catalog/relay/tests/test_phase_f86_reconciliation.py"
       - "catalog/relay/tests/test_phase_f87_trusted_provider_closeout.py"
+      - "catalog/flask_app/services/federation_contribution_publication.py"
       - "catalog/flask_app/provider_federation_routes.py"
+      - "catalog/flask_app/tests/test_federation_contribution_publication.py"
       - "catalog/flask_app/tests/test_provider_federation_surface.py"
       - "catalog/flask_app/tests/test_ai_runtime_integration.py"
       - "catalog/flask_app/tests/test_connected_ai_provider.py"
@@ -76,6 +84,10 @@ jobs:
           python -m compileall
           catalog/capabilities
           catalog/ai
+          catalog/relay/provider_service.py
+          catalog/relay/tests/test_provider_authority_relay.py
+          catalog/flask_app/services/federation_contribution_publication.py
+          catalog/flask_app/tests/test_federation_contribution_publication.py
           catalog/flask_app/provider_federation_routes.py
           catalog/flask_app/tests/test_provider_federation_surface.py
           catalog/flask_app/tests/test_ai_runtime_integration.py
@@ -91,6 +103,8 @@ jobs:
           python -m pytest -o addopts= -q
           catalog/capabilities/tests
           catalog/ai/tests
+          catalog/relay/tests/test_provider_authority_relay.py
+          catalog/flask_app/tests/test_federation_contribution_publication.py
           catalog/relay/tests/test_phase_f74_capability_dispatch.py
           catalog/relay/tests/test_phase_f75_retry_cancellation.py
           catalog/relay/tests/test_phase_f83_remote_ai_binding.py
@@ -108,6 +122,10 @@ jobs:
           python -m ruff check
           catalog/capabilities
           catalog/ai
+          catalog/relay/provider_service.py
+          catalog/relay/tests/test_provider_authority_relay.py
+          catalog/flask_app/services/federation_contribution_publication.py
+          catalog/flask_app/tests/test_federation_contribution_publication.py
           catalog/flask_app/provider_federation_routes.py
           catalog/flask_app/tests/test_provider_federation_surface.py
           catalog/relay/tests/test_phase_f87_trusted_provider_closeout.py

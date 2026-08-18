@@ -1,13 +1,16 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 import threading
 import time
+from pathlib import Path
 
 import pandas as pd
 
-from catalog.flask_app.services.catalog_service import ArtifactCatalog, ScanRootSignature
+from catalog.flask_app.services.catalog_service import (
+    ArtifactCatalog,
+    ScanRootSignature,
+)
 
 
 def test_ensure_scanned_refreshes_when_timeline_export_appears(tmp_path: Path, monkeypatch, caplog) -> None:
@@ -91,7 +94,6 @@ def test_background_rescan_request_during_active_scan_runs_pending_scan(tmp_path
     results_root = tmp_path / "results"
     results_root.mkdir()
     monkeypatch.setenv("FCP_SCAN_DIRS", str(results_root))
-    catalog = ArtifactCatalog()
     first_scan_started = threading.Event()
     allow_first_scan_to_finish = threading.Event()
     scan_calls = 0
@@ -112,7 +114,11 @@ def test_background_rescan_request_during_active_scan_runs_pending_scan(tmp_path
             }
         ], []
 
-    monkeypatch.setattr("catalog.flask_app.services.catalog_service.scan_artifacts", fake_scan_artifacts)
+    # Bind scanning to this catalog rather than the shared module symbol. Other
+    # tests create Flask apps, and app creation starts a background rescan whose
+    # daemon thread can still be running here; patching the module symbol would
+    # let that unrelated thread increment this test's scan counter.
+    catalog = ArtifactCatalog(scan_function=fake_scan_artifacts)
 
     assert catalog.start_background_rescan_if_idle(reason="startup") is True
     assert first_scan_started.wait(timeout=2.0)
@@ -137,3 +143,52 @@ def test_background_rescan_request_during_active_scan_runs_pending_scan(tmp_path
     snap = catalog.cached_snapshot(log_if_stale=False)
     assert scan_calls == 2
     assert [item["path"] for item in snap.artifacts] == [str(timeline_path)]
+
+
+def test_scan_accounting_is_not_disturbed_by_another_catalog_background_scan(
+    tmp_path: Path, monkeypatch
+) -> None:
+    """A catalog counts only its own scans.
+
+    Creating a Flask app starts a background rescan on a daemon thread that
+    outlives the test that made it. When scan accounting hangs off the shared
+    module symbol, that unrelated thread lands in another test's counter and
+    turns a correct implementation into an intermittently red release gate.
+    """
+
+    results_root = tmp_path / "results"
+    results_root.mkdir()
+    monkeypatch.setenv("FCP_SCAN_DIRS", str(results_root))
+
+    observed = 0
+
+    def counted_scan(scan_dirs):
+        nonlocal observed
+        observed += 1
+        return [], []
+
+    catalog = ArtifactCatalog(scan_function=counted_scan)
+    assert catalog.start_background_rescan_if_idle(reason="startup") is True
+
+    deadline = time.monotonic() + 2.0
+    while time.monotonic() < deadline and observed < 1:
+        time.sleep(0.01)
+    assert observed == 1
+
+    # Stand in for the leaked thread of some other catalog in the same process.
+    stray = threading.Event()
+
+    def stray_scan(scan_dirs):
+        stray.set()
+        return [], []
+
+    monkeypatch.setattr(
+        "catalog.flask_app.services.catalog_service.scan_artifacts",
+        stray_scan,
+    )
+    other = ArtifactCatalog()
+    assert other.start_background_rescan_if_idle(reason="unrelated-app-startup") is True
+    assert stray.wait(timeout=2.0)
+
+    # The stray scan ran, and it did not touch this catalog's accounting.
+    assert observed == 1

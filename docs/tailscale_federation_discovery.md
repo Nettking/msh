@@ -69,6 +69,46 @@ The discovery record itself contains only bounded public-safe metadata such as t
 
 The manual copy-and-paste `FCP1-...` pairing flow remains a fallback when Tailscale discovery or login-first enrollment is not being used.
 
+## Automatic joining for your own devices
+
+When both hosts are signed in to the same tailnet as the same user, a joining device is authorized automatically and nobody copies a pairing code.
+
+This runs on the host, not in the application container, because only the host can ask `tailscaled` who a connecting peer really is. The container sits behind a published Docker port and sees the Docker gateway rather than the peer, so it could never verify identity itself.
+
+The Tailscale launcher therefore starts a small host responder alongside discovery:
+
+1. A joining host asks the discovered coordinator's responder to authorize it.
+2. The responder reads the peer address from the connection itself and calls `tailscale whois`.
+3. It accepts the peer only when it is on the **same tailnet**, owned by the **same login**, **not shared in** from another tailnet, and **not tag-owned**.
+4. Only then does the responder ask the local FCP application for one ordinary pairing grant, authenticated with a secret stored in the mounted data directory.
+5. The joining host stores that grant privately and FCP redeems it through the normal pairing flow on the next page load.
+
+The grant is the same signed, one-use, short-lived pairing primitive used by manual pairing. The responder mints nothing itself, and there is no setting that turns the identity check off. A device that merely reaches the responder — a shared node, a tagged server, another user's device, or anything off the tailnet — is refused and never receives a grant.
+
+The responder listens on the host's Tailscale address on port `5151` by default. Set `FCP_AUTO_JOIN_PORT` to change it.
+
+`--fresh` removes the responder secret and any stored grant along with the rest of the mutable installation state, so a factory-reset device cannot rejoin the old Federation with old material.
+
+Because that reset runs after the launcher's host steps, a `--fresh` start deliberately skips the automatic join and says so:
+
+```
+Factory reset requested; automatic Federation joining runs on the next normal start.
+```
+
+Start the device again normally and it joins by itself. The responder keeps running through a reset on the coordinator side, because it re-reads its secret on every request.
+
+### Checking automatic joining before a test
+
+```bash
+python3 catalog/federation/tailnet_join_responder.py --check
+```
+
+```cmd
+python catalog\federation\tailnet_join_responder.py --check
+```
+
+It reports the signed-in Tailscale login, the tailnet, and the bind address, and exits non-zero with an explicit reason when Tailscale is missing, logged out, or has no address. The launcher runs the same check and prints `Automatic Federation joining is unavailable; manual pairing codes still work.` rather than letting the problem surface later as a Federation timeout.
+
 ## Enrollment return safety
 
 The one-use pairing grant is not placed in an HTTP query or sent as a cross-site form body. The authority returns it in the browser URL fragment, which is not transmitted in the HTTP request. The joining device immediately removes the fragment from browser history and submits the grant to itself with a same-origin CSRF-protected request bound to an expiring high-entropy browser state.

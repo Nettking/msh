@@ -1,15 +1,21 @@
 from __future__ import annotations
 
 import logging
-from dataclasses import dataclass
-from pathlib import Path
 import threading
 import time
+from collections.abc import Callable
+from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 import pandas as pd
 
-from catalog.common.artifact_registry import SUPPORTED_SUFFIXES, configured_scan_dirs, read_raw_table, scan_artifacts
+from catalog.common.artifact_registry import (
+    SUPPORTED_SUFFIXES,
+    configured_scan_dirs,
+    read_raw_table,
+    scan_artifacts,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +43,18 @@ class CatalogFreshness:
 
 
 class ArtifactCatalog:
-    def __init__(self, *, signature_ttl_seconds: float = 1.0, cached_snapshot_ttl_seconds: float = 30.0) -> None:
+    def __init__(
+        self,
+        *,
+        signature_ttl_seconds: float = 1.0,
+        cached_snapshot_ttl_seconds: float = 30.0,
+        scan_function: Callable[[list[str]], tuple[list[dict], list[str]]] | None = None,
+    ) -> None:
+        # Scanning is normally the module-level function, resolved at call time so
+        # it stays patchable. An explicit function binds scanning to this instance
+        # instead, which keeps a caller's scan accounting free of any other
+        # catalog's background thread.
+        self._scan_function = scan_function
         self._snapshot = ScanSnapshot(artifacts=[], warnings=[], scanned_at_epoch=0.0)
         self._last_scan_signature: ScanRootSignature | None = None
         self._signature_checked_at_epoch = 0.0
@@ -52,6 +69,11 @@ class ArtifactCatalog:
     @property
     def scan_dirs(self) -> list[str]:
         return configured_scan_dirs()
+
+    def _scan(self, scan_dirs: list[str]):
+        if self._scan_function is not None:
+            return self._scan_function(scan_dirs)
+        return scan_artifacts(scan_dirs)
 
     def snapshot(self) -> ScanSnapshot:
         with self._lock:
@@ -108,7 +130,7 @@ class ArtifactCatalog:
                     with self._lock:
                         self._scan_in_progress = True
                     LOGGER.info("Artifact catalog background rescan started reason=%s", scan_reason)
-                    artifacts, warnings = scan_artifacts(self.scan_dirs)
+                    artifacts, warnings = self._scan(self.scan_dirs)
                     signature = self._scan_root_signature()
                     snapshot = ScanSnapshot(artifacts=artifacts, warnings=warnings, scanned_at_epoch=time.time())
                     with self._lock:

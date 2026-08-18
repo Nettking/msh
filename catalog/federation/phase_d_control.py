@@ -1946,6 +1946,16 @@ class PhaseDControlPlane:
             token = max(token, int(row["last_fencing_token"]))
         return term, token
 
+    def next_leader_fencing(self, session_id: str, group_id: str) -> tuple[int, int]:
+        """Return the next monotonic ``(term, fencing_token)`` for a leader grant.
+
+        Callers that elect a leader must never reuse a term or fencing token that
+        this group has already issued, including grants that were later revoked.
+        """
+
+        term, token = self._historical_maxima(session_id, group_id)
+        return term + 1, token + 1
+
     def grant_leader(
         self,
         session_id: str,

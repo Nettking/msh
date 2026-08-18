@@ -260,10 +260,13 @@ class OverviewProjectionMixin:
         device_items = []
         for item in devices[:5]:
             is_connected = self._device_connected(snapshot, item)
+            role = getattr(item, "role", "member")
             device_items.append(
                 {
                     "label": item.label,
                     "detail": _count(item.capability_count, "service"),
+                    "role": role,
+                    "role_label": "Leader" if role == "leader" else "Member",
                     "state": "connected" if is_connected else "unavailable",
                     "state_label": "Connected" if is_connected else "Offline",
                 }

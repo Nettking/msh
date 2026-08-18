@@ -24,6 +24,7 @@ from urllib.request import Request, urlopen
 DISCOVERY_SCHEMA = "fcp.federation.tailscale-discovery.v1"
 ADVERTISEMENT_SCHEMA = "fcp.federation.discovery-advertisement.v1"
 DEFAULT_WEB_PORT = 5000
+DEFAULT_AUTO_JOIN_PORT = 5151
 DEFAULT_TIMEOUT_SECONDS = 0.75
 MAX_PEERS = 32
 MAX_RESPONSE_BYTES = 16_384
@@ -137,6 +138,18 @@ def _validate_advertisement(payload: object) -> dict[str, object] | None:
         or payload.get("pairing_required") is not True
     ):
         return None
+    # The responder port is public-safe routing information, like relay_port:
+    # it says where to ask, never who may join. A malformed or absent value
+    # falls back to the default rather than rejecting the whole advertisement,
+    # so a peer running an older build still discovers normally.
+    raw_auto_join_port = payload.get("auto_join_port")
+    auto_join_port = DEFAULT_AUTO_JOIN_PORT
+    if (
+        not isinstance(raw_auto_join_port, bool)
+        and isinstance(raw_auto_join_port, int)
+        and 1 <= raw_auto_join_port <= 65_535
+    ):
+        auto_join_port = raw_auto_join_port
     # Deliberately copy only the public-safe allowlist. Unknown fields from a
     # remote peer never enter the persisted snapshot.
     return {
@@ -145,6 +158,7 @@ def _validate_advertisement(payload: object) -> dict[str, object] | None:
         "device_name": device_name.strip(),
         "relay_port": relay_port,
         "pairing_required": True,
+        "auto_join_port": auto_join_port,
     }
 
 
