@@ -1,6 +1,6 @@
 # Tailscale Federation discovery and zero-touch enrollment
 
-Status: **current user and administrator guide**  
+Status: **current user and administrator guide**
 Reviewed: **2026-08-18**
 
 FCP uses an already installed and signed-in Tailscale client for two separate purposes:
