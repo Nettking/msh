@@ -71,55 +71,22 @@ fi
 : "${FCP_HUMAN_AUTH_BASE_URL:=http://$FCP_TAILSCALE_IP:$FCP_WEB_PORT}"
 FCP_TAILSCALE_DISCOVERY_PORT=$FCP_WEB_PORT
 FCP_AUTO_JOIN_APP_URL="http://$FCP_TAILSCALE_IP:$FCP_WEB_PORT"
+export FCP_TAILSCALE_IP
 export FCP_WEB_BIND FCP_RELAY_BIND FCP_DATA_DIR
 export FCP_WEB_PORT FCP_AUTO_JOIN_PORT
 export FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED FCP_FEDERATION_STORAGE_AUTHORITY_RELAY
 export FCP_PAIRING_RELAY_URL FCP_HUMAN_AUTH_BASE_URL
 export FCP_TAILSCALE_DISCOVERY_PORT FCP_AUTO_JOIN_APP_URL
 
-ADMIN_EMAIL=""
-ADMIN_PASSWORD=""
-RESET_CONFIRM=""
+# The explicit first-device path collects RESET + admin email + hidden password
+# before the long reset/build work and keeps the password only in host memory.
 if [ "$INITIALIZE_FEDERATION" = "1" ]; then
-  if [ ! -t 0 ]; then
-    echo "First Federation initialization requires an interactive terminal." >&2
-    exit 2
-  fi
-  printf '\nFIRST FEDERATION INITIALIZATION\n'
-  printf 'Enter the reset confirmation and first administrator credentials now.\n'
-  printf 'The password is kept only in this launcher process until FCP is ready.\n\n'
-  printf 'Type RESET to continue: '
-  IFS= read -r RESET_CONFIRM
-  if [ "$RESET_CONFIRM" != "RESET" ]; then
-    echo "Fresh install cancelled. No state was removed."
-    exit 2
-  fi
-  printf 'Federation administrator email: '
-  IFS= read -r ADMIN_EMAIL
-  if [ -z "$ADMIN_EMAIL" ]; then
-    echo "Federation administrator email is required." >&2
-    exit 2
-  fi
-  printf 'Federation administrator password: '
-  stty -echo
-  trap 'stty echo 2>/dev/null || true' EXIT HUP INT TERM
-  IFS= read -r ADMIN_PASSWORD
-  stty echo
-  trap - EXIT HUP INT TERM
-  printf '\n'
-  if [ -z "$ADMIN_PASSWORD" ]; then
-    echo "Federation administrator password is required." >&2
-    exit 2
-  fi
+  exec python3 "$ROOT/scripts/first_federation_start.py"
 fi
 
 # Factory reset happens first. Discovery/enrollment afterwards prevents --fresh
-# from deleting the snapshot or one-use grant before it can be redeemed. For the
-# first device, only the RESET confirmation is sent through the long-running
-# startup subprocess; the administrator credential remains in this shell only.
-if [ "$INITIALIZE_FEDERATION" = "1" ]; then
-  printf '%s\n' "$RESET_CONFIRM" | sh "$ROOT/start.sh" --fresh
-elif [ -n "$START_MODE" ]; then
+# from deleting the snapshot or one-use grant before it can be redeemed.
+if [ -n "$START_MODE" ]; then
   sh "$ROOT/start.sh" "$START_MODE"
 else
   sh "$ROOT/start.sh"
@@ -127,30 +94,15 @@ fi
 
 if ! python3 "$ROOT/scripts/federation_host_runner.py" tailnet_join_responder --check; then
   echo "Automatic Federation joining is unavailable; refusing zero-touch startup." >&2
-  ADMIN_PASSWORD=""
   exit 2
 fi
-
-if [ "$INITIALIZE_FEDERATION" = "1" ]; then
-  if ! printf '%s\n%s\n' "$ADMIN_EMAIL" "$ADMIN_PASSWORD" | \
-    python3 "$ROOT/scripts/zero_touch_federation_start.py" \
-      --initialize-federation \
-      --first-admin-stdin \
-      --web-port "$FCP_TAILSCALE_DISCOVERY_PORT"; then
-    ADMIN_PASSWORD=""
-    echo "FCP services are running, but zero-touch Federation setup did not complete." >&2
-    exit 2
-  fi
-  ADMIN_PASSWORD=""
-else
-  python3 "$ROOT/scripts/zero_touch_federation_start.py" \
-    --web-port "$FCP_TAILSCALE_DISCOVERY_PORT"
-fi
-
 python3 "$ROOT/scripts/federation_host_runner.py" tailnet_join_responder \
   --bind "$FCP_TAILSCALE_IP" \
   --port "$FCP_AUTO_JOIN_PORT" \
   --app-url "$FCP_AUTO_JOIN_APP_URL" &
+
+python3 "$ROOT/scripts/zero_touch_federation_start.py" \
+  --web-port "$FCP_TAILSCALE_DISCOVERY_PORT"
 
 echo "FCP Tailscale address: $FCP_TAILSCALE_IP"
 echo "Zero-touch startup is complete."
