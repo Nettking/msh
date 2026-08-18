@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import builtins
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -193,6 +194,91 @@ def test_windows_fresh_start_repairs_only_missing_git_tracked_scaffolding() -> N
     assert "Immutable checkout scaffolding is missing from HEAD" in repair
     assert "git reset --hard" not in repair
     assert "git clean" not in repair
+
+
+@pytest.mark.skipif(first.os.name != "nt", reason="requires real Windows cmd.exe and git")
+def test_windows_scaffolding_repair_restores_real_dirty_checkout(tmp_path: Path) -> None:
+    source_script = (ROOT / "start.cmd").read_text(encoding="utf-8")
+    repair = source_script.split("\n:repair_checkout_scaffolding", maxsplit=1)[1].split(
+        "\n:resolve_build_commit", maxsplit=1
+    )[0]
+
+    checkout = tmp_path / "FCP damaged checkout with spaces"
+    checkout.mkdir()
+    scaffolding = {
+        checkout / "data" / ".gitkeep": "data-gitkeep\n",
+        checkout / "data" / "README.md": "data-readme\n",
+        checkout / "results" / ".gitkeep": "results-gitkeep\n",
+        checkout / "results" / "README.md": "results-readme\n",
+    }
+    for path, content in scaffolding.items():
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+
+    wrapper = checkout / "repair-only.cmd"
+    wrapper.write_text(
+        "@echo off\n"
+        "setlocal EnableExtensions\n"
+        'cd /d "%~dp0"\n'
+        "call :repair_checkout_scaffolding\n"
+        "exit /b %ERRORLEVEL%\n\n"
+        ":repair_checkout_scaffolding\n"
+        + repair.lstrip("\n")
+        + "\n",
+        encoding="utf-8",
+    )
+
+    subprocess.run(["git", "init"], cwd=checkout, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "."], cwd=checkout, check=True, capture_output=True, text=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=FCP Test",
+            "-c",
+            "user.email=fcp-test@example.invalid",
+            "commit",
+            "-m",
+            "seed checkout",
+        ],
+        cwd=checkout,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+
+    for path in scaffolding:
+        path.unlink()
+
+    dirty = subprocess.run(
+        ["git", "status", "--porcelain=v1"],
+        cwd=checkout,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert " D data/.gitkeep" in dirty.stdout
+    assert " D results/README.md" in dirty.stdout
+
+    completed = subprocess.run(
+        [first.os.environ.get("COMSPEC") or "cmd.exe", "/d", "/c", "call", str(wrapper)],
+        cwd=checkout,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+    for path, expected in scaffolding.items():
+        assert path.read_text(encoding="utf-8") == expected
+    clean = subprocess.run(
+        ["git", "status", "--porcelain=v1"],
+        cwd=checkout,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    assert clean.stdout == ""
 
 
 def test_first_device_launchers_delegate_to_memory_only_host_orchestrator() -> None:
