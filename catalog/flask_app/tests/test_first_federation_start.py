@@ -4,6 +4,8 @@ import builtins
 from pathlib import Path
 from types import SimpleNamespace
 
+import pytest
+
 from scripts import first_federation_start as first
 from scripts import zero_touch_federation_start as zero_touch
 
@@ -95,6 +97,55 @@ def test_fresh_start_subprocess_receives_only_reset_not_admin_credentials(monkey
     encoded = repr(calls[0])
     assert "admin@example.com" not in encoded
     assert "private-password" not in encoded
+
+
+def test_windows_fresh_start_uses_cmd_call_without_nested_quote_string(monkeypatch) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_run(command, **kwargs):
+        calls.append({"command": command, **kwargs})
+        return SimpleNamespace(returncode=0)
+
+    monkeypatch.setattr(first.os, "name", "nt")
+    monkeypatch.setenv("COMSPEC", r"C:\Windows\System32\cmd.exe")
+    monkeypatch.setattr(first.subprocess, "run", fake_run)
+
+    first._run_fresh_reset()
+
+    assert len(calls) == 1
+    command = calls[0]["command"]
+    assert command == [
+        r"C:\Windows\System32\cmd.exe",
+        "/d",
+        "/c",
+        "call",
+        str(first.ROOT / "start.cmd"),
+        "--fresh",
+    ]
+    assert "/s" not in command
+    assert not str(command[4]).startswith('"')
+    assert calls[0]["input"] == "RESET\n"
+
+
+@pytest.mark.skipif(first.os.name != "nt", reason="requires real Windows cmd.exe")
+def test_windows_fresh_start_executes_real_batch_with_reset_stdin(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    root = tmp_path / "FCP checkout with spaces"
+    root.mkdir()
+    (root / "start.cmd").write_text(
+        "@echo off\n"
+        "set /p FCP_RESET_CONFIRM=\n"
+        '>"%~dp0marker.txt" echo %FCP_RESET_CONFIRM%\n'
+        "exit /b 0\n",
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(first, "ROOT", root)
+
+    first._run_fresh_reset()
+
+    assert (root / "marker.txt").read_text(encoding="utf-8").strip() == "RESET"
 
 
 def test_zero_touch_initializer_passes_both_human_credentials_only_on_stdin(monkeypatch) -> None:
