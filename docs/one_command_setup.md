@@ -1,124 +1,145 @@
 # One-command setup
 
 Status: **current startup guide**
-Reviewed: **2026-08-12**
+Reviewed: **2026-08-18**
 
-This page describes the supported default startup. A device is capability-first and does not receive one permanent product role.
+FCP's normal multi-device deployment model is **initialize the Federation once, then let trusted devices self-configure**. Human credentials belong to the Federation, not to each machine.
 
-## Normal FCP device
+## First device: initialize the Federation once
+
+The first device is the only device that creates a human administrator and a new Federation.
 
 ### Windows
 
 ```cmd
-start.cmd
+start-tailscale.cmd --fresh --initialize-federation
 ```
 
 ### Linux or macOS
 
 ```bash
-bash start.sh
+sh start-tailscale.sh --fresh --initialize-federation
 ```
 
-The supported launcher starts the normal core services, preserves device/Federation/capability/data/auth state, verifies the configured Ollama model, bakes the exact Git commit into the runtime, and starts the bounded host update agent.
-
-## First browser use
-
-Open the URL printed by the launcher, normally:
+A fresh reset requires the explicit `RESET` confirmation. The launcher then starts FCP and asks in the terminal for:
 
 ```text
-http://localhost:5000
+Federation administrator email:
+Federation administrator password:
 ```
 
-A fresh local authority with zero human users redirects to `/admin/users/bootstrap`. Create the first active administrator there with a valid email address and a confirmed password of at least 12 characters, then sign in.
+The password prompt is hidden. The password is not accepted on the command line and is not used as a device-enrollment credential.
 
-After sign-in, incomplete devices follow:
+The launcher then:
 
-```text
-Identity
-  -> Federation
-  -> Inspect
-  -> finish setup
-```
+1. creates the first human administrator;
+2. initializes the first Federation through the normal authenticated onboarding service;
+3. publishes the creator-backed Federation human sign-in authority;
+4. inspects the device;
+5. runs every applicable supported benchmark;
+6. enables every available supported contribution through the existing provider/storage authority adapters; and
+7. opens the Federation workbench.
 
-Benchmarks and contribution choices are optional follow-up work.
+The creator remains the human credential authority. Passwords and password hashes stay there.
 
-## Existing device
+## Additional trusted FCP device
 
-Windows:
-
-```cmd
-start.cmd --resume
-```
-
-Linux/macOS:
-
-```bash
-bash start.sh --resume
-```
-
-Resume reconnects the saved Federation and reuses persisted capability evidence without replacing identity or rerunning inspection/benchmarks merely because time passed.
-
-## Fresh-device reset
-
-Windows:
-
-```cmd
-start.cmd --fresh
-```
-
-After explicit confirmation, this removes local device/Federation onboarding/evidence state while preserving human accounts/auth secrets, recorded data, source configuration, recorder checkpoints, analyses, Docker images, and downloaded models.
-
-## Older Windows installation
-
-```cmd
-migrate.cmd
-```
-
-The one-shot migration bootstrap preserves existing state and fails closed rather than resetting/guessing when the old installation cannot be identified safely.
-
-## Optional Tailscale discovery
-
-If an existing Federation is already reachable through the same Tailscale tailnet:
+Sign the new host in to the same intended Tailscale tailnet with the same owning Tailscale user, then run:
 
 ### Windows
+
+```cmd
+start-tailscale.cmd --fresh
+```
+
+### Linux or macOS
+
+```bash
+sh start-tailscale.sh --fresh
+```
+
+After the `RESET` confirmation there is **no Federation enrollment prompt**. The device:
+
+1. discovers the existing Federation through Tailscale;
+2. asks the existing host responder to verify its Tailscale identity;
+3. receives and redeems the normal signed, short-lived, one-use pairing grant;
+4. creates its own device identity and joins the Federation;
+5. publishes its Federation human-SSO callback endpoint;
+6. inspects itself;
+7. runs every applicable supported benchmark; and
+8. enables every available supported contribution.
+
+No Federation IP address, `FCP1-...` code, email, username, password, Tailscale API key, or local administrator is required on the joining device.
+
+Shared-in peers, tag-owned peers, another Tailscale owner, another tailnet, malformed identity evidence, ambiguous Federation discovery, or a failed grant are rejected rather than silently creating a second Federation.
+
+## Normal restart
+
+Windows:
 
 ```cmd
 start-tailscale.cmd
 ```
 
-### Linux/macOS
+Linux/macOS:
 
 ```bash
-bash start-tailscale.sh
+sh start-tailscale.sh
 ```
 
-This uses the already signed-in local Tailscale client to find reachable FCP Federations before normal startup. No Tailscale API/auth key is required.
+Saved Federation membership is reused. Completed capability bootstrap is idempotent, so normal restart does not rerun expensive benchmarks merely because time passed.
 
-Discovery only helps locate the existing FCP endpoint. The joining device must still redeem a signed one-use `FCP1-...` pairing code.
+Use `--resume` when you specifically want the existing-install resume verification before zero-touch reconciliation.
 
-See [Tailscale Federation discovery](tailscale_federation_discovery.md).
+## Human sign-in on any member
 
-## Standalone recorder
+Open the member's Tailscale web address, for example:
 
-First join:
-
-```bash
-python start_recorder.py FCP1-...
+```text
+http://100.x.y.z:5000
 ```
 
-Later starts:
+A Federation member does not become an independent password authority. **Sign in through Federation** sends the browser to the creator-backed credential authority and returns a short-lived assertion bound to that exact member. The same Federation account therefore works on all trusted workbench members without replicating password hashes.
 
-```bash
-python start_recorder.py
+## Standalone MTConnect recorder
+
+On a Windows recorder host that is already signed in to the same trusted Tailscale environment, run:
+
+```cmd
+start-tailscale-recorder.cmd
 ```
 
-Any trusted Federation device can use `/federation/recorders` for bounded recorder-local scan/source control.
+Normal first start requires no `FCP1-...` code, credentials, IP address, or storage-group argument when exactly one ready logical-storage group exists. The launcher:
+
+1. discovers the Federation;
+2. uses the same verified Tailscale responder to obtain a one-use enrollment grant;
+3. joins with its own recorder identity;
+4. verifies the Federation publication route;
+5. discovers the bounded private MTConnect network;
+6. starts local-first loss-aware recording; and
+7. publishes checkpoint-committed data through Federation storage.
+
+If the MTConnect Agent is not available yet, the recorder keeps the existing bounded retry/backoff behavior and begins capture when the source appears.
+
+The legacy explicit `python start_recorder.py FCP1-...` path remains available for deliberate recovery/manual deployments; it is not the normal Tailscale setup.
+
+## Storage authority
+
+Normal full FCP startup supervises logical-storage authority automatically. Only the immutable Federation creator is permitted by the existing authority monitor to serve the creator-owned storage authority; a joined member cannot self-promote merely because supervision is enabled.
+
+Recorder and JSONL publishers still fail closed when no writable logical-storage authority is ready.
+
+## Local-only / recovery launchers
+
+`start.cmd` and `start.sh` remain available for deliberately standalone or manual-network deployments. They do not replace the reviewed Tailscale zero-touch trust path.
+
+Manual `FCP1-...` pairing remains a recovery mechanism when the automatic Tailscale trust requirements are not applicable. It does not weaken or bypass the normal identity checks.
 
 ## Federation-wide updates
 
-The **current operational leader** can run **Check for updates** and then **Update all devices**. Normal FCP devices started with the supported launcher have the required host update agent.
+The **current operational leader** can run **Check for updates** and then **Update all devices**. Full FCP devices started with the supported launcher have the bounded host update agent needed for that flow.
 
-A standalone `python start_recorder.py` process is not restarted by the normal Compose update agent and currently needs its own host process/update path.
+A standalone recorder process remains host-managed; updating the workbench's Compose runtime does not itself replace an independently running recorder host process.
 
 ## Related guides
 
@@ -126,4 +147,4 @@ A standalone `python start_recorder.py` process is not restarted by the normal C
 - [Human users, sign-in, and permissions](human-authentication.md)
 - [Federation operations](federation_operations.md)
 - [Tailscale Federation discovery](tailscale_federation_discovery.md)
-- [Server setup](server_setup.md)
+- [Standalone recorder](standalone_recorder.md)

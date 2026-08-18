@@ -1,272 +1,86 @@
 # Standalone MTConnect recorder
 
 Status: **current user/operator guide**
-Reviewed: **2026-08-12**
+Reviewed: **2026-08-18**
 
-The standalone recorder is a headless FCP device for loss-aware MTConnect capture. It can join an existing Federation, discover local MTConnect Agents, keep recording when the Federation is unavailable, publish checkpoint-committed data to Federation logical storage, and accept bounded scan/source-selection requests from trusted Federation devices.
+The standalone recorder is a headless FCP device for loss-aware MTConnect capture. It can join an existing Federation, discover local MTConnect Agents, keep recording locally through Federation outages, publish checkpoint-committed observations to Federation logical storage, and accept bounded recorder-local source controls from trusted Federation devices.
 
-## Simplest first start
+## Normal Windows/Tailscale first start
 
-Generate a signed `FCP1-...` pairing code from the **current Federation leader** and run, from the recorder checkout:
-
-```bash
-python start_recorder.py FCP1-...
-```
-
-That is the intended normal first-run command. The pairing code is the only required argument when the recorder can infer its private network and discover MTConnect Agents.
-
-On first configuration the launcher:
-
-1. loads or creates the recorder's stable FCP device identity;
-2. runs the bounded private-network MTConnect scan by default;
-3. selects discovered sources automatically only when no source selection has previously been completed;
-4. redeems the signed one-use pairing code and joins the Federation;
-5. starts managed loss-aware recording; and
-6. starts the Federation recorder-control worker and publication reconciler.
-
-## Windows recorder over Tailscale
-
-For a headless recorder on Windows, first install Tailscale and sign
-the host in to the same tailnet as the other Federation devices. Tailscale must
-already be running and signed in; the FCP launcher never changes tailnet login,
-routes, or ACL settings.
-
-### Leader prerequisite: enable the logical-storage authority
-
-Nothing can be published to a Federation that serves no logical-storage
-authority. Without it the leader advertises no storage capability, and a
-correctly fail-closed recorder refuses to start and reports
-`authority-unavailable`.
-
-The leader supervises the authority itself, but it is off by default so a device
-never opens an authority connection it was not asked to provide. Enable it on
-the **device that created the Federation** and restart it:
-
-```
-FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED=1
-FCP_FEDERATION_STORAGE_AUTHORITY_RELAY=ws://100.x.y.z:8765
-```
-
-The relay address falls back to `FCP_PAIRING_RELAY_URL` when it is already set.
-Everything else is derived from the existing device configuration: the
-coordinator database from `FCP_FEDERATION_COORDINATOR_DATABASE`, device state
-from `FCP_FEDERATION_NODE_STATE_DIR`, the display name from `FCP_DEVICE_NAME`,
-and the authority's own databases from `FCP_FEDERATION_STORAGE_AUTHORITY_DIR`
-(default `data/federation/storage`).
-
-It must be the session creator. A publisher accepts the storage capability only
-from the node that created the Federation, so enabling this elsewhere reports
-`not-session-creator` rather than advertising something nothing will select.
-
-To inspect the configuration without starting supervision, or to run the
-authority as its own process instead, the original command still works:
-
-```bash
-python -m catalog.node.storage_failover scan-once \
-  --relay-control-database data/federation/relay/control.sqlite3 \
-  --storage-control-database data/federation/storage/control.sqlite3 \
-  --publication-database data/federation/storage/publication.sqlite3 \
-  --failover-database data/federation/storage/failover.sqlite3 \
-  --state-dir data/federation/device \
-  --relay ws://100.x.y.z:8765 \
-  --display-name "FCP leader storage authority" \
-  --session-id <the leader's internal session id>
-```
-
-Under Docker Compose the relay control database is the mounted
-`/var/lib/fcp-relay/control.sqlite3` instead of the repository-relative path.
-
-On the current Federation leader, open FCP through the leader's numeric
-Tailscale `100.x.y.z` address (not `localhost`, a LAN name, or a DNS name) and
-generate a fresh `FCP1-...` pairing code. Then run this single command on
-the recorder host:
+Install/sign in to Tailscale on the recorder host, use the same reviewed same-owner/same-tailnet environment as the Federation, then run from the recorder checkout:
 
 ```cmd
-start-tailscale-recorder.cmd --storage-group fcp-local-storage
+start-tailscale-recorder.cmd
 ```
 
-The command prompts for the pairing code without echo on first start. Do not
-put the code after the command: keeping it out of the command line also keeps it
-out of shell history and process listings. Later starts use the saved
-membership and do not prompt again.
+That is the normal v1 first-start command.
 
-The command defaults the device label to
-`FCP MTConnect recorder`, runs the normal bounded local
-MTConnect discovery, and refuses to start capture unless all of these checks
-pass:
+It does **not** ask for:
 
-1. a signed-in Tailscale IPv4 address in `100.64.0.0/10` is present;
-2. the leader address answers a bounded `tailscale ping` as a peer in the same
-   tailnet and accepts TCP on the Federation relay port;
-3. a Python installation can load the recorder and its dependencies;
-4. the recorder joins or reconnects to the Federation; and
-5. the authenticated recorder publication worker resolves a writable storage
-   authority and completes a clean cycle, or a backlog cycle produces at least
-   one confirmed storage commit.
+- an `FCP1-...` pairing code;
+- Federation email/username or password;
+- a Federation/relay IP address; or
+- a storage-group ID when exactly one ready logical-storage group is available.
 
-That last check proves that the authenticated publication route is selected and
-the worker is healthy. On an empty first start it does not claim that an ingest
-has already been accepted. Once local checkpoint-committed observations exist,
-the same worker publishes them with durable retry while recording stays
-local-first. Keep the command window open; closing it stops the foreground
-recorder.
+The launcher:
 
-`fcp-local-storage` is the standard storage group created by the normal FCP
-creator setup. If this Federation uses a different group, replace it with that
-group's logical ID and then keep that choice stable. If an operator changes the
-group while a backlog exists, old-group rows remain durable locally rather than
-being sent to the new authority. Restart against the old group to drain it; do
-not delete the durable outbox as a workaround. If the MTConnect Agent is on a
-private subnet that cannot be inferred from the recorder host, add `--scan-cidr`,
-for example:
+1. verifies that local Tailscale has a signed-in IPv4 address inside `100.64.0.0/10`;
+2. performs bounded FCP Federation discovery over online Tailscale peers;
+3. requires exactly one unambiguous discovered Federation;
+4. asks that Federation's host responder to authorize the recorder using the same reviewed Tailscale peer-identity boundary as full FCP devices;
+5. receives the existing signed, short-lived, one-use pairing grant;
+6. keeps the grant out of shell arguments/history and hands it only to the in-process recorder enrollment path;
+7. persists only the resulting stable device identity and public-safe reconnect binding;
+8. validates the saved/issued relay as a literal Tailscale peer and checks TCP reachability;
+9. requires a usable Federation publication path;
+10. runs the existing bounded private-network MTConnect discovery; and
+11. starts local-first capture plus Federation publication/control workers.
 
-```cmd
-start-tailscale-recorder.cmd --storage-group fcp-local-storage --scan-cidr 192.168.10.0/24
-```
-
-The leader's Tailscale path and relay port `8765` must be allowed by the
-tailnet ACL and the leader host firewall. A failed preflight, pairing attempt,
-or sharing-readiness check exits non-zero instead of silently starting a
-local-only recorder.
-
-If the recorder cannot infer a suitable private IPv4 `/24`, it may still join the Federation. You can then request a scan remotely from another trusted Federation device or provide `--scan-cidr` explicitly.
+If automatic Tailscale identity authorization is refused, the launcher fails closed. It does not replace that refusal with a hidden manual token or a local-only recorder that looks healthy.
 
 ## Later starts
 
-After the first successful join, the pairing code is not required again:
+After the first successful join, run the same command:
 
-```bash
-python start_recorder.py
+```cmd
+start-tailscale-recorder.cmd
 ```
 
-The recorder reuses its stable identity, saved trusted Federation binding, and saved source selection. Normal restart does not silently repopulate a source set that an operator deliberately emptied.
+The recorder reuses its stable device identity, saved Federation binding, source selection, capture checkpoints, and durable publication state. It does not rediscover/re-enroll merely because the process restarted.
 
-Explicit source configuration remains available:
+## MTConnect source discovery and late source arrival
 
-```bash
-python start_recorder.py Mazak=http://192.168.10.20:5000
+On an unconfigured recorder, the normal bounded private-network scan runs on first startup. If exactly the intended local source is discoverable, normal source-selection rules can select it without manual URL entry.
+
+If the MTConnect Agent does not exist or is not reachable yet, the recorder retains the existing start-before-source behavior: retry is bounded/backed off rather than a busy-poll, and recording begins when the source later becomes available.
+
+If the host cannot infer the intended private `/24`, an explicit recovery/deployment network remains available:
+
+```cmd
+start-tailscale-recorder.cmd --scan-cidr 192.168.10.0/24
 ```
 
-Explicit scan network:
+Network discovery remains bounded to validated private IPv4 scopes with the existing timeout, redirect, and response-size protections.
 
-```bash
-python start_recorder.py FCP1-... --scan-cidr 192.168.10.0/24
+## Logical-storage publication
+
+Recorder capture is always local-first. A Federation acknowledgement is not part of the local capture commit boundary.
+
+Checkpoint-committed observations become eligible for publication through the existing authenticated logical-storage authority. Publication applies the current assignment, fencing, acknowledgement, primary/replica, and manifest rules; the recorder never selects an arbitrary database directly.
+
+If exactly one ready logical-storage group exists, it may be selected automatically. With genuinely multiple groups, choose one explicitly:
+
+```cmd
+start-tailscale-recorder.cmd --storage-group telemetry
 ```
 
-Use `--no-auto-scan` only when you deliberately want to skip startup discovery.
+A normal full FCP Federation creator supervises logical-storage authority automatically. The existing authority monitor still refuses creator-owned authority service on non-creator members.
 
-## Pairing-code behavior
+When Federation/storage is temporarily unavailable after an established recorder is running, capture stays local and durable publication state retries later. Do not delete the publication outbox or move checkpoints backward as a recovery technique.
 
-Browser-generated `FCP1-...` codes are signed, one-use, and valid for up to **10 minutes**. Generate another code when the previous code expired, was redeemed, or another device must join.
+## Data paths
 
-The recorder does not persist the pairing code, enrollment token, or invitation token. After successful enrollment it keeps only its stable device identity and public-safe reconnect binding.
-
-Operational leader authority may move after a valid leader transition. If that happens, create future pairing codes on the **current leader**, not necessarily the immutable Federation creator.
-
-## Manage the recorder from any trusted Federation device
-
-Open:
-
-```text
-/federation/recorders
-```
-
-The page lists connected standalone MTConnect recorders. A trusted operator can:
-
-- request a new network scan;
-- review machines returned by that recorder;
-- add discovered machines to that recorder's configured source set; and
-- remove sources that recorder currently captures.
-
-The scan executes on the recorder host, not on the browser/device from which the request was made.
-
-### Safety boundary
-
-Remote recorder control does not grant shell or arbitrary network authority. A remote member cannot:
-
-- send arbitrary commands/executables;
-- inject arbitrary MTConnect URLs or credentials;
-- make the recorder scan an unrestricted network;
-- target a normal FCP device that is not advertising the standalone-recorder capability; or
-- bypass recorder-local validation.
-
-Remote additions identify only opaque source IDs returned by the recorder's own latest scan. The recorder resolves/revalidates them locally before changing configuration.
-
-Network discovery remains bounded to validated RFC1918 private IPv4 networks of `/24` or smaller with the existing address, timeout, redirect, and response-size limits.
-
-## Source changes
-
-Adding/removing a source changes future capture only. It does not delete previously recorded telemetry or erase historical checkpoints.
-
-The managed recorder observes configuration changes without requiring a process restart. Safe capability metadata can be re-announced without exposing MTConnect source URLs or credentials.
-
-## Capture remains local-first
-
-Federation availability is not part of the recorder's local commit boundary.
-
-The recorder first commits local capture/checkpoint state. Only checkpoint-committed data becomes eligible for Federation publication.
-
-If relay/storage authority is unavailable, local recording continues and the durable publication outbox retries later. Federation outages do not move the MTConnect checkpoint backward and do not block normal polling.
-
-## Federation storage publication
-
-Pairing authority and storage authority are separate.
-
-The current operational leader controls reviewed leader actions such as pairing. Recorder data publication, however, uses the existing **session-owner logical-storage authority** and current storage-control-plane assignments. Do not interpret leader transfer as automatically moving storage ownership/assignments.
-
-The recorder never selects an arbitrary physical database. It publishes bounded deterministic chunks through authenticated Federation storage authority, which applies current assignment, fencing, acknowledgement, primary/replica routing, and manifest commit rules.
-
-If exactly one ready logical-storage group exists, the recorder may select it automatically. With several groups, choose one explicitly:
-
-```bash
-python start_recorder.py --storage-group telemetry
-```
-
-If no ready logical-storage authority exists, local capture still continues while publication waits safely.
-
-### Which JSONL data is shared
-
-The product uses two deliberate paths so recorder telemetry is not published
-and analyzed twice:
-
-| Local data | Federation path | Receiving workbench path |
-| --- | --- | --- |
-| `data/sources/mtconnect_recorder/jsonl/**` | checkpoint-, sequence-, and hash-verified recorder observations | `data/federation/shared/telemetry/*.jsonl` |
-| other supported `data/**/*.jsonl` on a full workbench or headless recorder | generic authenticated JSONL chunks | `data/federation/shared/jsonl-files/<producer>/**` |
-
-Every connected full workbench device therefore offers its supported
-non-recorder JSONL corpus on the recurring Federation synchronization pass.
-The headless recorder process now runs a publisher-only pass for the same
-supported non-recorder `data/**/*.jsonl` corpus. It does not download the
-Federation's JSONL corpus or start workbench analysis/refresh tasks. Recorder
-JSONL remains excluded from this generic pass and travels only through the
-stronger checkpointed recorder path, which prevents duplicate storage and
-duplicate analysis. Raw MTConnect XML/probe archives are local-only.
-
-`--require-data-sharing` waits for both publication paths. A rejected generic
-JSONL commit therefore prevents the launcher from reporting sharing as ready;
-the durable state retries it on the next pass.
-
-## Useful options
-
-```text
---device-name NAME            Stable display label for the recorder device
---storage-group ID            Explicit logical Federation storage group
---federation-timeout SECONDS  Federation request timeout
---require-federation          Stop instead of falling back to local capture when initial join/reconnect fails
---require-data-sharing        Also require a ready/confirmed logical-storage publication route
---sharing-timeout SECONDS     Bounded wait for required data sharing (default 45)
---scan-cidr CIDR              Explicit private IPv4 scan network
---scan-port PORT              MTConnect scan port (default 5000)
---no-auto-scan                Skip startup discovery
---once                        Run one recorder catch-up cycle and exit
-```
-
-Manual `NAME=URL` source arguments remain supported for explicit deployments and tests.
-
-## Durable recorder state
-
-Important local state includes:
+The recorder's durable local state normally includes:
 
 ```text
 data/capabilities/config.json
@@ -281,13 +95,80 @@ data/federation/jsonl-sync.sqlite3
 data/federation/jsonl-cache/
 ```
 
-Do not delete these paths to fix a transient Federation or scan error. Use the product's explicit source controls, pairing/reconnect path, or documented reset/migration procedure.
+Recorder observations under:
 
-For storage formats and the capture algorithm, see [`catalog/standalone-recorder_v2/README.md`](../catalog/standalone-recorder_v2/README.md).
+```text
+data/sources/mtconnect_recorder/jsonl/**
+```
+
+use the stronger checkpoint/sequence/hash-verified recorder publication path. Other supported non-recorder JSONL files use the generic authenticated JSONL synchronization path. Recorder JSONL is excluded from the generic path to avoid duplicate storage/analysis. Raw MTConnect XML/probe archives remain local-only.
+
+## Federation recorder controls
+
+From any trusted workbench device open:
+
+```text
+/federation/recorders
+```
+
+A trusted operator can request a recorder-local bounded scan, review machines returned by that recorder, add source IDs from the recorder's latest validated scan, and remove currently configured sources.
+
+Remote recorder control does not grant arbitrary shell or arbitrary network authority. A remote member cannot inject executables, arbitrary MTConnect URLs/credentials, unrestricted scan targets, or target a normal device that does not advertise the recorder capability.
+
+## Explicit/manual recovery pairing
+
+The signed `FCP1-...` path remains available for deployments where automatic same-owner Tailscale authorization is deliberately not applicable:
+
+```bash
+python start_recorder.py FCP1-...
+```
+
+Later manual-path starts can use:
+
+```bash
+python start_recorder.py
+```
+
+This is a recovery/manual deployment surface, not the normal Tailscale first-start flow. Pairing codes remain signed, one-use, short-lived and are not persisted after successful enrollment.
+
+Do not put an `FCP1-...` code on the `start-tailscale-recorder.cmd` command line. That launcher intentionally rejects such arguments.
+
+## Useful options
+
+```text
+--device-name NAME            Recorder display label
+--storage-group ID            Explicit logical Federation storage group
+--federation-timeout SECONDS  Federation request timeout
+--require-federation          Fail instead of local-only initial membership
+--require-data-sharing        Require a ready/confirmed publication route
+--sharing-timeout SECONDS     Bounded wait for required sharing
+--scan-cidr CIDR              Explicit private IPv4 scan network
+--scan-port PORT              MTConnect scan port (default 5000)
+--no-auto-scan                Deliberately skip startup discovery
+--once                        Run one recorder catch-up cycle and exit
+```
+
+The Tailscale wrapper adds `--require-federation` and `--require-data-sharing` itself for the normal supported path.
+
+## Failure behavior
+
+The zero-touch Tailscale recorder exits non-zero rather than silently degrading when initial trust/publication requirements are not met. Typical actionable failures include:
+
+- Tailscale missing/logged out/no valid IPv4;
+- no Federation discovered;
+- multiple ambiguous Federations discovered;
+- peer identity refused by the Federation responder;
+- no valid one-use grant returned;
+- saved/issued relay not a literal reachable Tailscale peer;
+- Federation membership invalid; or
+- required logical-storage publication unavailable.
+
+Once local capture is established, later Federation outages remain local-first/durable as described above.
 
 ## Related guides
 
+- [Quick start](quick_start.md)
+- [One-command setup](one_command_setup.md)
+- [Tailscale Federation discovery](tailscale_federation_discovery.md)
 - [Federation operations](federation_operations.md)
-- [Operator guide](operator_guide.md)
-- [Server setup](server_setup.md)
 - [Troubleshooting](troubleshooting.md)

@@ -1,8 +1,7 @@
-"""Fail-closed Tailscale launcher for the headless MTConnect recorder."""
+"""Fail-closed zero-touch Tailscale launcher for the headless MTConnect recorder."""
 
 from __future__ import annotations
 
-import getpass
 import ipaddress
 import os
 import shutil
@@ -18,12 +17,11 @@ from catalog.flask_app.services.federation_pairing_service import (
     PairingCodeCodec,
     RemotePairingStore,
 )
+from scripts.federation_host_runner import load_host_module
 
 DEFAULT_DEVICE_NAME: Final = "FCP MTConnect recorder"
-PAIRING_STATE_RELATIVE: Final = Path(
-    "federation/onboarding/remote_pairing.json"
-)
-TAILSCALE_NETWORK: Final = ipaddress.ip_network("100.64.0.0/10")
+PAIRING_STATE_RELATIVE: Final = Path("federation/onboarding/remote_pairing.json")
+TAILSCALE_NETWORK = ipaddress.ip_network("100.64.0.0/10")
 
 
 def _option_value(arguments: list[str], name: str) -> str | None:
@@ -40,9 +38,7 @@ def _option_value(arguments: list[str], name: str) -> str | None:
 
 
 def _has_option(arguments: list[str], name: str) -> bool:
-    return any(
-        value == name or value.startswith(f"{name}=") for value in arguments
-    )
+    return any(value == name or value.startswith(f"{name}=") for value in arguments)
 
 
 def _data_directory(arguments: list[str]) -> Path:
@@ -57,8 +53,7 @@ def _tailscale_ipv4() -> ipaddress.IPv4Address:
     executable = shutil.which("tailscale")
     if executable is None:
         raise RuntimeError(
-            "Tailscale was not found. Install it and sign this host in to the "
-            "shared tailnet before starting the recorder."
+            "Tailscale was not found. Install it and sign this host in to the shared tailnet before starting the recorder."
         )
     try:
         completed = subprocess.run(
@@ -73,15 +68,13 @@ def _tailscale_ipv4() -> ipaddress.IPv4Address:
             "Tailscale status could not be read; the recorder was not started."
         ) from exc
     first = next(
-        (line.strip() for line in completed.stdout.splitlines() if line.strip()),
-        "",
+        (line.strip() for line in completed.stdout.splitlines() if line.strip()), ""
     )
     try:
         address = ipaddress.ip_address(first)
     except ValueError as exc:
         raise RuntimeError(
-            "Tailscale is installed but has no signed-in IPv4 address. Run "
-            "'tailscale up' once, then run this command again."
+            "Tailscale is installed but has no signed-in IPv4 address. Run 'tailscale up' once, then run this command again."
         ) from exc
     if (
         completed.returncode != 0
@@ -89,30 +82,66 @@ def _tailscale_ipv4() -> ipaddress.IPv4Address:
         or address not in TAILSCALE_NETWORK
     ):
         raise RuntimeError(
-            "Tailscale did not return a signed-in 100.64.0.0/10 address; "
-            "the recorder was not started."
+            "Tailscale did not return a signed-in 100.64.0.0/10 address; the recorder was not started."
         )
     return address
 
 
+def _discovery_web_port() -> int:
+    raw = str(os.environ.get("FCP_TAILSCALE_DISCOVERY_PORT") or "5000").strip()
+    try:
+        port = int(raw)
+    except ValueError as exc:
+        raise RuntimeError("FCP_TAILSCALE_DISCOVERY_PORT must be an integer.") from exc
+    if not 1 <= port <= 65_535:
+        raise RuntimeError("FCP_TAILSCALE_DISCOVERY_PORT is outside the valid port range.")
+    return port
+
+
 def _pairing_key(arguments: list[str]) -> str | None:
-    membership = _data_directory(arguments) / PAIRING_STATE_RELATIVE
+    """Return one auto-join grant on first start; saved members need no grant."""
+
+    data_dir = _data_directory(arguments)
+    membership = data_dir / PAIRING_STATE_RELATIVE
     if membership.is_file():
         os.environ.pop("FCP_RECORDER_FEDERATION_KEY", None)
         return None
-    supplied = os.environ.pop("FCP_RECORDER_FEDERATION_KEY", "").strip()
-    if not supplied:
-        if not sys.stdin.isatty():
-            raise RuntimeError(
-                "First startup needs an interactive FCP1 pairing-code prompt "
-                "or FCP_RECORDER_FEDERATION_KEY."
-            )
-        supplied = getpass.getpass(
-            "Paste a fresh FCP1 pairing code from the current Federation leader: "
-        ).strip()
-    if not supplied.startswith("FCP1-"):
-        raise RuntimeError("The pairing code must start with FCP1-.")
-    return supplied
+
+    # The normal Tailscale recorder path never accepts a human-supplied key.
+    # Clear any inherited legacy value so it cannot silently bypass discovery.
+    os.environ.pop("FCP_RECORDER_FEDERATION_KEY", None)
+
+    discovery = load_host_module("tailscale_host_discovery")
+    snapshot_path = data_dir / "tailscale_discovery.json"
+    snapshot = discovery.discover(web_ports=(_discovery_web_port(),))
+    discovery.write_snapshot(snapshot_path, snapshot)
+    federations = snapshot.get("federations") if isinstance(snapshot, dict) else None
+    candidates = [item for item in federations if isinstance(item, dict)] if isinstance(federations, list) else []
+    if not candidates:
+        raise RuntimeError(
+            "No FCP Federation was discovered over Tailscale. Start the Federation creator first; manual FCP1 pairing remains a recovery path through start_recorder.py."
+        )
+    if len(candidates) != 1:
+        raise RuntimeError(
+            "More than one FCP Federation was discovered; refusing an ambiguous recorder auto-join."
+        )
+
+    client = load_host_module("tailnet_join_client")
+    bridge = load_host_module("tailnet_join_bridge")
+    grant_file = data_dir / bridge.GRANT_RELATIVE
+    joined, reason = client.join_discovered_federation(
+        snapshot_path=snapshot_path,
+        grant_file=grant_file,
+    )
+    if not joined:
+        raise RuntimeError(
+            f"The discovered Federation did not authorize this recorder ({reason})."
+        )
+    code = bridge.load_grant(grant_file)
+    bridge.clear_grant(grant_file)
+    if not isinstance(code, str) or not code.startswith("FCP1-"):
+        raise RuntimeError("The verified Federation responder returned no usable enrollment grant.")
+    return code
 
 
 def _recorder_arguments(arguments: list[str]) -> list[str]:
@@ -122,8 +151,7 @@ def _recorder_arguments(arguments: list[str]) -> list[str]:
         for value in arguments
     ):
         raise RuntimeError(
-            "Do not put the FCP1 code on this command line; run the command "
-            "without it and use the hidden prompt."
+            "Do not put an FCP1 code on this command line. The Tailscale recorder joins automatically; use start_recorder.py only for explicit recovery pairing."
         )
     result = ["--require-federation", "--require-data-sharing"]
     if not _has_option(arguments, "--device-name"):
@@ -145,7 +173,7 @@ def _relay_url(arguments: list[str], pairing_key: str | None) -> str:
         ).load()
     except (OSError, RuntimeError, ValueError) as exc:
         raise RuntimeError(
-            "The Federation pairing code or saved membership is invalid."
+            "The Federation enrollment grant or saved membership is invalid."
         ) from exc
     if state is None:
         raise RuntimeError("No saved Federation membership was found.")
@@ -162,31 +190,21 @@ def _require_tailnet_relay(relay_url: str) -> None:
         address = ipaddress.ip_address(host)
     except ValueError as exc:
         raise RuntimeError(
-            "The Federation relay must use the leader's literal Tailscale "
-            "100.64.0.0/10 IPv4 address. Generate the pairing code while the "
-            "leader is open on that numeric address."
+            "The Federation relay must use the leader's literal Tailscale 100.64.0.0/10 IPv4 address."
         ) from exc
     if (
         not isinstance(address, ipaddress.IPv4Address)
         or address not in TAILSCALE_NETWORK
     ):
         raise RuntimeError(
-            "The Federation relay is not a Tailscale 100.64.0.0/10 address. "
-            "Generate the pairing code while the leader is open on its numeric "
-            "Tailscale address."
+            "The Federation relay is not a Tailscale 100.64.0.0/10 address."
         )
     executable = shutil.which("tailscale")
     if executable is None:
         raise RuntimeError("Tailscale disappeared during the relay preflight.")
     try:
         peer_check = subprocess.run(
-            [
-                executable,
-                "ping",
-                "--timeout=5s",
-                "--c=1",
-                str(address),
-            ],
+            [executable, "ping", "--timeout=5s", "--c=1", str(address)],
             check=False,
             capture_output=True,
             text=True,
@@ -198,8 +216,7 @@ def _require_tailnet_relay(relay_url: str) -> None:
         ) from exc
     if peer_check.returncode != 0:
         raise RuntimeError(
-            "The Federation relay address is not a reachable peer in this "
-            "tailnet. Check the leader's Tailscale login and tailnet ACL."
+            "The Federation relay address is not a reachable peer in this tailnet. Check the leader's Tailscale login and tailnet ACL."
         )
     try:
         connection = socket.create_connection((str(address), port), timeout=5.0)
@@ -233,12 +250,14 @@ def main(argv: list[str] | None = None) -> int:
             return 2
 
         if pairing_key is not None:
+            # start_recorder consumes this only in-process and persists only the
+            # resulting public-safe reconnect binding.  The one-use key is
+            # removed from the environment in the finally block below.
             os.environ["FCP_RECORDER_FEDERATION_KEY"] = pairing_key
             pairing_key = None
         print(f"Tailscale ready: {address}")
         print(
-            "Starting the recorder; Federation membership and the recorder data "
-            "publication route are required."
+            "Starting the recorder; Federation membership and the recorder data publication route are required."
         )
         return start_recorder.main(recorder_arguments)
     finally:

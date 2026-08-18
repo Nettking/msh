@@ -5,7 +5,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from types import SimpleNamespace
 
 import pytest
 
@@ -29,7 +28,7 @@ def _command_script() -> Path:
     return _repository_root() / "start-tailscale-recorder.cmd"
 
 
-def test_tailscale_recorder_command_uses_same_process_secret_prompt() -> None:
+def test_tailscale_recorder_command_is_zero_touch_and_keeps_secrets_out_of_shell() -> None:
     root = _repository_root()
     command = _command_script().read_text(encoding="utf-8")
     powershell = _powershell_script().read_text(encoding="utf-8")
@@ -44,10 +43,13 @@ def test_tailscale_recorder_command_uses_same_process_secret_prompt() -> None:
     assert "import catalog.mtconnect_recorder.runtime" in powershell
     assert "import requests" in powershell
     assert "Remove-Item Env:FCP_RECORDER_FEDERATION_KEY" in powershell
+    assert "$PairingKey" not in powershell
     assert '"--require-federation"' in python
     assert '"--require-data-sharing"' in python
     assert "100.64.0.0/10" in python
-    assert "getpass.getpass" in python
+    assert "load_host_module" in python
+    assert "tailnet_join_client" in python
+    assert "getpass" not in python
     assert "FCP MTConnect recorder" in python
     assert "tailscale up" in python
     assert "start-tailscale.cmd" not in command
@@ -85,7 +87,55 @@ def test_tailscale_preflight_requires_a_signed_in_tailnet_address(monkeypatch) -
         launcher._tailscale_ipv4()
 
 
-def test_first_start_keeps_pairing_key_out_of_arguments_and_clears_it(
+def _auto_join_modules(*, code: str = "FCP1-private-test-key", joined: bool = True):
+    class Discovery:
+        @staticmethod
+        def discover(*, web_ports):
+            assert web_ports == (5000,)
+            return {"federations": [{"federation_id": "fed-test"}]}
+
+        @staticmethod
+        def write_snapshot(path, payload):
+            Path(path).parent.mkdir(parents=True, exist_ok=True)
+            Path(path).write_text("{}", encoding="utf-8")
+            assert payload["federations"]
+
+    class Client:
+        @staticmethod
+        def join_discovered_federation(*, snapshot_path, grant_file):
+            assert Path(snapshot_path).name == "tailscale_discovery.json"
+            assert str(grant_file).endswith("auto_join_grant.json")
+            return joined, "authorized" if joined else "peer-owned-by-another-user"
+
+    class Bridge:
+        GRANT_RELATIVE = "federation/onboarding/auto_join_grant.json"
+
+        @staticmethod
+        def load_grant(_path):
+            return code
+
+        @staticmethod
+        def clear_grant(_path):
+            return None
+
+    return {"tailscale_host_discovery": Discovery, "tailnet_join_client": Client, "tailnet_join_bridge": Bridge}
+
+
+def test_first_start_discovers_and_auto_joins_without_human_input(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    modules = _auto_join_modules()
+    monkeypatch.delenv("FCP_RECORDER_FEDERATION_KEY", raising=False)
+    monkeypatch.setattr(launcher, "load_host_module", lambda name: modules[name])
+
+    key = launcher._pairing_key(["--data-dir", str(tmp_path / "recorder-data")])
+
+    assert key == "FCP1-private-test-key"
+    assert "FCP_RECORDER_FEDERATION_KEY" not in os.environ
+
+
+def test_first_start_keeps_auto_join_key_out_of_arguments_and_clears_it(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -96,16 +146,7 @@ def test_first_start_keeps_pairing_key_out_of_arguments_and_clears_it(
         "_tailscale_ipv4",
         lambda: ipaddress.ip_address("100.100.0.44"),
     )
-    monkeypatch.setattr(
-        launcher.sys,
-        "stdin",
-        SimpleNamespace(isatty=lambda: True),
-    )
-    monkeypatch.setattr(
-        launcher.getpass,
-        "getpass",
-        lambda _prompt: "FCP1-private-test-key",
-    )
+    monkeypatch.setattr(launcher, "_pairing_key", lambda _args: "FCP1-private-test-key")
     monkeypatch.setattr(launcher, "_relay_url", lambda _args, _key: "ws://tail:8765")
     monkeypatch.setattr(launcher, "_require_tailnet_relay", lambda _url: None)
 
@@ -136,7 +177,53 @@ def test_first_start_keeps_pairing_key_out_of_arguments_and_clears_it(
     assert "FCP_RECORDER_FEDERATION_KEY" not in os.environ
 
 
-def test_saved_membership_restarts_without_pairing_prompt(
+def test_no_discovered_federation_fails_instead_of_prompting_or_starting_local(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    class Discovery:
+        @staticmethod
+        def discover(*, web_ports):
+            return {"federations": []}
+
+        @staticmethod
+        def write_snapshot(_path, _payload):
+            return None
+
+    monkeypatch.setattr(launcher, "load_host_module", lambda _name: Discovery)
+
+    with pytest.raises(RuntimeError, match="No FCP Federation was discovered"):
+        launcher._pairing_key(["--data-dir", str(tmp_path)])
+
+
+def test_ambiguous_discovery_fails_closed(tmp_path: Path, monkeypatch) -> None:
+    class Discovery:
+        @staticmethod
+        def discover(*, web_ports):
+            return {"federations": [{"id": "one"}, {"id": "two"}]}
+
+        @staticmethod
+        def write_snapshot(_path, _payload):
+            return None
+
+    monkeypatch.setattr(launcher, "load_host_module", lambda _name: Discovery)
+
+    with pytest.raises(RuntimeError, match="More than one"):
+        launcher._pairing_key(["--data-dir", str(tmp_path)])
+
+
+def test_identity_refusal_is_not_replaced_by_manual_pairing_prompt(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    modules = _auto_join_modules(joined=False)
+    monkeypatch.setattr(launcher, "load_host_module", lambda name: modules[name])
+
+    with pytest.raises(RuntimeError, match="peer-owned-by-another-user"):
+        launcher._pairing_key(["--data-dir", str(tmp_path)])
+
+
+def test_saved_membership_restarts_without_discovery(
     tmp_path: Path,
     monkeypatch,
 ) -> None:
@@ -144,22 +231,15 @@ def test_saved_membership_restarts_without_pairing_prompt(
     membership = data_dir / launcher.PAIRING_STATE_RELATIVE
     membership.parent.mkdir(parents=True)
     membership.write_text("{}", encoding="utf-8")
-    monkeypatch.delenv("FCP_RECORDER_FEDERATION_KEY", raising=False)
+    monkeypatch.setenv("FCP_RECORDER_FEDERATION_KEY", "FCP1-stale")
     monkeypatch.setattr(
         launcher,
-        "_tailscale_ipv4",
-        lambda: ipaddress.ip_address("100.100.0.44"),
+        "load_host_module",
+        lambda _name: pytest.fail("saved membership must not rediscover or pair"),
     )
-    monkeypatch.setattr(
-        launcher.getpass,
-        "getpass",
-        lambda _prompt: pytest.fail("saved membership must not prompt"),
-    )
-    monkeypatch.setattr(launcher, "_relay_url", lambda _args, _key: "ws://tail:8765")
-    monkeypatch.setattr(launcher, "_require_tailnet_relay", lambda _url: None)
-    monkeypatch.setattr(launcher.start_recorder, "main", lambda _args: 0)
 
-    assert launcher.main(["--data-dir", str(data_dir)]) == 0
+    assert launcher._pairing_key(["--data-dir", str(data_dir)]) is None
+    assert "FCP_RECORDER_FEDERATION_KEY" not in os.environ
 
 
 @pytest.mark.parametrize(
@@ -184,10 +264,10 @@ def test_pairing_code_is_rejected_on_the_command_line(
     )
 
     assert launcher.main(arguments) == 2
-    assert "hidden prompt" in capsys.readouterr().err
+    assert "joins automatically" in capsys.readouterr().err
 
 
-def test_help_needs_no_tailscale_or_pairing(monkeypatch, capsys) -> None:
+def test_help_needs_no_tailscale_or_enrollment(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         launcher,
         "_tailscale_ipv4",
@@ -196,7 +276,7 @@ def test_help_needs_no_tailscale_or_pairing(monkeypatch, capsys) -> None:
     monkeypatch.setattr(
         launcher,
         "_pairing_key",
-        lambda _args: pytest.fail("help must not request pairing"),
+        lambda _args: pytest.fail("help must not request enrollment"),
     )
 
     assert launcher.main(["--help"]) == 0
@@ -216,9 +296,7 @@ def test_environment_data_directory_is_forwarded_consistently(
     assert launcher._data_directory(arguments) == (tmp_path / "custom-data").resolve()
 
 
-def test_last_data_directory_option_controls_membership_and_startup(
-    tmp_path: Path,
-) -> None:
+def test_last_data_directory_option_controls_membership_and_startup(tmp_path: Path) -> None:
     first = tmp_path / "first"
     second = tmp_path / "second"
     incoming = ["--data-dir", str(first), f"--data-dir={second}"]
@@ -245,9 +323,7 @@ def test_invalid_data_directory_fails_before_tailscale_preflight(
     assert "--data-dir requires" in capsys.readouterr().err
 
 
-def test_abbreviated_data_directory_is_rejected_before_preflight(
-    monkeypatch,
-) -> None:
+def test_abbreviated_data_directory_is_rejected_before_preflight(monkeypatch) -> None:
     monkeypatch.setattr(
         launcher,
         "_tailscale_ipv4",
@@ -257,22 +333,7 @@ def test_abbreviated_data_directory_is_rejected_before_preflight(
     assert launcher.main(["--data-d", "other-data"]) == 2
 
 
-def test_saved_membership_discards_stale_environment_pairing_key(
-    tmp_path: Path,
-    monkeypatch,
-) -> None:
-    membership = tmp_path / launcher.PAIRING_STATE_RELATIVE
-    membership.parent.mkdir(parents=True)
-    membership.write_text("{}", encoding="utf-8")
-    monkeypatch.setenv("FCP_RECORDER_FEDERATION_KEY", "FCP1-stale")
-
-    assert launcher._pairing_key(["--data-dir", str(tmp_path)]) is None
-    assert "FCP_RECORDER_FEDERATION_KEY" not in os.environ
-
-
-def test_relay_preflight_requires_literal_tailnet_ip_and_tcp_reachability(
-    monkeypatch,
-) -> None:
+def test_relay_preflight_requires_literal_tailnet_ip_and_tcp_reachability(monkeypatch) -> None:
     connected: list[tuple[tuple[str, int], float]] = []
     peer_checks: list[list[str]] = []
 
@@ -296,9 +357,7 @@ def test_relay_preflight_requires_literal_tailnet_ip_and_tcp_reachability(
     )
 
     launcher._require_tailnet_relay("ws://100.90.1.2:8765")
-
     assert connected == [(('100.90.1.2', 8765), 5.0)]
-
     assert peer_checks == [
         ["tailscale", "ping", "--timeout=5s", "--c=1", "100.90.1.2"]
     ]
@@ -327,14 +386,12 @@ def test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint(
     blocker_directory.mkdir()
     (blocker_directory / "sitecustomize.py").write_text(
         "import importlib.abc\n"
-        "import sys\n"
-        "\n"
+        "import sys\n\n"
         "class ExactEntrypointBlocker(importlib.abc.MetaPathFinder):\n"
         "    def find_spec(self, fullname, path, target=None):\n"
         "        if fullname == 'scripts.start_tailscale_recorder':\n"
         "            raise ModuleNotFoundError('blocked exact recorder entrypoint')\n"
-        "        return None\n"
-        "\n"
+        "        return None\n\n"
         "sys.meta_path.insert(0, ExactEntrypointBlocker())\n",
         encoding="utf-8",
     )
@@ -386,7 +443,7 @@ def test_windows_probe_rejects_runtime_that_cannot_import_exact_entrypoint(
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows launcher execution")
-def test_windows_wrapper_validates_python_and_forwards_recorder_options(
+def test_windows_wrapper_scrubs_legacy_secret_and_forwards_recorder_options(
     tmp_path: Path,
 ) -> None:
     fake_python = tmp_path / "python.cmd"
@@ -438,18 +495,12 @@ def test_windows_wrapper_validates_python_and_forwards_recorder_options(
     assert "-m scripts.start_tailscale_recorder" in logged
     assert "--storage-group fcp-local-storage" in logged
     assert "FCP1-" not in logged
-    assert "FCP1-private-probe-test" not in probe_key_path.read_text(
-        encoding="utf-8"
-    )
-    assert final_key_path.read_text(encoding="utf-8").strip() == (
-        "KEY=FCP1-private-probe-test"
-    )
+    assert probe_key_path.read_text(encoding="utf-8").strip() == "KEY="
+    assert final_key_path.read_text(encoding="utf-8").strip() == "KEY="
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows launcher execution")
-def test_root_cmd_preserves_spaced_argument_and_nonzero_exit(
-    tmp_path: Path,
-) -> None:
+def test_root_cmd_preserves_spaced_argument_and_nonzero_exit(tmp_path: Path) -> None:
     fake_directory = tmp_path / "python with spaces"
     fake_directory.mkdir()
     fake_python = fake_directory / "python.cmd"

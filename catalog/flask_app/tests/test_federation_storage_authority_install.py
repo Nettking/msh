@@ -1,10 +1,8 @@
-"""Supervision of the leader's logical-storage authority.
+"""Supervision of the creator's logical-storage authority.
 
-The authority is the reason a Federation can accept published data at all, and
-before this it only ever ran when someone remembered to start a CLI. These tests
-pin the two things an operator depends on: it does not start itself uninvited,
-and when it refuses it says which precondition failed rather than looping in
-silence.
+The authority is the reason a Federation can accept published data at all. These
+tests pin the operator-visible lifecycle: install defaults alone do not start it,
+non-creators are fenced, and an enabled creator remains restartable.
 """
 
 from __future__ import annotations
@@ -98,7 +96,7 @@ def _creator_context() -> _Context:
     return _Context(_Binding(), _Coordinator(_Session()))
 
 
-def test_the_authority_is_opt_in_and_reports_being_off():
+def test_the_authority_is_opt_in_at_the_install_layer_and_reports_being_off():
     monitor = _monitor(
         context=_creator_context(),
         FEDERATION_STORAGE_AUTHORITY_ENABLED=False,
@@ -123,8 +121,6 @@ def test_defaults_are_installed_without_starting_anything():
 
 
 def test_a_non_creator_device_refuses_instead_of_announcing_into_the_void():
-    # A publisher accepts the storage capability only from the session creator,
-    # so an authority anywhere else would announce something never selected.
     context = _Context(_Binding(), _Coordinator(_Session(created_by_node_id="other")))
     monitor = _monitor(context=context)
 
@@ -143,8 +139,6 @@ def test_the_creator_is_recognised():
 
 
 def test_an_unknown_creator_does_not_block_startup():
-    # A coordinator that cannot answer must not be treated as a refusal, or a
-    # transient read would permanently disable the authority.
     monitor = _monitor(context=_Context(_Binding(), _Coordinator(None)))
 
     with monitor.app.app_context():
@@ -247,8 +241,6 @@ def test_an_authority_without_groups_is_not_reported_as_ready():
 
 
 def test_a_failing_composition_waits_and_stays_restartable(monkeypatch):
-    # The supervision loop must survive a leader that is not ready yet rather
-    # than exiting and leaving the Federation without an authority forever.
     monitor = _monitor(context=_creator_context())
     attempts: list[int] = []
 
@@ -281,8 +273,6 @@ def test_stopping_before_a_loop_exists_is_safe():
 
 
 def test_the_running_authority_is_stopped_between_scans(monkeypatch):
-    # A supervised host must be able to shut down promptly; the loop awaits the
-    # stop event with the scan interval as a timeout rather than sleeping it out.
     started = threading.Event()
     stopped = threading.Event()
 
@@ -293,7 +283,7 @@ def test_the_running_authority_is_stopped_between_scans(monkeypatch):
 
     monkeypatch.setattr(
         "catalog.flask_app.services.federation_storage_authority_install."
-        "run_storage_authority",
+        "run_trusted_storage_authority",
         fake_run,
     )
     monitor = _monitor(context=_creator_context())
@@ -306,7 +296,7 @@ def test_the_running_authority_is_stopped_between_scans(monkeypatch):
 
 
 def test_run_storage_authority_stops_promptly_on_a_long_interval():
-    # Guards the interruptible-sleep change in the authority loop itself.
+    # The standalone node-layer runtime still keeps its interruptible stop seam.
     from catalog.node import storage_failover
 
     async def scenario() -> float:
