@@ -56,13 +56,67 @@ def test_auto_join_clears_one_use_grant_before_redemption(monkeypatch) -> None:
     monkeypatch.setattr(cli, "grant_path", lambda: "grant.json")
     monkeypatch.setattr(cli, "load_grant", lambda _path: "FCP1-private-one-use")
     monkeypatch.setattr(cli, "clear_grant", lambda _path: events.append("clear"))
+    monkeypatch.setattr(
+        cli, "_publish_human_auth_state", lambda: events.append("publish-sso")
+    )
 
     result = cli.redeem_pending_tailnet_grant()
 
-    assert events == ["clear", "redeem"]
+    assert events == ["clear", "redeem", "publish-sso"]
     assert result.state == "connected"
     assert result.node_id == "node-b"
     assert result.federation_id == "fed-a"
+
+
+def test_creator_publishes_authority_users_without_waiting_for_browser(monkeypatch) -> None:
+    events: list[tuple[str, str | None]] = []
+
+    class HumanAuth:
+        @staticmethod
+        def mode(*, refresh):
+            assert refresh is True
+            return SimpleNamespace(is_authority=True, is_member=False)
+
+        @staticmethod
+        def ensure_authority(base_url):
+            events.append(("authority", base_url))
+            return SimpleNamespace(node_id="creator")
+
+        @staticmethod
+        def publish_all_users():
+            events.append(("users", None))
+
+    monkeypatch.setattr(cli, "configured_base_url", lambda: "http://100.80.0.1:5000")
+    monkeypatch.setattr(cli, "get_federated_human_auth_service", lambda: HumanAuth())
+
+    cli._publish_human_auth_state()
+
+    assert events == [
+        ("authority", "http://100.80.0.1:5000"),
+        ("users", None),
+    ]
+
+
+def test_member_publishes_target_endpoint_without_waiting_for_login(monkeypatch) -> None:
+    endpoints: list[str] = []
+
+    class HumanAuth:
+        @staticmethod
+        def mode(*, refresh):
+            assert refresh is True
+            return SimpleNamespace(is_authority=False, is_member=True)
+
+        @staticmethod
+        def ensure_member_endpoint(base_url):
+            endpoints.append(base_url)
+            return base_url
+
+    monkeypatch.setattr(cli, "configured_base_url", lambda: "http://100.80.0.2:5000")
+    monkeypatch.setattr(cli, "get_federated_human_auth_service", lambda: HumanAuth())
+
+    cli._publish_human_auth_state()
+
+    assert endpoints == ["http://100.80.0.2:5000"]
 
 
 def test_missing_host_grant_fails_instead_of_creating_membership(monkeypatch) -> None:
