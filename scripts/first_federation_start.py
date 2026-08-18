@@ -41,9 +41,10 @@ def _run_fresh_reset() -> None:
         command = [
             os.environ.get("COMSPEC") or "cmd.exe",
             "/d",
-            "/s",
             "/c",
-            f'"{ROOT / "start.cmd"}" --fresh',
+            "call",
+            str(ROOT / "start.cmd"),
+            "--fresh",
         ]
     else:
         command = ["sh", str(ROOT / "start.sh"), "--fresh"]
