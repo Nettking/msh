@@ -31,6 +31,12 @@ if /I "%~1"=="/?" goto :show_help
 goto :usage_error
 
 :arguments_ready
+if defined FCP_INITIALIZE_FEDERATION if /I not "%FCP_START_MODE%"=="--fresh" (
+    echo First Federation initialization requires --fresh.
+    echo Use: start-tailscale.cmd --fresh --initialize-federation
+    exit /b 2
+)
+
 where tailscale >nul 2>&1
 if errorlevel 1 (
     echo Tailscale was not found. Zero-touch Federation startup requires Tailscale.
@@ -63,6 +69,14 @@ if errorlevel 1 (
     exit /b 2
 )
 
+rem First-device initialization collects RESET + admin email + hidden password
+rem before any long reset/build work. The PowerShell helper keeps the password
+rem in SecureString memory and sends it only over stdin to the local initializer.
+if defined FCP_INITIALIZE_FEDERATION (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\start_first_federation.ps1" -RepoRoot "%~dp0"
+    exit /b %ERRORLEVEL%
+)
+
 rem The reset belongs to start.cmd. Discovery and enrollment deliberately happen
 rem afterwards, because --fresh removes all mutable data except the recording
 rem corpus and therefore must not be handed a pre-reset pairing grant.
@@ -92,9 +106,7 @@ if errorlevel 1 (
 )
 start "FCP tailnet join responder" /b python "%~dp0scripts\federation_host_runner.py" tailnet_join_responder --bind %FCP_TAILSCALE_IP% --port %FCP_AUTO_JOIN_PORT% --app-url %FCP_AUTO_JOIN_APP_URL%
 
-set "FCP_ZERO_TOUCH_ARGS="
-if defined FCP_INITIALIZE_FEDERATION set "FCP_ZERO_TOUCH_ARGS=--initialize-federation"
-python "%~dp0scripts\zero_touch_federation_start.py" %FCP_ZERO_TOUCH_ARGS% --web-port %FCP_TAILSCALE_DISCOVERY_PORT%
+python "%~dp0scripts\zero_touch_federation_start.py" --web-port %FCP_TAILSCALE_DISCOVERY_PORT%
 if errorlevel 1 (
     echo.
     echo FCP services are running, but zero-touch Federation setup did not complete.
@@ -111,7 +123,7 @@ exit /b 0
 :show_help
 echo Usage:
 echo   start-tailscale.cmd --fresh --initialize-federation
-echo      First device only: reset, create the Federation, and prompt once for the first admin.
+echo      First device only: enter RESET and the first admin credentials up front, then reset and create the Federation.
 echo   start-tailscale.cmd --fresh
 echo      New trusted device: reset, discover, join, benchmark, and activate services automatically.
 echo   start-tailscale.cmd
