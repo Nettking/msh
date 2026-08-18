@@ -1,6 +1,6 @@
 # One-command setup
 
-Status: **current startup guide**  
+Status: **current startup guide**
 Reviewed: **2026-08-18**
 
 FCP's normal multi-device deployment model is **initialize the Federation once, then let trusted devices self-configure**. Human credentials belong to the Federation, not to each machine.
