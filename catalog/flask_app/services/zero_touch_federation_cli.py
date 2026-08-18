@@ -1,7 +1,7 @@
 """Local CLI seams for one-time Federation initialization and trusted auto-join.
 
 Human credentials belong to the Federation creator and are created exactly once.
-They are never used as device-enrollment credentials.  Later devices redeem only
+They are never used as device-enrollment credentials. Later devices redeem only
 the existing short-lived pairing grant produced by the verified Tailscale host
 responder.
 
@@ -30,12 +30,12 @@ from catalog.federation.tailnet_join_bridge import clear_grant, grant_path, load
 from catalog.node.identity import NodeIdentityStateError
 
 from catalog.flask_app.app import create_app
-from catalog.flask_app.auth.models import Role, User, db
-from catalog.flask_app.auth.routes import (
-    _commit_first_user,
-    _normalized_email,
-    _publish_user_best_effort,
+from catalog.flask_app.auth.federation import (
+    configured_base_url,
+    get_federated_human_auth_service,
 )
+from catalog.flask_app.auth.models import Role, User, db
+from catalog.flask_app.auth.routes import _commit_first_user, _normalized_email
 
 from .capability_onboarding_service import get_capability_onboarding_service
 from .federation_pairing_service import PairingAwareCapabilityOnboardingService
@@ -84,6 +84,32 @@ def _read_password() -> str:
     return value.rstrip("\r\n")
 
 
+def _publish_human_auth_state() -> None:
+    """Publish the creator authority or member endpoint without a browser visit."""
+
+    human_auth = get_federated_human_auth_service()
+    base_url = configured_base_url()
+    mode = human_auth.mode(refresh=True)
+    if mode.is_authority:
+        authority = human_auth.ensure_authority(base_url)
+        if authority is None:
+            raise FederationOperationError(
+                "zero-touch-human-auth-authority-unavailable",
+                "the Federation creator could not publish its human sign-in authority",
+                "human_auth",
+            )
+        human_auth.publish_all_users()
+        return
+    if mode.is_member:
+        human_auth.ensure_member_endpoint(base_url)
+        return
+    raise FederationOperationError(
+        "zero-touch-human-auth-federation-required",
+        "Federation membership must be established before publishing human sign-in state",
+        "human_auth",
+    )
+
+
 def initialize_first_federation(
     *,
     email: str,
@@ -94,7 +120,9 @@ def initialize_first_federation(
     if _has_active_admin():
         # Idempotent retry after the administrator committed but before the
         # Federation creation result reached the host.
-        return create_first_federation()
+        result = create_first_federation()
+        _publish_human_auth_state()
+        return result
     if _has_users():
         raise FederationOperationError(
             "zero-touch-existing-users-without-admin",
@@ -133,15 +161,18 @@ def initialize_first_federation(
     )
     if not _commit_first_user(user):
         if _has_active_admin():
-            return create_first_federation()
+            result = create_first_federation()
+            _publish_human_auth_state()
+            return result
         raise FederationOperationError(
             "zero-touch-admin-bootstrap-conflict",
             "the first-administrator bootstrap could not be committed safely",
             "human_admin",
         )
 
-    _publish_user_best_effort(user)
-    return create_first_federation()
+    result = create_first_federation()
+    _publish_human_auth_state()
+    return result
 
 
 def redeem_pending_tailnet_grant() -> HeadlessFederationResult:
@@ -159,6 +190,7 @@ def redeem_pending_tailnet_grant() -> HeadlessFederationResult:
                 "saved Federation membership could not be revalidated",
                 "binding",
             )
+        _publish_human_auth_state()
         return status
 
     path = grant_path()
@@ -181,13 +213,15 @@ def redeem_pending_tailnet_grant() -> HeadlessFederationResult:
             "the joined device identity could not be reloaded",
             "device_id",
         )
-    return HeadlessFederationResult(
+    result = HeadlessFederationResult(
         action="auto-join",
         state="connected",
         node_id=credentials.identity.node_id,
         federation_id=str(binding.federation_id),
         session_id=str(binding.internal_session_id),
     )
+    _publish_human_auth_state()
+    return result
 
 
 def build_parser() -> argparse.ArgumentParser:
