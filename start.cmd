@@ -80,8 +80,8 @@ if errorlevel 1 (
 if "%FCP_FRESH_INSTALL%"=="1" (
     call :reset_device_state
     if errorlevel 1 exit /b 1
-    rem The reset image intentionally empties the mounted data/results roots.
-    rem Put the Git-tracked immutable scaffolding back before the clean-checkout gate.
+    rem Current reset code preserves Git-tracked root scaffolding directly.
+    rem Keep this repair as backward-compatible protection for older damaged checkouts.
     call :repair_checkout_scaffolding
     if errorlevel 1 (
         echo.
@@ -240,15 +240,17 @@ start "" "%FCP_OPEN_URL%"
 exit /b 0
 
 :repair_checkout_scaffolding
-for %%F in ("data\.gitkeep" "data\README.md" "results\.gitkeep" "results\README.md") do (
+for %%F in ("data/.gitkeep" "data/README.md" "results/.gitkeep" "results/README.md") do (
     if not exist "%~dp0%%~F" (
         git cat-file -e "HEAD:%%~F" >nul 2>&1
-        if not errorlevel 1 (
-            git restore --source=HEAD --worktree -- "%%~F" >nul 2>&1
-            if errorlevel 1 (
-                echo Could not restore immutable checkout scaffolding: %%~F
-                exit /b 1
-            )
+        if errorlevel 1 (
+            echo Immutable checkout scaffolding is missing from HEAD: %%~F
+            exit /b 1
+        )
+        git restore --source=HEAD --worktree -- "%%~F" >nul 2>&1
+        if errorlevel 1 (
+            echo Could not restore immutable checkout scaffolding: %%~F
+            exit /b 1
         )
     )
 )
@@ -447,8 +449,8 @@ echo source configuration, recorder checkpoints, results, and downloaded models.
 echo Resume mode never runs inspection or benchmarks and never replaces Federation authority.
 echo All modes install and verify the exact configured Ollama benchmark model.
 echo The supported launcher also keeps a bounded local host update agent running.
-echo The --fresh option requires typing RESET. Only the machine recording corpus
-echo and its integrity metadata survive within FCP application data.
+echo The --fresh option requires typing RESET. Machine recordings, integrity metadata,
+echo and immutable checkout scaffolding survive within the mounted application roots.
 exit /b 0
 
 :usage_error
