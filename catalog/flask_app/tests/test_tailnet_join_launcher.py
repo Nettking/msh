@@ -55,13 +55,29 @@ def test_both_launchers_attempt_an_automatic_join_after_discovery() -> None:
     assert posix.index("tailscale_host_discovery.py") < posix.index(CLIENT)
 
 
-def test_a_previous_responder_is_stopped_before_a_new_one_starts() -> None:
+def test_the_launcher_never_claims_the_responder_is_listening() -> None:
+    """Only the responder knows whether its socket exists.
+
+    The batch launcher cannot capture a pid from `start /b`, so its cleanup was
+    dead code and it announced a listener that may have failed to bind. The
+    responder now owns replacing the previous instance, its pid file, and the
+    success line.
+    """
+
+    for script in (_windows(), _posix()):
+        assert "Automatic Federation joining is listening" not in script
+        assert "tailnet_join_responder.pid" not in script
+        assert "taskkill /pid" not in script
+
+
+def test_windows_opens_the_responder_port_in_the_firewall() -> None:
+    """Docker publishes its own ports; a plain host listener gets no rule."""
+
     windows = _windows()
-    posix = _posix()
-    assert "tailnet_join_responder.pid" in windows
-    assert "tailnet_join_responder.pid" in posix
-    assert "taskkill" in windows
-    assert "kill" in posix
+    assert "netsh advfirewall firewall add rule" in windows
+    assert "localport=%FCP_AUTO_JOIN_PORT%" in windows
+    # Elevation may be missing, so the fallback must be actionable, not silent.
+    assert "elevated prompt" in windows
 
 
 def test_the_responder_never_blocks_normal_startup() -> None:

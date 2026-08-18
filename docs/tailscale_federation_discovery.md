@@ -87,6 +87,14 @@ The grant is the same signed, one-use, short-lived pairing primitive used by man
 
 The responder listens on the host's Tailscale address on port `5151` by default. Set `FCP_AUTO_JOIN_PORT` to change it.
 
+On Windows the launcher also adds a firewall rule for that port. The web and relay ports reach the tailnet because Docker Desktop creates its own rules; the responder is an ordinary host process and gets none, so without this the joining device is simply dropped. Adding the rule needs elevation. If the launcher could not add it, it prints the exact command to run once in an elevated prompt:
+
+```cmd
+netsh advfirewall firewall add rule name="FCP tailnet join responder" dir=in action=allow protocol=TCP localport=5151
+```
+
+Each start replaces any responder left over from an earlier start, so the port is never held by a stale process. The responder prints `listening on <address>:<port>` only after the socket actually exists; if it cannot bind, it says so and says that manual pairing still works.
+
 `--fresh` removes the responder secret and any stored grant along with the rest of the mutable installation state, so a factory-reset device cannot rejoin the old Federation with old material.
 
 Because that reset runs after the launcher's host steps, a `--fresh` start deliberately skips the automatic join and says so:

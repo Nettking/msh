@@ -29,11 +29,14 @@ from pathlib import Path
 
 SECRET_ENV = "FCP_AUTO_JOIN_SECRET_FILE"
 GRANT_ENV = "FCP_AUTO_JOIN_GRANT_FILE"
+PID_ENV = "FCP_AUTO_JOIN_PID_FILE"
 PORT_ENV = "FCP_AUTO_JOIN_PORT"
 SECRET_RELATIVE = "federation/onboarding/auto_join_secret"
 GRANT_RELATIVE = "federation/onboarding/auto_join_grant.json"
+PID_RELATIVE = "federation/onboarding/auto_join_responder.pid"
 DEFAULT_SECRET_FILE = f"data/{SECRET_RELATIVE}"
 DEFAULT_GRANT_FILE = f"data/{GRANT_RELATIVE}"
+DEFAULT_PID_FILE = f"data/{PID_RELATIVE}"
 DEFAULT_AUTO_JOIN_PORT = 5151
 SECRET_HEADER = "X-FCP-Auto-Join-Secret"
 GRANT_SCHEMA = "fcp.federation.tailnet-auto-join-grant.v1"
@@ -90,6 +93,14 @@ def grant_path(environ: dict[str, str] | None = None) -> Path:
     if configured:
         return Path(configured)
     return _data_relative(values, GRANT_RELATIVE, DEFAULT_GRANT_FILE)
+
+
+def pid_path(environ: dict[str, str] | None = None) -> Path:
+    values = os.environ if environ is None else environ
+    configured = str(values.get(PID_ENV, "") or "").strip()
+    if configured:
+        return Path(configured)
+    return _data_relative(values, PID_RELATIVE, DEFAULT_PID_FILE)
 
 
 def read_secret(path: Path | str) -> str:
@@ -173,12 +184,14 @@ __all__ = [
     "DEFAULT_AUTO_JOIN_PORT",
     "GRANT_REQUEST_SCHEMA",
     "GRANT_SCHEMA",
+    "PID_ENV",
     "SECRET_HEADER",
     "auto_join_port",
     "clear_grant",
     "ensure_secret",
     "grant_path",
     "load_grant",
+    "pid_path",
     "read_secret",
     "secret_path",
     "store_grant",

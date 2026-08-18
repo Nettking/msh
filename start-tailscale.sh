@@ -46,24 +46,15 @@ fi
 # either fails, manual pairing codes still work exactly as before.
 FCP_AUTO_JOIN_PORT=${FCP_AUTO_JOIN_PORT:-5151}
 export FCP_AUTO_JOIN_PORT
-RESPONDER_PID_FILE="$FCP_DATA_DIR/tailnet_join_responder.pid"
 if command -v python3 >/dev/null 2>&1; then
-  if [ -f "$RESPONDER_PID_FILE" ]; then
-    OLD_PID=$(cat "$RESPONDER_PID_FILE" 2>/dev/null || true)
-    if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" 2>/dev/null; then
-      kill "$OLD_PID" 2>/dev/null || true
-    fi
-    rm -f "$RESPONDER_PID_FILE"
-  fi
-
   if ! python3 "$ROOT/catalog/federation/tailnet_join_responder.py" --check; then
     echo "Automatic Federation joining is unavailable; manual pairing codes still work." >&2
   else
+    # The responder replaces any earlier instance, writes its own pid file, and
+    # prints its own listening line only once the socket really exists.
     python3 "$ROOT/catalog/federation/tailnet_join_responder.py" \
       --bind "$FCP_TAILSCALE_IP" \
       --port "$FCP_AUTO_JOIN_PORT" &
-    echo $! > "$RESPONDER_PID_FILE"
-    echo "Automatic Federation joining is listening on $FCP_TAILSCALE_IP:$FCP_AUTO_JOIN_PORT"
   fi
 
   # If another Federation was discovered and this device is not a member yet,
