@@ -56,14 +56,16 @@ fi
 
 : "${FCP_WEB_BIND:=$FCP_TAILSCALE_IP}"
 : "${FCP_RELAY_BIND:=$FCP_TAILSCALE_IP}"
+: "${FCP_WEB_PORT:=5000}"
 : "${FCP_DATA_DIR:=$ROOT/data}"
 : "${FCP_AUTO_JOIN_PORT:=5151}"
 : "${FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED:=1}"
 : "${FCP_FEDERATION_STORAGE_AUTHORITY_RELAY:=ws://relay:8765}"
-FCP_TAILSCALE_DISCOVERY_PORT=${FCP_WEB_PORT:-5000}
-export FCP_WEB_BIND FCP_RELAY_BIND FCP_DATA_DIR FCP_AUTO_JOIN_PORT
+FCP_TAILSCALE_DISCOVERY_PORT=$FCP_WEB_PORT
+FCP_AUTO_JOIN_APP_URL="http://$FCP_TAILSCALE_IP:$FCP_WEB_PORT"
+export FCP_WEB_BIND FCP_RELAY_BIND FCP_WEB_PORT FCP_DATA_DIR FCP_AUTO_JOIN_PORT
 export FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED FCP_FEDERATION_STORAGE_AUTHORITY_RELAY
-export FCP_TAILSCALE_DISCOVERY_PORT
+export FCP_TAILSCALE_DISCOVERY_PORT FCP_AUTO_JOIN_APP_URL
 
 # Factory reset happens first. Discovery/enrollment afterwards prevents --fresh
 # from deleting the snapshot or one-use grant before it can be redeemed.
@@ -79,7 +81,8 @@ if ! python3 "$ROOT/scripts/federation_host_runner.py" tailnet_join_responder --
 fi
 python3 "$ROOT/scripts/federation_host_runner.py" tailnet_join_responder \
   --bind "$FCP_TAILSCALE_IP" \
-  --port "$FCP_AUTO_JOIN_PORT" &
+  --port "$FCP_AUTO_JOIN_PORT" \
+  --app-url "$FCP_AUTO_JOIN_APP_URL" &
 
 if [ "$INITIALIZE_FEDERATION" = "1" ]; then
   python3 "$ROOT/scripts/zero_touch_federation_start.py" \
