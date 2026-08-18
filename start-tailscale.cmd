@@ -70,10 +70,10 @@ if errorlevel 1 (
 )
 
 rem First-device initialization collects RESET + admin email + hidden password
-rem before any long reset/build work. The PowerShell helper keeps the password
-rem in SecureString memory and sends it only over stdin to the local initializer.
+rem before any long reset/build work. The host Python process keeps the password
+rem only in memory and invokes the trusted initializer directly after startup.
 if defined FCP_INITIALIZE_FEDERATION (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\start_first_federation.ps1" -RepoRoot "%~dp0"
+    python "%~dp0scripts\first_federation_start.py" --open-browser
     exit /b %ERRORLEVEL%
 )
 
