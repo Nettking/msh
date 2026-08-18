@@ -1,6 +1,6 @@
 # Standalone MTConnect recorder
 
-Status: **current user/operator guide**  
+Status: **current user/operator guide**
 Reviewed: **2026-08-18**
 
 The standalone recorder is a headless FCP device for loss-aware MTConnect capture. It can join an existing Federation, discover local MTConnect Agents, keep recording locally through Federation outages, publish checkpoint-committed observations to Federation logical storage, and accept bounded recorder-local source controls from trusted Federation devices.
