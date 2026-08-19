@@ -84,6 +84,92 @@
   </section>
   {% endif %}
 
+  {% if vm.active_section == 'storage' and federation_storage_commit_view is defined %}
+  {% set storage_data = federation_storage_commit_view() %}
+  <section class="federation-panel" id="committed-storage-data">
+    <header class="federation-panel__header">
+      <div>
+        <span class="federation-eyebrow">Committed data</span>
+        <h3>Recorder delivery verification</h3>
+        <p>{{ storage_data.message }}</p>
+      </div>
+      {% if storage_data.state == 'committed' %}
+        {{ status_badge('active', 'Committed') }}
+      {% elif storage_data.state == 'empty' %}
+        {{ status_badge('information', 'No committed data') }}
+      {% else %}
+        {{ status_badge('degraded', 'Unavailable') }}
+      {% endif %}
+    </header>
+
+    <dl class="federation-detail-list">
+      <div><dt>Committed batches</dt><dd>{{ storage_data.committed_batches }}</dd></div>
+      <div><dt>Recorder batches</dt><dd>{{ storage_data.recorder_batches }}</dd></div>
+      <div><dt>Datasets</dt><dd>{{ storage_data.dataset_count }}</dd></div>
+      <div><dt>Latest commit</dt><dd>{{ storage_data.latest_committed_at or 'None yet' }}</dd></div>
+    </dl>
+
+    {% if storage_data.datasets %}
+    <h4 style="margin-top:18px">Committed datasets</h4>
+    <ul class="federation-entity-list">
+      {% for dataset in storage_data.datasets %}
+      <li>
+        <div>
+          <strong>{{ dataset.source_label }}</strong>
+          <span>{{ dataset.dataset_id }}</span>
+          <dl class="federation-detail-list">
+            <div><dt>Type</dt><dd>{{ 'MTConnect recorder telemetry' if dataset.is_recorder else dataset.schema_name }}</dd></div>
+            <div><dt>Schema</dt><dd>{{ dataset.schema_name }} v{{ dataset.schema_version }}</dd></div>
+            <div><dt>Committed batches</dt><dd>{{ dataset.batch_count }}</dd></div>
+            <div><dt>Sequence range</dt><dd>{{ dataset.sequence_range or 'Not sequence-based' }}</dd></div>
+            <div><dt>Latest sequence</dt><dd>{{ dataset.latest_sequence if dataset.latest_sequence is not none else 'Not available' }}</dd></div>
+            <div><dt>Latest commit</dt><dd>{{ dataset.latest_committed_at_label or 'Not available' }}</dd></div>
+            <div><dt>Stored payload bytes</dt><dd>{{ dataset.total_bytes }}</dd></div>
+            <div><dt>Latest batch</dt><dd><code>{{ dataset.latest_batch_id or 'Not available' }}</code></dd></div>
+            <div><dt>Latest content hash</dt><dd><code style="overflow-wrap:anywhere">{{ dataset.latest_content_hash or 'Not available' }}</code></dd></div>
+          </dl>
+        </div>
+        {{ status_badge('active', 'Committed') }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </section>
+
+  {% if storage_data.recent_batches %}
+  <section class="federation-panel">
+    <header class="federation-panel__header">
+      <div>
+        <span class="federation-eyebrow">Acceptance evidence</span>
+        <h3>Recent committed batches</h3>
+        <p>These entries come from the coordinator-owned committed manifest, not from recorder-local files or a provider directory scan.</p>
+      </div>
+    </header>
+    <ul class="federation-entity-list">
+      {% for batch in storage_data.recent_batches %}
+      <li>
+        <div>
+          <strong>{{ batch.source_id or batch.dataset_id }}</strong>
+          <span>{{ batch.sequence_range or batch.batch_id }}</span>
+          <dl class="federation-detail-list">
+            <div><dt>Dataset</dt><dd>{{ batch.dataset_id }}</dd></div>
+            <div><dt>Committed</dt><dd>{{ batch.committed_at_label or 'Not available' }}</dd></div>
+            <div><dt>Sequence range</dt><dd>{{ batch.sequence_range or 'Not sequence-based' }}</dd></div>
+            <div><dt>Payload bytes</dt><dd>{{ batch.size_bytes }}</dd></div>
+            <div><dt>Durable acknowledgements</dt><dd>{{ batch.acknowledgement_count }}</dd></div>
+            <div><dt>Manifest revision</dt><dd>{{ batch.manifest_revision }}</dd></div>
+            <div><dt>Batch ID</dt><dd><code>{{ batch.batch_id }}</code></dd></div>
+            <div><dt>Content hash</dt><dd><code style="overflow-wrap:anywhere">{{ batch.content_hash }}</code></dd></div>
+          </dl>
+        </div>
+        {{ status_badge('active', 'Committed') }}
+      </li>
+      {% endfor %}
+    </ul>
+  </section>
+  {% endif %}
+  {% endif %}
+
   <section class="federation-panel">
     <header class="federation-panel__header">
       <div>
