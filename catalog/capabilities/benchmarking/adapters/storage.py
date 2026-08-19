@@ -11,6 +11,7 @@ from catalog.federation.onboarding_models import (
     BenchmarkRecommendation,
     BenchmarkState,
 )
+from catalog.federation.storage_protocol import STORAGE_PROTOCOL
 
 from ..inspection import InspectionContext, InspectionFinding
 from ..policy import DURABLE_CAPABILITY_EVIDENCE_TTL_SECONDS
@@ -81,7 +82,7 @@ class StorageCandidateAdapter:
     definition = BenchmarkDefinition(
         benchmark_id=STORAGE_BENCHMARK_ID,
         capability_type="storage",
-        capability_protocol="fcp-storage-candidate",
+        capability_protocol=STORAGE_PROTOCOL,
         implementation_version="1.0.0",
         max_duration_seconds=10,
         max_parallelism=1,
