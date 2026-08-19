@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 from flask import Flask
 
@@ -9,6 +10,7 @@ from catalog.capabilities.contributions.candidates import _candidate_id
 from catalog.capabilities.contributions.types import LocalContributionDescriptor
 from catalog.capabilities.operator_surface import ProviderActivationState
 from catalog.capabilities.storage_authority_enrollment import (
+    STORAGE_AUTHORITY_PROPERTY,
     STORAGE_AUTHORITY_SCHEMA,
     parse_storage_authority_evidence,
 )
@@ -17,6 +19,9 @@ from catalog.federation.storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
 )
+from catalog.flask_app.services.federation_contribution_publication import (
+    plan_contribution_publications,
+)
 from catalog.flask_app.services.local_capability_candidates import _build_bundle
 from catalog.flask_app.services.pending_contribution_approval import (
     CapabilityFirstProviderOperatorSurface,
@@ -24,6 +29,24 @@ from catalog.flask_app.services.pending_contribution_approval import (
 
 NOW = datetime(2026, 8, 19, 8, 50, tzinfo=timezone.utc)
 _LEGACY_STORAGE_CANDIDATE_PROTOCOL = "fcp-storage-candidate"
+
+
+def _storage_authority_attestation() -> dict[str, dict[str, object]]:
+    return {
+        STORAGE_AUTHORITY_PROPERTY: {
+            "schema": STORAGE_AUTHORITY_SCHEMA,
+            "eligible": True,
+            "benchmark_state": "green",
+            "provider_id": "storage-provider-a",
+            "group_id": "fcp-local-storage",
+            "role": "primary",
+            "inspection_revision": 1,
+            "decision_revision": 1,
+            "benchmark_run_ids": ["storage-green-1"],
+            "desired_state": "enabled",
+            "policy_state": "allowed",
+        }
+    }
 
 
 def test_builtin_storage_candidate_matches_storage_authority_protocol(tmp_path) -> None:
@@ -47,19 +70,7 @@ def test_builtin_storage_candidate_matches_storage_authority_protocol(tmp_path) 
         properties={
             "kind": "capability-first-candidate",
             "candidate_id": "fcp-local-data-storage",
-            "storage_authority": {
-                "schema": STORAGE_AUTHORITY_SCHEMA,
-                "eligible": True,
-                "benchmark_state": "green",
-                "provider_id": "storage-provider-a",
-                "group_id": "fcp-local-storage",
-                "role": "primary",
-                "inspection_revision": 1,
-                "decision_revision": 1,
-                "benchmark_run_ids": ["storage-green-1"],
-                "desired_state": "enabled",
-                "policy_state": "allowed",
-            },
+            **_storage_authority_attestation(),
         },
         announced_at=NOW,
     )
@@ -67,7 +78,7 @@ def test_builtin_storage_candidate_matches_storage_authority_protocol(tmp_path) 
     assert parse_storage_authority_evidence(announcement) is not None
 
 
-def test_storage_protocol_correction_preserves_existing_candidate_identity(tmp_path) -> None:
+def _storage_descriptors(tmp_path):
     app = Flask(__name__)
     app.config["CAPABILITY_ONBOARDING_STORAGE_PROBE_DIRECTORY"] = str(tmp_path / "probe")
     with app.app_context():
@@ -79,16 +90,82 @@ def test_storage_protocol_correction_preserves_existing_candidate_identity(tmp_p
         "display_label": spec.display_label,
         "capacity_envelope": dict(spec.capacity_envelope),
     }
-    legacy = LocalContributionDescriptor(
-        capability_protocol=_LEGACY_STORAGE_CANDIDATE_PROTOCOL,
-        **shared,
-    )
-    corrected = LocalContributionDescriptor(
-        capability_protocol=STORAGE_PROTOCOL,
-        **shared,
+    return (
+        spec,
+        LocalContributionDescriptor(
+            capability_protocol=_LEGACY_STORAGE_CANDIDATE_PROTOCOL,
+            **shared,
+        ),
+        LocalContributionDescriptor(
+            capability_protocol=STORAGE_PROTOCOL,
+            **shared,
+        ),
     )
 
+
+def test_storage_protocol_correction_preserves_existing_candidate_identity(tmp_path) -> None:
+    _spec, legacy, corrected = _storage_descriptors(tmp_path)
+
     assert _candidate_id("node-a", corrected) == _candidate_id("node-a", legacy)
+
+
+def test_existing_storage_capability_upgrades_in_place_to_authority_protocol(tmp_path) -> None:
+    spec, legacy, corrected = _storage_descriptors(tmp_path)
+    candidate_id = _candidate_id("node-a", legacy)
+    assert _candidate_id("node-a", corrected) == candidate_id
+
+    candidate = SimpleNamespace(
+        candidate_id=candidate_id,
+        device_id="node-a",
+        capability_type="storage",
+        capability_protocol=STORAGE_PROTOCOL,
+        display_label=spec.display_label,
+        capacity_envelope=dict(spec.capacity_envelope),
+    )
+    intent = SimpleNamespace(
+        candidate_id=candidate_id,
+        device_id="node-a",
+        activation_state="active",
+        decision_revision=1,
+        decided_at=NOW,
+    )
+    authorized_status = {
+        "capabilities": [
+            {
+                "session_id": "session-a",
+                "capability_id": candidate_id,
+                "node_id": "node-a",
+                "type": "storage",
+                "protocol": _LEGACY_STORAGE_CANDIDATE_PROTOCOL,
+                "protocol_version": "1.0",
+                "status": "ready",
+                "properties": {
+                    "kind": "capability-first-candidate",
+                    "candidate_id": candidate_id,
+                },
+            }
+        ]
+    }
+
+    planned = plan_contribution_publications(
+        session_id="session-a",
+        node_id="node-a",
+        candidates=(candidate,),
+        intents=(intent,),
+        authorized_status=authorized_status,
+        now=NOW,
+        attestation_by_candidate_id={
+            candidate_id: _storage_authority_attestation(),
+        },
+    )
+
+    assert len(planned) == 1
+    announcement = planned[0].announcement
+    assert announcement.capability_id == candidate_id
+    assert announcement.protocol == STORAGE_PROTOCOL
+    assert announcement.protocol_version == STORAGE_PROTOCOL_VERSION
+    assert announcement.status is CapabilityStatus.READY
+    assert parse_storage_authority_evidence(announcement) is not None
 
 
 def test_storage_capabilities_never_offer_generic_provider_actions() -> None:
