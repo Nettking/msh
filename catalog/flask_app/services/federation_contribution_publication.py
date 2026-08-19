@@ -286,8 +286,19 @@ def _auto_enrollment_attestations(
             continue
         if _enum_text(getattr(intent, "policy_state", None)) != "allowed":
             continue
-        candidate_policy = getattr(candidate, "policy_state", None)
-        if candidate_policy is not None and _enum_text(candidate_policy) != "allowed":
+        candidate_policy = _enum_text(getattr(candidate, "policy_state", None))
+        if is_storage:
+            # Storage candidates are intentionally projected as approval-required
+            # until the candidate-only adapter observes the authoritative storage
+            # control-plane assignment. That adapter records the resulting local
+            # intent as ALLOWED + ACTIVE. Requiring the pre-adapter candidate
+            # projection itself to be ALLOWED would therefore suppress the strict
+            # storage-authority attestation forever, even after assignment.
+            if candidate_policy not in {"", "allowed", "approval-required"}:
+                continue
+            if _enum_text(getattr(intent, "activation_state", None)) != "active":
+                continue
+        elif candidate_policy and candidate_policy != "allowed":
             continue
         missing = getattr(candidate, "missing_prerequisites", ())
         if missing:
