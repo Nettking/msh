@@ -28,6 +28,7 @@ from catalog.federation.errors import (
 from catalog.federation.models import CapabilityAnnouncement, CapabilityStatus
 from catalog.node.storage_failover import StorageAuthoritySettings
 
+from .storage_commit_observability import current_storage_commit_view
 from .trusted_storage_authority_runtime import run_trusted_storage_authority
 
 _EXTENSION_KEY = "federation_storage_authority"
@@ -353,6 +354,15 @@ def install_federation_storage_authority(
     @app.before_request
     def _start_federation_storage_authority() -> None:
         monitor.start()
+
+    def _storage_commit_view() -> dict[str, object]:
+        return current_storage_commit_view(onboarding_service)
+
+    @app.context_processor
+    def _storage_commit_observability_context() -> dict[str, object]:
+        # Expose a callable rather than eagerly reading the manifest on every
+        # template render. The storage detail page invokes it only when needed.
+        return {"federation_storage_commit_view": _storage_commit_view}
 
     return monitor
 
