@@ -8,7 +8,9 @@ on:
       - "scripts/zero_touch_federation_start.py"
       - "start.cmd"
       - "start-tailscale.cmd"
+      - "start-tailscale.sh"
       - "catalog/flask_app/tests/test_first_federation_start.py"
+      - "catalog/flask_app/tests/test_tailscale_compose_project.py"
   push:
     branches: [main]
     paths:
@@ -17,7 +19,9 @@ on:
       - "scripts/zero_touch_federation_start.py"
       - "start.cmd"
       - "start-tailscale.cmd"
+      - "start-tailscale.sh"
       - "catalog/flask_app/tests/test_first_federation_start.py"
+      - "catalog/flask_app/tests/test_tailscale_compose_project.py"
 
 permissions:
   contents: read
@@ -48,6 +52,7 @@ jobs:
         run: >-
           python -m pytest -o addopts= -q
           catalog/flask_app/tests/test_first_federation_start.py
+          catalog/flask_app/tests/test_tailscale_compose_project.py
       - name: Diff hygiene
         shell: bash
         run: git diff --check "origin/${{ github.base_ref }}...HEAD"
