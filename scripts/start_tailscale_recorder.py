@@ -214,7 +214,14 @@ def _require_tailnet_relay(relay_url: str) -> None:
         raise RuntimeError(
             "The Federation leader could not be checked as a Tailscale peer."
         ) from exc
-    if peer_check.returncode != 0:
+
+    # On Windows, `tailscale ping` can successfully reach a peer via DERP and
+    # still exit 1 when it cannot upgrade that path to a direct connection.
+    # A DERP pong is valid Tailscale reachability; the following TCP connect is
+    # the authoritative check that the advertised relay service is usable.
+    peer_output = f"{peer_check.stdout}\n{peer_check.stderr}".lower()
+    peer_reached = peer_check.returncode == 0 or "pong from " in peer_output
+    if not peer_reached:
         raise RuntimeError(
             "The Federation relay address is not a reachable peer in this tailnet. Check the leader's Tailscale login and tailnet ACL."
         )
