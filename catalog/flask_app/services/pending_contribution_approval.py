@@ -101,10 +101,9 @@ class CapabilityFirstProviderEnrollmentService(ActiveLeaderProviderEnrollmentSer
         actor_node_id: str,
         command_id: str,
     ) -> ProviderEnrollmentRecord:
-        self._require_session_owner(
-            session_id=session_id,
-            actor_node_id=actor_node_id,
-        )
+        # Requests remain member-owned. Only the leader may make approval
+        # decisions, but a trusted member must still be able to request its own
+        # ordinary provider enrollment through the existing F8.1 path.
         announcement = self._announcement(
             session_id=session_id,
             capability_id=capability_id,
@@ -248,7 +247,10 @@ class CapabilityFirstProviderOperatorSurface(ActiveLeaderProviderOperatorSurface
             if announcement is not None
             else (None if enrollment is None else enrollment.capability_type)
         )
-        if isinstance(capability_type, str) and capability_type.strip().casefold() in _STORAGE_SEPARATE_TYPES:
+        if (
+            isinstance(capability_type, str)
+            and capability_type.strip().casefold() in _STORAGE_SEPARATE_TYPES
+        ):
             return ()
         return ProviderOperatorSurface._allowed_actions(
             is_owner=is_owner,
