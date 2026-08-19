@@ -258,7 +258,7 @@ exit /b 0
 
 :resolve_build_commit
 set "FCP_BUILD_COMMIT="
-for /f "usebackq delims=" %%C in (`git rev-parse --verify HEAD^^{commit} 2^>nul`) do set "FCP_BUILD_COMMIT=%%C"
+for /f "usebackq delims=" %%C in (`git rev-parse --verify HEAD 2^>nul`) do set "FCP_BUILD_COMMIT=%%C"
 if not defined FCP_BUILD_COMMIT exit /b 1
 powershell -NoProfile -Command "if ('%FCP_BUILD_COMMIT%' -match '^[0-9a-fA-F]{40}$') { exit 0 } else { exit 1 }"
 if errorlevel 1 (

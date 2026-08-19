@@ -281,6 +281,73 @@ def test_windows_scaffolding_repair_restores_real_dirty_checkout(tmp_path: Path)
     assert clean.stdout == ""
 
 
+@pytest.mark.skipif(first.os.name != "nt", reason="requires real Windows cmd.exe and git")
+def test_windows_build_commit_resolution_executes_real_batch(tmp_path: Path) -> None:
+    source_script = (ROOT / "start.cmd").read_text(encoding="utf-8")
+    resolver = source_script.split("\n:resolve_build_commit", maxsplit=1)[1].split(
+        "\n:start_update_agent", maxsplit=1
+    )[0]
+    assert "HEAD^^{commit}" not in resolver
+    assert "git rev-parse --verify HEAD 2^>nul" in resolver
+
+    checkout = tmp_path / "FCP clean checkout with spaces"
+    checkout.mkdir()
+    tracked = checkout / "tracked.txt"
+    tracked.write_text("clean checkout\n", encoding="utf-8")
+    subprocess.run(["git", "init"], cwd=checkout, check=True, capture_output=True, text=True)
+    subprocess.run(["git", "add", "tracked.txt"], cwd=checkout, check=True, capture_output=True, text=True)
+    subprocess.run(
+        [
+            "git",
+            "-c",
+            "user.name=FCP Test",
+            "-c",
+            "user.email=fcp-test@example.invalid",
+            "commit",
+            "-m",
+            "seed checkout",
+        ],
+        cwd=checkout,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    expected = subprocess.run(
+        ["git", "rev-parse", "HEAD"],
+        cwd=checkout,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.strip().lower()
+
+    resolved_path = tmp_path / "resolved.txt"
+    wrapper = tmp_path / "resolve-only.cmd"
+    wrapper.write_text(
+        "@echo off\n"
+        "setlocal EnableExtensions\n"
+        f'cd /d "{checkout}"\n'
+        "call :resolve_build_commit\n"
+        "if errorlevel 1 exit /b %ERRORLEVEL%\n"
+        f'>"{resolved_path}" echo %FCP_BUILD_COMMIT%\n'
+        "exit /b 0\n\n"
+        ":resolve_build_commit\n"
+        + resolver.lstrip("\n")
+        + "\n",
+        encoding="utf-8",
+    )
+
+    completed = subprocess.run(
+        [first.os.environ.get("COMSPEC") or "cmd.exe", "/d", "/c", "call", str(wrapper)],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+    assert resolved_path.read_text(encoding="utf-8").strip() == expected
+
+
 def test_first_device_launchers_delegate_to_memory_only_host_orchestrator() -> None:
     windows = (ROOT / "start-tailscale.cmd").read_text(encoding="utf-8")
     posix = (ROOT / "start-tailscale.sh").read_text(encoding="utf-8")
