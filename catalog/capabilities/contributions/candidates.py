@@ -16,12 +16,34 @@ from catalog.federation.onboarding_models import (
     ContributionPolicyState,
     DeviceInspectionSnapshot,
 )
+from catalog.federation.storage_protocol import STORAGE_PROTOCOL
 
 from .types import CandidateRecommendation, CandidateSource, LocalContributionDescriptor
+
+_LEGACY_STORAGE_CANDIDATE_PROTOCOL = "fcp-storage-candidate"
 
 
 def _utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _identity_protocol(descriptor: LocalContributionDescriptor) -> str:
+    """Keep the v1 storage candidate identity stable across protocol correction.
+
+    The first physical v1 builds used the authority-free storage benchmark protocol
+    as part of the candidate hash.  The Federation publication later corrected the
+    descriptor to the real storage protocol.  Existing enabled intent is keyed by
+    the original candidate ID, so changing that hash would orphan a valid storage
+    decision during an ordinary upgrade.  Only the supported storage protocol gets
+    this compatibility identity; unrelated protocol changes still produce a new ID.
+    """
+
+    if (
+        descriptor.capability_type == "storage"
+        and descriptor.capability_protocol == STORAGE_PROTOCOL
+    ):
+        return _LEGACY_STORAGE_CANDIDATE_PROTOCOL
+    return descriptor.capability_protocol
 
 
 def _candidate_id(device_id: str, descriptor: LocalContributionDescriptor) -> str:
@@ -30,7 +52,7 @@ def _candidate_id(device_id: str, descriptor: LocalContributionDescriptor) -> st
             "device_id": device_id,
             "logical_service_id": descriptor.logical_service_id,
             "capability_type": descriptor.capability_type,
-            "capability_protocol": descriptor.capability_protocol,
+            "capability_protocol": _identity_protocol(descriptor),
         },
         sort_keys=True,
         separators=(",", ":"),
