@@ -4,6 +4,9 @@ from datetime import datetime, timezone
 
 from flask import Flask
 
+from catalog.capabilities.benchmarking.adapters.storage import StorageCandidateAdapter
+from catalog.capabilities.contributions.candidates import _candidate_id
+from catalog.capabilities.contributions.types import LocalContributionDescriptor
 from catalog.capabilities.operator_surface import ProviderActivationState
 from catalog.capabilities.storage_authority_enrollment import (
     STORAGE_AUTHORITY_SCHEMA,
@@ -20,6 +23,7 @@ from catalog.flask_app.services.pending_contribution_approval import (
 )
 
 NOW = datetime(2026, 8, 19, 8, 50, tzinfo=timezone.utc)
+_LEGACY_STORAGE_CANDIDATE_PROTOCOL = "fcp-storage-candidate"
 
 
 def test_builtin_storage_candidate_matches_storage_authority_protocol(tmp_path) -> None:
@@ -30,6 +34,7 @@ def test_builtin_storage_candidate_matches_storage_authority_protocol(tmp_path) 
 
     assert spec.protocol == STORAGE_PROTOCOL
     assert spec.capacity_envelope["protocol_version"] == STORAGE_PROTOCOL_VERSION
+    assert StorageCandidateAdapter.definition.capability_protocol == STORAGE_PROTOCOL
 
     announcement = CapabilityAnnouncement(
         capability_id="candidate-storage",
@@ -60,6 +65,30 @@ def test_builtin_storage_candidate_matches_storage_authority_protocol(tmp_path) 
     )
 
     assert parse_storage_authority_evidence(announcement) is not None
+
+
+def test_storage_protocol_correction_preserves_existing_candidate_identity(tmp_path) -> None:
+    app = Flask(__name__)
+    app.config["CAPABILITY_ONBOARDING_STORAGE_PROBE_DIRECTORY"] = str(tmp_path / "probe")
+    with app.app_context():
+        spec = _build_bundle().storage_spec
+
+    shared = {
+        "logical_service_id": spec.provider_id,
+        "capability_type": "storage",
+        "display_label": spec.display_label,
+        "capacity_envelope": dict(spec.capacity_envelope),
+    }
+    legacy = LocalContributionDescriptor(
+        capability_protocol=_LEGACY_STORAGE_CANDIDATE_PROTOCOL,
+        **shared,
+    )
+    corrected = LocalContributionDescriptor(
+        capability_protocol=STORAGE_PROTOCOL,
+        **shared,
+    )
+
+    assert _candidate_id("node-a", corrected) == _candidate_id("node-a", legacy)
 
 
 def test_storage_capabilities_never_offer_generic_provider_actions() -> None:
