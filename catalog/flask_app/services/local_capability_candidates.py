@@ -355,7 +355,7 @@ class CreatorBootstrapStorageContributionAdapter:
         if context is None:
             raise FederationOperationError(
                 "contribution-federation-required",
-                "a trusted federation connection is required",
+                "a trusted federation connection is required before contributions",
                 "binding",
             )
         session_id = context.binding.internal_session_id
@@ -425,12 +425,13 @@ def _build_bundle() -> LocalCandidateBundle:
     )
     storage_spec = StorageCandidateSpec(
         provider_id=_STORAGE_PROVIDER_ID,
-        protocol="fcp-storage-candidate",
+        protocol=STORAGE_PROTOCOL,
         display_label="Local FCP data storage",
         capacity_envelope={
             "kind": "host-mounted-local-data",
             "scope": "candidate-only",
             "probe_payload_bytes": 256,
+            "protocol_version": STORAGE_PROTOCOL_VERSION,
         },
     )
     return LocalCandidateBundle(
