@@ -6,6 +6,7 @@ cd /d "%~dp0"
 
 set "FCP_START_MODE="
 set "FCP_INITIALIZE_FEDERATION="
+if not defined COMPOSE_PROJECT_NAME set "COMPOSE_PROJECT_NAME=fcp"
 
 :parse_args
 if "%~1"=="" goto :arguments_ready
