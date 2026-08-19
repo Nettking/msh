@@ -11,8 +11,9 @@ narrow product rule: the session creator may approve an already-requested
 but remains ineligible for resource binding until the member later advertises
 ``READY``.
 
-No storage assignment, compute activation, provider endpoint, executable, or
-other capability authority is created here.
+Storage and logical storage-control capabilities stay entirely outside this
+provider-enrollment authority. Their assignment and leadership are owned by the
+separate storage control plane.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ from flask import Flask, current_app
 
 from catalog.capabilities.operator_surface import (
     ProviderActivationState,
+    ProviderOperatorAction,
     ProviderOperatorSurface,
 )
 from catalog.capabilities.provider_enrollment import (
@@ -53,6 +55,7 @@ _EXTENSION_KEY = "capability_first_provider_operator_surface"
 _DEFAULT_ENROLLMENT_NAME = "provider_enrollment.sqlite3"
 _DEFAULT_HEALTH_NAME = "provider_health.sqlite3"
 _CAPABILITY_FIRST_KIND = "capability-first-candidate"
+_STORAGE_SEPARATE_TYPES = frozenset({"storage", "storage-control"})
 
 
 def _utc(value: datetime) -> datetime:
@@ -74,6 +77,10 @@ def _is_capability_first_pending(announcement: CapabilityAnnouncement) -> bool:
     )
 
 
+def _is_storage_separate(announcement: CapabilityAnnouncement) -> bool:
+    return announcement.type.strip().casefold() in _STORAGE_SEPARATE_TYPES
+
+
 class CapabilityFirstProviderEnrollmentService(ActiveLeaderProviderEnrollmentService):
     """F8.1 enrollment with explicit approval of capability-first REGISTERING.
 
@@ -81,7 +88,39 @@ class CapabilityFirstProviderEnrollmentService(ActiveLeaderProviderEnrollmentSer
     unrelated REGISTERING announcements keep the frozen F8.1 READY-only approval
     rule. The core store also keeps ``eligible_for_resource_binding`` strict:
     APPROVED is not sufficient; the reconciled announcement must also be READY.
+
+    Storage and storage-control are rejected here because generic provider
+    enrollment is not an authority path for logical storage.
     """
+
+    def request(
+        self,
+        *,
+        session_id: str,
+        capability_id: str,
+        actor_node_id: str,
+        command_id: str,
+    ) -> ProviderEnrollmentRecord:
+        # Requests remain member-owned. Only the leader may make approval
+        # decisions, but a trusted member must still be able to request its own
+        # ordinary provider enrollment through the existing F8.1 path.
+        announcement = self._announcement(
+            session_id=session_id,
+            capability_id=capability_id,
+            actor_node_id=actor_node_id,
+        )
+        if _is_storage_separate(announcement):
+            raise FederationOperationError(
+                "provider-enrollment-not-applicable",
+                "storage authority is managed by the separate storage control plane",
+                "capability_id",
+            )
+        return super().request(
+            session_id=session_id,
+            capability_id=capability_id,
+            actor_node_id=actor_node_id,
+            command_id=command_id,
+        )
 
     def approve(
         self,
@@ -101,6 +140,12 @@ class CapabilityFirstProviderEnrollmentService(ActiveLeaderProviderEnrollmentSer
             capability_id=capability_id,
             actor_node_id=actor_node_id,
         )
+        if _is_storage_separate(announcement):
+            raise FederationOperationError(
+                "provider-enrollment-not-applicable",
+                "storage authority is managed by the separate storage control plane",
+                "capability_id",
+            )
         if not _is_capability_first_pending(announcement):
             return super().approve(
                 session_id=session_id,
@@ -188,7 +233,30 @@ class CapabilityFirstProviderEnrollmentService(ActiveLeaderProviderEnrollmentSer
 
 
 class CapabilityFirstProviderOperatorSurface(ActiveLeaderProviderOperatorSurface):
-    """Present capability-first storage approval without inventing activation."""
+    """Keep storage status visible without exposing generic provider controls."""
+
+    @staticmethod
+    def _allowed_actions(
+        *,
+        is_owner: bool,
+        announcement: CapabilityAnnouncement | None,
+        enrollment: ProviderEnrollmentRecord | None,
+    ) -> tuple[ProviderOperatorAction, ...]:
+        capability_type = (
+            announcement.type
+            if announcement is not None
+            else (None if enrollment is None else enrollment.capability_type)
+        )
+        if (
+            isinstance(capability_type, str)
+            and capability_type.strip().casefold() in _STORAGE_SEPARATE_TYPES
+        ):
+            return ()
+        return ProviderOperatorSurface._allowed_actions(
+            is_owner=is_owner,
+            announcement=announcement,
+            enrollment=enrollment,
+        )
 
     def _activation(
         self,
@@ -198,35 +266,22 @@ class CapabilityFirstProviderOperatorSurface(ActiveLeaderProviderOperatorSurface
         health_state: ProviderHealthState,
         enrollment: ProviderEnrollmentRecord | None,
     ) -> tuple[ProviderActivationState, str, bool | None]:
-        if capability_type != "storage":
-            return super()._activation(
-                capability_id=capability_id,
-                capability_type=capability_type,
-                health_state=health_state,
-                enrollment=enrollment,
-            )
-        if enrollment is None:
+        normalized = capability_type.strip().casefold()
+        if normalized in _STORAGE_SEPARATE_TYPES:
             return (
-                ProviderActivationState.UNAVAILABLE,
-                "enrollment-not-requested",
+                ProviderActivationState.NOT_APPLICABLE,
+                (
+                    "storage-control-plane-separate"
+                    if normalized == "storage"
+                    else "logical-storage-authority-separate"
+                ),
                 None,
             )
-        if enrollment.state is not ProviderEnrollmentState.APPROVED:
-            return (
-                ProviderActivationState.UNAVAILABLE,
-                f"enrollment-{enrollment.state.value}",
-                None,
-            )
-        if enrollment.announcement_status is not CapabilityStatus.READY:
-            return (
-                ProviderActivationState.UNAVAILABLE,
-                "approved-waiting-for-storage-runtime",
-                None,
-            )
-        return (
-            ProviderActivationState.NOT_APPLICABLE,
-            "storage-control-plane-separate",
-            None,
+        return super()._activation(
+            capability_id=capability_id,
+            capability_type=capability_type,
+            health_state=health_state,
+            enrollment=enrollment,
         )
 
 
