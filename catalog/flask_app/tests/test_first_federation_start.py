@@ -84,6 +84,7 @@ def test_first_device_collects_reset_and_admin_before_long_startup(monkeypatch) 
 
 def test_fresh_start_subprocess_receives_only_reset_not_admin_credentials(monkeypatch) -> None:
     calls: list[dict[str, object]] = []
+    monkeypatch.delenv("FCP_SUPPRESS_BROWSER", raising=False)
 
     def fake_run(command, **kwargs):
         calls.append({"command": command, **kwargs})
@@ -95,6 +96,10 @@ def test_fresh_start_subprocess_receives_only_reset_not_admin_credentials(monkey
 
     assert len(calls) == 1
     assert calls[0]["input"] == "RESET\n"
+    child_env = calls[0]["env"]
+    assert isinstance(child_env, dict)
+    assert child_env["FCP_SUPPRESS_BROWSER"] == "1"
+    assert "FCP_SUPPRESS_BROWSER" not in first.os.environ
     encoded = repr(calls[0])
     assert "admin@example.com" not in encoded
     assert "private-password" not in encoded
@@ -126,6 +131,7 @@ def test_windows_fresh_start_uses_cmd_call_without_nested_quote_string(monkeypat
     assert "/s" not in command
     assert not str(command[4]).startswith('"')
     assert calls[0]["input"] == "RESET\n"
+    assert calls[0]["env"]["FCP_SUPPRESS_BROWSER"] == "1"
 
 
 @pytest.mark.skipif(first.os.name != "nt", reason="requires real Windows cmd.exe")
@@ -138,7 +144,7 @@ def test_windows_fresh_start_executes_real_batch_with_reset_stdin(
     (root / "start.cmd").write_text(
         "@echo off\n"
         "set /p FCP_RESET_CONFIRM=\n"
-        '>"%~dp0marker.txt" echo %FCP_RESET_CONFIRM%\n'
+        '>"%~dp0marker.txt" echo %FCP_RESET_CONFIRM%:%FCP_SUPPRESS_BROWSER%\n'
         "exit /b 0\n",
         encoding="utf-8",
     )
@@ -146,7 +152,7 @@ def test_windows_fresh_start_executes_real_batch_with_reset_stdin(
 
     first._run_fresh_reset()
 
-    assert (root / "marker.txt").read_text(encoding="utf-8").strip() == "RESET"
+    assert (root / "marker.txt").read_text(encoding="utf-8").strip() == "RESET:1"
 
 
 def test_zero_touch_initializer_passes_both_human_credentials_only_on_stdin(monkeypatch) -> None:
@@ -351,6 +357,7 @@ def test_windows_build_commit_resolution_executes_real_batch(tmp_path: Path) -> 
 def test_first_device_launchers_delegate_to_memory_only_host_orchestrator() -> None:
     windows = (ROOT / "start-tailscale.cmd").read_text(encoding="utf-8")
     posix = (ROOT / "start-tailscale.sh").read_text(encoding="utf-8")
+    windows_start = (ROOT / "start.cmd").read_text(encoding="utf-8")
     orchestrator = (ROOT / "scripts" / "first_federation_start.py").read_text(
         encoding="utf-8"
     )
@@ -359,7 +366,13 @@ def test_first_device_launchers_delegate_to_memory_only_host_orchestrator() -> N
     assert "scripts/first_federation_start.py" in posix
     assert "getpass.getpass" in orchestrator
     assert 'input="RESET\\n"' in orchestrator
+    assert 'child_env["FCP_SUPPRESS_BROWSER"] = "1"' in orchestrator
     assert "first_admin_credentials=(email, password)" in orchestrator
+    assert orchestrator.index("result = zero_touch.zero_touch_start(") < orchestrator.index(
+        "webbrowser.open("
+    )
+    assert 'if /I "%FCP_SUPPRESS_BROWSER%"=="1" (' in windows_start
+    assert "Browser opening deferred to the calling startup orchestrator." in windows_start
     assert "--password" not in orchestrator
     assert "--email" not in orchestrator
     assert "FCP_ADMIN_PASSWORD" not in orchestrator

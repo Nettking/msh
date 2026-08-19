@@ -236,7 +236,11 @@ echo Setup, Federation identity, pairing state, recording state, checkpoints,
 echo downloaded Ollama models, and recorded data are preserved between normal starts.
 echo.
 
-start "" "%FCP_OPEN_URL%"
+if /I "%FCP_SUPPRESS_BROWSER%"=="1" (
+    echo Browser opening deferred to the calling startup orchestrator.
+) else (
+    start "" "%FCP_OPEN_URL%"
+)
 exit /b 0
 
 :repair_checkout_scaffolding

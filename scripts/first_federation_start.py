@@ -48,10 +48,12 @@ def _run_fresh_reset() -> None:
         ]
     else:
         command = ["sh", str(ROOT / "start.sh"), "--fresh"]
+    child_env = os.environ.copy()
+    child_env["FCP_SUPPRESS_BROWSER"] = "1"
     completed = subprocess.run(
         command,
         cwd=ROOT,
-        env=os.environ.copy(),
+        env=child_env,
         input="RESET\n",
         text=True,
         check=False,
