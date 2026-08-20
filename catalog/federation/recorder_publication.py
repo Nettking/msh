@@ -25,7 +25,11 @@ from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
 from .errors import FederationValidationError
 from .outbox import MAX_PAYLOAD_BYTES
-from .recorder_delivery import DurableRecorderDeliveryQueue, RecorderDeliveryRunResult
+from .recorder_delivery import (
+    RECORDER_STORAGE_SCHEMA,
+    DurableRecorderDeliveryQueue,
+    RecorderDeliveryRunResult,
+)
 
 RECORDER_TELEMETRY_SCHEMA = "fcp.mtconnect.observations.v1"
 RECORDER_DATASET_SCHEMA_NAME = "fcp.mtconnect.observations"
@@ -653,7 +657,7 @@ class RecorderFederationPublisher:
         self.queue = queue
 
     async def run_once(self, *, limit: int = 100) -> RecorderPublisherRunResult:
-        reconcile = self.reconciler.reconcile()
+        reconcile = await asyncio.to_thread(self.reconciler.reconcile)
         delivery = await self.queue.run_once(limit=limit)
         return RecorderPublisherRunResult(
             reconcile=reconcile,
@@ -726,6 +730,17 @@ class RecorderFederationDeliveryWorker:
             ) from exc
         return stat.st_mtime_ns, stat.st_size
 
+    @staticmethod
+    def _belongs_to_queue(entry: object, queue: DurableRecorderDeliveryQueue) -> bool:
+        return (
+            getattr(entry, "schema_id", None) == RECORDER_STORAGE_SCHEMA
+            and getattr(entry, "session_id", None) == queue.session_id
+            and (
+                queue.destination_id is None
+                or getattr(entry, "destination_id", None) == queue.destination_id
+            )
+        )
+
     async def run_cycle(
         self,
         *,
@@ -738,13 +753,31 @@ class RecorderFederationDeliveryWorker:
             or stamp != self._last_checkpoint_stamp
         )
         reconcile: RecorderReconcileResult | None = None
-        if changed:
-            reconcile = self.reconciler.reconcile()
+
+        # On restart an offline recorder can already have thousands of durable
+        # batches waiting in its outbox. Re-reading every historical archive
+        # before attempting those already-prepared rows delays the first remote
+        # commit and, because reconciliation is filesystem/JSON/SQLite heavy,
+        # can starve the shared relay loop long enough for the coordinator to
+        # declare a healthy recorder heartbeat stale. Drain the durable backlog
+        # first; once it is empty, reconcile the checkpoint-covered archives to
+        # catch anything that was committed locally but not yet enqueued.
+        current_backlog = False
+        if changed and not force_reconcile:
+            pending_snapshot = await asyncio.to_thread(self.queue.outbox.pending)
+            current_backlog = any(
+                self._belongs_to_queue(entry, self.queue)
+                for entry in pending_snapshot
+            )
+
+        if changed and (force_reconcile or not current_backlog):
+            reconcile = await asyncio.to_thread(self.reconciler.reconcile)
             # Record the stamp observed before reconciliation. If capture commits
             # again during the scan, the next cycle sees the newer stamp and
             # reconciles again rather than losing that wakeup.
             self._last_checkpoint_stamp = stamp
             self._reconciled_once = True
+
         delivery = await self.queue.run_once(limit=self.delivery_limit)
         return RecorderWorkerCycleResult(
             checkpoint_changed=changed,
