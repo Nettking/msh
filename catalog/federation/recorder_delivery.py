@@ -74,6 +74,7 @@ class DurableRecorderDeliveryQueue:
             destination_id.strip() if isinstance(destination_id, str) else None
         )
         self.clock = clock
+        self._startup_deferred_retry_available = True
 
     def enqueue(
         self,
@@ -134,7 +135,7 @@ class DurableRecorderDeliveryQueue:
         self,
         *,
         limit: int = 100,
-        retry_deferred_heads: bool = False,
+        retry_deferred_heads: bool | None = None,
     ) -> RecorderDeliveryRunResult:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
             raise FederationValidationError(
@@ -142,11 +143,13 @@ class DurableRecorderDeliveryQueue:
                 "limit",
                 "must be a positive integer",
             )
-        if not isinstance(retry_deferred_heads, bool):
+        if retry_deferred_heads is not None and not isinstance(
+            retry_deferred_heads, bool
+        ):
             raise FederationValidationError(
                 "invalid-recorder-delivery",
                 "retry_deferred_heads",
-                "must be a boolean",
+                "must be a boolean when supplied",
             )
 
         # Reading a large durable backlog parses every pending JSON payload. Do
@@ -154,6 +157,14 @@ class DurableRecorderDeliveryQueue:
         # so heartbeat and routed replies remain live while an offline backlog
         # is being recovered.
         pending_snapshot = await asyncio.to_thread(self.outbox.pending)
+
+        # A new queue object is a new process/runtime delivery session. Consume
+        # its one restart retry on the first pass regardless of whether a
+        # deferred row exists, so normal later backoff cannot accidentally gain
+        # a retry just because the queue started while it was empty.
+        if retry_deferred_heads is None:
+            retry_deferred_heads = self._startup_deferred_retry_available
+        self._startup_deferred_retry_available = False
 
         # Preserve recorder sequence order independently per logical dataset.
         # A failed or not-yet-due older entry fences newer entries for that same
@@ -198,7 +209,7 @@ class DurableRecorderDeliveryQueue:
                 # during an unchanged outage, but after an operator has upgraded
                 # or repaired the remote authority it can leave a zero-touch
                 # recorder waiting an hour before proving the new path. On the
-                # worker's first cycle, allow exactly the oldest deferred row of
+                # queue's first pass, allow exactly the oldest deferred row of
                 # each ordered dataset one immediate attempt. No timestamp,
                 # attempt counter, error, payload, or later row is rewritten.
                 if (
