@@ -6,8 +6,19 @@ from types import SimpleNamespace
 from scripts import start_tailscale_recorder as launcher
 
 
+def _joined(*session_ids: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        joined_sessions=lambda: tuple(
+            SimpleNamespace(session_id=item) for item in session_ids
+        )
+    )
+
+
 def test_restore_remote_session_creator_from_revision_one_event() -> None:
     class Client:
+        # Recovery is a bounded replay, so it only covers joined sessions.
+        state = _joined("session-1")
+
         async def coordinator_replay_page(
             self,
             *,
@@ -50,6 +61,8 @@ def test_restore_remote_session_creator_from_revision_one_event() -> None:
 
 def test_restore_remote_session_creator_never_overwrites_status_owner() -> None:
     class Client:
+        state = _joined("session-1")
+
         async def coordinator_replay_page(self, **_kwargs):
             raise AssertionError("complete status must not replay creator")
 

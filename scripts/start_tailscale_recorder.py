@@ -8,11 +8,16 @@ import shutil
 import socket
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
 from typing import Any, Final
 from urllib.parse import urlsplit
 
 import start_recorder
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.flask_app.services.federation_pairing_service import (
     PairingCodeCodec,
     RemotePairingStore,
@@ -36,12 +41,20 @@ async def _restore_remote_session_creators(
     authority, so recover that immutable identity from the authoritative
     ``session.created`` event rather than guessing from connectivity or
     capabilities.
+
+    Reading that event is a bounded authenticated replay of a session this node
+    has already joined, so sessions the local state does not yet know are left
+    untouched. ``RelayNodeClient.connect`` reads coordinator status before it
+    reconciles local membership, and a status probe must never be what stops a
+    node from connecting. An unrecoverable creator simply stays absent, which
+    recorder selection already reports as an unavailable owner.
     """
 
     sessions = status.get("sessions")
     if not isinstance(sessions, list):
         return status
 
+    joined = {item.session_id for item in client.state.joined_sessions()}
     replacements: dict[str, str] = {}
     for value in sessions:
         if not isinstance(value, dict):
@@ -51,14 +64,18 @@ async def _restore_remote_session_creators(
         if (
             not isinstance(session_id, str)
             or not session_id
+            or session_id not in joined
             or (isinstance(creator, str) and creator)
         ):
             continue
-        events, _current_revision = await client.coordinator_replay_page(
-            session_id=session_id,
-            last_applied_revision=0,
-            limit=1,
-        )
+        try:
+            events, _current_revision = await client.coordinator_replay_page(
+                session_id=session_id,
+                last_applied_revision=0,
+                limit=1,
+            )
+        except (FederationOperationError, FederationValidationError):
+            continue
         if not events:
             continue
         first = events[0]
@@ -88,11 +105,17 @@ async def _restore_remote_session_creators(
     return restored
 
 
-def _install_remote_session_creator_fallback() -> None:
-    """Make complete remote status available to recorder storage selection."""
+def _install_remote_session_creator_fallback() -> Callable[[], None]:
+    """Make complete remote status available to recorder storage selection.
+
+    Returns the callable that restores the original method. The launcher owns
+    one recorder process, but the entry point is also exercised in-process, and
+    a class patch that outlives its caller would silently change every later
+    client in that process.
+    """
 
     if getattr(RelayNodeClient.coordinator_status, "_fcp_creator_fallback", False):
-        return
+        return lambda: None
     original = RelayNodeClient.coordinator_status
 
     async def coordinator_status(self: RelayNodeClient) -> dict[str, Any]:
@@ -101,6 +124,12 @@ def _install_remote_session_creator_fallback() -> None:
 
     coordinator_status._fcp_creator_fallback = True
     RelayNodeClient.coordinator_status = coordinator_status
+
+    def restore() -> None:
+        if RelayNodeClient.coordinator_status is coordinator_status:
+            RelayNodeClient.coordinator_status = original
+
+    return restore
 
 
 def _option_value(arguments: list[str], name: str) -> str | None:
@@ -316,6 +345,7 @@ def _require_tailnet_relay(relay_url: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     pairing_key: str | None = None
+    restore_coordinator_status: Callable[[], None] = lambda: None
     try:
         try:
             recorder_arguments = _recorder_arguments(arguments)
@@ -341,7 +371,7 @@ def main(argv: list[str] | None = None) -> int:
             # removed from the environment in the finally block below.
             os.environ["FCP_RECORDER_FEDERATION_KEY"] = pairing_key
             pairing_key = None
-        _install_remote_session_creator_fallback()
+        restore_coordinator_status = _install_remote_session_creator_fallback()
         print(f"Tailscale ready: {address}")
         print(
             "Starting the recorder; Federation membership and the recorder data publication route are required."
@@ -350,6 +380,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         pairing_key = None
         os.environ.pop("FCP_RECORDER_FEDERATION_KEY", None)
+        restore_coordinator_status()
 
 
 if __name__ == "__main__":
