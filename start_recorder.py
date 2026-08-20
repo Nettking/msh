@@ -53,7 +53,20 @@ from catalog.mtconnect_recorder.federation_node import (
     MAX_SHARING_READY_SECONDS,
     RecorderFederationNode,
 )
+from catalog.mtconnect_recorder.federation_update import (
+    RecorderFederationUpdateWorker,
+    RecorderHostUpdateAgentWorker,
+    RecorderUpdateActivationWatcher,
+    approved_update_restart,
+)
 from catalog.mtconnect_recorder.upgrade_compat import ensure_recorder_upgrade_config
+
+#: Reserved for one thing only: a native update the supervisor pre-validated,
+#: this process consented to, and capture ended for. Ctrl+C, ``--once``, an
+#: ordinary stop and every failure keep their existing exit codes so a
+#: supervisor can never relaunch behind an operator who asked the recorder to
+#: stop. The value follows the ``EX_TEMPFAIL`` convention for "retry me".
+APPROVED_UPDATE_RESTART_EXIT_CODE = 75
 
 _AUTO_CONFIG_SCHEMA = "fcp.mtconnect_recorder.autoconfig.v1"
 _CONTROL_SCHEMA = "fcp.mtconnect_recorder.control.v1"
@@ -468,6 +481,50 @@ def _start_federation(
                 pass
 
 
+def _shut_down(label: str, stop: Any) -> None:
+    """Run one worker's cleanup so a failure cannot skip the ones after it.
+
+    Recorder control, publication and the relay client each own durable state.
+    Letting the first raising cleanup abandon the rest is how leaked workers and
+    half-closed connections happen, so every failure is reported and bounded
+    here instead.
+    """
+
+    try:
+        if stop() is False:
+            print(
+                f"The recorder {label} did not finish within its shutdown "
+                "limit; it may still hold a bounded host operation.",
+                file=sys.stderr,
+            )
+    except Exception as exc:  # noqa: BLE001 - shutdown must reach every worker
+        print(
+            f"The recorder {label} did not shut down cleanly: "
+            f"{type(exc).__name__}.",
+            file=sys.stderr,
+        )
+
+
+def _publish_federation_status(node: RecorderFederationNode) -> None:
+    """Let capture publish this recorder's Federation health in its heartbeat."""
+
+    # Imported here rather than at module scope: the recorder runtime freezes
+    # its configuration from the environment at import time, and main() sets
+    # that environment above.
+    from catalog.mtconnect_recorder.runtime import set_federation_status_provider
+
+    def provider() -> dict[str, Any]:
+        snapshot = node.snapshot()
+        return {
+            "status": snapshot.status,
+            "node_id": snapshot.node_id,
+            "session_id": snapshot.session_id,
+            "storage_state": snapshot.storage_state,
+        }
+
+    set_federation_status_provider(provider)
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -548,6 +605,9 @@ def main(argv: list[str] | None = None) -> int:
 
     federation_node: RecorderFederationNode | None = None
     federation_control: RecorderFederationControlWorker | None = None
+    federation_update: RecorderFederationUpdateWorker | None = None
+    host_update: RecorderHostUpdateAgentWorker | None = None
+    activation: RecorderUpdateActivationWatcher | None = None
     try:
         try:
             federation_node = _start_federation(
@@ -578,6 +638,27 @@ def main(argv: list[str] | None = None) -> int:
                 data_directory=data_dir,
             )
             federation_control.start()
+            # Federation health travels in the recorder's own heartbeat so a
+            # host updater can prove liveness and membership from one file.
+            _publish_federation_status(federation_node)
+            federation_update = RecorderFederationUpdateWorker(
+                federation_node,
+                data_directory=data_dir,
+            )
+            federation_update.start()
+
+        # The host update agent runs here rather than as a separate process:
+        # this process already knows its data directory and repository, so a
+        # separate one would put another interpreter on the supported startup
+        # path just to resolve them. It starts only when supervised.
+        host_update = RecorderHostUpdateAgentWorker(data_directory=data_dir)
+        host_update.start()
+
+        # The watcher runs even without a Federation node: an activation left
+        # behind by an earlier process must still be evaluated and refused
+        # rather than sitting on disk unexamined.
+        activation = RecorderUpdateActivationWatcher(data_directory=data_dir)
+        activation.start()
 
         print("Starting loss-aware MTConnect recorder")
         if parsed_sources:
@@ -604,12 +685,27 @@ def main(argv: list[str] | None = None) -> int:
             runpy.run_path(str(recorder_path), run_name="__main__")
         finally:
             sys.argv = original_argv
+        if approved_update_restart(activation):
+            print(
+                "Capture stopped for an approved Federation update; the "
+                "supervisor will update this checkout and restart the recorder."
+            )
+            return APPROVED_UPDATE_RESTART_EXIT_CODE
         return 0
     finally:
+        # Stop the update path first: it is the only worker that may still be
+        # holding a bounded host operation, and recorder control, publication
+        # and the relay client must all shut down after it rather than under it.
+        if activation is not None:
+            _shut_down("update activation watcher", activation.stop)
+        if host_update is not None:
+            _shut_down("host update agent", host_update.stop)
+        if federation_update is not None:
+            _shut_down("Federation update worker", federation_update.stop)
         if federation_control is not None:
-            federation_control.stop()
+            _shut_down("Federation control worker", federation_control.stop)
         if federation_node is not None:
-            federation_node.stop()
+            _shut_down("Federation node", federation_node.stop)
 
 
 if __name__ == "__main__":

@@ -40,6 +40,11 @@ jobs:
           catalog/flask_app/tests/test_windows_migration_script.py
           catalog/flask_app/tests/test_windows_relay_volume_selector.py
           scripts/posix/fcp_recorder_update_agent.py
+          scripts/fcp_native_recorder_update_agent.py
+          catalog/mtconnect_recorder/native_identity.py
+          catalog/mtconnect_recorder/native_update.py
+          catalog/mtconnect_recorder/native_update_agent.py
+          catalog/mtconnect_recorder/federation_update.py
           termux/fcp_phone_update_codec.py
       - name: Run update contract tests
         run: >-
@@ -51,6 +56,9 @@ jobs:
           catalog/flask_app/tests/test_termux_federation_update_agent.py
           catalog/flask_app/tests/test_windows_migration_script.py
           catalog/flask_app/tests/test_windows_relay_volume_selector.py
+          catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py
+          catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py
+          catalog/mtconnect_recorder/tests/test_recorder_federation_update.py
       - name: Ruff update Python
         # TRY004: malformed event fields intentionally use the same ValueError
         # contract as the rest of the bounded protocol validator.
@@ -72,6 +80,14 @@ jobs:
           catalog/flask_app/tests/test_windows_migration_script.py
           catalog/flask_app/tests/test_windows_relay_volume_selector.py
           scripts/posix/fcp_recorder_update_agent.py
+          scripts/fcp_native_recorder_update_agent.py
+          catalog/mtconnect_recorder/native_identity.py
+          catalog/mtconnect_recorder/native_update.py
+          catalog/mtconnect_recorder/native_update_agent.py
+          catalog/mtconnect_recorder/federation_update.py
+          catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py
+          catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py
+          catalog/mtconnect_recorder/tests/test_recorder_federation_update.py
           termux/fcp_phone_update_codec.py
 
       - name: Parse and smoke Windows host agent
@@ -80,7 +96,9 @@ jobs:
         run: |
           foreach ($script in @(
             'scripts/windows/fcp_update_agent.ps1',
-            'scripts/windows/fcp_recorder_update_agent.ps1'
+            'scripts/windows/fcp_recorder_update_agent.ps1',
+            'scripts/windows/fcp_recorder_supervisor.ps1',
+            'scripts/windows/start_tailscale_recorder.ps1'
           )) {
             $tokens = $null
             $errors = $null
@@ -142,6 +160,41 @@ jobs:
           if (-not $nonzeroRejected) {
             throw 'native_nonzero_exit_was_not_rejected'
           }
+
+      - name: Smoke native recorder update agent
+        shell: bash
+        run: |
+          python scripts/fcp_native_recorder_update_agent.py \
+            --repo-root "$PWD" \
+            --data-directory "$RUNNER_TEMP/fcp-native-recorder-agent-smoke" \
+            --supervisor-session 0123456789abcdef0123456789abcdef \
+            --once
+          # A finalize with no pending activation must refuse, not mutate.
+          set +e
+          python scripts/fcp_native_recorder_update_agent.py \
+            --repo-root "$PWD" \
+            --data-directory "$RUNNER_TEMP/fcp-native-recorder-agent-smoke" \
+            --supervisor-session 0123456789abcdef0123456789abcdef \
+            --finalize
+          finalize_status=$?
+          set -e
+          if [ "$finalize_status" -ne 1 ]; then
+            echo "finalize without an activation must refuse" >&2
+            exit 1
+          fi
+          # A malformed supervisor session must never be accepted.
+          set +e
+          python scripts/fcp_native_recorder_update_agent.py \
+            --repo-root "$PWD" \
+            --data-directory "$RUNNER_TEMP/fcp-native-recorder-agent-smoke" \
+            --supervisor-session not-a-session \
+            --once
+          session_status=$?
+          set -e
+          if [ "$session_status" -eq 0 ]; then
+            echo "a malformed supervisor session must be refused" >&2
+            exit 1
+          fi
 
       - name: Smoke Windows activation exit handling
         if: runner.os == 'Windows'

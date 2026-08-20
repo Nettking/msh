@@ -10,6 +10,8 @@ on:
       - "start-tailscale-recorder.cmd"
       - "scripts/start_tailscale_recorder.py"
       - "scripts/windows/start_tailscale_recorder.ps1"
+      - "scripts/windows/fcp_recorder_supervisor.ps1"
+      - "scripts/fcp_native_recorder_update_agent.py"
       - "catalog/federation/recorder_control_events.py"
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
@@ -55,6 +57,8 @@ on:
       - "start-tailscale-recorder.cmd"
       - "scripts/start_tailscale_recorder.py"
       - "scripts/windows/start_tailscale_recorder.ps1"
+      - "scripts/windows/fcp_recorder_supervisor.ps1"
+      - "scripts/fcp_native_recorder_update_agent.py"
       - "catalog/federation/recorder_control_events.py"
       - "catalog/federation/recorder_delivery.py"
       - "catalog/federation/recorder_publication.py"
@@ -130,6 +134,7 @@ jobs:
           python -m compileall -q
           start_recorder.py
           scripts/start_tailscale_recorder.py
+          scripts/fcp_native_recorder_update_agent.py
           catalog/mtconnect_recorder
           catalog/node/storage_failover.py
           catalog/standalone-recorder_v2/standalone-recorder_v2.py
@@ -168,6 +173,9 @@ jobs:
           catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
           catalog/mtconnect_recorder/tests/test_managed_service.py
+          catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py
+          catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py
+          catalog/mtconnect_recorder/tests/test_recorder_federation_update.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
           catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py
           catalog/mtconnect_recorder/tests/test_upgrade_compat.py
@@ -191,15 +199,23 @@ jobs:
           catalog/flask_app/tests/test_federated_jsonl_product_bridge.py
           catalog/mtconnect_recorder/federation_control.py
           catalog/mtconnect_recorder/federation_node.py
+          catalog/mtconnect_recorder/federation_update.py
           catalog/mtconnect_recorder/managed_service.py
+          catalog/mtconnect_recorder/native_identity.py
+          catalog/mtconnect_recorder/native_update.py
+          catalog/mtconnect_recorder/native_update_agent.py
           catalog/mtconnect_recorder/runtime.py
           catalog/mtconnect_recorder/upgrade_compat.py
           catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
           catalog/mtconnect_recorder/tests/test_managed_service.py
+          catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py
+          catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py
+          catalog/mtconnect_recorder/tests/test_recorder_federation_update.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
           catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py
           catalog/mtconnect_recorder/tests/test_upgrade_compat.py
+          scripts/fcp_native_recorder_update_agent.py
           catalog/node/storage_failover.py
           catalog/standalone-recorder_v2/standalone-recorder_v2.py
           catalog/flask_app/app.py

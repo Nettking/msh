@@ -2,16 +2,22 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from contextlib import suppress
 from concurrent.futures import Future
+from datetime import datetime, timezone
 from types import SimpleNamespace
 
 import pytest
 
 from catalog.federation.errors import FederationOperationError
+from catalog.federation.outbox import SQLiteOutbox
+from catalog.federation.phase_d_client import PhaseDIngestOutcome
 from catalog.federation.recorder_delivery import (
     RECORDER_STORAGE_SCHEMA,
+    DurableRecorderDeliveryQueue,
     RecorderDeliveryRunResult,
 )
+from catalog.mtconnect_recorder import federation_node as federation_node_module
 from catalog.mtconnect_recorder.federation_node import (
     RecorderFederationNode,
     RecorderFederationSnapshot,
@@ -328,6 +334,214 @@ def test_headless_jsonl_publisher_uses_the_selected_storage_route() -> None:
     assert calls == [
         (state, context, "node-owner", "fcp-local-storage"),
     ]
+
+
+@pytest.mark.parametrize(
+    "jsonl_failure",
+    [False, True],
+    ids=["ready", "jsonl-failure"],
+)
+def test_publication_loop_proves_each_dataset_before_full_backlog_drain(
+    tmp_path,
+    monkeypatch,
+    jsonl_failure: bool,
+) -> None:
+    class _LoopGuardOutbox(SQLiteOutbox):
+        def __init__(self, database) -> None:
+            super().__init__(database)
+            self.forbidden_thread_id: int | None = None
+            self.pending_thread_ids: list[int] = []
+
+        def pending(self, *args, **kwargs):
+            thread_id = threading.get_ident()
+            self.pending_thread_ids.append(thread_id)
+            assert thread_id != self.forbidden_thread_id, (
+                "the durable backlog was read on the relay event-loop thread"
+            )
+            return super().pending(*args, **kwargs)
+
+    class _StatusClient:
+        async def coordinator_status(self):
+            return _status(_authority())
+
+    class _Runtime:
+        def __init__(self) -> None:
+            self.client = _StatusClient()
+
+        async def _ensure_connected(self, _state) -> None:
+            return None
+
+        def _connected_client(self):
+            return self.client
+
+    class _StorageClient:
+        def __init__(self) -> None:
+            self.batch_ids: list[str] = []
+            self.first_a_started = asyncio.Event()
+            self.release_first_a = asyncio.Event()
+            self.closed = False
+
+        async def start(self) -> None:
+            return None
+
+        async def close(self) -> None:
+            self.closed = True
+
+        async def ingest_batch(self, **kwargs):
+            batch_id = str(kwargs["batch_id"])
+            self.batch_ids.append(batch_id)
+            if batch_id == "dataset-a-batch-1":
+                self.first_a_started.set()
+                await self.release_first_a.wait()
+            elif batch_id.startswith("dataset-a-"):
+                raise AssertionError(
+                    "dataset A drained again before dataset B was probed"
+                )
+            return PhaseDIngestOutcome(committed=True)
+
+    async def scenario() -> None:
+        storage_client = _StorageClient()
+        outbox = _LoopGuardOutbox(tmp_path / "outbox.sqlite3")
+        seed_queue = DurableRecorderDeliveryQueue(
+            outbox=outbox,
+            client=storage_client,
+            session_id="session-1",
+            destination_id="telemetry",
+        )
+        created_at = datetime(2026, 8, 20, 17, 21, tzinfo=timezone.utc)
+        for index in range(1, 5):
+            seed_queue.enqueue(
+                session_id="session-1",
+                group_id="telemetry",
+                dataset_id="dataset-a",
+                batch_id=f"dataset-a-batch-{index}",
+                idempotency_key=f"dataset-a:{index}",
+                content={"dataset": "dataset-a", "index": index},
+                created_at=created_at,
+            )
+        seed_queue.enqueue(
+            session_id="session-1",
+            group_id="telemetry",
+            dataset_id="dataset-b",
+            batch_id="dataset-b-batch-1",
+            idempotency_key="dataset-b:1",
+            content={"dataset": "dataset-b", "index": 1},
+            created_at=created_at,
+        )
+
+        monkeypatch.setattr(
+            federation_node_module,
+            "SQLiteOutbox",
+            lambda _database: outbox,
+        )
+        monkeypatch.setattr(
+            federation_node_module,
+            "RelayRecorderStorageClient",
+            lambda *_args, **_kwargs: storage_client,
+        )
+
+        node = RecorderFederationNode.__new__(RecorderFederationNode)
+        node.data_directory = tmp_path
+        node.source_names = ("dataset-a", "dataset-b")
+        node.requested_storage_group = None
+        node.request_timeout = 1.0
+        node.publication_poll_seconds = 60.0
+        node.runtime = _Runtime()
+        node._lock = threading.RLock()
+        node._stop = threading.Event()
+        node._publication_future = Future()
+        node._snapshot = RecorderFederationSnapshot(
+            status="connected",
+            node_id="node-recorder",
+            federation_id="federation-1",
+            session_id="session-1",
+            storage_state="discovering",
+            jsonl_state="discovering",
+        )
+
+        async def announce_connected(_state) -> None:
+            return None
+
+        async def publish_jsonl(
+            _state,
+            *,
+            authority_node_id: str,
+            group_id: str,
+        ):
+            assert authority_node_id == "node-owner"
+            assert group_id == "telemetry"
+            if jsonl_failure:
+                raise FederationOperationError(
+                    "test-jsonl-failure",
+                    "the synthetic JSONL publication failed",
+                )
+            return SimpleNamespace(published_chunks=0)
+
+        node._announce_connected = announce_connected
+        node._publish_jsonl_once = publish_jsonl
+        state = SimpleNamespace(
+            binding=SimpleNamespace(
+                internal_session_id="session-1",
+                device_id="node-recorder",
+            )
+        )
+        outbox.forbidden_thread_id = threading.get_ident()
+        runner = asyncio.create_task(node._publication_loop(state))
+        try:
+            await asyncio.wait_for(storage_client.first_a_started.wait(), timeout=1.0)
+            readiness = (
+                None
+                if jsonl_failure
+                else asyncio.create_task(
+                    asyncio.to_thread(
+                        node.wait_until_sharing_ready,
+                        timeout_seconds=2.0,
+                    )
+                )
+            )
+            storage_client.release_first_a.set()
+            if readiness is not None:
+                snapshot = await asyncio.wait_for(readiness, timeout=3.0)
+            else:
+                deadline = asyncio.get_running_loop().time() + 2.0
+                while node.snapshot().status != "retrying":
+                    if runner.done():
+                        await runner
+                    if asyncio.get_running_loop().time() >= deadline:
+                        pytest.fail("publication failure snapshot was not reported")
+                    await asyncio.sleep(0.01)
+                snapshot = node.snapshot()
+
+            assert storage_client.batch_ids == [
+                "dataset-a-batch-1",
+                "dataset-b-batch-1",
+            ]
+            if jsonl_failure:
+                assert snapshot.status == "retrying"
+                assert snapshot.storage_state == "backlogged"
+                assert snapshot.jsonl_state == "backlogged"
+                assert snapshot.pending_batches == 3
+                assert snapshot.last_error_code == "test-jsonl-failure"
+            else:
+                assert snapshot.storage_state == "publishing"
+                assert snapshot.storage_group == "telemetry"
+                assert snapshot.last_committed_count == 2
+                assert snapshot.jsonl_state == "ready"
+            assert len(outbox.pending_thread_ids) >= 3
+            assert all(
+                thread_id != outbox.forbidden_thread_id
+                for thread_id in outbox.pending_thread_ids
+            )
+        finally:
+            node._stop.set()
+            runner.cancel()
+            with suppress(asyncio.CancelledError):
+                await runner
+            node._publication_future.cancel()
+
+        assert storage_client.closed is True
+
+    asyncio.run(scenario())
 
 
 def test_publication_cycle_status_is_session_scoped_and_failure_aware() -> None:

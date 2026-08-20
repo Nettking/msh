@@ -33,6 +33,7 @@ from .model import (
     _write_json_atomic,
     normalize_agent_base_url,
 )
+from .native_identity import runtime_identity
 from .parsing import (
     parse_probe,
     parse_stream_header,
@@ -167,6 +168,102 @@ log.addHandler(console_handler)
 log.addHandler(file_handler)
 
 
+SIGNAL_STOP_REASON = "signal"
+EXTERNAL_STOP_REASON = "external-activation"
+
+_STOP_REGISTRY_LOCK = threading.Lock()
+_STOP_TARGETS: list[RecorderRuntime] = []
+_STOP_REASON: str | None = None
+
+
+def register_stop_target(runtime: RecorderRuntime) -> None:
+    """Let an in-process supervisor stop capture without a signal or a kill.
+
+    A native update must end the current capture the same way Ctrl+C does --
+    at a commit boundary, with every worker shut down -- but it must remain
+    distinguishable from Ctrl+C so an operator stop can never be mistaken for
+    an approved update restart.
+    """
+
+    with _STOP_REGISTRY_LOCK:
+        if all(target is not runtime for target in _STOP_TARGETS):
+            _STOP_TARGETS.append(runtime)
+
+
+def unregister_stop_target(runtime: RecorderRuntime) -> None:
+    with _STOP_REGISTRY_LOCK:
+        _STOP_TARGETS[:] = [
+            target for target in _STOP_TARGETS if target is not runtime
+        ]
+
+
+def request_external_stop() -> bool:
+    """Ask every live capture runtime to finish its current cycle and exit."""
+
+    with _STOP_REGISTRY_LOCK:
+        targets = list(_STOP_TARGETS)
+    if not targets:
+        # Capture has not started yet. Reporting failure lets the caller retry
+        # rather than record a stop nothing received, which would otherwise let
+        # an ordinary later exit look like an approved update restart.
+        return False
+    # Recorded here rather than left to each target: the reason is what tells a
+    # supervisor that an approved update, and not the operator, ended capture.
+    _record_stop_reason(EXTERNAL_STOP_REASON)
+    for target in targets:
+        target.request_stop(external=True)
+    return True
+
+
+_FEDERATION_STATUS_LOCK = threading.Lock()
+_FEDERATION_STATUS_PROVIDER: Any = None
+
+
+def set_federation_status_provider(provider: Any) -> None:
+    """Publish Federation health in the same heartbeat as capture health.
+
+    A host updater must decide from *one* consistent observation whether the
+    replacement recorder is both alive and rejoined. Two files written at
+    different moments cannot answer that, so the launcher hands capture a
+    read-only view of its Federation snapshot instead.
+    """
+
+    global _FEDERATION_STATUS_PROVIDER
+    with _FEDERATION_STATUS_LOCK:
+        _FEDERATION_STATUS_PROVIDER = provider
+
+
+def _federation_status() -> dict[str, Any]:
+    with _FEDERATION_STATUS_LOCK:
+        provider = _FEDERATION_STATUS_PROVIDER
+    if provider is None:
+        return {"status": "not-started"}
+    try:
+        value = provider()
+    except Exception:  # noqa: BLE001 - status must never break the heartbeat
+        return {"status": "unavailable"}
+    return value if isinstance(value, dict) else {"status": "unavailable"}
+
+
+def last_stop_reason() -> str | None:
+    """Report why capture stopped, or ``None`` when it was never asked to."""
+
+    with _STOP_REGISTRY_LOCK:
+        return _STOP_REASON
+
+
+def _record_stop_reason(reason: str) -> None:
+    global _STOP_REASON
+    with _STOP_REGISTRY_LOCK:
+        # An operator stop always wins. If Ctrl+C already ended this process,
+        # a later activation must not be able to relabel it as an approved
+        # update restart and have the supervisor relaunch behind the operator.
+        if _STOP_REASON is None or (
+            _STOP_REASON == EXTERNAL_STOP_REASON and reason == SIGNAL_STOP_REASON
+        ):
+            _STOP_REASON = reason
+
+
 class RecorderRuntime:
     """Durable MTConnect worker controlled by environment or desired-state files."""
 
@@ -194,6 +291,7 @@ class RecorderRuntime:
         self.last_status_write = 0.0
         self.store = DurableRecorderStore(DATA_DIR)
         self.executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="mtconnect")
+        register_stop_target(self)
 
     def load_state(self) -> None:
         payload = _read_json(STATE_FILE)
@@ -808,6 +906,10 @@ class RecorderRuntime:
             payload = {
                 "schema": "fcp.mtconnect_recorder.status.v2",
                 "heartbeat_at": _utc_now(),
+                # Additive: existing readers ignore it, while a host updater can
+                # prove which exact native process produced this heartbeat.
+                "native_runtime": runtime_identity(),
+                "federation": _federation_status(),
                 "managed": MANAGED_MODE,
                 "enabled": self.enabled,
                 "configuration_ready": self.configuration_ready,
@@ -870,12 +972,26 @@ class RecorderRuntime:
                 self.message = "Recorder service is shutting down."
             self.publish_status(force=True)
             self.executor.shutdown(wait=True, cancel_futures=True)
+            unregister_stop_target(self)
             log.info("Loss-aware MTConnect recorder stopped")
 
-    def request_stop(self, signum: int | None = None, frame: Any = None) -> None:
+    def request_stop(
+        self,
+        signum: int | None = None,
+        frame: Any = None,
+        *,
+        external: bool = False,
+    ) -> None:
         del frame
+        _record_stop_reason(
+            EXTERNAL_STOP_REASON if external and signum is None else SIGNAL_STOP_REASON
+        )
         if not self.stop_event.is_set():
-            log.info("Stopping recorder service (signal=%s)", signum)
+            log.info(
+                "Stopping recorder service (signal=%s, external=%s)",
+                signum,
+                external,
+            )
             self.stop_event.set()
 
 

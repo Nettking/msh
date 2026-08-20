@@ -70,6 +70,11 @@ _IPV4_LOCATION = re.compile(
     r"(?<![0-9])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?"
 )
 _WINDOWS_LOCATION = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]")
+_MTCONNECT_CONTENT_SCHEMA: Final = "fcp.mtconnect.observations.v1"
+_MTCONNECT_OBSERVATION_SCHEMA: Final = "fcp.mtconnect.observation.v2"
+_MTCONNECT_COMPONENT_KEYS: Final = frozenset({"type", "id", "name", "native_name"})
+_MAX_MTCONNECT_COMPONENT_DEPTH: Final = 64
+_MAX_MTCONNECT_COMPONENT_TEXT_BYTES: Final = 512
 
 
 def is_secret_text(value: object) -> bool:
@@ -121,6 +126,49 @@ def is_nonpublic_location_text(value: object) -> bool:
         or _IPV4_LOCATION.search(normalized) is not None
         or _WINDOWS_LOCATION.search(value) is not None
     )
+
+
+def _is_public_mtconnect_component_text(
+    value: object,
+    *,
+    required: bool,
+) -> bool:
+    if value is None:
+        return not required
+    if (
+        not isinstance(value, str)
+        or (required and not value)
+        or value != value.strip()
+        or len(value.encode("utf-8")) > _MAX_MTCONNECT_COMPONENT_TEXT_BYTES
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+        or is_secret_text(value)
+        or is_nonpublic_location_text(value)
+    ):
+        return False
+    return bool(value) or not required
+
+
+def _is_public_mtconnect_component_path(value: object) -> bool:
+    """Recognize the recorder's bounded structural MTConnect probe path.
+
+    ``parse_probe`` stores ``component_path`` as a list of component metadata
+    dictionaries, not as a filesystem-style string.  Admit only that exact
+    public structure.  Every textual element is independently checked so a
+    path-shaped field cannot be used to smuggle a credential, URL, IP address,
+    drive path, or absolute path through the relay filter.
+    """
+
+    if not isinstance(value, (list, tuple)) or len(value) > _MAX_MTCONNECT_COMPONENT_DEPTH:
+        return False
+    for component in value:
+        if not isinstance(component, dict) or set(component) != _MTCONNECT_COMPONENT_KEYS:
+            return False
+        if not _is_public_mtconnect_component_text(component.get("type"), required=True):
+            return False
+        for key in ("id", "name", "native_name"):
+            if not _is_public_mtconnect_component_text(component.get(key), required=False):
+                return False
+    return True
 
 
 def contains_secret_material(value: Any) -> bool:
@@ -178,15 +226,47 @@ def redact_secret_material(value: Any) -> Any:
     return value
 
 
+def _redact_mtconnect_observation(value: Any) -> Any:
+    if not isinstance(value, dict):
+        return redact_nonpublic_data(value)
+    recorder_observation = value.get("schema") == _MTCONNECT_OBSERVATION_SCHEMA
+    return {
+        key: (
+            item
+            if recorder_observation
+            and key == "component_path"
+            and _is_public_mtconnect_component_path(item)
+            else REDACTED
+            if is_sensitive_field_name(str(key))
+            or is_nonpublic_location_key(str(key))
+            else redact_nonpublic_data(item)
+        )
+        for key, item in value.items()
+    }
+
+
 def redact_nonpublic_data(value: Any) -> Any:
-    """Recursively redact both credentials and backend location details."""
+    """Recursively redact credentials and backend location details.
+
+    Recorder observations carry ``component_path`` as probe-derived component
+    metadata such as ``[{"type": "Linear", "id": "x", ...}]``.  Its key ends
+    in ``_path`` even though it identifies an MTConnect model hierarchy rather
+    than a filesystem or network location.  Preserve only that exact bounded
+    structure inside the exact recorder content and observation schemas.  Every
+    other ``*_path`` field remains redacted.
+    """
 
     if is_secret_text(value) or is_nonpublic_location_text(value):
         return REDACTED
     if isinstance(value, dict):
+        recorder_content = value.get("schema") == _MTCONNECT_CONTENT_SCHEMA
         return {
             key: (
-                REDACTED
+                [_redact_mtconnect_observation(entry) for entry in item]
+                if recorder_content
+                and key == "observations"
+                and isinstance(item, (list, tuple))
+                else REDACTED
                 if is_sensitive_field_name(str(key))
                 or is_nonpublic_location_key(str(key))
                 else redact_nonpublic_data(item)

@@ -76,6 +76,8 @@ start-tailscale-recorder.cmd --storage-group telemetry
 
 A normal full FCP Federation creator supervises logical-storage authority automatically. The existing authority monitor still refuses creator-owned authority service on non-creator members.
 
+The leader's storage control plane is the coordinator database itself, named by `FCP_FEDERATION_COORDINATOR_DATABASE` (Compose points both the relay and Flask services at `/var/lib/fcp-relay/control.sqlite3` on the shared `relay_state` volume). The relay reconciles trusted GREEN storage into that control plane and the supervised authority announces its ready groups from the same file, so both sides always agree. An authority reading any other database would report no ready groups and every recorder would correctly refuse to publish.
+
 When Federation/storage is temporarily unavailable after an established recorder is running, capture stays local and durable publication state retries later. Do not delete the publication outbox or move checkpoints backward as a recovery technique.
 
 ## Data paths
@@ -91,9 +93,17 @@ data/source_state/mtconnect_recorder_autoconfig.json
 data/federation/device/
 data/federation/onboarding/
 data/federation/recorder_publication/
+data/federation/recorder_control/
+data/federation/recorder_update/
+data/federation/recorder-update-agent/
 data/federation/jsonl-sync.sqlite3
 data/federation/jsonl-cache/
 ```
+
+`recorder_update/` and `recorder-update-agent/` hold only bounded updater state:
+the replayed Federation update revision, the current activation, and a bounded
+journal of recent activations. They are the one thing an update may rewrite;
+everything else above is preserved across updates.
 
 Recorder observations under:
 
@@ -150,9 +160,89 @@ Do not put an `FCP1-...` code on the `start-tailscale-recorder.cmd` command line
 
 The Tailscale wrapper adds `--require-federation` and `--require-data-sharing` itself for the normal supported path.
 
+## Federation software updates
+
+A recorder started with `start-tailscale-recorder.cmd` runs under a native
+supervisor and participates in **Check for updates -> Update all devices** like
+any other Federation member. There is no separate updater to start and no
+recurring manual Git procedure.
+
+Update commands travel over the recorder's existing authenticated Federation
+connection. No second Federation identity, relay connection, or reader is
+created, and no peer ever supplies an executable, path, command, argument, URL,
+or environment value.
+
+The host update agent runs inside the recorder process, so a supervised
+recorder is still exactly one process. The supervisor starts nothing beside it;
+it only fast-forwards the checkout after the recorder exits and starts the
+replacement.
+
+### What an update does on this host
+
+1. **Prevalidate while still recording.** The checkout must be the expected one,
+   on `main`, with the canonical approved FCP origin, a clean tree including
+   untracked files, and a full 40-character target that is a fast-forward from
+   the current commit on fetched approved `main`. An update that would change
+   Python dependency inputs (`requirements.txt`, constraints files,
+   `pyproject.toml`) is refused here rather than after capture has stopped.
+2. **Stop gracefully.** The host agent asks this exact process to stop, naming
+   the request, commit, supervisor, process ID, process-instance nonce and an
+   expiry. The recorder accepts it only when every field matches and it has a
+   durable pending Federation update request for that commit. It then finishes
+   the current capture/commit boundary and exits, exactly as `Ctrl+C` would.
+   Nothing is force-killed.
+3. **Update the source only after the process is gone.** The checkout is
+   fast-forwarded with `git merge --ff-only` and nothing else -- never `reset`,
+   `clean`, `stash`, or a rewrite.
+4. **Relaunch once, then prove it.** The supervisor starts exactly one
+   replacement using the same locally resolved interpreter and arguments it was
+   started with. Success requires a different process ID *and* a different
+   process-instance nonce under the same supervisor, running the exact target
+   commit, with a heartbeat newer than the activation and a connected
+   Federation membership.
+
+An interrupted update is resumable: a bounded durable journal under
+`data/federation/recorder-update-agent/journal.json` records the stage reached,
+duplicate requests are answered from the retained result rather than applied
+twice, and a stop request left behind by an earlier process is ignored by any
+recorder it does not name.
+
+Nothing durable is touched: pairing, the stable device identity, MTConnect
+checkpoints, raw and JSONL captures, the publication outbox and the backlog all
+survive an update unchanged.
+
+### One-time bootstrap for recorders installed before this change
+
+A recorder cannot install an updater that does not exist in its current
+checkout, so each already-deployed recorder needs one manual move to current
+`main`. On the recorder host:
+
+```cmd
+REM 1. Stop the running recorder cleanly (Ctrl+C in its window), then:
+cd C:\path\to\your\fcp-checkout
+git status --porcelain --untracked-files=all
+git fetch --no-tags origin main
+git merge --ff-only origin/main
+start-tailscale-recorder.cmd
+```
+
+`git status` must print nothing before the merge. If it does not, review those
+local changes first -- do not use `git reset --hard`, `git clean`, or `git
+stash` to clear them.
+
+After that one start, the recorder participates in **Update all devices**
+automatically.
+
+### Limitations
+
+- An update that changes Python dependency inputs is refused rather than
+  applied. Prepare that environment and bootstrap manually as above.
+- A recorder started directly with `python start_recorder.py` has no supervisor,
+  so it reports update checks but cannot activate an update.
+
 ## Failure behavior
 
-The zero-touch Tailscale recorder exits non-zero rather than silently degrading when initial trust/publication requirements are not met. Typical actionable failures include:
+The zero-touch Tailscale recorder exits non-zero rather than silently degrading when initial trust/publication requirements are not met. Exit code `75` is reserved for one thing only: an approved Federation update restart, which the supervisor handles automatically. Typical actionable failures include:
 
 - Tailscale missing/logged out/no valid IPv4;
 - no Federation discovered;

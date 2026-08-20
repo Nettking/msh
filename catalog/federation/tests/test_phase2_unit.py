@@ -1573,12 +1573,18 @@ def test_authorized_status_is_scoped_deterministic_and_secret_free(
     second = CoordinatorStore(database).authorized_status(
         actor_node_id=owner.identity.node_id
     )
+    member_status = store.authorized_status(actor_node_id=member.identity.node_id)
 
     assert first == second
     assert first["schema"] == "fcp.coordinator_status.v1"
     assert [session["session_id"] for session in first["sessions"]] == [
         shared.session_id
     ]
+    assert first["sessions"][0]["created_by_node_id"] == owner.identity.node_id
+    assert (
+        member_status["sessions"][0]["created_by_node_id"]
+        == owner.identity.node_id
+    )
     assert private.session_id not in json.dumps(first, sort_keys=True)
     assert {node["node_id"] for node in first["nodes"]} == {
         owner.identity.node_id,

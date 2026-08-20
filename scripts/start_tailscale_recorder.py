@@ -8,20 +8,128 @@ import shutil
 import socket
 import subprocess
 import sys
+from collections.abc import Callable
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 from urllib.parse import urlsplit
 
 import start_recorder
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.flask_app.services.federation_pairing_service import (
     PairingCodeCodec,
     RemotePairingStore,
 )
+from catalog.node.client import RelayNodeClient
 from scripts.federation_host_runner import load_host_module
 
 DEFAULT_DEVICE_NAME: Final = "FCP MTConnect recorder"
 PAIRING_STATE_RELATIVE: Final = Path("federation/onboarding/remote_pairing.json")
 TAILSCALE_NETWORK = ipaddress.ip_network("100.64.0.0/10")
+
+
+async def _restore_remote_session_creators(
+    client: RelayNodeClient,
+    status: dict[str, Any],
+) -> dict[str, Any]:
+    """Restore omitted immutable session creators from authoritative revision 1.
+
+    Remote coordinator status may omit ``created_by_node_id``. Recorder storage
+    selection intentionally trusts only the session creator's advertised storage
+    authority, so recover that immutable identity from the authoritative
+    ``session.created`` event rather than guessing from connectivity or
+    capabilities.
+
+    Reading that event is a bounded authenticated replay of a session this node
+    has already joined, so sessions the local state does not yet know are left
+    untouched. ``RelayNodeClient.connect`` reads coordinator status before it
+    reconciles local membership, and a status probe must never be what stops a
+    node from connecting. An unrecoverable creator simply stays absent, which
+    recorder selection already reports as an unavailable owner.
+    """
+
+    sessions = status.get("sessions")
+    if not isinstance(sessions, list):
+        return status
+
+    joined = {item.session_id for item in client.state.joined_sessions()}
+    replacements: dict[str, str] = {}
+    for value in sessions:
+        if not isinstance(value, dict):
+            continue
+        session_id = value.get("session_id")
+        creator = value.get("created_by_node_id")
+        if (
+            not isinstance(session_id, str)
+            or not session_id
+            or session_id not in joined
+            or (isinstance(creator, str) and creator)
+        ):
+            continue
+        try:
+            events, _current_revision = await client.coordinator_replay_page(
+                session_id=session_id,
+                last_applied_revision=0,
+                limit=1,
+            )
+        except (FederationOperationError, FederationValidationError):
+            continue
+        if not events:
+            continue
+        first = events[0]
+        event_creator = getattr(first, "actor_node_id", None)
+        if (
+            getattr(first, "revision", None) == 1
+            and getattr(first, "event_type", None) == "session.created"
+            and getattr(first, "session_id", None) == session_id
+            and isinstance(event_creator, str)
+            and event_creator
+        ):
+            replacements[session_id] = event_creator
+
+    if not replacements:
+        return status
+
+    restored = dict(status)
+    restored["sessions"] = [
+        (
+            {**value, "created_by_node_id": replacements[value["session_id"]]}
+            if isinstance(value, dict)
+            and value.get("session_id") in replacements
+            else value
+        )
+        for value in sessions
+    ]
+    return restored
+
+
+def _install_remote_session_creator_fallback() -> Callable[[], None]:
+    """Make complete remote status available to recorder storage selection.
+
+    Returns the callable that restores the original method. The launcher owns
+    one recorder process, but the entry point is also exercised in-process, and
+    a class patch that outlives its caller would silently change every later
+    client in that process.
+    """
+
+    if getattr(RelayNodeClient.coordinator_status, "_fcp_creator_fallback", False):
+        return lambda: None
+    original = RelayNodeClient.coordinator_status
+
+    async def coordinator_status(self: RelayNodeClient) -> dict[str, Any]:
+        status = await original(self)
+        return await _restore_remote_session_creators(self, status)
+
+    coordinator_status._fcp_creator_fallback = True
+    RelayNodeClient.coordinator_status = coordinator_status
+
+    def restore() -> None:
+        if RelayNodeClient.coordinator_status is coordinator_status:
+            RelayNodeClient.coordinator_status = original
+
+    return restore
 
 
 def _option_value(arguments: list[str], name: str) -> str | None:
@@ -47,6 +155,17 @@ def _data_directory(arguments: list[str]) -> Path:
         raise RuntimeError("--data-dir requires a non-empty value.")
     configured = option or os.environ.get("FCP_RECORDER_DATA_DIR") or "data"
     return Path(configured).resolve()
+
+
+def recorder_data_directory(arguments: list[str]) -> Path:
+    """Resolve the recorder data directory exactly as the launcher will.
+
+    The native supervisor needs this before it starts anything, and it must not
+    re-implement the rule: a supervisor that watched a different directory than
+    the recorder writes to would verify the wrong process.
+    """
+
+    return _data_directory(arguments)
 
 
 def _tailscale_ipv4() -> ipaddress.IPv4Address:
@@ -214,7 +333,14 @@ def _require_tailnet_relay(relay_url: str) -> None:
         raise RuntimeError(
             "The Federation leader could not be checked as a Tailscale peer."
         ) from exc
-    if peer_check.returncode != 0:
+
+    # On Windows, `tailscale ping` can successfully reach a peer via DERP and
+    # still exit 1 when it cannot upgrade that path to a direct connection.
+    # A DERP pong is valid Tailscale reachability; the following TCP connect is
+    # the authoritative check that the advertised relay service is usable.
+    peer_output = f"{peer_check.stdout}\n{peer_check.stderr}".lower()
+    peer_reached = peer_check.returncode == 0 or "pong from " in peer_output
+    if not peer_reached:
         raise RuntimeError(
             "The Federation relay address is not a reachable peer in this tailnet. Check the leader's Tailscale login and tailnet ACL."
         )
@@ -230,6 +356,7 @@ def _require_tailnet_relay(relay_url: str) -> None:
 def main(argv: list[str] | None = None) -> int:
     arguments = list(sys.argv[1:] if argv is None else argv)
     pairing_key: str | None = None
+    restore_coordinator_status: Callable[[], None] = lambda: None
     try:
         try:
             recorder_arguments = _recorder_arguments(arguments)
@@ -255,6 +382,7 @@ def main(argv: list[str] | None = None) -> int:
             # removed from the environment in the finally block below.
             os.environ["FCP_RECORDER_FEDERATION_KEY"] = pairing_key
             pairing_key = None
+        restore_coordinator_status = _install_remote_session_creator_fallback()
         print(f"Tailscale ready: {address}")
         print(
             "Starting the recorder; Federation membership and the recorder data publication route are required."
@@ -263,6 +391,7 @@ def main(argv: list[str] | None = None) -> int:
     finally:
         pairing_key = None
         os.environ.pop("FCP_RECORDER_FEDERATION_KEY", None)
+        restore_coordinator_status()
 
 
 if __name__ == "__main__":

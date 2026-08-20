@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Protocol
@@ -73,6 +74,7 @@ class DurableRecorderDeliveryQueue:
             destination_id.strip() if isinstance(destination_id, str) else None
         )
         self.clock = clock
+        self._startup_probe_available = True
 
     def enqueue(
         self,
@@ -129,13 +131,45 @@ class DurableRecorderDeliveryQueue:
             return None
         return entry.session_id, entry.destination_id, dataset_id
 
-    async def run_once(self, *, limit: int = 100) -> RecorderDeliveryRunResult:
+    async def run_once(
+        self,
+        *,
+        limit: int = 100,
+        retry_deferred_heads: bool | None = None,
+    ) -> RecorderDeliveryRunResult:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
             raise FederationValidationError(
                 "invalid-limit",
                 "limit",
                 "must be a positive integer",
             )
+        if retry_deferred_heads is not None and not isinstance(
+            retry_deferred_heads, bool
+        ):
+            raise FederationValidationError(
+                "invalid-recorder-delivery",
+                "retry_deferred_heads",
+                "must be a boolean when supplied",
+            )
+
+        # Reading a large durable backlog parses every pending JSON payload. Do
+        # that blocking SQLite/JSON work off the authenticated relay event loop
+        # so heartbeat and routed replies remain live while an offline backlog
+        # is being recovered.
+        pending_snapshot = await asyncio.to_thread(self.outbox.pending)
+
+        # A new queue object is a new process/runtime delivery session. Its
+        # automatic first pass is a bounded route proof: try no more than the
+        # oldest row of each ordered dataset, including one row whose durable
+        # backoff is not yet due. This prevents one large dataset from occupying
+        # the whole startup cycle before the recorder can report a proven route,
+        # while later passes retain the configured backlog-drain throughput.
+        startup_probe = (
+            retry_deferred_heads is None and self._startup_probe_available
+        )
+        if retry_deferred_heads is None:
+            retry_deferred_heads = startup_probe
+        self._startup_probe_available = False
 
         # Preserve recorder sequence order independently per logical dataset.
         # A failed or not-yet-due older entry fences newer entries for that same
@@ -146,7 +180,7 @@ class DurableRecorderDeliveryQueue:
             sorted(
                 (
                     entry
-                    for entry in self.outbox.pending()
+                    for entry in pending_snapshot
                     if entry.schema_id == RECORDER_STORAGE_SCHEMA
                     # The client is authenticated for exactly this session.
                     # Rows from prior sessions remain durable for a worker
@@ -164,6 +198,8 @@ class DurableRecorderDeliveryQueue:
             )
         )
         blocked: set[tuple[str, str, str]] = set()
+        deferred_retry_used: set[tuple[str, str, str]] = set()
+        startup_probe_used: set[tuple[str, str, str]] = set()
         attempted = 0
         committed = 0
         pending = 0
@@ -174,10 +210,27 @@ class DurableRecorderDeliveryQueue:
             ordering_key = self._ordering_key(entry)
             if ordering_key is not None and ordering_key in blocked:
                 continue
+            if startup_probe and ordering_key is not None:
+                if ordering_key in startup_probe_used:
+                    continue
+                startup_probe_used.add(ordering_key)
             if entry.next_attempt_at > now:
-                if ordering_key is not None:
-                    blocked.add(ordering_key)
-                continue
+                # Exponential backoff survives process restarts. That is correct
+                # during an unchanged outage, but after an operator has upgraded
+                # or repaired the remote authority it can leave a zero-touch
+                # recorder waiting an hour before proving the new path. On the
+                # queue's first pass, allow exactly the oldest deferred row of
+                # each ordered dataset one immediate attempt. No timestamp,
+                # attempt counter, error, payload, or later row is rewritten.
+                if (
+                    not retry_deferred_heads
+                    or ordering_key is None
+                    or ordering_key in deferred_retry_used
+                ):
+                    if ordering_key is not None:
+                        blocked.add(ordering_key)
+                    continue
+                deferred_retry_used.add(ordering_key)
 
             attempted += 1
             payload = entry.payload

@@ -202,6 +202,22 @@ The rollout is manual. For each eligible normal FCP host, the host-owned agent:
 6. verifies required model/runtime readiness; and
 7. reports success only when the running runtime proves the exact target commit.
 
+A standalone MTConnect recorder is a native process rather than a Compose
+service, so its host agent follows the same contract with a different
+activation:
+
+1. it revalidates the handoff, repository, branch, target and clean tree, and
+   additionally refuses any target that changes Python dependency inputs, all
+   while capture is still running;
+2. it asks the running recorder to stop, naming the exact request, commit,
+   supervisor, process ID and process-instance nonce it is for;
+3. the recorder finishes its current capture/commit boundary and exits;
+4. only then is the checkout fast-forwarded;
+5. the supervisor starts exactly one replacement recorder; and
+6. success requires that replacement to be a *different* process -- new process
+   ID and new process-instance nonce, same supervisor -- running the exact
+   target commit, with a fresh heartbeat and a connected Federation membership.
+
 The successful UI state is **Updated**. A Git fast-forward alone is not success.
 
 Each device is evaluated independently. One dirty/offline/failed member cannot make another member's result successful or failed.
@@ -230,7 +246,29 @@ A legacy Windows installation may need:
 migrate.cmd
 ```
 
-A standalone recorder launched directly with `python start_recorder.py` is not itself a host update agent and currently needs its own host checkout/process administration path.
+### Standalone MTConnect recorder
+
+A standalone recorder started with the supported launcher runs under a native
+supervisor, and runs its host update agent inside the recorder process itself:
+
+```cmd
+start-tailscale-recorder.cmd
+```
+
+No separate updater command or process is needed, and no recurring manual Git
+procedure is expected. There is one recorder process; do not look for a second
+agent process beside it. **Check for updates -> Update all devices** covers the recorder like
+any other member.
+
+One-time bootstrap: a recorder installed before this capability existed cannot
+install an updater that is not in its current checkout. Each such recorder needs
+one manual move to current `main` first -- see
+[Standalone MTConnect recorder](standalone_recorder.md#federation-software-updates).
+
+A recorder started directly with `python start_recorder.py` runs without that
+supervisor. It still records, and still reports update *checks*, but it cannot
+activate an update by itself; use the supported launcher for hosts that should
+participate in **Update all devices**.
 
 ## If an update fails
 
@@ -248,6 +286,14 @@ Linux/macOS:
 ```bash
 cat data/federation/update-agent/result.json
 docker compose ps
+```
+
+On a standalone recorder host the equivalent files are the recorder's own, and
+its journal names the exact stage the activation reached:
+
+```cmd
+type data\federation\recorder-update-agent\result.json
+type data\federation\recorder-update-agent\journal.json
 ```
 
 Do not use `git reset --hard`, `git clean`, delete Docker volumes, or remove Federation state simply to clear an update warning.

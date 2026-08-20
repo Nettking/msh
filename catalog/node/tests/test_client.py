@@ -739,3 +739,244 @@ def test_replay_request_never_reuses_a_completed_task(
         assert calls == 1
 
     asyncio.run(scenario())
+
+
+def test_replay_teardown_is_reported_as_a_structured_relay_failure(
+    tmp_path: Path,
+) -> None:
+    """A closed connection must not reach callers as a bare cancellation.
+
+    ``asyncio.shield`` reports a cancelled shared task with the same
+    ``CancelledError`` it uses for the caller's own cancellation. That is a
+    ``BaseException``, so before this every supervised Federation runtime that
+    retried on ``except Exception`` was killed outright by an ordinary relay
+    disconnect.
+    """
+
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        started = asyncio.Event()
+
+        async def blocked_replay(session_id: str) -> dict[str, Any]:
+            started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+        client._request_replay_pass = blocked_replay  # type: ignore[method-assign]
+        waiter = asyncio.create_task(client.request_replay("session-a"))
+        await asyncio.wait_for(started.wait(), timeout=1)
+
+        await client.disconnect(error_code="connection-replaced")
+
+        with pytest.raises(RelayRemoteError) as rejected:
+            await waiter
+
+        assert isinstance(rejected.value, Exception)
+        assert rejected.value.code == "connection-replaced"
+        assert client._replay_tasks == {}
+        assert client._gap_replay_tasks == {}
+
+    asyncio.run(scenario())
+
+
+def test_replay_teardown_without_an_error_code_still_fails_closed(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        started = asyncio.Event()
+
+        async def blocked_replay(session_id: str) -> dict[str, Any]:
+            started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+        client._request_replay_pass = blocked_replay  # type: ignore[method-assign]
+        waiter = asyncio.create_task(client.request_replay("session-a"))
+        await asyncio.wait_for(started.wait(), timeout=1)
+
+        await client.disconnect()
+
+        with pytest.raises(RelayRemoteError) as rejected:
+            await waiter
+
+        assert rejected.value.code == "connection-closed"
+
+    asyncio.run(scenario())
+
+
+def test_every_shared_replay_waiter_learns_the_same_teardown_reason(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        started = asyncio.Event()
+
+        async def blocked_replay(session_id: str) -> dict[str, Any]:
+            started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+        client._request_replay_pass = blocked_replay  # type: ignore[method-assign]
+        first = asyncio.create_task(client.request_replay("session-a"))
+        await asyncio.wait_for(started.wait(), timeout=1)
+        second = asyncio.create_task(client.request_replay("session-a"))
+        await asyncio.sleep(0)
+
+        assert len(client._replay_tasks) == 1
+
+        await client.disconnect(error_code="revoked-node")
+        outcomes = await asyncio.gather(
+            first, second, return_exceptions=True
+        )
+
+        assert [getattr(item, "code", None) for item in outcomes] == [
+            "revoked-node",
+            "revoked-node",
+        ]
+
+    asyncio.run(scenario())
+
+
+def test_a_cancelled_replay_caller_still_observes_its_own_cancellation(
+    tmp_path: Path,
+) -> None:
+    """Only teardown becomes an error; a real cancellation must propagate."""
+
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        started = asyncio.Event()
+
+        async def blocked_replay(session_id: str) -> dict[str, Any]:
+            started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+        client._request_replay_pass = blocked_replay  # type: ignore[method-assign]
+        waiter = asyncio.create_task(client.request_replay("session-a"))
+        await asyncio.wait_for(started.wait(), timeout=1)
+        shared = client._replay_tasks["session-a"]
+
+        waiter.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await waiter
+
+        # The shared pass is shielded from one caller going away.
+        assert not shared.done()
+        assert client._replay_tasks["session-a"] is shared
+
+        await client.disconnect(error_code="test-teardown")
+        assert client._replay_tasks == {}
+
+    asyncio.run(scenario())
+
+
+def test_a_caller_cancelled_during_teardown_is_not_downgraded(
+    tmp_path: Path,
+) -> None:
+    """A task cancelled while the shared pass dies keeps its cancellation."""
+
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        started = asyncio.Event()
+
+        async def blocked_replay(session_id: str) -> dict[str, Any]:
+            started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+        client._request_replay_pass = blocked_replay  # type: ignore[method-assign]
+        waiter = asyncio.create_task(client.request_replay("session-a"))
+        await asyncio.wait_for(started.wait(), timeout=1)
+        shared = client._replay_tasks["session-a"]
+
+        shared.cancel()
+        waiter.cancel()
+
+        with pytest.raises(asyncio.CancelledError):
+            await waiter
+
+    asyncio.run(scenario())
+
+
+def test_a_reconnected_replay_never_reuses_stale_teardown_state(
+    tmp_path: Path,
+) -> None:
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        started = asyncio.Event()
+
+        async def blocked_replay(session_id: str) -> dict[str, Any]:
+            started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+        client._request_replay_pass = blocked_replay  # type: ignore[method-assign]
+        waiter = asyncio.create_task(client.request_replay("session-a"))
+        await asyncio.wait_for(started.wait(), timeout=1)
+        await client.disconnect(error_code="connection-replaced")
+        with pytest.raises(RelayRemoteError):
+            await waiter
+
+        assert client._replay_teardown_codes == {
+            "session-a": "connection-replaced"
+        }
+
+        async def completed_replay(session_id: str) -> dict[str, Any]:
+            return {"current_revision": 4}
+
+        client._request_replay_pass = completed_replay  # type: ignore[method-assign]
+
+        assert await client.request_replay("session-a") == {
+            "current_revision": 4
+        }
+        assert client._replay_teardown_codes == {}
+        assert client._replay_tasks == {}
+
+    asyncio.run(scenario())
+
+
+def test_teardown_leaves_no_pending_replay_or_gap_task(
+    tmp_path: Path,
+) -> None:
+    """No task may still be pending when the client's loop is torn down."""
+
+    async def scenario() -> None:
+        client = _client(tmp_path)
+        _join_connected_session(client)
+        started = asyncio.Event()
+
+        async def blocked_replay(session_id: str) -> dict[str, Any]:
+            started.set()
+            await asyncio.Event().wait()
+            raise AssertionError("unreachable")
+
+        client._request_replay_pass = blocked_replay  # type: ignore[method-assign]
+        waiter = asyncio.create_task(client.request_replay("session-a"))
+        await asyncio.wait_for(started.wait(), timeout=1)
+        shared = client._replay_tasks["session-a"]
+        gap = client._schedule_gap_replay("session-a")
+        await asyncio.sleep(0)
+
+        await client.disconnect(error_code="connection-replaced")
+        with pytest.raises(RelayRemoteError):
+            await waiter
+
+        assert shared.done()
+        assert gap.done()
+        assert client._replay_tasks == {}
+        assert client._gap_replay_tasks == {}
+        pending = {
+            task
+            for task in asyncio.all_tasks()
+            if task is not asyncio.current_task()
+        }
+        assert pending == set()
+
+    asyncio.run(scenario())

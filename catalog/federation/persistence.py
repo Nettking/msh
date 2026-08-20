@@ -2415,7 +2415,8 @@ class CoordinatorStore:
             for row in database.execute(
                 """
                 SELECT session.session_id,session.display_name,
-                       session.state,session.revision
+                       session.state,session.revision,
+                       session.created_by_node_id
                 FROM sessions AS session
                 JOIN session_memberships AS membership USING(session_id)
                 WHERE membership.node_id=? AND membership.removed_at IS NULL
@@ -2432,6 +2433,7 @@ class CoordinatorStore:
                         row["display_name"],
                         row["state"],
                         row["revision"],
+                        row["created_by_node_id"],
                     ),
                 )
 
@@ -2551,6 +2553,9 @@ class CoordinatorStore:
                             "session_id": redact_secrets(row["session_id"]),
                             "display_name": redact_secrets(
                                 row["display_name"]
+                            ),
+                            "created_by_node_id": redact_secrets(
+                                row["created_by_node_id"]
                             ),
                             "state": row["state"],
                             "revision": row["revision"],

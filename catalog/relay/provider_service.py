@@ -39,8 +39,8 @@ from catalog.capabilities.provider_health import (
     SQLiteProviderHealthStore,
 )
 from catalog.capabilities.provider_reports import ProviderResourceReport
-from catalog.capabilities.storage_authority_enrollment import (
-    TrustedGreenStorageAuthority,
+from catalog.capabilities.storage_authority_lease import (
+    RenewingTrustedGreenStorageAuthority,
 )
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import (
@@ -104,8 +104,10 @@ class ProviderAuthorityRelayServer(RelayServer):
             self.provider_enrollment.store,
         )
         # Storage keeps its own control-plane authority, so it is reconciled by a
-        # separate policy rather than through F8.1 provider enrollment.
-        self.storage_authority = TrustedGreenStorageAuthority(
+        # separate policy rather than through F8.1 provider enrollment. The
+        # renewing wrapper revalidates the exact same GREEN evidence before
+        # rotating a same-primary lease that is close to expiry.
+        self.storage_authority = RenewingTrustedGreenStorageAuthority(
             coordinator,
             PhaseDControlPlane(coordinator.store.database),
         )
@@ -144,7 +146,15 @@ class ProviderAuthorityRelayServer(RelayServer):
         try:
             announcement = CapabilityAnnouncement.from_dict(value)
             self.provider_auto_enrollment.reconcile(announcement)
-            self.storage_authority.reconcile(announcement)
+            # Any accepted capability announcement from this authenticated node
+            # is a safe cadence trigger to re-check its current storage evidence.
+            # The creator's supervised logical-storage authority publishes on its
+            # normal scan cadence, so a healthy primary renews before a five-minute
+            # lease expires without inventing a second grant authority.
+            self.storage_authority.reconcile_current_node(
+                session_id=announcement.session_id,
+                node_id=announcement.node_id,
+            )
         except (
             FederationOperationError,
             FederationValidationError,
