@@ -267,9 +267,14 @@ def test_green_auto_enrollment_reaches_the_announced_authority(
 
     assert capability.status is CapabilityStatus.READY
     assert capability.properties["group_ids"] == [GROUP]
+    coordinator.announce_capability(
+        capability,
+        actor_node_id=creator.identity.node_id,
+        request_id="announce-recorder-storage-authority",
+    )
 
     selection = select_storage_authority(
-        _recorder_status(capability, creator),
+        coordinator.status(actor_node_id=creator.identity.node_id),
         session_id=SESSION,
         requested_group=None,
     )

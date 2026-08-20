@@ -184,21 +184,6 @@ async def _shutdown(
         await relay.stop()
 
 
-def _recorder_visible_status(
-    status: dict[str, Any], *, session_id: str, creator_node_id: str
-) -> dict[str, Any]:
-    """Mirror the launcher's recovery of the omitted immutable session creator."""
-
-    restored = dict(status)
-    restored["sessions"] = [
-        {**value, "created_by_node_id": creator_node_id}
-        if isinstance(value, dict) and value.get("session_id") == session_id
-        else value
-        for value in status["sessions"]
-    ]
-    return restored
-
-
 def test_initial_connect_replay_reports_a_replaced_connection_as_a_relay_error(
     tmp_path: Path,
 ) -> None:
@@ -340,11 +325,7 @@ def test_the_authority_reconnects_and_the_recorder_then_selects_it(
             assert events[0].actor_node_id == creator.node_id
 
             selection = select_storage_authority(
-                _recorder_visible_status(
-                    await recorder.coordinator_status(),
-                    session_id=session_id,
-                    creator_node_id=creator.node_id,
-                ),
+                await recorder.coordinator_status(),
                 session_id=session_id,
                 requested_group=None,
             )
