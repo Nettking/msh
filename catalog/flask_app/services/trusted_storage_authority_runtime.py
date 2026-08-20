@@ -206,9 +206,14 @@ async def run_trusted_storage_authority(
             except asyncio.TimeoutError:
                 continue
     finally:
+        # The failover coordinator owns only its own control channel, never the
+        # shared relay endpoint underneath it. Closing one is not closing the
+        # other, so the endpoint's reader task has to be stopped here as well;
+        # otherwise every restart of this runtime leaves a pending
+        # ``fcp-storage-relay-*`` task behind on a loop that is about to close.
         if failover is not None:
             await failover.close()
-        elif endpoint is not None:
+        if endpoint is not None:
             await endpoint.close()
         if client is not None and client.connected_event.is_set():
             await client.disconnect()
