@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Protocol
@@ -137,6 +138,12 @@ class DurableRecorderDeliveryQueue:
                 "must be a positive integer",
             )
 
+        # Reading a large durable backlog parses every pending JSON payload. Do
+        # that blocking SQLite/JSON work off the authenticated relay event loop
+        # so heartbeat and routed replies remain live while an offline backlog
+        # is being recovered.
+        pending_snapshot = await asyncio.to_thread(self.outbox.pending)
+
         # Preserve recorder sequence order independently per logical dataset.
         # A failed or not-yet-due older entry fences newer entries for that same
         # session/group/dataset until the older entry commits. Other datasets
@@ -146,7 +153,7 @@ class DurableRecorderDeliveryQueue:
             sorted(
                 (
                     entry
-                    for entry in self.outbox.pending()
+                    for entry in pending_snapshot
                     if entry.schema_id == RECORDER_STORAGE_SCHEMA
                     # The client is authenticated for exactly this session.
                     # Rows from prior sessions remain durable for a worker
