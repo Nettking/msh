@@ -5,7 +5,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from catalog.federation.errors import AuthenticationError
+from catalog.federation.errors import AuthenticationError, FederationOperationError
 from catalog.flask_app.services import trusted_storage_authority_runtime as runtime
 from catalog.node.client import RelayRemoteError
 
@@ -162,6 +162,13 @@ class _Failover:
         await self.channel.close()
 
 
+class _HangingFailover(_Failover):
+    async def scan_once(self) -> tuple[object, ...]:
+        self.scans += 1
+        await asyncio.Event().wait()
+        raise AssertionError("unreachable")
+
+
 def _settings(tmp_path) -> runtime.StorageAuthoritySettings:
     return runtime.StorageAuthoritySettings(
         relay_control_database=str(tmp_path / "control.sqlite3"),
@@ -293,6 +300,41 @@ def test_a_relay_teardown_during_announce_is_raised_for_the_supervisor(
             )
         assert isinstance(rejected.value, Exception)
         assert rejected.value.code == "connection-closed"
+        assert not [
+            task
+            for task in asyncio.all_tasks()
+            if task is not asyncio.current_task()
+        ]
+        return endpoints
+
+    endpoints = asyncio.run(scenario())
+
+    assert endpoints[0]._closed is True
+    assert client.disconnected is True
+
+
+def test_stalled_failover_scan_cannot_silence_storage_discovery(
+    tmp_path, monkeypatch
+) -> None:
+    """Physical regression: keep announcing while one failover scan is wedged."""
+
+    client = _CreatorClient()
+
+    async def scenario() -> list[object]:
+        endpoints = _compose(monkeypatch, client)
+        monkeypatch.setattr(runtime, "StorageFailoverCoordinator", _HangingFailover)
+        monkeypatch.setattr(runtime, "_failover_scan_timeout", lambda _settings: 0.06)
+
+        with pytest.raises(FederationOperationError) as rejected:
+            await runtime.run_trusted_storage_authority(
+                _settings(tmp_path), stop=asyncio.Event()
+            )
+
+        assert rejected.value.code == "storage-authority-scan-timeout"
+        # The old sequential loop announced only *after* scan_once and therefore
+        # produced zero refreshes when the scan stalled. The independent cadence
+        # must remain alive during the same bounded failure window.
+        assert len(client.announced) >= 2
         assert not [
             task
             for task in asyncio.all_tasks()
