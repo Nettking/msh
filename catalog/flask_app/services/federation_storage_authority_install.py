@@ -248,20 +248,26 @@ class FederationStorageAuthorityMonitor:
         self,
         settings: StorageAuthoritySettings,
     ) -> _SharedRelayContext | None:
-        """Borrow the product relay runtime when the onboarding service has one.
+        """Borrow the already-connected product relay without retargeting it.
+
+        The saved-membership monitor is the sole owner of connection establishment
+        and relay-route selection for the full workbench. Storage must wait for
+        that connection and compose behind it; using the authority's own relay
+        setting here can differ from the product route (for example Compose DNS
+        versus the host's Tailscale address) and would make ``ensure_connected``
+        replace the same node identity's live WebSocket on every retry.
 
         Tiny unit-test fakes and direct low-level compositions may not expose a
-        runtime; those retain the legacy owned-client path. The installed FCP
-        product always supplies ``FederatedDataPairingRelayRuntime`` here.
+        runtime; those retain the legacy owned-client path.
         """
 
+        del settings  # Shared mode deliberately does not choose a relay route.
         runtime = getattr(self.onboarding_service, "relay_runtime", None)
         if runtime is None:
             return None
-        ensure_connected = getattr(runtime, "ensure_connected", None)
         connected_client = getattr(runtime, "_connected_client", None)
         start_loop = getattr(runtime, "_start_loop", None)
-        if not all(callable(item) for item in (ensure_connected, connected_client, start_loop)):
+        if not all(callable(item) for item in (connected_client, start_loop)):
             raise FederationOperationError(
                 "storage-authority-shared-relay-required",
                 "the installed Federation runtime does not expose its shared relay connection",
@@ -278,8 +284,7 @@ class FederationStorageAuthorityMonitor:
                 "binding",
                 "the trusted Federation binding is incomplete",
             )
-        state = RemotePairingState(settings.relay, binding)
-        ensure_connected(state)
+
         client = connected_client()
         if getattr(client, "node_id", None) != device_id:
             raise AuthenticationError(
@@ -287,12 +292,24 @@ class FederationStorageAuthorityMonitor:
                 "the shared relay client does not use the Federation creator identity",
                 "node_id",
             )
+        current_relay_url = getattr(runtime, "_relay_url", None)
+        if not isinstance(current_relay_url, str) or not current_relay_url:
+            raise FederationOperationError(
+                "storage-authority-shared-relay-not-ready",
+                "the saved-membership runtime has not established its relay route yet",
+                "connection",
+            )
+        state = RemotePairingState(current_relay_url, binding)
         loop = start_loop()
 
         bridge = self.app.extensions.get(_AI_BRIDGE_EXTENSION_KEY)
         transport_context = getattr(bridge, "_transport_context", None)
         source = None
         if callable(transport_context):
+            # The AI bridge may revalidate connectivity, but the state passed to
+            # it names the runtime's current route, never the storage-specific
+            # configuration. Revalidation therefore cannot replace the live
+            # connection merely because two equivalent relay addresses differ.
             source, bridge_loop = transport_context(runtime, state)
             if bridge_loop is not loop:
                 raise FederationOperationError(
