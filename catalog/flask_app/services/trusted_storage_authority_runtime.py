@@ -22,6 +22,9 @@ import asyncio
 from pathlib import Path
 from typing import Any, Callable
 
+from catalog.capabilities.storage_authority_enrollment import (
+    federation_storage_provider_id,
+)
 from catalog.federation.commit_tracking import DurableAcknowledgementStore
 from catalog.federation.control_sync import StorageControlPublicationStore
 from catalog.federation.coordinator import SessionCoordinator
@@ -37,9 +40,12 @@ from catalog.federation.live_failover import (
     LiveFailoverStore,
     StorageFailoverCoordinator,
 )
+from catalog.federation.local_storage import FilesystemBatchStorageProvider
 from catalog.federation.models import CapabilityAnnouncement
+from catalog.federation.outbox import SQLiteOutbox
 from catalog.federation.phase_d_client import PhaseDLogicalStorageClient
 from catalog.federation.phase_d_control import PhaseDControlPlane
+from catalog.federation.phase_d_service import PhaseDStorageService
 from catalog.federation.recorder_storage_relay import (
     RECORDER_LOGICAL_STORAGE_KIND,
     RecorderAwareStorageControlRelayChannel,
@@ -59,6 +65,7 @@ from .federation_pairing_service import PairingRelayNodeClient
 
 _BOOTSTRAP_TTL_SECONDS = 300
 _SHARED_OTHER_MESSAGE_LIMIT = 64
+_BUILTIN_LOCAL_STORAGE_PROVIDER_ID = "fcp-local-data-storage"
 
 
 def _local_pairing_material(
@@ -156,6 +163,88 @@ def _require_borrowed_creator(
             "the shared creator relay client is not joined to this Federation session",
             "session_id",
         )
+
+
+def _builtin_local_provider_id(node_id: str) -> str:
+    return federation_storage_provider_id(
+        node_id,
+        _BUILTIN_LOCAL_STORAGE_PROVIDER_ID,
+    )
+
+
+def _builtin_local_provider_paths(
+    settings: StorageAuthoritySettings,
+    provider_id: str,
+) -> tuple[Path, Path, Path]:
+    """Keep provider data and journals beside the authority's durable sidecars."""
+
+    root = Path(_acknowledgements_database(settings)).resolve().parent
+    runtime_root = root / "local-provider-runtime" / provider_id
+    return (
+        runtime_root / "batches",
+        runtime_root / "outbox.sqlite3",
+        runtime_root / "acknowledgements.sqlite3",
+    )
+
+
+def _ensure_builtin_local_storage_service(
+    *,
+    endpoint: RelayStorageEndpoint,
+    control: PhaseDControlPlane,
+    client: PairingRelayNodeClient,
+    settings: StorageAuthoritySettings,
+) -> PhaseDStorageService | None:
+    """Expose the built-in host storage when the control plane assigns it here.
+
+    Capability-first onboarding previously registered the creator's GREEN local
+    storage candidate in Phase D but never composed the provider service that
+    actually owns that provider id. The logical-storage authority therefore
+    routed recorder batches back to this node and the relay correctly answered
+    ``target node does not host the requested storage provider``.
+
+    Only the stable built-in provider id derived from this authenticated node is
+    eligible for this automatic runtime. Other provider registrations retain
+    their own explicit provider processes and are never silently mapped to this
+    filesystem backend.
+    """
+
+    provider_id = _builtin_local_provider_id(client.node_id)
+    existing = endpoint.services.get(provider_id)
+    if existing is not None:
+        if isinstance(existing, PhaseDStorageService):
+            return existing
+        raise FederationOperationError(
+            "storage-authority-local-provider-conflict",
+            "the built-in local storage provider id is already owned by another service",
+            "provider_id",
+        )
+
+    registration = control.snapshot(settings.session_id).providers.get(provider_id)
+    if registration is None:
+        return None
+    if registration.node_id != client.node_id:
+        raise FederationOperationError(
+            "storage-authority-local-provider-node-mismatch",
+            "the built-in local storage provider registration belongs to another node",
+            "provider_id",
+        )
+    if not registration.assignable:
+        return None
+
+    storage_directory, outbox_database, acknowledgements_database = (
+        _builtin_local_provider_paths(settings, provider_id)
+    )
+    service = PhaseDStorageService(
+        provider_id=provider_id,
+        provider=FilesystemBatchStorageProvider(storage_directory),
+        control_plane=control,
+        outbox=SQLiteOutbox(outbox_database),
+        acknowledgements=DurableAcknowledgementStore(acknowledgements_database),
+        replication_transport=endpoint,
+    )
+    service.reconcile_prepared()
+    endpoint.register_service(provider_id, service)
+    return service
 
 
 class SharedRecorderAwareStorageControlRelayChannel(
@@ -257,6 +346,12 @@ async def run_trusted_storage_authority(
         await endpoint.start()
         control = PhaseDControlPlane(Path(settings.storage_control_database))
         coordinator = SessionCoordinator(Path(settings.relay_control_database))
+        _ensure_builtin_local_storage_service(
+            endpoint=endpoint,
+            control=control,
+            client=client,
+            settings=settings,
+        )
         channel_type = (
             SharedRecorderAwareStorageControlRelayChannel
             if message_source is not None
@@ -312,6 +407,15 @@ async def run_trusted_storage_authority(
         if on_message_source is not None:
             on_message_source(channel)
         while stop is None or not stop.is_set():
+            # Storage authority enrollment can land after the authority task has
+            # started. Reconcile the one built-in runtime before each scan so a
+            # newly assigned creator provider becomes callable without restart.
+            _ensure_builtin_local_storage_service(
+                endpoint=endpoint,
+                control=control,
+                client=client,
+                settings=settings,
+            )
             await failover.scan_once()
             await announce()
             if stop is None:
