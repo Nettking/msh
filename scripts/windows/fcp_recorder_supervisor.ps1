@@ -232,7 +232,7 @@ try {
             if ([string]::IsNullOrWhiteSpace($buildCommit)) {
                 [Console]::Error.WriteLine(
                     'The recorder checkout has no readable commit. Federation ' +
-                    'updates need a supported Git checkout of Nettking/msh.'
+                    'updates need a supported FCP Git checkout.'
                 )
                 exit 2
             }

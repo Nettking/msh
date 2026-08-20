@@ -175,7 +175,7 @@ or environment value.
 ### What an update does on this host
 
 1. **Prevalidate while still recording.** The checkout must be the expected one,
-   on `main`, with the canonical `Nettking/msh` origin, a clean tree including
+   on `main`, with the canonical approved FCP origin, a clean tree including
    untracked files, and a full 40-character target that is a fast-forward from
    the current commit on fetched approved `main`. An update that would change
    Python dependency inputs (`requirements.txt`, constraints files,
@@ -214,7 +214,7 @@ checkout, so each already-deployed recorder needs one manual move to current
 
 ```cmd
 REM 1. Stop the running recorder cleanly (Ctrl+C in its window), then:
-cd C:\path\to\msh
+cd C:\path\to\your\fcp-checkout
 git status --porcelain --untracked-files=all
 git fetch --no-tags origin main
 git merge --ff-only origin/main

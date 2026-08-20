@@ -17,7 +17,11 @@ from typing import Any
 
 import pytest
 
-from catalog.federation.software_update import GitUpdateAdapter
+from catalog.federation.software_update import (
+    APPROVED_BRANCH,
+    APPROVED_REPOSITORY,
+    GitUpdateAdapter,
+)
 from catalog.mtconnect_recorder import native_update, native_update_agent
 from catalog.mtconnect_recorder.native_identity import (
     NATIVE_RUNTIME_SCHEMA,
@@ -201,7 +205,7 @@ def _request(action: str, request_id: str, target: str | None) -> dict[str, obje
         "schema": native_update.REQUEST_SCHEMA,
         "request_id": request_id,
         "action": action,
-        "repository": "Nettking/msh",
+        "repository": APPROVED_REPOSITORY,
         "branch": "main",
         "target_commit": target,
         "created_at": stamp(now),
@@ -330,9 +334,13 @@ def test_an_unapproved_origin_is_refused_by_the_shipped_adapter() -> None:
     """The fixture widens the allow-list; the shipped rule must still be strict."""
 
     approved = GitUpdateAdapter._approved_remote
-    assert approved("https://github.com/Nettking/msh.git")
-    assert not approved("https://github.com/attacker/msh.git")
-    assert not approved("https://token@github.com/Nettking/msh.git")
+    canonical = f"https://github.com/{APPROVED_REPOSITORY}"
+    assert approved(f"{canonical}.git")
+    assert approved(f"git@github.com:{APPROVED_REPOSITORY}.git")
+    # A different owner, an embedded credential, and a local path are all
+    # refused even though each contains the approved repository name.
+    assert not approved(canonical.replace("Nettking", "attacker") + ".git")
+    assert not approved(canonical.replace("https://", "https://token@") + ".git")
     assert not approved("/tmp/somewhere/remote.git")
 
 
@@ -823,8 +831,8 @@ def test_the_journal_records_every_declared_stage_in_order(
     ("mutation", "code"),
     [
         ({"schema": "other"}, "malformed_message"),
-        ({"repository": "attacker/msh"}, "unapproved_source"),
-        ({"branch": "release"}, "unapproved_source"),
+        ({"repository": "attacker/other"}, "unapproved_source"),
+        ({"branch": f"not-{APPROVED_BRANCH}"}, "unapproved_source"),
         ({"target_commit": "not-a-commit"}, "malformed_target"),
         ({"request_id": "../escape"}, "malformed_request_id"),
         ({"action": "run"}, "malformed_action"),
@@ -865,7 +873,7 @@ def test_a_request_carrying_a_command_cannot_smuggle_one(
             "command": "powershell.exe",
             "arguments": ["-c", "whoami"],
             "python": "C:/evil/python.exe",
-            "remote": "https://github.com/attacker/msh.git",
+            "remote": "https://github.com/attacker/other.git",
             "environment": {"PATH": "C:/evil"},
         }
     )
