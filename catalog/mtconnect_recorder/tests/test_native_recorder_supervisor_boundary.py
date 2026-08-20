@@ -60,16 +60,39 @@ def test_the_supervisor_never_force_kills_the_recorder() -> None:
     supervisor = _text(SUPERVISOR)
 
     assert "Stop-Process" not in supervisor
-    assert "-Force -ErrorAction SilentlyContinue" not in supervisor.replace(
-        "Remove-Item -LiteralPath $AgentStopFile -Force -ErrorAction SilentlyContinue",
-        "",
-    )
     assert "taskkill" not in supervisor.lower()
     assert "Kill()" not in supervisor
     assert ".Terminate" not in supervisor
-    # The agent is asked to stop through a file and is waited for, never killed.
-    assert "New-Item -ItemType File -Path $AgentStopFile" in supervisor
-    assert "$Agent.WaitForExit(" in supervisor
+    # The recorder is run synchronously and simply allowed to finish.
+    assert "$exitCode = Start-Recorder $nonce $buildCommit" in supervisor
+
+
+def test_the_supervisor_starts_nothing_before_the_recorder() -> None:
+    """The supported startup path must stay exactly one child process.
+
+    An earlier revision started a background agent and ran a Python probe to
+    resolve the data directory before launching the recorder. Both collided
+    with the launcher's own interpreter contract -- the probe shares the ``-c``
+    import-probe shape the launcher already uses -- and the existing Windows
+    launcher regressions caught it. Nothing may run before the child again.
+    """
+
+    supervisor = _text(SUPERVISOR)
+
+    assert "Start-Process" not in supervisor
+    assert "Start-Job" not in supervisor
+    # No import-probe shape: the launcher already owns the only "-c" call, and a
+    # second one collides with the fake interpreters the launcher tests use.
+    assert "'-c'" not in supervisor
+
+    loop = supervisor[supervisor.index("while ($true) {") :]
+    launch = loop.index("$exitCode = Start-Recorder")
+    # Inside the loop, the only interpreter call reachable before the child is
+    # the relaunch bookkeeping, and that runs solely after an approved update.
+    assert loop.index("Invoke-Finalize") > launch
+    assert loop.count("Set-RelaunchedNonce $nonce") == 1
+    assert loop.index("Set-RelaunchedNonce $nonce") < launch
+    assert "if ($replacementPending) {" in loop
 
 
 def test_the_supervisor_guarantees_one_recorder_per_checkout() -> None:
@@ -125,10 +148,10 @@ def test_recorder_arguments_are_never_re_parsed_by_the_supervisor() -> None:
     parameters = supervisor[: supervisor.index(")\n")]
     assert "[string[]]$RecorderArguments" in parameters
     assert "ValueFromRemainingArguments" not in parameters
-    # Quoting is applied only where Start-Process needs it; the call operator
-    # quotes for itself, so double-quoting there would corrupt the arguments.
-    assert "ConvertTo-ProcessArgument" in supervisor
-    assert supervisor.count("ConvertTo-ProcessArgument $RecorderArguments") == 0
+    # They reach the replacement verbatim, and reach the agent only as opaque
+    # values it uses to resolve the data directory the launcher would.
+    assert "-m scripts.start_tailscale_recorder @RecorderArguments" in supervisor
+    assert "('--recorder-arg=' + $argument)" in supervisor
 
 
 def test_the_relaunch_profile_is_the_one_the_operator_started_with() -> None:
@@ -176,9 +199,8 @@ def test_a_failed_finalize_never_relaunches() -> None:
     relaunch = supervisor.index("$replacementPending = $true")
     assert failure < relaunch
     assert "exit 5" in supervisor
-    # An agent that did not finish is also a refusal, not a relaunch.
-    assert "if (-not $agentStopped) {" in supervisor
-    assert "exit 4" in supervisor
+    # An unreadable checkout is a refusal too, not a relaunch.
+    assert "exit 2" in supervisor
 
 
 def test_the_supervisor_records_the_replacement_before_starting_it() -> None:
@@ -252,11 +274,20 @@ def test_the_agent_entry_point_takes_no_peer_supplied_process_shape() -> None:
 
 
 def test_the_agent_allows_one_instance_per_recorder() -> None:
-    text = _text(AGENT)
+    """One recorder process means one agent, with no lock file to go stale."""
 
-    assert "_claim_single_instance" in text
-    assert "process_is_running(holder)" in text
-    assert "agent.lock" in text
+    agent = _text(AGENT)
+    worker = _text(ROOT / "catalog/mtconnect_recorder/federation_update.py")
+
+    # The polling agent lives in the recorder process, so it is single-instance
+    # by construction rather than by a lock that a crash could leave behind.
+    assert "class RecorderHostUpdateAgentWorker" in worker
+    assert "NativeRecorderUpdateAgent(" in worker
+    # The script keeps only the steps that cannot run inside the recorder.
+    assert "--finalize" in agent
+    assert "--mark-relaunched" in agent
+    assert "while True" not in agent
+    assert "--stop-file" not in agent
 
 
 def test_the_windows_process_probe_never_signals() -> None:

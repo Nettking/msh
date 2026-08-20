@@ -1,16 +1,12 @@
-"""Host update agent for the native standalone MTConnect recorder.
+"""Host update steps for the native standalone MTConnect recorder.
 
-This is a thin, explicit entry point. Every lifecycle rule lives in
-``catalog.mtconnect_recorder.native_update_agent`` so the same state machine is
-exercised by CI on Linux and Windows alike; this file only chooses a mode,
-enforces one agent per recorder, and prints a bounded result.
+The recorder runs the update agent inside its own process: it already knows its
+data directory and repository, so a separate long-running agent would add an
+interpreter to the supported startup path for no benefit.
 
-Modes:
+What is left here are the two steps that genuinely cannot happen inside the
+recorder, plus a bounded self-check for CI:
 
-``(default)``
-    Poll the bounded request handoff and resume any interrupted activation.
-``--once``
-    One bounded pass, used by CI smoke checks.
 ``--finalize``
     Fast-forward the checkout after the supervised recorder has exited. This is
     the only mode that mutates the checkout, and it refuses to run while the
@@ -18,9 +14,13 @@ Modes:
 ``--mark-relaunched``
     Record the exact process-instance nonce the supervisor just started, so the
     replacement must be proven to be that process and not a survivor.
+``--once``
+    One bounded pass of the same state machine the recorder runs in-process.
 
-No mode accepts an executable, path, command, argument, URL, or environment
-value from a Federation peer.
+The data directory is resolved either explicitly or, exactly as the launcher
+resolves it, from the recorder arguments the supervisor was started with. No
+mode accepts an executable, path, command, argument, URL, or environment value
+from a Federation peer.
 """
 
 from __future__ import annotations
@@ -29,7 +29,6 @@ import argparse
 import json
 import os
 import sys
-import time
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
@@ -40,40 +39,8 @@ from catalog.mtconnect_recorder.native_identity import (
     NONCE_RE,
     SUPERVISOR_SESSION_ENV,
 )
-from catalog.mtconnect_recorder.native_update import (
-    NativeRecorderUpdatePaths,
-    process_is_running,
-    read_json,
-    write_json_atomic,
-)
-from catalog.mtconnect_recorder.native_update_agent import (
-    NativeRecorderUpdateAgent,
-)
-
-LOCK_SCHEMA = "fcp.recorder-update-agent-lock.v1"
-
-
-def _claim_single_instance(lock_file: Path) -> bool:
-    """Allow exactly one agent per recorder data directory.
-
-    A lock left behind by a crashed agent is reclaimed only after its recorded
-    PID is proven gone with the same read-only probe used everywhere else.
-    """
-
-    lock_file.parent.mkdir(parents=True, exist_ok=True)
-    existing = read_json(lock_file)
-    if existing is not None and existing.get("schema") == LOCK_SCHEMA:
-        holder = existing.get("pid")
-        if holder != os.getpid() and process_is_running(holder):
-            return False
-    write_json_atomic(lock_file, {"schema": LOCK_SCHEMA, "pid": os.getpid()})
-    return True
-
-
-def _release_single_instance(lock_file: Path) -> None:
-    existing = read_json(lock_file)
-    if existing is not None and existing.get("pid") == os.getpid():
-        lock_file.unlink(missing_ok=True)
+from catalog.mtconnect_recorder.native_update_agent import NativeRecorderUpdateAgent
+from scripts.start_tailscale_recorder import recorder_data_directory
 
 
 def _supervisor_session(value: str | None) -> str:
@@ -87,13 +54,39 @@ def _supervisor_session(value: str | None) -> str:
     return candidate
 
 
+def _data_directory(
+    parser: argparse.ArgumentParser,
+    explicit: str | None,
+    recorder_arguments: list[str],
+) -> Path:
+    if explicit:
+        return Path(explicit).resolve()
+    # Resolved by the launcher's own rule rather than re-implemented here: an
+    # agent watching a different directory than the recorder writes to would
+    # verify the wrong process.
+    try:
+        return recorder_data_directory(list(recorder_arguments))
+    except (RuntimeError, OSError, ValueError):
+        parser.error(
+            "The recorder data directory could not be resolved. Pass "
+            "--data-directory explicitly."
+        )
+        raise  # pragma: no cover - parser.error always exits
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--repo-root", required=True)
-    parser.add_argument("--data-directory", required=True)
+    parser.add_argument("--data-directory", default=None)
+    parser.add_argument(
+        "--recorder-arg",
+        dest="recorder_arguments",
+        action="append",
+        default=[],
+        help="One recorder argument, repeated, used only to resolve the data "
+        "directory exactly as the launcher does.",
+    )
     parser.add_argument("--supervisor-session", default=None)
-    parser.add_argument("--poll-seconds", type=float, default=2.0)
-    parser.add_argument("--stop-file", default=None)
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--finalize", action="store_true")
     parser.add_argument("--mark-relaunched", action="store_true")
@@ -105,13 +98,13 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     session = _supervisor_session(args.supervisor_session)
-    root = Path(args.repo_root).resolve()
-    data_directory = Path(args.data_directory).resolve()
-    poll_seconds = min(max(float(args.poll_seconds), 0.1), 30.0)
-
     agent = NativeRecorderUpdateAgent(
-        repository_root=root,
-        data_directory=data_directory,
+        repository_root=Path(args.repo_root).resolve(),
+        data_directory=_data_directory(
+            parser,
+            args.data_directory,
+            args.recorder_arguments,
+        ),
         supervisor_session=session,
     )
 
@@ -127,25 +120,8 @@ def main(argv: list[str] | None = None) -> int:
         print(json.dumps(outcome, sort_keys=True))
         return 0 if outcome.get("relaunch") else 1
 
-    paths = NativeRecorderUpdatePaths(data_directory)
-    lock_file = paths.directory / "agent.lock"
-    if not _claim_single_instance(lock_file):
-        return 0
-    # The supervisor ends a generation by creating this file rather than by
-    # killing the agent, so an agent is never terminated mid-operation and the
-    # next generation always starts from freshly checked-out code.
-    stop_file = Path(args.stop_file).resolve() if args.stop_file else None
-    try:
-        while True:
-            worked = agent.poll_once()
-            if args.once:
-                return 0
-            if stop_file is not None and stop_file.exists():
-                return 0
-            if not worked:
-                time.sleep(poll_seconds)
-    finally:
-        _release_single_instance(lock_file)
+    agent.poll_once()
+    return 0
 
 
 if __name__ == "__main__":

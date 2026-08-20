@@ -25,10 +25,13 @@ param(
 # contribution to an update is:
 #
 #   * generate a supervisor session, and a fresh process-instance nonce per child
-#   * run the host update agent alongside the recorder
 #   * notice the approved-update exit code
 #   * fast-forward the checkout only after the child has actually exited
 #   * start exactly one replacement, and record which one it started
+#
+# The recorder runs the host update agent inside its own process, so the
+# supported startup path stays exactly one child and this supervisor starts
+# nothing before it.
 #
 # It never force-kills the recorder, never runs reset/clean/stash, and never
 # builds or starts a Compose service.
@@ -37,10 +40,12 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $ApprovedUpdateRestartExitCode = 75
-$AgentShutdownTimeoutSeconds = 60
 $UpdateAgentScript = 'scripts/fcp_native_recorder_update_agent.py'
 
 function Normalize-DirectoryPath([string]$Value) {
+    if ([string]::IsNullOrWhiteSpace($Value)) {
+        throw 'recorder_supervisor_path_missing'
+    }
     $full = [System.IO.Path]::GetFullPath($Value)
     $root = [System.IO.Path]::GetPathRoot($full)
     if ($full.Length -le $root.Length) { return $full }
@@ -50,16 +55,6 @@ function Normalize-DirectoryPath([string]$Value) {
     )
     return $full.TrimEnd($separators)
 }
-
-function ConvertTo-ProcessArgument([string]$Value) {
-    # Windows PowerShell 5.1 does not quote Start-Process arguments for us, and
-    # a physical recorder is routinely installed under a path with spaces.
-    if ($Value -match '^[A-Za-z0-9._:\\/=-]+$') { return $Value }
-    return '"' + $Value.Replace('"', '\"') + '"'
-}
-
-if ($null -eq $PythonPrefix) { $PythonPrefix = @() }
-if ($null -eq $RecorderArguments) { $RecorderArguments = @() }
 
 $RepoRoot = Normalize-DirectoryPath $RepoRoot
 
@@ -117,27 +112,6 @@ function Get-HeadCommit {
     return ''
 }
 
-function Resolve-DataDirectory {
-    # Resolved by the launcher's own rule rather than re-implemented here. A
-    # supervisor watching a different directory than the recorder writes to
-    # would verify the wrong process.
-    $probe = (
-        'import sys; ' +
-        'from scripts.start_tailscale_recorder import recorder_data_directory; ' +
-        'print(recorder_data_directory(sys.argv[1:]))'
-    )
-    $result = Invoke-Python (@('-c', $probe) + $RecorderArguments)
-    if ($result.ExitCode -ne 0) {
-        throw 'recorder_data_directory_unavailable'
-    }
-    return Normalize-DirectoryPath ((Last-Text $result.Output).Trim())
-}
-
-$DataDirectory = Resolve-DataDirectory
-$AgentDirectory = Join-Path $DataDirectory 'federation\recorder-update-agent'
-$AgentStopFile = Join-Path $AgentDirectory 'agent-stop'
-New-Item -ItemType Directory -Path $AgentDirectory -Force | Out-Null
-
 # Exactly one supervisor -- and therefore exactly one recorder -- per checkout.
 $mutexName = 'Global\FCPNativeRecorderSupervisor-' + (Get-PathHash $RepoRoot)
 $createdNew = $false
@@ -154,55 +128,30 @@ if (-not $createdNew) {
 $SupervisorSession = New-Nonce
 
 function Get-AgentArguments([string[]]$Extra) {
-    return @($PythonPrefix) + @(
-        (ConvertTo-ProcessArgument $UpdateAgentScript),
-        '--repo-root', (ConvertTo-ProcessArgument $RepoRoot),
-        '--data-directory', (ConvertTo-ProcessArgument $DataDirectory),
+    # The agent resolves the recorder data directory from these arguments with
+    # the launcher's own rule, so the supervisor never has to compute it -- and
+    # never runs an extra interpreter on the supported startup path to do so.
+    # One token per argument. A recorder argument starts with "--", so a
+    # separate value token would be parsed as an option name instead.
+    $forwarded = @()
+    foreach ($argument in $RecorderArguments) {
+        $forwarded += ('--recorder-arg=' + $argument)
+    }
+    return @(
+        $UpdateAgentScript,
+        '--repo-root', $RepoRoot,
         '--supervisor-session', $SupervisorSession
-    ) + $Extra
-}
-
-function Start-UpdateAgent {
-    Remove-Item -LiteralPath $AgentStopFile -Force -ErrorAction SilentlyContinue
-    return Start-Process `
-        -FilePath $PythonExecutable `
-        -ArgumentList (Get-AgentArguments @(
-            '--stop-file', (ConvertTo-ProcessArgument $AgentStopFile)
-        )) `
-        -WorkingDirectory $RepoRoot `
-        -WindowStyle Hidden `
-        -PassThru
-}
-
-function Stop-UpdateAgent([object]$Agent) {
-    if ($null -eq $Agent) { return $true }
-    # Cooperative shutdown only. The agent finishes whatever bounded step it is
-    # in and exits by itself; nothing here terminates it mid-operation.
-    New-Item -ItemType File -Path $AgentStopFile -Force | Out-Null
-    $stopped = $Agent.WaitForExit($AgentShutdownTimeoutSeconds * 1000)
-    if ($stopped) { $Agent.Dispose() }
-    return $stopped
+    ) + $forwarded + $Extra
 }
 
 function Invoke-Finalize {
-    return Invoke-Python (@(
-        $UpdateAgentScript,
-        '--repo-root', $RepoRoot,
-        '--data-directory', $DataDirectory,
-        '--supervisor-session', $SupervisorSession,
-        '--finalize'
-    ))
+    return Invoke-Python (Get-AgentArguments @('--finalize'))
 }
 
 function Set-RelaunchedNonce([string]$Nonce) {
-    Invoke-Python (@(
-        $UpdateAgentScript,
-        '--repo-root', $RepoRoot,
-        '--data-directory', $DataDirectory,
-        '--supervisor-session', $SupervisorSession,
-        '--mark-relaunched',
-        '--process-nonce', $Nonce
-    )) | Out-Null
+    Invoke-Python (
+        Get-AgentArguments @('--mark-relaunched', '--process-nonce', $Nonce)
+    ) | Out-Null
 }
 
 function Start-Recorder([string]$Nonce, [string]$BuildCommit) {
@@ -244,30 +193,17 @@ try {
                 $replacementPending = $false
             }
 
-            $agent = $null
-            try {
-                $agent = Start-UpdateAgent
-            }
-            catch {
-                # Capture is the product. A recorder that cannot participate in
-                # updates still records; it simply reports no update result.
-                Write-Warning "FCP recorder update agent did not start: $($_.Exception.Message)"
-            }
-
+            # Nothing else is started here. The recorder runs the host update
+            # agent inside its own process, so the supported startup path is
+            # exactly one child and the launcher contract is unchanged.
             $exitCode = Start-Recorder $nonce $buildCommit
-            $agentStopped = Stop-UpdateAgent $agent
 
             if ($exitCode -ne $ApprovedUpdateRestartExitCode) {
                 exit $exitCode
             }
-            if (-not $agentStopped) {
-                [Console]::Error.WriteLine(
-                    'The recorder update agent did not finish; the checkout was ' +
-                    'left untouched and the recorder was not restarted.'
-                )
-                exit 4
-            }
 
+            # Reached only for an approved update, and only after the recorder
+            # process has exited.
             $finalize = Invoke-Finalize
             if ($finalize.ExitCode -ne 0) {
                 [Console]::Error.WriteLine(

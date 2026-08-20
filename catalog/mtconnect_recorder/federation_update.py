@@ -41,6 +41,12 @@ from .native_update import (
     pending_federation_updates,
     read_json,
 )
+from .native_update_agent import NativeRecorderUpdateAgent
+
+#: The repository this process is running from. Resolved locally from this
+#: module's own location -- never from a peer, an argument, or an environment
+#: value a peer could reach.
+REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 
 #: The activation file is polled rather than watched so the recorder never
 #: depends on a platform file-notification API. One second is far below every
@@ -130,6 +136,83 @@ class RecorderFederationUpdateWorker:
             except Exception:  # noqa: BLE001 - transport failures retry safely
                 # Update participation must never be able to end capture. Every
                 # failure simply waits and replays again from durable state.
+                self._stop.wait(self.poll_seconds)
+                continue
+            self._stop.wait(self.poll_seconds)
+
+
+class RecorderHostUpdateAgentWorker:
+    """Run the host update agent inside the recorder process.
+
+    The agent could be a separate process, and originally was. It should not be:
+    the recorder already knows its data directory and its repository, so a
+    separate process would need both handed to it -- and the only way to compute
+    the data directory outside the recorder is to run the launcher's own
+    resolution in yet another interpreter, which puts an extra Python
+    invocation on the supported startup path for no benefit.
+
+    Running it here keeps startup to exactly one recorder process, makes the
+    agent single-instance by construction, and leaves the supervisor with only
+    the two steps that genuinely cannot happen inside the recorder: the
+    fast-forward after it exits, and the relaunch.
+    """
+
+    def __init__(
+        self,
+        *,
+        data_directory: Path | str,
+        poll_seconds: float = 2.0,
+        environment: Any = None,
+        agent: Any = None,
+        repository_root: Path | str = REPOSITORY_ROOT,
+    ) -> None:
+        if poll_seconds <= 0:
+            raise ValueError("poll_seconds must be positive")
+        self.poll_seconds = float(poll_seconds)
+        self.supervisor_session = supervisor_session(environment)
+        self.agent = agent
+        if self.agent is None and self.supervisor_session is not None:
+            self.agent = NativeRecorderUpdateAgent(
+                repository_root=repository_root,
+                data_directory=data_directory,
+                supervisor_session=self.supervisor_session,
+            )
+        self._stop = threading.Event()
+        self._thread: threading.Thread | None = None
+
+    @property
+    def supervised(self) -> bool:
+        return self.agent is not None
+
+    def start(self) -> None:
+        if not self.supervised or (
+            self._thread is not None and self._thread.is_alive()
+        ):
+            return
+        self._stop.clear()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="fcp-recorder-host-update-agent",
+            daemon=True,
+        )
+        self._thread.start()
+
+    def stop(self, *, timeout: float = SHUTDOWN_TIMEOUT_SECONDS) -> bool:
+        self._stop.set()
+        thread, self._thread = self._thread, None
+        if thread is None:
+            return True
+        thread.join(timeout=timeout)
+        return not thread.is_alive()
+
+    def poll_once(self) -> bool:
+        return bool(self.agent is not None and self.agent.poll_once())
+
+    def _run(self) -> None:
+        while not self._stop.is_set():
+            try:
+                self.poll_once()
+            except Exception:  # noqa: BLE001 - a host failure must not end capture
                 self._stop.wait(self.poll_seconds)
                 continue
             self._stop.wait(self.poll_seconds)
@@ -261,8 +344,10 @@ def approved_update_restart(watcher: RecorderUpdateActivationWatcher | None) -> 
 __all__ = [
     "DEFAULT_POLL_SECONDS",
     "HANDOFF_TIMEOUT_SECONDS",
+    "REPOSITORY_ROOT",
     "SHUTDOWN_TIMEOUT_SECONDS",
     "RecorderFederationUpdateWorker",
+    "RecorderHostUpdateAgentWorker",
     "RecorderUpdateActivationWatcher",
     "approved_update_restart",
 ]

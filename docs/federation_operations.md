@@ -249,14 +249,15 @@ migrate.cmd
 ### Standalone MTConnect recorder
 
 A standalone recorder started with the supported launcher runs under a native
-supervisor that starts its host update agent automatically:
+supervisor, and runs its host update agent inside the recorder process itself:
 
 ```cmd
 start-tailscale-recorder.cmd
 ```
 
-No separate updater command is needed, and no recurring manual Git procedure is
-expected. **Check for updates -> Update all devices** covers the recorder like
+No separate updater command or process is needed, and no recurring manual Git
+procedure is expected. There is one recorder process; do not look for a second
+agent process beside it. **Check for updates -> Update all devices** covers the recorder like
 any other member.
 
 One-time bootstrap: a recorder installed before this capability existed cannot

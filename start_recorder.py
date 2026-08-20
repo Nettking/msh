@@ -55,6 +55,7 @@ from catalog.mtconnect_recorder.federation_node import (
 )
 from catalog.mtconnect_recorder.federation_update import (
     RecorderFederationUpdateWorker,
+    RecorderHostUpdateAgentWorker,
     RecorderUpdateActivationWatcher,
     approved_update_restart,
 )
@@ -605,6 +606,7 @@ def main(argv: list[str] | None = None) -> int:
     federation_node: RecorderFederationNode | None = None
     federation_control: RecorderFederationControlWorker | None = None
     federation_update: RecorderFederationUpdateWorker | None = None
+    host_update: RecorderHostUpdateAgentWorker | None = None
     activation: RecorderUpdateActivationWatcher | None = None
     try:
         try:
@@ -644,6 +646,13 @@ def main(argv: list[str] | None = None) -> int:
                 data_directory=data_dir,
             )
             federation_update.start()
+
+        # The host update agent runs here rather than as a separate process:
+        # this process already knows its data directory and repository, so a
+        # separate one would put another interpreter on the supported startup
+        # path just to resolve them. It starts only when supervised.
+        host_update = RecorderHostUpdateAgentWorker(data_directory=data_dir)
+        host_update.start()
 
         # The watcher runs even without a Federation node: an activation left
         # behind by an earlier process must still be evaluated and refused
@@ -689,6 +698,8 @@ def main(argv: list[str] | None = None) -> int:
         # and the relay client must all shut down after it rather than under it.
         if activation is not None:
             _shut_down("update activation watcher", activation.stop)
+        if host_update is not None:
+            _shut_down("host update agent", host_update.stop)
         if federation_update is not None:
             _shut_down("Federation update worker", federation_update.stop)
         if federation_control is not None:

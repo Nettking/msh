@@ -172,6 +172,11 @@ connection. No second Federation identity, relay connection, or reader is
 created, and no peer ever supplies an executable, path, command, argument, URL,
 or environment value.
 
+The host update agent runs inside the recorder process, so a supervised
+recorder is still exactly one process. The supervisor starts nothing beside it;
+it only fast-forwards the checkout after the recorder exits and starts the
+replacement.
+
 ### What an update does on this host
 
 1. **Prevalidate while still recording.** The checkout must be the expected one,

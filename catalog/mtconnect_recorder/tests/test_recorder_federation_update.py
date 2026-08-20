@@ -684,3 +684,111 @@ def test_capture_stops_before_the_update_path_is_torn_down() -> None:
             "catalog.mtconnect_recorder.federation_update", fromlist=["x"]
         ).__file__
     ).read_text(encoding="utf-8")
+
+# --------------------------------------------------------------------------
+# the host agent runs inside the recorder process
+# --------------------------------------------------------------------------
+
+
+def test_the_host_agent_runs_in_process_only_when_supervised(tmp_path: Path) -> None:
+    from catalog.mtconnect_recorder.federation_update import (
+        RecorderHostUpdateAgentWorker,
+    )
+
+    unsupervised = RecorderHostUpdateAgentWorker(
+        data_directory=tmp_path, environment={}
+    )
+    unsupervised.start()
+
+    assert unsupervised.supervised is False
+    assert unsupervised.poll_once() is False
+    assert unsupervised._thread is None
+
+    passes: list[int] = []
+
+    class _Agent:
+        def poll_once(self) -> bool:
+            passes.append(1)
+            return True
+
+    supervised = RecorderHostUpdateAgentWorker(
+        data_directory=tmp_path,
+        environment={SUPERVISOR_SESSION_ENV: SUPERVISOR},
+        agent=_Agent(),
+    )
+
+    assert supervised.supervised is True
+    assert supervised.poll_once() is True
+    assert passes == [1]
+
+
+def test_the_host_agent_resolves_its_repository_locally() -> None:
+    """Never from a peer, an argument, or an environment value."""
+
+    from catalog.mtconnect_recorder import federation_update as module
+
+    assert (module.REPOSITORY_ROOT / "start_recorder.py").is_file()
+    source = Path(module.__file__).read_text(encoding="utf-8")
+    assert "Path(__file__).resolve().parents[2]" in source
+    assert "os.environ" not in source
+
+
+def test_a_host_agent_failure_never_ends_capture(tmp_path: Path) -> None:
+    from catalog.mtconnect_recorder.federation_update import (
+        RecorderHostUpdateAgentWorker,
+    )
+
+    class _Exploding:
+        def poll_once(self) -> bool:
+            raise RuntimeError("git unavailable")
+
+    worker = RecorderHostUpdateAgentWorker(
+        data_directory=tmp_path,
+        environment={SUPERVISOR_SESSION_ENV: SUPERVISOR},
+        agent=_Exploding(),
+        poll_seconds=0.01,
+    )
+    worker._stop.set()
+
+    worker._run()
+
+
+def test_the_agent_script_forwards_recorder_arguments_as_single_tokens(
+    tmp_path: Path,
+) -> None:
+    """``--recorder-arg --data-dir`` would be parsed as an option name."""
+
+    import subprocess
+    import sys
+
+    from catalog.mtconnect_recorder.federation_update import REPOSITORY_ROOT
+
+    script = REPOSITORY_ROOT / "scripts" / "fcp_native_recorder_update_agent.py"
+    # An absolute directory outside the checkout: resolving a relative one would
+    # write updater state into the repository and dirty the working tree.
+    data_directory = tmp_path / "recorder-data"
+    completed = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--repo-root",
+            str(REPOSITORY_ROOT),
+            "--supervisor-session",
+            SUPERVISOR,
+            "--recorder-arg=--data-dir",
+            f"--recorder-arg={data_directory}",
+            "--finalize",
+        ],
+        check=False,
+        capture_output=True,
+        text=True,
+        cwd=REPOSITORY_ROOT,
+        timeout=120,
+    )
+
+    # No pending activation, so it refuses -- but it parsed and resolved.
+    assert completed.returncode == 1, completed.stderr
+    assert "no_pending_activation" in completed.stdout
+    assert (data_directory / "federation" / "recorder-update-agent").is_dir()
+    # Nothing was written inside the checkout.
+    assert not (REPOSITORY_ROOT / "recorder-data").exists()
