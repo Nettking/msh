@@ -9,7 +9,7 @@ import socket
 import subprocess
 import sys
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 from urllib.parse import urlsplit
 
 import start_recorder
@@ -17,11 +17,90 @@ from catalog.flask_app.services.federation_pairing_service import (
     PairingCodeCodec,
     RemotePairingStore,
 )
+from catalog.node.client import RelayNodeClient
 from scripts.federation_host_runner import load_host_module
 
 DEFAULT_DEVICE_NAME: Final = "FCP MTConnect recorder"
 PAIRING_STATE_RELATIVE: Final = Path("federation/onboarding/remote_pairing.json")
 TAILSCALE_NETWORK = ipaddress.ip_network("100.64.0.0/10")
+
+
+async def _restore_remote_session_creators(
+    client: RelayNodeClient,
+    status: dict[str, Any],
+) -> dict[str, Any]:
+    """Restore omitted immutable session creators from authoritative revision 1.
+
+    Remote coordinator status may omit ``created_by_node_id``. Recorder storage
+    selection intentionally trusts only the session creator's advertised storage
+    authority, so recover that immutable identity from the authoritative
+    ``session.created`` event rather than guessing from connectivity or
+    capabilities.
+    """
+
+    sessions = status.get("sessions")
+    if not isinstance(sessions, list):
+        return status
+
+    replacements: dict[str, str] = {}
+    for value in sessions:
+        if not isinstance(value, dict):
+            continue
+        session_id = value.get("session_id")
+        creator = value.get("created_by_node_id")
+        if (
+            not isinstance(session_id, str)
+            or not session_id
+            or (isinstance(creator, str) and creator)
+        ):
+            continue
+        events, _current_revision = await client.coordinator_replay_page(
+            session_id=session_id,
+            last_applied_revision=0,
+            limit=1,
+        )
+        if not events:
+            continue
+        first = events[0]
+        event_creator = getattr(first, "actor_node_id", None)
+        if (
+            getattr(first, "revision", None) == 1
+            and getattr(first, "event_type", None) == "session.created"
+            and getattr(first, "session_id", None) == session_id
+            and isinstance(event_creator, str)
+            and event_creator
+        ):
+            replacements[session_id] = event_creator
+
+    if not replacements:
+        return status
+
+    restored = dict(status)
+    restored["sessions"] = [
+        (
+            {**value, "created_by_node_id": replacements[value["session_id"]]}
+            if isinstance(value, dict)
+            and value.get("session_id") in replacements
+            else value
+        )
+        for value in sessions
+    ]
+    return restored
+
+
+def _install_remote_session_creator_fallback() -> None:
+    """Make complete remote status available to recorder storage selection."""
+
+    if getattr(RelayNodeClient.coordinator_status, "_fcp_creator_fallback", False):
+        return
+    original = RelayNodeClient.coordinator_status
+
+    async def coordinator_status(self: RelayNodeClient) -> dict[str, Any]:
+        status = await original(self)
+        return await _restore_remote_session_creators(self, status)
+
+    setattr(coordinator_status, "_fcp_creator_fallback", True)
+    RelayNodeClient.coordinator_status = coordinator_status
 
 
 def _option_value(arguments: list[str], name: str) -> str | None:
@@ -262,6 +341,7 @@ def main(argv: list[str] | None = None) -> int:
             # removed from the environment in the finally block below.
             os.environ["FCP_RECORDER_FEDERATION_KEY"] = pairing_key
             pairing_key = None
+        _install_remote_session_creator_fallback()
         print(f"Tailscale ready: {address}")
         print(
             "Starting the recorder; Federation membership and the recorder data publication route are required."
