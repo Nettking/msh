@@ -160,6 +160,7 @@ class RelayNodeClient:
         self._replay_tasks: dict[
             str, asyncio.Task[dict[str, Any]]
         ] = {}
+        self._replay_teardown_codes: dict[str, str] = {}
         self._gap_replay_tasks: dict[str, asyncio.Task[None]] = {}
         self._receiver_task: asyncio.Task[None] | None = None
         self._heartbeat_task: asyncio.Task[None] | None = None
@@ -363,6 +364,7 @@ class RelayNodeClient:
         }
         for session_id in sorted(local_session_ids - remote_session_ids):
             self.state.remove_session(session_id, now=now)
+            self._replay_teardown_codes.pop(session_id, None)
         for session_id in sorted(remote_session_ids - local_session_ids):
             self.state.join_session(session_id, now=now)
 
@@ -373,6 +375,13 @@ class RelayNodeClient:
         replay_tasks = tuple(self._replay_tasks.items())
         gap_replay_tasks = tuple(self._gap_replay_tasks.items())
         websocket, self._websocket = self._websocket, None
+        # Record why each shared replay pass is being stopped before cancelling
+        # it, so every coroutine awaiting that pass fails closed with this
+        # connection's structured reason instead of an opaque cancellation.
+        teardown_code = error_code or "connection-closed"
+        for session_id, task in replay_tasks:
+            if task is not current:
+                self._replay_teardown_codes[session_id] = teardown_code
         tasks = [
             task
             for task in (
@@ -411,15 +420,19 @@ class RelayNodeClient:
         self._pending_message_responses.clear()
         self.connected_event.clear()
         self.disconnected_event.set()
-        enrollment_state = self.state.status()["enrollment_state"]
-        if enrollment_state == EnrollmentState.REVOKED.value:
+        durable = self.state.status()
+        if durable["enrollment_state"] == EnrollmentState.REVOKED.value:
             status = ConnectionState.REVOKED
+        elif error_code:
+            status = ConnectionState.ERROR
+        elif durable["connection_state"] == ConnectionState.ERROR.value:
+            # One closed connection is torn down by whichever coroutine notices
+            # first, and the caller that owns the failure follows with its own
+            # reason. A later reasonless teardown must not overwrite a recorded
+            # failure with a clean shutdown; only a new connection clears it.
+            return
         else:
-            status = (
-                ConnectionState.ERROR
-                if error_code
-                else ConnectionState.DISCONNECTED
-            )
+            status = ConnectionState.DISCONNECTED
         self.state.set_connection_state(
             status,
             now=self._clock(),
@@ -685,6 +698,8 @@ class RelayNodeClient:
     async def request_replay(self, session_id: str) -> dict[str, Any]:
         task = self._replay_tasks.get(session_id)
         if task is None or task.done():
+            # A fresh pass supersedes any recorded teardown of the previous one.
+            self._replay_teardown_codes.pop(session_id, None)
             task = asyncio.create_task(
                 self._request_replay_pass(session_id),
                 name=f"fcp-replay-{session_id}",
@@ -695,7 +710,31 @@ class RelayNodeClient:
                     session_id, completed
                 )
             )
-        return await asyncio.shield(task)
+        try:
+            return await asyncio.shield(task)
+        except asyncio.CancelledError:
+            # ``asyncio.shield`` raises the same bare ``CancelledError`` whether
+            # this caller was cancelled or the shared pass was torn down by
+            # ``disconnect``. Only the first is a real cancellation of this
+            # coroutine and must propagate; the second is an ordinary bounded
+            # relay failure, and reporting it as ``CancelledError`` would send a
+            # ``BaseException`` through every ``except Exception`` retry
+            # boundary that supervises a Federation client.
+            if self._own_cancellation_requested() or not task.cancelled():
+                raise
+            raise RelayRemoteError(
+                self._replay_teardown_codes.get(
+                    session_id, "replay-cancelled"
+                ),
+                "the shared session replay stopped when the relay connection closed",
+            ) from None
+
+    @staticmethod
+    def _own_cancellation_requested() -> bool:
+        """Report whether the awaiting task itself has a pending cancellation."""
+
+        current = asyncio.current_task()
+        return current is not None and current.cancelling() > 0
 
     async def _request_replay_pass(self, session_id: str) -> dict[str, Any]:
         self.state.mark_session_replaying(session_id, now=self._clock())
@@ -1057,6 +1096,9 @@ class RelayNodeClient:
                 ):
                     self.state.remove_session(
                         envelope.session_id, now=self._clock()
+                    )
+                    self._replay_teardown_codes.pop(
+                        envelope.session_id, None
                     )
                     continue
                 if envelope.message_type.endswith(".accepted") or envelope.message_type in {

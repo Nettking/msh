@@ -473,6 +473,9 @@ class PairingRelayNodeClient(RelayNodeClient):
         # receiver before ordinary inbound messages are queued.
         self._pending_message_responses = {}
         self._replay_tasks = {}
+        # Why one shared replay pass stopped, so callers awaiting it fail closed
+        # with the relay's reason instead of an opaque task cancellation.
+        self._replay_teardown_codes = {}
         self._gap_replay_tasks = {}
         self._receiver_task = None
         self._heartbeat_task = None

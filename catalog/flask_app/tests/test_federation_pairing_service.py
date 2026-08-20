@@ -240,3 +240,36 @@ def test_fresh_reset_preserves_only_recorder_jsonl(tmp_path: Path) -> None:
     assert not recorder_state.exists()
     assert not result.exists()
     assert summary.preserved_jsonl_files == 1
+
+
+def test_the_trusted_pairing_client_matches_the_generic_client_state(
+    tmp_path: Path,
+) -> None:
+    """The hand-written trusted constructor must stay in lockstep.
+
+    ``PairingRelayNodeClient`` deliberately re-implements ``__init__`` to allow
+    trusted-network plaintext without weakening the generic transport policy. A
+    field added to the generic client and missed here fails only at runtime, on
+    the physical relay, inside the storage authority.
+    """
+
+    from catalog.flask_app.services.federation_pairing_service import (
+        PairingRelayNodeClient,
+    )
+    from catalog.node.client import RelayNodeClient
+
+    generic = RelayNodeClient(
+        state_directory=tmp_path / "generic",
+        relay_url="ws://127.0.0.1:8765",
+        display_name="Generic",
+        allow_insecure_local=True,
+        clock=lambda: NOW,
+    )
+    trusted = PairingRelayNodeClient(
+        state_directory=tmp_path / "trusted",
+        relay_url="ws://127.0.0.1:8765",
+        display_name="Trusted",
+        clock=lambda: NOW,
+    )
+
+    assert set(vars(trusted)) == set(vars(generic))
