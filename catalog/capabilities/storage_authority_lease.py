@@ -1,15 +1,15 @@
 """Ongoing lease maintenance for trusted GREEN storage authority.
 
 Storage enrollment proves that a provider is a current, trusted, GREEN candidate
-and creates the initial coordinator-issued write lease.  A lease is deliberately
-short-lived, so a healthy primary also needs a bounded renewal path.  Renewal
+and creates the initial coordinator-issued write lease. A lease is deliberately
+short-lived, so a healthy primary also needs a bounded renewal path. Renewal
 must not bypass enrollment: every pass first re-runs
 :class:`TrustedGreenStorageAuthority` against the coordinator's current
 capability announcement, then rotates the same provider's grant only when the
 existing lease is close to expiry.
 
 This keeps the relay-side coordinator as the authority for terms, fencing tokens
-and grants.  The storage runtime never self-mints authority merely because it is
+and grants. The storage runtime never self-mints authority merely because it is
 reachable.
 """
 
@@ -22,7 +22,6 @@ from dataclasses import replace
 from datetime import datetime, timedelta, timezone
 
 from catalog.federation.coordinator import SessionCoordinator
-from catalog.federation.errors import FederationValidationError
 from catalog.federation.phase_d_control import PhaseDControlPlane
 
 from .storage_authority_enrollment import (
