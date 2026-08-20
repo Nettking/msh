@@ -36,6 +36,12 @@ class RelayMessageClient(Protocol):
     async def receive_message(self, *, timeout: float | None = None): ...
 
 
+class RelayMessageSource(Protocol):
+    """Upstream single-reader multiplexer forwarding frames it does not own."""
+
+    async def receive_other(self, *, timeout: float | None = None): ...
+
+
 class AsyncStorageService(Protocol):
     async def dispatch(self, envelope: StorageRequestEnvelope) -> StorageResponseEnvelope: ...
 
@@ -49,11 +55,13 @@ class _PendingRequest:
 
 
 class RelayStorageEndpoint:
-    """Own one node client's application relay queue for storage traffic.
+    """Own one logical application-relay stage for storage traffic.
 
-    The endpoint multiplexes correlated responses and provider-side request handling
-    without changing the Phase 2 relay protocol. Unrelated relay messages are retained
-    in a bounded queue for optional consumers instead of being silently discarded.
+    By default the endpoint reads directly from a node client's application queue.
+    ``message_source`` composes it behind an existing single-reader multiplexer so
+    several product protocols can share one authenticated node connection without
+    racing to consume ``relay.message`` frames. Unrelated messages are retained in
+    a bounded queue for the next downstream consumer.
     """
 
     def __init__(
@@ -63,10 +71,12 @@ class RelayStorageEndpoint:
         *,
         request_timeout: float = 15.0,
         other_message_limit: int = 64,
+        message_source: RelayMessageSource | None = None,
     ) -> None:
         if request_timeout <= 0:
             raise ValueError("request_timeout must be positive")
         self.relay_client = relay_client
+        self.message_source = message_source
         self.services = dict(services or {})
         self.request_timeout = float(request_timeout)
         self._pending: dict[str, _PendingRequest] = {}
@@ -161,10 +171,15 @@ class RelayStorageEndpoint:
             return await self._other_messages.get()
         return await asyncio.wait_for(self._other_messages.get(), timeout=timeout)
 
+    async def _receive(self):
+        if self.message_source is not None:
+            return await self.message_source.receive_other()
+        return await self.relay_client.receive_message()
+
     async def _reader_loop(self) -> None:
         try:
             while not self._closed:
-                message = await self.relay_client.receive_message()
+                message = await self._receive()
                 payload = getattr(message, "payload", None)
                 if not isinstance(payload, dict) or payload.get("kind") != RELAY_STORAGE_KIND:
                     try:
