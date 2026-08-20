@@ -19,6 +19,7 @@ standalone composition. It is never used by the full-workbench supervisor.
 from __future__ import annotations
 
 import asyncio
+from contextlib import suppress
 from pathlib import Path
 from typing import Any, Callable
 
@@ -66,6 +67,7 @@ from .federation_pairing_service import PairingRelayNodeClient
 _BOOTSTRAP_TTL_SECONDS = 300
 _SHARED_OTHER_MESSAGE_LIMIT = 64
 _BUILTIN_LOCAL_STORAGE_PROVIDER_ID = "fcp-local-data-storage"
+_MIN_FAILOVER_SCAN_TIMEOUT_SECONDS = 30.0
 
 
 def _local_pairing_material(
@@ -312,6 +314,29 @@ class SharedRecorderAwareStorageControlRelayChannel(
             self._forward_other(message)
 
 
+def _failover_scan_timeout(settings: StorageAuthoritySettings) -> float:
+    """Bound one failover pass without constraining normal provider timeouts."""
+
+    return max(
+        _MIN_FAILOVER_SCAN_TIMEOUT_SECONDS,
+        settings.request_timeout * 2.0,
+        settings.scan_interval * 2.0,
+    )
+
+
+async def _wait_scan_interval(
+    stop: asyncio.Event | None,
+    seconds: float,
+) -> None:
+    if stop is None:
+        await asyncio.sleep(seconds)
+        return
+    try:
+        await asyncio.wait_for(stop.wait(), seconds)
+    except asyncio.TimeoutError:
+        return
+
+
 async def run_trusted_storage_authority(
     settings: StorageAuthoritySettings,
     *,
@@ -327,11 +352,16 @@ async def run_trusted_storage_authority(
     creator connection is reused and is never disconnected here. ``message_source``
     must be the upstream single-reader stage for that shared connection. Without
     a supplied client the legacy direct self-bootstrap path remains unchanged.
+
+    Discovery/lease keepalive is intentionally independent of failover scanning.
+    A stalled failover pass must not make a healthy creator silently disappear as
+    the recorder's logical-storage authority or allow its write lease to expire.
     """
 
     owns_client = client is None
     endpoint: RelayStorageEndpoint | None = None
     failover: StorageFailoverCoordinator | None = None
+    announcement_task: asyncio.Task[None] | None = None
     try:
         if client is None:
             client = await _connect_creator(settings)
@@ -403,10 +433,30 @@ async def run_trusted_storage_authority(
             if on_announced is not None:
                 on_announced(announcement)
 
+        async def announce_forever() -> None:
+            while stop is None or not stop.is_set():
+                await announce()
+                await _wait_scan_interval(stop, settings.scan_interval)
+
         await failover.start()
         if on_message_source is not None:
             on_message_source(channel)
+        announcement_task = asyncio.create_task(
+            announce_forever(),
+            name="fcp-storage-authority-announce",
+        )
+
         while stop is None or not stop.is_set():
+            if announcement_task.done():
+                await announcement_task
+                if stop is not None and stop.is_set():
+                    break
+                raise FederationOperationError(
+                    "storage-authority-announcement-stopped",
+                    "logical-storage authority announcement loop stopped unexpectedly",
+                    "capability",
+                )
+
             # Storage authority enrollment can land after the authority task has
             # started. Reconcile the one built-in runtime before each scan so a
             # newly assigned creator provider becomes callable without restart.
@@ -416,16 +466,26 @@ async def run_trusted_storage_authority(
                 client=client,
                 settings=settings,
             )
-            await failover.scan_once()
-            await announce()
-            if stop is None:
-                await asyncio.sleep(settings.scan_interval)
-                continue
             try:
-                await asyncio.wait_for(stop.wait(), settings.scan_interval)
-            except asyncio.TimeoutError:
-                continue
+                await asyncio.wait_for(
+                    failover.scan_once(),
+                    timeout=_failover_scan_timeout(settings),
+                )
+            except asyncio.TimeoutError as exc:
+                raise FederationOperationError(
+                    "storage-authority-scan-timeout",
+                    "storage failover scan did not complete within its runtime bound",
+                    "failover",
+                ) from exc
+
+            if announcement_task.done():
+                await announcement_task
+            await _wait_scan_interval(stop, settings.scan_interval)
     finally:
+        if announcement_task is not None:
+            announcement_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await announcement_task
         if failover is not None:
             await failover.close()
         if endpoint is not None:
