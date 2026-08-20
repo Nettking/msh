@@ -147,18 +147,26 @@ class FederationStorageAuthorityMonitor:
                 "the authority needs the Federation relay address; set "
                 "FCP_FEDERATION_STORAGE_AUTHORITY_RELAY or FCP_PAIRING_RELAY_URL",
             )
+        coordinator_database = str(
+            self.app.config["FEDERATION_STORAGE_AUTHORITY_CONTROL_DATABASE"]
+        )
         return StorageAuthoritySettings(
-            relay_control_database=str(
-                self.app.config["FEDERATION_STORAGE_AUTHORITY_CONTROL_DATABASE"]
-            ),
-            storage_control_database=str(
-                self.app.config["FEDERATION_STORAGE_AUTHORITY_STORAGE_DATABASE"]
-            ),
+            relay_control_database=coordinator_database,
+            # One authoritative Phase-D control plane, the coordinator's own.
+            # Reading a separate database here is what left the announced
+            # logical-storage authority with no groups while the coordinator
+            # already held a READY primary provider and its leader grant.
+            storage_control_database=coordinator_database,
             publication_database=str(
                 self.app.config["FEDERATION_STORAGE_AUTHORITY_PUBLICATION_DATABASE"]
             ),
             failover_database=str(
                 self.app.config["FEDERATION_STORAGE_AUTHORITY_FAILOVER_DATABASE"]
+            ),
+            acknowledgements_database=str(
+                self.app.config[
+                    "FEDERATION_STORAGE_AUTHORITY_ACKNOWLEDGEMENTS_DATABASE"
+                ]
             ),
             state_dir=str(self.app.config["FEDERATION_STORAGE_AUTHORITY_STATE_DIR"]),
             relay=relay_url,
@@ -332,9 +340,13 @@ def install_federation_storage_authority(
     storage_root = Path(
         os.getenv("FCP_FEDERATION_STORAGE_AUTHORITY_DIR", "data/federation/storage")
     )
-    app.config.setdefault(
-        "FEDERATION_STORAGE_AUTHORITY_STORAGE_DATABASE",
-        str(storage_root / "control.sqlite3"),
+    # The Phase-D control plane is the coordinator's, not a second database of
+    # the authority's own. The relay reconciles trusted GREEN storage into
+    # ``PhaseDControlPlane(coordinator.store.database)``, so an authority
+    # pointed anywhere else reads an empty control plane and advertises no
+    # groups. Every in-process reader resolves this one key.
+    app.config["FEDERATION_STORAGE_AUTHORITY_STORAGE_DATABASE"] = str(
+        app.config["FEDERATION_STORAGE_AUTHORITY_CONTROL_DATABASE"]
     )
     app.config.setdefault(
         "FEDERATION_STORAGE_AUTHORITY_PUBLICATION_DATABASE",
@@ -343,6 +355,12 @@ def install_federation_storage_authority(
     app.config.setdefault(
         "FEDERATION_STORAGE_AUTHORITY_FAILOVER_DATABASE",
         str(storage_root / "failover.sqlite3"),
+    )
+    # Publication, failover, and the recorder ingest journal stay authority-local
+    # sidecars; only the control plane is shared with the coordinator.
+    app.config.setdefault(
+        "FEDERATION_STORAGE_AUTHORITY_ACKNOWLEDGEMENTS_DATABASE",
+        str(storage_root / "recorder_ingest_acknowledgements.sqlite3"),
     )
     app.config.setdefault(
         "FEDERATION_STORAGE_AUTHORITY_STATE_DIR",

@@ -76,6 +76,8 @@ start-tailscale-recorder.cmd --storage-group telemetry
 
 A normal full FCP Federation creator supervises logical-storage authority automatically. The existing authority monitor still refuses creator-owned authority service on non-creator members.
 
+The leader's storage control plane is the coordinator database itself, named by `FCP_FEDERATION_COORDINATOR_DATABASE` (Compose points both the relay and Flask services at `/var/lib/fcp-relay/control.sqlite3` on the shared `relay_state` volume). The relay reconciles trusted GREEN storage into that control plane and the supervised authority announces its ready groups from the same file, so both sides always agree. An authority reading any other database would report no ready groups and every recorder would correctly refuse to publish.
+
 When Federation/storage is temporarily unavailable after an established recorder is running, capture stays local and durable publication state retries later. Do not delete the publication outbox or move checkpoints backward as a recovery technique.
 
 ## Data paths
