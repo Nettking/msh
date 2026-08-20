@@ -109,6 +109,12 @@ def _fixture(tmp_path: Path):
     return clock, coordinator, provider, control, policy, announcement
 
 
+def _grant_expiry(grant: dict[str, object]) -> datetime:
+    return datetime.fromisoformat(
+        str(grant["lease_expires_at"]).replace("Z", "+00:00")
+    )
+
+
 def test_current_green_primary_lease_renews_before_expiry(tmp_path: Path) -> None:
     clock, _coordinator, provider, control, policy, announcement = _fixture(tmp_path)
 
@@ -143,9 +149,7 @@ def test_current_green_primary_lease_renews_before_expiry(tmp_path: Path) -> Non
     assert second["provider_id"] == PROVIDER_ID
     assert int(second["term"]) > int(first["term"])
     assert int(second["fencing_token"]) > int(first["fencing_token"])
-    assert datetime.fromisoformat(str(second["lease_expires_at"]).replace("Z", "+00:00")) > datetime.fromisoformat(
-        str(first["lease_expires_at"]).replace("Z", "+00:00")
-    )
+    assert _grant_expiry(second) > _grant_expiry(first)
 
 
 def test_expired_same_primary_lease_is_recovered_without_reassignment(
