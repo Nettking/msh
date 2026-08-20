@@ -19,7 +19,6 @@ standalone composition. It is never used by the full-workbench supervisor.
 from __future__ import annotations
 
 import asyncio
-from contextlib import suppress
 from pathlib import Path
 from typing import Any, Callable
 
@@ -484,8 +483,12 @@ async def run_trusted_storage_authority(
     finally:
         if announcement_task is not None:
             announcement_task.cancel()
-            with suppress(asyncio.CancelledError):
-                await announcement_task
+            # The announcement loop is usually already finished with the very
+            # failure that is propagating. Awaiting it directly re-raises that
+            # exception out of this cleanup block and skips everything below,
+            # leaking the relay endpoint's reader task and leaving the creator
+            # connected. Retrieve its outcome without re-raising instead.
+            await asyncio.gather(announcement_task, return_exceptions=True)
         if failover is not None:
             await failover.close()
         if endpoint is not None:
