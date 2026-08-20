@@ -114,6 +114,15 @@ def _settings(tmp_path) -> runtime.StorageAuthoritySettings:
 def _stub_authority(monkeypatch) -> None:
     monkeypatch.setattr(runtime, "SharedRecorderAwareStorageControlRelayChannel", _Channel)
     monkeypatch.setattr(runtime, "StorageFailoverCoordinator", _Failover)
+    # These shared-relay tests deliberately replace the storage/control
+    # composition with tiny fakes. The real built-in provider composition has
+    # its own end-to-end regression coverage and must not inspect those fake
+    # snapshots, exactly as the sibling lifecycle tests already require.
+    monkeypatch.setattr(
+        runtime,
+        "_ensure_builtin_local_storage_service",
+        lambda **_kwargs: None,
+    )
     for name in (
         "PhaseDControlPlane",
         "SessionCoordinator",

@@ -276,7 +276,10 @@ def test_the_running_authority_is_stopped_between_scans(monkeypatch):
     started = threading.Event()
     stopped = threading.Event()
 
-    async def fake_run(settings, *, stop=None, on_announced=None):
+    # The supervisor also passes the shared-relay client and message source.
+    # Rejecting them here would raise TypeError inside the retry boundary and
+    # spin this loop forever instead of exercising the lifecycle under test.
+    async def fake_run(settings, *, stop=None, on_announced=None, **_kwargs):
         started.set()
         await stop.wait()
         stopped.set()
@@ -334,7 +337,10 @@ def test_a_cancelled_runtime_does_not_kill_the_supervising_thread(monkeypatch):
 
     attempts: list[int] = []
 
-    async def fake_run(settings, *, stop=None, on_announced=None):
+    # The supervisor also passes the shared-relay client and message source.
+    # Rejecting them here would raise TypeError inside the retry boundary and
+    # spin this loop forever instead of exercising the lifecycle under test.
+    async def fake_run(settings, *, stop=None, on_announced=None, **_kwargs):
         attempts.append(1)
         if len(attempts) == 1:
             raise asyncio.CancelledError
@@ -374,7 +380,10 @@ def test_the_supervised_thread_stays_alive_across_a_cancelled_runtime(monkeypatc
     cancelled_once = threading.Event()
     attempts: list[int] = []
 
-    async def fake_run(settings, *, stop=None, on_announced=None):
+    # The supervisor also passes the shared-relay client and message source.
+    # Rejecting them here would raise TypeError inside the retry boundary and
+    # spin this loop forever instead of exercising the lifecycle under test.
+    async def fake_run(settings, *, stop=None, on_announced=None, **_kwargs):
         attempts.append(1)
         if len(attempts) == 1:
             cancelled_once.set()
