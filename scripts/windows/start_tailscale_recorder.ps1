@@ -114,9 +114,25 @@ function Resolve-RecorderPython {
 Remove-Item Env:FCP_RECORDER_FEDERATION_KEY -ErrorAction SilentlyContinue
 $PythonCommand = Resolve-RecorderPython
 
+# The recorder runs under the native supervisor so "Check for updates ->
+# Update all devices" can actually replace this process. The supervisor keeps
+# the operator command unchanged: it resolves nothing a Federation peer can
+# influence, and reuses exactly the interpreter and arguments resolved above.
+$SupervisorScript = Join-Path $PSScriptRoot 'fcp_recorder_supervisor.ps1'
+if (-not (Test-Path -LiteralPath $SupervisorScript -PathType Leaf)) {
+    Stop-RecorderLaunch (
+        "The FCP recorder supervisor is missing from this checkout. Update " +
+        "this checkout to current main, then run this command again."
+    )
+}
+
 Push-Location $RepositoryRoot
 try {
-    & $PythonCommand.Executable @($PythonCommand.Prefix) -m scripts.start_tailscale_recorder @RecorderArguments
+    & $SupervisorScript `
+        -RepoRoot $RepositoryRoot `
+        -PythonExecutable $PythonCommand.Executable `
+        -PythonPrefix $PythonCommand.Prefix `
+        -RecorderArguments $RecorderArguments
     $LauncherExitCode = $LASTEXITCODE
 }
 finally {

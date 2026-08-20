@@ -157,6 +157,17 @@ def _data_directory(arguments: list[str]) -> Path:
     return Path(configured).resolve()
 
 
+def recorder_data_directory(arguments: list[str]) -> Path:
+    """Resolve the recorder data directory exactly as the launcher will.
+
+    The native supervisor needs this before it starts anything, and it must not
+    re-implement the rule: a supervisor that watched a different directory than
+    the recorder writes to would verify the wrong process.
+    """
+
+    return _data_directory(arguments)
+
+
 def _tailscale_ipv4() -> ipaddress.IPv4Address:
     executable = shutil.which("tailscale")
     if executable is None:
