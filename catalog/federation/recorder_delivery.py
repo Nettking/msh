@@ -130,12 +130,23 @@ class DurableRecorderDeliveryQueue:
             return None
         return entry.session_id, entry.destination_id, dataset_id
 
-    async def run_once(self, *, limit: int = 100) -> RecorderDeliveryRunResult:
+    async def run_once(
+        self,
+        *,
+        limit: int = 100,
+        retry_deferred_heads: bool = False,
+    ) -> RecorderDeliveryRunResult:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
             raise FederationValidationError(
                 "invalid-limit",
                 "limit",
                 "must be a positive integer",
+            )
+        if not isinstance(retry_deferred_heads, bool):
+            raise FederationValidationError(
+                "invalid-recorder-delivery",
+                "retry_deferred_heads",
+                "must be a boolean",
             )
 
         # Reading a large durable backlog parses every pending JSON payload. Do
@@ -171,6 +182,7 @@ class DurableRecorderDeliveryQueue:
             )
         )
         blocked: set[tuple[str, str, str]] = set()
+        deferred_retry_used: set[tuple[str, str, str]] = set()
         attempted = 0
         committed = 0
         pending = 0
@@ -182,9 +194,22 @@ class DurableRecorderDeliveryQueue:
             if ordering_key is not None and ordering_key in blocked:
                 continue
             if entry.next_attempt_at > now:
-                if ordering_key is not None:
-                    blocked.add(ordering_key)
-                continue
+                # Exponential backoff survives process restarts. That is correct
+                # during an unchanged outage, but after an operator has upgraded
+                # or repaired the remote authority it can leave a zero-touch
+                # recorder waiting an hour before proving the new path. On the
+                # worker's first cycle, allow exactly the oldest deferred row of
+                # each ordered dataset one immediate attempt. No timestamp,
+                # attempt counter, error, payload, or later row is rewritten.
+                if (
+                    not retry_deferred_heads
+                    or ordering_key is None
+                    or ordering_key in deferred_retry_used
+                ):
+                    if ordering_key is not None:
+                        blocked.add(ordering_key)
+                    continue
+                deferred_retry_used.add(ordering_key)
 
             attempted += 1
             payload = entry.payload
