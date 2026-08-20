@@ -70,6 +70,7 @@ _IPV4_LOCATION = re.compile(
     r"(?<![0-9])(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?"
 )
 _WINDOWS_LOCATION = re.compile(r"(?<![A-Za-z0-9])[A-Za-z]:[\\/]")
+_MTCONNECT_CONTENT_SCHEMA: Final = "fcp.mtconnect.observations.v1"
 
 
 def is_secret_text(value: object) -> bool:
@@ -121,6 +122,25 @@ def is_nonpublic_location_text(value: object) -> bool:
         or _IPV4_LOCATION.search(normalized) is not None
         or _WINDOWS_LOCATION.search(value) is not None
     )
+
+
+def _is_public_mtconnect_component_path(value: object) -> bool:
+    """Recognize the recorder's logical component path, never a backend path."""
+
+    if value is None:
+        return True
+    if (
+        not isinstance(value, str)
+        or not value
+        or value != value.strip()
+        or len(value.encode("utf-8")) > 512
+        or "\\" in value
+        or any(ord(character) < 32 or ord(character) == 127 for character in value)
+        or is_nonpublic_location_text(value)
+    ):
+        return False
+    parts = value.split("/")
+    return bool(parts) and all(part not in {"", ".", ".."} for part in parts)
 
 
 def contains_secret_material(value: Any) -> bool:
@@ -178,15 +198,43 @@ def redact_secret_material(value: Any) -> Any:
     return value
 
 
+def _redact_mtconnect_observation(value: Any) -> Any:
+    if not isinstance(value, dict):
+        return redact_nonpublic_data(value)
+    return {
+        key: (
+            item
+            if key == "component_path" and _is_public_mtconnect_component_path(item)
+            else REDACTED
+            if is_sensitive_field_name(str(key))
+            or is_nonpublic_location_key(str(key))
+            else redact_nonpublic_data(item)
+        )
+        for key, item in value.items()
+    }
+
+
 def redact_nonpublic_data(value: Any) -> Any:
-    """Recursively redact both credentials and backend location details."""
+    """Recursively redact credentials and backend location details.
+
+    MTConnect recorder observations contain a logical ``component_path`` such
+    as ``Linear/X``. The name ends in ``_path`` but the value is not a filesystem
+    or network location. Preserve only that one field when it occurs directly
+    in an exact recorder observation schema and its value passes the bounded
+    logical-path check above. Every other ``*_path`` field remains redacted.
+    """
 
     if is_secret_text(value) or is_nonpublic_location_text(value):
         return REDACTED
     if isinstance(value, dict):
+        recorder_content = value.get("schema") == _MTCONNECT_CONTENT_SCHEMA
         return {
             key: (
-                REDACTED
+                [_redact_mtconnect_observation(entry) for entry in item]
+                if recorder_content
+                and key == "observations"
+                and isinstance(item, (list, tuple))
+                else REDACTED
                 if is_sensitive_field_name(str(key))
                 or is_nonpublic_location_key(str(key))
                 else redact_nonpublic_data(item)
