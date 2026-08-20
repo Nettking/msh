@@ -99,7 +99,7 @@ def _install_remote_session_creator_fallback() -> None:
         status = await original(self)
         return await _restore_remote_session_creators(self, status)
 
-    setattr(coordinator_status, "_fcp_creator_fallback", True)
+    coordinator_status._fcp_creator_fallback = True
     RelayNodeClient.coordinator_status = coordinator_status
 
 
