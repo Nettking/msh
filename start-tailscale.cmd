@@ -78,6 +78,19 @@ if defined FCP_INITIALIZE_FEDERATION (
     exit /b %ERRORLEVEL%
 )
 
+rem A normal restart can begin while this exact Compose project's Flask container
+rem still owns the configured tailnet web port. Release only that verified FCP
+rem service before start.cmd resolves runtime state. Never kill an arbitrary host
+rem process and never remove a container or volume here.
+for /f "usebackq delims=" %%C in (`docker ps --filter "label=com.docker.compose.project=%COMPOSE_PROJECT_NAME%" --filter "label=com.docker.compose.service=flask" --format "{{.ID}}" 2^>nul`) do (
+    echo Stopping the existing FCP web container before restart...
+    docker stop --time 20 %%C >nul 2>&1
+    if errorlevel 1 (
+        echo Could not stop the existing FCP web container safely.
+        exit /b 2
+    )
+)
+
 rem The reset belongs to start.cmd. Discovery and enrollment deliberately happen
 rem afterwards, because --fresh removes all mutable data except the recording
 rem corpus and therefore must not be handed a pre-reset pairing grant.
