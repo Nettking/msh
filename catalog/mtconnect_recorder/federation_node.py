@@ -707,9 +707,10 @@ class RecorderFederationNode:
                         authority_node_id=authority_node_id,
                         group_id=group_id,
                     )
+                    pending_snapshot = await asyncio.to_thread(outbox.pending)
                     storage_state, pending, delivery_error = (
                         _publication_cycle_status(
-                            pending_entries=outbox.pending(),
+                            pending_entries=pending_snapshot,
                             session_id=state.binding.internal_session_id,
                             group_id=group_id,
                             delivery=cycle.delivery,
@@ -739,19 +740,20 @@ class RecorderFederationNode:
                     TimeoutError,
                 ) as exc:
                     failures += 1
+                    pending_snapshot = (
+                        ()
+                        if outbox is None
+                        else await asyncio.to_thread(outbox.pending)
+                    )
                     self._set_snapshot(
                         status="retrying",
                         storage_state="backlogged",
                         jsonl_state="backlogged",
-                        pending_batches=(
-                            0
-                            if outbox is None
-                            else len(
-                                _current_recorder_pending(
-                                    outbox.pending(),
-                                    session_id=state.binding.internal_session_id,
-                                    group_id=group_id or "",
-                                )
+                        pending_batches=len(
+                            _current_recorder_pending(
+                                pending_snapshot,
+                                session_id=state.binding.internal_session_id,
+                                group_id=group_id or "",
                             )
                         ),
                         last_error_code=str(

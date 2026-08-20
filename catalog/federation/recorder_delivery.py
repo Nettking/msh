@@ -74,7 +74,7 @@ class DurableRecorderDeliveryQueue:
             destination_id.strip() if isinstance(destination_id, str) else None
         )
         self.clock = clock
-        self._startup_deferred_retry_available = True
+        self._startup_probe_available = True
 
     def enqueue(
         self,
@@ -158,13 +158,18 @@ class DurableRecorderDeliveryQueue:
         # is being recovered.
         pending_snapshot = await asyncio.to_thread(self.outbox.pending)
 
-        # A new queue object is a new process/runtime delivery session. Consume
-        # its one restart retry on the first pass regardless of whether a
-        # deferred row exists, so normal later backoff cannot accidentally gain
-        # a retry just because the queue started while it was empty.
+        # A new queue object is a new process/runtime delivery session. Its
+        # automatic first pass is a bounded route proof: try no more than the
+        # oldest row of each ordered dataset, including one row whose durable
+        # backoff is not yet due. This prevents one large dataset from occupying
+        # the whole startup cycle before the recorder can report a proven route,
+        # while later passes retain the configured backlog-drain throughput.
+        startup_probe = (
+            retry_deferred_heads is None and self._startup_probe_available
+        )
         if retry_deferred_heads is None:
-            retry_deferred_heads = self._startup_deferred_retry_available
-        self._startup_deferred_retry_available = False
+            retry_deferred_heads = startup_probe
+        self._startup_probe_available = False
 
         # Preserve recorder sequence order independently per logical dataset.
         # A failed or not-yet-due older entry fences newer entries for that same
@@ -194,6 +199,7 @@ class DurableRecorderDeliveryQueue:
         )
         blocked: set[tuple[str, str, str]] = set()
         deferred_retry_used: set[tuple[str, str, str]] = set()
+        startup_probe_used: set[tuple[str, str, str]] = set()
         attempted = 0
         committed = 0
         pending = 0
@@ -204,6 +210,10 @@ class DurableRecorderDeliveryQueue:
             ordering_key = self._ordering_key(entry)
             if ordering_key is not None and ordering_key in blocked:
                 continue
+            if startup_probe and ordering_key is not None:
+                if ordering_key in startup_probe_used:
+                    continue
+                startup_probe_used.add(ordering_key)
             if entry.next_attempt_at > now:
                 # Exponential backoff survives process restarts. That is correct
                 # during an unchanged outage, but after an operator has upgraded

@@ -23,9 +23,11 @@ class _FailingClient:
 class _CommittingClient:
     def __init__(self) -> None:
         self.calls = 0
+        self.batch_ids: list[str] = []
 
-    async def ingest_batch(self, **_kwargs):
+    async def ingest_batch(self, **kwargs):
         self.calls += 1
+        self.batch_ids.append(str(kwargs["batch_id"]))
         return PhaseDIngestOutcome(committed=True)
 
 
@@ -115,3 +117,53 @@ def test_restart_retry_remains_one_head_per_dataset(tmp_path) -> None:
     assert attempts["dataset-b-batch-1"] == 2
     assert attempts["dataset-a-batch-2"] == 0
     assert attempts["dataset-b-batch-2"] == 0
+
+
+def test_successful_startup_probe_reaches_each_dataset_before_backlog_drain(
+    tmp_path,
+) -> None:
+    outbox = SQLiteOutbox(tmp_path / "outbox.sqlite3")
+    client = _CommittingClient()
+    queue = _queue(outbox, client)
+    for index in range(1, 5):
+        queue.enqueue(
+            session_id="session-a",
+            group_id="fcp-local-storage",
+            dataset_id="dataset-a",
+            batch_id=f"dataset-a-batch-{index}",
+            idempotency_key=f"dataset-a:{index}",
+            content={"dataset": "dataset-a", "index": index},
+            created_at=NOW,
+        )
+    queue.enqueue(
+        session_id="session-a",
+        group_id="fcp-local-storage",
+        dataset_id="dataset-b",
+        batch_id="dataset-b-batch-1",
+        idempotency_key="dataset-b:1",
+        content={"dataset": "dataset-b", "index": 1},
+        created_at=NOW,
+    )
+
+    first = asyncio.run(queue.run_once(limit=3))
+
+    # Dataset A has enough older rows to fill the limit, but the automatic
+    # startup pass proves both dataset routes before normal backlog draining.
+    assert first.attempted == 2
+    assert first.committed == 2
+    assert client.batch_ids == ["dataset-a-batch-1", "dataset-b-batch-1"]
+
+    second = asyncio.run(queue.run_once(limit=3))
+
+    # Only the first automatic pass is a route probe. Later cycles retain the
+    # configured throughput and drain the remaining ordered backlog normally.
+    assert second.attempted == 3
+    assert second.committed == 3
+    assert client.batch_ids == [
+        "dataset-a-batch-1",
+        "dataset-b-batch-1",
+        "dataset-a-batch-2",
+        "dataset-a-batch-3",
+        "dataset-a-batch-4",
+    ]
+    assert outbox.pending() == ()
