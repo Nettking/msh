@@ -1,13 +1,13 @@
 """Loss-aware MTConnect recorder package."""
 from __future__ import annotations
 
+import importlib as _importlib
 from typing import Any
 
 from .model import *
 from .parsing import *
 from .storage import *
 from . import parsing as _parsing
-from . import runtime
 
 
 _original_parse_streams = _parsing.parse_streams
@@ -44,10 +44,37 @@ def parse_streams(
     return batch
 
 
-# Runtime imported parse_streams when its module was loaded. Replace that bound
-# reference as well so direct runs, Docker runs, crash recovery, and tests all use
-# identical chronological ordering.
+# Patch parsing immediately, but do not import the runtime here.  The standalone
+# launcher configures FCP_RECORDER_* after importing Federation support modules;
+# importing runtime from the package initializer would freeze those settings
+# before the launcher has supplied its managed control/configuration paths.
 _parsing.parse_streams = parse_streams
-runtime.parse_streams = parse_streams
 
-from .runtime import RecorderRuntime, MtconnectClient, run
+
+def _runtime_module():
+    runtime_module = _importlib.import_module(f"{__name__}.runtime")
+    # Keep direct runtime imports and the package facade on the same canonical
+    # chronological parser even when the runtime was already present in
+    # sys.modules for an embedding process.
+    runtime_module.parse_streams = parse_streams
+    return runtime_module
+
+
+def run() -> None:
+    """Run the recorder after runtime configuration has been established."""
+
+    _runtime_module().run()
+
+
+def __getattr__(name: str) -> Any:
+    if name == "runtime":
+        return _runtime_module()
+    if name in {"RecorderRuntime", "MtconnectClient"}:
+        return getattr(_runtime_module(), name)
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+
+
+# Preserve the package's historical star-import surface used by the standalone
+# compatibility entry point while keeping runtime itself lazy.
+__all__ = [name for name in globals() if not name.startswith("_")]
+__all__.extend(["runtime", "RecorderRuntime", "MtconnectClient"])
