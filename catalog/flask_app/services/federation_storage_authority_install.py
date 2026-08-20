@@ -243,6 +243,19 @@ class FederationStorageAuthorityMonitor:
             try:
                 asyncio.set_event_loop(loop)
                 loop.run_until_complete(self._run_authority(settings))
+            except asyncio.CancelledError:
+                # A supervised runtime must never be killed by a cancellation
+                # escaping its own event loop. ``CancelledError`` is a
+                # ``BaseException``, so without this boundary it would end the
+                # supervising thread and leave the authority permanently down
+                # while the status still claimed it was starting.
+                self._set_snapshot(
+                    "retrying",
+                    enabled=True,
+                    error_code="storage-authority-cancelled",
+                )
+                if self._stop.wait(_RETRY_SECONDS):
+                    return
             except Exception as exc:  # noqa: BLE001 - authority stays restartable
                 self._set_snapshot(
                     "retrying",

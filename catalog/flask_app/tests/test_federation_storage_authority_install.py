@@ -323,3 +323,83 @@ def test_run_storage_authority_stops_promptly_on_a_long_interval():
         return loop.time() - started
 
     assert asyncio.run(scenario()) < 2.0
+
+
+def test_a_cancelled_runtime_does_not_kill_the_supervising_thread(monkeypatch):
+    """``CancelledError`` is a ``BaseException`` and escaped the retry boundary.
+
+    Physical testing showed the thread dying outright with the authority status
+    frozen at ``starting`` while every request restarted and re-killed it.
+    """
+
+    attempts: list[int] = []
+
+    async def fake_run(settings, *, stop=None, on_announced=None):
+        attempts.append(1)
+        if len(attempts) == 1:
+            raise asyncio.CancelledError
+        monitor._stop.set()
+
+    monkeypatch.setattr(
+        "catalog.flask_app.services.federation_storage_authority_install."
+        "run_trusted_storage_authority",
+        fake_run,
+    )
+    monkeypatch.setattr(
+        "catalog.flask_app.services.federation_storage_authority_install."
+        "_RETRY_SECONDS",
+        0.01,
+    )
+    monitor = _monitor(context=_creator_context())
+    first_error: list[str | None] = []
+
+    original_set = monitor._set_snapshot
+
+    def record(status, **kwargs):
+        original_set(status, **kwargs)
+        if status == "retrying":
+            first_error.append(kwargs.get("error_code"))
+
+    monkeypatch.setattr(monitor, "_set_snapshot", record)
+
+    monitor._run()
+
+    assert len(attempts) == 2
+    assert first_error == ["storage-authority-cancelled"]
+    assert monitor.snapshot().status == "stopped"
+
+
+def test_the_supervised_thread_stays_alive_across_a_cancelled_runtime(monkeypatch):
+    started = threading.Event()
+    cancelled_once = threading.Event()
+    attempts: list[int] = []
+
+    async def fake_run(settings, *, stop=None, on_announced=None):
+        attempts.append(1)
+        if len(attempts) == 1:
+            cancelled_once.set()
+            raise asyncio.CancelledError
+        started.set()
+        await stop.wait()
+
+    monkeypatch.setattr(
+        "catalog.flask_app.services.federation_storage_authority_install."
+        "run_trusted_storage_authority",
+        fake_run,
+    )
+    monkeypatch.setattr(
+        "catalog.flask_app.services.federation_storage_authority_install."
+        "_RETRY_SECONDS",
+        0.01,
+    )
+    monitor = _monitor(context=_creator_context())
+
+    monitor.start()
+    try:
+        assert cancelled_once.wait(5.0)
+        # The authority must come back by itself rather than needing a new
+        # request to notice a dead thread.
+        assert started.wait(5.0)
+        assert monitor._thread is not None and monitor._thread.is_alive()
+    finally:
+        monitor.stop()
