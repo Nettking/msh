@@ -185,10 +185,17 @@ def test_borrowed_creator_connection_is_never_reconnected_or_disconnected(
     assert len(exposed) == 1
 
 
-def test_product_monitor_prefers_the_shared_runtime_over_owned_client(tmp_path) -> None:
+def test_product_monitor_borrows_current_relay_route_without_retargeting(
+    tmp_path,
+) -> None:
     app = Flask(__name__)
     app.config.update(
         FEDERATION_STORAGE_AUTHORITY_ENABLED=True,
+        # This intentionally differs from the already-connected product route.
+        # Physical Tailscale startup used exactly this split: the storage setting
+        # named Compose DNS while the saved-membership runtime used the host's
+        # tailnet address. Retargeting the shared runtime here caused the two
+        # supervisors to replace the same node connection every few seconds.
         FEDERATION_STORAGE_AUTHORITY_RELAY_URL="ws://relay:8765",
         FEDERATION_STORAGE_AUTHORITY_CONTROL_DATABASE=str(tmp_path / "control.sqlite3"),
         FEDERATION_STORAGE_AUTHORITY_PUBLICATION_DATABASE=str(tmp_path / "publication.sqlite3"),
@@ -209,7 +216,12 @@ def test_product_monitor_prefers_the_shared_runtime_over_owned_client(tmp_path) 
     seen: list[object] = []
 
     class Runtime:
+        _relay_url = "ws://100.85.20.75:8765"
+
         def ensure_connected(self, state):
+            # Mirror the real bridge's connectivity revalidation. It is safe only
+            # when storage passes the route already owned by this runtime.
+            assert state.relay_url == self._relay_url
             seen.append(state)
 
         @staticmethod
@@ -220,13 +232,19 @@ def test_product_monitor_prefers_the_shared_runtime_over_owned_client(tmp_path) 
         def _start_loop():
             return loop
 
+    runtime_instance = Runtime()
     onboarding = SimpleNamespace(
-        relay_runtime=Runtime(),
+        relay_runtime=runtime_instance,
         authorized_context=lambda: context,
     )
     source = object()
+
+    def transport_context(shared_runtime, state):
+        shared_runtime.ensure_connected(state)
+        return source, loop
+
     app.extensions["federated_ai_product_bridge"] = SimpleNamespace(
-        _transport_context=lambda _runtime, _state: (source, loop)
+        _transport_context=transport_context
     )
     monitor = install.FederationStorageAuthorityMonitor(app, onboarding)
 
@@ -237,5 +255,6 @@ def test_product_monitor_prefers_the_shared_runtime_over_owned_client(tmp_path) 
         assert shared.client is client
         assert shared.message_source is source
         assert len(seen) == 1
+        assert seen[0].relay_url == runtime_instance._relay_url
     finally:
         loop.close()
