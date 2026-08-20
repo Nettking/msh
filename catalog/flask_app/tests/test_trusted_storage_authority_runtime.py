@@ -194,6 +194,14 @@ def _compose(monkeypatch, client: _CreatorClient) -> list[object]:
     monkeypatch.setattr(runtime, "RelayStorageEndpoint", _Endpoint)
     monkeypatch.setattr(runtime, "RecorderAwareStorageControlRelayChannel", _Channel)
     monkeypatch.setattr(runtime, "StorageFailoverCoordinator", _Failover)
+    # These lifecycle tests deliberately replace the storage/control composition
+    # with tiny fakes. The real built-in provider composition has its own
+    # end-to-end regression coverage and must not inspect those fake snapshots.
+    monkeypatch.setattr(
+        runtime,
+        "_ensure_builtin_local_storage_service",
+        lambda **_kwargs: None,
+    )
     for name in (
         "PhaseDControlPlane",
         "SessionCoordinator",
