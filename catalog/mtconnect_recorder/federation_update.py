@@ -26,6 +26,7 @@ from __future__ import annotations
 
 import os
 import threading
+from _thread import interrupt_main
 from pathlib import Path
 from typing import Any
 
@@ -34,7 +35,7 @@ from catalog.flask_app.services.federation_active_leader_runtime import (
 )
 from catalog.flask_app.services.federation_update_handoff import HostUpdateHandoff
 
-from .native_identity import process_nonce, supervisor_session
+from .native_identity import process_nonce, production_root, supervisor_session
 from .native_update import (
     NativeRecorderUpdatePaths,
     evaluate_activation,
@@ -170,12 +171,21 @@ class RecorderHostUpdateAgentWorker:
             raise ValueError("poll_seconds must be positive")
         self.poll_seconds = float(poll_seconds)
         self.supervisor_session = supervisor_session(environment)
+        self.trial_stop = RecorderTrialStop()
         self.agent = agent
+        # During a branch trial this process runs from a trial worktree, so its
+        # own location is not the checkout the host agent governs. The
+        # supervisor states the permanent one.
+        self.repository_root = production_root(environment) or Path(repository_root)
         if self.agent is None and self.supervisor_session is not None:
             self.agent = NativeRecorderUpdateAgent(
-                repository_root=repository_root,
+                repository_root=self.repository_root,
                 data_directory=data_directory,
                 supervisor_session=self.supervisor_session,
+                # A trial that cannot prove itself ends its *own* capture. That
+                # is what makes automatic fallback possible without anything in
+                # this product ever force-killing a recorder.
+                request_capture_stop=self.trial_stop.request,
             )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
@@ -216,6 +226,71 @@ class RecorderHostUpdateAgentWorker:
                 self._stop.wait(self.poll_seconds)
                 continue
             self._stop.wait(self.poll_seconds)
+
+
+class RecorderTrialStop:
+    """End this process's capture because its own branch trial failed.
+
+    The trial verifier decides; this only carries out the stop and remembers
+    that it did. The two are separate so the decision stays in one durable,
+    testable place and the stop keeps the runtime's existing semantics.
+
+    An operator's Ctrl+C always wins. Capture records *why* it stopped, and the
+    launcher only treats this as a fallback restart when the operator did not
+    stop it -- so a deliberate stop during a trial ends the recorder rather
+    than relaunching the safe version behind the operator's back.
+    """
+
+    def __init__(self) -> None:
+        self._latched = threading.Event()
+        self._delivered = False
+
+    @property
+    def latched(self) -> bool:
+        return self._latched.is_set()
+
+    @property
+    def delivered(self) -> bool:
+        """Whether the stop actually reached a live capture runtime."""
+
+        return self._delivered
+
+    def request(self) -> bool:
+        # Import lazily: the recorder runtime freezes its configuration from
+        # the environment at import time, and the launcher sets that
+        # environment only inside main().
+        from .runtime import request_external_stop
+
+        self._latched.set()
+        if not self._delivered:
+            self._delivered = bool(request_external_stop())
+        if not self._delivered:
+            # Capture never started, so there is nothing to ask politely. Raise
+            # the same interruption Ctrl+C raises in the main thread, which
+            # unwinds the launcher through its ordinary shutdown path rather
+            # than killing anything.
+            interrupt_main()
+        return self._delivered
+
+    def restart_required(self) -> bool:
+        """Whether this exit is an automatic fallback the supervisor must serve.
+
+        Both halves are required, exactly like an approved update restart. The
+        verifier must have latched a failure, and the operator must not have
+        been the one who stopped capture.
+        """
+
+        if not self._latched.is_set():
+            return False
+        from .runtime import EXTERNAL_STOP_REASON, last_stop_reason
+
+        reason = last_stop_reason()
+        if self._delivered:
+            return reason == EXTERNAL_STOP_REASON
+        # The stop was never delivered because capture had not started. Any
+        # recorded reason at all means something else -- an operator signal --
+        # ended this process, and that always wins.
+        return reason is None
 
 
 class RecorderUpdateActivationWatcher:
@@ -341,6 +416,30 @@ def approved_update_restart(watcher: RecorderUpdateActivationWatcher | None) -> 
     return last_stop_reason() == EXTERNAL_STOP_REASON
 
 
+def trial_fallback_restart(worker: RecorderHostUpdateAgentWorker | None) -> bool:
+    """Decide whether this exit is an automatic branch-trial fallback."""
+
+    return worker is not None and worker.trial_stop.restart_required()
+
+
+def mark_trial_operator_stopped(
+    worker: RecorderHostUpdateAgentWorker | None,
+) -> bool:
+    """Record that an operator, not a failure, ended this trial process.
+
+    Written before the process exits so the supervisor's next bounded question
+    -- "what should I launch now?" -- can distinguish an operator stop from a
+    crash, and answer "nothing" rather than relaunching behind them.
+    """
+
+    if worker is None or worker.agent is None or worker.trial_stop.latched:
+        return False
+    try:
+        return bool(worker.agent.trial.mark_operator_stopped())
+    except Exception:  # noqa: BLE001 - shutdown bookkeeping never raises
+        return False
+
+
 __all__ = [
     "DEFAULT_POLL_SECONDS",
     "HANDOFF_TIMEOUT_SECONDS",
@@ -348,6 +447,9 @@ __all__ = [
     "SHUTDOWN_TIMEOUT_SECONDS",
     "RecorderFederationUpdateWorker",
     "RecorderHostUpdateAgentWorker",
+    "RecorderTrialStop",
     "RecorderUpdateActivationWatcher",
     "approved_update_restart",
+    "mark_trial_operator_stopped",
+    "trial_fallback_restart",
 ]

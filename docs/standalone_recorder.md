@@ -240,9 +240,47 @@ automatically.
 - A recorder started directly with `python start_recorder.py` has no supervisor,
   so it reports update checks but cannot activate an update.
 
+## Trying a development branch on this recorder
+
+The Federation overview has a **Software version** control. It lists branches
+published by the approved FCP source and can put selected devices on one
+temporarily, so a change can be tried on real hardware before it reaches `main`.
+
+For a recorder the fallback is not optional:
+
+1. everything that can be checked is checked while capture is still running --
+   approved repository, the branch exists, the exact commit is on it, the
+   checkout is clean and on `main`, dependency inputs are unchanged, and this
+   interpreter can actually load the branch. A failure here never stops capture;
+2. the exact commit the recorder is *proven* to be running is pinned as the
+   fallback before anything stops;
+3. the trial runs from a separate worktree beside the checkout, so `main` stays
+   checked out at the known-good commit for the whole trial;
+4. the replacement has 60 seconds to prove a new process instance, the exact
+   trial commit, a fresh heartbeat, a reconnected Federation and a healthy
+   recording state; and
+5. if it cannot, the recorder is returned to the pinned commit automatically and
+   the restored version has to prove the same conditions before recovery counts.
+
+Because `main` is never moved during a trial, restoring it needs no Git
+operation at all -- it is simply a relaunch from the untouched checkout.
+
+Selecting `main` again on a device that is running a test branch returns it to
+its pinned commit through the same verified path. Restarting the recorder
+normally also returns it to the production checkout, so a trial never survives
+a restart by accident. Ordinary updates are refused while a device is on a test
+branch: return it to `main` first.
+
+Trial state lives beside the update journal and is inspected the same way:
+
+```cmd
+type data\federation\recorder-update-agent\trial-result.json
+type data\federation\recorder-update-agent\trial-journal.json
+```
+
 ## Failure behavior
 
-The zero-touch Tailscale recorder exits non-zero rather than silently degrading when initial trust/publication requirements are not met. Exit code `75` is reserved for one thing only: an approved Federation update restart, which the supervisor handles automatically. Typical actionable failures include:
+The zero-touch Tailscale recorder exits non-zero rather than silently degrading when initial trust/publication requirements are not met. Exit code `75` is reserved for two things: an approved Federation update restart, and a branch trial that could not prove a healthy startup and needs its pinned known-good version back. The supervisor handles both automatically, and an operator's Ctrl+C is never turned into either. Typical actionable failures include:
 
 - Tailscale missing/logged out/no valid IPv4;
 - no Federation discovered;

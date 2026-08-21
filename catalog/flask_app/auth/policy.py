@@ -107,6 +107,9 @@ ENDPOINT_PERMISSIONS: dict[str, str] = {
     "federation_web.request_member_capabilities": "federation.manage",
     "federation_web.check_updates": "software.update",
     "federation_web.apply_updates": "software.update",
+    # Running a device on a test branch is a software-version change, so it
+    # requires exactly the permission an update does -- never less.
+    "federation_web.switch_software_version": "software.update",
     "federation_pairing_web.create_pairing_code": "pairing.manage",
     "federation_pairing_web.pair_device": "pairing.manage",
     "federation_enrollment.start": "pairing.manage",

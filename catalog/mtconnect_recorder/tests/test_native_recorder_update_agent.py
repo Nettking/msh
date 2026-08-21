@@ -534,8 +534,15 @@ def test_the_checkout_is_fast_forwarded_only_after_the_process_exits(
 
     assert outcome == {
         "relaunch": True,
+        "mode": "update",
         "code": "source_updated",
         "target_commit": fixture.target,
+        # An ordinary update names no root, data directory or build commit.
+        # That absence is the supervisor's instruction to relaunch exactly the
+        # way it always has, so branch trials cannot change this path.
+        "launch_root": None,
+        "data_directory": None,
+        "build_commit": None,
     }
     assert fixture.head() == fixture.target
     assert agent.journal.active()["stage"] == STAGE_SOURCE_UPDATED

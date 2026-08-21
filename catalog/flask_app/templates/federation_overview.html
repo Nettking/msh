@@ -183,6 +183,76 @@
     {% endif %}
   </section>
 
+  {% set versions = federation_software_version|default({'status': 'idle', 'devices': [], 'branches': []}) %}
+  {% set version_branches = versions.branches|default([]) %}
+  {% set version_devices = versions.devices|default([]) %}
+  {% set version_can_manage = versions.can_manage|default(false) %}
+  {% set version_targets = version_devices|selectattr('connected')|list %}
+  {# Only the Federation leader can change a device's software version, so only
+     the leader is shown the control. A member device still reports its own
+     branch and commit through the existing update panel. #}
+  {% if version_can_manage %}
+  <section class="federation-panel federation-software-version-panel">
+    <header class="federation-panel__header">
+      <div>
+        <span class="federation-eyebrow">Software version</span>
+        <h3>{{ (versions.status|default('idle')).replace('_', ' ')|title }}</h3>
+        <p>Temporarily run selected devices on a branch from the approved FCP source{% if versions.repository|default(none) %} <code>{{ versions.repository }}</code>{% endif %}. A recorder that cannot prove a healthy startup on the test branch automatically returns to the exact known-good <code>{{ 'main' }}</code> commit it was running, and verifies that recording resumed.</p>
+      </div>
+    </header>
+    {% if version_devices %}
+    <ul class="federation-entity-list federation-software-version-devices">
+      {% for device in version_devices %}
+      <li>
+        <div>
+          <strong>{{ device.label }}</strong>
+          <span>Branch <code>{{ device.branch|default('main') }}</code>{% if device.commit %} · <code>{{ device.commit[:8] }}</code>{% endif %}</span>
+          {% if device.safe_commit %}<span>Fallback: <code>{{ device.safe_branch|default('main') }}</code> · <code>{{ device.safe_commit[:8] }}</code></span>{% endif %}
+          {% if device.failure_reason %}<span class="federation-muted">{{ device.failure_reason }}</span>{% elif device.message %}<span class="federation-muted">{{ device.message }}</span>{% endif %}
+          {% if device.recovery %}
+          <span class="federation-muted">Automatic recovery:
+            {{ '✓' if device.recovery.trial_process_stopped else '✗' }} test process stopped ·
+            {{ '✓' if device.recovery.safe_version_started else '✗' }} known-good restored ·
+            {{ '✓' if device.recovery.recorder_running else '✗' }} recorder running ·
+            {{ '✓' if device.recovery.federation_connected else '✗' }} Federation connected ·
+            {{ '✓' if device.recovery.recording_resumed else '✗' }} recording resumed
+          </span>
+          {% endif %}
+        </div>
+        <span class="federation-device-role">{{ 'Test branch' if device.on_test_branch else 'Approved main' }}</span>
+        {{ status_badge(device.software_state, device.software_state.replace('_', ' ')|title) }}
+      </li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="federation-muted">No other trusted device has reported a software version yet. Refresh the update status above to populate this list.</p>
+    {% endif %}
+    {% if update_csrf and version_can_manage and version_branches and version_targets %}
+    <form method="post" action="{{ url_for('federation_web.switch_software_version') }}" class="federation-software-version-form">
+      <input type="hidden" name="_csrf_token" value="{{ update_csrf }}">
+      <label for="federation-software-version-branch">Run</label>
+      {# One field, so the branch and the exact commit an operator saw can
+         never disagree by the time the form is submitted. #}
+      <select id="federation-software-version-branch" name="version" required>
+        {% for branch in version_branches %}
+        <option value="{{ branch.commit }}:{{ branch.name }}"{{ ' selected' if branch.name == 'main' else '' }}>{{ branch.name }} · {{ branch.commit[:8] }}</option>
+        {% endfor %}
+      </select>
+      <fieldset class="federation-software-version-devices-select">
+        <legend>Devices</legend>
+        {% for device in version_targets %}
+        <label><input type="checkbox" name="node_id" value="{{ device.node_id }}"> {{ device.label }} — currently <code>{{ device.branch|default('main') }}</code>{% if device.commit %} · <code>{{ device.commit[:8] }}</code>{% endif %}</label>
+        {% endfor %}
+      </fieldset>
+      <button class="federation-button federation-button--primary" type="submit">Switch version</button>
+    </form>
+    <p class="federation-muted">Offline devices are not listed. The coordinator serving this page is never a target. Every host independently revalidates the approved repository, the branch, the exact commit, a clean checkout and its interpreter <em>before</em> capture is stopped, and pins the exact commit it was running as the fallback.</p>
+    {% elif version_can_manage and not version_branches %}
+    <p class="federation-muted">This coordinator's host agent did not publish a branch list for the approved repository, so no test branch can be selected from here.</p>
+    {% endif %}
+  </section>
+  {% endif %}
+
   <section class="federation-panel federation-panel--devices">
     <header class="federation-panel__header"><div><span class="federation-eyebrow">Devices</span><h3>{{ vm.devices.title }}</h3><p>{{ vm.devices.summary }}</p></div><a class="federation-text-link" href="{{ vm.devices.detail_url }}">View all</a></header>
     {% if vm.devices['items'] %}

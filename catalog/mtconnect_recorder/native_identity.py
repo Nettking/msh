@@ -29,6 +29,7 @@ from __future__ import annotations
 import os
 import re
 import uuid
+from pathlib import Path
 from typing import Any
 
 NATIVE_RUNTIME_SCHEMA = "fcp.recorder-native-runtime.v1"
@@ -37,6 +38,13 @@ NATIVE_RUNTIME_TYPE = "native-python"
 SUPERVISOR_SESSION_ENV = "FCP_RECORDER_SUPERVISOR_SESSION"
 PROCESS_NONCE_ENV = "FCP_RECORDER_PROCESS_NONCE"
 BUILD_COMMIT_ENV = "FCP_RECORDER_BUILD_COMMIT"
+#: The permanent known-good checkout this child belongs to.
+#:
+#: A branch trial runs the recorder from a separate worktree, so a process
+#: cannot infer the production checkout from where its own code lives. The
+#: supervisor -- which resolved that path locally long before any peer was
+#: involved -- states it instead.
+PRODUCTION_ROOT_ENV = "FCP_RECORDER_PRODUCTION_ROOT"
 
 NONCE_RE = re.compile(r"^[0-9a-f]{32}$")
 OID_RE = re.compile(r"^[0-9a-f]{40}$")
@@ -71,6 +79,25 @@ def process_nonce(environment: Any = None) -> str | None:
 def build_commit(environment: Any = None) -> str | None:
     source = os.environ if environment is None else environment
     return _bounded_commit(source.get(BUILD_COMMIT_ENV))
+
+
+def production_root(environment: Any = None) -> Path | None:
+    """Resolve the supervisor's production checkout, or ``None``.
+
+    Validated as an existing Git checkout before it is believed. An absent or
+    unusable value simply means "not supervised into a separate worktree", and
+    callers fall back to their own location exactly as they did before.
+    """
+
+    source = os.environ if environment is None else environment
+    value = source.get(PRODUCTION_ROOT_ENV)
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        candidate = Path(value.strip()).resolve()
+    except (OSError, ValueError):
+        return None
+    return candidate if (candidate / ".git").exists() else None
 
 
 def runtime_identity(
@@ -122,11 +149,13 @@ __all__ = [
     "NONCE_RE",
     "OID_RE",
     "PROCESS_NONCE_ENV",
+    "PRODUCTION_ROOT_ENV",
     "SUPERVISOR_SESSION_ENV",
     "build_commit",
     "identity_matches",
     "new_nonce",
     "process_nonce",
+    "production_root",
     "runtime_identity",
     "supervisor_session",
 ]

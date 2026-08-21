@@ -34,6 +34,16 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from catalog.federation.software_trial import (
+    BRANCHES_REQUEST_SCHEMA,
+    TRIAL_PREPARING,
+    TRIAL_REQUEST_SCHEMA,
+    TRIAL_STARTING,
+    TrialRefused,
+    branches_result_document,
+    trial_summary,
+    validate_trial_request,
+)
 from catalog.federation.software_update import (
     APPROVED_BRANCH,
     APPROVED_REPOSITORY,
@@ -42,6 +52,11 @@ from catalog.federation.software_update import (
 )
 
 from .native_identity import NONCE_RE
+from .native_trial import running_trial
+from .native_trial_agent import (
+    NativeRecorderTrialAgent,
+    TrialRefusedLocally,
+)
 from .native_update import (
     RECORDER_EXIT_TIMEOUT_SECONDS,
     REPLACEMENT_TIMEOUT_SECONDS,
@@ -157,6 +172,8 @@ class NativeRecorderUpdateAgent:
         adapter: GitUpdateAdapter | None = None,
         now: Callable[[], datetime] = utc_now,
         sleep: Callable[[float], None] = time.sleep,
+        request_capture_stop: Callable[[], bool] | None = None,
+        trial: NativeRecorderTrialAgent | None = None,
     ) -> None:
         if not NONCE_RE.fullmatch(str(supervisor_session)):
             raise ValueError("malformed_supervisor_session")
@@ -168,6 +185,18 @@ class NativeRecorderUpdateAgent:
         self._now = now
         self._sleep = sleep
         self.paths.directory.mkdir(parents=True, exist_ok=True)
+        # Branch trials are a sibling lifecycle, not a mode of this one. They
+        # share the request channel, the recorder identity rules and the
+        # supervisor, and nothing else: the update journal, the update request
+        # schema and every refusal above stay exactly as they were.
+        self.trial = trial or NativeRecorderTrialAgent(
+            repository_root=self.root,
+            paths=self.paths,
+            supervisor_session=self.supervisor_session,
+            adapter=self.adapter,
+            now=now,
+            request_capture_stop=request_capture_stop,
+        )
 
     # ---- bounded result channel -----------------------------------------
 
@@ -199,6 +228,9 @@ class NativeRecorderUpdateAgent:
             "message": message[:512],
             "completed_at": stamp(self._now()),
         }
+        summary = self.trial_summary()
+        if summary is not None:
+            value["trial"] = summary
         write_json_atomic(self._result_path(request_id), value)
         write_json_atomic(self.paths.result_file, value)
         return value
@@ -298,7 +330,67 @@ class NativeRecorderUpdateAgent:
         finally:
             processing.unlink(missing_ok=True)
 
+    def active_trial(self) -> dict[str, Any] | None:
+        """The trial this device is *currently* running, from live evidence.
+
+        The journal alone is not enough. A successful trial stays recorded as
+        the last thing that happened, but an ordinary restart brings the
+        recorder back on the production checkout -- so a retained record whose
+        commit is demonstrably not the one running is history, not state.
+        """
+
+        record = running_trial(self.trial.journal)
+        if record is None:
+            return None
+        running = self._running_commit()
+        if running is not None and running != record.get("trial_commit"):
+            return None
+        return record
+
+    def trial_summary(self) -> dict[str, object] | None:
+        """The bounded branch-trial summary this device reports, if any."""
+
+        record = self.trial.journal.latest()
+        if record is None:
+            return None
+        return trial_summary(
+            stage=record.get("stage"),
+            branch=record.get("trial_branch"),
+            commit=record.get("trial_commit"),
+            safe_branch=record.get("safe_branch"),
+            safe_commit=record.get("safe_commit"),
+            failure_reason=record.get("failure_reason"),
+            active=self.active_trial() is not None,
+        )
+
     def handle_check(self, request_id: str, target: str | None) -> dict[str, object]:
+        running = self.active_trial()
+        if running is not None:
+            # The production checkout is still clean, on main, at the pinned
+            # known-good commit -- the *runtime* is what is elsewhere. Reporting
+            # the checkout's ordinary state here would claim a device is up to
+            # date while it runs a test branch, so say what is actually true and
+            # leave it out of ``Update all devices`` until it is back on main.
+            #
+            # The checkout is deliberately not inspected here: this process may
+            # itself be running from the trial worktree, and the pinned commit
+            # is the accurate, already-proven answer.
+            safe = running.get("safe_commit")
+            return self._write_result(
+                request_id=request_id,
+                action="check",
+                state="trial_running",
+                current=safe if isinstance(safe, str) else None,
+                target=target,
+                running=self._running_commit(),
+                code="trial_active",
+                message=(
+                    "This device is running the test branch "
+                    f"{running.get('trial_branch')}. Return it to "
+                    f"{running.get('safe_branch') or APPROVED_BRANCH} before "
+                    "updating it."
+                ),
+            )
         inspection = self.adapter.inspect(target=target, fetch=True)
         return self._write_result(
             request_id=request_id,
@@ -340,6 +432,23 @@ class NativeRecorderUpdateAgent:
                 running=self._running_commit(),
                 code="host_update_busy",
                 message="Another recorder update activation is already running.",
+            )
+        if self.trial.journal.active() is not None or self.active_trial() is not None:
+            # Fast-forwarding the production checkout while the runtime is a
+            # trial worktree would update a tree nothing is running from, and
+            # would move the pinned fallback out from under the trial.
+            return self._write_result(
+                request_id=request_id,
+                action="apply",
+                state="error",
+                current=self._current_commit(),
+                target=target,
+                running=self._running_commit(),
+                code="trial_active",
+                message=(
+                    "This device is running a branch trial. Return it to "
+                    f"{APPROVED_BRANCH} before updating it."
+                ),
             )
 
         try:
@@ -440,9 +549,10 @@ class NativeRecorderUpdateAgent:
     def resume(self) -> bool:
         """Advance an interrupted activation. Safe to call repeatedly."""
 
+        trial_worked = self._verify_trial()
         active = self.journal.active()
         if active is None:
-            return False
+            return trial_worked
         request_id = str(active.get("request_id") or "")
         target = str(active.get("target_commit") or "")
         if not REQUEST_ID_RE.fullmatch(request_id) or not OID_RE.fullmatch(target):
@@ -483,6 +593,112 @@ class NativeRecorderUpdateAgent:
             )
             return True
         return False
+
+    def handle_branches(self, request_id: str) -> dict[str, object]:
+        """Answer which branches the approved repository publishes.
+
+        Read-only, and behind the same approved-remote check every other Git
+        operation here is behind: a checkout wired to a different repository
+        publishes no branch list at all rather than someone else's branches.
+        """
+
+        try:
+            listed = self.adapter.approved_branches()
+            document = branches_result_document(
+                request_id=request_id, branches=listed
+            )
+        except (RuntimeError, OSError, ValueError) as exc:
+            document = branches_result_document(
+                request_id=request_id,
+                branches=(),
+                code=str(exc) if isinstance(exc, RuntimeError) else "branches_failed",
+                message="The approved FCP source branch list is unavailable.",
+            )
+        digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+        write_json_atomic(
+            self.paths.directory / f"branches-result-{digest}.json", document
+        )
+        return document
+
+    def _verify_trial(self) -> bool:
+        """Judge this process against an in-flight trial, never fatally.
+
+        A branch trial must not be able to end the update agent or capture, so
+        a failure here is swallowed and simply retried on the next pass.
+        """
+
+        try:
+            return self.trial.verify_once()
+        except (OSError, RuntimeError, ValueError):
+            return False
+
+    def _handle_trial_request(self, request: dict[str, Any]) -> dict[str, object]:
+        """Prevalidate a branch trial and, only then, request a graceful stop.
+
+        Ordering is the whole point: the branch is fetched, checked out beside
+        the production checkout and probed with the real interpreter *before*
+        any activation is written. A trial that cannot be prepared never stops
+        capture.
+        """
+
+        try:
+            request_id, selection = validate_trial_request(request, now=self._now())
+        except TrialRefused as refused:
+            candidate = request.get("request_id")
+            return self.trial.write_refusal(
+                candidate
+                if isinstance(candidate, str) and REQUEST_ID_RE.fullmatch(candidate)
+                else "invalid-request",
+                code=refused.code,
+                message="The requested software version was not accepted.",
+            )
+        result = self.trial.handle_trial(
+            request_id,
+            selection,
+            update_active=self.journal.active() is not None,
+        )
+        if result.get("state") != TRIAL_PREPARING or result.get("code") != (
+            "trial_prevalidated"
+        ):
+            return result
+        try:
+            status = self.trial.supervised_recorder()
+            self._await_pending_federation_update(
+                request_id, selection.target_commit
+            )
+            intent = activation_intent(
+                request_id=request_id,
+                target_commit=selection.target_commit,
+                supervisor_session=self.supervisor_session,
+                recorder_pid=int(status.pid or 0),
+                process_nonce=str(status.process_nonce),
+                now=self._now(),
+            )
+        except (UpdateRefused, TrialRefusedLocally) as refused:
+            return self.trial.abandon(
+                request_id, code=refused.code, message=refused.message
+            )
+        except (OSError, RuntimeError, ValueError) as exc:
+            return self.trial.abandon(
+                request_id,
+                code="trial_activation_failed",
+                message=(
+                    "The branch trial stopped safely before capture was "
+                    f"ended ({type(exc).__name__})."
+                ),
+            )
+        write_json_atomic(self.paths.activation_file, intent)
+        self.trial.mark_stop_requested(expires_at=str(intent["expires_at"]))
+        return self.trial.report_stage(
+            request_id,
+            TRIAL_STARTING,
+            code="trial_stop_requested",
+            message=(
+                "The recorder was asked to stop for the trial branch. The "
+                "known-good version stays checked out and pinned for automatic "
+                "recovery."
+            ),
+        )
 
     def _deadline_passed(self, active: dict[str, Any], seconds: float) -> bool:
         updated = parse_stamp(active.get("updated_at"))
@@ -601,20 +817,36 @@ class NativeRecorderUpdateAgent:
         mutated, and it refuses to run while the named process is still alive.
         """
 
+        try:
+            plan = self.trial.plan_after_exit()
+        except (OSError, RuntimeError, ValueError) as exc:
+            # A trial must never be able to end the supervisor's loop with a
+            # traceback. Report a bounded refusal and leave everything as it is.
+            return self._plan(
+                False,
+                "trial",
+                f"trial_plan_failed_{type(exc).__name__.casefold()}",
+            )
+        if plan is not None:
+            # A branch trial owns this exit. The production checkout is not
+            # fast-forwarded, is not moved, and is not even read for a target:
+            # the plan says which prepared root to launch, and rolling back is
+            # simply launching the untouched one again.
+            return plan.to_dict()
         active = self.journal.active()
         if active is None:
-            return {"relaunch": False, "code": "no_pending_activation"}
+            return self._plan(False, "update", "no_pending_activation")
         request_id = str(active.get("request_id") or "")
         target = str(active.get("target_commit") or "")
         if not REQUEST_ID_RE.fullmatch(request_id) or not OID_RE.fullmatch(target):
             self.journal.discard_active()
-            return {"relaunch": False, "code": "malformed_activation"}
+            return self._plan(False, "update", "malformed_activation")
         if active.get("stage") not in {
             STAGE_STOP_REQUESTED,
             STAGE_RECORDER_EXITED,
             STAGE_SOURCE_UPDATED,
         }:
-            return {"relaunch": False, "code": "unexpected_stage"}
+            return self._plan(False, "update", "unexpected_stage")
         try:
             if active.get("stage") == STAGE_STOP_REQUESTED:
                 status = self.recorder_status()
@@ -633,8 +865,35 @@ class NativeRecorderUpdateAgent:
                 active = self._fast_forward(active, target)
         except UpdateRefused as refused:
             self._fail(request_id, target, refused)
-            return {"relaunch": False, "code": refused.code}
-        return {"relaunch": True, "code": "source_updated", "target_commit": target}
+            return self._plan(False, "update", refused.code)
+        return self._plan(
+            True, "update", "source_updated", target_commit=target
+        )
+
+    @staticmethod
+    def _plan(
+        relaunch: bool,
+        mode: str,
+        code: str,
+        *,
+        target_commit: str | None = None,
+    ) -> dict[str, object]:
+        """One launch plan shape for the supervisor, trial or update alike.
+
+        The update path always answers ``None`` for root, data directory and
+        build commit, which is the supervisor's instruction to keep doing
+        exactly what it did before branch trials existed.
+        """
+
+        return {
+            "relaunch": relaunch,
+            "mode": mode,
+            "code": code,
+            "target_commit": target_commit,
+            "launch_root": None,
+            "data_directory": None,
+            "build_commit": None,
+        }
 
     def _fast_forward(self, active: dict[str, Any], target: str) -> dict[str, Any]:
         inspection = self.adapter.inspect(target=target, fetch=True)
@@ -664,6 +923,8 @@ class NativeRecorderUpdateAgent:
 
         if not NONCE_RE.fullmatch(str(process_nonce)):
             raise ValueError("malformed_process_nonce")
+        if self.trial.mark_relaunched(process_nonce):
+            return True
         active = self.journal.active()
         if active is None or active.get("stage") not in {
             STAGE_SOURCE_UPDATED,
@@ -683,6 +944,26 @@ class NativeRecorderUpdateAgent:
         request = self._claim_request()
         if request is None:
             return worked
+        if isinstance(request, dict) and request.get("schema") == (
+            BRANCHES_REQUEST_SCHEMA
+        ):
+            candidate = request.get("request_id")
+            if isinstance(candidate, str) and REQUEST_ID_RE.fullmatch(candidate):
+                self.handle_branches(candidate)
+            return True
+        if isinstance(request, dict) and request.get("schema") == TRIAL_REQUEST_SCHEMA:
+            try:
+                self._handle_trial_request(request)
+            except (OSError, RuntimeError, ValueError) as exc:
+                self.trial.write_refusal(
+                    "invalid-request",
+                    code="trial_failed_safely",
+                    message=(
+                        "The branch trial stopped safely before it could "
+                        f"change anything ({type(exc).__name__})."
+                    ),
+                )
+            return True
         request_id, action, target, activate_after = "invalid-request", "unknown", None, None
         try:
             request_id, action, target, activate_after = validate_request(request)

@@ -21,9 +21,18 @@ APPROVED_REPOSITORY = "Nettking/msh"
 APPROVED_BRANCH = "main"
 REQUEST_SCHEMA = "fcp.host-update-request.v1"
 RESULT_SCHEMA = "fcp.host-update-result.v1"
+#: Read-only branch discovery for the Federation software-version dropdown.
+#: The Flask process runs no Git, so it asks this host-owned agent instead.
+BRANCHES_REQUEST_SCHEMA = "fcp.host-branches-request.v1"
+BRANCHES_RESULT_SCHEMA = "fcp.host-branches-result.v1"
+MAX_LISTED_BRANCHES = 60
 MAX_BYTES = 8192
 OID_RE = re.compile(r"^[0-9a-f]{40}$")
 REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+BRANCH_RE = re.compile(
+    r"^(?![./-])(?!.*\.\.)(?!.*//)(?!.*@\{)(?!.*\.lock(?:/|$))"
+    r"[A-Za-z0-9][A-Za-z0-9._/-]{0,180}(?<![./])$"
+)
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
 
 
@@ -217,6 +226,87 @@ def atomic_json(path: Path, value: dict[str, object]) -> None:
         if fd >= 0:
             os.close(fd)
         temporary.unlink(missing_ok=True)
+
+
+def approved_branches(root: Path) -> list[dict[str, str]]:
+    """List branches published by the approved repository, tips included.
+
+    Behind the same approved-remote check every other operation here is behind,
+    and read-only: no fetch, no checkout, nothing mutated.
+    """
+
+    if not approved_remote(git(root, "remote", "get-url", "origin").stdout):
+        raise RuntimeError("unapproved_remote")
+    listed = git(root, "ls-remote", "--heads", "--", "origin", check=False)
+    if listed.returncode != 0:
+        raise RuntimeError("remote_unavailable")
+    found: dict[str, str] = {}
+    for line in listed.stdout.splitlines():
+        commit, _, reference = line.strip().partition("\t")
+        commit = commit.strip().lower()
+        name = reference.strip().removeprefix("refs/heads/")
+        if reference.strip() == name or not OID_RE.fullmatch(commit):
+            continue
+        if not BRANCH_RE.fullmatch(name):
+            continue
+        found[name] = commit
+    ordered = sorted(
+        found.items(),
+        key=lambda item: (item[0] != APPROVED_BRANCH, item[0]),
+    )
+    return [
+        {"name": name, "commit": commit}
+        for name, commit in ordered[:MAX_LISTED_BRANCHES]
+    ]
+
+
+def write_branches_result(
+    result_file: Path,
+    *,
+    request_id: str,
+    branches: list[dict[str, str]],
+    code: str | None = None,
+    message: str = "",
+) -> None:
+    digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+    atomic_json(
+        result_file.with_name(f"branches-result-{digest}.json"),
+        {
+            "schema": BRANCHES_RESULT_SCHEMA,
+            "request_id": request_id,
+            "action": "branches",
+            "state": "error" if code else "branches",
+            "repository": APPROVED_REPOSITORY,
+            "branches": branches,
+            "code": code,
+            "message": message[:512],
+        },
+    )
+
+
+def handle_branches_request(
+    root: Path,
+    result_file: Path,
+    value: dict[str, object],
+) -> bool:
+    request_id = value.get("request_id")
+    if not isinstance(request_id, str) or not REQUEST_ID_RE.fullmatch(request_id):
+        return True
+    try:
+        write_branches_result(
+            result_file,
+            request_id=request_id,
+            branches=approved_branches(root),
+        )
+    except (RuntimeError, ValueError, OSError, subprocess.SubprocessError) as exc:
+        write_branches_result(
+            result_file,
+            request_id=request_id,
+            branches=[],
+            code=str(exc) if isinstance(exc, RuntimeError) else "branches_failed",
+            message="The approved FCP source branch list is unavailable.",
+        )
+    return True
 
 
 def _request_result_path(result_file: Path, request_id: str) -> Path:
@@ -445,6 +535,12 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             value = json.loads(processing.read_text(encoding="utf-8"))
         except (OSError, UnicodeDecodeError, json.JSONDecodeError):
             return True
+
+        if (
+            isinstance(value, dict)
+            and value.get("schema") == BRANCHES_REQUEST_SCHEMA
+        ):
+            return handle_branches_request(root, result_file, value)
 
         request_id, action, target, activate_after = validate_request(value)
         if activate_after is not None:
