@@ -79,20 +79,33 @@ def test_the_supervisor_starts_nothing_before_the_recorder() -> None:
 
     supervisor = _text(SUPERVISOR)
 
-    assert "Start-Process" not in supervisor
     assert "Start-Job" not in supervisor
     # No import-probe shape: the launcher already owns the only "-c" call, and a
     # second one collides with the fake interpreters the launcher tests use.
     assert "'-c'" not in supervisor
 
+    # The one background process this file may start is the branch-trial
+    # watchdog, and it is unreachable on the supported startup path: both flags
+    # guarding it initialize false, so the first child is still the first thing
+    # started.
+    assert supervisor.count("Start-Process") == 1
+    watchdog = supervisor.index("Start-Process")
+    assert supervisor.rindex("function Start-TrialWatchdog {") < watchdog
+    assert "$replacementPending = $false\n" in supervisor
+    assert "$trialActive = $false\n" in supervisor
+
     loop = supervisor[supervisor.index("while ($true) {") :]
     launch = loop.index("$exitCode = Start-Recorder")
     # Inside the loop, the only interpreter call reachable before the child is
-    # the relaunch bookkeeping, and that runs solely after an approved update.
+    # the relaunch bookkeeping, and that runs solely after an approved update
+    # or a trial the agent planned.
     assert loop.index("Invoke-Finalize") > launch
     assert loop.count("Set-RelaunchedNonce $nonce") == 1
     assert loop.index("Set-RelaunchedNonce $nonce") < launch
     assert "if ($replacementPending) {" in loop
+    guarded = loop[loop.index("if ($replacementPending) {") : launch]
+    assert "if ($trialActive) {" in guarded
+    assert guarded.index("if ($trialActive) {") < guarded.index("Start-TrialWatchdog")
 
 
 def test_the_supervisor_guarantees_one_recorder_per_checkout() -> None:
@@ -150,14 +163,22 @@ def test_recorder_arguments_are_never_re_parsed_by_the_supervisor() -> None:
     assert "ValueFromRemainingArguments" not in parameters
     # They reach the replacement verbatim, and reach the agent only as opaque
     # values it uses to resolve the data directory the launcher would.
-    assert "-m scripts.start_tailscale_recorder @RecorderArguments" in supervisor
+    assert "-m scripts.start_tailscale_recorder @arguments" in supervisor
+    assert "$arguments = @($RecorderArguments)" in supervisor
+    # The only thing ever added to them is a host-resolved data directory for a
+    # trial child launched from another root -- and it is the *same* directory
+    # the launcher would have resolved, appended rather than re-parsed.
+    added = [
+        line.strip() for line in supervisor.splitlines() if "$arguments +=" in line
+    ]
+    assert added == ["$arguments += @('--data-dir', $DataDirectory)"]
     assert "('--recorder-arg=' + $argument)" in supervisor
 
 
 def test_the_relaunch_profile_is_the_one_the_operator_started_with() -> None:
     supervisor = _text(SUPERVISOR)
 
-    assert "-m scripts.start_tailscale_recorder @RecorderArguments" in supervisor
+    assert "-m scripts.start_tailscale_recorder @arguments" in supervisor
     # The interpreter and arguments are parameters resolved by the launcher, and
     # are reused verbatim; the supervisor never re-resolves or rewrites them.
     assert "[string]$PythonExecutable" in supervisor
@@ -187,9 +208,17 @@ def test_the_supervisor_relaunches_only_for_the_approved_exit_code() -> None:
     supervisor = _text(SUPERVISOR)
 
     assert "$ApprovedUpdateRestartExitCode = 75" in supervisor
-    assert "if ($exitCode -ne $ApprovedUpdateRestartExitCode) {" in supervisor
-    # Any other exit code, including 0 and Ctrl+C, ends supervision.
+    # Any other exit code, including 0 and Ctrl+C, ends supervision -- unless a
+    # *trial* child exited, which is precisely the case the pinned fallback
+    # exists for and which the branch never reaches when it crashes on startup.
+    assert (
+        "if ($exitCode -ne $ApprovedUpdateRestartExitCode -and -not $trialActive) {"
+        in supervisor
+    )
     assert "exit $exitCode" in supervisor
+    # And a trial is only ever "active" because the host agent said the child it
+    # just planned is one. The supervisor never decides that for itself.
+    assert "$trialActive = ([string]$plan.mode -eq 'trial')" in supervisor
 
 
 def test_a_failed_finalize_never_relaunches() -> None:
@@ -302,3 +331,115 @@ def test_the_windows_process_probe_never_signals() -> None:
     assert "os.kill" not in windows_branch
     assert "PROCESS_TERMINATE" not in text
     assert "TerminateProcess" not in text
+
+
+# --------------------------------------------------------------------------
+# branch trials add a destination, never an authority
+# --------------------------------------------------------------------------
+
+
+def test_the_supervisor_launches_only_what_the_host_agent_planned() -> None:
+    """The supervisor never invents a root, a data directory or a commit."""
+
+    supervisor = _text(SUPERVISOR)
+
+    # Every launch value is read from the agent's plan, and nothing else.
+    assert "$launchRoot = Normalize-DirectoryPath ([string]$plan.launch_root)" in supervisor
+    assert (
+        "$launchDataDirectory = Normalize-DirectoryPath ([string]$plan.data_directory)"
+        in supervisor
+    )
+    assert "$launchBuildCommit = ([string]$plan.build_commit).Trim().ToLowerInvariant()" in supervisor
+    # A plan that names anything but an exact commit is refused, not launched.
+    assert "if ($launchBuildCommit -notmatch '^[0-9a-f]{40}$') {" in supervisor
+    # Defaults are reset before each plan is read, so a stale trial root can
+    # never leak into a later launch.
+    reset = supervisor.index("$launchRoot = $RepoRoot\n            $launchDataDirectory")
+    assert reset < supervisor.index("$plan.launch_root")
+
+
+def test_a_missing_or_unreadable_plan_never_relaunches() -> None:
+    supervisor = _text(SUPERVISOR)
+
+    assert (
+        "if ($finalize.ExitCode -ne 0 -or $null -eq $plan -or -not $plan.relaunch) {"
+        in supervisor
+    )
+    failure = supervisor.index("The approved recorder update did not complete")
+    relaunch = supervisor.rindex("$replacementPending = $true")
+    assert failure < relaunch
+
+
+def test_the_supervisor_owns_no_git_for_a_trial() -> None:
+    """Rolling back is a relaunch, not a repair: no Git belongs here at all."""
+
+    supervisor = _text(SUPERVISOR)
+    invocations = [
+        line.strip()
+        for line in supervisor.splitlines()
+        if not line.lstrip().startswith("#") and "git " in line
+    ]
+
+    # Exactly two: one availability probe and one read-only commit read. No
+    # worktree, merge, reset, clean, stash or checkout is invoked here at all,
+    # which is why a rollback is a relaunch rather than a repair.
+    assert invocations == [
+        "if ($null -eq (Get-Command git -ErrorAction SilentlyContinue)) { return '' }",
+        "$output = & git -C $Root rev-parse --verify 'HEAD^{commit}' 2>&1",
+    ]
+
+
+def test_a_trial_child_is_told_the_permanent_checkout_it_belongs_to() -> None:
+    supervisor = _text(SUPERVISOR)
+
+    assert "$env:FCP_RECORDER_PRODUCTION_ROOT = $RepoRoot" in supervisor
+    # Locally resolved, and cleared again with the rest of the child identity.
+    assert "Remove-Item Env:FCP_RECORDER_PRODUCTION_ROOT" in supervisor
+
+
+def test_an_operator_stop_during_a_trial_still_ends_supervision() -> None:
+    supervisor = _text(SUPERVISOR)
+
+    index = supervisor.index("$plan.code -eq 'trial_operator_stopped'")
+    assert "exit $exitCode" in supervisor[index : index + 400]
+
+
+def test_the_trial_lifecycle_is_documented_where_it_is_implemented() -> None:
+    lifecycle = _text(LIFECYCLE)
+
+    # The agent still never kills, never rewrites history, never runs a
+    # destructive Git recovery, and never takes a path from a peer.
+    for forbidden in ("reset --hard", "git clean", "git stash", "taskkill", "SIGKILL"):
+        assert forbidden not in lifecycle
+
+
+def test_the_trial_watchdog_runs_from_the_permanent_checkout() -> None:
+    """The verdict on a trial must not come from the branch being tested.
+
+    A check living in the trial worktree is one that branch could omit, break
+    or simply predate -- and a trial that never fails itself would keep an
+    unproven recorder running indefinitely. So the watchdog is started from the
+    permanent checkout, with the permanent checkout's own agent.
+    """
+
+    supervisor = _text(SUPERVISOR)
+    body = supervisor[
+        supervisor.index("function Start-TrialWatchdog {") :
+    ].split("\n}\n", 1)[0]
+
+    assert "Get-AgentArguments @('--watch-trial')" in body
+    assert "-WorkingDirectory $RepoRoot" in body
+    # Never blocking: the supervisor still waits on the child, not on this.
+    assert "-Wait" not in body
+    # And the agent it runs is resolved from $RepoRoot, never a launch root.
+    assert "$launchRoot" not in body
+    assert "'--repo-root', $RepoRoot" in _text(SUPERVISOR)
+
+
+def test_the_supervisor_still_never_terminates_a_process() -> None:
+    """Including a trial child, which writes to the real data directory."""
+
+    supervisor = _text(SUPERVISOR)
+
+    for forbidden in ("Stop-Process", "taskkill", "Kill()", ".Terminate", "-Force"):
+        assert forbidden not in supervisor

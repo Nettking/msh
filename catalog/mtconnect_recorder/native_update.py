@@ -572,6 +572,12 @@ class NativeRecorderUpdatePaths:
         self.result_file = self.directory / "result.json"
         self.journal_file = self.directory / "journal.json"
         self.activation_file = self.directory / "activation.json"
+        # Branch trials keep their own durable record next to the update
+        # journal rather than inside it, so adding trials changed nothing the
+        # existing updater reads or writes.
+        self.trial_journal_file = self.directory / "trial-journal.json"
+        self.trial_result_file = self.directory / "trial-result.json"
+        self.trial_stop_file = self.directory / "trial-stop.json"
         self.status_file = (
             self.data_directory / "source_state" / "mtconnect_recorder_status.json"
         )

@@ -162,6 +162,7 @@ class FederationUpdateService:
                 "The source is current, but the running FCP build is not verified at the target commit.",
                 result.running_commit,
                 result.request_id,
+                result.trial,
             )
         if (
             result.state == "runtime_verified"
@@ -178,6 +179,7 @@ class FederationUpdateService:
                 "The host reported completion without proving the requested running commit.",
                 result.running_commit,
                 result.request_id,
+                result.trial,
             )
         return result
 

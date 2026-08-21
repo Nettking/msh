@@ -4,7 +4,7 @@
 | --- | --- |
 | Status | Active |
 | Audience | Maintainers, reviewers, acceptance owners, and implementation agents |
-| Scope | Durable Federation product behavior, current release closeout, update design, pending-contribution authority, device naming, remaining acceptance work, and stop conditions |
+| Scope | Durable Federation product behavior, current release closeout, update and branch-trial design, pending-contribution authority, device naming, remaining acceptance work, and stop conditions |
 | Authority | Current status/sequencing is reconciled by the current handoff/track index; documents here retain their durable decisions where not superseded |
 | Entry point | [Current task handoff](../../current_task_handoff.md) |
 | Parent | [Federation implementation documentation](../) |
@@ -18,7 +18,8 @@
 3. [Manual Federation-wide FCP updates](manual_updates.md) — implemented manual-only exact-commit update extension and host-authority boundary.
 4. [Federation pending-contribution approval](pending_contribution_approval.md) — leader-only explicit decision contract for capability-first `REGISTERING` contributions, including the separation between enrollment approval and runtime/storage/compute authority.
 5. [Federation-scoped device names](device_names.md) — leader-owned public-safe names that follow stable node identities across operational projections without changing authority.
-6. Update rollout probe/acceptance notes in this directory — implementation/acceptance evidence for the update path, not a replacement for the complete CF7 acceptance manifest.
+6. [Federation software-version branch trials](branch_trials.md) — running a device temporarily on an approved test branch, with a pinned known-good fallback that is restored and verified automatically when startup fails.
+7. Update rollout probe/acceptance notes in this directory — implementation/acceptance evidence for the update path, not a replacement for the complete CF7 acceptance manifest.
 
 ## Current rule
 

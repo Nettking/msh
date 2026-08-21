@@ -52,6 +52,9 @@ from .services.federation_leader_authority import resolve_federation_leader
 from .services.federation_projection_service import (
     get_federation_projection_service,
 )
+from .services.federation_software_version_service import (
+    get_federation_software_version_service,
+)
 
 federation_web = Blueprint("federation_web", __name__)
 
@@ -219,6 +222,7 @@ def _page_response(page: FederationPage) -> Response:
     update_status = None
     capability_request_status = None
     leadership_status = None
+    software_version_status = None
     if page is FederationPage.OVERVIEW:
         try:
             update_status = get_federation_update_service().snapshot()
@@ -237,6 +241,21 @@ def _page_response(page: FederationPage) -> Response:
                 type(exc).__name__,
             )
             capability_request_status = {"status": "unavailable", "devices": []}
+
+        try:
+            software_version_status = (
+                get_federation_software_version_service().snapshot()
+            )
+        except Exception as exc:  # noqa: BLE001 - safe passive degradation
+            current_app.logger.warning(
+                "Federation software version status unavailable (%s)",
+                type(exc).__name__,
+            )
+            software_version_status = {
+                "status": "unavailable",
+                "devices": [],
+                "branches": [],
+            }
 
         is_member, can_manage_updates, leadership_status = _leader_authority_view()
         update_status = {
@@ -259,6 +278,11 @@ def _page_response(page: FederationPage) -> Response:
                 **capability_request_status,
                 "status": "managed_by_coordinator",
             }
+        software_version_status = {
+            **software_version_status,
+            "can_manage": can_manage_updates,
+            "managed_by_coordinator": is_member and not can_manage_updates,
+        }
 
     response = make_response(
         render_template(
@@ -278,6 +302,7 @@ def _page_response(page: FederationPage) -> Response:
                 else None
             ),
             federation_update=update_status,
+            federation_software_version=software_version_status,
             federation_capability_request=capability_request_status,
             federation_leadership=leadership_status,
         )
@@ -453,6 +478,60 @@ def apply_updates() -> Response:
     except Exception as exc:  # noqa: BLE001 - never expose process details
         current_app.logger.warning("Federation update failed (%s)", type(exc).__name__)
         flash("The verified update rollout failed safely.", "error")
+    return redirect(url_for("federation_web.overview"), code=303)
+
+
+@federation_web.post("/federation/software-version/switch")
+def switch_software_version() -> Response:
+    """Ask selected devices to run one approved branch at one exact commit.
+
+    The form carries no path, URL, command or environment value, and cannot:
+    the only fields read here are an approved branch name, one exact commit and
+    which already-known devices to send it to. Each device revalidates all of
+    it locally before anything stops.
+    """
+
+    _require_update_csrf()
+    # One selection field: the exact commit and the branch it was published on
+    # arrive together, so a stale page cannot pair a branch name with some
+    # other branch's commit. Both halves are revalidated by the service, and
+    # again by every device that receives them.
+    target_commit, _, branch = str(request.form.get("version") or "").partition(":")
+    node_ids = [
+        str(value)
+        for value in request.form.getlist("node_id")
+        if isinstance(value, str) and value
+    ]
+    try:
+        result = get_federation_software_version_service().switch_version(
+            node_ids=node_ids,
+            branch=branch,
+            target_commit=target_commit,
+        )
+        count = len(result.get("expected_report_node_ids", []))
+        flash(
+            f"Asked {count} device{'' if count == 1 else 's'} to run "
+            f"{branch}. Each device validates the branch while it is still "
+            "recording, and a recorder that cannot prove a healthy startup "
+            "automatically returns to the exact version it was running.",
+            "success",
+        )
+    except PermissionError:
+        flash(
+            "Only the current Federation leader can change device software versions.",
+            "error",
+        )
+    except (ValueError, RuntimeError):
+        flash(
+            "The software version was not changed because its authority, "
+            "branch, commit, or device selection was not accepted.",
+            "error",
+        )
+    except Exception as exc:  # noqa: BLE001 - never expose process details
+        current_app.logger.warning(
+            "Federation software version switch failed (%s)", type(exc).__name__
+        )
+        flash("The software version change failed safely.", "error")
     return redirect(url_for("federation_web.overview"), code=303)
 
 

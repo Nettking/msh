@@ -14,6 +14,13 @@ recorder, plus a bounded self-check for CI:
 ``--mark-relaunched``
     Record the exact process-instance nonce the supervisor just started, so the
     replacement must be proven to be that process and not a survivor.
+``--watch-trial``
+    Judge an in-flight branch trial *from this permanent checkout*, for a
+    bounded time, and ask the trial process to stop if it did not prove itself.
+    This mode exists precisely because it must not run from the branch under
+    test: a check living in the trial worktree is one that branch could omit,
+    break, or simply predate, and a trial that never fails itself would keep an
+    unproven recorder running indefinitely.
 ``--once``
     One bounded pass of the same state machine the recorder runs in-process.
 
@@ -29,12 +36,18 @@ import argparse
 import json
 import os
 import sys
+import time
 from pathlib import Path
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from catalog.federation.software_trial import (
+    TRIAL_FAILED,
+    TRIAL_RUNNING,
+    TRIAL_STARTUP_TIMEOUT_SECONDS,
+)
 from catalog.mtconnect_recorder.native_identity import (
     NONCE_RE,
     SUPERVISOR_SESSION_ENV,
@@ -90,8 +103,59 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--once", action="store_true")
     parser.add_argument("--finalize", action="store_true")
     parser.add_argument("--mark-relaunched", action="store_true")
+    parser.add_argument("--watch-trial", action="store_true")
     parser.add_argument("--process-nonce", default=None)
     return parser
+
+
+#: How long the watchdog waits, past the acceptance window, for a trial process
+#: to honour a stop request before reporting that it never did.
+STOP_GRACE_SECONDS = 60
+WATCH_INTERVAL_SECONDS = 2.0
+
+
+def watch_trial(
+    agent: NativeRecorderUpdateAgent,
+    *,
+    sleep=time.sleep,
+    monotonic=time.monotonic,
+) -> dict:
+    """Own the verdict on one in-flight trial, then exit.
+
+    Bounded twice over: the acceptance window the trial was given, plus a grace
+    period for a failed trial to end its own capture. It never kills anything --
+    if the trial process ignores the stop request, that is reported rather than
+    forced, because the trial writes to the real recorder data directory.
+    """
+
+    deadline = (
+        monotonic()
+        + TRIAL_STARTUP_TIMEOUT_SECONDS
+        + STOP_GRACE_SECONDS
+        + WATCH_INTERVAL_SECONDS
+    )
+    outcome = "idle"
+    while monotonic() < deadline:
+        outcome = agent.trial.evaluate_trial()
+        if outcome == TRIAL_RUNNING:
+            return {"watched": True, "outcome": outcome, "stopped": None}
+        if outcome == TRIAL_FAILED:
+            break
+        if outcome != "pending":
+            # Either there is no trial to judge -- the supervisor records the
+            # replacement instance before starting this, so an idle journal
+            # means nothing is in flight -- or it already moved on because the
+            # child exited and a rollback was planned.
+            return {"watched": True, "outcome": outcome, "stopped": None}
+        sleep(WATCH_INTERVAL_SECONDS)
+    if outcome != TRIAL_FAILED:
+        return {"watched": True, "outcome": outcome, "stopped": None}
+    grace = monotonic() + STOP_GRACE_SECONDS
+    while monotonic() < grace:
+        if not agent.trial.recorder_status().is_running():
+            return {"watched": True, "outcome": outcome, "stopped": True}
+        sleep(WATCH_INTERVAL_SECONDS)
+    return {"watched": True, "outcome": outcome, "stopped": False}
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -113,6 +177,10 @@ def main(argv: list[str] | None = None) -> int:
         if not NONCE_RE.fullmatch(nonce):
             parser.error("--process-nonce must be 32 hexadecimal characters.")
         print(json.dumps({"marked": agent.mark_relaunched(nonce)}))
+        return 0
+
+    if args.watch_trial:
+        print(json.dumps(watch_trial(agent), sort_keys=True))
         return 0
 
     if args.finalize:

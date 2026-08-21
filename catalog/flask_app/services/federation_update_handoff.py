@@ -18,6 +18,16 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
 
+from catalog.federation.software_trial import (
+    BRANCHES_RESULT_SCHEMA,
+    TRIAL_REQUEST_TTL_SECONDS,
+    TRIAL_RESULT_SCHEMA,
+    TrialRefused,
+    TrialSelection,
+    branches_from_result,
+    branches_request_document,
+    trial_request_document,
+)
 from catalog.federation.software_update import (
     APPROVED_BRANCH,
     APPROVED_REPOSITORY,
@@ -299,12 +309,131 @@ class HostUpdateHandoff:
         )
 
 
+    def approved_branches(self) -> tuple[dict[str, str], ...]:
+        """Ask the local host agent which approved branches exist.
+
+        Flask still runs no Git. A host agent that does not implement the
+        request simply never answers, and an empty list is the honest result:
+        the dropdown then offers approved main only.
+        """
+
+        request = branches_request_document(
+            request_id=f"host-branches-{uuid.uuid4().hex}",
+            created_at=datetime.now(timezone.utc),
+        )
+        request_id = str(request["request_id"])
+        try:
+            self._write_request(request)
+        except HostUpdateBusyError:
+            return ()
+        deadline = time.monotonic() + self.timeout
+        while time.monotonic() < deadline:
+            value = self._read(self._branches_result_path(request_id))
+            if value is not None and value.get("schema") == BRANCHES_RESULT_SCHEMA:
+                return branches_from_result(value)
+            time.sleep(self.poll_interval)
+        return ()
+
+    def _branches_result_path(self, request_id: str) -> Path:
+        digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+        return self.directory / f"branches-result-{digest}.json"
+
+    # ---- branch trials ---------------------------------------------------
+    #
+    # A trial rides the same one-pending-request handoff, with its own request
+    # and result schemas so the update contract is untouched. The Flask process
+    # gains no new authority: it still only writes one declarative document
+    # naming an approved repository branch and commit.
+
+    def _trial_result_path(self, request_id: str) -> Path:
+        digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+        return self.directory / f"trial-result-{digest}.json"
+
+    def trial_result_for(self, request_id: str) -> dict[str, Any] | None:
+        value = self._read(self._trial_result_path(request_id))
+        if value is None or value.get("schema") != TRIAL_RESULT_SCHEMA:
+            return None
+        return value if value.get("request_id") == request_id else None
+
+    def latest_trial_result(self) -> dict[str, Any] | None:
+        value = self._read(self.directory / "trial-result.json")
+        if value is None or value.get("schema") != TRIAL_RESULT_SCHEMA:
+            return None
+        return value
+
+    def trial(
+        self,
+        selection: TrialSelection,
+        *,
+        request_id: str | None = None,
+    ) -> dict[str, Any]:
+        """Queue one branch trial for the local host agent.
+
+        Returns immediately with a bounded queued document. Prevalidation --
+        which fetches, checks out the trial worktree and probes the interpreter
+        -- happens on the host side while capture is still running, so it must
+        never be waited for on a request thread.
+        """
+
+        resolved = request_id or f"host-trial-{uuid.uuid4().hex}"
+        try:
+            selection.validate()
+            document = trial_request_document(
+                request_id=resolved,
+                selection=selection,
+                created_at=datetime.now(timezone.utc),
+                ttl_seconds=TRIAL_REQUEST_TTL_SECONDS,
+            )
+        except TrialRefused as refused:
+            return {
+                "schema": TRIAL_RESULT_SCHEMA,
+                "request_id": resolved,
+                "action": "trial",
+                "state": "refused",
+                "code": refused.code,
+                "message": "The requested software version was not accepted.",
+                "branch": None,
+                "target_commit": None,
+            }
+        try:
+            self._write_request(document)
+        except HostUpdateBusyError:
+            return {
+                "schema": TRIAL_RESULT_SCHEMA,
+                "request_id": resolved,
+                "action": "trial",
+                "state": "error",
+                "code": "host_update_busy",
+                "message": (
+                    "The host update agent already has a bounded pending "
+                    "request. Retry after that request has been claimed."
+                ),
+                "branch": selection.branch,
+                "target_commit": selection.target_commit,
+            }
+        return {
+            "schema": TRIAL_RESULT_SCHEMA,
+            "request_id": resolved,
+            "action": "trial",
+            "state": "trial_requested",
+            "code": "trial_queued",
+            "message": (
+                "The branch trial was queued for the local host agent. It is "
+                "validated while the recorder is still recording, and success "
+                "is reported only after a verified healthy replacement."
+            ),
+            "branch": selection.branch,
+            "target_commit": selection.target_commit,
+        }
+
+
 __all__ = [
     "ACTIVATION_GRACE_SECONDS",
     "HOST_REQUEST_TTL_SECONDS",
     "MAX_HANDOFF_BYTES",
     "REQUEST_SCHEMA",
     "RESULT_SCHEMA",
+    "TRIAL_RESULT_SCHEMA",
     "HostUpdateBusyError",
     "HostUpdateHandoff",
 ]

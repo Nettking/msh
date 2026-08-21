@@ -354,9 +354,13 @@ def test_start_recorder_reserves_seventy_five_for_approved_updates() -> None:
 
     assert start_recorder.APPROVED_UPDATE_RESTART_EXIT_CODE == 75
     source = Path(start_recorder.__file__).read_text(encoding="utf-8")
-    # The only path that may return it is the one guarded by both halves.
-    assert source.count("APPROVED_UPDATE_RESTART_EXIT_CODE") == 2
+    # Exactly two paths may return it -- an approved update, and a branch trial
+    # that could not prove a healthy startup -- plus the definition itself. Each
+    # is guarded by its own two-half check, and an operator stop still loses
+    # neither guard.
+    assert source.count("APPROVED_UPDATE_RESTART_EXIT_CODE") == 3
     assert "if approved_update_restart(activation):" in source
+    assert "if trial_fallback_restart(host_update):" in source
 
 
 # --------------------------------------------------------------------------
@@ -792,3 +796,105 @@ def test_the_agent_script_forwards_recorder_arguments_as_single_tokens(
     assert (data_directory / "federation" / "recorder-update-agent").is_dir()
     # Nothing was written inside the checkout.
     assert not (REPOSITORY_ROOT / "recorder-data").exists()
+
+
+# --------------------------------------------------------------------------
+# a failed branch trial ends its own capture, and an operator still wins
+# --------------------------------------------------------------------------
+
+
+def _stop() -> Any:
+    from catalog.mtconnect_recorder.federation_update import RecorderTrialStop
+
+    return RecorderTrialStop()
+
+
+def test_a_failed_trial_stops_capture_cooperatively_and_asks_for_a_restart(
+    clean_stop_state: None,
+) -> None:
+    """The trial process ends its own capture; nothing force-kills anything."""
+
+    target = _StopTarget()
+    recorder_runtime.register_stop_target(target)  # type: ignore[arg-type]
+    stop = _stop()
+
+    assert stop.request() is True
+
+    assert target.calls == [{"signum": None, "external": True}]
+    assert stop.latched is True
+    assert stop.delivered is True
+    assert recorder_runtime.last_stop_reason() == recorder_runtime.EXTERNAL_STOP_REASON
+    assert stop.restart_required() is True
+
+
+def test_an_operator_stop_during_a_trial_is_never_turned_into_a_restart(
+    clean_stop_state: None,
+) -> None:
+    recorder_runtime.register_stop_target(_StopTarget())  # type: ignore[arg-type]
+    stop = _stop()
+    stop.request()
+
+    # Ctrl+C after the trial latched its failure. An operator stop always wins.
+    recorder_runtime._record_stop_reason(recorder_runtime.SIGNAL_STOP_REASON)
+
+    assert stop.restart_required() is False
+
+
+def test_a_trial_that_never_started_capture_interrupts_its_own_launcher(
+    clean_stop_state: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A branch that hangs before capture exists still has to be recoverable."""
+
+    from catalog.mtconnect_recorder import federation_update as module
+
+    interrupted: list[bool] = []
+    monkeypatch.setattr(module, "interrupt_main", lambda: interrupted.append(True))
+    stop = _stop()
+
+    assert stop.request() is False
+
+    assert interrupted == [True]
+    assert stop.latched is True
+    assert stop.delivered is False
+    # Nothing else stopped this process, so the fallback is still owed.
+    assert stop.restart_required() is True
+
+
+def test_an_undelivered_trial_stop_never_overrides_an_operator_signal(
+    clean_stop_state: None, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from catalog.mtconnect_recorder import federation_update as module
+
+    monkeypatch.setattr(module, "interrupt_main", lambda: None)
+    stop = _stop()
+    stop.request()
+
+    recorder_runtime._record_stop_reason(recorder_runtime.SIGNAL_STOP_REASON)
+
+    assert stop.restart_required() is False
+
+
+def test_a_trial_that_was_never_latched_never_asks_for_a_restart(
+    clean_stop_state: None,
+) -> None:
+    assert _stop().restart_required() is False
+
+
+def test_a_supervised_child_uses_the_production_root_it_was_given(
+    tmp_path: Path,
+) -> None:
+    """A trial child runs from a worktree, so its own location is not the one."""
+
+    from catalog.mtconnect_recorder.native_identity import (
+        PRODUCTION_ROOT_ENV,
+        production_root,
+    )
+
+    production = tmp_path / "v2"
+    (production / ".git").mkdir(parents=True)
+
+    assert production_root({PRODUCTION_ROOT_ENV: str(production)}) == production
+    # Anything that is not a real checkout is refused rather than believed.
+    assert production_root({PRODUCTION_ROOT_ENV: str(tmp_path / "missing")}) is None
+    assert production_root({PRODUCTION_ROOT_ENV: ""}) is None
+    assert production_root({}) is None

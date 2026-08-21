@@ -25,9 +25,16 @@ from catalog.federation.control_commands import (
 from catalog.federation.control_commands import (
     stamp_utc as _stamp,
 )
+from catalog.federation.software_trial import (
+    TrialRefused,
+    TrialSelection,
+    trial_selection,
+    validate_trial_summary,
+)
 from catalog.federation.software_update import (
     APPROVED_BRANCH,
     APPROVED_REPOSITORY,
+    BRANCH_RE,
     OID_RE,
     UpdateInspection,
 )
@@ -40,6 +47,10 @@ CHECK_REQUEST_EVENT = "software.update.check.requested"
 CHECK_REPORT_EVENT = "software.update.check.reported"
 APPLY_REQUEST_EVENT = "software.update.apply.requested"
 APPLY_REPORT_EVENT = "software.update.apply.reported"
+#: Branch trials travel through the same authoritative log, with the same
+#: leader fencing and the same bounded envelope. Only the payload differs.
+TRIAL_REQUEST_EVENT = "software.trial.requested"
+TRIAL_REPORT_EVENT = "software.trial.reported"
 SESSION_CREATED_EVENT = "session.created"
 MAX_TARGETS = 256
 MAX_EVENT_BYTES = 8192
@@ -103,6 +114,137 @@ def validate_command_payload(value: object) -> dict[str, object]:
     return value
 
 
+def trial_command_payload(
+    *,
+    request_id: str,
+    selection: TrialSelection,
+    target_node_ids: tuple[str, ...],
+    created_at: datetime,
+    expires_at: datetime,
+) -> dict[str, object]:
+    """Publish one branch trial command through the existing bounded envelope.
+
+    The payload can express exactly three things about *what* to run: an
+    approved repository, a branch name on it, and one exact commit. There is no
+    field a path, URL, command, argument or environment value could travel in,
+    which is what keeps a trial from being a remote-execution channel.
+    """
+
+    envelope = ControlCommandEnvelope.issue(
+        request_id=request_id,
+        target_node_ids=target_node_ids,
+        created_at=created_at,
+        expires_at=expires_at,
+        max_lifetime=timedelta(minutes=15),
+        max_targets=MAX_TARGETS,
+    )
+    selection.validate()
+    value: dict[str, object] = {
+        "schema": EVENT_SCHEMA,
+        **envelope.payload_fields(),
+        **selection.to_dict(),
+    }
+    _bounded(value)
+    return value
+
+
+def validate_trial_command_payload(value: object) -> tuple[dict[str, object], TrialSelection]:
+    """Re-read a trial command with no trust in the leader that published it."""
+
+    if not isinstance(value, dict) or value.get("schema") != EVENT_SCHEMA:
+        raise ValueError("malformed_message")
+    ControlCommandEnvelope.parse_payload(
+        value,
+        max_lifetime=timedelta(minutes=15),
+        max_targets=MAX_TARGETS,
+        require_unique_targets=False,
+    )
+    try:
+        selection = trial_selection(value)
+    except TrialRefused as refused:
+        raise ValueError(refused.code) from refused
+    _bounded(value)
+    return value, selection
+
+
+def trial_report_payload(
+    *,
+    request_id: str,
+    node_id: str,
+    document: dict[str, object],
+) -> dict[str, object]:
+    """Report one device's bounded trial outcome back to the Federation."""
+
+    def text(field: str, limit: int = 512) -> str | None:
+        candidate = document.get(field)
+        return candidate[:limit] if isinstance(candidate, str) else None
+
+    def commit(field: str) -> str | None:
+        candidate = document.get(field)
+        return (
+            candidate.lower()
+            if isinstance(candidate, str) and OID_RE.fullmatch(candidate.lower())
+            else None
+        )
+
+    def branch(field: str) -> str | None:
+        candidate = document.get(field)
+        return (
+            candidate
+            if isinstance(candidate, str) and BRANCH_RE.fullmatch(candidate)
+            else None
+        )
+
+    def flags(field: str) -> dict[str, object] | None:
+        candidate = document.get(field)
+        if not isinstance(candidate, dict):
+            return None
+        return {
+            key: bool(item)
+            for key, item in sorted(candidate.items())
+            if isinstance(key, str) and isinstance(item, bool)
+        }
+
+    state = document.get("state")
+    value: dict[str, object] = {
+        "schema": EVENT_SCHEMA,
+        "request_id": request_id,
+        "node_id": node_id,
+        "state": state if isinstance(state, str) and state else "error",
+        "code": text("code", 128),
+        "message": text("message"),
+        "branch": branch("branch"),
+        "target_commit": commit("target_commit"),
+        "running_commit": commit("running_commit"),
+        "safe_branch": branch("safe_branch"),
+        "safe_commit": commit("safe_commit"),
+        "acceptance": flags("acceptance"),
+        "recovery": flags("recovery"),
+        "reported_at": _stamp(datetime.now(timezone.utc)),
+    }
+    _bounded(value)
+    return value
+
+
+def trial_from_report(value: object) -> tuple[str, str, dict[str, object]] | None:
+    """Read one device's trial report, keeping only the bounded shape."""
+
+    if not isinstance(value, dict) or value.get("schema") != EVENT_SCHEMA:
+        return None
+    request_id = value.get("request_id")
+    node_id = value.get("node_id")
+    state = value.get("state")
+    if not all(
+        isinstance(item, str) and item for item in (request_id, node_id, state)
+    ):
+        return None
+    return request_id, node_id, trial_report_payload(
+        request_id=request_id,
+        node_id=node_id,
+        document=value,
+    )
+
+
 def report_payload(
     *,
     request_id: str,
@@ -124,6 +266,11 @@ def report_payload(
         "message": message,
         "reported_at": _stamp(datetime.now(timezone.utc)),
     }
+    trial = validate_trial_summary(result.trial)
+    if trial is not None:
+        # Additive: a device that has never left approved main reports nothing
+        # here, exactly as every device did before branch trials existed.
+        value["trial"] = trial
     _bounded(value)
     return value
 
@@ -163,8 +310,29 @@ def inspection_from_report(
                 value.get("message") if isinstance(value.get("message"), str) else None
             ),
             running_commit=commits["running_commit"],
+            trial=validate_trial_summary(value.get("trial")),
         ),
     )
+
+
+#: Trial states after which nothing more will be reported for that request.
+SETTLED_TRIAL_STATES = frozenset(
+    {
+        "trial_running",
+        "safe_restored",
+        "rollback_failed",
+        "trial_operator_stopped",
+        "refused",
+        "error",
+        "dirty",
+        "unsupported_checkout",
+        "up_to_date",
+    }
+)
+
+
+def _trial_is_settled(document: dict[str, object]) -> bool:
+    return str(document.get("state") or "") in SETTLED_TRIAL_STATES
 
 
 def _host_request_id(request_id: str, node_id: str) -> str:
@@ -285,6 +453,41 @@ class FederationUpdateEventProcessor:
             ),
         )
 
+    def _report_trial(
+        self,
+        context: Any,
+        *,
+        federation_request_id: str,
+        document: dict[str, object],
+    ) -> None:
+        node_id = context.credentials.identity.node_id
+        payload = trial_report_payload(
+            request_id=federation_request_id,
+            node_id=node_id,
+            document=document,
+        )
+        _append_remote_event(
+            self.service,
+            context,
+            TRIAL_REPORT_EVENT,
+            payload,
+            _event_request_id(
+                "trial-report",
+                ":".join(
+                    (
+                        federation_request_id,
+                        str(payload.get("state")),
+                        str(payload.get("running_commit") or ""),
+                    )
+                ),
+                node_id,
+            ),
+        )
+
+    def _host_trial_result(self, request_id: str) -> dict[str, object] | None:
+        reader = getattr(self.handoff, "trial_result_for", None)
+        return reader(request_id) if callable(reader) else None
+
     def _host_result(self, request_id: str) -> UpdateInspection | None:
         result_for = getattr(self.handoff, "result_for", None)
         if callable(result_for):
@@ -311,6 +514,22 @@ class FederationUpdateEventProcessor:
             host_request_id = record.get("host_request_id")
             target_commit = record.get("target_commit")
             if not isinstance(host_request_id, str):
+                pending.pop(federation_request_id, None)
+                changed = True
+                continue
+            if record.get("kind") == "trial":
+                document = self._host_trial_result(host_request_id)
+                if document is None or document.get("target_commit") != target_commit:
+                    continue
+                self._report_trial(
+                    context,
+                    federation_request_id=federation_request_id,
+                    document=document,
+                )
+                if not _trial_is_settled(document):
+                    # A trial that is still starting or verifying keeps its
+                    # pending record so the later outcome is reported too.
+                    continue
                 pending.pop(federation_request_id, None)
                 changed = True
                 continue
@@ -346,6 +565,62 @@ class FederationUpdateEventProcessor:
             raise ValueError("session_creator_identity_changed")
         state["authority_node_id"] = candidate
         return candidate
+
+    def _process_trial_request(
+        self,
+        context: Any,
+        event: Any,
+        state: dict[str, object],
+        *,
+        local_node: str,
+    ) -> dict[str, object]:
+        """Bridge one leader-authorized branch trial to the local host agent.
+
+        The host agent is the party that decides whether the trial is safe. All
+        this does is refuse anything outside the bounded shape and hand the
+        selection across; it never resolves a path, an interpreter or a command.
+        """
+
+        payload, selection = validate_trial_command_payload(event.payload)
+        if local_node not in payload["target_node_ids"]:
+            return state
+        federation_request_id = str(payload["request_id"])
+        host_request_id = _host_request_id(federation_request_id, local_node)
+        pending = state.get("pending")
+        if not isinstance(pending, dict):
+            pending = {}
+        existing = self._host_trial_result(host_request_id)
+        if existing is not None:
+            self._report_trial(
+                context,
+                federation_request_id=federation_request_id,
+                document=existing,
+            )
+            if _trial_is_settled(existing):
+                pending.pop(federation_request_id, None)
+                state["pending"] = pending
+                _write_state(self.state_file, state)
+                return state
+        queued = self.handoff.trial(selection, request_id=host_request_id)
+        if _trial_is_settled(queued):
+            pending.pop(federation_request_id, None)
+        else:
+            # The recorder activation watcher only accepts a stop request for
+            # work this device is genuinely waiting on, so the pending record is
+            # written before the report, exactly as an update does.
+            pending[federation_request_id] = {
+                "kind": "trial",
+                "host_request_id": host_request_id,
+                "target_commit": selection.target_commit,
+            }
+        state["pending"] = pending
+        _write_state(self.state_file, state)
+        self._report_trial(
+            context,
+            federation_request_id=federation_request_id,
+            document=queued,
+        )
+        return state
 
     def process(self, context: Any) -> None:
         remote = self.service.remote_store.load()
@@ -384,9 +659,18 @@ class FederationUpdateEventProcessor:
                     if event.event_type not in {
                         CHECK_REQUEST_EVENT,
                         APPLY_REQUEST_EVENT,
+                        TRIAL_REQUEST_EVENT,
                     }:
                         continue
                     if authority is None or event.actor_node_id != authority:
+                        continue
+                    if event.event_type == TRIAL_REQUEST_EVENT:
+                        state = self._process_trial_request(
+                            context,
+                            event,
+                            state,
+                            local_node=local_node,
+                        )
                         continue
                     payload = validate_command_payload(event.payload)
                     targets = payload["target_node_ids"]
@@ -457,9 +741,15 @@ __all__ = [
     "CHECK_REQUEST_EVENT",
     "EVENT_SCHEMA",
     "SESSION_CREATED_EVENT",
+    "TRIAL_REPORT_EVENT",
+    "TRIAL_REQUEST_EVENT",
     "FederationUpdateEventProcessor",
     "command_payload",
     "inspection_from_report",
     "report_payload",
+    "trial_command_payload",
+    "trial_from_report",
+    "trial_report_payload",
     "validate_command_payload",
+    "validate_trial_command_payload",
 ]

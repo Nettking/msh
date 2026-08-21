@@ -58,14 +58,18 @@ from catalog.mtconnect_recorder.federation_update import (
     RecorderHostUpdateAgentWorker,
     RecorderUpdateActivationWatcher,
     approved_update_restart,
+    mark_trial_operator_stopped,
+    trial_fallback_restart,
 )
 from catalog.mtconnect_recorder.upgrade_compat import ensure_recorder_upgrade_config
 
-#: Reserved for one thing only: a native update the supervisor pre-validated,
-#: this process consented to, and capture ended for. Ctrl+C, ``--once``, an
-#: ordinary stop and every failure keep their existing exit codes so a
-#: supervisor can never relaunch behind an operator who asked the recorder to
-#: stop. The value follows the ``EX_TEMPFAIL`` convention for "retry me".
+#: Reserved for two things: a native update the supervisor pre-validated, this
+#: process consented to and capture ended for, and a branch trial that could
+#: not prove a healthy startup and asked for its pinned known-good version
+#: back. Ctrl+C, ``--once``, an ordinary stop and every failure keep their
+#: existing exit codes so a supervisor can never relaunch behind an operator
+#: who asked the recorder to stop. The value follows the ``EX_TEMPFAIL``
+#: convention for "retry me".
 APPROVED_UPDATE_RESTART_EXIT_CODE = 75
 
 _AUTO_CONFIG_SCHEMA = "fcp.mtconnect_recorder.autoconfig.v1"
@@ -683,6 +687,13 @@ def main(argv: list[str] | None = None) -> int:
         try:
             sys.argv = [str(recorder_path)]
             runpy.run_path(str(recorder_path), run_name="__main__")
+        except KeyboardInterrupt:
+            # A failed branch trial that never managed to start capture asks
+            # for this interruption in the main thread rather than killing
+            # anything. An ordinary Ctrl+C reaches the recorder's own signal
+            # handler and does not arrive here, and either way the restart
+            # decision below requires the operator not to have stopped capture.
+            pass
         finally:
             sys.argv = original_argv
         if approved_update_restart(activation):
@@ -691,6 +702,13 @@ def main(argv: list[str] | None = None) -> int:
                 "supervisor will update this checkout and restart the recorder."
             )
             return APPROVED_UPDATE_RESTART_EXIT_CODE
+        if trial_fallback_restart(host_update):
+            print(
+                "The trial branch did not prove a healthy recorder; the "
+                "supervisor will restore the pinned known-good version."
+            )
+            return APPROVED_UPDATE_RESTART_EXIT_CODE
+        mark_trial_operator_stopped(host_update)
         return 0
     finally:
         # Stop the update path first: it is the only worker that may still be
