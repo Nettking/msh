@@ -288,8 +288,14 @@ healthy startup within its bounded window is replaced by the pinned version,
 which then has to prove itself in turn. The result reports what actually
 happened, including whether recording resumed.
 
+The verdict on a trial is reached by a watchdog running from the device's
+permanent checkout rather than by the branch under test, so a branch cannot pass
+itself by omitting the check. A trial that ignores the request to stop is
+reported rather than killed.
+
 A device on a test branch is reported as such and is not queued by *Update all
-devices*. Select `main` for it to return it to its pinned commit.
+devices*. Each one offers its own **Return to main · &lt;commit&gt;** control,
+carrying the exact commit that device pinned.
 
 ## If an update fails
 

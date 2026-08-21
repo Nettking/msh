@@ -577,6 +577,7 @@ class NativeRecorderUpdatePaths:
         # existing updater reads or writes.
         self.trial_journal_file = self.directory / "trial-journal.json"
         self.trial_result_file = self.directory / "trial-result.json"
+        self.trial_stop_file = self.directory / "trial-stop.json"
         self.status_file = (
             self.data_directory / "source_state" / "mtconnect_recorder_status.json"
         )

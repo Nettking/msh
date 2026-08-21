@@ -194,6 +194,13 @@ jobs:
             echo "finalize without an activation must refuse" >&2
             exit 1
           fi
+          # The branch-trial watchdog must return promptly when nothing is in
+          # flight, rather than spinning for its whole acceptance window.
+          python scripts/fcp_native_recorder_update_agent.py \
+            --repo-root "$PWD" \
+            --data-directory "$RUNNER_TEMP/fcp-native-recorder-agent-smoke" \
+            --supervisor-session 0123456789abcdef0123456789abcdef \
+            --watch-trial
           # A malformed supervisor session must never be accepted.
           set +e
           python scripts/fcp_native_recorder_update_agent.py \

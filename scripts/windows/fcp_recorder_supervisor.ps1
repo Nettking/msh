@@ -36,6 +36,12 @@ param(
 # the production checkout that was never moved -- which is why restoring the
 # known-good version needs no Git operation at all.
 #
+# A trial child also gets one bounded companion: a watchdog run from *this*
+# permanent checkout, never from the branch under test. It owns the verdict on
+# the trial, because a check living in the trial worktree is one the tested
+# branch could omit, break or simply predate. It exits on its own, is started
+# only for a trial child, and is never started on the ordinary startup path.
+#
 # The recorder runs the host update agent inside its own process, so the
 # supported startup path stays exactly one child and this supervisor starts
 # nothing before it.
@@ -155,6 +161,17 @@ function Invoke-Finalize {
     return Invoke-Python (Get-AgentArguments @('--finalize'))
 }
 
+function Start-TrialWatchdog {
+    # Started from $RepoRoot with the permanent checkout's own agent, so the
+    # branch under test cannot influence, disable or outlive the verdict.
+    $arguments = @($PythonPrefix) + (Get-AgentArguments @('--watch-trial'))
+    Start-Process `
+        -FilePath $PythonExecutable `
+        -ArgumentList $arguments `
+        -WorkingDirectory $RepoRoot `
+        -WindowStyle Hidden | Out-Null
+}
+
 function Read-LaunchPlan([object[]]$Output) {
     # The agent answers with one JSON document. Anything else -- an empty
     # result, a traceback, a partial line -- is treated as "no plan", which
@@ -249,6 +266,11 @@ try {
                 # proven to be exactly this process and not an earlier survivor.
                 Set-RelaunchedNonce $nonce
                 $replacementPending = $false
+                if ($trialActive) {
+                    # Only for a trial child, and only after the journal names
+                    # the instance the watchdog has to judge.
+                    Start-TrialWatchdog
+                }
             }
 
             # Nothing else is started here. The recorder runs the host update

@@ -16,9 +16,15 @@ $ApprovedRepository = 'Nettking/msh'
 $ApprovedBranch = 'main'
 $RequestSchema = 'fcp.host-update-request.v1'
 $ResultSchema = 'fcp.host-update-result.v1'
+# Read-only branch discovery for the Federation software-version dropdown. The
+# Flask process runs no Git, so it asks this host-owned agent instead.
+$BranchesRequestSchema = 'fcp.host-branches-request.v1'
+$BranchesResultSchema = 'fcp.host-branches-result.v1'
+$MaxListedBranches = 60
 $MaxBytes = 8192
 $OidPattern = '^[0-9a-f]{40}$'
 $RequestIdPattern = '^[A-Za-z0-9._:-]{1,128}$'
+$BranchPattern = '^(?![./-])(?!.*\.\.)(?!.*//)(?!.*@\{)(?!.*\.lock(?:/|$))[A-Za-z0-9][A-Za-z0-9._/-]{0,180}(?<![./])$'
 $ModelPattern = '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$'
 
 function Normalize-DirectoryPath([string]$Value) {
@@ -156,6 +162,88 @@ function Write-AgentResult {
     $requestResultFile = Get-RequestResultFile $RequestId
     Write-AtomicJsonFile $requestResultFile $json
     Write-AtomicJsonFile $ResultFile $json
+}
+
+function Get-BranchesResultFile([string]$RequestId) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($RequestId)
+        $digest = ([System.BitConverter]::ToString(
+            $sha.ComputeHash($bytes)
+        )).Replace('-', '').ToLowerInvariant()
+    }
+    finally {
+        $sha.Dispose()
+    }
+    return Join-Path $AgentDirectory "branches-result-$digest.json"
+}
+
+function Get-ApprovedBranches {
+    # Behind the same approved-remote check as every other operation here, and
+    # read-only: a listing, never a fetch, a checkout or a mutation.
+    if (-not (Test-ApprovedRemote (Last-Text (Invoke-Git @('remote', 'get-url', 'origin'))))) {
+        throw 'unapproved_remote'
+    }
+    $listed = Invoke-Git @('ls-remote', '--heads', '--', 'origin')
+    $found = [ordered]@{}
+    foreach ($line in $listed) {
+        $text = ([string]$line).Trim()
+        $parts = $text -split "`t", 2
+        if ($parts.Count -ne 2) { continue }
+        $commit = $parts[0].Trim().ToLowerInvariant()
+        if ($commit -notmatch $OidPattern) { continue }
+        $reference = $parts[1].Trim()
+        if (-not $reference.StartsWith('refs/heads/')) { continue }
+        $name = $reference.Substring('refs/heads/'.Length)
+        if ($name -notmatch $BranchPattern) { continue }
+        $found[$name] = $commit
+    }
+    $ordered = $found.Keys | Sort-Object -Property @(
+        @{ Expression = { $_ -ne $ApprovedBranch } },
+        @{ Expression = { $_ } }
+    )
+    $branches = @()
+    foreach ($name in $ordered) {
+        if ($branches.Count -ge $MaxListedBranches) { break }
+        $branches += [ordered]@{ name = $name; commit = $found[$name] }
+    }
+    return $branches
+}
+
+function Write-BranchesResult {
+    param(
+        [string]$RequestId,
+        [object[]]$Branches,
+        [AllowNull()][string]$Code,
+        [string]$Message
+    )
+    $value = [ordered]@{
+        schema = $BranchesResultSchema
+        request_id = $RequestId
+        action = 'branches'
+        state = if ($Code) { 'error' } else { 'branches' }
+        repository = $ApprovedRepository
+        branches = @($Branches)
+        code = $Code
+        message = $Message
+    }
+    Write-AtomicJsonFile (Get-BranchesResultFile $RequestId) (
+        $value | ConvertTo-Json -Compress -Depth 5
+    )
+}
+
+function Invoke-BranchesRequest([object]$Request) {
+    $requestId = [string]$Request.request_id
+    if ($requestId -notmatch $RequestIdPattern) { return $true }
+    try {
+        Write-BranchesResult $requestId (Get-ApprovedBranches) $null ''
+    }
+    catch {
+        Write-BranchesResult $requestId @() ([string]$_.Exception.Message) (
+            'The approved FCP source branch list is unavailable.'
+        )
+    }
+    return $true
 }
 
 function Invoke-ExternalResult {
@@ -445,6 +533,11 @@ function Process-Request {
         }
         catch {
             return $true
+        }
+
+        if ($request.PSObject.Properties.Name -contains 'schema' -and
+            [string]$request.schema -eq $BranchesRequestSchema) {
+            return Invoke-BranchesRequest $request
         }
 
         $requestId = [string]$request.request_id

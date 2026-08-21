@@ -829,3 +829,118 @@ def test_the_posix_host_agent_lists_branches_read_only_and_approved_only() -> No
     assert "BRANCH_RE.fullmatch(name)" in posix
     for forbidden in ("reset --hard", "git clean", "git stash"):
         assert forbidden not in posix
+
+
+def test_the_windows_host_agent_answers_the_branch_list_too() -> None:
+    """A Windows-hosted coordinator must not get an empty dropdown."""
+
+    root = Path(__file__).resolve().parents[3]
+    windows = (root / "scripts/windows/fcp_update_agent.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "$BranchesRequestSchema = 'fcp.host-branches-request.v1'" in windows
+    # Dispatched before the update contract, which still accepts main only.
+    dispatch = windows.index("[string]$request.schema -eq $BranchesRequestSchema")
+    assert dispatch < windows.index("if ($request.schema -ne $RequestSchema)")
+    # Behind the same approved-remote check, and read-only.
+    assert "throw 'unapproved_remote'" in windows
+    assert "Invoke-Git @('ls-remote', '--heads', '--', 'origin')" in windows
+    assert "$name -notmatch $BranchPattern" in windows
+    for forbidden in ("reset --hard", "'clean'", "'stash'"):
+        assert forbidden not in windows
+
+
+def _device_row(**overrides: Any) -> dict[str, Any]:
+    row: dict[str, Any] = {
+        "node_id": RECORDER,
+        "label": "recorder-01",
+        "connected": True,
+        "branch": BRANCH,
+        "commit": TRIAL,
+        "on_test_branch": True,
+        "software_state": "trial_running",
+        "safe_branch": "main",
+        "safe_commit": SAFE,
+        "failure_reason": None,
+        "message": None,
+        "recovery": None,
+    }
+    row.update(overrides)
+    return row
+
+
+def test_a_device_on_a_test_branch_can_be_returned_to_its_own_pinned_commit(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Approved main may have advanced since the trial started.
+
+    The dropdown only knows where the remote is now, and a device only accepts
+    the exact commit it pinned -- so the return control has to carry that
+    device's own commit rather than today's tip.
+    """
+
+    moved = "9" * 40
+    service = _VersionService(
+        {
+            "status": "reported",
+            # The remote tip has moved on since this device pinned its fallback.
+            "branches": [{"name": "main", "commit": moved}],
+            "devices": [_device_row()],
+        }
+    )
+
+    page = _overview(_install_routes(monkeypatch, service))
+
+    assert f'value="{SAFE}:main"' in page
+    assert f"Return to main · {SAFE[:8]}" in page
+    # And the bulk selector cannot send it somewhere else first.
+    assert "(return it first)" in page
+
+
+def test_returning_a_device_submits_its_pinned_commit_to_the_service(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from catalog.flask_app.capability_onboarding_routes import _CSRF_SESSION_KEY
+
+    service = _VersionService(
+        {"status": "reported", "branches": [], "devices": [_device_row()]}
+    )
+    client = _install_routes(monkeypatch, service).test_client()
+    client.get("/federation")
+    with client.session_transaction() as browser:
+        token = str(browser[_CSRF_SESSION_KEY])
+
+    response = client.post(
+        "/federation/software-version/switch",
+        data={"_csrf_token": token, "version": f"{SAFE}:main", "node_id": RECORDER},
+    )
+
+    assert response.status_code == 303
+    assert service.calls == [
+        {"node_ids": [RECORDER], "branch": "main", "target_commit": SAFE}
+    ]
+
+
+def test_a_device_already_on_main_is_offered_no_return_control(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = _VersionService(
+        {
+            "status": "reported",
+            "branches": [{"name": "main", "commit": SAFE}],
+            "devices": [
+                _device_row(
+                    branch="main",
+                    commit=SAFE,
+                    on_test_branch=False,
+                    software_state="up_to_date",
+                )
+            ],
+        }
+    )
+
+    page = _overview(_install_routes(monkeypatch, service))
+
+    assert "Return to main" not in page
+    assert "(return it first)" not in page

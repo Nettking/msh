@@ -258,15 +258,23 @@ For a recorder the fallback is not optional:
    checked out at the known-good commit for the whole trial;
 4. the replacement has 60 seconds to prove a new process instance, the exact
    trial commit, a fresh heartbeat, a reconnected Federation and a healthy
-   recording state; and
+   recording state. That verdict is reached by a watchdog running from the
+   permanent checkout, not by the branch being tested, so a branch cannot pass
+   itself by omitting or breaking the check; and
 5. if it cannot, the recorder is returned to the pinned commit automatically and
    the restored version has to prove the same conditions before recovery counts.
+
+A trial process that ignores the request to stop is reported rather than killed
+— it writes to the real recorder data directory, so forcing it dead is the one
+outcome worse than a slow recovery.
 
 Because `main` is never moved during a trial, restoring it needs no Git
 operation at all -- it is simply a relaunch from the untouched checkout.
 
-Selecting `main` again on a device that is running a test branch returns it to
-its pinned commit through the same verified path. Restarting the recorder
+Each device on a test branch gets its own **Return to main · &lt;commit&gt;**
+control, carrying the exact commit that device pinned — approved `main` may have
+advanced since the trial started, and a device only accepts the commit it fell
+back to. It returns through the same verified path. Restarting the recorder
 normally also returns it to the production checkout, so a trial never survives
 a restart by accident. Ordinary updates are refused while a device is on a test
 branch: return it to `main` first.

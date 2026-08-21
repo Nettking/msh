@@ -29,6 +29,7 @@ from catalog.federation.software_trial import (
     TRIAL_RUNNING,
     TRIAL_STARTING,
     TRIAL_STARTUP_TIMEOUT_SECONDS,
+    TRIAL_VERIFYING,
     TrialRefused,
     TrialSelection,
     trial_request_document,
@@ -681,7 +682,7 @@ def _verify(
     if expire:
         fixture.clock.advance(TRIAL_STARTUP_TIMEOUT_SECONDS + 1)
     stopper = Stopper(fixture, alive)
-    fixture.agent(stopper=stopper).trial.verify_once()
+    fixture.agent(stopper=stopper).trial.evaluate_trial()
     journal = native_trial.TrialJournal(fixture.paths.trial_journal_file)
     record = journal.active() or journal.latest()
     assert record is not None
@@ -747,7 +748,7 @@ def test_a_survivor_is_never_accepted_as_the_trial_process(
         pid=RECORDER_PID, nonce=RECORDER_NONCE, commit=fixture.trial
     )
     fixture.clock.advance(TRIAL_STARTUP_TIMEOUT_SECONDS + 1)
-    fixture.agent(stopper=Stopper(fixture, alive)).trial.verify_once()
+    fixture.agent(stopper=Stopper(fixture, alive)).trial.evaluate_trial()
 
     journal = native_trial.TrialJournal(fixture.paths.trial_journal_file)
     record = journal.active()
@@ -764,7 +765,7 @@ def test_a_process_the_supervisor_did_not_start_is_not_the_trial(
 
     fixture.write_status(pid=9999, nonce="f" * 32, commit=fixture.trial)
     fixture.clock.advance(TRIAL_STARTUP_TIMEOUT_SECONDS + 1)
-    fixture.agent(stopper=Stopper(fixture, alive)).trial.verify_once()
+    fixture.agent(stopper=Stopper(fixture, alive)).trial.evaluate_trial()
 
     record = native_trial.TrialJournal(fixture.paths.trial_journal_file).active()
     assert "distinct_instance" in record["acceptance"]["failures"]
@@ -837,7 +838,9 @@ def _fail_trial(fixture: Fixture, alive: set[int]) -> Stopper:
     )
     fixture.clock.advance(TRIAL_STARTUP_TIMEOUT_SECONDS + 1)
     stopper = Stopper(fixture, alive)
-    assert fixture.agent(stopper=stopper).trial.verify_once() is True
+    assert (
+        fixture.agent(stopper=stopper).trial.evaluate_trial() == TRIAL_FAILED
+    )
     return stopper
 
 
@@ -1023,7 +1026,7 @@ def _running_trial(fixture: Fixture, alive: set[int]) -> None:
     _start_trial(fixture)
     _launch_trial(fixture, alive)
     fixture.write_status(pid=TRIAL_PID, nonce=TRIAL_NONCE, commit=fixture.trial)
-    assert fixture.agent().trial.verify_once() is True
+    assert fixture.agent().trial.evaluate_trial() == TRIAL_RUNNING
 
 
 def test_a_second_trial_cannot_stack_on_an_unproven_one(
@@ -1467,3 +1470,159 @@ def test_a_plan_that_cannot_be_computed_never_ends_the_supervisor_loop(
     assert plan["relaunch"] is False
     assert plan["code"].startswith("trial_plan_failed_")
     assert plan["launch_root"] is None
+
+
+# --------------------------------------------------------------------------
+# the verdict does not live in the branch under test
+# --------------------------------------------------------------------------
+
+
+def test_the_in_process_agent_never_judges_a_trial_itself(
+    fixture: Fixture, alive: set[int]
+) -> None:
+    """A check inside the trial tree is one that branch could omit or break.
+
+    So the code that runs from the trial worktree is only an actuator. Even
+    with the acceptance window long past and every condition unmet, it reaches
+    no verdict of its own.
+    """
+
+    _start_trial(fixture)
+    _launch_trial(fixture, alive)
+    fixture.write_status(
+        pid=TRIAL_PID,
+        nonce=TRIAL_NONCE,
+        commit=fixture.trial,
+        federation_status="connecting",
+    )
+    fixture.clock.advance(TRIAL_STARTUP_TIMEOUT_SECONDS + 1)
+
+    assert fixture.agent(stopper=Stopper(fixture, alive)).trial.verify_once() is False
+
+    record = native_trial.TrialJournal(fixture.paths.trial_journal_file).active()
+    assert record["stage"] == TRIAL_VERIFYING
+
+
+def test_a_branch_that_never_runs_the_watchdog_is_still_failed_and_rolled_back(
+    fixture: Fixture, alive: set[int]
+) -> None:
+    """The whole point: an older or broken branch cannot outlive the verdict.
+
+    Nothing from the trial tree runs here at all -- only the permanent
+    checkout's evaluator, exactly as the supervisor's watchdog invokes it.
+    """
+
+    _start_trial(fixture)
+    _launch_trial(fixture, alive)
+    fixture.write_status(
+        pid=TRIAL_PID,
+        nonce=TRIAL_NONCE,
+        commit=fixture.trial,
+        federation_status="connecting",
+    )
+    fixture.clock.advance(TRIAL_STARTUP_TIMEOUT_SECONDS + 1)
+
+    # No stop callback: a separate watchdog process has none.
+    assert fixture.agent().trial.evaluate_trial() == TRIAL_FAILED
+
+    result = fixture.trial_result("req-trial")
+    assert result["state"] == TRIAL_FAILED
+    # And it asked that exact process, and only it, to end its own capture.
+    marker = native_update.read_json(fixture.paths.trial_stop_file)
+    assert marker["schema"] == "fcp.recorder-trial-stop.v1"
+    assert marker["process_nonce"] == TRIAL_NONCE
+    assert marker["recorder_pid"] == TRIAL_PID
+
+    alive.discard(TRIAL_PID)
+    plan = fixture.agent().finalize_after_exit()
+    assert plan["mode"] == "rollback"
+    assert plan["build_commit"] == fixture.safe
+
+
+def test_a_stop_marker_only_ever_stops_the_instance_it_names(
+    fixture: Fixture, alive: set[int]
+) -> None:
+    _start_trial(fixture)
+    _launch_trial(fixture, alive)
+    fixture.write_status(
+        pid=TRIAL_PID,
+        nonce=TRIAL_NONCE,
+        commit=fixture.trial,
+        federation_status="connecting",
+    )
+    fixture.clock.advance(TRIAL_STARTUP_TIMEOUT_SECONDS + 1)
+    fixture.agent().trial.evaluate_trial()
+    marker = native_update.read_json(fixture.paths.trial_stop_file)
+
+    for wrong in (
+        {"process_nonce": "f" * 32},
+        {"recorder_pid": 9999},
+        {"supervisor_session": "e" * 32},
+        {"trial_id": "0" * 32},
+        {"expires_at": stamp(fixture.clock() - timedelta(seconds=1))},
+        {"schema": "fcp.recorder-update-activation.v1"},
+    ):
+        native_update.write_json_atomic(
+            fixture.paths.trial_stop_file, {**marker, **wrong}
+        )
+        stopper = Stopper(fixture, alive)
+        assert fixture.agent(stopper=stopper).trial.verify_once() is False
+        assert stopper.calls == 0
+
+    # The marker exactly as written does apply, and stops this process only.
+    native_update.write_json_atomic(fixture.paths.trial_stop_file, marker)
+    stopper = Stopper(fixture, alive)
+    assert fixture.agent(stopper=stopper).trial.verify_once() is True
+    assert stopper.calls == 1
+
+
+def _watch(fixture: Fixture, agent: NativeRecorderUpdateAgent) -> dict[str, Any]:
+    """Drive the real watchdog loop on a controllable clock, not a real wait."""
+
+    from scripts.fcp_native_recorder_update_agent import watch_trial
+
+    elapsed = [0.0]
+
+    def sleep(seconds: float) -> None:
+        elapsed[0] += seconds
+        fixture.clock.advance(seconds)
+
+    return watch_trial(agent, sleep=sleep, monotonic=lambda: elapsed[0])
+
+
+def test_the_watchdog_reports_a_trial_that_proved_itself(
+    fixture: Fixture, alive: set[int]
+) -> None:
+    _start_trial(fixture)
+    _launch_trial(fixture, alive)
+    fixture.write_status(pid=TRIAL_PID, nonce=TRIAL_NONCE, commit=fixture.trial)
+
+    outcome = _watch(fixture, fixture.agent())
+
+    assert outcome["outcome"] == TRIAL_RUNNING
+    assert not fixture.paths.trial_stop_file.exists()
+
+
+def test_the_watchdog_reports_a_stop_request_the_trial_ignored(
+    fixture: Fixture, alive: set[int]
+) -> None:
+    """A branch that will not stop is reported, never killed.
+
+    The trial writes to the real recorder data directory, so forcing it dead is
+    exactly the corruption this whole path exists to avoid.
+    """
+
+    _start_trial(fixture)
+    _launch_trial(fixture, alive)
+    fixture.write_status(
+        pid=TRIAL_PID,
+        nonce=TRIAL_NONCE,
+        commit=fixture.trial,
+        federation_status="connecting",
+    )
+
+    outcome = _watch(fixture, fixture.agent())
+
+    assert outcome["outcome"] == TRIAL_FAILED
+    assert outcome["stopped"] is False
+    assert alive == {TRIAL_PID}

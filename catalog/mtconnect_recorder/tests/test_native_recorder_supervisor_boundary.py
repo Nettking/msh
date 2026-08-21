@@ -79,20 +79,33 @@ def test_the_supervisor_starts_nothing_before_the_recorder() -> None:
 
     supervisor = _text(SUPERVISOR)
 
-    assert "Start-Process" not in supervisor
     assert "Start-Job" not in supervisor
     # No import-probe shape: the launcher already owns the only "-c" call, and a
     # second one collides with the fake interpreters the launcher tests use.
     assert "'-c'" not in supervisor
 
+    # The one background process this file may start is the branch-trial
+    # watchdog, and it is unreachable on the supported startup path: both flags
+    # guarding it initialize false, so the first child is still the first thing
+    # started.
+    assert supervisor.count("Start-Process") == 1
+    watchdog = supervisor.index("Start-Process")
+    assert supervisor.rindex("function Start-TrialWatchdog {") < watchdog
+    assert "$replacementPending = $false\n" in supervisor
+    assert "$trialActive = $false\n" in supervisor
+
     loop = supervisor[supervisor.index("while ($true) {") :]
     launch = loop.index("$exitCode = Start-Recorder")
     # Inside the loop, the only interpreter call reachable before the child is
-    # the relaunch bookkeeping, and that runs solely after an approved update.
+    # the relaunch bookkeeping, and that runs solely after an approved update
+    # or a trial the agent planned.
     assert loop.index("Invoke-Finalize") > launch
     assert loop.count("Set-RelaunchedNonce $nonce") == 1
     assert loop.index("Set-RelaunchedNonce $nonce") < launch
     assert "if ($replacementPending) {" in loop
+    guarded = loop[loop.index("if ($replacementPending) {") : launch]
+    assert "if ($trialActive) {" in guarded
+    assert guarded.index("if ($trialActive) {") < guarded.index("Start-TrialWatchdog")
 
 
 def test_the_supervisor_guarantees_one_recorder_per_checkout() -> None:
@@ -398,3 +411,35 @@ def test_the_trial_lifecycle_is_documented_where_it_is_implemented() -> None:
     # destructive Git recovery, and never takes a path from a peer.
     for forbidden in ("reset --hard", "git clean", "git stash", "taskkill", "SIGKILL"):
         assert forbidden not in lifecycle
+
+
+def test_the_trial_watchdog_runs_from_the_permanent_checkout() -> None:
+    """The verdict on a trial must not come from the branch being tested.
+
+    A check living in the trial worktree is one that branch could omit, break
+    or simply predate -- and a trial that never fails itself would keep an
+    unproven recorder running indefinitely. So the watchdog is started from the
+    permanent checkout, with the permanent checkout's own agent.
+    """
+
+    supervisor = _text(SUPERVISOR)
+    body = supervisor[
+        supervisor.index("function Start-TrialWatchdog {") :
+    ].split("\n}\n", 1)[0]
+
+    assert "Get-AgentArguments @('--watch-trial')" in body
+    assert "-WorkingDirectory $RepoRoot" in body
+    # Never blocking: the supervisor still waits on the child, not on this.
+    assert "-Wait" not in body
+    # And the agent it runs is resolved from $RepoRoot, never a launch root.
+    assert "$launchRoot" not in body
+    assert "'--repo-root', $RepoRoot" in _text(SUPERVISOR)
+
+
+def test_the_supervisor_still_never_terminates_a_process() -> None:
+    """Including a trial child, which writes to the real data directory."""
+
+    supervisor = _text(SUPERVISOR)
+
+    for forbidden in ("Stop-Process", "taskkill", "Kill()", ".Terminate", "-Force"):
+        assert forbidden not in supervisor

@@ -105,8 +105,20 @@ re-verifies `HEAD == safe_commit` before relaunching rather than assuming it.
 
 ### 5. How startup success is evaluated
 
-A bounded 60-second acceptance window, evaluated by the trial process's own
-in-process agent against the durable journal. All of the following are required:
+A bounded 60-second acceptance window. The verdict is deliberately made from
+**outside the branch under test**: a trial child runs from the trial worktree,
+so any check living in its own tree is one that branch could omit, break, or
+simply predate — and a branch that never fails itself would keep an unproven
+recorder running indefinitely. The supervisor therefore starts one bounded
+watchdog from the *permanent* checkout alongside a trial child, and that
+watchdog owns the verdict. The code inside the trial tree is only an actuator:
+it reads a stop marker addressed to its exact process instance and ends its own
+capture the way Ctrl+C would.
+
+Rollback verification stays in-process, because a rollback always runs from the
+permanent checkout by construction.
+
+All of the following are required:
 
 1. a replacement process exists and is running;
 2. it is a *different* instance — new PID **and** the exact process-instance
@@ -129,9 +141,15 @@ without ever force-killing anything:
 
 * if the trial process crashes outright, the supervisor sees a non-approved exit
   code from a trial child and consults the agent;
-* if the trial process starts but cannot prove health inside the window, its own
-  in-process verifier latches the failure durably and ends capture the same way
-  Ctrl+C would, then exits with the approved-restart code.
+* if the trial process starts but cannot prove health inside the window, the
+  permanent checkout's watchdog records the failure durably and writes a stop
+  marker naming that exact process instance; the trial process reads it, ends
+  capture the same way Ctrl+C would, and exits with the approved-restart code.
+
+A trial that ignores its stop marker is **reported, never killed**: the trial
+child writes to the real recorder data directory, so forcing it dead is exactly
+the corruption this path exists to avoid. The watchdog waits a bounded grace and
+records whether the stop was honoured.
 
 Either way the supervisor asks the agent what to launch next and gets the pinned
 safe checkout. The rollback is then verified with the *same* acceptance

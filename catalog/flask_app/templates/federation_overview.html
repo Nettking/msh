@@ -221,6 +221,17 @@
         </div>
         <span class="federation-device-role">{{ 'Test branch' if device.on_test_branch else 'Approved main' }}</span>
         {{ status_badge(device.software_state, device.software_state.replace('_', ' ')|title) }}
+        {% if update_csrf and version_can_manage and device.on_test_branch and device.connected and device.safe_commit %}
+        {# Per device, because each one pinned its own known-good commit and the
+           branch list only knows where the remote is *now*. Returning a device
+           must offer the exact commit it fell back to, not today's tip. #}
+        <form method="post" action="{{ url_for('federation_web.switch_software_version') }}" class="federation-software-version-restore">
+          <input type="hidden" name="_csrf_token" value="{{ update_csrf }}">
+          <input type="hidden" name="node_id" value="{{ device.node_id }}">
+          <input type="hidden" name="version" value="{{ device.safe_commit }}:{{ device.safe_branch|default('main') }}">
+          <button class="federation-button federation-button--secondary" type="submit">Return to {{ device.safe_branch|default('main') }} · {{ device.safe_commit[:8] }}</button>
+        </form>
+        {% endif %}
       </li>
       {% endfor %}
     </ul>
@@ -241,7 +252,7 @@
       <fieldset class="federation-software-version-devices-select">
         <legend>Devices</legend>
         {% for device in version_targets %}
-        <label><input type="checkbox" name="node_id" value="{{ device.node_id }}"> {{ device.label }} — currently <code>{{ device.branch|default('main') }}</code>{% if device.commit %} · <code>{{ device.commit[:8] }}</code>{% endif %}</label>
+        <label><input type="checkbox" name="node_id" value="{{ device.node_id }}"{{ ' disabled' if device.on_test_branch else '' }}> {{ device.label }} — currently <code>{{ device.branch|default('main') }}</code>{% if device.commit %} · <code>{{ device.commit[:8] }}</code>{% endif %}{% if device.on_test_branch %} (return it first){% endif %}</label>
         {% endfor %}
       </fieldset>
       <button class="federation-button federation-button--primary" type="submit">Switch version</button>

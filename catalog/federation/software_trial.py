@@ -35,6 +35,9 @@ from .software_update import (
     OID_RE,
 )
 
+#: A locally generated process-instance value. Never accepted from a peer.
+NONCE_RE = re.compile(r"^[0-9a-f]{32}$")
+
 TRIAL_REQUEST_SCHEMA = "fcp.host-trial-request.v1"
 TRIAL_RESULT_SCHEMA = "fcp.host-trial-result.v1"
 #: Asking the local host which branches the approved repository publishes.
@@ -45,6 +48,16 @@ BRANCHES_RESULT_SCHEMA = "fcp.host-branches-result.v1"
 #: What one bounded handoff document can carry without exceeding its limit.
 MAX_LISTED_BRANCHES = 60
 TRIAL_JOURNAL_SCHEMA = "fcp.recorder-trial-journal.v1"
+#: The one thing a trial process is ever asked to do by another process.
+#:
+#: The verdict on a trial is deliberately *not* made by the branch under test --
+#: a branch that omits or breaks the watchdog would otherwise never fail. It is
+#: made by a watchdog running from the permanent checkout, which writes this
+#: marker when the trial did not prove itself. The trial process only reads it
+#: and ends its own capture, exactly as an operator's Ctrl+C would.
+TRIAL_STOP_SCHEMA = "fcp.recorder-trial-stop.v1"
+#: How long a stop marker stays actionable.
+TRIAL_STOP_TTL_SECONDS = 300
 
 TRIAL_ID_RE = re.compile(r"^[0-9a-f]{32}$")
 REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
@@ -219,6 +232,80 @@ def validate_trial_request(
     ):
         raise TrialRefused("expired_or_invalid_request")
     return request_id, trial_selection(value)
+
+
+def trial_stop_request(
+    *,
+    trial_id: str,
+    request_id: str,
+    supervisor_session: str,
+    recorder_pid: int,
+    process_nonce: str,
+    reason: str,
+    created_at: datetime,
+    ttl_seconds: int = TRIAL_STOP_TTL_SECONDS,
+) -> dict[str, object]:
+    """Ask one exact trial process, and only it, to end its own capture."""
+
+    if not TRIAL_ID_RE.fullmatch(trial_id):
+        raise TrialRefused("malformed_trial_id")
+    if not REQUEST_ID_RE.fullmatch(request_id):
+        raise TrialRefused("malformed_request_id")
+    if not NONCE_RE.fullmatch(supervisor_session) or not NONCE_RE.fullmatch(
+        process_nonce
+    ):
+        raise TrialRefused("malformed_process_identity")
+    if (
+        isinstance(recorder_pid, bool)
+        or not isinstance(recorder_pid, int)
+        or recorder_pid <= 0
+    ):
+        raise TrialRefused("malformed_recorder_pid")
+    return {
+        "schema": TRIAL_STOP_SCHEMA,
+        "trial_id": trial_id,
+        "request_id": request_id,
+        "supervisor_session": supervisor_session,
+        "recorder_pid": recorder_pid,
+        "process_nonce": process_nonce,
+        "reason": reason[:256],
+        "created_at": _stamp(created_at),
+        "expires_at": _stamp(created_at + timedelta(seconds=int(ttl_seconds))),
+    }
+
+
+def trial_stop_applies(
+    value: object,
+    *,
+    trial_id: object,
+    pid: int,
+    process_nonce: str | None,
+    supervisor_session: str | None,
+    now: datetime,
+) -> bool:
+    """Decide whether a stop marker names *this* exact trial process.
+
+    Every field must match. A marker for another trial, another supervisor,
+    another process instance or an expired window is ignored, so one left
+    behind on disk can never end an unrelated recorder.
+    """
+
+    if not isinstance(value, dict) or value.get("schema") != TRIAL_STOP_SCHEMA:
+        return False
+    if value.get("trial_id") != trial_id or value.get("recorder_pid") != pid:
+        return False
+    if process_nonce is None or value.get("process_nonce") != process_nonce:
+        return False
+    if (
+        supervisor_session is None
+        or value.get("supervisor_session") != supervisor_session
+    ):
+        return False
+    created = parse_stamp(value.get("created_at"))
+    expires = parse_stamp(value.get("expires_at"))
+    if created is None or expires is None:
+        return False
+    return created <= now + timedelta(minutes=1) and expires > now
 
 
 def branches_request_document(
@@ -422,6 +509,8 @@ __all__ = [
     "TRIAL_STAGES",
     "TRIAL_STARTING",
     "TRIAL_STARTUP_TIMEOUT_SECONDS",
+    "TRIAL_STOP_SCHEMA",
+    "TRIAL_STOP_TTL_SECONDS",
     "TRIAL_SUMMARY_KEYS",
     "TRIAL_VERIFYING",
     "TrialRefused",
@@ -432,6 +521,8 @@ __all__ = [
     "parse_stamp",
     "trial_request_document",
     "trial_selection",
+    "trial_stop_applies",
+    "trial_stop_request",
     "trial_summary",
     "validate_trial_request",
     "validate_trial_summary",

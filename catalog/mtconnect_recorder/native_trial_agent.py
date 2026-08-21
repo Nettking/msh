@@ -18,6 +18,16 @@ with the same rules, in the same order:
    window, and if it cannot, the pinned safe version is relaunched and has to
    prove the same six conditions itself.
 
+The verdict on a trial is deliberately made from *outside* the branch under
+test. A trial child runs from the trial worktree, so any check living in its own
+tree is a check that branch could omit, break or simply predate -- and a branch
+that never fails itself would keep an unproven recorder running forever. So the
+watchdog runs from the permanent checkout (:meth:`evaluate_trial`), and the code
+inside the trial tree is only an actuator: it reads a stop marker addressed to
+its exact process instance and ends its own capture, the way Ctrl+C would
+(:meth:`verify_once`). Rollback verification is in-process again, because a
+rollback always runs from the permanent checkout by construction.
+
 A peer names an approved repository branch and commit. Every path, interpreter,
 argument, data directory and timeout here is local.
 """
@@ -47,7 +57,10 @@ from catalog.federation.software_trial import (
     TRIAL_STARTING,
     TRIAL_STARTUP_TIMEOUT_SECONDS,
     TRIAL_VERIFYING,
+    TrialRefused,
     TrialSelection,
+    trial_stop_applies,
+    trial_stop_request,
 )
 from catalog.federation.software_update import APPROVED_BRANCH, OID_RE
 
@@ -394,6 +407,7 @@ class NativeRecorderTrialAgent:
                 ),
             )
         record["request_id"] = request_id
+        self.paths.trial_stop_file.unlink(missing_ok=True)
         opened = self.journal.open({**record, "stage": TRIAL_PREPARING})
         return self._write_result(
             request_id=request_id,
@@ -544,6 +558,7 @@ class NativeRecorderTrialAgent:
         """
 
         result = self.write_refusal(request_id, code=code, message=message)
+        self.paths.trial_stop_file.unlink(missing_ok=True)
         active = self.journal.active()
         if active is not None and active.get("request_id") == request_id:
             self.journal.discard_active()
@@ -666,6 +681,10 @@ class NativeRecorderTrialAgent:
             # alive. Two recorders writing one data directory is worse than a
             # slow recovery.
             return TrialPlan(False, "rollback", code="trial_still_running")
+        # The instance the stop marker addressed is proven gone, so the marker
+        # has done its job. Leaving it could stop the restored recorder if a
+        # later process ever matched it.
+        self.paths.trial_stop_file.unlink(missing_ok=True)
         stage = record.get("stage")
         if stage != TRIAL_FAILED:
             record = self.journal.advance(
@@ -755,25 +774,60 @@ class NativeRecorderTrialAgent:
     # ---- in-process verification ----------------------------------------
 
     def verify_once(self) -> bool:
-        """Judge this process against the durable trial record. Safe to repeat.
+        """Advance what *this* process is allowed to decide. Safe to repeat.
 
-        Runs inside the replacement recorder itself. That is what makes the
-        fallback work without anything ever force-killing a process: a trial
-        that cannot prove itself ends its own capture and lets the supervisor
-        bring the pinned safe version back.
+        Runs inside the recorder. It never judges a trial: that verdict belongs
+        outside the branch under test. What it does own is ending this
+        process's own capture when a stop marker names it, verifying a rollback
+        (which always runs from the permanent checkout), and releasing a trial
+        whose stop request never took effect.
         """
 
+        if self._stop_requested():
+            return True
         active = self.journal.active()
         if active is None:
             return False
         stage = active.get("stage")
-        if stage == TRIAL_VERIFYING:
-            return self._verify_trial(active)
         if stage == ROLLBACK_VERIFYING:
             return self._verify_rollback(active)
         if stage in {TRIAL_PREPARING, TRIAL_STARTING}:
             return self._expire_unactivated(active)
         return False
+
+    def _stop_requested(self) -> bool:
+        """End this process's capture if a stop marker names this instance."""
+
+        marker = read_json(self.paths.trial_stop_file)
+        if marker is None:
+            return False
+        status = self.recorder_status()
+        if not trial_stop_applies(
+            marker,
+            trial_id=(self.journal.latest() or {}).get("trial_id"),
+            pid=int(status.pid or 0),
+            process_nonce=status.process_nonce,
+            supervisor_session=self.supervisor_session,
+            now=self._now(),
+        ):
+            return False
+        self._stop_capture_for_rollback()
+        return True
+
+    def evaluate_trial(self) -> str:
+        """Judge an in-flight trial from the permanent checkout. Repeatable.
+
+        This is the check a branch under test cannot omit, because it does not
+        run from that branch. Returns the stage the trial is now in, or
+        ``"pending"`` while it is still inside its acceptance window.
+        """
+
+        active = self.journal.active()
+        if active is None:
+            return "idle"
+        if active.get("stage") != TRIAL_VERIFYING:
+            return str(active.get("stage") or "idle")
+        return self._verify_trial(active)
 
     def _expire_unactivated(self, record: dict[str, Any]) -> bool:
         """Release a trial whose stop request never took effect.
@@ -809,7 +863,7 @@ class NativeRecorderTrialAgent:
             return True
         return False
 
-    def _verify_trial(self, record: dict[str, Any]) -> bool:
+    def _verify_trial(self, record: dict[str, Any]) -> str:
         expected = str(record.get("trial_commit") or "")
         acceptance = evaluate_startup(
             self.recorder_status(),
@@ -833,14 +887,16 @@ class NativeRecorderTrialAgent:
                 record=record,
                 acceptance=acceptance.to_dict(),
             )
-            self.journal.finish(TRIAL_RUNNING, result=result, acceptance=acceptance.to_dict())
-            return True
+            self.journal.finish(
+                TRIAL_RUNNING, result=result, acceptance=acceptance.to_dict()
+            )
+            return TRIAL_RUNNING
         if not deadline_passed(record, now=self._now()):
-            return False
+            return "pending"
         reason = failure_reason(
             acceptance, seconds=TRIAL_STARTUP_TIMEOUT_SECONDS
         )
-        self.journal.advance(
+        failed = self.journal.advance(
             TRIAL_FAILED,
             failure_reason=reason,
             acceptance=acceptance.to_dict(),
@@ -853,8 +909,36 @@ class NativeRecorderTrialAgent:
             record=record,
             acceptance=acceptance.to_dict(),
         )
+        self._request_trial_stop(failed, reason)
+        return TRIAL_FAILED
+
+    def _request_trial_stop(self, record: dict[str, Any], reason: str) -> None:
+        """Ask the trial process to end its own capture, and note that we did.
+
+        Addressed to one exact process instance. The trial process is the only
+        thing that can stop it cleanly, so this is a request, not a kill -- and
+        whether it was honoured is reported rather than assumed.
+        """
+
+        status = self.recorder_status()
+        try:
+            marker = trial_stop_request(
+                trial_id=str(record.get("trial_id") or ""),
+                request_id=str(record.get("request_id") or ""),
+                supervisor_session=self.supervisor_session,
+                recorder_pid=int(status.pid or 0),
+                process_nonce=str(status.process_nonce or ""),
+                reason=reason,
+                created_at=self._now(),
+            )
+        except (TrialRefused, ValueError):
+            # No live trial instance to address. The supervisor already regains
+            # control when the child exits, so there is nothing to ask.
+            return
+        write_json_atomic(self.paths.trial_stop_file, marker)
+        # The in-process actuator may not exist in the branch under test, so
+        # the caller waits a bounded grace and reports if it never exited.
         self._stop_capture_for_rollback()
-        return True
 
     def _verify_rollback(self, record: dict[str, Any]) -> bool:
         expected = str(record.get("safe_commit") or "")
