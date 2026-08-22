@@ -460,6 +460,38 @@ def test_a_restart_rebuilds_the_pending_set_from_durable_state_alone(
 
     assert restarted.pending_job_ids() == (pending,)
     assert [item.job_id for item in restarted.run_scheduling_pass()] == [pending]
+    # The driver re-checks after each pass, which is where a job that has just
+    # finished is settled. Nothing is left for a later scan to re-read: the scan
+    # stays proportional to unfinished work rather than to all history.
+    assert restarted.pending_job_ids() == ()
+    assert restarted.registry.unsettled_job_ids(session_id=stack.session_id) == ()
+    assert finished in {
+        record.job_id
+        for record in restarted.registry.records(session_id=stack.session_id)
+    }
+
+
+def test_a_settled_job_leaves_the_lifecycle_scan_but_not_the_product_view(
+    tmp_path,
+) -> None:
+    """Enumeration shrinks as work finishes; the operator index keeps every job."""
+
+    stack = build_stack(tmp_path)
+    finished = stack.submit().job_id
+    pending = stack.submit(target_date="2026-08-14").job_id
+    registry = stack.service.registry
+    assert set(registry.unsettled_job_ids(session_id=stack.session_id)) == {
+        finished,
+        pending,
+    }
+
+    _schedule(stack, finished)
+    assert stack.service.pending_job_ids() == (pending,)
+
+    assert registry.unsettled_job_ids(session_id=stack.session_id) == (pending,)
+    assert {
+        record.job_id for record in registry.records(session_id=stack.session_id)
+    } == {finished, pending}
 
 
 def test_the_pending_scan_drops_settled_jobs_and_keeps_unfinished_ones(

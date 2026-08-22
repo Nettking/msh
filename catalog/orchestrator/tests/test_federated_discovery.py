@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import threading
 from datetime import date
 from pathlib import Path
@@ -27,6 +28,29 @@ class _RecordingGateway:
         self.views: dict[str, dict[str, object]] = {}
         self._known: set[str] = set()
 
+    def job_identity(
+        self,
+        *,
+        target_day: date,
+        script_keys,
+        runtime_namespace: str,
+        source_signature: str,
+        origin: str = "automatic-discovery",
+    ) -> str:
+        """Mirror the real identity inputs, so identity is not the source alone."""
+
+        digest = hashlib.sha256(
+            "\0".join(
+                (
+                    target_day.isoformat(),
+                    ",".join(script_keys),
+                    runtime_namespace,
+                    source_signature,
+                )
+            ).encode("utf-8")
+        ).hexdigest()
+        return f"analysis-{target_day.isoformat()}-{digest[:8]}"
+
     def submit_date_slice(
         self,
         *,
@@ -36,7 +60,12 @@ class _RecordingGateway:
         runtime_namespace: str,
         source_signature: str,
     ) -> SubmissionOutcome:
-        job_id = f"analysis-{target_day.isoformat()}-{source_signature[:8]}"
+        job_id = self.job_identity(
+            target_day=target_day,
+            script_keys=script_keys,
+            runtime_namespace=runtime_namespace,
+            source_signature=source_signature,
+        )
         self.submissions.append(
             {
                 "data_dir": data_dir,
@@ -533,7 +562,7 @@ def test_a_later_success_clears_the_recorded_failure_for_that_day(
     orchestrator._run_update(bootstrap=True)
     _settle(gateway, str(gateway.submissions[0]["job_id"]), succeeded=False)
     orchestrator._run_update(bootstrap=False)
-    assert orchestrator.state_snapshot()["failed_analysis_slices"]
+    assert orchestrator.state_snapshot()["failed_analysis_jobs"]
 
     _record_batch(data_dir, "2026-08-13", 1)
     orchestrator._run_update(bootstrap=False)
@@ -541,7 +570,7 @@ def test_a_later_success_clears_the_recorded_failure_for_that_day(
     orchestrator._run_update(bootstrap=False)
 
     state = orchestrator.state_snapshot()
-    assert state["failed_analysis_slices"] == {}
+    assert state["failed_analysis_jobs"] == {}
     assert state["processed_dates"] == ["2026-08-13"]
 
 
@@ -671,3 +700,51 @@ def test_jobs_settling_while_discovery_runs_still_converges(
         _settle_all(gateway)
         orchestrator._run_update(bootstrap=False)
     assert set(orchestrator.state_snapshot()["processed_dates"]) == set(days)
+
+
+def test_a_changed_analysis_contract_reopens_an_older_failed_day(
+    tmp_path: Path, discovery, monkeypatch
+) -> None:
+    """A failed day is held back by job identity, not by its source alone.
+
+    An upgrade that changes the automatic script set makes the day genuinely
+    different work that has never been attempted. Only the latest day would be
+    rescued by bootstrap, so an older one must become eligible on its own.
+    """
+
+    orchestrator, gateway, _executed = discovery
+    data_dir = tmp_path / "data"
+    for day in ("2026-08-12", "2026-08-13"):
+        _record_batch(data_dir, day, 0)
+
+    orchestrator._run_update(bootstrap=True)
+    _settle(gateway, str(gateway.submissions[0]["job_id"]))
+    orchestrator._run_update(bootstrap=False)
+    older = next(
+        item for item in gateway.submissions if item["target_day"] == date(2026, 8, 12)
+    )
+    _settle(gateway, str(older["job_id"]), succeeded=False)
+    orchestrator._run_update(bootstrap=False)
+    queued_before = len(gateway.submissions)
+
+    # Held back while the work is identical.
+    orchestrator._run_update(bootstrap=False)
+    assert len(gateway.submissions) == queued_before
+
+    # An upgrade changes the automatic contract without touching the source.
+    upgraded = (*pipeline.AUTO_COVERAGE_SCRIPT_KEYS, "machines_active_per_day")
+    monkeypatch.setattr(pipeline, "AUTO_COVERAGE_SCRIPT_KEYS", upgraded)
+    monkeypatch.setattr(
+        pipeline,
+        "discover_runnable_scripts",
+        lambda _root: [pipeline_script(key) for key in upgraded],
+    )
+    orchestrator._run_update(bootstrap=False)
+
+    reoffered = [
+        item
+        for item in gateway.submissions[queued_before:]
+        if item["target_day"] == date(2026, 8, 12)
+    ]
+    assert len(reoffered) == 1
+    assert reoffered[0]["job_id"] != older["job_id"]

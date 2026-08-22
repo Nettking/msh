@@ -75,7 +75,17 @@ A day with a durable analysis job still in flight is not queued again, whatever 
 
 Because of that, a day still receiving data is normally reported as pending: its newest records really have not been analysed yet. Progress counters describe analysed source, not recording that has stopped.
 
-A slice whose durable job ended in a terminal failure, cancellation, or timeout is not offered again while the source is unchanged: job identity is derived from that source, so resubmitting it returns the same terminal job and can never reach a different outcome. Leaving it schedulable would take a lane on every cycle and hold every other pending day behind it. The runtime keeps reporting that failure, and the day becomes eligible again as soon as new data arrives for it, a later analysis of it succeeds, or a restart runs latest-day bootstrap over it.
+A slice whose durable job ended in a terminal failure, cancellation, or timeout is not offered again while it would be that same job: resubmitting it returns the terminal job and can never reach a different outcome. Leaving it schedulable would take a lane on every cycle and hold every other pending day behind it.
+
+What counts as "the same job" is the durable job identity, not the source alone. Identity also covers the federation session, the analysis contract version, the automatic script set and the runtime namespace, so a day held back after a failure becomes eligible again on any of:
+
+- new data arriving for it,
+- an upgrade that changes the analysis contract or the automatic script set,
+- a new runtime namespace or federation session,
+- a later analysis of that day succeeding, which clears the record,
+- latest-day bootstrap, which re-offers the newest day once per start.
+
+The runtime keeps reporting the failure while the day is held back, so a slice waiting on one of those is visible rather than silently skipped.
 
 ## Manual sessions and runs
 

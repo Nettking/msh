@@ -96,6 +96,27 @@ class AnalysisJobRegistry:
                     ON federated_analysis_jobs(session_id, created_at DESC)
                 """
             )
+            columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(federated_analysis_jobs)"
+                ).fetchall()
+            }
+            if "settled_at" not in columns:
+                connection.execute(
+                    "ALTER TABLE federated_analysis_jobs ADD COLUMN settled_at TEXT"
+                )
+            # Lifecycle scanning only cares about work that has not finished, and
+            # on a device that keeps discovering data the finished rows dominate.
+            # A partial index keeps that scan proportional to unsettled work
+            # rather than to the whole history.
+            connection.execute(
+                """
+                CREATE INDEX IF NOT EXISTS idx_federated_analysis_jobs_unsettled
+                    ON federated_analysis_jobs(session_id, created_at)
+                    WHERE settled_at IS NULL
+                """
+            )
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
@@ -158,24 +179,46 @@ class AnalysisJobRegistry:
             rows = connection.execute(query, parameters).fetchall()
         return tuple(self._record_from_row(row) for row in rows)
 
-    def scan_job_ids(self, *, session_id: str | None = None) -> tuple[str, ...]:
-        """Return every recorded job id, oldest first.
+    def unsettled_job_ids(self, *, session_id: str | None = None) -> tuple[str, ...]:
+        """Return recorded job ids not yet known to be finished, oldest first.
 
         :meth:`records` is a bounded product view. Lifecycle scanning must not
         inherit that bound: a device that keeps receiving data keeps creating
         jobs, and a job that scrolled off the newest page still has to be driven
-        to a terminal state.
+        to a terminal state. It must not inherit the whole history either, so
+        jobs already observed in a terminal state are excluded here rather than
+        re-read on every pass.
         """
 
-        query = "SELECT job_id FROM federated_analysis_jobs"
+        query = "SELECT job_id FROM federated_analysis_jobs WHERE settled_at IS NULL"
         parameters: list[Any] = []
         if session_id is not None:
-            query += " WHERE session_id=?"
+            query += " AND session_id=?"
             parameters.append(session_id)
         query += " ORDER BY created_at ASC, job_id ASC"
         with self._connect() as connection:
             rows = connection.execute(query, parameters).fetchall()
         return tuple(str(row["job_id"]) for row in rows)
+
+    def mark_settled(self, job_ids: Sequence[str], *, settled_at: datetime) -> None:
+        """Record that these jobs reached a terminal state.
+
+        Terminal job states are absorbing, so this is durable rather than a
+        per-process memo: a restart must not have to re-read finished history to
+        rediscover what it already established.
+        """
+
+        if not job_ids:
+            return
+        stamp = _stamp(settled_at)
+        with self._connect() as connection:
+            connection.executemany(
+                """
+                UPDATE federated_analysis_jobs SET settled_at=?
+                WHERE job_id=? AND settled_at IS NULL
+                """,
+                [(stamp, str(job_id)) for job_id in job_ids],
+            )
 
     def record_for(self, job_id: str) -> AnalysisJobRecord | None:
         with self._connect() as connection:
@@ -201,11 +244,6 @@ class AnalysisWorkService:
         self.registry = registry
         self.session_id = session_id
         self.scheduler_poll_seconds = max(float(scheduler_poll_seconds), 0.05)
-        # Terminal is final, so a job that reached it never has to be read from
-        # the durable store again while this runtime lives. Without that the
-        # lifecycle scan would keep growing on a device that keeps discovering
-        # data, even though almost all of those jobs are long finished.
-        self._settled_job_ids: set[str] = set()
         self._lock = threading.Lock()
         self._scheduling = threading.Event()
         self._scheduler_wake = threading.Event()
@@ -241,21 +279,25 @@ class AnalysisWorkService:
 
         The driver stops when this is empty, so it has to see all of the work:
         scanning only the newest page of the index would strand older pending
-        jobs on a device that keeps discovering new data.
+        jobs on a device that keeps discovering new data. Terminal is final, so
+        a job seen finished here is recorded as settled and drops out of every
+        later scan, which keeps a pass proportional to unfinished work.
         """
 
         pending: list[str] = []
-        for job_id in self.registry.scan_job_ids(session_id=self.session_id):
-            if job_id in self._settled_job_ids:
-                continue
+        settled: list[str] = []
+        for job_id in self.registry.unsettled_job_ids(session_id=self.session_id):
             try:
                 snapshot = self.scheduler.store.snapshot(job_id)
             except _SCHEDULING_ERRORS:
+                # An unreadable job is not evidence of anything. Leave it
+                # unsettled so a later pass reads it again.
                 continue
             if snapshot.job.terminal:
-                self._settled_job_ids.add(job_id)
+                settled.append(job_id)
                 continue
             pending.append(job_id)
+        self.registry.mark_settled(settled, settled_at=self.scheduler.clock())
         return tuple(pending)
 
     async def schedule_pending(self) -> tuple[SchedulingOutcome, ...]:

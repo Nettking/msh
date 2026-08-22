@@ -158,7 +158,7 @@ class RuntimeState:
     pending_analysis_jobs: list[str]
     pending_analysis_slices: dict[str, str]
     completed_analysis_slices: dict[str, str]
-    failed_analysis_slices: dict[str, str]
+    failed_analysis_jobs: dict[str, str]
     last_analysis_job_id: str | None
     last_analysis_job_status: str | None
     last_analysis_provider_id: str | None
@@ -603,7 +603,7 @@ class RuntimeOrchestrator:
             pending_analysis_jobs=[],
             pending_analysis_slices={},
             completed_analysis_slices={},
-            failed_analysis_slices={},
+            failed_analysis_jobs={},
             last_analysis_job_id=None,
             last_analysis_job_status=None,
             last_analysis_provider_id=None,
@@ -649,8 +649,8 @@ class RuntimeOrchestrator:
         state.completed_analysis_slices = _date_signature_map(
             state.completed_analysis_slices
         )
-        state.failed_analysis_slices = _date_signature_map(
-            state.failed_analysis_slices
+        state.failed_analysis_jobs = _date_signature_map(
+            state.failed_analysis_jobs
         )
         return state
 
@@ -1275,18 +1275,30 @@ class RuntimeOrchestrator:
             # most one day per cycle, so neither can starve the other.
             with self._lock:
                 analysed_before = set(self._state.completed_analysis_slices)
-                failed_slices = dict(self._state.failed_analysis_slices)
-            # Re-queueing a slice whose durable job already ended in a terminal
-            # failure cannot produce a different outcome: job identity is derived
-            # from the same source, so the submission returns that same failed
-            # job. Left schedulable it would take a lane on every cycle forever
-            # and block every other pending day behind it. New data changes the
-            # signature, which is different work, and makes the day eligible
-            # again; so does a later success, which clears the record.
+                failed_jobs = dict(self._state.failed_analysis_jobs)
+                namespace = str(self._state.active_runtime_namespace or "default")
+            # Re-offering work whose durable job already ended in a terminal
+            # failure cannot produce a different outcome: it is the same job, so
+            # the submission returns that same failed job. Left schedulable it
+            # would take a lane on every cycle forever and block every other
+            # pending day behind it.
+            #
+            # The comparison is the durable job identity, not the source alone.
+            # A newer analysis contract, a changed automatic script set, a new
+            # runtime namespace or a new federation session all make this
+            # genuinely different work that has never been attempted, and only
+            # the latest day would otherwise be rescued by bootstrap.
             blocked_by_failure = [
                 day
                 for day in pending_desc
-                if failed_slices.get(day.isoformat()) == _slice_signature(day)
+                if day.isoformat() in failed_jobs
+                and failed_jobs[day.isoformat()]
+                == self._prospective_job_id(
+                    target_day=day,
+                    script_keys=AUTO_COVERAGE_SCRIPT_KEYS,
+                    runtime_namespace=namespace,
+                    source_signature=_slice_signature(day),
+                )
             ]
             schedulable = [
                 day
@@ -1481,6 +1493,27 @@ class RuntimeOrchestrator:
         )
         return outcome.job_id
 
+    def _prospective_job_id(
+        self,
+        *,
+        target_day: date,
+        script_keys: tuple[str, ...],
+        runtime_namespace: str,
+        source_signature: str,
+    ) -> str | None:
+        """Return the durable job id this day would be submitted as, if known."""
+
+        try:
+            return self.analysis_gateway().job_identity(
+                target_day=target_day,
+                script_keys=script_keys,
+                runtime_namespace=runtime_namespace,
+                source_signature=source_signature,
+            )
+        except Exception as exc:  # noqa: BLE001 - an unknown identity offers work
+            self.status.warn(f"analysis job identity unavailable: {exc}")
+            return None
+
     def _request_scheduling_pass(self) -> None:
         try:
             self.analysis_gateway().request_scheduling_pass()
@@ -1510,7 +1543,7 @@ class RuntimeOrchestrator:
         still_pending: list[str] = []
         finished_dates: set[str] = set()
         succeeded_slices: dict[str, str] = {}
-        failed_slices: dict[str, str] = {}
+        failed_jobs: dict[str, str] = {}
         observed_failure: str | None = None
         for job_id in pending:
             view = gateway.job_view(job_id)
@@ -1527,9 +1560,10 @@ class RuntimeOrchestrator:
             if signature and view.get("succeeded"):
                 succeeded_slices.update({item: str(signature) for item in completed})
             elif signature:
-                # This exact source was analysed and the analysis ended badly.
-                # Remember it so discovery stops re-offering identical work.
-                failed_slices.update({item: str(signature) for item in completed})
+                # This exact work was attempted and ended badly. Remember the job
+                # itself, so discovery stops re-offering that identical job while
+                # still recognizing any genuinely different work for the day.
+                failed_jobs.update({item: job_id for item in completed})
             with self._lock:
                 self._state.last_analysis_job_id = job_id
                 self._state.last_analysis_job_status = str(view.get("status"))
@@ -1578,11 +1612,11 @@ class RuntimeOrchestrator:
             }
             # A success for a day supersedes any failure recorded for it, so the
             # day is never left blocked by an outcome it has already moved past.
-            self._state.failed_analysis_slices = {
-                day: signature
-                for day, signature in {
-                    **self._state.failed_analysis_slices,
-                    **failed_slices,
+            self._state.failed_analysis_jobs = {
+                day: failed_job_id
+                for day, failed_job_id in {
+                    **self._state.failed_analysis_jobs,
+                    **failed_jobs,
                 }.items()
                 if day not in succeeded_slices
             }

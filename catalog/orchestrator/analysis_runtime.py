@@ -459,6 +459,60 @@ class DiscoveryAnalysisGateway:
     def runtime(self) -> AnalysisRuntime:
         return self._runtime if self._runtime is not None else get_analysis_runtime()
 
+    def _work_slice(
+        self,
+        *,
+        target_dates: Sequence[date | str],
+        script_keys: Sequence[str],
+        runtime_namespace: str,
+        source_signature: str,
+        slice_kind: str,
+        slice_key: str,
+        origin: str,
+    ) -> AnalysisWorkSlice:
+        isolated = tuple(
+            item.isoformat() if isinstance(item, date) else str(item)
+            for item in target_dates
+        )
+        return AnalysisWorkSlice(
+            session_id=self.runtime.identity.session_id,
+            slice_kind=slice_kind,
+            slice_key=slice_key,
+            target_dates=isolated,
+            script_keys=tuple(script_keys),
+            runtime_namespace=runtime_namespace,
+            source_signature=source_signature,
+            origin=origin,
+        )
+
+    def job_identity(
+        self,
+        *,
+        target_day: date,
+        script_keys: Sequence[str],
+        runtime_namespace: str,
+        source_signature: str,
+        origin: str = ORIGIN_AUTOMATIC_DISCOVERY,
+    ) -> str:
+        """Return the durable job id this date slice would be submitted as.
+
+        Job identity covers more than the source: the federation session, the
+        analysis contract version, the script set and the runtime namespace all
+        change what the result means. A caller deciding whether work it already
+        has an outcome for is the same work has to ask the same question the
+        durable contract asks, not a narrower one of its own.
+        """
+
+        return self._work_slice(
+            target_dates=(target_day,),
+            script_keys=script_keys,
+            runtime_namespace=runtime_namespace,
+            source_signature=source_signature,
+            slice_kind=SLICE_KIND_DATE,
+            slice_key=target_day.isoformat(),
+            origin=origin,
+        ).job_id
+
     def submit_slice(
         self,
         *,
@@ -479,14 +533,13 @@ class DiscoveryAnalysisGateway:
         files = source_files_for_dates(data_dir, isolated)
         if not files:
             return None
-        work = AnalysisWorkSlice(
-            session_id=runtime.identity.session_id,
-            slice_kind=slice_kind,
-            slice_key=slice_key,
+        work = self._work_slice(
             target_dates=isolated,
-            script_keys=tuple(script_keys),
+            script_keys=script_keys,
             runtime_namespace=runtime_namespace,
             source_signature=source_signature,
+            slice_kind=slice_kind,
+            slice_key=slice_key,
             origin=origin,
         )
         service = runtime.service
