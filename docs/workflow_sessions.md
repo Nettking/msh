@@ -75,6 +75,8 @@ A day with a durable analysis job still in flight is not queued again, whatever 
 
 Because of that, a day still receiving data is normally reported as pending: its newest records really have not been analysed yet. Progress counters describe analysed source, not recording that has stopped.
 
+A slice whose durable job ended in a terminal failure, cancellation, or timeout is not offered again while the source is unchanged: job identity is derived from that source, so resubmitting it returns the same terminal job and can never reach a different outcome. Leaving it schedulable would take a lane on every cycle and hold every other pending day behind it. The runtime keeps reporting that failure, and the day becomes eligible again as soon as new data arrives for it, a later analysis of it succeeds, or a restart runs latest-day bootstrap over it.
+
 ## Manual sessions and runs
 
 From `/control`, operators can:

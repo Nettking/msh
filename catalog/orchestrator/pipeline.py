@@ -17,6 +17,7 @@ import re
 import threading
 import traceback
 import uuid
+from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date, datetime
 from pathlib import Path
@@ -157,6 +158,7 @@ class RuntimeState:
     pending_analysis_jobs: list[str]
     pending_analysis_slices: dict[str, str]
     completed_analysis_slices: dict[str, str]
+    failed_analysis_slices: dict[str, str]
     last_analysis_job_id: str | None
     last_analysis_job_status: str | None
     last_analysis_provider_id: str | None
@@ -248,6 +250,18 @@ def _load_or_create_auto_session(
     )
     write_session_metadata(session_dir, metadata)
     return session_id, session_dir, metadata, "created"
+
+
+def _blocked_by_failure_message(days: Sequence[date]) -> str | None:
+    """Describe slices held back because that exact source already failed."""
+
+    if not days:
+        return None
+    listed = ", ".join(day.isoformat() for day in sorted(days, reverse=True))
+    return (
+        f"Analysis failed for {listed}; that source will be offered again when "
+        "new data arrives for it"
+    )
 
 
 def _utc_now_iso() -> str:
@@ -589,6 +603,7 @@ class RuntimeOrchestrator:
             pending_analysis_jobs=[],
             pending_analysis_slices={},
             completed_analysis_slices={},
+            failed_analysis_slices={},
             last_analysis_job_id=None,
             last_analysis_job_status=None,
             last_analysis_provider_id=None,
@@ -633,6 +648,9 @@ class RuntimeOrchestrator:
         )
         state.completed_analysis_slices = _date_signature_map(
             state.completed_analysis_slices
+        )
+        state.failed_analysis_slices = _date_signature_map(
+            state.failed_analysis_slices
         )
         return state
 
@@ -1172,7 +1190,7 @@ class RuntimeOrchestrator:
 
         # Durable jobs are the unit of progress now, so fold any finished job into
         # runtime state before deciding what still needs to be queued.
-        self._reconcile_analysis_jobs()
+        reconciled_failure = self._reconcile_analysis_jobs()
 
         verified_processed_dates = self._processed_dates(
             script_options=script_options,
@@ -1205,6 +1223,8 @@ class RuntimeOrchestrator:
 
         def _slice_signature(day: date) -> str:
             return date_range_source_signature(current_source_signatures, day, day)
+
+        blocked_by_failure: list[date] = []
 
         # A day with a live durable job is already scheduled work, whatever its
         # source looked like when that job was created. A source that is still
@@ -1253,11 +1273,27 @@ class RuntimeOrchestrator:
             # every cycle, so sharing one lane let it spend the whole catch-up
             # budget on itself while the backlog never moved. Each lane queues at
             # most one day per cycle, so neither can starve the other.
-            schedulable = [
-                day for day in pending_desc if day.isoformat() not in awaiting_jobs
-            ]
             with self._lock:
                 analysed_before = set(self._state.completed_analysis_slices)
+                failed_slices = dict(self._state.failed_analysis_slices)
+            # Re-queueing a slice whose durable job already ended in a terminal
+            # failure cannot produce a different outcome: job identity is derived
+            # from the same source, so the submission returns that same failed
+            # job. Left schedulable it would take a lane on every cycle forever
+            # and block every other pending day behind it. New data changes the
+            # signature, which is different work, and makes the day eligible
+            # again; so does a later success, which clears the record.
+            blocked_by_failure = [
+                day
+                for day in pending_desc
+                if failed_slices.get(day.isoformat()) == _slice_signature(day)
+            ]
+            schedulable = [
+                day
+                for day in pending_desc
+                if day.isoformat() not in awaiting_jobs
+                and day not in blocked_by_failure
+            ]
             backlog = [
                 day for day in schedulable if day.isoformat() not in analysed_before
             ]
@@ -1358,7 +1394,13 @@ class RuntimeOrchestrator:
             )
             with self._lock:
                 self._state.failed_scripts = []
-                self._state.last_failure = None
+                # A quiet cycle clears the previous cycle's failure, but a
+                # failure this cycle observed, and a slice held back because that
+                # exact source already failed, are both conditions the operator
+                # still has to see.
+                self._state.last_failure = reconciled_failure or (
+                    _blocked_by_failure_message(blocked_by_failure)
+                )
                 _, pending_desc, _, _ = self._apply_progress_state(
                     available_dates=available_dates,
                     verified_processed_dates=verified_processed_dates,
@@ -1445,8 +1487,12 @@ class RuntimeOrchestrator:
         except Exception as exc:  # noqa: BLE001 - scheduling never blocks discovery
             self.status.warn(f"analysis scheduling pass could not start: {exc}")
 
-    def _reconcile_analysis_jobs(self) -> None:
-        """Fold durable job outcomes back into the runtime state the UI reads."""
+    def _reconcile_analysis_jobs(self) -> str | None:
+        """Fold durable job outcomes back into the runtime state the UI reads.
+
+        Returns the failure this cycle observed, so a cycle that then finds
+        nothing to queue reports that failure rather than clearing it.
+        """
 
         with self._lock:
             pending = list(self._state.pending_analysis_jobs)
@@ -1455,15 +1501,17 @@ class RuntimeOrchestrator:
                 self._state.pending_analysis_slices = {}
                 self._persist_state()
         if not pending:
-            return
+            return None
         try:
             gateway = self.analysis_gateway()
         except Exception as exc:  # noqa: BLE001 - runtime stays available
             self.status.warn(f"analysis job reconciliation unavailable: {exc}")
-            return
+            return None
         still_pending: list[str] = []
         finished_dates: set[str] = set()
         succeeded_slices: dict[str, str] = {}
+        failed_slices: dict[str, str] = {}
+        observed_failure: str | None = None
         for job_id in pending:
             view = gateway.job_view(job_id)
             if view is None or not view.get("terminal"):
@@ -1476,8 +1524,12 @@ class RuntimeOrchestrator:
             completed = [str(item) for item in (view.get("target_dates") or [])]
             finished_dates.update(completed)
             signature = view.get("source_signature")
-            if view.get("succeeded") and signature:
+            if signature and view.get("succeeded"):
                 succeeded_slices.update({item: str(signature) for item in completed})
+            elif signature:
+                # This exact source was analysed and the analysis ended badly.
+                # Remember it so discovery stops re-offering identical work.
+                failed_slices.update({item: str(signature) for item in completed})
             with self._lock:
                 self._state.last_analysis_job_id = job_id
                 self._state.last_analysis_job_status = str(view.get("status"))
@@ -1499,7 +1551,7 @@ class RuntimeOrchestrator:
                     self._state.failed_scripts = []
                     self._state.last_failure = None
                 else:
-                    self._state.last_failure = (
+                    observed_failure = (
                         f"Analysis job {job_id} ended as {view.get('status')}"
                         + (
                             f" ({view['error_code']})"
@@ -1507,6 +1559,7 @@ class RuntimeOrchestrator:
                             else ""
                         )
                     )
+                    self._state.last_failure = observed_failure
         with self._lock:
             self._state.pending_analysis_jobs = sorted(set(still_pending))
             # A day is only "awaiting scheduling" while it has a live durable job.
@@ -1523,7 +1576,18 @@ class RuntimeOrchestrator:
                 **self._state.completed_analysis_slices,
                 **succeeded_slices,
             }
+            # A success for a day supersedes any failure recorded for it, so the
+            # day is never left blocked by an outcome it has already moved past.
+            self._state.failed_analysis_slices = {
+                day: signature
+                for day, signature in {
+                    **self._state.failed_analysis_slices,
+                    **failed_slices,
+                }.items()
+                if day not in succeeded_slices
+            }
             self._persist_state()
+        return observed_failure
 
 
 _RUNTIME_MANAGER: RuntimeOrchestrator | None = None
