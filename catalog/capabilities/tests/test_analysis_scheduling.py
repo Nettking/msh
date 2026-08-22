@@ -8,10 +8,13 @@ Every test drives the real components: F8.2 provider health feeds
 from __future__ import annotations
 
 import asyncio
+import time
+from concurrent.futures import ThreadPoolExecutor
 from datetime import timedelta
 
 import pytest
 
+from catalog.capabilities.analysis import AnalysisJobRegistry, AnalysisWorkService
 from catalog.capabilities.analysis.contracts import analysis_grant_id
 from catalog.capabilities.analysis.provisioning import analysis_handler_descriptor
 from catalog.capabilities.analysis.scheduler import (
@@ -29,6 +32,7 @@ from catalog.capabilities.tests.analysis_harness import (
     StaticReportSource,
     build_stack,
     provider_report,
+    work_slice,
 )
 from catalog.federation.errors import FederationValidationError
 
@@ -403,6 +407,142 @@ def test_scheduling_pass_reports_every_pending_job(tmp_path) -> None:
 
     assert {item.job_id for item in outcomes} == {first, second}
     assert all(item.decision == DECISION_DISPATCHED for item in outcomes)
+
+
+def test_pending_work_is_found_past_the_newest_page_of_the_index(tmp_path) -> None:
+    """A device that keeps discovering data must not strand its older jobs.
+
+    The job index also backs bounded product views. Lifecycle scanning has to see
+    all of the work, or a job that scrolled off the newest page would sit pending
+    forever while newer slices kept arriving.
+    """
+
+    stack = build_stack(tmp_path)
+    oldest = stack.submit().job_id
+    registry = stack.service.registry
+    for index in range(1, 260):
+        registry.record(
+            work_slice(
+                session_id=stack.session_id,
+                target_date="2026-08-14",
+                source_signature=f"{index:064x}",
+            ),
+            created_at=stack.clock.now + timedelta(minutes=index),
+        )
+    newest = stack.submit(target_date="2026-08-15").job_id
+    _schedule(stack, newest)
+    assert stack.store.snapshot(newest).job.terminal is True
+
+    listed = {record.job_id for record in registry.records(session_id=stack.session_id)}
+    assert oldest not in listed
+    assert stack.service.pending_job_ids() == (oldest,)
+    assert [item.job_id for item in stack.service.run_scheduling_pass()] == [oldest]
+
+
+def test_a_restart_rebuilds_the_pending_set_from_durable_state_alone(
+    tmp_path,
+) -> None:
+    """Remembering settled jobs is an optimization, never the source of truth."""
+
+    stack = build_stack(tmp_path)
+    finished = stack.submit().job_id
+    pending = stack.submit(target_date="2026-08-14").job_id
+    _schedule(stack, finished)
+    assert stack.service.pending_job_ids() == (pending,)
+
+    restarted = AnalysisWorkService(
+        scheduler=stack.scheduler,
+        registry=AnalysisJobRegistry(
+            tmp_path / "capabilities" / "analysis_jobs.sqlite3"
+        ),
+        session_id=stack.session_id,
+    )
+
+    assert restarted.pending_job_ids() == (pending,)
+    assert [item.job_id for item in restarted.run_scheduling_pass()] == [pending]
+    # The driver re-checks after each pass, which is where a job that has just
+    # finished is settled. Nothing is left for a later scan to re-read: the scan
+    # stays proportional to unfinished work rather than to all history.
+    assert restarted.pending_job_ids() == ()
+    assert restarted.registry.unsettled_job_ids(session_id=stack.session_id) == ()
+    assert finished in {
+        record.job_id
+        for record in restarted.registry.records(session_id=stack.session_id)
+    }
+
+
+def test_a_settled_job_leaves_the_lifecycle_scan_but_not_the_product_view(
+    tmp_path,
+) -> None:
+    """Enumeration shrinks as work finishes; the operator index keeps every job."""
+
+    stack = build_stack(tmp_path)
+    finished = stack.submit().job_id
+    pending = stack.submit(target_date="2026-08-14").job_id
+    registry = stack.service.registry
+    assert set(registry.unsettled_job_ids(session_id=stack.session_id)) == {
+        finished,
+        pending,
+    }
+
+    _schedule(stack, finished)
+    assert stack.service.pending_job_ids() == (pending,)
+
+    assert registry.unsettled_job_ids(session_id=stack.session_id) == (pending,)
+    assert {
+        record.job_id for record in registry.records(session_id=stack.session_id)
+    } == {finished, pending}
+
+
+def test_the_pending_scan_drops_settled_jobs_and_keeps_unfinished_ones(
+    tmp_path,
+) -> None:
+    """Repeated passes must stay stable: the driver polls this continuously."""
+
+    stack = build_stack(tmp_path)
+    first = stack.submit().job_id
+    second = stack.submit(target_date="2026-08-14").job_id
+    assert set(stack.service.pending_job_ids()) == {first, second}
+
+    _schedule(stack, first)
+
+    assert stack.store.snapshot(first).job.terminal is True
+    assert stack.service.pending_job_ids() == (second,)
+    assert stack.service.pending_job_ids() == (second,)
+
+
+def test_concurrent_submission_beside_the_running_driver_strands_nothing(
+    tmp_path,
+) -> None:
+    """Discovery submits while the driver runs. Neither may lose or duplicate work.
+
+    This is the production call pattern: submit the slice, then ask for the
+    lifecycle driver, from whichever thread discovered the data.
+    """
+
+    stack = build_stack(tmp_path)
+    stack.service.scheduler_poll_seconds = 0.05
+    days = [f"2026-08-{day:02d}" for day in range(10, 20)]
+
+    def _submit(day: str) -> str:
+        outcome = stack.submit(target_date=day)
+        stack.service.request_scheduling_pass()
+        return outcome.job_id
+
+    try:
+        with ThreadPoolExecutor(max_workers=4) as pool:
+            # Every day is offered twice, concurrently: one slice is one job.
+            job_ids = list(pool.map(_submit, [*days, *days]))
+        deadline = time.monotonic() + 60
+        while stack.service.pending_job_ids() and time.monotonic() < deadline:
+            time.sleep(0.05)
+    finally:
+        stack.service.stop_scheduling()
+
+    assert len(set(job_ids)) == len(days)
+    assert stack.service.pending_job_ids() == ()
+    for job_id in set(job_ids):
+        assert stack.store.snapshot(job_id).job.status is JobStatus.SUCCEEDED
 
 
 def test_clock_is_injected_rather_than_read_from_the_wall(tmp_path) -> None:
