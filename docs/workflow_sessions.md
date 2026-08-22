@@ -60,6 +60,21 @@ Bootstrap prioritizes fast operator visibility:
 
 After bootstrap, historical catch-up processes available source days incrementally, one day per cycle. Current policy is reverse chronological catch-up after the latest-day bootstrap. When catch-up is complete, the runtime polls for newly arriving source days and processes new slices rather than recomputing all history.
 
+## Source data that is still arriving
+
+A source day is not finished when it is first analysed. A recorder keeps writing today, and a Federation mirror can keep syncing an older day, so that day's source signature keeps changing and the day becomes pending again.
+
+Discovery handles that in two lanes, and each lane queues at most one day per cycle:
+
+- **new days** — days with no analysis yet, newest first. This is historical catch-up.
+- **refresh** — days that were analysed before and have received data since.
+
+Separating them means a day that keeps growing cannot spend the whole catch-up budget refreshing itself, and a long backlog cannot stop the freshest day from being refreshed.
+
+A day with a durable analysis job still in flight is not queued again, whatever data arrived since. The newer data is queued on the first cycle after that job reaches a terminal state, so one day never has more than one analysis running for it, and a growing day never stacks a job per poll for source snapshots that are already stale.
+
+Because of that, a day still receiving data is normally reported as pending: its newest records really have not been analysed yet. Progress counters describe analysed source, not recording that has stopped.
+
 ## Manual sessions and runs
 
 From `/control`, operators can:

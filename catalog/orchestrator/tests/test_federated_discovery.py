@@ -77,6 +77,43 @@ def _write_day(data_dir: Path, day: str, *, machine: str = "A") -> Path:
     return path
 
 
+def _record_batch(data_dir: Path, day: str, batch: int) -> Path:
+    """Add one more recorded batch for a day, the way a live recorder does."""
+
+    day_dir = data_dir / day
+    day_dir.mkdir(parents=True, exist_ok=True)
+    path = day_dir / f"batch-{batch:03d}.jsonl"
+    path.write_text(
+        f'{{"timestamp":"{day}T10:{batch:02d}:00Z","machine":"A"}}\n',
+        encoding="utf-8",
+    )
+    return path
+
+
+def _settle(gateway: _RecordingGateway, job_id: str, *, succeeded: bool = True) -> None:
+    """Let one durable job reach a terminal state, as a provider would."""
+
+    submission = next(
+        item for item in gateway.submissions if item["job_id"] == job_id
+    )
+    gateway.views[job_id] = {
+        "terminal": True,
+        "succeeded": succeeded,
+        "status": "succeeded" if succeeded else "failed",
+        "provider_id": "provider-remote",
+        "node_id": "node-remote",
+        "target_dates": [submission["target_day"].isoformat()],
+        "source_signature": submission["source_signature"],
+    }
+
+
+def _settle_all(gateway: _RecordingGateway) -> None:
+    for submission in list(gateway.submissions):
+        job_id = str(submission["job_id"])
+        if job_id not in gateway.views:
+            _settle(gateway, job_id)
+
+
 @pytest.fixture
 def discovery(tmp_path: Path, monkeypatch):
     gateway = _RecordingGateway()
@@ -159,6 +196,9 @@ def test_materially_changed_data_produces_new_work(
     first_signature = gateway.submissions[0]["source_signature"]
 
     _write_day(data_dir, "2026-08-13", machine="B")
+    # The queued job settles first: changed data is new work for that day, but it
+    # is queued once, after the analysis already in flight for it has finished.
+    _settle(gateway, str(gateway.submissions[0]["job_id"]))
     orchestrator._run_update(bootstrap=False)
 
     signatures = {item["source_signature"] for item in gateway.submissions}
@@ -250,3 +290,115 @@ def test_failed_job_surfaces_the_error_without_local_fallback(
     assert "failed" in str(state["last_failure"])
     assert "worker-handler-failed" in str(state["last_failure"])
     assert executed == []
+
+
+def test_catch_up_advances_while_the_newest_day_keeps_receiving_data(
+    tmp_path: Path, discovery
+) -> None:
+    """A recorder writing today must not starve the rest of the backlog.
+
+    Every poll cycle sees a new batch for the newest day, so that day's source
+    signature keeps moving. Catch-up still has to work through the older days.
+    """
+
+    orchestrator, gateway, _executed = discovery
+    data_dir = tmp_path / "data"
+    for day in ("2026-08-10", "2026-08-11", "2026-08-12"):
+        _record_batch(data_dir, day, 0)
+    _record_batch(data_dir, "2026-08-13", 0)
+
+    orchestrator._run_update(bootstrap=True)
+    for batch in range(1, 6):
+        _settle_all(gateway)
+        _record_batch(data_dir, "2026-08-13", batch)
+        orchestrator._run_update(bootstrap=False)
+
+    queued_days = {item["target_day"].isoformat() for item in gateway.submissions}
+    assert queued_days == {"2026-08-10", "2026-08-11", "2026-08-12", "2026-08-13"}
+    state = orchestrator.state_snapshot()
+    assert {"2026-08-10", "2026-08-11", "2026-08-12"} <= set(state["processed_dates"])
+    # The day still being recorded is refreshed as its new batches land, so the
+    # backlog draining never costs the operator a stale view of today.
+    live_day_jobs = {
+        item["job_id"]
+        for item in gateway.submissions
+        if item["target_day"] == date(2026, 8, 13)
+    }
+    assert len(live_day_jobs) > 1
+
+
+def test_a_day_still_receiving_data_keeps_one_job_in_flight(
+    tmp_path: Path, discovery
+) -> None:
+    """Discovery must not stack a job per poll for a source that keeps growing."""
+
+    orchestrator, gateway, _executed = discovery
+    data_dir = tmp_path / "data"
+    _record_batch(data_dir, "2026-08-13", 0)
+
+    orchestrator._run_update(bootstrap=True)
+    for batch in range(1, 5):
+        _record_batch(data_dir, "2026-08-13", batch)
+        orchestrator._run_update(bootstrap=False)
+
+    assert len({item["job_id"] for item in gateway.submissions}) == 1
+    state = orchestrator.state_snapshot()
+    assert len(state["pending_analysis_jobs"]) == 1
+
+
+def test_data_that_arrived_while_a_job_ran_is_queued_once_it_settles(
+    tmp_path: Path, discovery
+) -> None:
+    """Waiting for the in-flight job must not lose the batches that arrived."""
+
+    orchestrator, gateway, _executed = discovery
+    data_dir = tmp_path / "data"
+    _record_batch(data_dir, "2026-08-13", 0)
+    orchestrator._run_update(bootstrap=True)
+    first_job = str(gateway.submissions[0]["job_id"])
+
+    _record_batch(data_dir, "2026-08-13", 1)
+    orchestrator._run_update(bootstrap=False)
+    assert len(gateway.submissions) == 1
+
+    _settle(gateway, first_job)
+    orchestrator._run_update(bootstrap=False)
+
+    assert len({item["job_id"] for item in gateway.submissions}) == 2
+    latest = gateway.submissions[-1]
+    assert latest["target_day"] == date(2026, 8, 13)
+    assert latest["source_signature"] != gateway.submissions[0]["source_signature"]
+    # The day is not claimed as processed while its newest data is still queued.
+    assert orchestrator.state_snapshot()["processed_dates"] == []
+
+
+def test_a_cycle_with_nothing_new_still_drives_jobs_already_in_flight(
+    tmp_path: Path, discovery
+) -> None:
+    """The lifecycle driver has to stay alive on quiet cycles too."""
+
+    orchestrator, gateway, _executed = discovery
+    _record_batch(tmp_path / "data", "2026-08-13", 0)
+
+    orchestrator._run_update(bootstrap=True)
+    passes_after_bootstrap = gateway.scheduling_passes
+    orchestrator._run_update(bootstrap=False)
+
+    assert len(gateway.submissions) == 1
+    assert gateway.scheduling_passes == passes_after_bootstrap + 1
+
+
+def test_no_pending_jobs_leaves_a_quiet_cycle_quiet(
+    tmp_path: Path, discovery
+) -> None:
+    orchestrator, gateway, _executed = discovery
+    _record_batch(tmp_path / "data", "2026-08-13", 0)
+
+    orchestrator._run_update(bootstrap=True)
+    _settle_all(gateway)
+    orchestrator._run_update(bootstrap=False)
+    passes_after_settle = gateway.scheduling_passes
+    orchestrator._run_update(bootstrap=False)
+
+    assert gateway.scheduling_passes == passes_after_settle
+    assert orchestrator.state_snapshot()["pending_analysis_jobs"] == []

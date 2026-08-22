@@ -158,6 +158,25 @@ class AnalysisJobRegistry:
             rows = connection.execute(query, parameters).fetchall()
         return tuple(self._record_from_row(row) for row in rows)
 
+    def scan_job_ids(self, *, session_id: str | None = None) -> tuple[str, ...]:
+        """Return every recorded job id, oldest first.
+
+        :meth:`records` is a bounded product view. Lifecycle scanning must not
+        inherit that bound: a device that keeps receiving data keeps creating
+        jobs, and a job that scrolled off the newest page still has to be driven
+        to a terminal state.
+        """
+
+        query = "SELECT job_id FROM federated_analysis_jobs"
+        parameters: list[Any] = []
+        if session_id is not None:
+            query += " WHERE session_id=?"
+            parameters.append(session_id)
+        query += " ORDER BY created_at ASC, job_id ASC"
+        with self._connect() as connection:
+            rows = connection.execute(query, parameters).fetchall()
+        return tuple(str(row["job_id"]) for row in rows)
+
     def record_for(self, job_id: str) -> AnalysisJobRecord | None:
         with self._connect() as connection:
             row = connection.execute(
@@ -182,6 +201,11 @@ class AnalysisWorkService:
         self.registry = registry
         self.session_id = session_id
         self.scheduler_poll_seconds = max(float(scheduler_poll_seconds), 0.05)
+        # Terminal is final, so a job that reached it never has to be read from
+        # the durable store again while this runtime lives. Without that the
+        # lifecycle scan would keep growing on a device that keeps discovering
+        # data, even though almost all of those jobs are long finished.
+        self._settled_job_ids: set[str] = set()
         self._lock = threading.Lock()
         self._scheduling = threading.Event()
         self._scheduler_wake = threading.Event()
@@ -213,14 +237,25 @@ class AnalysisWorkService:
     # ------------------------------------------------------------------
 
     def pending_job_ids(self) -> tuple[str, ...]:
+        """Return every non-terminal job this session owns, oldest first.
+
+        The driver stops when this is empty, so it has to see all of the work:
+        scanning only the newest page of the index would strand older pending
+        jobs on a device that keeps discovering new data.
+        """
+
         pending: list[str] = []
-        for record in self.registry.records(session_id=self.session_id):
+        for job_id in self.registry.scan_job_ids(session_id=self.session_id):
+            if job_id in self._settled_job_ids:
+                continue
             try:
-                snapshot = self.scheduler.store.snapshot(record.job_id)
+                snapshot = self.scheduler.store.snapshot(job_id)
             except _SCHEDULING_ERRORS:
                 continue
-            if not snapshot.job.terminal:
-                pending.append(record.job_id)
+            if snapshot.job.terminal:
+                self._settled_job_ids.add(job_id)
+                continue
+            pending.append(job_id)
         return tuple(pending)
 
     async def schedule_pending(self) -> tuple[SchedulingOutcome, ...]:

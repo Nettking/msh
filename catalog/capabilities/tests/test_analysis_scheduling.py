@@ -29,6 +29,7 @@ from catalog.capabilities.tests.analysis_harness import (
     StaticReportSource,
     build_stack,
     provider_report,
+    work_slice,
 )
 from catalog.federation.errors import FederationValidationError
 
@@ -403,6 +404,50 @@ def test_scheduling_pass_reports_every_pending_job(tmp_path) -> None:
 
     assert {item.job_id for item in outcomes} == {first, second}
     assert all(item.decision == DECISION_DISPATCHED for item in outcomes)
+
+
+def test_pending_work_is_found_past_the_newest_page_of_the_index(tmp_path) -> None:
+    """A device that keeps discovering data must not strand its older jobs.
+
+    The job index also backs bounded product views. Lifecycle scanning has to see
+    all of the work, or a job that scrolled off the newest page would sit pending
+    forever while newer slices kept arriving.
+    """
+
+    stack = build_stack(tmp_path)
+    oldest = stack.submit().job_id
+    registry = stack.service.registry
+    for index in range(1, 260):
+        registry.record(
+            work_slice(
+                session_id=stack.session_id,
+                target_date="2026-08-14",
+                source_signature=f"{index:064x}",
+            ),
+            created_at=stack.clock.now + timedelta(minutes=index),
+        )
+
+    listed = {record.job_id for record in registry.records(session_id=stack.session_id)}
+    assert oldest not in listed
+    assert oldest in stack.service.pending_job_ids()
+    assert [item.job_id for item in stack.service.run_scheduling_pass()] == [oldest]
+
+
+def test_the_pending_scan_drops_settled_jobs_and_keeps_unfinished_ones(
+    tmp_path,
+) -> None:
+    """Repeated passes must stay stable: the driver polls this continuously."""
+
+    stack = build_stack(tmp_path)
+    first = stack.submit().job_id
+    second = stack.submit(target_date="2026-08-14").job_id
+    assert set(stack.service.pending_job_ids()) == {first, second}
+
+    _schedule(stack, first)
+
+    assert stack.store.snapshot(first).job.terminal is True
+    assert stack.service.pending_job_ids() == (second,)
+    assert stack.service.pending_job_ids() == (second,)
 
 
 def test_clock_is_injected_rather_than_read_from_the_wall(tmp_path) -> None:

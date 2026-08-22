@@ -1203,19 +1203,19 @@ class RuntimeOrchestrator:
                 + ", ".join(sorted(dropped_unverified, reverse=True))
             )
 
-        # A day whose current source signature already has a live durable job is
-        # scheduled work. Re-queueing is suppressed by job identity anyway, but
-        # skipping it lets catch-up advance instead of spinning on the same day.
-        # A changed signature is different work and is queued again.
         def _slice_signature(day: date) -> str:
             return date_range_source_signature(current_source_signatures, day, day)
 
+        # A day with a live durable job is already scheduled work, whatever its
+        # source looked like when that job was created. A source that is still
+        # growing — a recorder writing today, a federation mirror still syncing —
+        # changes that day's signature on nearly every poll, so keying this on the
+        # signature made the active day take every catch-up slot for itself and
+        # stack a duplicate job per cycle for snapshots that were already stale.
+        # Newer data for a day in flight is queued once that job settles, which
+        # keeps one refresh in flight per day and lets catch-up keep advancing.
         with self._lock:
-            awaiting_jobs = {
-                day
-                for day, signature in self._state.pending_analysis_slices.items()
-                if signature == _slice_signature(date.fromisoformat(day))
-            }
+            awaiting_jobs = set(self._state.pending_analysis_slices)
 
         if bootstrap:
             # Latest-day first gives operators the freshest playback view quickly;
@@ -1244,18 +1244,37 @@ class RuntimeOrchestrator:
                 f"{latest.isoformat()} (policy={BOOTSTRAP_FULL_ANALYSIS_POLICY})"
             )
         else:
-            # Catch-up intentionally advances one day per cycle rather than doing a
-            # full historical recompute on every poll.
+            # Catch-up advances at most one never-analysed day per cycle rather
+            # than doing a full historical recompute on every poll.
+            #
+            # Refreshing a day that already has an analysis is a separate lane. A
+            # source that keeps growing — a recorder writing today, a federation
+            # mirror still syncing a day — is the newest pending day on nearly
+            # every cycle, so sharing one lane let it spend the whole catch-up
+            # budget on itself while the backlog never moved. Each lane queues at
+            # most one day per cycle, so neither can starve the other.
             schedulable = [
                 day for day in pending_desc if day.isoformat() not in awaiting_jobs
             ]
-            target_days = [schedulable[0]] if schedulable else []
+            with self._lock:
+                analysed_before = set(self._state.completed_analysis_slices)
+            backlog = [
+                day for day in schedulable if day.isoformat() not in analysed_before
+            ]
+            refresh = [
+                day for day in schedulable if day.isoformat() in analysed_before
+            ]
+            target_days = sorted(set(backlog[:1] + refresh[:1]))
             if target_days:
+                queued_slices = ", ".join(
+                    day.isoformat() for day in reversed(target_days)
+                )
                 self.status.info(
-                    "historical catch-up phase: processing one pending day "
-                    f"{target_days[0].isoformat()} "
-                    f"(active_slice={target_days[0].isoformat()}, "
-                    f"remaining_slices={max(0, len(pending_desc) - 1)}, "
+                    "historical catch-up phase: processing pending day(s) "
+                    f"{queued_slices} "
+                    f"(active_slice={target_days[-1].isoformat()}, "
+                    f"new_days={len(backlog)}, refresh_days={len(refresh)}, "
+                    f"remaining_slices={max(0, len(pending_desc) - len(target_days))}, "
                     f"pending_before_cycle={len(pending_desc)})"
                 )
             else:
@@ -1349,6 +1368,12 @@ class RuntimeOrchestrator:
                     f"processed={self._state.processed_days_count}/{self._state.total_available_days}, "
                     f"remaining={len(pending_desc)}"
                 )
+                jobs_in_flight = bool(self._state.pending_analysis_jobs)
+            if jobs_in_flight:
+                # Nothing new to queue, but durable work is still in flight: a day
+                # being analysed now, or a job a restart left behind. Keep the
+                # lifecycle driver alive so those jobs still reach a terminal state.
+                self._request_scheduling_pass()
 
         with self._lock:
             self._state.update_running = False
@@ -1425,6 +1450,10 @@ class RuntimeOrchestrator:
 
         with self._lock:
             pending = list(self._state.pending_analysis_jobs)
+            if not pending and self._state.pending_analysis_slices:
+                # No live job is left to hold a date in flight.
+                self._state.pending_analysis_slices = {}
+                self._persist_state()
         if not pending:
             return
         try:
@@ -1438,6 +1467,10 @@ class RuntimeOrchestrator:
         for job_id in pending:
             view = gateway.job_view(job_id)
             if view is None or not view.get("terminal"):
+                # Work is still in flight for this job's dates, or the coordinator
+                # cannot read it yet. Neither is a finished slice, so the job stays
+                # tracked and keeps holding its dates until it reaches a terminal
+                # state on a later cycle.
                 still_pending.append(job_id)
                 continue
             completed = [str(item) for item in (view.get("target_dates") or [])]
@@ -1477,7 +1510,8 @@ class RuntimeOrchestrator:
         with self._lock:
             self._state.pending_analysis_jobs = sorted(set(still_pending))
             # A day is only "awaiting scheduling" while it has a live durable job.
-            # A finished job releases it so catch-up can move on or retry it.
+            # A finished job releases it, so catch-up can move on and any data that
+            # arrived for that day while the job ran is queued on the next cycle.
             self._state.pending_analysis_slices = {
                 day: signature
                 for day, signature in self._state.pending_analysis_slices.items()
