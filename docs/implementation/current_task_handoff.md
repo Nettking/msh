@@ -103,6 +103,16 @@ stale-heartbeat sweep now wakes both supported relay owners and produces a
 nonzero process exit so the existing Compose restart policy can act. Together
 these are **B06 2/8 properties automated-proven; B06 remains open**.
 
+The recorder timestamp/path-confinement delivery advances **B02 1/9 properties
+automated-proven**: the timestamp-derived storage day must be a real ASCII
+`YYYY-MM-DD` calendar date, and raw, observation and compatibility-JSONL targets
+are resolved and proven beneath their configured durable roots before writing.
+Traversal-shaped and impossible dates are rejected before the first recorder
+write. B02 remains open for finite ingress and total deadlines, observation and
+sequence-span bounds, bounded continuity validation, healthy-source isolation,
+incremental recovery, durable event-storm control and pressure behavior.
+P04/P05/P09 physical evidence remains open; no physical acceptance state changed.
+
 The current analysis-slice crash-correctness delivery advances **B08 1/5
 properties automated-proven**: deterministic slice archives are written through
 same-directory partial files, fsynced before atomic replacement, fully verified
