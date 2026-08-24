@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
+
+import pytest
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -148,3 +151,172 @@ def test_runtime_images_bake_build_identity() -> None:
         assert "FCP_BUILD_COMMIT=${FCP_BUILD_COMMIT}" in text
         assert "no.fcp.build_commit=${FCP_BUILD_COMMIT}" in text
     assert compose.count("FCP_BUILD_COMMIT: ${FCP_BUILD_COMMIT:-unknown}") >= 3
+
+
+# -- update disk lifecycle -----------------------------------------------
+#
+# The physical host that filled its drive did it through repeated update
+# builds: 21 GB of BuildKit cache in ~1 GB entries, while every FCP data path
+# together was under 1% of the disk. These pin the three properties that stop
+# it recurring.
+
+
+def test_the_build_commit_is_declared_below_the_dependency_install() -> None:
+    """This ordering is the whole fix; reversing it re-breaks the cache.
+
+    A build argument invalidates the layer that consumes it and every layer
+    after it. Declared above the install, each changed commit re-ran the whole
+    dependency install and wrote roughly a gigabyte of fresh cache per image.
+    """
+
+    for name in ("Dockerfile", "Dockerfile.cli"):
+        text = (ROOT / name).read_text(encoding="utf-8")
+        install = text.index("python -m pip install")
+        declaration = text.index("ARG FCP_BUILD_COMMIT=unknown")
+        assert declaration > install, (
+            f"{name}: the build commit must be declared after the dependency "
+            "install, or every update rebuilds and re-caches it"
+        )
+
+
+def test_both_agents_preflight_disk_before_building() -> None:
+    """Refusing after Flask is stopped is the state this must never reach."""
+
+    windows = (ROOT / "scripts/windows/fcp_update_agent.ps1").read_text(
+        encoding="utf-8"
+    )
+    posix = (ROOT / "scripts/posix/fcp_update_agent.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "insufficient_disk_for_update" in windows
+    assert "insufficient_disk_for_update" in posix
+
+    # The preflight must sit before the build, and the build before the stop.
+    assert (
+        windows.index("Assert-DiskPreflight")
+        < windows.index("'compose', 'build', 'relay', 'flask', 'recorder'")
+        < windows.index("'compose', 'stop', 'flask'")
+    )
+    assert posix.index("preflight_disk(root, env)") < posix.index(
+        '["docker", "compose", "build", "relay", "flask", "recorder"]'
+    )
+
+
+def test_both_agents_bound_the_build_cache() -> None:
+    windows = (ROOT / "scripts/windows/fcp_update_agent.ps1").read_text(
+        encoding="utf-8"
+    )
+    posix = (ROOT / "scripts/posix/fcp_update_agent.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "'builder', 'prune', '--force'" in windows
+    assert '"builder",' in posix and '"prune",' in posix
+    assert "keep-storage" in windows
+    assert "keep-storage" in posix
+
+
+def test_the_two_agents_agree_on_the_disk_figures() -> None:
+    """Two languages, one policy. A drift here is a silent inconsistency."""
+
+    windows = (ROOT / "scripts/windows/fcp_update_agent.ps1").read_text(
+        encoding="utf-8"
+    )
+    posix = (ROOT / "scripts/posix/fcp_update_agent.py").read_text(
+        encoding="utf-8"
+    )
+
+    assert "UPDATE_REQUIRED_FREE_BYTES = 10 * 1024**3" in posix
+    assert "$UpdateRequiredFreeBytes = 10737418240" in windows
+    assert 10 * 1024**3 == 10737418240
+
+    assert "BUILD_CACHE_KEEP_BYTES = 8 * 1024**3" in posix
+    assert "$BuildCacheKeepBytes = 8589934592" in windows
+    assert 8 * 1024**3 == 8589934592
+
+
+
+#: The POSIX agent imports ``fcntl`` for its single-instance lock, so it cannot
+#: be loaded on Windows at all. That is by design -- it is the POSIX launcher's
+#: agent, and Windows hosts run the PowerShell one. The cross-platform
+#: assertions above read both agents as text and so still cover this policy on
+#: Windows; only the tests that execute the module are skipped.
+_POSIX_AGENT_ONLY = pytest.mark.skipif(
+    importlib.util.find_spec("fcntl") is None,
+    reason="the POSIX update agent imports fcntl, which Windows does not provide",
+)
+
+
+def _load_posix_agent():
+    """Import the standalone POSIX agent by path, as its launcher runs it."""
+
+    spec = importlib.util.spec_from_file_location(
+        "_fcp_update_agent_under_test",
+        ROOT / "scripts/posix/fcp_update_agent.py",
+    )
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+@_POSIX_AGENT_ONLY
+def test_preflight_passes_when_there_is_room(tmp_path, monkeypatch) -> None:
+    agent = _load_posix_agent()
+    monkeypatch.setattr(
+        agent, "free_bytes", lambda _root: agent.UPDATE_REQUIRED_FREE_BYTES
+    )
+    pruned: list[bool] = []
+    monkeypatch.setattr(
+        agent, "prune_build_cache", lambda *_a: pruned.append(True) or True
+    )
+
+    agent.preflight_disk(tmp_path, {})
+
+    assert pruned == [], "a host with room must not have its cache pruned"
+
+
+@_POSIX_AGENT_ONLY
+def test_preflight_recovers_from_its_own_build_cache(tmp_path, monkeypatch) -> None:
+    """A cache past its bound is the usual reason the room went missing."""
+
+    agent = _load_posix_agent()
+    readings = iter([0, agent.UPDATE_REQUIRED_FREE_BYTES])
+    monkeypatch.setattr(agent, "free_bytes", lambda _root: next(readings))
+    pruned: list[bool] = []
+    monkeypatch.setattr(
+        agent, "prune_build_cache", lambda *_a: pruned.append(True) or True
+    )
+
+    agent.preflight_disk(tmp_path, {})
+
+    assert pruned == [True]
+
+
+@_POSIX_AGENT_ONLY
+def test_preflight_refuses_when_pruning_is_not_enough(tmp_path, monkeypatch) -> None:
+    """The refusal must land before anything is stopped, not during."""
+
+    agent = _load_posix_agent()
+    monkeypatch.setattr(agent, "free_bytes", lambda _root: 0)
+    monkeypatch.setattr(agent, "prune_build_cache", lambda *_a: True)
+
+    with pytest.raises(RuntimeError) as caught:
+        agent.preflight_disk(tmp_path, {})
+
+    assert str(caught.value) == "insufficient_disk_for_update"
+
+
+@_POSIX_AGENT_ONLY
+def test_a_failed_prune_never_becomes_an_update_failure(tmp_path, monkeypatch) -> None:
+    """Cache is reconstructible; failing to prune it must not fail the update."""
+
+    agent = _load_posix_agent()
+
+    def _explode(*_args, **_kwargs):
+        raise OSError("docker unavailable")
+
+    monkeypatch.setattr(agent.subprocess, "run", _explode)
+
+    assert agent.prune_build_cache(tmp_path, {}) is False

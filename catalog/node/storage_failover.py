@@ -66,6 +66,13 @@ class StorageAuthoritySettings:
     request_timeout: float = 15.0
     scan_interval: float = 2.0
     lease_seconds: float = 300.0
+    #: Bytes this authority offers the Federation, reserved on disk in advance.
+    #: ``None`` leaves it bounded only by the free-space floor below.
+    storage_budget_bytes: int | None = None
+    #: Free space on the volume this authority never consumes, whatever the
+    #: budget says. It is what keeps a storage contribution from taking the
+    #: host down with it. ``None`` derives it from the volume and platform.
+    storage_floor_bytes: int | None = None
 
     def __post_init__(self) -> None:
         for name in (

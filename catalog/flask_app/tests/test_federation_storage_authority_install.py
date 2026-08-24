@@ -11,6 +11,7 @@ import asyncio
 import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 from flask import Flask
@@ -412,3 +413,158 @@ def test_the_supervised_thread_stays_alive_across_a_cancelled_runtime(monkeypatc
         assert monitor._thread is not None and monitor._thread.is_alive()
     finally:
         monitor.stop()
+
+
+# -- disk allocation reaches the normal full-FCP composition -------------
+#
+# The allocation is only a product guarantee if the path a normal device
+# actually starts through carries it. These pin that: the same settings object
+# the supervisor builds is what the provider is later constructed from, so a
+# budget that stops here is a budget no device ever applies.
+
+
+def test_settings_carry_no_allocation_when_nothing_is_configured():
+    """Unconfigured means floor-only with a derived floor, not a silent zero."""
+
+    monitor = _monitor(context=_creator_context())
+
+    with monitor.app.app_context():
+        settings = monitor.build_settings()
+
+    assert settings.storage_budget_bytes is None
+    assert settings.storage_floor_bytes is None
+
+
+def test_a_configured_budget_and_floor_reach_the_settings():
+    monitor = _monitor(
+        context=_creator_context(),
+        FEDERATION_STORAGE_AUTHORITY_BUDGET_BYTES=50 * 1024**3,
+        FEDERATION_STORAGE_AUTHORITY_FLOOR_BYTES=20 * 1024**3,
+    )
+
+    with monitor.app.app_context():
+        settings = monitor.build_settings()
+
+    assert settings.storage_budget_bytes == 50 * 1024**3
+    assert settings.storage_floor_bytes == 20 * 1024**3
+
+
+def test_an_explicit_zero_floor_is_carried_rather_than_defaulted():
+    """An operator who measured their own host outranks the derivation."""
+
+    monitor = _monitor(
+        context=_creator_context(),
+        FEDERATION_STORAGE_AUTHORITY_FLOOR_BYTES=0,
+    )
+
+    with monitor.app.app_context():
+        settings = monitor.build_settings()
+
+    assert settings.storage_floor_bytes == 0
+
+
+@pytest.mark.parametrize(
+    "value",
+    [-1, "50GB", 12.5, True],
+)
+def test_a_malformed_allocation_is_refused_rather_than_defaulted(value):
+    """Silently dropping a mistyped budget is the failure this prevents."""
+
+    monitor = _monitor(
+        context=_creator_context(),
+        FEDERATION_STORAGE_AUTHORITY_BUDGET_BYTES=value,
+    )
+
+    with monitor.app.app_context(), pytest.raises(Exception) as caught:
+        monitor.build_settings()
+
+    assert getattr(caught.value, "code", "") == (
+        "invalid-storage-authority-allocation"
+    )
+
+
+# -- the whole host-to-authority path ------------------------------------
+#
+# The settings tests above start from application config, which is one step
+# short of the truth: on a normal device the authority runs inside the Flask
+# container, so a value set on the host reaches it only if Compose passes it
+# through and only if install_federation_storage_authority reads it from the
+# environment. Both halves were missing once. These cover the real path.
+
+COMPOSE = Path(__file__).resolve().parents[3] / "docker-compose.yml"
+BUDGET_ENV = "FCP_FEDERATION_STORAGE_AUTHORITY_BUDGET_BYTES"
+FLOOR_ENV = "FCP_FEDERATION_STORAGE_AUTHORITY_FLOOR_BYTES"
+
+
+def test_compose_passes_the_allocation_into_the_flask_container():
+    """Without this the host can set them and the container never sees them."""
+
+    compose = COMPOSE.read_text(encoding="utf-8")
+    flask_service = compose.split("  ollama:")[0]
+
+    for name in (BUDGET_ENV, FLOOR_ENV):
+        assert f"- {name}=${{{name}:-}}" in flask_service, (
+            f"{name} must be passed into the flask service, or a host value "
+            "cannot reach the authority that reads it"
+        )
+
+
+def test_the_environment_reaches_the_settings_the_authority_is_built_from(
+    monkeypatch,
+):
+    """Host environment -> install defaults -> settings, end to end."""
+
+    monkeypatch.setenv(BUDGET_ENV, str(50 * 1024**3))
+    monkeypatch.setenv(FLOOR_ENV, str(20 * 1024**3))
+
+    monitor = _monitor(context=_creator_context())
+    with monitor.app.app_context():
+        settings = monitor.build_settings()
+
+    assert settings.storage_budget_bytes == 50 * 1024**3
+    assert settings.storage_floor_bytes == 20 * 1024**3
+
+
+def test_an_unset_environment_leaves_the_allocation_underived(monkeypatch):
+    """Compose sends "" for an unset host variable; that is not a budget."""
+
+    monkeypatch.setenv(BUDGET_ENV, "")
+    monkeypatch.setenv(FLOOR_ENV, "")
+
+    monitor = _monitor(context=_creator_context())
+    with monitor.app.app_context():
+        settings = monitor.build_settings()
+
+    assert settings.storage_budget_bytes is None
+    assert settings.storage_floor_bytes is None
+
+
+@pytest.mark.parametrize("value", ["50GB", "-1", "1.5", "  "])
+def test_a_malformed_environment_value_is_refused_at_startup(monkeypatch, value):
+    """A mistyped budget must not silently become "unbounded"."""
+
+    monkeypatch.setenv(BUDGET_ENV, value)
+
+    if value.strip() == "":
+        monitor = _monitor(context=_creator_context())
+        with monitor.app.app_context():
+            assert monitor.build_settings().storage_budget_bytes is None
+        return
+
+    with pytest.raises(Exception) as caught:
+        _monitor(context=_creator_context())
+
+    assert getattr(caught.value, "code", "") == (
+        "invalid-storage-authority-allocation"
+    )
+
+
+def test_the_documented_variables_are_the_ones_the_code_reads():
+    """.env.example must not document a name nothing consumes."""
+
+    example = (
+        Path(__file__).resolve().parents[3] / ".env.example"
+    ).read_text(encoding="utf-8")
+
+    for name in (BUDGET_ENV, FLOOR_ENV):
+        assert name in example

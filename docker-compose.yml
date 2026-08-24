@@ -33,6 +33,13 @@ services:
       - FCP_FEDERATION_COORDINATOR_DATABASE=${FCP_FEDERATION_COORDINATOR_DATABASE:-/var/lib/fcp-relay/control.sqlite3}
       - FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED=${FCP_FEDERATION_STORAGE_AUTHORITY_ENABLED:-1}
       - FCP_FEDERATION_STORAGE_AUTHORITY_RELAY=${FCP_FEDERATION_STORAGE_AUTHORITY_RELAY:-ws://relay:8765}
+      # Disk this device offers the Federation, and the free space it never
+      # consumes. Both are deliberately empty by default: unset means the
+      # device is bounded by the derived floor alone. They must be listed
+      # here even so -- the authority runs inside this container, so a value
+      # set on the host reaches it only by being passed through.
+      - FCP_FEDERATION_STORAGE_AUTHORITY_BUDGET_BYTES=${FCP_FEDERATION_STORAGE_AUTHORITY_BUDGET_BYTES:-}
+      - FCP_FEDERATION_STORAGE_AUTHORITY_FLOOR_BYTES=${FCP_FEDERATION_STORAGE_AUTHORITY_FLOOR_BYTES:-}
     volumes:
       - type: bind
         source: ${FCP_RESULTS_DIR:-./results}

@@ -23,6 +23,27 @@ class StorageCandidateSpec:
     display_label: str
     capacity_envelope: dict[str, Any]
     missing_prerequisites: tuple[str, ...] = ()
+    #: Resolved per inspection rather than frozen into the spec. What a device
+    #: can offer changes as its disk fills, and an envelope captured once at
+    #: startup would advertise capacity this device no longer has.
+    capacity_provider: Callable[[], Mapping[str, Any]] | None = None
+
+
+def _live_capacity(spec: StorageCandidateSpec) -> Mapping[str, Any]:
+    """Current allocation state, or nothing if it cannot be read.
+
+    A capacity reading that fails must not remove the candidate: the device can
+    still store, it just cannot say how much right now. Falling back to the
+    static envelope keeps inspection working while leaving the allocation
+    itself -- which is enforced at write time -- unaffected.
+    """
+
+    if spec.capacity_provider is None:
+        return {}
+    try:
+        return dict(spec.capacity_provider())
+    except Exception:  # noqa: BLE001 - inspection never fails on a disk read
+        return {}
 
 
 class StorageCandidateSource:
@@ -42,6 +63,7 @@ class StorageCandidateSource:
                 display_label=spec.display_label,
                 capacity_envelope={
                     **spec.capacity_envelope,
+                    **_live_capacity(spec),
                     "provider_id": spec.provider_id,
                     "authority": "candidate-only",
                 },

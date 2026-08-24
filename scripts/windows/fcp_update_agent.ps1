@@ -26,6 +26,15 @@ $OidPattern = '^[0-9a-f]{40}$'
 $RequestIdPattern = '^[A-Za-z0-9._:-]{1,128}$'
 $BranchPattern = '^(?![./-])(?!.*\.\.)(?!.*//)(?!.*@\{)(?!.*\.lock(?:/|$))[A-Za-z0-9][A-Za-z0-9._/-]{0,180}(?<![./])$'
 $ModelPattern = '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$'
+# Free space an activation needs before it may start. An update rebuilds three
+# images and replaces the running Flask container; discovering there is no room
+# for that *after* Flask has been stopped is the failure this prevents. Keep
+# these two in step with scripts/posix/fcp_update_agent.py, which a test pins.
+$UpdateRequiredFreeBytes = 10737418240
+# Ceiling for the BuildKit cache. Large enough that a build still reuses the
+# dependency layer it just wrote, far below the 21 GB an unbounded cache
+# reached on the host that filled its drive.
+$BuildCacheKeepBytes = 8589934592
 
 function Normalize-DirectoryPath([string]$Value) {
     $full = [System.IO.Path]::GetFullPath($Value)
@@ -276,6 +285,38 @@ function Invoke-External {
         throw "external_command_failed:${FilePath}:$($result.ExitCode)`n$rendered"
     }
     return @($result.Output)
+}
+
+function Get-FreeBytes {
+    # The checkout and the Docker data root share the system volume on the
+    # supported Windows layout, so this is the number that decides whether a
+    # build can finish. Docker Desktop's disk image grows on demand from the
+    # same volume and does not shrink when files inside it are deleted.
+    $drive = [System.IO.Path]::GetPathRoot((Resolve-Path $RepoRoot).Path)
+    return ([System.IO.DriveInfo]::New($drive)).AvailableFreeSpace
+}
+
+function Invoke-BuildCachePrune {
+    # ``--keep-storage`` retains recent cache, so the dependency layer a build
+    # wants to reuse survives while stale entries from earlier commits are
+    # released. Cache is reconstructible by definition, so a failure here is
+    # reported rather than thrown: it must never become an update failure.
+    $result = Invoke-ExternalResult 'docker' @(
+        'builder', 'prune', '--force', "--keep-storage=$BuildCacheKeepBytes"
+    )
+    return ($result.ExitCode -eq 0)
+}
+
+function Assert-DiskPreflight {
+    # A host that is short on space gets one chance to recover from its own
+    # build cache first: pruning is non-destructive, and a cache past its bound
+    # is the usual reason the room went missing. Only if space is still short
+    # does the activation refuse -- and it refuses here, while the running FCP
+    # is still whole.
+    if ((Get-FreeBytes) -ge $UpdateRequiredFreeBytes) { return }
+    Invoke-BuildCachePrune | Out-Null
+    if ((Get-FreeBytes) -ge $UpdateRequiredFreeBytes) { return }
+    throw 'insufficient_disk_for_update'
 }
 
 function Invoke-Git([string[]]$Arguments) {
@@ -660,9 +701,15 @@ function Process-Request {
 
         Preserve-RelayVolumeSelection | Out-Null
         $env:FCP_BUILD_COMMIT = $target
+        # Before the build, because the build is what consumes the space and
+        # the running FCP is still whole at this point.
+        Assert-DiskPreflight
         Invoke-External 'docker' @(
             'compose', 'build', 'relay', 'flask', 'recorder'
         ) | Out-Null
+        # And again after, so the cache this build just wrote is bounded rather
+        # than left for the next update to trip over.
+        Invoke-BuildCachePrune | Out-Null
         Invoke-External 'docker' @(
             'compose', 'up', '-d', 'relay', 'ollama', 'recorder'
         ) | Out-Null

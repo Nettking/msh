@@ -10,13 +10,20 @@ This is separate from the runtime session choice:
 
 ## Start FCP
 
-On the Windows FCP machine, update and start from Command Prompt:
+On the Windows FCP machine, start from Command Prompt:
 
 ```cmd
 cd /d C:\path\to\fcp
-git pull --ff-only origin main
 start.cmd
 ```
+
+Do not fast-forward the checkout by hand as part of an ordinary start. Software
+updates have their own supported paths: on a Federation, the current leader's
+**Check for updates** -> **Update all devices** flow updates every reachable
+device, including this one, and proves the running build afterwards. For a
+device that is updating only itself, `update.cmd` performs the same safe
+fast-forward and then resumes the saved setup. See
+[Manual Federation-wide FCP updates](implementation/federation/active/manual_updates.md).
 
 `start.cmd` starts both containers in the background and opens:
 
@@ -41,8 +48,8 @@ cd fcp
 start.cmd
 ```
 
-If `git pull --ff-only` reports local changes or a branch conflict, stop and
-inspect those changes. Do not use a hard reset on a recorder machine.
+If an update stops because the checkout has local changes or a branch conflict,
+stop and inspect those changes. Do not use a hard reset on a recorder machine.
 
 ## Discover machines from MTConnect data
 

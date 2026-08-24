@@ -46,6 +46,7 @@ from catalog.capabilities.worker_activation import (
     LocalComputeHandlerDescriptor,
     LocalComputeHandlerInventory,
 )
+from catalog.federation import storage_allocation
 from catalog.federation.errors import (
     FederationOperationError,
     FederationValidationError,
@@ -423,6 +424,7 @@ def _build_bundle() -> LocalCandidateBundle:
         cleanup_probe=storage_probe.cleanup,
         payload_bytes=256,
     )
+    probe_root = _probe_root()
     storage_spec = StorageCandidateSpec(
         provider_id=_STORAGE_PROVIDER_ID,
         protocol=STORAGE_PROTOCOL,
@@ -433,6 +435,14 @@ def _build_bundle() -> LocalCandidateBundle:
             "probe_payload_bytes": 256,
             "protocol_version": STORAGE_PROTOCOL_VERSION,
         },
+        # The probe proves this device can write 256 bytes. It says nothing
+        # about how many bytes the device can afford to accept, so the real
+        # allocation state is read per inspection and travels with it. Reading
+        # is deliberately side-effect free: advertising capacity must never
+        # reserve any.
+        capacity_provider=lambda: storage_allocation.describe(
+            probe_root
+        ).as_capacity_envelope(),
     )
     return LocalCandidateBundle(
         inventory=inventory,

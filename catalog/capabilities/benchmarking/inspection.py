@@ -62,9 +62,29 @@ def _memory_bytes() -> int | None:
     return page_size * page_count
 
 
+def _data_volume() -> str:
+    """The path whose volume actually holds FCP data.
+
+    Free space on the filesystem root says nothing about what a device can
+    contribute when the data directory is a bind mount, a second disk, or a
+    Windows drive other than the system one -- which is the normal deployment.
+    Measure where the bytes land. A directory that does not exist yet is
+    measured at its nearest existing ancestor, which is on the same volume.
+    """
+
+    configured = os.environ.get("FCP_DATA_DIR", "").strip()
+    candidate = os.path.abspath(configured or "data")
+    while not os.path.exists(candidate):
+        parent = os.path.dirname(candidate)
+        if parent == candidate:
+            return os.path.abspath(os.sep)
+        candidate = parent
+    return candidate
+
+
 def _disk_free_bytes() -> int | None:
     try:
-        return shutil.disk_usage(os.path.abspath(os.sep)).free
+        return shutil.disk_usage(_data_volume()).free
     except OSError:
         return None
 

@@ -9,6 +9,7 @@ import hashlib
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -34,6 +35,19 @@ BRANCH_RE = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._/-]{0,180}(?<![./])$"
 )
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
+
+#: Free space an activation needs before it may start. An update rebuilds three
+#: images and replaces the running Flask container; discovering there is no room
+#: for that *after* Flask has been stopped is the failure this prevents. The
+#: figure matches the storage floor's platform minimum in
+#: ``catalog/federation/storage_allocation.py``: one update cycle, operating
+#: headroom, and the margin Docker Desktop needs on Windows.
+UPDATE_REQUIRED_FREE_BYTES = 10 * 1024**3
+
+#: Ceiling for the BuildKit cache. Large enough that a build still reuses the
+#: dependency layer it just wrote, far below the 21 GB an unbounded cache
+#: reached on the host that filled its drive.
+BUILD_CACHE_KEEP_BYTES = 8 * 1024**3
 
 
 def utc(value: str) -> datetime:
@@ -468,6 +482,64 @@ def ensure_ollama_model(root: Path, env: dict[str, str]) -> str:
     return model
 
 
+def free_bytes(root: Path) -> int:
+    """Free space on the volume holding the checkout and the Docker data root.
+
+    Docker's storage lives on the system volume on the supported platforms, so
+    this is the number that decides whether a build can finish. A host whose
+    Docker root is elsewhere is outside the supported layout.
+    """
+
+    return shutil.disk_usage(root).free
+
+
+def prune_build_cache(root: Path, env: dict[str, str]) -> bool:
+    """Bound the BuildKit cache, keeping the most recently used entries.
+
+    ``--keep-storage`` retains recent cache, so the dependency layer a build
+    wants to reuse survives while stale entries from earlier commits are
+    released. Cache is by definition reconstructible, so a failure here is
+    reported rather than raised: it must never turn into an update failure.
+    """
+
+    try:
+        subprocess.run(
+            [
+                "docker",
+                "builder",
+                "prune",
+                "--force",
+                f"--keep-storage={BUILD_CACHE_KEEP_BYTES}",
+            ],
+            cwd=root,
+            env=env,
+            shell=False,
+            check=True,
+            timeout=300,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return True
+
+
+def preflight_disk(root: Path, env: dict[str, str]) -> None:
+    """Refuse an activation that cannot finish, before anything is stopped.
+
+    A host that is short on space is given one chance to recover from its own
+    build cache first: pruning is non-destructive, and a cache that grew past
+    its bound is the usual reason the room went missing. Only if space is still
+    short after that does the activation refuse -- and it refuses here, while
+    the running FCP is still untouched.
+    """
+
+    if free_bytes(root) >= UPDATE_REQUIRED_FREE_BYTES:
+        return
+    prune_build_cache(root, env)
+    if free_bytes(root) >= UPDATE_REQUIRED_FREE_BYTES:
+        return
+    raise RuntimeError("insufficient_disk_for_update")
+
+
 def validate_request(
     value: object,
 ) -> tuple[str, str, str | None, datetime | None]:
@@ -598,6 +670,9 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             raise RuntimeError("dirty_build_context")
         env = os.environ.copy()
         env["FCP_BUILD_COMMIT"] = target
+        # Before the build, because the build is what consumes the space and
+        # the running FCP is still whole at this point.
+        preflight_disk(root, env)
         subprocess.run(
             ["docker", "compose", "build", "relay", "flask", "recorder"],
             cwd=root,
@@ -606,6 +681,9 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             check=True,
             timeout=900,
         )
+        # And again after, so the cache this build just wrote is bounded rather
+        # than left for the next update to trip over.
+        prune_build_cache(root, env)
         subprocess.run(
             [
                 "docker",
