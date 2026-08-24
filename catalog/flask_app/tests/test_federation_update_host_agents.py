@@ -237,6 +237,17 @@ def test_the_two_agents_agree_on_the_disk_figures() -> None:
 
 
 
+#: The POSIX agent imports ``fcntl`` for its single-instance lock, so it cannot
+#: be loaded on Windows at all. That is by design -- it is the POSIX launcher's
+#: agent, and Windows hosts run the PowerShell one. The cross-platform
+#: assertions above read both agents as text and so still cover this policy on
+#: Windows; only the tests that execute the module are skipped.
+_POSIX_AGENT_ONLY = pytest.mark.skipif(
+    importlib.util.find_spec("fcntl") is None,
+    reason="the POSIX update agent imports fcntl, which Windows does not provide",
+)
+
+
 def _load_posix_agent():
     """Import the standalone POSIX agent by path, as its launcher runs it."""
 
@@ -250,6 +261,7 @@ def _load_posix_agent():
     return module
 
 
+@_POSIX_AGENT_ONLY
 def test_preflight_passes_when_there_is_room(tmp_path, monkeypatch) -> None:
     agent = _load_posix_agent()
     monkeypatch.setattr(
@@ -265,6 +277,7 @@ def test_preflight_passes_when_there_is_room(tmp_path, monkeypatch) -> None:
     assert pruned == [], "a host with room must not have its cache pruned"
 
 
+@_POSIX_AGENT_ONLY
 def test_preflight_recovers_from_its_own_build_cache(tmp_path, monkeypatch) -> None:
     """A cache past its bound is the usual reason the room went missing."""
 
@@ -281,6 +294,7 @@ def test_preflight_recovers_from_its_own_build_cache(tmp_path, monkeypatch) -> N
     assert pruned == [True]
 
 
+@_POSIX_AGENT_ONLY
 def test_preflight_refuses_when_pruning_is_not_enough(tmp_path, monkeypatch) -> None:
     """The refusal must land before anything is stopped, not during."""
 
@@ -294,6 +308,7 @@ def test_preflight_refuses_when_pruning_is_not_enough(tmp_path, monkeypatch) -> 
     assert str(caught.value) == "insufficient_disk_for_update"
 
 
+@_POSIX_AGENT_ONLY
 def test_a_failed_prune_never_becomes_an_update_failure(tmp_path, monkeypatch) -> None:
     """Cache is reconstructible; failing to prune it must not fail the update."""
 
