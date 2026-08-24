@@ -7,7 +7,10 @@ same-tailnet, same-owner peer must end without a grant.
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 import threading
+import time
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -314,33 +317,87 @@ def test_a_stale_responder_is_replaced_instead_of_blocking_the_port(
     """
 
     pid_file = tmp_path / "responder.pid"
-    pid_file.write_text("4242", encoding="utf-8")
-    killed: list[int] = []
-
-    monkeypatch.setattr(responder, "process_is_running", lambda pid: pid == 4242)
-    monkeypatch.setattr(responder.os, "name", "posix")
+    pid_file.write_text(
+        json.dumps(
+            {
+                "schema": responder.PROCESS_RECORD_SCHEMA,
+                "pid": 4242,
+                "start_token": "boot-a:100",
+            }
+        ),
+        encoding="utf-8",
+    )
+    terminated: list[tuple[int, str]] = []
     monkeypatch.setattr(
-        responder.os,
-        "kill",
-        lambda pid, sig: killed.append(pid),
+        responder,
+        "terminate_process_if_same_instance",
+        lambda pid, token: terminated.append((pid, token)) or True,
     )
 
     replaced = responder.stop_previous_instance(pid_file)
 
     assert replaced == 4242
-    assert killed == [4242]
+    assert terminated == [(4242, "boot-a:100")]
+
+
+def test_a_reused_pid_is_not_terminated(tmp_path: Path, monkeypatch) -> None:
+    pid_file = tmp_path / "responder.pid"
+    pid_file.write_text(
+        json.dumps(
+            {
+                "schema": responder.PROCESS_RECORD_SCHEMA,
+                "pid": 4242,
+                "start_token": "boot-a:100",
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setattr(
+        responder,
+        "terminate_process_if_same_instance",
+        lambda pid, token: False,
+    )
+
+    assert responder.stop_previous_instance(pid_file) is None
+
+
+def test_a_legacy_bare_pid_file_is_never_trusted(tmp_path: Path, monkeypatch) -> None:
+    pid_file = tmp_path / "responder.pid"
+    pid_file.write_text("4242", encoding="utf-8")
+    terminated: list[tuple[int, str]] = []
+    monkeypatch.setattr(
+        responder,
+        "terminate_process_if_same_instance",
+        lambda pid, token: terminated.append((pid, token)) or True,
+    )
+
+    assert responder.stop_previous_instance(pid_file) is None
+    assert terminated == []
 
 
 def test_a_dead_or_missing_pid_is_not_treated_as_a_running_responder(
     tmp_path: Path, monkeypatch
 ) -> None:
-    monkeypatch.setattr(responder, "process_is_running", lambda pid: False)
+    monkeypatch.setattr(
+        responder,
+        "terminate_process_if_same_instance",
+        lambda pid, token: False,
+    )
 
     missing = tmp_path / "absent.pid"
     assert responder.stop_previous_instance(missing) is None
 
     dead = tmp_path / "dead.pid"
-    dead.write_text("4242", encoding="utf-8")
+    dead.write_text(
+        json.dumps(
+            {
+                "schema": responder.PROCESS_RECORD_SCHEMA,
+                "pid": 4242,
+                "start_token": "boot-a:100",
+            }
+        ),
+        encoding="utf-8",
+    )
     assert responder.stop_previous_instance(dead) is None
 
     garbage = tmp_path / "garbage.pid"
@@ -352,18 +409,75 @@ def test_the_responder_never_terminates_itself(tmp_path: Path) -> None:
     import os as _os
 
     pid_file = tmp_path / "self.pid"
-    pid_file.write_text(str(_os.getpid()), encoding="utf-8")
+    pid_file.write_text(
+        json.dumps(
+            {
+                "schema": responder.PROCESS_RECORD_SCHEMA,
+                "pid": _os.getpid(),
+                "start_token": "current-process",
+            }
+        ),
+        encoding="utf-8",
+    )
 
     assert responder.stop_previous_instance(pid_file) is None
 
 
-def test_the_pid_file_records_the_live_responder(tmp_path: Path) -> None:
+def test_the_pid_file_records_the_live_responder(
+    tmp_path: Path, monkeypatch
+) -> None:
     import os as _os
 
     pid_file = tmp_path / "nested" / "responder.pid"
+    monkeypatch.setattr(
+        responder,
+        "process_start_token",
+        lambda pid: "boot-a:100" if pid == _os.getpid() else None,
+    )
     responder.write_pid_file(pid_file)
 
-    assert pid_file.read_text(encoding="utf-8") == str(_os.getpid())
+    assert json.loads(pid_file.read_text(encoding="utf-8")) == {
+        "schema": responder.PROCESS_RECORD_SCHEMA,
+        "pid": _os.getpid(),
+        "start_token": "boot-a:100",
+    }
+
+
+def test_matching_process_identity_is_rechecked_before_termination(
+    monkeypatch,
+) -> None:
+    tokens = iter(("boot-a:100", "boot-b:1"))
+    killed: list[int] = []
+    monkeypatch.setattr(responder, "process_start_token", lambda pid: next(tokens))
+    monkeypatch.setattr(responder.os, "name", "posix")
+    monkeypatch.setattr(
+        responder.os,
+        "kill",
+        lambda pid, sig: killed.append(pid),
+    )
+
+    assert not responder.terminate_process_if_same_instance(4242, "boot-a:100")
+    assert killed == []
+
+
+def test_a_matching_child_process_instance_can_be_terminated() -> None:
+    child = subprocess.Popen(
+        [sys.executable, "-c", "import time; time.sleep(30)"],
+    )
+    try:
+        token = None
+        deadline = time.monotonic() + 5.0
+        while token is None and time.monotonic() < deadline:
+            token = responder.process_start_token(child.pid)
+            if token is None:
+                time.sleep(0.05)
+        assert token is not None
+        assert responder.terminate_process_if_same_instance(child.pid, token)
+        child.wait(timeout=5.0)
+    finally:
+        if child.poll() is None:
+            child.kill()
+            child.wait(timeout=5.0)
 
 
 def test_a_port_already_in_use_is_reported_instead_of_announced_as_listening(
