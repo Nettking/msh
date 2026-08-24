@@ -388,7 +388,12 @@ def process_start_token(pid: int) -> str | None:
         return None
     if os.name == "nt":
         return _windows_process_start_token(pid)
-    return _proc_process_start_token(pid) or _ps_process_start_token(pid)
+    if sys.platform.startswith("linux"):
+        # Linux termination is authorized by this token, so only the boot-id +
+        # kernel start-time identity is strong enough. A second-resolution
+        # `ps lstart` fallback could match a different process after PID reuse.
+        return _proc_process_start_token(pid)
+    return _ps_process_start_token(pid)
 
 
 def terminate_process_if_same_instance(pid: int, expected_start_token: str) -> bool:
