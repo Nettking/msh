@@ -46,7 +46,7 @@ from .contracts import (
     slice_artifact_id,
 )
 from .gateway import AnalysisArtifactGateway
-from .packaging import write_slice_archive
+from .packaging import slice_archive_matches, write_slice_archive
 
 DEFAULT_HEARTBEAT_TIMEOUT_SECONDS = 15 * 60
 
@@ -152,7 +152,10 @@ class FederatedAnalysisScheduler:
             plan_key, work.plan_bytes()
         )
         slice_identity = self._ensure_slice_archive(
-            slice_key, files=slice_files, root=slice_root
+            slice_key,
+            artifact_id=slice_artifact_id(work),
+            files=slice_files,
+            root=slice_root,
         )
 
         job = build_analysis_job(
@@ -215,19 +218,49 @@ class FederatedAnalysisScheduler:
         self,
         object_key: str,
         *,
+        artifact_id: str,
         files: Sequence[Path],
         root: Path,
     ) -> ContentIdentity:
         store = self.gateway.content_store
         destination = store.resolve(object_key)
-        if not destination.is_file():
+        try:
+            registered = self.gateway.authority.artifact(artifact_id)
+        except FederationValidationError as exc:
+            if exc.code != "artifact-not-found":
+                raise
+            registered = None
+        archive_matches = slice_archive_matches(
+            destination,
+            files=files,
+            root=root,
+            max_bytes=store.max_bytes,
+        )
+        if not archive_matches and registered is not None:
+            raise FederationValidationError(
+                "analysis-slice-registered-content-invalid",
+                "object_key",
+                "registered analysis slice does not match its deterministic input",
+            )
+        if not archive_matches:
             write_slice_archive(
                 destination,
                 files=list(files),
                 root=root,
                 max_bytes=store.max_bytes,
             )
-        return store.identity(object_key)
+        identity = store.identity(object_key)
+        if registered is not None and (
+            registered.object_key != object_key
+            or registered.content_hash != identity.content_hash
+            or registered.size_bytes != identity.size_bytes
+        ):
+            raise FederationValidationError(
+                "analysis-slice-registered-content-invalid",
+                "object_key",
+                "registered analysis slice identity does not match its stored body",
+            )
+        return identity
 
     # ------------------------------------------------------------------
     # Coordinator: select, own, authorize, dispatch

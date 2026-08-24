@@ -96,15 +96,21 @@ A recorder whose current checkout predates this capability needs one manual fast
 ### Federation work still open
 
 Robustness implementation is proceeding as isolated delivery PRs. The merged
-tailnet responder process-identity delivery closes the stale-process-cleanup B06
-property with automated tests. The relay required-loop delivery on this branch
-closes a second distinct B06 property with automated tests: a fatal
+tailnet responder process-identity and relay required-loop deliveries close two
+distinct B06 properties with automated evidence: stale process records cannot
+authorize termination of a reused unrelated process, and a fatal relay
 stale-heartbeat sweep now wakes both supported relay owners and produces a
 nonzero process exit so the existing Compose restart policy can act. Together
-these are **B06 2/8 properties automated-proven; B06 remains open** for service
-health semantics, crash-loop visibility, recorder supervision/status containment,
-and publication/analysis-driver health. P05/P09 physical evidence remains open;
-no physical acceptance state changed.
+these are **B06 2/8 properties automated-proven; B06 remains open**.
+
+The current analysis-slice crash-correctness delivery advances **B08 1/5
+properties automated-proven**: deterministic slice archives are written through
+same-directory partial files, fsynced before atomic replacement, fully verified
+before reuse, rebuilt when unregistered content is stale or partial, and never
+overwritten when an immutable registered artifact disagrees. B08 remains open
+for stale workspace/partial lifecycle, upload orphan recovery, upload publication
+crash reconciliation, and ownership/path-confined cleanup. P05/P09 physical
+evidence remains open; no physical acceptance state changed.
 
 1. Continue the reconciled robustness blockers B01-B10 from [the authoritative reconciliation](v1_robustness_reconciliation.md), one named delivery/PR at a time and in the recommended dependency order.
 2. Keep the documented non-goals and accepted boundaries out of the v1 implementation unless new concrete evidence invalidates them.
