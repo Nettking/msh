@@ -95,14 +95,16 @@ A recorder whose current checkout predates this capability needs one manual fast
 
 ### Federation work still open
 
-Robustness implementation is now proceeding as isolated delivery PRs. The
-tailnet responder process-identity delivery closes one B06 property with
-automated tests: stale/legacy PID records can no longer authorize termination
-of a reused unrelated host process. Windows terminates through one verified
-process handle, Linux uses a pinned pidfd, other POSIX platforms refuse unsafe
-automatic termination, and Windows cannot run two responder listeners on the
-same port. B06 remains open for relay, recorder, scheduler and crash-loop
-supervision. No physical evidence state changed.
+Robustness implementation is proceeding as isolated delivery PRs. The merged
+tailnet responder process-identity delivery closes the stale-process-cleanup B06
+property with automated tests. The relay required-loop delivery on this branch
+closes a second distinct B06 property with automated tests: a fatal
+stale-heartbeat sweep now wakes both supported relay owners and produces a
+nonzero process exit so the existing Compose restart policy can act. Together
+these are **B06 2/8 properties automated-proven; B06 remains open** for service
+health semantics, crash-loop visibility, recorder supervision/status containment,
+and publication/analysis-driver health. P05/P09 physical evidence remains open;
+no physical acceptance state changed.
 
 1. Continue the reconciled robustness blockers B01-B10 from [the authoritative reconciliation](v1_robustness_reconciliation.md), one named delivery/PR at a time and in the recommended dependency order.
 2. Keep the documented non-goals and accepted boundaries out of the v1 implementation unless new concrete evidence invalidates them.
