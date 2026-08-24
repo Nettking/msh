@@ -15,6 +15,7 @@ Reviewed: **2026-08-24 Europe/Oslo**
 - Verified manual Federation-wide software updates: merged.
 - Standalone recorder Federation bootstrap/publication and Federation-wide recorder control: merged.
 - Disk-allocation/update-cache hardening from PR #325: merged; physical disk-exhaustion closeout remains open until the real-host robustness campaign passes.
+- Independent adversarial robustness review: reconciled; implementation must follow the reconciled blocker set.
 - Complete physical CF7 acceptance: not accepted.
 - Complete Federation v1 end-to-end acceptance: false.
 - OSL integration: separate planning track; production implementation status is governed by the OSL track documents.
@@ -39,10 +40,11 @@ Detailed runtime-update design:
 
 Active v1 robustness closeout:
 
-- [Federation v1 robustness gate](v1_robustness_gate.md)
-- [Disk accounting audit](disk_accounting_audit.md)
+- [Reconciled robustness review](v1_robustness_reconciliation.md) — **authoritative implementation input**;
+- [Federation v1 robustness gate](v1_robustness_gate.md) — initial systematic gate/evidence vocabulary;
+- [Disk accounting audit](disk_accounting_audit.md) — disk-specific forensic input.
 
-The robustness gate is a closeout/evidence checklist. It does not change Federation authority or acceptance flags by itself. Reconcile its independent review before implementing new robustness work, then use its physical campaign as evidence in addition to the existing CF7 contract.
+The independent review has been reconciled. New robustness implementation must start from `v1_robustness_reconciliation.md`, which overrides classifications in the initial gate where they differ. The documents do not change Federation authority or acceptance flags by themselves; their corrected physical campaign supplies additional evidence alongside the existing CF7 contract.
 
 Acceptance workspace:
 
@@ -76,7 +78,7 @@ The installed product now includes:
 - storage, transport, AI/provider, compute/job/artifact, recovery, fencing, and authority boundaries;
 - permanent Ubuntu and Windows component/product/release gates.
 
-The pairing-code UX currently issues signed one-use codes valid for up to 10 minutes and permits a fresh code to be generated when another attempt is required.
+The pairing-code UX currently issues signed one-use codes valid for up to 10 minutes and permits a fresh code to be generated when another join attempt is required.
 
 A successful software activation remains internally `runtime_verified`; the UI presents that terminal success as **Updated**.
 
@@ -93,15 +95,16 @@ A recorder whose current checkout predates this capability needs one manual fast
 
 ### Federation work still open
 
-1. Reconcile the independent adversarial review of [the Federation v1 robustness gate](v1_robustness_gate.md); do not implement its open/review findings piecemeal before that review is reconciled.
-2. Close the agreed v1 robustness blockers and execute the gate's physical fault/growth/restore campaign on the exact candidate; green CI alone is insufficient.
-3. Reconcile physical-acceptance instructions with the current post-CF8, update-capable, recorder-capable product baseline.
-4. Resolve any verified runtime-parity, native-host, privacy, browser, restart, multi-host, recorder-control, update-rollout, resource-exhaustion or recovery defects found on the exact candidate.
-5. Freeze one exact candidate only after known blockers are closed.
-6. Execute the complete physical CF7 campaign on that same commit.
-7. Update acceptance flags only through a separate evidence-backed review.
-8. Create a Federation v1 release tag only after the release acceptance contract is satisfied.
-9. Decide whether a POSIX native-recorder supervisor is in scope; until one exists, native recorders on Linux and macOS stay outside **Update all devices** by construction rather than by policy.
+1. Implement the reconciled robustness blockers B01-B10 from [the authoritative reconciliation](v1_robustness_reconciliation.md), one named delivery/PR at a time and in the recommended dependency order.
+2. Keep the documented non-goals and accepted boundaries out of the v1 implementation unless new concrete evidence invalidates them.
+3. Execute the corrected P01-P12 physical fault/growth/restore campaign on one exact candidate after the blocker implementations and automated gates are green; green CI alone is insufficient.
+4. Reconcile physical-acceptance instructions with the current post-CF8, update-capable, recorder-capable product baseline.
+5. Resolve any verified runtime-parity, native-host, privacy, browser, restart, multi-host, recorder-control, update-rollout, resource-exhaustion or recovery defects found on the exact candidate.
+6. Freeze one exact candidate only after known blockers are closed.
+7. Execute the complete physical CF7 campaign on that same commit.
+8. Update acceptance flags only through a separate evidence-backed review.
+9. Create a Federation v1 release tag only after the release acceptance contract is satisfied.
+10. Decide whether a POSIX native-recorder supervisor is in scope; until one exists, native recorders on Linux and macOS stay outside **Update all devices** by construction rather than by policy.
 
 Do **not** restart CF1-CF6 implementation waves and do **not** reintroduce role-first runtime authority to solve migration or startup defects.
 
@@ -142,8 +145,8 @@ Federation work and OSL work remain separate review boundaries. Before beginning
 
 ## Resume safety
 
-- Safe to continue Federation robustness closeout and CF7 preparation: **yes, after reading the active robustness gate and current handoff**.
-- Safe to implement robustness findings before the independent gate review is reconciled: **no**.
+- Safe to continue Federation robustness implementation: **yes, only from the reconciled blocker set and one named delivery at a time**.
+- Safe to treat the initial robustness gate as authoritative where the reconciliation disagrees: **no**.
 - Safe to mark physical CF7 accepted from merged code/green CI alone: **no**.
 - Safe to treat CF8 as future/blocking work: **no; CF8 is already merged for the installed product**.
 - Safe to reintroduce role-first authority for convenience: **no**.
