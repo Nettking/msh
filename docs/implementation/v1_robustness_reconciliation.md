@@ -1,6 +1,6 @@
 # Federation v1 robustness review reconciliation
 
-Status: **authoritative implementation input; independent review reconciled; implementation not started**
+Status: **authoritative implementation input; independent review reconciled; implementation in progress**
 
 Reviewed: **2026-08-24 Europe/Oslo**
 
@@ -169,19 +169,20 @@ Required properties:
 - recorder publication and analysis scheduler driver failure must be observable and recoverable rather than silently stranding durable work; and
 - stale host-process cleanup must verify responder process identity beyond a bare PID before terminating it.
 
-Robustness progress: **B06 1/8 properties automated-proven by the tailnet
-responder process-identity delivery; B06 remains `OPEN`.** The responder now
-stores an atomic process record containing PID plus the operating system's
-process-creation identity. Replacement revalidates that identity before
-termination, legacy bare-PID records fail closed, and Windows termination uses
-the same open process handle for identity verification and termination. Linux
-likewise opens a pidfd before the identity check and signals only that pinned
-process object. Other POSIX platforms fail closed rather than retaining a
-check-then-`kill(pid)` reuse race. Windows also refuses address reuse that could
-leave two live join listeners on one port. Automated tests cover PID reuse,
-stable-handle signalling, legacy records, matching-child termination, atomic
-record format, self-protection, and occupied-port behavior. Physical
-reboot/PID-reuse coverage remains in P05/P09.
+Robustness progress: **B06 2/8 properties automated-proven; B06 remains `OPEN`.**
+The merged tailnet responder process-identity delivery stores an atomic process
+record containing PID plus OS process-creation identity, uses stable Windows and
+Linux process handles before termination, fails closed on unsupported POSIX
+replacement, and prevents Windows responder address reuse. The relay
+required-loop delivery adds the second property: a fatal stale-heartbeat sweep
+records its cause, closes the relay, wakes the supported generic and provider
+service owners, and is converted into a nonzero process exit so the existing
+Compose restart policy can act. Operator signal and Ctrl+C shutdown remain
+clean. Automated tests cover responder PID reuse/stable-handle behavior and relay
+failure injection/cause propagation/nonzero entry-point exits/operator-stop task
+cleanup. Physical reboot/PID-reuse coverage remains in P05/P09, and P05 still
+must inject the relay database failure through the exact Compose candidate. No
+physical evidence or acceptance state changed.
 
 ### B07 — bounded reconstructible and cumulative metadata growth
 
