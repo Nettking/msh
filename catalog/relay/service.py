@@ -87,6 +87,10 @@ class RelayTransportError(FederationOperationError):
     """A bounded live-delivery operation could not be completed."""
 
 
+class RelayRuntimeError(FederationOperationError):
+    """A required relay background task failed."""
+
+
 @dataclass(slots=True)
 class _AuthenticationResult:
     node_id: str
@@ -358,6 +362,7 @@ class RelayServer:
         self._connections_lock = asyncio.Lock()
         self._sweep_task: asyncio.Task[None] | None = None
         self._stop_event = asyncio.Event()
+        self._fatal_error: BaseException | None = None
         self._bound_port: int | None = None
 
     @property
@@ -423,6 +428,7 @@ class RelayServer:
         self._validate_transport_security()
         self._ssl_context = self._build_ssl_context()
         self._stop_event.clear()
+        self._fatal_error = None
         self.coordinator.relay_started()
         self._server = await serve(
             self._handle_connection,
@@ -490,12 +496,20 @@ class RelayServer:
 
     async def serve_forever(self) -> None:
         await self.start()
-        if self._server is None:  # pragma: no cover - start establishes invariant
-            raise RelayConfigurationError("relay failed to start")
         try:
-            await self._server.serve_forever()
+            await self.wait_stopped()
         finally:
             await self.stop()
+
+    async def wait_stopped(self) -> None:
+        """Wait for relay shutdown and surface a required-loop failure."""
+
+        await self._stop_event.wait()
+        if self._fatal_error is not None:
+            raise RelayRuntimeError(
+                "relay-background-task-failed",
+                "required relay background task failed",
+            ) from self._fatal_error
 
     async def __aenter__(self) -> Self:
         await self.start()
@@ -1769,6 +1783,7 @@ class RelayServer:
         except asyncio.CancelledError:
             raise
         except Exception as error:  # noqa: BLE001 - structured task boundary
+            self._fatal_error = error
             with suppress(
                 FederationValidationError,
                 FederationOperationError,
@@ -1800,6 +1815,30 @@ class RelayServer:
                     ),
                     return_exceptions=True,
                 )
+
+
+async def _wait_for_relay_shutdown(
+    relay: RelayServer,
+    stop_requested: asyncio.Event,
+) -> None:
+    """Wait for either operator shutdown or a required relay-loop failure."""
+
+    operator_task = asyncio.create_task(
+        stop_requested.wait(), name="fcp-relay-operator-stop"
+    )
+    relay_task = asyncio.create_task(
+        relay.wait_stopped(), name="fcp-relay-required-loop-stop"
+    )
+    tasks = (operator_task, relay_task)
+    try:
+        done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+        if relay_task in done:
+            await relay_task
+    finally:
+        for task in tasks:
+            if not task.done():
+                task.cancel()
+        await asyncio.gather(*tasks, return_exceptions=True)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -1913,10 +1952,7 @@ async def _serve_from_args(args: argparse.Namespace) -> None:
         installed_signals.append(shutdown_signal)
     await relay.start()
     try:
-        if installed_signals:
-            await stop_requested.wait()
-        elif relay._server is not None:
-            await relay._server.serve_forever()
+        await _wait_for_relay_shutdown(relay, stop_requested)
     finally:
         for shutdown_signal in installed_signals:
             loop.remove_signal_handler(shutdown_signal)

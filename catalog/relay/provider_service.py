@@ -55,6 +55,7 @@ from catalog.relay.service import (
     _bounded_number,
     _build_parser,
     _payload_text,
+    _wait_for_relay_shutdown,
 )
 from catalog.relay.service import (
     main as phase2_main,
@@ -368,10 +369,7 @@ async def _serve_from_args(args: argparse.Namespace) -> None:
         installed_signals.append(shutdown_signal)
     await relay.start()
     try:
-        if installed_signals:
-            await stop_requested.wait()
-        elif relay._server is not None:
-            await relay._server.serve_forever()
+        await _wait_for_relay_shutdown(relay, stop_requested)
     finally:
         for shutdown_signal in installed_signals:
             with suppress(NotImplementedError, RuntimeError):
