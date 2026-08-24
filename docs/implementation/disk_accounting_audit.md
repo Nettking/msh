@@ -1,142 +1,320 @@
 # FCP disk accounting audit
 
-| Metadata | Value |
-| --- | --- |
-| Status | Active |
-| Audience | Maintainers, release reviewers, physical test operators |
-| Scope | Every FCP-owned path that consumes host disk, and whether it is bounded |
-| Reviewed | 2026-08-24 Europe/Oslo |
+Status: **current diagnostic input to the Federation v1 robustness gate**
 
-## Why this exists
+Reviewed: **2026-08-24 Europe/Oslo**
 
-A physical host filled its drive while serving a Federation and doing its own
-work. The first fix bounded Federation logical storage. That was a real gap, but
-it was chosen because it was the plausible producer, not because it was the
-measured one. This audit exists so the protection matches the failure.
+Baseline: `main` at `6ba682755082d08ac4b26c7adb85fff8f5546f11`
 
-**Federation logical storage did not cause the incident.** That is measured, not
-inferred. See the physical evidence below.
+Related gate: [Federation v1 robustness gate](v1_robustness_gate.md)
 
-The consumer-side telemetry mirror -- the path that receives another device's
-recorder data and materializes it for the local product -- was already capped at
-2 GiB of batches plus 512 MiB of materializations before any of this work. A path
-with a 2.5 GiB ceiling does not fill a drive. The authority-side ingest path
-genuinely was unbounded and is now bounded, and that remains worth having, but it
-is not what filled the host.
+## Why this audit exists
 
-## Physical evidence
+The physical Beast incident changed the disk-exhaustion diagnosis.
 
-Measured on the affected Windows host:
+On the affected Windows/Docker Desktop host:
 
-| Location | Size |
-| --- | --- |
-| The checkout's `data` directory | ~0.01 GB |
-| `results` | effectively empty |
-| `fcp_relay_state` volume | ~47 MB |
-| Ollama model volumes | ~2 GB |
-| **`docker_data.vhdx`** | **40.5 GB** |
-| **BuildKit cache (`docker system df`)** | **21.08 GB, 18.93 GB reclaimable** |
+- the Windows system disk had fallen to roughly **0.3 GiB free**;
+- `C:\wsl\msh\data` was roughly **0.01 GiB**;
+- `results` was effectively empty;
+- relay state was roughly **47 MiB**;
+- Ollama models were roughly **2 GiB**;
+- Docker's `docker_data.vhdx` was roughly **40.5 GiB**; and
+- `docker system df` reported **21.08 GiB BuildKit cache**, **18.93 GiB reclaimable**.
 
-The cache held many entries of roughly 1.01 GB each, created three days apart in
-a cluster. That figure is not a coincidence: the Python dependency tree this
-project installs measures about 726 MiB, and with the base image and application
-source on top, one FCP image layer set comes to roughly 1 GB.
+The cache contained many entries around 1.01 GiB. Before PR #325, `FCP_BUILD_COMMIT` invalidated the dependency-install layer for every changed commit and the update path rebuilt three FCP images without a cache lifecycle. This was a major confirmed contributor to the host exhaustion. It was not evidence that Federation logical storage filled the disk.
 
-Every FCP data path on the host together accounts for well under 1% of the drive.
-The Docker build cache accounts for half of it.
+After `docker builder prune -f`, BuildKit cache fell from 21.08 GiB to 2.147 GiB. Compacting Docker Desktop's dynamically expanded VHDX then reduced it from about 40.5 GiB to 36.1 GiB and Windows free space rose to about 8.6 GiB. The existing FCP containers restarted from retained state without reset/rebuild/state deletion.
 
-### Why each build wrote a fresh gigabyte
+Recorder logs from the incident contained a real filesystem failure while writing recorder status:
 
-This describes the state that produced the incident. It has since been fixed;
-see *Delivered against the measured cause* below.
+```text
+OSError: [Errno 5] Input/output error
+```
 
-Both Dockerfiles wrote `FCP_BUILD_COMMIT` into `ENV` *above* the dependency
-install. Changing a build argument invalidates the layer that consumes it and
-every layer after it, so a new commit meant the entire dependency install was
-re-run and re-cached, sharing nothing with the previous build but the base
-image.
+This audit therefore distinguishes three different questions:
 
-The Windows update agent runs `docker compose build relay flask recorder` on
-every activation. Three images, roughly a gigabyte of fresh cache each, on
-every update, with no cleanup and no bound anywhere in the update path.
+1. **Is one request/object bounded?**
+2. **Can the store still grow forever through many valid requests/objects?**
+3. **Does the bound see the real host resource that can fail?**
 
-## Bounded
+A per-object maximum is not a lifetime disk bound, and a container filesystem measurement is not necessarily a Windows-host measurement.
 
-| Path | Bound | Evidence |
-| --- | --- | --- |
-| Storage authority committed batches | Preallocated budget plus a derived free-space floor | `catalog/federation/storage_allocation.py`, enforced in `local_storage.py` `ingest` |
-| Federated telemetry mirror | 2 GiB of batches, 512 MiB of materializations, both totals not per-item | `telemetry_mirror.py:40-42`, enforced at `:654` and `:919` |
-| Federation audit log | Ring buffer; the oldest rows are deleted on write | `persistence.py:507` |
-| Efficiency observation store | Explicit retention bounds, pruned on write | `catalog/capabilities/efficiency/store.py:170,293` |
-| Object transfer staging | `MAX_TRANSFER_OBJECT_BYTES` per staging root | `object_transfer_staging.py:68` |
-| Branch trial worktrees | `MAX_RETAINED_TRIALS = 3`, older ones pruned | `catalog/mtconnect_recorder/native_trial.py:75` |
-| SQLite write-ahead logs | Default autocheckpoint, roughly 4 MB per database | `journal_mode=WAL` set with no `wal_autocheckpoint` override |
+## Categories
 
-## Not bounded
+### Cumulative bound
 
-Every entry here can grow until the volume is full. None of them is affected by
-the storage allocation.
+The path has an explicit policy that prevents accepted ordinary work from growing it indefinitely past a known total, or it is an atomic replacement/ring whose retained history is bounded.
 
-| Path | State | Evidence |
-| --- | --- | --- |
-| Recorder raw capture (`raw/**.xml.gz` and manifests) | No retention of any kind. Grows for as long as the recorder records | `catalog/mtconnect_recorder/storage.py:42,98` |
-| Recorder normalized JSONL (`jsonl/**`) | No retention | `catalog/mtconnect_recorder/storage.py:45,231` |
-| Recorder outbox completed rows | A bound exists and is never applied: `compact_completed()` has no caller outside tests | `catalog/federation/outbox.py:462` |
-| Federation session event log | Append-only with "no compaction, snapshotting, or retention". Lives in the retained `relay_state` volume | `persistence.py:422`; `docs/implementation/federation_sharing_evaluation.md` |
-| Docker images superseded by updates | Old tagged image sets are still never removed, though a rebuild no longer produces a wholly new one | Neither host agent runs `rmi` |
-| Docker container logs | No `logging:` limits are configured, so the default json-file driver grows without bound | `docker-compose.yml` |
-| Ollama model volumes | Two separate volumes, each holding full models | `docker-compose.yml:198-201` |
+### Per-operation bound only
 
-Recorder retention is a deliberate absence rather than an oversight.
-`docs/implementation/federation/reference/recorder_federation_delivery.md`
-lists retention policy among unstarted operational hardening at `:172`, and
-records "delete local files after upload" as an explicitly **rejected**
-alternative at `:204`, because a remote acknowledgement is not a safe
-garbage-collection trigger. Any future bound has to respect that.
+Each request, object, batch or active transfer is bounded, but successive valid operations can accumulate without a total lifetime bound.
 
-## What the storage allocation does and does not claim
+### Unbounded / operator-owned cumulative data
 
-It bounds **what this device accepts from other Federation members** into its
-logical-storage authority. Within that scope it is strong: the budget is
-reserved on disk in advance, and a batch that does not fit is refused before
-any file is created.
+The path intentionally retains primary/user data or has no lifecycle bound. These paths need host-pressure admission/stop behavior even when automatic deletion would be wrong.
 
-It does **not** prevent FCP from filling a host disk. It does not bound this
-device's own recorder capture, its outbox, the session event log, or anything
-Docker holds. A device can still fill its drive with the allocation working
-exactly as designed -- and on the affected host, that is precisely what
-happened. Nobody should read a green allocation as evidence that a host is safe
-from exhaustion.
+### Host-managed/reconstructible
 
-## Follow-up work this audit names
+Docker/model/runtime material may be reconstructible, but if FCP does not impose a limit the host can still be exhausted by it.
 
-None of these was a measurable contributor on the affected host. They are real
-gaps, not the cause, and are listed so nobody mistakes the delivered work for
-full coverage.
+# 1. Cumulatively bounded paths
 
-1. **Recorder capture retention.** Needs a policy decision first, given the
-   rejected alternative above.
-2. **Outbox compaction.** The bound already exists; it needs a caller.
-3. **Session event log.** Compaction or snapshotting on the coordinator's
-   retained relay volume, which is also the volume whose loss is unrecoverable.
-4. **Container log limits.** A `logging:` block in `docker-compose.yml`.
-5. **Superseded image removal.** A rebuild no longer writes a whole new image
-   set, but old tagged ones are still never removed.
+## Federation logical-storage ingestion
 
-## Delivered against the measured cause
+PR #325 added `StorageAllocation` (`catalog/federation/storage_allocation.py`). A storage authority can have:
 
-- The build commit is declared **below** the dependency install in both
-  Dockerfiles, so a rebuild reuses the cached layer instead of writing about a
-  gigabyte per image. A test pins the ordering, because reversing it silently
-  restores the original failure.
-- Both host update agents bound the BuildKit cache with
-  `docker builder prune --keep-storage`, sized to keep the layer a build wants
-  to reuse while releasing entries from earlier commits.
-- Both agents run a disk preflight **before** the build, which is before Flask
-  is stopped. A host short on space first tries to recover from its own cache;
-  only if that is not enough does the activation refuse, with the running FCP
-  still whole. Refusing after Flask has been stopped is the state this exists
-  to prevent.
+- a preallocated byte budget held in advance; and
+- a free-space floor that accepted remote Federation writes may not cross.
 
-Disk exhaustion should be reassessed against a physical rerun on the affected
-host. It should not be closed on this evidence alone.
+The default derived floor keeps at least 10 GiB or 5% of the volume, whichever is larger, capped at 64 GiB. The 10 GiB minimum is deliberately platform-independent because the authority runs inside the Linux Flask container even on Windows and cannot infer the real host OS from `os.name`.
+
+Important limitation: this protects **remote logical-storage ingestion**, not the whole FCP host. On Docker Desktop the container's volume-free view can also differ materially from the Windows host underneath it.
+
+## Recorder telemetry mirror
+
+The consumer-side recorder telemetry mirror is bounded by configured totals for mirrored batch content and materializations. The incident data path was far below these bounds.
+
+## Generic federated JSONL mirror
+
+The federated JSONL mirror has an explicit total mirror quota. Reaching it stops further materialization rather than allowing the mirror to grow without limit.
+
+## Coordinator audit ring
+
+`catalog/federation/persistence.py` trims the coordinator audit table to a bounded retained row count. This bound must not be confused with the separate authoritative session-event log, which is append-only.
+
+## Recorder local file log
+
+`catalog/mtconnect_recorder/runtime.py` uses `RotatingFileHandler(maxBytes=2_000_000, backupCount=3)`. The recorder's own file log is therefore bounded. Docker stdout/stderr generated by the same process is a separate path and is not bounded by this handler.
+
+## Execution-efficiency history
+
+The execution-efficiency learning store has a bounded retained observation/history policy. It is not a plausible Beast-scale disk producer.
+
+## Branch-trial worktrees
+
+The recorder branch-trial implementation deliberately bounds retained trial worktrees. These are reconstructible source trees and are not intended to accumulate indefinitely.
+
+# 2. Bounded per operation, but not cumulatively bounded
+
+## Browser uploads
+
+`DataUploadService` bounds a single upload:
+
+- default max 50 files;
+- default max 512 MiB per file;
+- default max 1 GiB total batch;
+- bounded line size; and
+- bounded concurrent/pending imports.
+
+Staging is cleaned/reconciled safely. Successful published uploads under `data/uploads` are intentionally retained user data. Repeated valid uploads can therefore grow the installation indefinitely. This is not a request-validation defect; it is a lifetime host-pressure/admission concern.
+
+## Analysis content store
+
+`LocalArtifactContentStore` validates and atomically writes each object with a configured maximum size. The production analysis runtime stores durable plan, packed-slice and result bodies under `results/capabilities/artifacts`.
+
+There is no total artifact-store byte quota/GC in this primitive. New work identities/signatures can therefore accumulate valid bounded objects indefinitely.
+
+## Analysis workspaces
+
+Per-attempt analysis workspaces are intentionally temporary and the worker removes them in `finally`. This is a good bounded-active-work property. It does not reclaim the persistent content-addressed artifacts or durable job history created outside the workspace.
+
+## Analysis/job/artifact metadata
+
+The analysis registry, F7 lifecycle store and artifact authority bound individual contracts/messages, but retain cumulative history including combinations of:
+
+- jobs and attempts;
+- idempotency/command records;
+- cancellation/retry/result state;
+- analysis-registry rows (including `settled_at` terminal rows);
+- artifact descriptors;
+- grants;
+- publications; and
+- artifact/job audit history.
+
+PR #324 made lifecycle scanning proportional to **unfinished** work; it did not introduce terminal-history retention.
+
+## Durable resumable object transfers
+
+The durable resumable-transfer path has:
+
+- a staged-byte maximum;
+- a maximum number of durable incoming/outgoing records; and
+- cleanup for abandoned unfinished transfers.
+
+The durable chunk-store subclass reconstructs staged byte indexes from journal state after restart, unlike the generic process-local store.
+
+However, completed durable journal records are not removed by `cleanup_abandoned()`, which targets active/publishing old work. A long-lived active use of this endpoint can therefore approach the durable-record count ceiling even if byte staging is clean.
+
+Current repository search during this audit did **not** prove that `ResumableChunkTransferEndpoint` is instantiated on the supported installed-product path outside tests. Treat this as a product-path review item, not as proven current production disk growth.
+
+# 3. Unbounded or operator-owned cumulative paths
+
+## Recorder primary corpus
+
+The recorder is more than raw XML plus compatibility JSONL. `DurableRecorderStore` owns six cumulative evidence/data roots:
+
+```text
+data/sources/mtconnect_recorder/
+  raw/
+  probe/
+  observations/
+  jsonl/
+  gaps/
+  events/
+```
+
+For an ordinary observation batch, `store_batch()` intentionally writes:
+
+1. compressed immutable raw MTConnect XML plus manifest;
+2. detailed observation NDJSON; and
+3. wide FCP-compatible JSONL snapshots;
+
+before the caller commits the durable checkpoint. Probe snapshots, gap evidence and recorder events add further historical material.
+
+There is no automatic recorder retention policy. This is deliberate: primary recorder evidence must not be silently deleted just because a disk is under pressure. The v1 robustness requirement is to reserve enough headroom for the active commit and then pause capture cleanly before filesystem failure.
+
+## Recorder publication outbox completed-row history
+
+The outbox needs a correction to earlier wording.
+
+`compact_completed()` does **not** provide a retention bound. It only replaces legacy completed payload bodies with compact receipts and explicitly performs no deletion/vacuuming. New acknowledgements already convert their payload into compact receipt form.
+
+Therefore:
+
+- completed payload **size per row** is compact;
+- completed **row count/history** is unbounded; and
+- simply calling `compact_completed()` does not solve cumulative growth.
+
+Any eventual retirement policy must preserve the minimum evidence needed for idempotency/publication correctness.
+
+## Federation authoritative session events
+
+`session_events` is append-only because it is authoritative replay state. There is no event-log compaction/snapshot-retirement policy in the current v1 path.
+
+This cannot be solved by deleting arbitrary old rows: session creation/creator provenance, membership, capability projections, human-auth projections and shared operator knowledge may depend on replay semantics.
+
+The coordinator also has durable idempotency/request state such as `accepted_requests` for which this audit found no retention path. Independent review should classify which coordinator tables genuinely need lifetime retention and which can be safely snapshotted/retired.
+
+## Published uploads and workflow/results output
+
+`data/uploads` and `results/workflows` are intentional operator/research data. No total installation quota was found. These should participate in host-pressure admission control rather than automatic deletion.
+
+## Persistent analysis artifacts/history
+
+`results/capabilities/artifacts` and the shared analysis job/artifact authority database persist across completed work. They currently have per-object/schema bounds rather than a total lifetime budget.
+
+# 4. Host-managed/reconstructible paths
+
+## BuildKit cache — Update all path
+
+PR #325 changed two things:
+
+- Dockerfile layer ordering no longer invalidates the heavy dependency layer merely because the build commit changes; and
+- Compose update agents perform bounded `docker builder prune --keep-storage` cleanup and host free-space preflight.
+
+This is the path aimed at the measured Beast cause. It is automated-proven but still needs a repeated physical update run on Beast before the incident is considered closed.
+
+## BuildKit cache — normal startup/manual build paths
+
+The #325 cache lifecycle is **not a global Docker cache policy**.
+
+Both supported normal launchers still execute:
+
+```text
+docker compose build relay flask recorder
+```
+
+on ordinary startup. They currently do not invoke the update-agent host disk preflight or post-build cache keep-storage cleanup. The corrected Dockerfile should make repeated unchanged builds much cheaper, but this must not be described as a cumulative bound without physical/implementation evidence.
+
+Manual Docker builds are likewise outside FCP's update-agent cleanup contract.
+
+## Superseded Docker images
+
+FCP does not currently retire superseded application images after a verified activation. They are reconstructible, but can consume host disk over time. Cleanup must be narrowly scoped and must never delete volumes or authority/data state.
+
+## Docker container logs
+
+`docker-compose.yml` sets no FCP-owned `logging:` size/count policy for Flask, relay, recorder, Ollama or model-provider containers. The actual daemon driver/rotation may vary by host; relying on that host default is not an FCP cumulative bound.
+
+## POSIX update-agent log
+
+`start.sh` appends the host update agent's output to:
+
+```text
+data/federation/update-agent/agent.log
+```
+
+without an FCP rotation rule. It is expected to be low volume, but it is still an unbounded append path.
+
+## Ollama/model-provider volumes
+
+Model volumes are intentionally persistent and re-downloadable. FCP validates model identifiers but does not impose a cumulative model-volume quota. A new/missing model can be a large legitimate writer.
+
+The v1 requirement is safe refusal under host pressure; automatic model eviction is not required.
+
+# 5. Failure amplification observations
+
+## Recorder status write
+
+Per-source recorder work catches exceptions and backs off. The periodic `publish_status()` write is outside that source-level exception boundary. When the filesystem itself fails, a status-file `OSError` can terminate the process. The `finally` path then attempts another status write before executor cleanup.
+
+This matched the Beast failure signature. The preferred v1 prevention is host-pressure headroom that pauses capture before filesystem failure; independent review should also decide whether status/finally I/O deserves a direct hardening change.
+
+## Docker restart policy
+
+Flask, relay and managed recorder use `restart: unless-stopped` with no Compose healthcheck. This can amplify a persistent resource failure into repeated restart churn. Ollama has a healthcheck.
+
+Disk accounting therefore cannot be separated from process supervision.
+
+# 6. Update/start resource-order observations
+
+## Update path
+
+The Windows Compose update agent performs its host disk preflight before Docker build and before Flask is stopped, which is the important measured safety improvement.
+
+However:
+
+- approved-main fetch/inspection and a required fast-forward source mutation happen before the disk preflight; and
+- required-model installation can happen after the build without a dedicated second host-space check.
+
+These are robustness-review points, not evidence that the #325 fix is wrong. The source/runtime split is already explicit in the update model and may be safely resumable; model pull still must not be allowed to cross the emergency host floor.
+
+## Normal startup
+
+`start.cmd` and `start.sh` build the three FCP images and can install the required Ollama model without using the update-agent host disk preflight/cache lifecycle. The release robustness test must cover repeated **ordinary starts** as well as repeated Update-all activations.
+
+# 7. What the Beast incident proves and does not prove
+
+It proves:
+
+- logical Federation storage was not the measured disk consumer;
+- BuildKit cache was a major confirmed contributor;
+- Docker Desktop's VHDX can retain host allocation after internal files/cache are deleted;
+- the recorder can encounter real filesystem I/O errors when host/Docker storage is exhausted;
+- existing FCP state survived the incident and existing containers restarted successfully after space was recovered; and
+- destructive reset/prune of volumes was not required.
+
+It does **not** prove:
+
+- BuildKit was every byte of host usage;
+- #325 prevents every host disk-exhaustion path;
+- logical-storage allocation protects recorder/user/model/Docker growth;
+- a container-reported free-space floor protects the Windows host underneath Docker Desktop; or
+- one successful post-recovery start is a long-run soak test.
+
+# 8. Required follow-up
+
+The authoritative follow-up is tracked in [Federation v1 robustness gate](v1_robustness_gate.md). In disk-specific terms, the high-priority work is:
+
+1. physically repeat the #325 update path on Beast and measure cache/VHDX/host growth;
+2. bring normal startup builds under the same host-resource policy or prove them bounded;
+3. establish a real-host disk-pressure signal and pressure/critical behavior;
+4. stop the recorder safely before the filesystem can fail instead of deleting primary evidence;
+5. bound FCP-owned container/update-agent logs;
+6. decide cumulative-history policy for outbox/session/job/artifact metadata without breaking replay/idempotency;
+7. keep operator-owned uploads/results behind admission control rather than automatic deletion;
+8. protect model pulls and image/cache growth from consuming the emergency host floor; and
+9. verify recovery without `--fresh`, volume deletion or manual database editing.
+
+Do not use broad `docker system prune`, delete Docker volumes, or purge recorder primary data as a robustness mechanism.

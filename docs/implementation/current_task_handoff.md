@@ -14,6 +14,7 @@ Reviewed: **2026-08-24 Europe/Oslo**
 - Role-first installed-product runtime retirement (CF8): merged.
 - Verified manual Federation-wide software updates: merged.
 - Standalone recorder Federation bootstrap/publication and Federation-wide recorder control: merged.
+- Disk-allocation/update-cache hardening from PR #325: merged; physical disk-exhaustion closeout remains open until the real-host robustness campaign passes.
 - Complete physical CF7 acceptance: not accepted.
 - Complete Federation v1 end-to-end acceptance: false.
 - OSL integration: separate planning track; production implementation status is governed by the OSL track documents.
@@ -35,6 +36,13 @@ Current operational documentation:
 Detailed runtime-update design:
 
 - [Manual Federation-wide FCP updates](federation/active/manual_updates.md)
+
+Active v1 robustness closeout:
+
+- [Federation v1 robustness gate](v1_robustness_gate.md)
+- [Disk accounting audit](disk_accounting_audit.md)
+
+The robustness gate is a closeout/evidence checklist. It does not change Federation authority or acceptance flags by itself. Reconcile its independent review before implementing new robustness work, then use its physical campaign as evidence in addition to the existing CF7 contract.
 
 Acceptance workspace:
 
@@ -64,6 +72,7 @@ The installed product now includes:
 - recorder-local startup network discovery with first-configuration auto-selection;
 - local-first checkpoint-gated recorder publication through Federation logical-storage authority;
 - `/federation/recorders` control from any trusted Federation device for bounded recorder-local scans and add/remove source selection;
+- bounded logical-storage allocation/free-space floors and update-path Docker build-cache/preflight protection from PR #325;
 - storage, transport, AI/provider, compute/job/artifact, recovery, fencing, and authority boundaries;
 - permanent Ubuntu and Windows component/product/release gates.
 
@@ -84,13 +93,15 @@ A recorder whose current checkout predates this capability needs one manual fast
 
 ### Federation work still open
 
-1. Reconcile physical-acceptance instructions with the current post-CF8, update-capable, recorder-capable product baseline.
-2. Resolve any verified runtime-parity, native-host, privacy, browser, restart, multi-host, recorder-control, or update-rollout defects found on the exact candidate.
-3. Freeze one exact candidate only after known blockers are closed.
-4. Execute the complete physical CF7 campaign on that same commit.
-5. Update acceptance flags only through a separate evidence-backed review.
-6. Create a Federation v1 release tag only after the release acceptance contract is satisfied.
-7. Decide whether a POSIX native-recorder supervisor is in scope; until one exists, native recorders on Linux and macOS stay outside **Update all devices** by construction rather than by policy.
+1. Reconcile the independent adversarial review of [the Federation v1 robustness gate](v1_robustness_gate.md); do not implement its open/review findings piecemeal before that review is reconciled.
+2. Close the agreed v1 robustness blockers and execute the gate's physical fault/growth/restore campaign on the exact candidate; green CI alone is insufficient.
+3. Reconcile physical-acceptance instructions with the current post-CF8, update-capable, recorder-capable product baseline.
+4. Resolve any verified runtime-parity, native-host, privacy, browser, restart, multi-host, recorder-control, update-rollout, resource-exhaustion or recovery defects found on the exact candidate.
+5. Freeze one exact candidate only after known blockers are closed.
+6. Execute the complete physical CF7 campaign on that same commit.
+7. Update acceptance flags only through a separate evidence-backed review.
+8. Create a Federation v1 release tag only after the release acceptance contract is satisfied.
+9. Decide whether a POSIX native-recorder supervisor is in scope; until one exists, native recorders on Linux and macOS stay outside **Update all devices** by construction rather than by policy.
 
 Do **not** restart CF1-CF6 implementation waves and do **not** reintroduce role-first runtime authority to solve migration or startup defects.
 
@@ -125,13 +136,14 @@ Federation work and OSL work remain separate review boundaries. Before beginning
 3. Declare owned paths before editing shared Flask, setup, navigation, security, persistence, update, recorder-control, or workflow files.
 4. Commit after coherent boundaries so partial work remains recoverable.
 5. Open a draft PR unless the repository owner explicitly requests another state.
-6. Distinguish automated, simulated, browser, physical, multi-host, service, and human evidence.
-7. Preserve authority, privacy, migration, restart, and cross-platform gates.
+6. Distinguish automated, simulated, browser, physical, multi-host, service, resource-pressure and human evidence.
+7. Preserve authority, privacy, migration, restart, recovery and cross-platform gates.
 8. Stop when a missing decision would require scope expansion or a permissive assumption.
 
 ## Resume safety
 
-- Safe to continue Federation closeout and CF7 preparation: **yes**.
+- Safe to continue Federation robustness closeout and CF7 preparation: **yes, after reading the active robustness gate and current handoff**.
+- Safe to implement robustness findings before the independent gate review is reconciled: **no**.
 - Safe to mark physical CF7 accepted from merged code/green CI alone: **no**.
 - Safe to treat CF8 as future/blocking work: **no; CF8 is already merged for the installed product**.
 - Safe to reintroduce role-first authority for convenience: **no**.
