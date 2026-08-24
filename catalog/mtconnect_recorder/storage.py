@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import gzip
 import json
+import re
 from collections.abc import Mapping
+from datetime import date
 from hashlib import sha256
 from pathlib import Path
 from typing import Any
@@ -33,6 +35,43 @@ from .schema_compat import (
     SUPPORTED_RAW_BATCH_MANIFEST_SCHEMAS,
     classify_raw_batch_manifest_schema,
 )
+
+_STORAGE_DAY_PATTERN = re.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}\Z")
+
+
+def _observation_storage_day(batch: ParsedBatch) -> str:
+    """Return one validated calendar-day path component for ``batch``."""
+
+    timestamp = batch.observations[0].get("timestamp") or _utc_now()
+    if not isinstance(timestamp, str):
+        raise MtconnectProtocolError(
+            "MTConnect observation timestamp must be ISO-8601 text."
+        )
+    text = timestamp.strip()
+    day = text[:10]
+    try:
+        if not _STORAGE_DAY_PATTERN.fullmatch(day):
+            raise ValueError("timestamp date is not YYYY-MM-DD")
+        parsed_day = date.fromisoformat(day)
+    except ValueError as exc:
+        raise MtconnectProtocolError(
+            "MTConnect observation timestamp must begin with a valid "
+            "ISO-8601 calendar date."
+        ) from exc
+    return parsed_day.isoformat()
+
+
+def _confined_storage_path(root: Path, *components: str) -> Path:
+    """Join a recorder path and prove that it remains below its durable root."""
+
+    candidate = root.joinpath(*components)
+    try:
+        candidate.resolve(strict=False).relative_to(root.resolve(strict=False))
+    except ValueError as exc:
+        raise MtconnectProtocolError(
+            "Recorder storage path escaped its configured durable root."
+        ) from exc
+    return candidate
 
 
 class DurableRecorderStore:
@@ -91,16 +130,16 @@ class DurableRecorderStore:
 
         raw_bytes = xml_text.encode("utf-8")
         raw_digest = sha256(raw_bytes).hexdigest()
-        day = str(batch.observations[0].get("timestamp") or _utc_now())[:10]
+        day = _observation_storage_day(batch)
         source_slug = _slug(source_name)
         instance = str(batch.header.instance_id)
         base_name = f"seq-{first}-{last}-next-{batch.header.next_sequence}"
-        raw_path = (
-            self.raw_root
-            / source_slug
-            / instance
-            / day
-            / f"{base_name}-{raw_digest}.xml.gz"
+        raw_path = _confined_storage_path(
+            self.raw_root,
+            source_slug,
+            instance,
+            day,
+            f"{base_name}-{raw_digest}.xml.gz",
         )
         _write_bytes_atomic(raw_path, gzip.compress(raw_bytes, mtime=0))
 
@@ -149,7 +188,7 @@ class DurableRecorderStore:
         last = batch.last_observation_sequence
         if first is None or last is None:
             raise ValueError("Observation batch does not contain sequence numbers.")
-        day = str(batch.observations[0].get("timestamp") or _utc_now())[:10]
+        day = _observation_storage_day(batch)
         base_name = f"seq-{first}-{last}-next-{batch.header.next_sequence}"
         if raw_sha256 is not None:
             if len(raw_sha256) != 64 or any(
@@ -173,12 +212,12 @@ class DurableRecorderStore:
             batch=batch,
             raw_sha256=raw_sha256,
         )
-        path = (
-            self.observation_root
-            / _slug(source_name)
-            / str(batch.header.instance_id)
-            / day
-            / f"{base_name}.ndjson"
+        path = _confined_storage_path(
+            self.observation_root,
+            _slug(source_name),
+            str(batch.header.instance_id),
+            day,
+            f"{base_name}.ndjson",
         )
         text = "".join(
             json.dumps(record, ensure_ascii=False, sort_keys=True) + "\n"
@@ -223,12 +262,12 @@ class DurableRecorderStore:
             batch=batch,
             raw_sha256=raw_sha256,
         )
-        normalized_path = (
-            self.normalized_root
-            / _slug(source_name)
-            / str(batch.header.instance_id)
-            / day
-            / f"{base_name}.jsonl"
+        normalized_path = _confined_storage_path(
+            self.normalized_root,
+            _slug(source_name),
+            str(batch.header.instance_id),
+            day,
+            f"{base_name}.jsonl",
         )
         states: dict[str, dict[str, Any]] = {
             str(machine): dict(values)
