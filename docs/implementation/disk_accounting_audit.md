@@ -15,7 +15,7 @@ The physical Beast incident changed the disk-exhaustion diagnosis.
 On the affected Windows/Docker Desktop host:
 
 - the Windows system disk had fallen to roughly **0.3 GiB free**;
-- `C:\wsl\msh\data` was roughly **0.01 GiB**;
+- the FCP repository data directory was roughly **0.01 GiB**;
 - `results` was effectively empty;
 - relay state was roughly **47 MiB**;
 - Ollama models were roughly **2 GiB**;
