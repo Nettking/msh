@@ -70,30 +70,36 @@ _GIB = 1024**3
 # update plus room for the host to keep operating, because the observed
 # exhaustion happened on a machine that was both recording and updating.
 #
-# One update rebuilds the ``relay``, ``flask`` and ``recorder`` images. None of
-# them share the expensive layer: ``FCP_BUILD_COMMIT`` is written into ``ENV``
-# at ``Dockerfile`` line 8, above the dependency install at lines 15-16, so a
-# changed commit invalidates that layer and every layer after it. Each image
-# therefore carries a full copy of the Python dependency tree, measured at
-# roughly 726 MiB installed (pyarrow, scipy, pandas, duckdb, scikit-learn,
-# numpy and matplotlib account for most of it), on top of a ~150 MiB base
-# image and the application source.
+# One update rebuilds the ``relay``, ``flask`` and ``recorder`` images. Since
+# the build commit moved below the dependency install, a rebuild reuses the
+# cached dependency layer rather than writing a fresh copy of it -- but the
+# image set is still replaced, the superseded one is not removed, and build
+# cache is still produced. The dependency tree measures roughly 726 MiB
+# installed (pyarrow, scipy, pandas, duckdb, scikit-learn, numpy and matplotlib
+# account for most of it) on top of a ~150 MiB base image, so an update cycle
+# is still measured in gigabytes.
 #
-#: Approximate on-disk cost of the image set one update produces, before the
-#: previous set is released. Three images at ~1 GiB, plus build cache.
+#: Approximate on-disk cost of an update, before the superseded image set is
+#: released: three images plus the cache the build produces.
 _UPDATE_CYCLE_BYTES = 4 * _GIB
 
 #: Room the host needs to keep operating while that happens: SQLite WAL and
 #: journals, container logs between rotations, OS paging and servicing.
 _OPERATING_HEADROOM_BYTES = 2 * _GIB
 
-#: Windows with Docker Desktop needs a second update cycle of margin. The
-#: WSL2 disk image grows on demand and does not shrink when files inside it
-#: are deleted, so space freed in the VM does not return to the host promptly
-#: and the docker data root must be able to grow through a whole update
-#: without the host reaching exhaustion. Runtime instability near exhaustion
-#: is what the physical incident actually showed.
-_WINDOWS_DOCKER_MARGIN_BYTES = 4 * _GIB
+#: Margin for a Docker Desktop host, whose disk image grows on demand and does
+#: not shrink when files inside it are deleted, so space freed in the VM does
+#: not return to the host promptly.
+#:
+#: This is added unconditionally rather than when the platform looks like
+#: Windows, because *this code cannot observe the host platform*. On a Windows
+#: FCP host the authority runs inside the Linux Flask container, so ``os.name``
+#: there is always ``posix`` -- an OS check would have quietly selected the
+#: smaller floor on exactly the hosts that need the larger one. Reserving this
+#: on a Linux host costs some headroom that host did not strictly need;
+#: omitting it on a Docker Desktop host costs the host. Only one of those is
+#: recoverable.
+_DOCKER_DESKTOP_MARGIN_BYTES = 4 * _GIB
 
 #: Share of the volume held back when that is larger than the absolute
 #: minimum, so a bigger disk keeps proportionally more slack.
@@ -104,31 +110,40 @@ FLOOR_VOLUME_FRACTION = 0.05
 MAXIMUM_FLOOR_BYTES = 64 * _GIB
 
 
-def minimum_headroom_bytes(*, windows: bool | None = None) -> int:
-    """The absolute floor for this platform, below which FCP never operates."""
+def minimum_headroom_bytes() -> int:
+    """The absolute floor below which FCP never operates, on any platform.
 
-    if windows is None:
-        windows = os.name == "nt"
-    total = _UPDATE_CYCLE_BYTES + _OPERATING_HEADROOM_BYTES
-    if windows:
-        total += _WINDOWS_DOCKER_MARGIN_BYTES
-    return total
-
-
-def default_floor_bytes(
-    root: Path | str,
-    *,
-    windows: bool | None = None,
-) -> int:
-    """Derive the free space FCP never consumes on ``root``'s volume.
-
-    The larger of the platform minimum and a share of the volume, capped so a
-    large disk does not reserve an absurd amount. An explicitly configured
-    floor always wins over this: an operator who has measured their own host
-    knows more than a policy can.
+    Deliberately platform-independent. See ``_DOCKER_DESKTOP_MARGIN_BYTES``:
+    the process evaluating this runs in a container and cannot see the host it
+    is protecting, so the figure is sized for the worst supported host rather
+    than guessed from the container's own operating system.
     """
 
-    minimum = minimum_headroom_bytes(windows=windows)
+    return (
+        _UPDATE_CYCLE_BYTES
+        + _OPERATING_HEADROOM_BYTES
+        + _DOCKER_DESKTOP_MARGIN_BYTES
+    )
+
+
+def default_floor_bytes(root: Path | str) -> int:
+    """Derive the free space FCP never consumes on ``root``'s volume.
+
+    The larger of the minimum and a share of the volume, capped so a large
+    disk does not reserve an absurd amount. An explicitly configured floor
+    always wins over this: an operator who has measured their own host knows
+    more than a policy can.
+
+    One honest limit. Measured from inside a container, ``root``'s free space
+    is the container's view of its filesystem. On Docker Desktop that is the
+    VM's disk image, which grows on demand, so the container can read plenty
+    of free space while the host drive underneath is nearly full. This floor
+    is therefore a backstop rather than a complete guarantee on that topology.
+    The host-side check that does see the real drive is the update agents'
+    disk preflight, which runs on the host and not in a container.
+    """
+
+    minimum = minimum_headroom_bytes()
     try:
         total = shutil.disk_usage(_nearest_existing(Path(root))).total
     except OSError:

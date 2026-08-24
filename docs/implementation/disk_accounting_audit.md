@@ -45,17 +45,20 @@ source on top, one FCP image layer set comes to roughly 1 GB.
 Every FCP data path on the host together accounts for well under 1% of the drive.
 The Docker build cache accounts for half of it.
 
-### Why each build writes a fresh gigabyte
+### Why each build wrote a fresh gigabyte
 
-`Dockerfile:3-9` and `Dockerfile.cli:3-8` write `FCP_BUILD_COMMIT` into `ENV` at
-line 8, *above* the dependency install at lines 15-16. Changing a build argument
-invalidates the layer that consumes it and every layer after it, so a new commit
-means the entire dependency install is re-run and re-cached. Nothing is shared
-with the previous build but the base image.
+This describes the state that produced the incident. It has since been fixed;
+see *Delivered against the measured cause* below.
+
+Both Dockerfiles wrote `FCP_BUILD_COMMIT` into `ENV` *above* the dependency
+install. Changing a build argument invalidates the layer that consumes it and
+every layer after it, so a new commit meant the entire dependency install was
+re-run and re-cached, sharing nothing with the previous build but the base
+image.
 
 The Windows update agent runs `docker compose build relay flask recorder` on
-every activation. Three images, roughly a gigabyte of fresh cache each, on every
-update, with no cleanup and no bound anywhere in the update path.
+every activation. Three images, roughly a gigabyte of fresh cache each, on
+every update, with no cleanup and no bound anywhere in the update path.
 
 ## Bounded
 

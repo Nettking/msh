@@ -150,13 +150,21 @@ a quota tells you afterwards that you are out of room.
 
 **Floor.** Free space on the volume that FCP never consumes, whatever the budget
 says. Leave it unset and it is derived rather than guessed: the larger of a
-share of the volume and a platform minimum sized to complete one FCP update
-with room for the host to keep operating. One update rebuilds three images that
-share no expensive layer, so that minimum is several gigabytes, and Windows
-with Docker Desktop gets more again because its WSL2 disk image grows on demand
-and does not shrink when files inside it are deleted. An explicitly configured
-floor always wins: an operator who has measured their own host outranks the
-policy.
+share of the volume and a minimum sized to complete one FCP update, keep the
+host operating, and absorb a Docker Desktop disk image that grows on demand and
+does not shrink when files inside it are deleted. That minimum is the same on
+every platform, deliberately -- the authority runs inside the Linux Flask
+container even on a Windows host, so it cannot observe which host it is
+protecting, and an operating-system check there would read `posix` and pick the
+smaller figure on exactly the hosts needing the larger one. An explicitly
+configured floor always wins: an operator who has measured their own host
+outranks the policy.
+
+The floor is a backstop, not a complete guarantee. Measured from inside a
+container, free space is the container's view of its filesystem; on Docker
+Desktop that is the VM's disk image, which can report room while the host drive
+underneath is nearly full. The check that sees the real drive is the update
+agents' disk preflight, which runs on the host.
 
 Both are local configuration. A peer never sets, sees, or influences either one:
 what a device can safely hold is a property of its own disk.
@@ -164,7 +172,8 @@ what a device can safely hold is a property of its own disk.
 | Setting | Default | Meaning |
 | --- | --- | --- |
 | `storage_budget_bytes` | unset | Bytes offered to the Federation, reserved in advance. Unset leaves the device bounded by the floor alone. |
-| `storage_floor_bytes` | 2 GiB | Free space never consumed, whatever the budget says. |
+| Host environment | `FCP_FEDERATION_STORAGE_AUTHORITY_BUDGET_BYTES`, `FCP_FEDERATION_STORAGE_AUTHORITY_FLOOR_BYTES` | Set on the host; Compose passes both into the Flask container, where the authority reads them. |
+| `storage_floor_bytes` | derived | Free space never consumed, whatever the budget says. Unset derives it from the volume; set it to override. |
 
 A batch that does not fit is refused before any file is created: no partial
 batch, no catalogue row, and no consumed bytes. The refusal reaches the writing

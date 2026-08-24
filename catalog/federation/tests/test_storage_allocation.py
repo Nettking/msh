@@ -19,6 +19,7 @@ import sqlite3
 from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from pathlib import Path
+from unittest import mock
 
 import pytest
 
@@ -343,23 +344,39 @@ def test_a_provider_without_an_allocation_is_unchanged(tmp_path: Path) -> None:
 def test_the_minimum_covers_a_whole_update_cycle() -> None:
     """2 GiB could not cover one update, which is why it is not the floor.
 
-    An update rebuilds three images and none of them shares the dependency
-    layer, because the build commit is written into ENV above the install.
-    The measured dependency tree alone is about 726 MiB installed.
+    An update still replaces three images and still produces build cache, and
+    the measured dependency tree alone is about 726 MiB installed. Moving the
+    build commit below the install stopped each rebuild writing a *fresh* copy
+    of that layer; it did not make an update cheap.
     """
 
     measured_dependency_tree = 726 * 1024**2
     one_update = 3 * measured_dependency_tree
 
-    assert minimum_headroom_bytes(windows=False) > one_update
+    assert minimum_headroom_bytes() > one_update
 
 
-def test_windows_reserves_more_than_posix() -> None:
-    """Docker Desktop's disk image grows on demand and does not shrink."""
+def test_the_minimum_does_not_depend_on_the_running_platform() -> None:
+    """The container cannot see the host, so it must not guess at it.
 
-    assert minimum_headroom_bytes(windows=True) > minimum_headroom_bytes(
-        windows=False
-    )
+    On a Windows FCP host the authority runs inside the Linux Flask container.
+    An ``os.name`` check there always reads ``posix`` and would have selected
+    the smaller floor on exactly the Docker Desktop hosts that need the larger
+    one, so the Docker Desktop margin is included unconditionally.
+    """
+
+    from catalog.federation import storage_allocation
+
+    with mock.patch.object(storage_allocation.os, "name", "posix"):
+        as_posix = minimum_headroom_bytes()
+    with mock.patch.object(storage_allocation.os, "name", "nt"):
+        as_windows = minimum_headroom_bytes()
+
+    assert as_posix == as_windows
+
+    # And the figure keeps the Docker Desktop margin rather than dropping to
+    # the smaller one whenever the container reports posix.
+    assert as_posix >= 10 * 1024**3
 
 
 def test_the_derived_floor_is_never_below_the_platform_minimum(
