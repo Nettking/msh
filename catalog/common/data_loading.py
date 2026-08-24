@@ -34,7 +34,16 @@ def _inside_incomplete_import(file_path: Path, root: Path) -> bool:
 
     current = file_path.parent
     while True:
-        if (current / _INCOMPLETE_IMPORT_MARKER).is_file():
+        try:
+            (current / _INCOMPLETE_IMPORT_MARKER).lstat()
+        except FileNotFoundError:
+            pass
+        except OSError:
+            # Discovery must fail closed when marker state cannot be inspected.
+            return True
+        else:
+            # Any entry at the reserved marker path hides the batch. The upload
+            # service separately validates the exact regular-file ownership.
             return True
         if current == root or current.parent == current:
             return False

@@ -11,15 +11,17 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import re
 import secrets
-import shutil
 import sqlite3
+import stat
 import threading
 import uuid
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from flask import current_app
 from werkzeug.datastructures import FileStorage
@@ -29,16 +31,48 @@ from catalog.orchestrator.pipeline import get_runtime_manager
 from catalog.runner.script_catalog import repo_root
 
 _IMPORT_MARKER = ".fcp-importing"
+_STAGING_OWNER = ".fcp-upload-owner.json"
+_STAGING_OWNER_SCHEMA = "fcp-data-upload-staging-v1"
+_GENERATED_BATCH_ID = re.compile(r"upload-[0-9a-f]{32}")
+_LEGACY_STAGED_NAME = re.compile(r"[0-9]{3}-[0-9a-f]{32}\.uploading")
+_SAFE_BATCH_ID = re.compile(r"upload-[A-Za-z0-9](?:[A-Za-z0-9._-]{0,119}[A-Za-z0-9])?")
+_SAFE_FILE_NAME = re.compile(r"[A-Za-z0-9._-]{1,255}")
 _DEFAULT_MAX_FILES = 50
 _DEFAULT_MAX_FILE_BYTES = 512 * 1024 * 1024
 _DEFAULT_MAX_TOTAL_BYTES = 1024 * 1024 * 1024
 _DEFAULT_MAX_LINE_BYTES = 4 * 1024 * 1024
 _COPY_CHUNK_BYTES = 1024 * 1024
 _DEFAULT_MAX_PENDING_IMPORTS = 8
+_SERVICE_INITIALIZATION_LOCK = threading.Lock()
 
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def _fsync_directory(path: Path) -> None:
+    """Persist directory entries where the host exposes directory fsync."""
+
+    # CPython cannot open directory handles with os.open on Windows. File data
+    # is still flushed individually there; supported POSIX directory fsync must
+    # fail closed so ENOSPC/EIO cannot be mistaken for durable ordering.
+    if os.name == "nt":
+        return
+    descriptor = os.open(
+        str(path),
+        os.O_RDONLY | getattr(os, "O_DIRECTORY", 0),
+    )
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _is_reparse_point(metadata: os.stat_result) -> bool:
+    return bool(
+        getattr(metadata, "st_file_attributes", 0)
+        & getattr(stat, "FILE_ATTRIBUTE_REPARSE_POINT", 0)
+    )
 
 
 class DataUploadError(ValueError):
@@ -103,9 +137,21 @@ class DataUploadService:
         connection.execute("PRAGMA synchronous=FULL")
         return connection
 
+    def _batch_record_exists(self, batch_id: str) -> bool | None:
+        """Return None when absence cannot be established safely."""
+
+        try:
+            with self._connect() as connection:
+                row = connection.execute(
+                    "SELECT 1 FROM data_upload_batches WHERE batch_id=?",
+                    (batch_id,),
+                ).fetchone()
+        except Exception:  # noqa: BLE001 - uncertainty must preserve durable staging
+            return None
+        return row is not None
+
     def _initialize(self) -> None:
-        interrupted: tuple[str, ...] = ()
-        interrupted_publications: tuple[str, ...] = ()
+        batches: tuple[tuple[str, str], ...] = ()
         with self._connect() as connection:
             connection.execute("PRAGMA journal_mode=WAL")
             connection.executescript("""
@@ -146,25 +192,328 @@ class DataUploadService:
                 CREATE INDEX IF NOT EXISTS data_upload_records_by_batch
                     ON data_upload_records(batch_id, file_id, line_number);
                 """)
-            interrupted = tuple(str(row["batch_id"]) for row in connection.execute("""
-                    SELECT batch_id FROM data_upload_batches
-                    WHERE status IN ('queued', 'importing', 'publishing')
-                    """).fetchall())
-            interrupted_publications = tuple(str(row["batch_id"]) for row in connection.execute("""
-                    SELECT batch_id FROM data_upload_batches
-                    WHERE status='publishing'
-                    """).fetchall())
-            connection.execute("""
-                UPDATE data_upload_batches
-                SET status='queued', error_code=NULL, started_at=NULL, completed_at=NULL
-                WHERE status IN ('queued', 'importing', 'publishing')
-                """)
-        # Hide incomplete final directories synchronously, before discovery can
-        # observe them and before asynchronous recovery workers are scheduled.
-        for batch_id in interrupted_publications:
-            self._prepare_publication_recovery(batch_id)
-        if interrupted:
+            batches = tuple(
+                (str(row["batch_id"]), str(row["status"]))
+                for row in connection.execute(
+                    "SELECT batch_id,status FROM data_upload_batches"
+                ).fetchall()
+            )
+
+        known_batch_ids = {batch_id for batch_id, _status in batches}
+        self._reconcile_orphan_staging(known_batch_ids)
+        queued = False
+        for batch_id, status in batches:
+            try:
+                if self._reconcile_batch_on_startup(batch_id, status):
+                    queued = True
+            except DataUploadError as exc:
+                self._set_batch_state(
+                    batch_id,
+                    "failed",
+                    completed_at=_utc_now(),
+                    error_code=exc.code,
+                )
+        if queued:
             self._drain_queued_imports()
+
+    @staticmethod
+    def _safe_component(batch_id: str) -> bool:
+        return _SAFE_BATCH_ID.fullmatch(batch_id) is not None
+
+    @staticmethod
+    def _safe_file_name(name: str) -> bool:
+        return bool(
+            _SAFE_FILE_NAME.fullmatch(name)
+            and name not in {".", "..", _IMPORT_MARKER, _STAGING_OWNER}
+        )
+
+    def _batch_directory(self, root: Path, batch_id: str) -> Path:
+        if not self._safe_component(batch_id):
+            raise DataUploadError(
+                "upload-path-invalid",
+                "The upload batch storage path is not safe.",
+            )
+        candidate = root / batch_id
+        try:
+            root_resolved = root.resolve()
+            candidate_resolved = candidate.resolve(strict=False)
+            try:
+                metadata = candidate.lstat()
+            except FileNotFoundError:
+                metadata = None
+        except OSError as exc:
+            raise DataUploadError(
+                "upload-path-invalid",
+                "The upload batch storage path could not be verified safely.",
+            ) from exc
+        if candidate_resolved.parent != root_resolved or (
+            metadata is not None
+            and (stat.S_ISLNK(metadata.st_mode) or _is_reparse_point(metadata))
+        ):
+            raise DataUploadError(
+                "upload-path-invalid",
+                "The upload batch storage path is not confined to upload storage.",
+            )
+        return candidate
+
+    def _write_staging_owner(self, staging_dir: Path, batch_id: str) -> None:
+        owner = staging_dir / _STAGING_OWNER
+        payload = json.dumps(
+            {"batch_id": batch_id, "schema": _STAGING_OWNER_SCHEMA},
+            sort_keys=True,
+            separators=(",", ":"),
+        ).encode("utf-8")
+        with owner.open("xb") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        _fsync_directory(staging_dir)
+
+    def _staging_owner_valid(
+        self,
+        staging_dir: Path,
+        batch_id: str,
+        *,
+        missing_ok: bool = False,
+    ) -> bool:
+        owner = staging_dir / _STAGING_OWNER
+        try:
+            owner_metadata = owner.lstat()
+        except FileNotFoundError:
+            return missing_ok
+        except OSError:
+            return False
+        if (
+            not stat.S_ISREG(owner_metadata.st_mode)
+            or stat.S_ISLNK(owner_metadata.st_mode)
+            or _is_reparse_point(owner_metadata)
+            or owner_metadata.st_size > 512
+        ):
+            return False
+        try:
+            with owner.open("rb") as handle:
+                encoded = handle.read(513)
+            if len(encoded) > 512:
+                return False
+            value = json.loads(encoded.decode("utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            return False
+        return value == {
+            "batch_id": batch_id,
+            "schema": _STAGING_OWNER_SCHEMA,
+        }
+
+    def _owned_orphan(self, candidate: Path) -> bool:
+        try:
+            metadata = candidate.lstat()
+            if (
+                not stat.S_ISDIR(metadata.st_mode)
+                or stat.S_ISLNK(metadata.st_mode)
+                or _is_reparse_point(metadata)
+                or _GENERATED_BATCH_ID.fullmatch(candidate.name) is None
+                or candidate.resolve().parent != self.staging_root.resolve()
+            ):
+                return False
+            if not self._staging_owner_valid(candidate, candidate.name):
+                return False
+            file_count = 0
+            total_bytes = 0
+            for entry in candidate.iterdir():
+                if entry.name == _STAGING_OWNER:
+                    continue
+                file_count += 1
+                if file_count > self.max_files:
+                    return False
+                entry_metadata = entry.lstat()
+                total_bytes += entry_metadata.st_size
+                if (
+                    _LEGACY_STAGED_NAME.fullmatch(entry.name) is None
+                    or not stat.S_ISREG(entry_metadata.st_mode)
+                    or stat.S_ISLNK(entry_metadata.st_mode)
+                    or _is_reparse_point(entry_metadata)
+                    or entry_metadata.st_size > self.max_file_bytes
+                    or total_bytes > self.max_total_bytes
+                ):
+                    return False
+        except OSError:
+            return False
+        return True
+
+    def _legacy_owned_orphan(self, candidate: Path) -> bool:
+        """Recognize the exact pre-ownership-record staging layout."""
+
+        try:
+            metadata = candidate.lstat()
+            if (
+                not stat.S_ISDIR(metadata.st_mode)
+                or stat.S_ISLNK(metadata.st_mode)
+                or _is_reparse_point(metadata)
+                or _GENERATED_BATCH_ID.fullmatch(candidate.name) is None
+                or candidate.resolve().parent != self.staging_root.resolve()
+            ):
+                return False
+            try:
+                (candidate / _STAGING_OWNER).lstat()
+            except FileNotFoundError:
+                pass
+            else:
+                return False
+            file_count = 0
+            total_bytes = 0
+            for entry in candidate.iterdir():
+                file_count += 1
+                if file_count > self.max_files:
+                    return False
+                entry_metadata = entry.lstat()
+                total_bytes += entry_metadata.st_size
+                if (
+                    _LEGACY_STAGED_NAME.fullmatch(entry.name) is None
+                    or not stat.S_ISREG(entry_metadata.st_mode)
+                    or stat.S_ISLNK(entry_metadata.st_mode)
+                    or _is_reparse_point(entry_metadata)
+                    or entry_metadata.st_size > self.max_file_bytes
+                    or total_bytes > self.max_total_bytes
+                ):
+                    return False
+        except OSError:
+            return False
+        return file_count > 0
+
+    def _remove_proven_orphan(self, candidate: Path) -> bool:
+        """Remove only bounded, regular entries; never recurse through a path."""
+
+        entries: list[Path] = []
+        file_count = 0
+        try:
+            for entry in candidate.iterdir():
+                metadata = entry.lstat()
+                if entry.name == _STAGING_OWNER:
+                    if not self._staging_owner_valid(candidate, candidate.name):
+                        return False
+                else:
+                    file_count += 1
+                    if file_count > self.max_files or (
+                        _LEGACY_STAGED_NAME.fullmatch(entry.name) is None
+                        or not stat.S_ISREG(metadata.st_mode)
+                        or stat.S_ISLNK(metadata.st_mode)
+                        or _is_reparse_point(metadata)
+                    ):
+                        return False
+                entries.append(entry)
+            for entry in entries:
+                entry.unlink()
+            candidate.rmdir()
+            _fsync_directory(self.staging_root)
+        except OSError:
+            return False
+        return True
+
+    def _cleanup_pre_database_staging(self, staging_dir: Path) -> None:
+        if self._owned_orphan(staging_dir):
+            self._remove_proven_orphan(staging_dir)
+            return
+        # Before the ownership record exists, only an empty directory is safe
+        # to remove. A concurrent or foreign entry makes rmdir fail closed.
+        try:
+            staging_dir.rmdir()
+            _fsync_directory(self.staging_root)
+        except OSError:
+            pass
+
+    def _reconcile_orphan_staging(self, known_batch_ids: set[str]) -> None:
+        """Remove only generated staging proven to be owned and absent from SQLite."""
+
+        try:
+            for candidate in self.staging_root.iterdir():
+                if candidate.name in known_batch_ids:
+                    continue
+                if self._owned_orphan(candidate) or self._legacy_owned_orphan(candidate):
+                    self._remove_proven_orphan(candidate)
+                    continue
+                # A crash between mkdir and the ownership record can leave only an
+                # empty generated directory. rmdir cannot remove unrelated content.
+                if _GENERATED_BATCH_ID.fullmatch(candidate.name):
+                    try:
+                        metadata = candidate.lstat()
+                        if (
+                            not stat.S_ISDIR(metadata.st_mode)
+                            or stat.S_ISLNK(metadata.st_mode)
+                            or _is_reparse_point(metadata)
+                            or candidate.resolve().parent
+                            != self.staging_root.resolve()
+                        ):
+                            continue
+                        candidate.rmdir()
+                        _fsync_directory(self.staging_root)
+                    except OSError:
+                        pass
+        except OSError:
+            return
+
+    def _reconcile_batch_on_startup(self, batch_id: str, status: str) -> bool:
+        staging_dir = self._batch_directory(self.staging_root, batch_id)
+        final_dir = self._batch_directory(self.published_root, batch_id)
+        if status == "ready" and not self._import_marker_present(final_dir, batch_id):
+            if staging_dir.exists():
+                try:
+                    self._cleanup_staging(
+                        staging_dir,
+                        self._publication_files(batch_id),
+                    )
+                except DataUploadError:
+                    # The committed publication remains valid. Ambiguous
+                    # staging is retained rather than deleting unknown data.
+                    pass
+            return False
+
+        active = {"queued", "importing", "publishing"}
+        if status == "failed" and not final_dir.exists() and not staging_dir.exists():
+            return False
+        if status not in active | {"ready", "failed"}:
+            if final_dir.exists():
+                self._prepare_publication_recovery(batch_id)
+            return False
+
+        files = self._publication_files(batch_id)
+        complete = self._publication_complete(final_dir, files)
+
+        if status == "ready":
+            if complete:
+                self._cleanup_staging(staging_dir, files)
+                self._reveal_publication(batch_id, final_dir, files)
+                return False
+            self._prepare_publication_recovery(batch_id)
+            self._queue_batch_for_recovery(batch_id)
+            return True
+
+        if status in active:
+            self._prepare_publication_recovery(batch_id)
+            self._queue_batch_for_recovery(batch_id)
+            return True
+
+        if (
+            status == "failed"
+            and files
+            and all(str(item["status"]) == "imported" for item in files)
+        ):
+            self._prepare_publication_recovery(batch_id)
+            if complete:
+                self._cleanup_staging(staging_dir, files)
+                self._set_batch_state(
+                    batch_id,
+                    "ready",
+                    completed_at=_utc_now(),
+                    published_path=str(final_dir),
+                )
+                self._reveal_publication(batch_id, final_dir, files)
+                return False
+            if self._publication_recoverable(final_dir, staging_dir, files):
+                self._queue_batch_for_recovery(batch_id)
+                return True
+
+        if final_dir.exists():
+            self._prepare_publication_recovery(batch_id)
+        return False
 
     def enqueue(self, files: Iterable[FileStorage]) -> dict[str, Any]:
         selected = tuple(item for item in files if item and item.filename)
@@ -184,12 +533,14 @@ class DataUploadService:
             )
 
         batch_id = f"upload-{uuid.uuid4().hex}"
-        staging_dir = self.staging_root / batch_id
-        staging_dir.mkdir(parents=True, exist_ok=False)
+        staging_dir = self._batch_directory(self.staging_root, batch_id)
         staged: list[StagedUpload] = []
         total_bytes = 0
         used_names: set[str] = set()
         try:
+            staging_dir.mkdir(parents=True, exist_ok=False)
+            _fsync_directory(self.staging_root)
+            self._write_staging_owner(staging_dir, batch_id)
             for index, upload in enumerate(selected, start=1):
                 original_name = Path(str(upload.filename)).name
                 if Path(original_name).suffix.casefold() != ".jsonl":
@@ -236,8 +587,9 @@ class DataUploadService:
                         content_sha256=digest.hexdigest(),
                     )
                 )
+            _fsync_directory(staging_dir)
         except BaseException:
-            shutil.rmtree(staging_dir, ignore_errors=True)
+            self._cleanup_pre_database_staging(staging_dir)
             self._import_slots.release()
             raise
 
@@ -275,7 +627,15 @@ class DataUploadService:
                 )
                 connection.commit()
         except BaseException:
-            shutil.rmtree(staging_dir, ignore_errors=True)
+            # SQLite may report an I/O error after a commit became durable. Only
+            # a fresh positive read adopts that durable row; absence permits
+            # cleanup, while an unreadable result preserves staging and reraises.
+            durable_state = self._batch_record_exists(batch_id)
+            if durable_state is True:
+                self._start_import(batch_id, slot_acquired=True)
+                return self.batch(batch_id)
+            if durable_state is False:
+                self._cleanup_pre_database_staging(staging_dir)
             self._import_slots.release()
             raise
 
@@ -347,8 +707,11 @@ class DataUploadService:
             self._import_batch_serialized(batch_id)
 
     def _import_batch_serialized(self, batch_id: str) -> None:
-        staging_dir = self.staging_root / batch_id
+        staging_dir: Path | None = None
+        publication_committed = False
+        ready_committed = False
         try:
+            staging_dir = self._batch_directory(self.staging_root, batch_id)
             self._set_batch_state(batch_id, "importing", started_at=_utc_now())
             with self._connect() as connection:
                 files = connection.execute(
@@ -398,6 +761,7 @@ class DataUploadService:
                     (total_records, batch_id),
                 )
                 connection.commit()
+                publication_committed = True
 
             published_dir = self._publish_batch(batch_id, staging_dir)
             self._set_batch_state(
@@ -406,7 +770,32 @@ class DataUploadService:
                 completed_at=_utc_now(),
                 published_path=str(published_dir),
             )
+            ready_committed = True
+            self._reveal_publication(
+                batch_id,
+                published_dir,
+                self._publication_files(batch_id),
+            )
         except Exception as exc:  # noqa: BLE001 - worker must persist a safe terminal state
+            if ready_committed:
+                # Ready is already durable. Marker removal is idempotent and a
+                # restart will retry it; never rewrite the DB to failed after
+                # the publication commit has crossed that boundary.
+                return
+            files_for_cleanup: tuple[sqlite3.Row, ...] | None = None
+            if not publication_committed:
+                try:
+                    files_for_cleanup = self._publication_files(batch_id)
+                except (DataUploadError, sqlite3.Error, OSError):
+                    pass
+                else:
+                    # A commit can become durable before SQLite reports its
+                    # result. Imported rows prove the staged source is still
+                    # required for publication/restart recovery.
+                    publication_committed = bool(files_for_cleanup) and all(
+                        str(item["status"]) == "imported"
+                        for item in files_for_cleanup
+                    )
             code = (
                 exc.code if isinstance(exc, DataUploadError) else "upload-import-failed"
             )
@@ -416,7 +805,19 @@ class DataUploadService:
                 completed_at=_utc_now(),
                 error_code=code,
             )
-            shutil.rmtree(staging_dir, ignore_errors=True)
+            if (
+                not publication_committed
+                and staging_dir is not None
+                and files_for_cleanup is not None
+            ):
+                try:
+                    self._cleanup_staging(
+                        staging_dir,
+                        files_for_cleanup,
+                    )
+                except DataUploadError:
+                    # Ambiguous content is evidence, not upload-owned cleanup.
+                    pass
 
     def _import_file(
         self,
@@ -477,23 +878,22 @@ class DataUploadService:
         return count
 
     def _publish_batch(self, batch_id: str, staging_dir: Path) -> Path:
-        final_dir = self.published_root / batch_id
+        final_dir = self._batch_directory(self.published_root, batch_id)
         files = self._publication_files(batch_id)
+        final_dir.mkdir(parents=True, exist_ok=True)
+        _fsync_directory(self.published_root)
+        self._write_import_marker(final_dir, batch_id)
         if self._publication_complete(final_dir, files):
-            (final_dir / _IMPORT_MARKER).unlink(missing_ok=True)
-            shutil.rmtree(staging_dir, ignore_errors=True)
+            self._cleanup_staging(staging_dir, files)
             return final_dir
 
-        final_dir.mkdir(parents=True, exist_ok=True)
-        marker = final_dir / _IMPORT_MARKER
-        marker.write_text(batch_id, encoding="utf-8")
         # The marker remains if publication fails, so recursive discovery cannot
         # consume a partially published batch.
         for item in files:
             source = staging_dir / str(item["staged_name"])
             destination = final_dir / str(item["published_name"])
             if self._file_matches(destination, item):
-                source.unlink(missing_ok=True)
+                continue
             elif self._file_matches(source, item):
                 os.replace(source, destination)
             else:
@@ -501,31 +901,60 @@ class DataUploadService:
                     "upload-publish-incomplete",
                     f"{item['published_name']} is missing or does not match the staged upload.",
                 )
+        _fsync_directory(final_dir)
+        if staging_dir.exists():
+            _fsync_directory(staging_dir)
         if not self._publication_complete(final_dir, files):
             raise DataUploadError(
                 "upload-publish-incomplete",
                 "The published upload could not be verified safely.",
             )
-        marker.unlink()
-        if staging_dir.exists():
-            staging_dir.rmdir()
+        self._cleanup_staging(staging_dir, files)
         return final_dir
 
     def _publication_files(self, batch_id: str) -> tuple[sqlite3.Row, ...]:
         with self._connect() as connection:
-            return tuple(connection.execute(
-                """
-                SELECT staged_name,published_name,size_bytes,content_sha256
-                FROM data_upload_files
-                WHERE batch_id=? ORDER BY published_name,file_id
-                """,
-                (batch_id,),
-            ).fetchall())
+            files = tuple(
+                connection.execute(
+                    """
+                    SELECT staged_name,published_name,size_bytes,content_sha256,status
+                    FROM data_upload_files
+                    WHERE batch_id=? ORDER BY published_name,file_id
+                    """,
+                    (batch_id,),
+                ).fetchall()
+            )
+        published_names: set[str] = set()
+        staged_names: set[str] = set()
+        for item in files:
+            published_name = str(item["published_name"])
+            staged_name = str(item["staged_name"])
+            if (
+                not self._safe_file_name(published_name)
+                or Path(published_name).suffix.casefold() != ".jsonl"
+                or not self._safe_file_name(staged_name)
+                or not staged_name.endswith(".uploading")
+                or published_name.casefold() in published_names
+                or staged_name.casefold() in staged_names
+            ):
+                raise DataUploadError(
+                    "upload-path-invalid",
+                    "The upload file storage path is not confined safely.",
+                )
+            published_names.add(published_name.casefold())
+            staged_names.add(staged_name.casefold())
+        return files
 
     @staticmethod
     def _file_matches(path: Path, item: sqlite3.Row) -> bool:
         try:
-            if not path.is_file() or path.stat().st_size != int(item["size_bytes"]):
+            metadata = path.lstat()
+            if (
+                not stat.S_ISREG(metadata.st_mode)
+                or stat.S_ISLNK(metadata.st_mode)
+                or _is_reparse_point(metadata)
+                or metadata.st_size != int(item["size_bytes"])
+            ):
                 return False
             digest = hashlib.sha256()
             with path.open("rb") as handle:
@@ -541,6 +970,8 @@ class DataUploadService:
         if not files or not final_dir.is_dir():
             return False
         expected_names = {str(item["published_name"]) for item in files}
+        if len(expected_names) != len(files):
+            return False
         try:
             actual_names = {
                 path.name for path in final_dir.iterdir() if path.name != _IMPORT_MARKER
@@ -552,14 +983,218 @@ class DataUploadService:
             for item in files
         )
 
+    def _publication_recoverable(
+        self,
+        final_dir: Path,
+        staging_dir: Path,
+        files: tuple[sqlite3.Row, ...],
+    ) -> bool:
+        if not files:
+            return False
+        expected_names = {str(item["published_name"]) for item in files}
+        if len(expected_names) != len(files):
+            return False
+        if final_dir.exists():
+            try:
+                actual_names = {
+                    path.name
+                    for path in final_dir.iterdir()
+                    if path.name != _IMPORT_MARKER
+                }
+            except OSError:
+                return False
+            if not actual_names.issubset(expected_names):
+                return False
+        if not self._staging_contains_only_owned_entries(staging_dir, files):
+            return False
+        return all(
+            self._file_matches(final_dir / str(item["published_name"]), item)
+            or self._file_matches(staging_dir / str(item["staged_name"]), item)
+            for item in files
+        )
+
+    def _staging_contains_only_owned_entries(
+        self,
+        staging_dir: Path,
+        files: tuple[sqlite3.Row, ...],
+    ) -> bool:
+        try:
+            directory_metadata = staging_dir.lstat()
+        except FileNotFoundError:
+            return True
+        except OSError:
+            return False
+        if (
+            not stat.S_ISDIR(directory_metadata.st_mode)
+            or stat.S_ISLNK(directory_metadata.st_mode)
+            or _is_reparse_point(directory_metadata)
+            or not self._safe_component(staging_dir.name)
+        ):
+            return False
+        try:
+            if staging_dir.resolve().parent != self.staging_root.resolve():
+                return False
+            owner = staging_dir / _STAGING_OWNER
+            try:
+                owner.lstat()
+            except FileNotFoundError:
+                pass  # Supported recovery for staging created before owner records.
+            else:
+                if not self._staging_owner_valid(staging_dir, staging_dir.name):
+                    return False
+            by_name = {str(item["staged_name"]): item for item in files}
+            if len(by_name) != len(files):
+                return False
+            entry_count = 0
+            for path in staging_dir.iterdir():
+                entry_count += 1
+                if entry_count > len(files) + 1:
+                    return False
+                if path.name == _STAGING_OWNER:
+                    continue
+                item = by_name.get(path.name)
+                if item is None or not self._file_matches(path, item):
+                    return False
+        except OSError:
+            return False
+        return True
+
+    def _cleanup_staging(
+        self,
+        staging_dir: Path,
+        files: tuple[sqlite3.Row, ...],
+    ) -> None:
+        try:
+            staging_dir.lstat()
+        except FileNotFoundError:
+            return
+        except OSError as exc:
+            raise DataUploadError(
+                "upload-staging-ambiguous",
+                "The upload staging path could not be verified safely.",
+            ) from exc
+        if not self._staging_contains_only_owned_entries(staging_dir, files):
+            raise DataUploadError(
+                "upload-staging-ambiguous",
+                "Unexpected content in upload staging was preserved for review.",
+            )
+        try:
+            by_name = {str(item["staged_name"]): item for item in files}
+            for entry_count, entry in enumerate(staging_dir.iterdir(), start=1):
+                if entry_count > len(files) + 1:
+                    raise DataUploadError(
+                        "upload-staging-ambiguous",
+                        "Unexpected content in upload staging was preserved for review.",
+                    )
+                if entry.name == _STAGING_OWNER:
+                    if not self._staging_owner_valid(staging_dir, staging_dir.name):
+                        raise DataUploadError(
+                            "upload-staging-ambiguous",
+                            "The upload staging owner record was preserved for review.",
+                        )
+                else:
+                    item = by_name.get(entry.name)
+                    if item is None or not self._file_matches(entry, item):
+                        raise DataUploadError(
+                            "upload-staging-ambiguous",
+                            "Unexpected content in upload staging was preserved for review.",
+                        )
+                entry.unlink()
+            staging_dir.rmdir()
+            _fsync_directory(self.staging_root)
+        except DataUploadError:
+            raise
+        except OSError:
+            # A complete verified publication does not become unsafe merely
+            # because a redundant owned staging copy is temporarily locked.
+            pass
+
+    def _import_marker_present(self, final_dir: Path, batch_id: str) -> bool:
+        marker = final_dir / _IMPORT_MARKER
+        expected = batch_id.encode("utf-8")
+        try:
+            metadata = marker.lstat()
+        except FileNotFoundError:
+            return False
+        except OSError as exc:
+            raise DataUploadError(
+                "upload-publish-marker-invalid",
+                "The upload publication marker could not be verified safely.",
+            ) from exc
+        if (
+            not stat.S_ISREG(metadata.st_mode)
+            or stat.S_ISLNK(metadata.st_mode)
+            or _is_reparse_point(metadata)
+            or metadata.st_size != len(expected)
+        ):
+            raise DataUploadError(
+                "upload-publish-marker-invalid",
+                "The upload publication marker is not the owned batch marker.",
+            )
+        try:
+            with marker.open("rb") as handle:
+                actual = handle.read(len(expected) + 1)
+        except OSError as exc:
+            raise DataUploadError(
+                "upload-publish-marker-invalid",
+                "The upload publication marker could not be read safely.",
+            ) from exc
+        if actual != expected:
+            raise DataUploadError(
+                "upload-publish-marker-invalid",
+                "The upload publication marker belongs to a different batch.",
+            )
+        return True
+
+    def _write_import_marker(self, final_dir: Path, batch_id: str) -> None:
+        marker = final_dir / _IMPORT_MARKER
+        if self._import_marker_present(final_dir, batch_id):
+            return
+        try:
+            with marker.open("xb") as handle:
+                handle.write(batch_id.encode("utf-8"))
+                handle.flush()
+                os.fsync(handle.fileno())
+            _fsync_directory(final_dir)
+        except OSError as exc:
+            raise DataUploadError(
+                "upload-publish-marker-failed",
+                "The upload could not be hidden safely before publication.",
+            ) from exc
+
+    def _reveal_publication(
+        self,
+        batch_id: str,
+        final_dir: Path,
+        files: tuple[sqlite3.Row, ...],
+    ) -> None:
+        if not self._publication_complete(final_dir, files):
+            raise DataUploadError(
+                "upload-publish-incomplete",
+                "The complete upload could not be verified before publication.",
+            )
+        marker = final_dir / _IMPORT_MARKER
+        if not self._import_marker_present(final_dir, batch_id):
+            return
+        try:
+            marker.unlink()
+            _fsync_directory(final_dir)
+        except OSError as exc:
+            try:
+                self._write_import_marker(final_dir, batch_id)
+            except DataUploadError:
+                pass
+            raise DataUploadError(
+                "upload-publish-marker-failed",
+                f"Upload batch {batch_id} could not be made visible safely.",
+            ) from exc
+
     def _prepare_publication_recovery(self, batch_id: str) -> None:
-        """Keep incomplete publication hidden until its worker reconciles it."""
-        final_dir = self.published_root / batch_id
+        """Keep every non-ready publication hidden until DB state catches up."""
+        final_dir = self._batch_directory(self.published_root, batch_id)
         if not final_dir.exists():
             return
-        files = self._publication_files(batch_id)
-        if not self._publication_complete(final_dir, files):
-            (final_dir / _IMPORT_MARKER).write_text(batch_id, encoding="utf-8")
+        self._write_import_marker(final_dir, batch_id)
 
     def _set_batch_state(
         self,
@@ -596,12 +1231,28 @@ class DataUploadService:
                     "upload-batch-not-found", "Upload batch not found."
                 )
 
+    def _queue_batch_for_recovery(self, batch_id: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE data_upload_batches
+                SET status='queued', started_at=NULL, completed_at=NULL,
+                    published_path=NULL, error_code=NULL
+                WHERE batch_id=?
+                """,
+                (batch_id,),
+            )
+            if connection.total_changes != 1:
+                raise DataUploadError(
+                    "upload-batch-not-found", "Upload batch not found."
+                )
+
     def request_analysis(
         self, batch_id: str, *, execution_id: str | None = None
     ) -> dict[str, Any]:
         with self._analysis_lock:
             batch = self.batch(batch_id)
-            if batch["status"] != "ready":
+            if not batch["ready_for_analysis"]:
                 raise DataUploadError(
                     "upload-not-ready",
                     "Wait for the complete upload batch to finish importing.",
@@ -631,6 +1282,33 @@ class DataUploadService:
                         "The upload state changed before analysis could be requested.",
                     )
         return self.batch(batch_id)
+
+    def _publication_visible(
+        self,
+        batch_id: str,
+        published_path: object,
+    ) -> bool:
+        if not published_path:
+            return False
+        try:
+            final_dir = self._batch_directory(self.published_root, batch_id)
+            final_resolved = final_dir.resolve()
+            recorded = Path(str(published_path)).resolve()
+        except (DataUploadError, OSError):
+            return False
+        try:
+            (final_dir / _IMPORT_MARKER).lstat()
+        except FileNotFoundError:
+            marker_absent = True
+        except OSError:
+            return False
+        else:
+            marker_absent = False
+        return bool(
+            recorded == final_resolved
+            and final_dir.is_dir()
+            and marker_absent
+        )
 
     def batch(self, batch_id: str) -> dict[str, Any]:
         with self._connect() as connection:
@@ -664,7 +1342,9 @@ class DataUploadService:
             "analysis_state": str(row["analysis_state"]),
             "analysis_requested_at": row["analysis_requested_at"],
             "ready_for_analysis": (
-                row["status"] == "ready" and row["analysis_state"] != "requested"
+                row["status"] == "ready"
+                and row["analysis_state"] != "requested"
+                and self._publication_visible(batch_id, row["published_path"])
             ),
             "files": [dict(item) for item in files],
         }
@@ -691,43 +1371,47 @@ def get_data_upload_service() -> DataUploadService:
     existing = current_app.extensions.get("data_upload_service")
     if isinstance(existing, DataUploadService):
         return existing
-    service = DataUploadService(
-        database=_configured_path(
-            "DATA_UPLOAD_DATABASE",
-            "data/imports/uploads.sqlite3",
-        ),
-        staging_root=_configured_path(
-            "DATA_UPLOAD_STAGING_DIRECTORY",
-            "data/imports/staging",
-        ),
-        published_root=_configured_path(
-            "DATA_UPLOAD_PUBLISHED_DIRECTORY",
-            "data/uploads",
-        ),
-        max_files=int(
-            current_app.config.get("DATA_UPLOAD_MAX_FILES", _DEFAULT_MAX_FILES)
-        ),
-        max_file_bytes=int(
-            current_app.config.get(
-                "DATA_UPLOAD_MAX_FILE_BYTES",
-                _DEFAULT_MAX_FILE_BYTES,
-            )
-        ),
-        max_total_bytes=int(
-            current_app.config.get(
-                "DATA_UPLOAD_MAX_TOTAL_BYTES",
-                _DEFAULT_MAX_TOTAL_BYTES,
-            )
-        ),
-        max_line_bytes=int(
-            current_app.config.get(
-                "DATA_UPLOAD_MAX_LINE_BYTES",
-                _DEFAULT_MAX_LINE_BYTES,
-            )
-        ),
-    )
-    current_app.extensions["data_upload_service"] = service
-    return service
+    with _SERVICE_INITIALIZATION_LOCK:
+        existing = current_app.extensions.get("data_upload_service")
+        if isinstance(existing, DataUploadService):
+            return existing
+        service = DataUploadService(
+            database=_configured_path(
+                "DATA_UPLOAD_DATABASE",
+                "data/imports/uploads.sqlite3",
+            ),
+            staging_root=_configured_path(
+                "DATA_UPLOAD_STAGING_DIRECTORY",
+                "data/imports/staging",
+            ),
+            published_root=_configured_path(
+                "DATA_UPLOAD_PUBLISHED_DIRECTORY",
+                "data/uploads",
+            ),
+            max_files=int(
+                current_app.config.get("DATA_UPLOAD_MAX_FILES", _DEFAULT_MAX_FILES)
+            ),
+            max_file_bytes=int(
+                current_app.config.get(
+                    "DATA_UPLOAD_MAX_FILE_BYTES",
+                    _DEFAULT_MAX_FILE_BYTES,
+                )
+            ),
+            max_total_bytes=int(
+                current_app.config.get(
+                    "DATA_UPLOAD_MAX_TOTAL_BYTES",
+                    _DEFAULT_MAX_TOTAL_BYTES,
+                )
+            ),
+            max_line_bytes=int(
+                current_app.config.get(
+                    "DATA_UPLOAD_MAX_LINE_BYTES",
+                    _DEFAULT_MAX_LINE_BYTES,
+                )
+            ),
+        )
+        current_app.extensions["data_upload_service"] = service
+        return service
 
 
 __all__ = [
