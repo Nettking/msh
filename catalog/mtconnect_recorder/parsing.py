@@ -6,6 +6,7 @@ from hashlib import sha256
 from typing import Any
 from xml.etree import ElementTree as ET
 
+from .limits import MAX_OBSERVATIONS_PER_BATCH, MAX_SEQUENCE_SPAN
 from .model import (
     MtconnectProtocolError,
     ParsedBatch,
@@ -206,16 +207,26 @@ def parse_streams(
     source_name: str,
     probe: ProbeModel | None,
     received_at: str | None = None,
+    max_observations: int = MAX_OBSERVATIONS_PER_BATCH,
+    max_sequence_span: int = MAX_SEQUENCE_SPAN,
 ) -> ParsedBatch:
+    if max_observations <= 0 or max_sequence_span <= 0:
+        raise ValueError("MTConnect parsing limits must be positive.")
     header = parse_stream_header(xml_text)
     root = ET.fromstring(xml_text)
     received = received_at or _utc_now()
     observations: list[dict[str, Any]] = []
-    sequences: list[int] = []
+    first_sequence: int | None = None
+    last_sequence: int | None = None
 
     for ordinal, (stream_context, category, element) in enumerate(
         _iter_stream_observations(root)
     ):
+        if ordinal >= max_observations:
+            raise MtconnectProtocolError(
+                "MTConnect response contained more than "
+                f"{max_observations} observations."
+            )
         attributes = dict(element.attrib)
         sequence_raw = attributes.get("sequence")
         try:
@@ -223,7 +234,17 @@ def parse_streams(
         except ValueError:
             sequence = None
         if sequence is not None:
-            sequences.append(sequence)
+            first_sequence = (
+                sequence if first_sequence is None else min(first_sequence, sequence)
+            )
+            last_sequence = (
+                sequence if last_sequence is None else max(last_sequence, sequence)
+            )
+            if last_sequence - first_sequence + 1 > max_sequence_span:
+                raise MtconnectProtocolError(
+                    "MTConnect response sequence span exceeds maximum "
+                    f"{max_sequence_span}."
+                )
 
         data_item_id = attributes.get("dataItemId")
         metadata = probe.data_items.get(data_item_id, {}) if probe and data_item_id else {}
@@ -297,8 +318,8 @@ def parse_streams(
     return ParsedBatch(
         header=header,
         observations=observations,
-        first_observation_sequence=min(sequences) if sequences else None,
-        last_observation_sequence=max(sequences) if sequences else None,
+        first_observation_sequence=first_sequence,
+        last_observation_sequence=last_sequence,
     )
 
 
@@ -341,13 +362,14 @@ def validate_batch_continuity(batch: ParsedBatch, expected_from: int) -> None:
         raise MtconnectProtocolError(
             f"Expected first observation sequence {expected_from}, received {sequences[0]}."
         )
-    expected = list(range(sequences[0], sequences[-1] + 1))
-    if sequences != expected:
-        missing = sorted(set(expected) - set(sequences))
-        preview = ", ".join(str(value) for value in missing[:10])
-        raise MtconnectProtocolError(
-            f"Non-contiguous sequence response; missing {preview or 'unknown sequences'}."
-        )
+    previous = sequences[0]
+    for sequence in sequences[1:]:
+        if sequence != previous + 1:
+            raise MtconnectProtocolError(
+                "Non-contiguous sequence response; "
+                f"missing {previous + 1}."
+            )
+        previous = sequence
     if batch.header.next_sequence != sequences[-1] + 1:
         raise MtconnectProtocolError(
             "Header.nextSequence does not follow the final returned observation: "
