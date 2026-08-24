@@ -95,7 +95,16 @@ A recorder whose current checkout predates this capability needs one manual fast
 
 ### Federation work still open
 
-1. Implement the reconciled robustness blockers B01-B10 from [the authoritative reconciliation](v1_robustness_reconciliation.md), one named delivery/PR at a time and in the recommended dependency order.
+Robustness implementation is now proceeding as isolated delivery PRs. The
+tailnet responder process-identity delivery closes one B06 property with
+automated tests: stale/legacy PID records can no longer authorize termination
+of a reused unrelated host process. Windows terminates through one verified
+process handle, Linux uses a pinned pidfd, other POSIX platforms refuse unsafe
+automatic termination, and Windows cannot run two responder listeners on the
+same port. B06 remains open for relay, recorder, scheduler and crash-loop
+supervision. No physical evidence state changed.
+
+1. Continue the reconciled robustness blockers B01-B10 from [the authoritative reconciliation](v1_robustness_reconciliation.md), one named delivery/PR at a time and in the recommended dependency order.
 2. Keep the documented non-goals and accepted boundaries out of the v1 implementation unless new concrete evidence invalidates them.
 3. Execute the corrected P01-P12 physical fault/growth/restore campaign on one exact candidate after the blocker implementations and automated gates are green; green CI alone is insufficient.
 4. Reconcile physical-acceptance instructions with the current post-CF8, update-capable, recorder-capable product baseline.

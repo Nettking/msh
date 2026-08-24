@@ -31,6 +31,7 @@ import signal
 import socketserver
 import subprocess
 import sys
+import tempfile
 import threading
 import urllib.error
 import urllib.request
@@ -58,6 +59,9 @@ RESPONSE_SCHEMA = "fcp.federation.tailnet-auto-join.v1"
 MAX_REQUEST_BYTES = 4096
 GRANT_TIMEOUT_SECONDS = 10.0
 DEFAULT_APP_URL = "http://127.0.0.1:5000"
+PROCESS_RECORD_SCHEMA = "fcp.federation.tailnet-auto-join-process.v2"
+MAX_PROCESS_RECORD_BYTES = 4096
+MAX_PROCESS_START_TOKEN_LENGTH = 512
 
 
 def application_url(environ: dict[str, str] | None = None) -> str:
@@ -191,7 +195,10 @@ class _Handler(http.server.BaseHTTPRequestHandler):
 
 class _Server(socketserver.ThreadingTCPServer):
     daemon_threads = True
-    allow_reuse_address = True
+    # Windows SO_REUSEADDR permits two live listeners to bind the same port.
+    # The replacement must either own the port or fail explicitly, never race
+    # an older or unrelated listener for join requests.
+    allow_reuse_address = os.name != "nt"
     # A stuck peer must never hold the responder open.
     timeout = GRANT_TIMEOUT_SECONDS
 
@@ -238,26 +245,177 @@ def serve(
         server.serve_forever(poll_interval=0.5)
 
 
-def process_is_running(pid: int) -> bool:
-    """Return whether a process with this id currently exists."""
+def _windows_start_token_from_handle(handle: object) -> str | None:
+    import ctypes
+    from ctypes import wintypes
 
-    if pid <= 0:
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.GetProcessTimes.argtypes = (
+        wintypes.HANDLE,
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+        ctypes.POINTER(wintypes.FILETIME),
+    )
+    kernel32.GetProcessTimes.restype = wintypes.BOOL
+    creation = wintypes.FILETIME()
+    exit_time = wintypes.FILETIME()
+    kernel_time = wintypes.FILETIME()
+    user_time = wintypes.FILETIME()
+    if not kernel32.GetProcessTimes(
+        handle,
+        ctypes.byref(creation),
+        ctypes.byref(exit_time),
+        ctypes.byref(kernel_time),
+        ctypes.byref(user_time),
+    ):
+        return None
+    value = (int(creation.dwHighDateTime) << 32) | int(creation.dwLowDateTime)
+    return f"windows:{value}"
+
+
+def _windows_process_start_token(pid: int) -> str | None:
+    import ctypes
+    from ctypes import wintypes
+
+    process_query_limited_information = 0x1000
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+    if not handle:
+        return None
+    try:
+        return _windows_start_token_from_handle(handle)
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _terminate_windows_process_if_same_instance(
+    pid: int, expected_start_token: str
+) -> bool:
+    import ctypes
+    from ctypes import wintypes
+
+    process_terminate = 0x0001
+    process_query_limited_information = 0x1000
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.TerminateProcess.argtypes = (wintypes.HANDLE, wintypes.UINT)
+    kernel32.TerminateProcess.restype = wintypes.BOOL
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    kernel32.CloseHandle.restype = wintypes.BOOL
+    handle = kernel32.OpenProcess(
+        process_query_limited_information | process_terminate, False, pid
+    )
+    if not handle:
         return False
-    if os.name == "nt":
+    try:
+        if _windows_start_token_from_handle(handle) != expected_start_token:
+            return False
+        return bool(kernel32.TerminateProcess(handle, 1))
+    finally:
+        kernel32.CloseHandle(handle)
+
+
+def _terminate_linux_process_if_same_instance(
+    pid: int, expected_start_token: str
+) -> bool:
+    """Signal only the process object pinned by a Linux pidfd."""
+
+    try:
+        descriptor = os.pidfd_open(pid, 0)
+    except (AttributeError, OSError):
+        return False
+    try:
+        # Open the stable handle first. If the recorded process exited before
+        # the open, this token describes the replacement and fails the check.
+        # If it exits afterwards, pidfd_send_signal targets only the pinned,
+        # now-dead process object and can never cross into a reused PID.
+        if process_start_token(pid) != expected_start_token:
+            return False
+        try:
+            signal.pidfd_send_signal(descriptor, signal.SIGTERM)
+        except (AttributeError, OSError):
+            return False
+        return True
+    finally:
+        os.close(descriptor)
+
+
+def _proc_process_start_token(pid: int) -> str | None:
+    try:
+        raw_stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
+        boot_id = Path("/proc/sys/kernel/random/boot_id").read_text(
+            encoding="utf-8"
+        ).strip()
+    except (OSError, UnicodeDecodeError):
+        return None
+    closing_parenthesis = raw_stat.rfind(")")
+    if closing_parenthesis < 0 or not boot_id:
+        return None
+    # Fields after ``comm`` begin with field 3; process start time is field 22.
+    fields = raw_stat[closing_parenthesis + 2 :].split()
+    if len(fields) <= 19 or not fields[19].isdigit():
+        return None
+    return f"linux:{boot_id}:{fields[19]}"
+
+
+def _ps_process_start_token(pid: int) -> str | None:
+    try:
         completed = subprocess.run(
-            ("tasklist", "/FI", f"PID eq {pid}", "/NH"),
+            ("ps", "-o", "lstart=", "-p", str(pid)),
             capture_output=True,
             text=True,
             check=False,
+            timeout=5.0,
         )
-        return str(pid) in (completed.stdout or "")
-    try:
-        os.kill(pid, 0)
-    except ProcessLookupError:
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    value = " ".join((completed.stdout or "").split())
+    if completed.returncode != 0 or not value:
+        return None
+    return f"posix:{value}"
+
+
+def process_start_token(pid: int) -> str | None:
+    """Return an OS process-creation identity, not merely process existence."""
+
+    if pid <= 0:
+        return None
+    if os.name == "nt":
+        return _windows_process_start_token(pid)
+    if sys.platform.startswith("linux"):
+        # Linux termination is authorized by this token, so only the boot-id +
+        # kernel start-time identity is strong enough. A second-resolution
+        # `ps lstart` fallback could match a different process after PID reuse.
+        return _proc_process_start_token(pid)
+    return _ps_process_start_token(pid)
+
+
+def terminate_process_if_same_instance(pid: int, expected_start_token: str) -> bool:
+    """Terminate only when the PID still names the recorded process instance."""
+
+    if pid <= 0 or not expected_start_token:
         return False
-    except PermissionError:
-        return True
-    return True
+    if os.name == "nt":
+        # OpenProcess pins the kernel process object while creation identity is
+        # checked and termination is requested, closing the PID-reuse race.
+        return _terminate_windows_process_if_same_instance(
+            pid, expected_start_token
+        )
+    if sys.platform.startswith("linux"):
+        return _terminate_linux_process_if_same_instance(
+            pid, expected_start_token
+        )
+    # Other POSIX platforms do not expose a stable process handle through the
+    # Python runtime. A token check followed by kill(pid) would retain a PID
+    # reuse race, so replacement fails closed and the occupied-port error makes
+    # automatic joining unavailable without risking an unrelated process.
+    return False
 
 
 def stop_previous_instance(pid_file: Path) -> int | None:
@@ -268,32 +426,58 @@ def stop_previous_instance(pid_file: Path) -> int | None:
     that was never there.
     """
 
+    path = Path(pid_file)
     try:
-        raw = Path(pid_file).read_text(encoding="utf-8").strip()
-    except (OSError, UnicodeDecodeError):
+        if path.stat().st_size > MAX_PROCESS_RECORD_BYTES:
+            return None
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
         return None
-    try:
-        pid = int(raw)
-    except ValueError:
+    if not isinstance(payload, dict) or payload.get("schema") != PROCESS_RECORD_SCHEMA:
         return None
-    if pid == os.getpid() or not process_is_running(pid):
+    pid = payload.get("pid")
+    start_token = payload.get("start_token")
+    if isinstance(pid, bool) or not isinstance(pid, int) or pid <= 0:
         return None
-    if os.name == "nt":
-        subprocess.run(
-            ("taskkill", "/PID", str(pid), "/F"),
-            capture_output=True,
-            check=False,
-        )
-    else:
-        with suppress(ProcessLookupError, PermissionError, OSError):
-            os.kill(pid, signal.SIGTERM)
-    return pid
+    if not isinstance(start_token, str):
+        return None
+    start_token = start_token.strip()
+    if not start_token or len(start_token) > MAX_PROCESS_START_TOKEN_LENGTH:
+        return None
+    if pid == os.getpid():
+        return None
+    return pid if terminate_process_if_same_instance(pid, start_token) else None
 
 
 def write_pid_file(pid_file: Path) -> None:
     path = Path(pid_file)
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(str(os.getpid()), encoding="utf-8")
+    pid = os.getpid()
+    start_token = process_start_token(pid)
+    if start_token is None:
+        raise RuntimeError("could not determine responder process identity")
+    payload = json.dumps(
+        {
+            "schema": PROCESS_RECORD_SCHEMA,
+            "pid": pid,
+            "start_token": start_token,
+        },
+        sort_keys=True,
+        separators=(",", ":"),
+    )
+    descriptor, temporary_name = tempfile.mkstemp(
+        prefix=f".{path.name}.", suffix=".tmp", dir=path.parent
+    )
+    temporary_path = Path(temporary_name)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temporary_path, path)
+    finally:
+        with suppress(OSError):
+            temporary_path.unlink(missing_ok=True)
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -393,8 +577,19 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
-    # Only now is the listener real, so this is the first honest success line.
-    write_pid_file(pid_file)
+    # Only now is the listener real. Refuse to advertise it unless future
+    # replacement can prove this exact process instance rather than trust a PID.
+    try:
+        write_pid_file(pid_file)
+    except (OSError, RuntimeError) as error:
+        server.server_close()
+        print(
+            "tailnet-join responder: could not record a safe process identity "
+            f"({error}). Automatic Federation joining is unavailable; manual "
+            "pairing codes still work.",
+            file=sys.stderr,
+        )
+        return 1
     print(
         f"tailnet-join responder: listening on {bind_host}:{port}",
         file=sys.stderr,
@@ -404,9 +599,9 @@ def main(argv: list[str] | None = None) -> int:
             server.serve_forever(poll_interval=0.5)
     except KeyboardInterrupt:
         return 0
-    finally:
-        with suppress(OSError):
-            Path(pid_file).unlink(missing_ok=True)
+    # Retain the final process record. A later start can prove that the process
+    # is gone before overwriting it; unlinking here could race a replacement and
+    # delete the replacement's identity record.
     return 0
 
 
