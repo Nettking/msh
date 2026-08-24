@@ -2,7 +2,7 @@
 
 Status: **current repository handoff**
 
-Reviewed: **2026-08-11 Europe/Oslo**
+Reviewed: **2026-08-24 Europe/Oslo**
 
 ## Repository state
 
@@ -59,6 +59,7 @@ The installed product now includes:
 - public-safe Federation overview/detail surfaces plus explicit reviewed mutation surfaces;
 - coordinator-owned **Check for updates** and **Update all devices** with exact-commit host validation and running-runtime proof;
 - Windows/POSIX host-owned update agents and conservative Windows legacy migration bootstrap;
+- a supervised native standalone recorder that participates in the same **Update all devices** rollout over its existing Federation connection;
 - a headless MTConnect recorder that can join a Federation using the normal `FCP1-...` pairing flow;
 - recorder-local startup network discovery with first-configuration auto-selection;
 - local-first checkpoint-gated recorder publication through Federation logical-storage authority;
@@ -70,11 +71,16 @@ The pairing-code UX currently issues signed one-use codes valid for up to 10 min
 
 A successful software activation remains internally `runtime_verified`; the UI presents that terminal success as **Updated**.
 
-### Important current limitation
+### Standalone recorder update coverage
 
-A standalone recorder launched directly with `python start_recorder.py` is a headless Federation node but does not host the normal Flask update-event processor/host update agent. The current **Update all devices** activation path manages normal FCP installations and their Compose-managed recorder service; it does not restart an independently launched standalone recorder process.
+A native standalone recorder started through its supervisor (`start-tailscale-recorder.cmd`, which runs `scripts/windows/fcp_recorder_supervisor.ps1`) now participates in **Check for updates -> Update all devices** like any other Federation member. The host update agent runs inside the recorder process and starts only when the supervisor has set `FCP_RECORDER_SUPERVISOR_SESSION`; the supervisor performs only the two steps that cannot happen inside the recorder, namely the fast-forward after the process exits and the single relaunch. Success still requires a different process ID and a different process-instance nonce under the same supervisor, running the exact target commit, with a fresh heartbeat and connected Federation membership. See [Standalone recorder](../standalone_recorder.md).
 
-Do not document or claim automatic standalone-recorder self-update until a dedicated bounded updater exists and is accepted.
+Two limits remain, and neither may be softened in documentation:
+
+- A recorder launched directly with `python start_recorder.py` has no supervisor session, so it starts no host update agent. It is still a headless Federation node and still receives the update event, but its bounded handoff is answered by nothing and the coordinator records `host_update_agent_unavailable` for that device. It is reported as an error, never as a silent success, and never as an updated device.
+- The supervisor exists for Windows only. There is no POSIX native-recorder supervisor, so a native recorder on Linux or macOS is in the unsupervised case above.
+
+A recorder whose current checkout predates this capability needs one manual fast-forward and one supervised start before it can be updated by the Federation flow, for the same reason normal FCP devices do.
 
 ### Federation work still open
 
@@ -84,7 +90,7 @@ Do not document or claim automatic standalone-recorder self-update until a dedic
 4. Execute the complete physical CF7 campaign on that same commit.
 5. Update acceptance flags only through a separate evidence-backed review.
 6. Create a Federation v1 release tag only after the release acceptance contract is satisfied.
-7. Treat any future standalone-recorder update mechanism as a separate bounded authority/security delivery rather than extending peer control implicitly.
+7. Decide whether a POSIX native-recorder supervisor is in scope; until one exists, native recorders on Linux and macOS stay outside **Update all devices** by construction rather than by policy.
 
 Do **not** restart CF1-CF6 implementation waves and do **not** reintroduce role-first runtime authority to solve migration or startup defects.
 
@@ -130,5 +136,6 @@ Federation work and OSL work remain separate review boundaries. Before beginning
 - Safe to treat CF8 as future/blocking work: **no; CF8 is already merged for the installed product**.
 - Safe to reintroduce role-first authority for convenience: **no**.
 - Safe to document Federation-wide updates as automatic/background updates: **no; activation remains explicit/manual**.
-- Safe to claim standalone `start_recorder.py` processes are updated by **Update all devices**: **no**.
+- Safe to claim *supervised* native standalone recorders are updated by **Update all devices**: **yes**.
+- Safe to claim an unsupervised `python start_recorder.py` process is updated by **Update all devices**: **no; it reports `host_update_agent_unavailable`**.
 - Safe to begin an OSL delivery: only after checking the current OSL track documents and respecting its named prerequisite/review boundaries.
