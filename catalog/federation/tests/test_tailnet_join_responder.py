@@ -443,24 +443,67 @@ def test_the_pid_file_records_the_live_responder(
     }
 
 
-def test_matching_process_identity_is_rechecked_before_termination(
+def test_linux_process_identity_is_checked_after_pinning_the_process(
     monkeypatch,
 ) -> None:
-    tokens = iter(("boot-a:100", "boot-b:1"))
-    killed: list[int] = []
-    monkeypatch.setattr(responder, "process_start_token", lambda pid: next(tokens))
+    opened: list[int] = []
+    signalled: list[tuple[int, int]] = []
+    closed: list[int] = []
+    monkeypatch.setattr(
+        responder,
+        "process_start_token",
+        lambda pid: "boot-b:1",
+    )
     monkeypatch.setattr(responder.os, "name", "posix")
     monkeypatch.setattr(
+        responder.sys,
+        "platform",
+        "linux",
+    )
+    monkeypatch.setattr(
         responder.os,
-        "kill",
-        lambda pid, sig: killed.append(pid),
+        "pidfd_open",
+        lambda pid, flags=0: opened.append(pid) or 91,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        responder.signal,
+        "pidfd_send_signal",
+        lambda descriptor, sig: signalled.append((descriptor, sig)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        responder.os,
+        "close",
+        lambda descriptor: closed.append(descriptor),
     )
 
     assert not responder.terminate_process_if_same_instance(4242, "boot-a:100")
-    assert killed == []
+    assert opened == [4242]
+    assert signalled == []
+    assert closed == [91]
+
+
+def test_non_linux_posix_without_a_pinned_handle_fails_closed(monkeypatch) -> None:
+    monkeypatch.setattr(responder.os, "name", "posix")
+    monkeypatch.setattr(responder.sys, "platform", "darwin")
+    monkeypatch.setattr(
+        responder,
+        "process_start_token",
+        lambda pid: "start-token",
+    )
+    monkeypatch.setattr(
+        responder.os,
+        "kill",
+        lambda pid, sig: pytest.fail("an unpinned PID must not be signalled"),
+    )
+
+    assert not responder.terminate_process_if_same_instance(4242, "start-token")
 
 
 def test_a_matching_child_process_instance_can_be_terminated() -> None:
+    if responder.os.name != "nt" and not responder.sys.platform.startswith("linux"):
+        pytest.skip("this POSIX platform has no pinned process signalling primitive")
     child = subprocess.Popen(
         [sys.executable, "-c", "import time; time.sleep(30)"],
     )
