@@ -480,4 +480,3 @@ def test_a_malformed_allocation_is_refused_rather_than_defaulted(value):
     assert getattr(caught.value, "code", "") == (
         "invalid-storage-authority-allocation"
     )
-

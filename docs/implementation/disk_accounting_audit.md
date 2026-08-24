@@ -30,7 +30,7 @@ Measured on the affected Windows host:
 
 | Location | Size |
 | --- | --- |
-| `C:\wsl\msh\data` | ~0.01 GB |
+| The checkout's `data` directory | ~0.01 GB |
 | `results` | effectively empty |
 | `fcp_relay_state` volume | ~47 MB |
 | Ollama model volumes | ~2 GB |
@@ -80,8 +80,7 @@ the storage allocation.
 | Recorder normalized JSONL (`jsonl/**`) | No retention | `catalog/mtconnect_recorder/storage.py:45,231` |
 | Recorder outbox completed rows | A bound exists and is never applied: `compact_completed()` has no caller outside tests | `catalog/federation/outbox.py:462` |
 | Federation session event log | Append-only with "no compaction, snapshotting, or retention". Lives in the retained `relay_state` volume | `persistence.py:422`; `docs/implementation/federation_sharing_evaluation.md` |
-| Docker images produced by updates | Each update rebuilds three images that share no expensive layer, and nothing prunes the previous set | `Dockerfile:3-9` writes the build commit into `ENV` above the dependency install at `:15-16`; no `prune` or `rmi` in either host update agent, `start.cmd`, or `start.sh` |
-| Docker build cache | Never pruned | As above |
+| Docker images superseded by updates | Old tagged image sets are still never removed, though a rebuild no longer produces a wholly new one | Neither host agent runs `rmi` |
 | Docker container logs | No `logging:` limits are configured, so the default json-file driver grows without bound | `docker-compose.yml` |
 | Ollama model volumes | Two separate volumes, each holding full models | `docker-compose.yml:198-201` |
 
@@ -108,21 +107,33 @@ from exhaustion.
 
 ## Follow-up work this audit names
 
-Ordered by measured contribution on the affected host:
+None of these was a measurable contributor on the affected host. They are real
+gaps, not the cause, and are listed so nobody mistakes the delivered work for
+full coverage.
 
-1. **Build-cache lifecycle and update preflight.** This is the physical cause and
-   the only item the evidence puts above the rest. Move the `ARG`/`ENV`/`LABEL`
-   block below the dependency install in both Dockerfiles so a build reuses the
-   cached dependency layer instead of writing a fresh gigabyte; bound the
-   BuildKit cache rather than letting it grow without limit; and refuse an
-   update activation that does not have room to complete, so a host stops before
-   exhaustion rather than during a rebuild with Flask already stopped.
-2. **Recorder capture retention.** Needs a policy decision first, given the
+1. **Recorder capture retention.** Needs a policy decision first, given the
    rejected alternative above.
-3. **Outbox compaction.** The bound already exists; it needs a caller.
-4. **Session event log.** Compaction or snapshotting on the coordinator's
+2. **Outbox compaction.** The bound already exists; it needs a caller.
+3. **Session event log.** Compaction or snapshotting on the coordinator's
    retained relay volume, which is also the volume whose loss is unrecoverable.
-5. **Container log limits.** A `logging:` block in `docker-compose.yml`.
+4. **Container log limits.** A `logging:` block in `docker-compose.yml`.
+5. **Superseded image removal.** A rebuild no longer writes a whole new image
+   set, but old tagged ones are still never removed.
 
-Until at least the first of these is delivered, disk exhaustion should not be
-treated as closed.
+## Delivered against the measured cause
+
+- The build commit is declared **below** the dependency install in both
+  Dockerfiles, so a rebuild reuses the cached layer instead of writing about a
+  gigabyte per image. A test pins the ordering, because reversing it silently
+  restores the original failure.
+- Both host update agents bound the BuildKit cache with
+  `docker builder prune --keep-storage`, sized to keep the layer a build wants
+  to reuse while releasing entries from earlier commits.
+- Both agents run a disk preflight **before** the build, which is before Flask
+  is stopped. A host short on space first tries to recover from its own cache;
+  only if that is not enough does the activation refuse, with the running FCP
+  still whole. Refusing after Flask has been stopped is the state this exists
+  to prevent.
+
+Disk exhaustion should be reassessed against a physical rerun on the affected
+host. It should not be closed on this evidence alone.

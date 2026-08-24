@@ -405,4 +405,3 @@ def test_an_explicit_zero_floor_is_honoured(tmp_path: Path) -> None:
     )
 
     assert allocation.floor_bytes == 0
-
