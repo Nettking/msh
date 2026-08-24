@@ -52,6 +52,7 @@ from catalog.federation.recorder_storage_relay import (
 )
 from catalog.federation.relay_storage import RelayStorageEndpoint
 from catalog.federation.shared_file_storage import FederationLogicalStorageAuthority
+from catalog.federation.storage_allocation import StorageAllocation
 from catalog.node.storage_failover import (
     StorageAuthoritySettings,
     _acknowledgements_database,
@@ -237,7 +238,17 @@ def _ensure_builtin_local_storage_service(
     )
     service = PhaseDStorageService(
         provider_id=provider_id,
-        provider=FilesystemBatchStorageProvider(storage_directory),
+        # The bound travels with the provider rather than the control plane:
+        # what this device can safely hold is a property of its own disk, and
+        # no peer decides it.
+        provider=FilesystemBatchStorageProvider(
+            storage_directory,
+            allocation=StorageAllocation(
+                storage_directory,
+                budget_bytes=settings.storage_budget_bytes,
+                floor_bytes=settings.storage_floor_bytes,
+            ),
+        ),
         control_plane=control,
         outbox=SQLiteOutbox(outbox_database),
         acknowledgements=DurableAcknowledgementStore(acknowledgements_database),

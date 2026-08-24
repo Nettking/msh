@@ -11,6 +11,7 @@ import json
 import os
 import sqlite3
 import tempfile
+from contextlib import AbstractContextManager, nullcontext
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -18,6 +19,7 @@ from typing import Protocol
 
 from .errors import FederationValidationError
 from .sqlite_schema import SQLiteMigration, ensure_sqlite_schema
+from .storage_allocation import StorageAllocation
 from .storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
@@ -182,12 +184,28 @@ class FilesystemBatchStorageProvider:
     weakening the D1 visibility guarantee.
     """
 
-    def __init__(self, root: Path) -> None:
+    def __init__(
+        self,
+        root: Path,
+        *,
+        allocation: StorageAllocation | None = None,
+    ) -> None:
         self.root = Path(root)
         self.batch_root = self.root / "batches"
         self.batch_root.mkdir(parents=True, exist_ok=True)
         self.database_path = self.root / "storage-index.sqlite3"
+        # Without an allocation this provider accepts batches until the volume
+        # itself refuses, which is how a storage contribution could consume its
+        # host's whole disk. Callers that serve the Federation pass one.
+        self.allocation = allocation
         self._initialize()
+
+    def _claim(self, nbytes: int) -> AbstractContextManager[None]:
+        """Hold the bytes a batch needs, or refuse before anything is written."""
+
+        if self.allocation is None:
+            return nullcontext()
+        return self.allocation.claimed(nbytes)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database_path)
@@ -367,45 +385,50 @@ class FilesystemBatchStorageProvider:
                 separators=(",", ":"),
                 ensure_ascii=False,
             )
-            fd, temporary_name = tempfile.mkstemp(
-                prefix=f".{final_path.stem}-",
-                suffix=".tmp",
-                dir=final_path.parent,
-            )
-            temporary_path = Path(temporary_name)
-            try:
-                with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
-                    handle.write(payload)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.replace(temporary_path, final_path)
-                self._fsync_directory(final_path.parent)
-                connection.execute(
-                    """INSERT INTO committed_batches
-                       (session_id, group_id, dataset_id, dataset_schema_name,
-                        dataset_schema_version, batch_id, idempotency_key,
-                        content_hash, relative_path, created_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                    (
-                        request.authority.session_id,
-                        request.authority.group_id,
-                        request.dataset_id,
-                        request.dataset_schema_name,
-                        request.dataset_schema_version,
-                        request.batch_id,
-                        request.idempotency_key,
-                        request.content_hash,
-                        relative_path.as_posix(),
-                        request.created_at.isoformat(),
-                    ),
+            # Claimed before the temporary file exists, so a refusal leaves no
+            # partial batch, no catalogue row and no consumed bytes. Both
+            # idempotent returns above have already happened, so re-delivering
+            # a batch this device already holds is never charged twice.
+            with self._claim(len(payload.encode("utf-8"))):
+                fd, temporary_name = tempfile.mkstemp(
+                    prefix=f".{final_path.stem}-",
+                    suffix=".tmp",
+                    dir=final_path.parent,
                 )
-                connection.commit()
-            except Exception:
-                temporary_path.unlink(missing_ok=True)
-                if final_path.exists():
-                    final_path.unlink(missing_ok=True)
-                connection.rollback()
-                raise
+                temporary_path = Path(temporary_name)
+                try:
+                    with os.fdopen(fd, "w", encoding="utf-8", newline="\n") as handle:
+                        handle.write(payload)
+                        handle.flush()
+                        os.fsync(handle.fileno())
+                    os.replace(temporary_path, final_path)
+                    self._fsync_directory(final_path.parent)
+                    connection.execute(
+                        """INSERT INTO committed_batches
+                           (session_id, group_id, dataset_id, dataset_schema_name,
+                            dataset_schema_version, batch_id, idempotency_key,
+                            content_hash, relative_path, created_at)
+                           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                        (
+                            request.authority.session_id,
+                            request.authority.group_id,
+                            request.dataset_id,
+                            request.dataset_schema_name,
+                            request.dataset_schema_version,
+                            request.batch_id,
+                            request.idempotency_key,
+                            request.content_hash,
+                            relative_path.as_posix(),
+                            request.created_at.isoformat(),
+                        ),
+                    )
+                    connection.commit()
+                except Exception:
+                    temporary_path.unlink(missing_ok=True)
+                    if final_path.exists():
+                        final_path.unlink(missing_ok=True)
+                    connection.rollback()
+                    raise
 
         return BatchIngestResult(
             request.batch_id,

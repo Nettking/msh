@@ -134,6 +134,47 @@ Approval and activation remain separate. For example:
 - storage approval does not invent a storage primary/replica assignment; and
 - recorder control stays on its separate bounded recorder-control path.
 
+## Storage allocation on a contributing device
+
+A device that contributes the storage capability accepts data written by other
+Federation members. Two independent bounds decide how much, and a commit must
+satisfy both.
+
+**Budget.** The bytes this device offers the Federation. It is reserved on disk
+in advance: a reservation file holding the unclaimed remainder is created with
+real committed blocks when the budget is set, and shrunk by exactly the size of
+each batch immediately before that batch is written. Space this device promised
+is therefore held from the moment the promise is made. Nothing else on the host
+can take it first, which is the difference between an allocation and a quota --
+a quota tells you afterwards that you are out of room.
+
+**Floor.** Free space on the volume that FCP never consumes, whatever the budget
+says. It defaults to 2 GiB. The floor is what keeps a mis-set budget, a volume
+shared with other software, or a non-FCP writer from turning a storage
+contribution into a full host disk.
+
+Both are local configuration. A peer never sets, sees, or influences either one:
+what a device can safely hold is a property of its own disk.
+
+| Setting | Default | Meaning |
+| --- | --- | --- |
+| `storage_budget_bytes` | unset | Bytes offered to the Federation, reserved in advance. Unset leaves the device bounded by the floor alone. |
+| `storage_floor_bytes` | 2 GiB | Free space never consumed, whatever the budget says. |
+
+A batch that does not fit is refused before any file is created: no partial
+batch, no catalogue row, and no consumed bytes. The refusal reaches the writing
+device as `allocation-exhausted`. Re-delivering a batch this device already
+holds is answered from the catalogue and is never charged twice.
+
+Refusal is not data loss. A recorder keeps its own complete local archive --
+delivery never deletes it, and a local checkpoint never depends on a remote
+commit -- so a refused batch stays on the recorder and its backlog grows until
+room is made or another authority takes it.
+
+Current inspection advertises the live allocation state with the candidate, so
+a leader choosing a storage authority sees remaining capacity rather than only
+that the device passed a 256-byte write probe.
+
 ## Federation-visible JSONL data
 
 Supported non-recorder `data/**/*.jsonl` can be published through Federation logical storage and materialized on connected workbench members inside the normal local `data/` scan boundary.

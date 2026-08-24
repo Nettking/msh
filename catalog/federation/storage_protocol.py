@@ -112,6 +112,7 @@ class StorageErrorCode(str, Enum):
     BATCH_NOT_FOUND = "batch-not-found"
     IDEMPOTENCY_CONFLICT = "idempotency-conflict"
     CONTENT_HASH_MISMATCH = "content-hash-mismatch"
+    ALLOCATION_EXHAUSTED = "allocation-exhausted"
     INTERNAL_ERROR = "internal-error"
 
 

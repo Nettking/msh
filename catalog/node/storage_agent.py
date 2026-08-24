@@ -27,6 +27,10 @@ from catalog.federation.outbox import SQLiteOutbox
 from catalog.federation.phase_d_control import PhaseDControlPlane
 from catalog.federation.phase_d_service import PhaseDStorageService
 from catalog.federation.relay_storage import RelayStorageEndpoint
+from catalog.federation.storage_allocation import (
+    DEFAULT_FLOOR_BYTES,
+    StorageAllocation,
+)
 from catalog.federation.storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
@@ -57,6 +61,25 @@ def _required_text(value: Any, field: str) -> str:
             "invalid-storage-node-config",
             field,
             "must be non-empty text",
+        )
+    return value
+
+
+def _optional_bytes(value: Any, field: str, default: int | None = None) -> int | None:
+    """Read an optional non-negative byte count from local configuration.
+
+    A malformed value is refused rather than defaulted: a storage budget that
+    silently became "unbounded" because someone typed it wrong is exactly the
+    outcome the allocation exists to prevent.
+    """
+
+    if value is None:
+        return default
+    if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+        raise StorageNodeAgentError(
+            "invalid-storage-node-config",
+            field,
+            "must be a non-negative integer number of bytes",
         )
     return value
 
@@ -100,6 +123,11 @@ class StorageNodeConfig:
     heartbeat_interval: float = 10.0
     request_timeout: float = 15.0
     capability_id: str = ""
+    #: Bytes this node offers the Federation, reserved on disk in advance.
+    #: ``None`` leaves the node bounded only by the free-space floor below.
+    storage_budget_bytes: int | None = None
+    #: Free space on the volume this node never consumes, whatever the budget.
+    storage_floor_bytes: int = DEFAULT_FLOOR_BYTES
 
     @classmethod
     def load(cls, source: Path | str) -> StorageNodeConfig:
@@ -150,6 +178,8 @@ class StorageNodeConfig:
             "heartbeat_interval",
             "request_timeout",
             "capability_id",
+            "storage_budget_bytes",
+            "storage_floor_bytes",
         }
         unknown = sorted(set(value).difference(allowed))
         if unknown:
@@ -200,6 +230,14 @@ class StorageNodeConfig:
                 value.get("request_timeout"), "request_timeout", 15.0
             ),
             capability_id=capability_id,
+            storage_budget_bytes=_optional_bytes(
+                value.get("storage_budget_bytes"), "storage_budget_bytes"
+            ),
+            storage_floor_bytes=_optional_bytes(
+                value.get("storage_floor_bytes"),
+                "storage_floor_bytes",
+                default=DEFAULT_FLOOR_BYTES,
+            ),
         )
 
     def public_summary(self) -> dict[str, Any]:
@@ -238,7 +276,14 @@ class StorageNodeAgent:
             clock=self._clock,
         )
         self.control = PhaseDControlPlane(config.control_database)
-        self.provider = FilesystemBatchStorageProvider(config.storage_directory)
+        self.provider = FilesystemBatchStorageProvider(
+            config.storage_directory,
+            allocation=StorageAllocation(
+                config.storage_directory,
+                budget_bytes=config.storage_budget_bytes,
+                floor_bytes=config.storage_floor_bytes,
+            ),
+        )
         self.outbox = SQLiteOutbox(config.outbox_database)
         self.acknowledgements = DurableAcknowledgementStore(
             config.acknowledgements_database

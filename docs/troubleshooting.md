@@ -235,7 +235,10 @@ Check that:
 - the recorder reports a committed Federation watermark rather than only a local checkpoint;
 - the session owner advertises a ready `fcp.storage-control` authority;
 - the selected storage group matches on the recorder and Flask device when more than one group exists; and
-- the local mirror has free space below its configured quota.
+- the local mirror has room: a storage device refuses a batch that would
+  exceed its allocated budget or take the volume below its reserved
+  free-space floor, and reports `allocation-exhausted` rather than filling
+  the disk. See [Storage allocation on a contributing device](federation_operations.md#storage-allocation-on-a-contributing-device).
 
 Do not point the scanner at a provider's batch directory. It contains internal storage envelopes and may include prepared or stale data. A hash, schema, or sequence conflict is rejected and quarantined instead of being shown.
 

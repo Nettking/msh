@@ -18,6 +18,7 @@ from catalog.federation.commit_tracking import DurableAcknowledgementStore
 from catalog.federation.control_sync import StorageControlPublicationStore
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import FederationValidationError
+from catalog.federation.storage_allocation import DEFAULT_FLOOR_BYTES
 from catalog.federation.live_failover import (
     LiveFailoverStore,
     StorageFailoverCoordinator,
@@ -66,6 +67,13 @@ class StorageAuthoritySettings:
     request_timeout: float = 15.0
     scan_interval: float = 2.0
     lease_seconds: float = 300.0
+    #: Bytes this authority offers the Federation, reserved on disk in advance.
+    #: ``None`` leaves it bounded only by the free-space floor below.
+    storage_budget_bytes: int | None = None
+    #: Free space on the volume this authority never consumes, whatever the
+    #: budget says. It is what keeps a storage contribution from taking the
+    #: host down with it.
+    storage_floor_bytes: int = DEFAULT_FLOOR_BYTES
 
     def __post_init__(self) -> None:
         for name in (
