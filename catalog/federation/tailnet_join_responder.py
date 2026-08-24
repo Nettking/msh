@@ -321,6 +321,31 @@ def _terminate_windows_process_if_same_instance(
         kernel32.CloseHandle(handle)
 
 
+def _terminate_linux_process_if_same_instance(
+    pid: int, expected_start_token: str
+) -> bool:
+    """Signal only the process object pinned by a Linux pidfd."""
+
+    try:
+        descriptor = os.pidfd_open(pid, 0)
+    except (AttributeError, OSError):
+        return False
+    try:
+        # Open the stable handle first. If the recorded process exited before
+        # the open, this token describes the replacement and fails the check.
+        # If it exits afterwards, pidfd_send_signal targets only the pinned,
+        # now-dead process object and can never cross into a reused PID.
+        if process_start_token(pid) != expected_start_token:
+            return False
+        try:
+            signal.pidfd_send_signal(descriptor, signal.SIGTERM)
+        except (AttributeError, OSError):
+            return False
+        return True
+    finally:
+        os.close(descriptor)
+
+
 def _proc_process_start_token(pid: int) -> str | None:
     try:
         raw_stat = Path(f"/proc/{pid}/stat").read_text(encoding="utf-8")
@@ -377,17 +402,15 @@ def terminate_process_if_same_instance(pid: int, expected_start_token: str) -> b
         return _terminate_windows_process_if_same_instance(
             pid, expected_start_token
         )
-    if process_start_token(pid) != expected_start_token:
-        return False
-    # Re-read immediately before signalling. A stale record or PID reuse fails
-    # closed instead of allowing an unrelated host process to be terminated.
-    if process_start_token(pid) != expected_start_token:
-        return False
-    try:
-        os.kill(pid, signal.SIGTERM)
-    except (ProcessLookupError, PermissionError, OSError):
-        return False
-    return True
+    if sys.platform.startswith("linux"):
+        return _terminate_linux_process_if_same_instance(
+            pid, expected_start_token
+        )
+    # Other POSIX platforms do not expose a stable process handle through the
+    # Python runtime. A token check followed by kill(pid) would retain a PID
+    # reuse race, so replacement fails closed and the occupied-port error makes
+    # automatic joining unavailable without risking an unrelated process.
+    return False
 
 
 def stop_previous_instance(pid_file: Path) -> int | None:

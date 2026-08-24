@@ -484,6 +484,41 @@ def test_linux_process_identity_is_checked_after_pinning_the_process(
     assert closed == [91]
 
 
+def test_linux_matching_identity_signals_only_the_pinned_process(
+    monkeypatch,
+) -> None:
+    signalled: list[tuple[int, int]] = []
+    closed: list[int] = []
+    monkeypatch.setattr(responder.os, "name", "posix")
+    monkeypatch.setattr(responder.sys, "platform", "linux")
+    monkeypatch.setattr(
+        responder,
+        "process_start_token",
+        lambda pid: "boot-a:100",
+    )
+    monkeypatch.setattr(
+        responder.os,
+        "pidfd_open",
+        lambda pid, flags=0: 91,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        responder.signal,
+        "pidfd_send_signal",
+        lambda descriptor, sig: signalled.append((descriptor, sig)),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        responder.os,
+        "close",
+        lambda descriptor: closed.append(descriptor),
+    )
+
+    assert responder.terminate_process_if_same_instance(4242, "boot-a:100")
+    assert signalled == [(91, responder.signal.SIGTERM)]
+    assert closed == [91]
+
+
 def test_non_linux_posix_without_a_pinned_handle_fails_closed(monkeypatch) -> None:
     monkeypatch.setattr(responder.os, "name", "posix")
     monkeypatch.setattr(responder.sys, "platform", "darwin")

@@ -174,11 +174,14 @@ responder process-identity delivery; B06 remains `OPEN`.** The responder now
 stores an atomic process record containing PID plus the operating system's
 process-creation identity. Replacement revalidates that identity before
 termination, legacy bare-PID records fail closed, and Windows termination uses
-the same open process handle for identity verification and termination. Windows
-also refuses address reuse that could leave two live join listeners on one
-port. Automated tests cover PID reuse, legacy records, identity recheck,
-matching-child termination, atomic record format, self-protection, and occupied
-port behavior. Physical reboot/PID-reuse coverage remains in P05/P09.
+the same open process handle for identity verification and termination. Linux
+likewise opens a pidfd before the identity check and signals only that pinned
+process object. Other POSIX platforms fail closed rather than retaining a
+check-then-`kill(pid)` reuse race. Windows also refuses address reuse that could
+leave two live join listeners on one port. Automated tests cover PID reuse,
+stable-handle signalling, legacy records, matching-child termination, atomic
+record format, self-protection, and occupied-port behavior. Physical
+reboot/PID-reuse coverage remains in P05/P09.
 
 ### B07 — bounded reconstructible and cumulative metadata growth
 
