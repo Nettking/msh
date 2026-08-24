@@ -37,6 +37,13 @@ write it pays for, and restoring it after a failed write is best effort: if the
 restore itself fails, this device under-offers its budget until the next
 reclaim. Under-offering is safe; over-offering is the bug this module exists to
 prevent.
+
+Scope, so this is not mistaken for more than it is: what is bounded here is
+data *other Federation members write to this device*. This device's own
+recorder capture, its outbox, the session event log and everything Docker holds
+are all unbounded and untouched by any of this. A host can still fill its drive
+with this module working exactly as designed. See
+``docs/implementation/disk_accounting_audit.md``.
 """
 
 from __future__ import annotations
@@ -55,11 +62,79 @@ from catalog.federation.errors import FederationValidationError
 #: protocol change to a single value; the message says which bound it was.
 ALLOCATION_EXHAUSTED_CODE = "allocation-exhausted"
 
-#: Free space on the volume that FCP never consumes, whatever a budget says.
-#: An operating system, container runtime, SQLite WAL and log set need room to
-#: keep working; a storage contribution that takes the last byte takes the host
-#: down with it.
-DEFAULT_FLOOR_BYTES = 2 * 1024**3
+_GIB = 1024**3
+
+# -- headroom policy -----------------------------------------------------
+#
+# The floor is derived, not picked. What it must cover is one complete FCP
+# update plus room for the host to keep operating, because the observed
+# exhaustion happened on a machine that was both recording and updating.
+#
+# One update rebuilds the ``relay``, ``flask`` and ``recorder`` images. None of
+# them share the expensive layer: ``FCP_BUILD_COMMIT`` is written into ``ENV``
+# at ``Dockerfile`` line 8, above the dependency install at lines 15-16, so a
+# changed commit invalidates that layer and every layer after it. Each image
+# therefore carries a full copy of the Python dependency tree, measured at
+# roughly 726 MiB installed (pyarrow, scipy, pandas, duckdb, scikit-learn,
+# numpy and matplotlib account for most of it), on top of a ~150 MiB base
+# image and the application source.
+#
+#: Approximate on-disk cost of the image set one update produces, before the
+#: previous set is released. Three images at ~1 GiB, plus build cache.
+_UPDATE_CYCLE_BYTES = 4 * _GIB
+
+#: Room the host needs to keep operating while that happens: SQLite WAL and
+#: journals, container logs between rotations, OS paging and servicing.
+_OPERATING_HEADROOM_BYTES = 2 * _GIB
+
+#: Windows with Docker Desktop needs a second update cycle of margin. The
+#: WSL2 disk image grows on demand and does not shrink when files inside it
+#: are deleted, so space freed in the VM does not return to the host promptly
+#: and the docker data root must be able to grow through a whole update
+#: without the host reaching exhaustion. Runtime instability near exhaustion
+#: is what the physical incident actually showed.
+_WINDOWS_DOCKER_MARGIN_BYTES = 4 * _GIB
+
+#: Share of the volume held back when that is larger than the absolute
+#: minimum, so a bigger disk keeps proportionally more slack.
+FLOOR_VOLUME_FRACTION = 0.05
+
+#: Ceiling on the derived floor. Without it a large volume would reserve an
+#: unreasonable amount of space that FCP would never have used anyway.
+MAXIMUM_FLOOR_BYTES = 64 * _GIB
+
+
+def minimum_headroom_bytes(*, windows: bool | None = None) -> int:
+    """The absolute floor for this platform, below which FCP never operates."""
+
+    if windows is None:
+        windows = os.name == "nt"
+    total = _UPDATE_CYCLE_BYTES + _OPERATING_HEADROOM_BYTES
+    if windows:
+        total += _WINDOWS_DOCKER_MARGIN_BYTES
+    return total
+
+
+def default_floor_bytes(
+    root: Path | str,
+    *,
+    windows: bool | None = None,
+) -> int:
+    """Derive the free space FCP never consumes on ``root``'s volume.
+
+    The larger of the platform minimum and a share of the volume, capped so a
+    large disk does not reserve an absurd amount. An explicitly configured
+    floor always wins over this: an operator who has measured their own host
+    knows more than a policy can.
+    """
+
+    minimum = minimum_headroom_bytes(windows=windows)
+    try:
+        total = shutil.disk_usage(_nearest_existing(Path(root))).total
+    except OSError:
+        return minimum
+    proportional = int(total * FLOOR_VOLUME_FRACTION)
+    return min(max(minimum, proportional), MAXIMUM_FLOOR_BYTES)
 
 #: Reservation resize chunk for platforms without real ``fallocate``.
 _ZERO_CHUNK = 1024 * 1024
@@ -162,10 +237,15 @@ class StorageAllocation:
         root: Path | str,
         *,
         budget_bytes: int | None = None,
-        floor_bytes: int = DEFAULT_FLOOR_BYTES,
+        floor_bytes: int | None = None,
     ) -> None:
         self.root = Path(root)
         self.root.mkdir(parents=True, exist_ok=True)
+        # ``None`` derives the floor from this volume and platform. An explicit
+        # value -- including zero -- is taken as given: an operator who has
+        # measured their own host outranks the policy.
+        if floor_bytes is None:
+            floor_bytes = default_floor_bytes(self.root)
         self.floor_bytes = _positive_or_zero(floor_bytes, "floor_bytes")
         self.reservation_path = self.root / _RESERVATION_NAME
         self.state_path = self.root / _STATE_NAME
@@ -335,7 +415,7 @@ class StorageAllocation:
 def describe(
     root: Path | str,
     *,
-    floor_bytes: int = DEFAULT_FLOOR_BYTES,
+    floor_bytes: int | None = None,
 ) -> AllocationSnapshot:
     """Read allocation state for ``root`` without reserving anything.
 
@@ -347,6 +427,8 @@ def describe(
     """
 
     root = Path(root)
+    if floor_bytes is None:
+        floor_bytes = default_floor_bytes(root)
     try:
         free = shutil.disk_usage(root).free
     except OSError:
@@ -393,8 +475,11 @@ def _nearest_existing(path: Path) -> Path:
 
 __all__ = [
     "ALLOCATION_EXHAUSTED_CODE",
-    "DEFAULT_FLOOR_BYTES",
+    "FLOOR_VOLUME_FRACTION",
+    "MAXIMUM_FLOOR_BYTES",
     "AllocationSnapshot",
     "StorageAllocation",
+    "default_floor_bytes",
     "describe",
+    "minimum_headroom_bytes",
 ]

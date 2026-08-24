@@ -149,9 +149,14 @@ can take it first, which is the difference between an allocation and a quota --
 a quota tells you afterwards that you are out of room.
 
 **Floor.** Free space on the volume that FCP never consumes, whatever the budget
-says. It defaults to 2 GiB. The floor is what keeps a mis-set budget, a volume
-shared with other software, or a non-FCP writer from turning a storage
-contribution into a full host disk.
+says. Leave it unset and it is derived rather than guessed: the larger of a
+share of the volume and a platform minimum sized to complete one FCP update
+with room for the host to keep operating. One update rebuilds three images that
+share no expensive layer, so that minimum is several gigabytes, and Windows
+with Docker Desktop gets more again because its WSL2 disk image grows on demand
+and does not shrink when files inside it are deleted. An explicitly configured
+floor always wins: an operator who has measured their own host outranks the
+policy.
 
 Both are local configuration. A peer never sets, sees, or influences either one:
 what a device can safely hold is a property of its own disk.
@@ -174,6 +179,22 @@ room is made or another authority takes it.
 Current inspection advertises the live allocation state with the candidate, so
 a leader choosing a storage authority sees remaining capacity rather than only
 that the device passed a 256-byte write probe.
+
+### What this does not bound
+
+The allocation bounds what this device accepts **from other Federation
+members**. It does not bound this device's own disk use, and it does not
+prevent FCP from filling a host drive.
+
+Not covered: recorder raw capture and normalized JSONL, which have no retention
+at all; completed outbox rows, whose compaction exists but is never called; the
+Federation session event log, which is append-only with no compaction; and
+everything Docker holds -- the image set every update rebuilds, the build
+cache, and container logs, none of which are pruned or size-limited.
+
+A device can still fill its drive with this allocation working exactly as
+designed. See the [disk accounting audit](implementation/disk_accounting_audit.md)
+for the full accounting and the follow-up work it names.
 
 ## Federation-visible JSONL data
 

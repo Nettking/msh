@@ -18,7 +18,6 @@ from catalog.federation.commit_tracking import DurableAcknowledgementStore
 from catalog.federation.control_sync import StorageControlPublicationStore
 from catalog.federation.coordinator import SessionCoordinator
 from catalog.federation.errors import FederationValidationError
-from catalog.federation.storage_allocation import DEFAULT_FLOOR_BYTES
 from catalog.federation.live_failover import (
     LiveFailoverStore,
     StorageFailoverCoordinator,
@@ -72,8 +71,8 @@ class StorageAuthoritySettings:
     storage_budget_bytes: int | None = None
     #: Free space on the volume this authority never consumes, whatever the
     #: budget says. It is what keeps a storage contribution from taking the
-    #: host down with it.
-    storage_floor_bytes: int = DEFAULT_FLOOR_BYTES
+    #: host down with it. ``None`` derives it from the volume and platform.
+    storage_floor_bytes: int | None = None
 
     def __post_init__(self) -> None:
         for name in (

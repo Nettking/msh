@@ -29,8 +29,11 @@ from catalog.federation.local_storage import (
 )
 from catalog.federation.storage_allocation import (
     ALLOCATION_EXHAUSTED_CODE,
+    MAXIMUM_FLOOR_BYTES,
     StorageAllocation,
+    default_floor_bytes,
     describe,
+    minimum_headroom_bytes,
 )
 from catalog.federation.storage_protocol import (
     STORAGE_PROTOCOL,
@@ -332,3 +335,74 @@ def test_a_provider_without_an_allocation_is_unchanged(tmp_path: Path) -> None:
     result = provider.ingest(_request({"rows": ["y" * 200] * 60}))
 
     assert result.state is BatchIngestState.STORED
+
+
+# -- the headroom policy is derived, not picked --------------------------
+
+
+def test_the_minimum_covers_a_whole_update_cycle() -> None:
+    """2 GiB could not cover one update, which is why it is not the floor.
+
+    An update rebuilds three images and none of them shares the dependency
+    layer, because the build commit is written into ENV above the install.
+    The measured dependency tree alone is about 726 MiB installed.
+    """
+
+    measured_dependency_tree = 726 * 1024**2
+    one_update = 3 * measured_dependency_tree
+
+    assert minimum_headroom_bytes(windows=False) > one_update
+
+
+def test_windows_reserves_more_than_posix() -> None:
+    """Docker Desktop's disk image grows on demand and does not shrink."""
+
+    assert minimum_headroom_bytes(windows=True) > minimum_headroom_bytes(
+        windows=False
+    )
+
+
+def test_the_derived_floor_is_never_below_the_platform_minimum(
+    tmp_path: Path,
+) -> None:
+    assert default_floor_bytes(tmp_path) >= minimum_headroom_bytes()
+
+
+class _Usage:
+    """Stand-in for ``shutil.disk_usage`` on a volume no runner actually has."""
+
+    def __init__(self, total: int) -> None:
+        self.total = total
+        self.used = 0
+        self.free = total
+
+
+def test_the_derived_floor_is_capped_for_a_large_volume(monkeypatch) -> None:
+    """A very large disk must not reserve an absurd amount it never needed."""
+
+    petabyte = 1024**5
+    monkeypatch.setattr(
+        "catalog.federation.storage_allocation.shutil.disk_usage",
+        lambda _path: _Usage(petabyte),
+    )
+
+    assert default_floor_bytes("/") == MAXIMUM_FLOOR_BYTES
+
+
+def test_an_unset_floor_is_derived_rather_than_zero(tmp_path: Path) -> None:
+    """Omitting the floor must never mean "no floor"."""
+
+    allocation = StorageAllocation(tmp_path / "storage", budget_bytes=None)
+
+    assert allocation.floor_bytes >= minimum_headroom_bytes()
+
+
+def test_an_explicit_zero_floor_is_honoured(tmp_path: Path) -> None:
+    """An operator who measured their own host outranks the policy."""
+
+    allocation = StorageAllocation(
+        tmp_path / "storage", budget_bytes=None, floor_bytes=0
+    )
+
+    assert allocation.floor_bytes == 0
+

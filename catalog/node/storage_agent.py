@@ -27,10 +27,7 @@ from catalog.federation.outbox import SQLiteOutbox
 from catalog.federation.phase_d_control import PhaseDControlPlane
 from catalog.federation.phase_d_service import PhaseDStorageService
 from catalog.federation.relay_storage import RelayStorageEndpoint
-from catalog.federation.storage_allocation import (
-    DEFAULT_FLOOR_BYTES,
-    StorageAllocation,
-)
+from catalog.federation.storage_allocation import StorageAllocation
 from catalog.federation.storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,
@@ -127,7 +124,8 @@ class StorageNodeConfig:
     #: ``None`` leaves the node bounded only by the free-space floor below.
     storage_budget_bytes: int | None = None
     #: Free space on the volume this node never consumes, whatever the budget.
-    storage_floor_bytes: int = DEFAULT_FLOOR_BYTES
+    #: ``None`` derives it from the volume and platform.
+    storage_floor_bytes: int | None = None
 
     @classmethod
     def load(cls, source: Path | str) -> StorageNodeConfig:
@@ -234,9 +232,7 @@ class StorageNodeConfig:
                 value.get("storage_budget_bytes"), "storage_budget_bytes"
             ),
             storage_floor_bytes=_optional_bytes(
-                value.get("storage_floor_bytes"),
-                "storage_floor_bytes",
-                default=DEFAULT_FLOOR_BYTES,
+                value.get("storage_floor_bytes"), "storage_floor_bytes"
             ),
         )
 

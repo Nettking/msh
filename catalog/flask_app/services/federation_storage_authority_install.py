@@ -41,6 +41,34 @@ _RETRY_SECONDS = 5.0
 _AI_BRIDGE_EXTENSION_KEY = "federated_ai_product_bridge"
 
 
+def _env_bytes(name: str) -> int | None:
+    """Read an optional byte count from the environment.
+
+    Unset means "not configured", which each consumer interprets for itself.
+    A present but malformed value is a configuration error and is refused at
+    startup rather than being quietly dropped.
+    """
+
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return None
+    try:
+        parsed = int(raw)
+    except ValueError as exc:
+        raise FederationValidationError(
+            "invalid-storage-authority-allocation",
+            name,
+            "must be a non-negative integer number of bytes",
+        ) from exc
+    if parsed < 0:
+        raise FederationValidationError(
+            "invalid-storage-authority-allocation",
+            name,
+            "must be a non-negative integer number of bytes",
+        )
+    return parsed
+
+
 def _env_bool(name: str, default: bool = False) -> bool:
     raw = os.getenv(name)
     if raw is None:
@@ -216,7 +244,33 @@ class FederationStorageAuthorityMonitor:
             lease_seconds=float(
                 self.app.config["FEDERATION_STORAGE_AUTHORITY_LEASE_SECONDS"]
             ),
+            storage_budget_bytes=self._optional_bytes(
+                "FEDERATION_STORAGE_AUTHORITY_BUDGET_BYTES"
+            ),
+            storage_floor_bytes=self._optional_bytes(
+                "FEDERATION_STORAGE_AUTHORITY_FLOOR_BYTES"
+            ),
         )
+
+    def _optional_bytes(self, key: str) -> int | None:
+        """Read an optional byte count from application configuration.
+
+        A malformed value is refused rather than defaulted. A storage budget
+        that silently became "unbounded" because someone mistyped it is the
+        outcome the allocation exists to prevent, and a floor that silently
+        became the derived default would hide an operator's deliberate choice.
+        """
+
+        value = self.app.config.get(key)
+        if value is None:
+            return None
+        if isinstance(value, bool) or not isinstance(value, int) or value < 0:
+            raise FederationValidationError(
+                "invalid-storage-authority-allocation",
+                key,
+                "must be a non-negative integer number of bytes",
+            )
+        return value
 
     def session_creator_state(self) -> str:
         """Report whether an authority started here can be used at all."""
@@ -562,6 +616,18 @@ def install_federation_storage_authority(
     app.config.setdefault(
         "FEDERATION_STORAGE_AUTHORITY_LEASE_SECONDS",
         float(os.getenv("FCP_FEDERATION_STORAGE_AUTHORITY_LEASE_SECONDS", "300.0")),
+    )
+    # Disk this device offers the Federation, and the free space it never
+    # consumes. Both are unset by default: an unset budget leaves the device
+    # bounded by the floor alone, and an unset floor is derived from the
+    # volume and platform rather than guessed at.
+    app.config.setdefault(
+        "FEDERATION_STORAGE_AUTHORITY_BUDGET_BYTES",
+        _env_bytes("FCP_FEDERATION_STORAGE_AUTHORITY_BUDGET_BYTES"),
+    )
+    app.config.setdefault(
+        "FEDERATION_STORAGE_AUTHORITY_FLOOR_BYTES",
+        _env_bytes("FCP_FEDERATION_STORAGE_AUTHORITY_FLOOR_BYTES"),
     )
 
     monitor = FederationStorageAuthorityMonitor(app, onboarding_service)

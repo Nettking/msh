@@ -412,3 +412,72 @@ def test_the_supervised_thread_stays_alive_across_a_cancelled_runtime(monkeypatc
         assert monitor._thread is not None and monitor._thread.is_alive()
     finally:
         monitor.stop()
+
+
+# -- disk allocation reaches the normal full-FCP composition -------------
+#
+# The allocation is only a product guarantee if the path a normal device
+# actually starts through carries it. These pin that: the same settings object
+# the supervisor builds is what the provider is later constructed from, so a
+# budget that stops here is a budget no device ever applies.
+
+
+def test_settings_carry_no_allocation_when_nothing_is_configured():
+    """Unconfigured means floor-only with a derived floor, not a silent zero."""
+
+    monitor = _monitor(context=_creator_context())
+
+    with monitor.app.app_context():
+        settings = monitor.build_settings()
+
+    assert settings.storage_budget_bytes is None
+    assert settings.storage_floor_bytes is None
+
+
+def test_a_configured_budget_and_floor_reach_the_settings():
+    monitor = _monitor(
+        context=_creator_context(),
+        FEDERATION_STORAGE_AUTHORITY_BUDGET_BYTES=50 * 1024**3,
+        FEDERATION_STORAGE_AUTHORITY_FLOOR_BYTES=20 * 1024**3,
+    )
+
+    with monitor.app.app_context():
+        settings = monitor.build_settings()
+
+    assert settings.storage_budget_bytes == 50 * 1024**3
+    assert settings.storage_floor_bytes == 20 * 1024**3
+
+
+def test_an_explicit_zero_floor_is_carried_rather_than_defaulted():
+    """An operator who measured their own host outranks the derivation."""
+
+    monitor = _monitor(
+        context=_creator_context(),
+        FEDERATION_STORAGE_AUTHORITY_FLOOR_BYTES=0,
+    )
+
+    with monitor.app.app_context():
+        settings = monitor.build_settings()
+
+    assert settings.storage_floor_bytes == 0
+
+
+@pytest.mark.parametrize(
+    "value",
+    [-1, "50GB", 12.5, True],
+)
+def test_a_malformed_allocation_is_refused_rather_than_defaulted(value):
+    """Silently dropping a mistyped budget is the failure this prevents."""
+
+    monitor = _monitor(
+        context=_creator_context(),
+        FEDERATION_STORAGE_AUTHORITY_BUDGET_BYTES=value,
+    )
+
+    with monitor.app.app_context(), pytest.raises(Exception) as caught:
+        monitor.build_settings()
+
+    assert getattr(caught.value, "code", "") == (
+        "invalid-storage-authority-allocation"
+    )
+
