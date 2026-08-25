@@ -103,15 +103,22 @@ stale-heartbeat sweep now wakes both supported relay owners and produces a
 nonzero process exit so the existing Compose restart policy can act. Together
 these are **B06 2/8 properties automated-proven; B06 remains open**.
 
-The recorder timestamp/path-confinement delivery advances **B02 1/9 properties
-automated-proven**: the timestamp-derived storage day must be a real ASCII
-`YYYY-MM-DD` calendar date, and raw, observation and compatibility-JSONL targets
-are resolved and proven beneath their configured durable roots before writing.
-Traversal-shaped and impossible dates are rejected before the first recorder
-write. B02 remains open for finite ingress and total deadlines, observation and
-sequence-span bounds, bounded continuity validation, healthy-source isolation,
-incremental recovery, durable event-storm control and pressure behavior.
-P04/P05/P09 physical evidence remains open; no physical acceptance state changed.
+The recorder path-confinement and finite-transaction deliveries together advance
+**B02 5/9 properties automated-proven; B02 remains open**. Timestamp-derived
+storage days are validated/confined before writes. `/current`, `/probe`, and
+`/sample` now have finite decoded response-byte ceilings and a finite total
+request deadline; accepted XML is structurally budgeted before retained-tree
+parsing; parsed sample batches have hard observation and sequence-span ceilings;
+and continuity validation is bounded by accepted observation count rather than
+materializing an arbitrary remote integer range. Detailed observation NDJSON and
+wide compatibility JSONL are streamed through byte-bounded atomic publications,
+and carried compatibility checkpoint state has a finite serialized ceiling, so
+bounded ingress cannot amplify into an effectively quadratic in-memory/disk
+batch. B02 remains open for healthy-source progress isolation, incremental crash
+recovery, durable event-storm deduplication/rate bounds, and pressure/critical
+behavior. P04/P05/P09 physical evidence remains open; B01 still owns aggregate
+host-resource admission across concurrent writers. No physical acceptance state
+changed.
 
 The analysis-slice and upload crash-correctness deliveries together advance
 **B08 4/5 properties automated-proven**. Deterministic analysis slice archives

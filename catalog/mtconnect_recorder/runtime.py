@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import logging
+import math
 import os
 import signal
 import threading
@@ -13,10 +14,21 @@ from dataclasses import replace
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
+from urllib.parse import urljoin
 from xml.etree import ElementTree as ET
 
 import requests
+from urllib3 import exceptions as urllib3_exceptions
+from urllib3.util import Timeout as Urllib3Timeout
 
+from .limits import (
+    MAX_CURRENT_RESPONSE_BYTES,
+    MAX_OBSERVATIONS_PER_BATCH,
+    MAX_PROBE_RESPONSE_BYTES,
+    MAX_REQUEST_DEADLINE_SECONDS,
+    MAX_SAMPLE_RESPONSE_BYTES,
+    MAX_SEQUENCE_SPAN,
+)
 from .model import (
     MtconnectProtocolError,
     ProbeModel,
@@ -44,21 +56,183 @@ from .parsing import (
 from .schema_compat import CHECKPOINT_SCHEMA, LEGACY_CHECKPOINT_SCHEMAS
 from .storage import DurableRecorderStore
 
+RESPONSE_BYTE_LIMITS = {
+    "current": MAX_CURRENT_RESPONSE_BYTES,
+    "probe": MAX_PROBE_RESPONSE_BYTES,
+    "sample": MAX_SAMPLE_RESPONSE_BYTES,
+}
+_RESPONSE_READ_CHUNK_BYTES = 64 * 1024
+_MAX_HTTP_REDIRECTS = 3
+
+
+def _remaining_request_seconds(*, deadline: float, endpoint: str) -> float:
+    remaining = deadline - time.monotonic()
+    if remaining <= 0:
+        raise MtconnectProtocolError(
+            f"MTConnect /{endpoint} exceeded its total request deadline."
+        )
+    return remaining
+
+
+def _response_transport_socket(response: requests.Response) -> Any | None:
+    """Return urllib3's live transport socket while a streamed body is open."""
+
+    raw = response.raw
+    connection = getattr(raw, "_connection", None)
+    sock = getattr(connection, "sock", None)
+    if sock is not None:
+        return sock
+    # CPython's HTTPResponse keeps the socket under its buffered reader. The
+    # fallback is needed after a server has sent response headers, when urllib3
+    # may already have cleared ``connection.sock`` while the body remains open.
+    response_fp = getattr(raw, "_fp", None)
+    buffered = getattr(response_fp, "fp", None)
+    transport = getattr(buffered, "raw", None)
+    return getattr(transport, "_sock", None)
+
+
+def _set_response_read_deadline(
+    response: requests.Response,
+    *,
+    remaining: float,
+    endpoint: str,
+) -> None:
+    sock = _response_transport_socket(response)
+    if sock is None:
+        if getattr(response.raw, "closed", False):
+            return
+        raise MtconnectProtocolError(
+            f"MTConnect /{endpoint} transport cannot enforce the total request deadline."
+        )
+    if getattr(sock, "_closed", False):
+        # A closed peer cannot slow-trickle more network bytes; any remaining
+        # bytes are already held in the bounded local response buffer.
+        return
+    sock.settimeout(remaining)
+
 
 class MtconnectClient:
     def __init__(self, base_url: str, *, timeout: float) -> None:
         self.base_url = normalize_agent_base_url(base_url)
-        self.timeout = timeout
+        if (
+            not math.isfinite(timeout)
+            or not 0 < timeout <= MAX_REQUEST_DEADLINE_SECONDS
+        ):
+            raise ValueError(
+                "MTConnect request deadline must be finite, positive, and at most "
+                f"{MAX_REQUEST_DEADLINE_SECONDS:g} seconds."
+            )
+        self.timeout = float(timeout)
         self.session = requests.Session()
 
     def _get(self, endpoint: str, *, params: Mapping[str, Any] | None = None) -> str:
-        response = self.session.get(
-            f"{self.base_url}/{endpoint}",
-            params=dict(params or {}),
-            timeout=self.timeout,
-        )
-        response.raise_for_status()
-        body = response.text.strip()
+        limit = RESPONSE_BYTE_LIMITS[endpoint]
+        deadline = time.monotonic() + self.timeout
+        url = f"{self.base_url}/{endpoint}"
+        request_params: Mapping[str, Any] | None = dict(params or {})
+        response: requests.Response | None = None
+        try:
+            for redirect_count in range(_MAX_HTTP_REDIRECTS + 1):
+                remaining = _remaining_request_seconds(
+                    deadline=deadline,
+                    endpoint=endpoint,
+                )
+                response = self.session.get(
+                    url,
+                    params=request_params,
+                    timeout=Urllib3Timeout(
+                        total=remaining,
+                        connect=remaining,
+                        read=remaining,
+                    ),
+                    stream=True,
+                    allow_redirects=False,
+                    headers={"Accept-Encoding": "identity"},
+                )
+                if not response.is_redirect:
+                    break
+                if redirect_count >= _MAX_HTTP_REDIRECTS:
+                    raise MtconnectProtocolError(
+                        f"MTConnect /{endpoint} exceeded {_MAX_HTTP_REDIRECTS} redirects."
+                    )
+                location = response.headers.get("Location")
+                if not location:
+                    raise MtconnectProtocolError(
+                        f"MTConnect /{endpoint} returned a redirect without Location."
+                    )
+                redirected = urljoin(response.url, location)
+                redirected_parts = requests.utils.urlparse(redirected)
+                if redirected_parts.scheme not in {"http", "https"}:
+                    raise MtconnectProtocolError(
+                        f"MTConnect /{endpoint} redirected to a non-HTTP URL."
+                    )
+                response.close()
+                response = None
+                url = redirected
+                request_params = None
+
+            if response is None:
+                raise MtconnectProtocolError(
+                    f"MTConnect /{endpoint} did not return a response."
+                )
+            response.raise_for_status()
+            declared_length = response.headers.get("Content-Length")
+            if declared_length is not None:
+                try:
+                    declared_bytes = int(declared_length)
+                except ValueError:
+                    declared_bytes = -1
+                if declared_bytes > limit:
+                    raise MtconnectProtocolError(
+                        f"MTConnect /{endpoint} response exceeds maximum {limit} bytes "
+                        f"(declared {declared_bytes})."
+                    )
+
+            payload = bytearray()
+            read1 = getattr(response.raw, "read1", None)
+            if not callable(read1):
+                raise MtconnectProtocolError(
+                    f"MTConnect /{endpoint} transport cannot perform bounded reads."
+                )
+            while True:
+                remaining = _remaining_request_seconds(
+                    deadline=deadline,
+                    endpoint=endpoint,
+                )
+                _set_response_read_deadline(
+                    response,
+                    remaining=remaining,
+                    endpoint=endpoint,
+                )
+                chunk = read1(
+                    min(_RESPONSE_READ_CHUNK_BYTES, limit - len(payload) + 1),
+                    decode_content=True,
+                )
+                _remaining_request_seconds(deadline=deadline, endpoint=endpoint)
+                if not chunk:
+                    break
+                payload.extend(chunk)
+                if len(payload) > limit:
+                    raise MtconnectProtocolError(
+                        f"MTConnect /{endpoint} response exceeds maximum {limit} bytes."
+                    )
+            try:
+                body = bytes(payload).decode(response.encoding or "utf-8").strip()
+            except (LookupError, UnicodeDecodeError) as exc:
+                raise MtconnectProtocolError(
+                    f"MTConnect /{endpoint} response was not valid text."
+                ) from exc
+        except (
+            requests.Timeout,
+            TimeoutError,
+            urllib3_exceptions.TimeoutError,
+        ) as exc:
+            raise MtconnectProtocolError(
+                f"MTConnect /{endpoint} exceeded its total request deadline."
+            ) from exc
+        finally:
+            if response is not None:
+                response.close()
         if not body:
             raise MtconnectProtocolError(f"MTConnect /{endpoint} returned an empty body.")
         if _local_name(ET.fromstring(body).tag) == "MTConnectError":
@@ -113,8 +287,16 @@ LOG_FILE = Path(
         "data/source_state/mtconnect_recorder.log",
     )
 )
-REQUEST_TIMEOUT = _float_from_env("FCP_RECORDER_REQUEST_TIMEOUT", 10.0)
-BATCH_SIZE = max(1, _int_from_env("FCP_RECORDER_BATCH_SIZE", 1000))
+_configured_request_timeout = _float_from_env("FCP_RECORDER_REQUEST_TIMEOUT", 10.0)
+REQUEST_TIMEOUT = (
+    min(_configured_request_timeout, MAX_REQUEST_DEADLINE_SECONDS)
+    if math.isfinite(_configured_request_timeout) and _configured_request_timeout > 0
+    else 10.0
+)
+BATCH_SIZE = min(
+    MAX_OBSERVATIONS_PER_BATCH,
+    max(1, _int_from_env("FCP_RECORDER_BATCH_SIZE", 1000)),
+)
 MAX_BATCHES_PER_CYCLE = max(1, _int_from_env("FCP_RECORDER_MAX_BATCHES_PER_CYCLE", 20))
 CONFIG_REFRESH_INTERVAL = _float_from_env("FCP_RECORDER_CONFIG_REFRESH_INTERVAL", 1.0)
 STATUS_INTERVAL = _float_from_env("FCP_RECORDER_STATUS_INTERVAL", 1.0)
@@ -565,6 +747,8 @@ class RecorderRuntime:
                 xml_text,
                 source_name=source_name,
                 probe=probe,
+                max_observations=MAX_OBSERVATIONS_PER_BATCH,
+                max_sequence_span=MAX_SEQUENCE_SPAN,
             )
             if batch.header.instance_id != instance_id:
                 raise MtconnectProtocolError(
@@ -748,6 +932,8 @@ class RecorderRuntime:
                     sample_xml,
                     source_name=source_name,
                     probe=current_probe,
+                    max_observations=MAX_OBSERVATIONS_PER_BATCH,
+                    max_sequence_span=MAX_SEQUENCE_SPAN,
                 )
 
                 if batch.header.instance_id != current_header.instance_id:
@@ -928,7 +1114,10 @@ class RecorderRuntime:
                 "last_error": self.last_error,
                 "poll_interval_seconds": self.poll_interval,
                 "request_timeout_seconds": REQUEST_TIMEOUT,
+                "response_byte_limits": dict(RESPONSE_BYTE_LIMITS),
                 "batch_size": BATCH_SIZE,
+                "max_observations_per_batch": MAX_OBSERVATIONS_PER_BATCH,
+                "max_sequence_span": MAX_SEQUENCE_SPAN,
                 "max_batches_per_cycle": MAX_BATCHES_PER_CYCLE,
                 "conditions_included": True,
                 "raw_archive_enabled": True,

@@ -61,6 +61,10 @@ from catalog.mtconnect_recorder.federation_update import (
     mark_trial_operator_stopped,
     trial_fallback_restart,
 )
+from catalog.mtconnect_recorder.limits import (
+    MAX_OBSERVATIONS_PER_BATCH,
+    MAX_REQUEST_DEADLINE_SECONDS,
+)
 from catalog.mtconnect_recorder.upgrade_compat import ensure_recorder_upgrade_config
 
 #: Reserved for two things: a native update the supervisor pre-validated, this
@@ -144,7 +148,10 @@ def build_parser() -> ArgumentParser:
         "--batch-size",
         type=int,
         default=1000,
-        help="Maximum observations requested per /sample call (default: 1000).",
+        help=(
+            "Maximum observations requested per /sample call (default: 1000; "
+            f"hard maximum: {MAX_OBSERVATIONS_PER_BATCH})."
+        ),
     )
     parser.add_argument(
         "--max-batches-per-cycle",
@@ -156,7 +163,10 @@ def build_parser() -> ArgumentParser:
         "--timeout",
         type=float,
         default=10.0,
-        help="HTTP timeout in seconds (default: 10).",
+        help=(
+            "Total HTTP request deadline in seconds (default: 10; maximum: "
+            f"{MAX_REQUEST_DEADLINE_SECONDS:g})."
+        ),
     )
     parser.add_argument(
         "--once",
@@ -536,12 +546,21 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.poll_interval <= 0:
         parser.error("--poll-interval must be greater than zero.")
-    if args.batch_size <= 0:
-        parser.error("--batch-size must be greater than zero.")
+    if not 1 <= args.batch_size <= MAX_OBSERVATIONS_PER_BATCH:
+        parser.error(
+            "--batch-size must be between 1 and "
+            f"{MAX_OBSERVATIONS_PER_BATCH}."
+        )
     if args.max_batches_per_cycle <= 0:
         parser.error("--max-batches-per-cycle must be greater than zero.")
-    if args.timeout <= 0:
-        parser.error("--timeout must be greater than zero.")
+    if (
+        not math.isfinite(args.timeout)
+        or not 0 < args.timeout <= MAX_REQUEST_DEADLINE_SECONDS
+    ):
+        parser.error(
+            "--timeout must be finite, greater than zero, and at most "
+            f"{MAX_REQUEST_DEADLINE_SECONDS:g} seconds."
+        )
     if (
         not math.isfinite(args.federation_timeout)
         or not 0 < args.federation_timeout <= MAX_FEDERATION_REQUEST_SECONDS

@@ -194,6 +194,24 @@ def test_start_recorder_rejects_unbounded_federation_timeout(timeout: str) -> No
     assert excinfo.value.code == 2
 
 
+@pytest.mark.parametrize("timeout", ["nan", "inf", "61"])
+def test_start_recorder_rejects_unbounded_capture_deadline(timeout: str) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        start_recorder.main(["--timeout", timeout])
+
+    assert excinfo.value.code == 2
+
+
+@pytest.mark.parametrize("batch_size", ["0", "10001"])
+def test_start_recorder_rejects_batch_size_outside_parser_bound(
+    batch_size: str,
+) -> None:
+    with pytest.raises(SystemExit) as excinfo:
+        start_recorder.main(["--batch-size", batch_size])
+
+    assert excinfo.value.code == 2
+
+
 def test_first_start_auto_scan_selects_discovered_sources(
     tmp_path: Path,
     monkeypatch,

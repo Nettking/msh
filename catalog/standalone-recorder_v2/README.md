@@ -256,11 +256,18 @@ data/federation/jsonl-cache/
 | `FCP_RECORDER_DATA_DIR` | `data` | Root data directory. |
 | `FCP_RECORDER_STATE_FILE` | `data/source_state/mtconnect_recorder_state.json` | Durable committed checkpoint. |
 | `FCP_RECORDER_POLL_INTERVAL` | `0.2` | Delay between catch-up cycles. |
-| `FCP_RECORDER_BATCH_SIZE` | `1000` | Maximum observations requested per `/sample` call. |
+| `FCP_RECORDER_BATCH_SIZE` | `1000` | Maximum observations requested per `/sample` call; values are capped at the hard 10,000-observation parser limit. |
 | `FCP_RECORDER_MAX_BATCHES_PER_CYCLE` | `20` | Catch-up batches per source before yielding. |
-| `FCP_RECORDER_REQUEST_TIMEOUT` | `10.0` | HTTP request timeout in seconds. |
+| `FCP_RECORDER_REQUEST_TIMEOUT` | `10.0` | Total HTTP request deadline in seconds; finite positive values are capped at 60 seconds. |
 | `FCP_RECORDER_ONCE` | `false` | Run one catch-up cycle and exit. |
 | `FCP_RECORDER_FEDERATION_KEY` | unset | Optional first-join key; removed from the process environment after bootstrap. |
+
+Recorder ingress is deliberately finite even when an MTConnect Agent ignores
+the requested sample count or keeps a connection active with a slow trickle.
+`/current` is limited to 8 MiB, while `/probe` and `/sample` are each limited to
+16 MiB. A parsed sample may contain at most 10,000 observations and span at most
+10,000 global sequence numbers. Rejected responses do not enter the raw batch
+archive and cannot advance the durable checkpoint.
 
 Conditions are always recorded. The legacy `FCP_RECORDER_INCLUDE_CONDITION` setting is no longer used because excluding Conditions would make the recorder intentionally lossy.
 
