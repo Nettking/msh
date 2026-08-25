@@ -11,6 +11,7 @@ from catalog.command_setup import (
     env_lines_for_plan,
     normalize_command_profile,
 )
+from catalog.federation.model_resource_pull import ModelPullResult
 from catalog.flask_app.services.capability_config_service import CapabilityConfigError
 import setup_fcp
 
@@ -166,18 +167,26 @@ def test_fresh_command_setup_writes_capability_config_not_legacy_role(
     assert calls[0][1:] == (False, False)
 
 
-def test_provider_node_starts_only_provider_and_installs_model(monkeypatch) -> None:
+def test_provider_node_starts_only_provider_and_uses_admitted_model_pull(
+    monkeypatch,
+) -> None:
     plan = _plan(profile="language-model-provider", ai_profile="edge-small")
-    calls: list[tuple[list[str], dict[str, str], bool]] = []
+    process_calls: list[tuple[list[str], dict[str, str], bool]] = []
+    pull_calls: list[tuple[str, str]] = []
 
     def fake_run(command, *, env, check):
-        calls.append((command, env, check))
+        process_calls.append((command, env, check))
+
+    def fake_pull(_root, *, model, target_name):
+        pull_calls.append((model, target_name))
+        return ModelPullResult(True, "installed", "model ready")
 
     monkeypatch.setattr(setup_fcp.subprocess, "run", fake_run)
+    monkeypatch.setattr(setup_fcp, "admitted_model_pull", fake_pull)
 
     setup_fcp._run_compose(plan, pull_model=True, start=True)
 
-    assert [call[0] for call in calls] == [
+    assert [call[0] for call in process_calls] == [
         [
             "docker",
             "compose",
@@ -186,19 +195,11 @@ def test_provider_node_starts_only_provider_and_installs_model(monkeypatch) -> N
             "up",
             "-d",
             "model-provider",
-        ],
-        [
-            "docker",
-            "compose",
-            "--profile",
-            "provider",
-            "run",
-            "--rm",
-            "model-provider-install",
-        ],
+        ]
     ]
-    assert all(call[2] is True for call in calls)
-    assert calls[0][1]["FCP_PROVIDER_MODEL"] == "smollm2:360m"
+    assert process_calls[0][2] is True
+    assert process_calls[0][1]["FCP_PROVIDER_MODEL"] == "smollm2:360m"
+    assert pull_calls == [("smollm2:360m", "model-provider")]
 
 
 def test_one_shot_profile_does_not_persist_product_configuration(
