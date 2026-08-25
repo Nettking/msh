@@ -9,6 +9,7 @@ from . import storage as _storage
 from .bounded_storage import BoundedDurableRecorderStore
 from .model import *
 from .parsing import *
+from .resource_pressure import install_runtime_resource_pressure
 from .storage import *
 from .xml_budget import validate_xml_budget
 
@@ -91,6 +92,10 @@ def _runtime_module():
     runtime_module.parse_stream_header = parse_stream_header
     runtime_module.parse_probe = parse_probe
     runtime_module.parse_streams = parse_streams
+    # Resource admission is also installed here, after launcher environment
+    # configuration has established DATA_DIR/STATE_FILE. This preserves the
+    # lazy-import contract while making normal package startup resource-aware.
+    install_runtime_resource_pressure(runtime_module)
     return runtime_module
 
 
