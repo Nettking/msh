@@ -134,10 +134,10 @@ def test_supported_model_install_paths_have_no_direct_pull_bypass() -> None:
 
 
 def test_update_agents_treat_ollama_as_optional_and_under_host_admission() -> None:
-    windows = (ROOT / "scripts/windows/fcp_update_agent.ps1").read_text(
+    windows = (ROOT / "scripts/windows/fcp_update_engine.ps1").read_text(
         encoding="utf-8"
     )
-    posix = (ROOT / "scripts/posix/fcp_update_agent.py").read_text(encoding="utf-8")
+    posix = (ROOT / "scripts/posix/fcp_update_engine.py").read_text(encoding="utf-8")
 
     assert "fcp.host-model-install-request.v1" in windows
     assert "fcp.host-model-install-request.v1" in posix
