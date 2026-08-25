@@ -3,6 +3,9 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import subprocess
+
+import pytest
 
 from catalog.federation.host_resources import (
     DEFAULT_CRITICAL_FREE_BYTES,
@@ -178,3 +181,23 @@ def test_windows_and_python_model_runners_share_pressure_and_stop_contract() -> 
     assert "writer_stop_unverified" in python_runner
     assert '["docker", "compose", "stop", "--timeout", "15", target.service]' in python_runner
     assert '["docker", "compose", "kill", target.service]' not in python_runner
+
+
+@pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell parser check")
+def test_windows_model_pull_script_has_valid_powershell_syntax() -> None:
+    path = ROOT / "scripts" / "windows" / "fcp_model_pull.ps1"
+    escaped_path = str(path).replace("'", "''")
+    command = (
+        "$errors = $null; "
+        "[System.Management.Automation.Language.Parser]::ParseFile("
+        f"'{escaped_path}', [ref]$null, [ref]$errors) | Out-Null; "
+        "if ($errors.Count -gt 0) { "
+        "$errors | ForEach-Object { Write-Error $_.Message }; exit 1 }"
+    )
+    completed = subprocess.run(
+        ["powershell", "-NoProfile", "-Command", command],
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr or completed.stdout
