@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,7 +25,7 @@ from catalog.mtconnect_recorder.schema_compat import (
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
 from .errors import FederationValidationError
-from .outbox import MAX_PAYLOAD_BYTES
+from .outbox import MAX_PAYLOAD_BYTES, RetiredSummary
 from .recorder_delivery import (
     RECORDER_STORAGE_SCHEMA,
     DurableRecorderDeliveryQueue,
@@ -665,11 +666,56 @@ class RecorderFederationPublisher:
         )
 
 
+#: No tombstones at all, for a cycle that could not read the outbox.
+_NO_RETIREMENT = RetiredSummary(total=0, datasets=(), truncated=False)
+
+#: Publication health, worst first. ``failing`` means the worker cycle itself
+#: could not complete; ``degraded`` means delivery works but some evidence has
+#: been permanently withdrawn and will not arrive without operator action;
+#: ``blocked`` means an ordered dataset is fenced behind a row that is still
+#: being retried; ``publishing`` means ordinary progress.
+PUBLICATION_HEALTH_STATES = ("failing", "degraded", "blocked", "publishing")
+
+
 @dataclass(frozen=True)
 class RecorderWorkerCycleResult:
     checkpoint_changed: bool
     reconcile: RecorderReconcileResult | None
     delivery: RecorderDeliveryRunResult
+    # Durable tombstones as they exist right now, re-read from the outbox on
+    # every cycle rather than accumulated in memory. That is the whole reason
+    # degraded health cannot be forgotten by a restart or left stale by a
+    # repair: it is never remembered in the first place, only observed.
+    retirement: RetiredSummary = _NO_RETIREMENT
+
+
+@dataclass(frozen=True)
+class RecorderPublicationCycleReport:
+    """What one bounded worker cycle proved, whether or not it succeeded.
+
+    The required publication loop used to absorb every cycle failure silently,
+    so a recorder whose outbox had become unreadable looked exactly like a
+    recorder with nothing to do. This report is what the loop hands to whoever
+    owns the thread, so a failure has somewhere to be seen.
+    """
+
+    result: RecorderWorkerCycleResult | None = None
+    error_code: str | None = None
+    consecutive_failures: int = 0
+
+    @property
+    def state(self) -> str:
+        if self.error_code is not None or self.result is None:
+            return "failing"
+        if self.result.retirement.total:
+            return "degraded"
+        if self.result.delivery.blocked_datasets:
+            return "blocked"
+        return "publishing"
+
+    @property
+    def healthy(self) -> bool:
+        return self.state == "publishing"
 
 
 class RecorderFederationDeliveryWorker:
@@ -689,6 +735,8 @@ class RecorderFederationDeliveryWorker:
         queue: DurableRecorderDeliveryQueue,
         poll_interval_seconds: float = 0.2,
         delivery_limit: int = 100,
+        cycle_observer: Callable[[RecorderPublicationCycleReport], None]
+        | None = None,
     ) -> None:
         if (
             isinstance(poll_interval_seconds, bool)
@@ -710,12 +758,20 @@ class RecorderFederationDeliveryWorker:
                 "delivery_limit",
                 "must be a positive integer",
             )
+        if cycle_observer is not None and not callable(cycle_observer):
+            raise FederationValidationError(
+                "invalid-recorder-publication",
+                "cycle_observer",
+                "must be callable when supplied",
+            )
         self.reconciler = reconciler
         self.queue = queue
         self.poll_interval_seconds = float(poll_interval_seconds)
         self.delivery_limit = delivery_limit
+        self.cycle_observer = cycle_observer
         self._last_checkpoint_stamp: tuple[int, int] | None = None
         self._reconciled_once = False
+        self._consecutive_failures = 0
 
     def _checkpoint_stamp(self) -> tuple[int, int] | None:
         try:
@@ -805,11 +861,38 @@ class RecorderFederationDeliveryWorker:
             self._reconciled_once = True
 
         delivery = await self.queue.run_once(limit=self.delivery_limit)
+
+        # Read the tombstones back from the database rather than reporting what
+        # this cycle happened to retire. A cycle that retires nothing because
+        # the poisoned row was withdrawn days ago must still report degraded,
+        # and a cycle that runs after an operator repaired one must stop
+        # reporting it. Only durable truth answers both.
+        retirement = await asyncio.to_thread(
+            self.queue.outbox.retired_summary,
+            session_id=self.queue.session_id,
+            destination_id=self.queue.destination_id,
+            schema_id=RECORDER_STORAGE_SCHEMA,
+        )
         return RecorderWorkerCycleResult(
             checkpoint_changed=changed,
             reconcile=reconcile,
             delivery=delivery,
+            retirement=retirement,
         )
+
+    def _report(self, report: RecorderPublicationCycleReport) -> None:
+        """Hand one cycle outcome to the owner of this required thread."""
+
+        observer = self.cycle_observer
+        if observer is None:
+            return
+        try:
+            observer(report)
+        except Exception:  # noqa: BLE001 - a health sink cannot kill the loop
+            # Reporting health must never be able to strand durable delivery
+            # work. The next cycle reports again from durable truth, so one
+            # failed hand-off loses nothing.
+            pass
 
     async def run_forever(self, stop_event: asyncio.Event) -> None:
         if not isinstance(stop_event, asyncio.Event):
@@ -820,17 +903,33 @@ class RecorderFederationDeliveryWorker:
             )
         while not stop_event.is_set():
             try:
-                await self.run_cycle()
+                result = await self.run_cycle()
             except (
                 FederationValidationError,
                 OSError,
                 RuntimeError,
                 TypeError,
                 ValueError,
-            ):
-                # Capture remains independent. The next bounded cycle retries
-                # reconciliation/delivery from durable local state.
-                pass
+            ) as exc:
+                # Capture remains independent and the next bounded cycle
+                # retries reconciliation/delivery from durable local state --
+                # but the failure is no longer invisible. Absorbing it silently
+                # let an unreadable outbox or an unstattable checkpoint spin
+                # this required loop forever while every health surface still
+                # reported an ordinary running publisher.
+                self._consecutive_failures += 1
+                self._report(
+                    RecorderPublicationCycleReport(
+                        result=None,
+                        error_code=str(getattr(exc, "code", type(exc).__name__)),
+                        consecutive_failures=self._consecutive_failures,
+                    )
+                )
+            else:
+                self._consecutive_failures = 0
+                self._report(
+                    RecorderPublicationCycleReport(result=result)
+                )
             try:
                 await asyncio.wait_for(
                     stop_event.wait(),
@@ -843,12 +942,14 @@ class RecorderFederationDeliveryWorker:
 __all__ = [
     "DEFAULT_MAX_CONTENT_BYTES",
     "MAX_SAFE_CONTENT_BYTES",
+    "PUBLICATION_HEALTH_STATES",
     "RECORDER_DATASET_SCHEMA_NAME",
     "RECORDER_DATASET_SCHEMA_VERSION",
     "RECORDER_TELEMETRY_SCHEMA",
     "RecorderArchiveReconciler",
     "RecorderFederationDeliveryWorker",
     "RecorderFederationPublisher",
+    "RecorderPublicationCycleReport",
     "RecorderPublicationTarget",
     "RecorderPublisherRunResult",
     "RecorderReconcileResult",

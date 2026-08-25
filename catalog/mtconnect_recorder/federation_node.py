@@ -102,8 +102,18 @@ def _publication_cycle_status(
     session_id: str,
     group_id: str,
     delivery: RecorderDeliveryRunResult,
+    retired_total: int = 0,
 ) -> tuple[str, int, str | None]:
-    """Classify only deliverable rows owned by this authenticated session."""
+    """Classify only deliverable rows owned by this authenticated session.
+
+    ``retired_total`` is durable truth re-read from the outbox this cycle, not
+    a remembered count, and it outranks every other state. A recorder that has
+    permanently withdrawn some evidence is not "up-to-date" even when nothing
+    is pending: reporting the happy state there would be the exact silent
+    disappearance the durable tombstone exists to prevent. It equally outranks
+    "backlogged", because a retryable backlog resolves itself and a withdrawal
+    does not -- it waits for a person.
+    """
 
     current = _current_recorder_pending(
         pending_entries,
@@ -111,6 +121,8 @@ def _publication_cycle_status(
         group_id=group_id,
     )
     pending = len(current)
+    if retired_total > 0:
+        return "degraded", pending, "recorder-delivery-retired"
     failed = delivery.pending > 0 or any(
         getattr(entry, "last_error", None) for entry in current
     )
@@ -233,6 +245,12 @@ SHARING_STATE_REMEDIES: dict[str, str] = {
     "discovering": (
         "the recorder is still looking for the leader's storage authority; if "
         "this persists, confirm the leader is running that authority process"
+    ),
+    "degraded": (
+        "some recorder evidence was permanently withdrawn from publication "
+        "because it could never be sent; newer evidence is still publishing. "
+        "The withdrawn rows are retained as durable tombstones in the recorder "
+        "publication outbox, and the primary archive was not touched"
     ),
 }
 
@@ -437,7 +455,14 @@ class RecorderFederationNode:
                     + suffix,
                 )
             snapshot = self.snapshot()
-            if snapshot.storage_state == "up-to-date" or (
+            # "degraded" is ready. Publication is working; some older evidence
+            # was permanently withdrawn and is reported as such. Refusing to
+            # report ready here would let one ancient poisoned row block
+            # recorder startup forever -- reintroducing, at the readiness gate,
+            # exactly the starvation the durable tombstone removed from the
+            # delivery loop. The degraded state and its error code stay on the
+            # returned snapshot, so the caller still sees it.
+            if snapshot.storage_state in ("up-to-date", "degraded") or (
                 snapshot.storage_state == "publishing"
                 and snapshot.last_committed_count > 0
             ):
@@ -714,6 +739,7 @@ class RecorderFederationNode:
                             session_id=state.binding.internal_session_id,
                             group_id=group_id,
                             delivery=cycle.delivery,
+                            retired_total=cycle.retirement.total,
                         )
                     )
                     self._set_snapshot(

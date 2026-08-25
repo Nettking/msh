@@ -4,27 +4,51 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
+from collections.abc import Callable
 from typing import Any
 
 from .errors import FederationValidationError
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 MAX_ERROR_LENGTH = 2048
 MAX_PAYLOAD_BYTES = 1_048_576
 MAX_COMPLETED_RECEIPT_BYTES = 4_096
 MAX_COMPACTION_BATCH = 1_000
+MAX_RETIRED_SUMMARY_DATASETS = 1_000
+MAX_RETIREMENT_REASON_LENGTH = 64
+MAX_RETIREMENT_DATASET_LENGTH = 512
 COMPLETED_RECEIPT_SCHEMA = "fcp.outbox.completed_receipt.v1"
+
+#: A retirement reason is an operator-facing classification, never an error
+#: message.  Keeping it a bounded lowercase token means it can be persisted,
+#: compared, indexed and rendered without ever carrying remote text.  The
+#: free-text cause stays in ``last_error``, which retirement preserves.
+RETIREMENT_REASON = re.compile(
+    r"\A[a-z][a-z0-9-]{0,%d}\Z" % (MAX_RETIREMENT_REASON_LENGTH - 1,)
+)
 
 
 class OutboxState(str, Enum):
     PREPARED = "prepared"
     PENDING = "pending"
     COMPLETED = "completed"
+    #: Terminal, deliberate isolation.  A retired row is durable evidence that
+    #: this exact delivery identity was permanently withdrawn from delivery.
+    #: It is never produced by a retryable failure, never reached by timing out
+    #: or by counting attempts, and never deleted -- the row itself is the
+    #: tombstone that stops reconciliation re-enqueuing the same evidence as
+    #: new work forever.
+    RETIRED = "retired"
+
+
+#: Rows that will never be attempted again.  Both keep their identity columns.
+TERMINAL_STATES = frozenset({OutboxState.COMPLETED, OutboxState.RETIRED})
 
 
 @dataclass(frozen=True)
@@ -42,6 +66,42 @@ class OutboxEntry:
     updated_at: datetime
     next_attempt_at: datetime
     last_error: str | None
+    # Retirement metadata.  Present exactly when ``state`` is RETIRED, so a
+    # reader cannot see a half-written tombstone.  ``retirement_dataset_id``
+    # records which ordered dataset this withdrawal punched a hole in; it is a
+    # column rather than payload so it survives receipt compaction, which is
+    # what lets an operator still answer "where is the gap?" afterwards.  The
+    # skipped sequence span stays recoverable from ``idempotency_key``, which
+    # is immutable identity and is never compacted away.
+    retired_at: datetime | None = None
+    retirement_reason: str | None = None
+    retirement_dataset_id: str | None = None
+
+    @property
+    def is_terminal(self) -> bool:
+        return self.state in TERMINAL_STATES
+
+
+@dataclass(frozen=True)
+class RetiredDatasetCount:
+    """How many retired rows one ordered dataset carries."""
+
+    dataset_id: str | None
+    rows: int
+
+
+@dataclass(frozen=True)
+class RetiredSummary:
+    """A bounded, durably-derived view of terminal isolation.
+
+    ``datasets`` is truncated to the caller's limit while ``total`` counts
+    every matching row, so a health surface can report "degraded" truthfully
+    without ever materialising an unbounded result set.
+    """
+
+    total: int
+    datasets: tuple[RetiredDatasetCount, ...]
+    truncated: bool
 
 
 def _time(value: datetime) -> str:
@@ -101,6 +161,69 @@ def _completed_receipt_json(
     )
 
 
+_OUTBOX_INDEX_DDL = (
+    "CREATE INDEX IF NOT EXISTS outbox_pending_due "
+    "ON outbox(state, next_attempt_at, outbox_id);"
+)
+
+
+def _outbox_table_ddl(name: str, *, if_not_exists: bool) -> str:
+    """Return the current outbox DDL.
+
+    One definition serves both a fresh database and the v2 rebuild, so the
+    migrated table can never drift from the table a new install creates.  The
+    retirement columns are constrained to be present exactly when the row is
+    retired: a half-written tombstone is rejected by the database itself, not
+    only by the decoder.
+    """
+
+    guard = "IF NOT EXISTS " if if_not_exists else ""
+    return f"""
+                CREATE TABLE {guard}{name} (
+                    outbox_id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL CHECK(length(session_id) > 0),
+                    destination_id TEXT NOT NULL CHECK(length(destination_id) > 0),
+                    schema_id TEXT NOT NULL CHECK(length(schema_id) > 0),
+                    payload_json TEXT NOT NULL CHECK(length(payload_json) <= {MAX_PAYLOAD_BYTES} AND json_valid(payload_json)),
+                    idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) > 0),
+                    content_hash TEXT NOT NULL CHECK(length(content_hash) > 0),
+                    state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('prepared','pending','completed','retired')),
+                    payload_compacted INTEGER NOT NULL DEFAULT 0
+                        CHECK(
+                            payload_compacted IN (0, 1)
+                            AND (
+                                payload_compacted = 0
+                                OR state IN ('completed','retired')
+                            )
+                        ),
+                    attempt_count INTEGER NOT NULL DEFAULT 0 CHECK(attempt_count >= 0),
+                    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, next_attempt_at TEXT NOT NULL,
+                    last_error TEXT CHECK(last_error IS NULL OR length(last_error) <= {MAX_ERROR_LENGTH}),
+                    retired_at TEXT
+                        CHECK((state = 'retired') = (retired_at IS NOT NULL)),
+                    retirement_reason TEXT
+                        CHECK(
+                            (state = 'retired') = (retirement_reason IS NOT NULL)
+                            AND (
+                                retirement_reason IS NULL
+                                OR length(retirement_reason)
+                                    BETWEEN 1 AND {MAX_RETIREMENT_REASON_LENGTH}
+                            )
+                        ),
+                    retirement_dataset_id TEXT
+                        CHECK(
+                            (state = 'retired' OR retirement_dataset_id IS NULL)
+                            AND (
+                                retirement_dataset_id IS NULL
+                                OR length(retirement_dataset_id)
+                                    BETWEEN 1 AND {MAX_RETIREMENT_DATASET_LENGTH}
+                            )
+                        ),
+                    UNIQUE(session_id, destination_id, idempotency_key)
+                );
+    """
+
+
 class SQLiteOutbox:
     """Each mutation uses BEGIN IMMEDIATE; no delivery item is destructively claimed."""
 
@@ -120,33 +243,15 @@ class SQLiteOutbox:
     def initialize(self) -> None:
         with self._connect() as db:
             db.execute("PRAGMA journal_mode=WAL")
-            db.executescript("""
+            db.executescript(f"""
                 CREATE TABLE IF NOT EXISTS outbox_schema (
                     singleton INTEGER PRIMARY KEY CHECK (singleton = 1),
                     version INTEGER NOT NULL CHECK (version > 0)
                 );
-                INSERT OR IGNORE INTO outbox_schema(singleton, version) VALUES(1, 2);
-                CREATE TABLE IF NOT EXISTS outbox (
-                    outbox_id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    session_id TEXT NOT NULL CHECK(length(session_id) > 0),
-                    destination_id TEXT NOT NULL CHECK(length(destination_id) > 0),
-                    schema_id TEXT NOT NULL CHECK(length(schema_id) > 0),
-                    payload_json TEXT NOT NULL CHECK(length(payload_json) <= 1048576 AND json_valid(payload_json)),
-                    idempotency_key TEXT NOT NULL CHECK(length(idempotency_key) > 0),
-                    content_hash TEXT NOT NULL CHECK(length(content_hash) > 0),
-                    state TEXT NOT NULL DEFAULT 'pending' CHECK(state IN ('prepared','pending','completed')),
-                    payload_compacted INTEGER NOT NULL DEFAULT 0
-                        CHECK(
-                            payload_compacted IN (0, 1)
-                            AND (payload_compacted = 0 OR state = 'completed')
-                        ),
-                    attempt_count INTEGER NOT NULL DEFAULT 0 CHECK(attempt_count >= 0),
-                    created_at TEXT NOT NULL, updated_at TEXT NOT NULL, next_attempt_at TEXT NOT NULL,
-                    last_error TEXT CHECK(last_error IS NULL OR length(last_error) <= 2048),
-                    UNIQUE(session_id, destination_id, idempotency_key)
-                );
-                CREATE INDEX IF NOT EXISTS outbox_pending_due
-                    ON outbox(state, next_attempt_at, outbox_id);
+                INSERT OR IGNORE INTO outbox_schema(singleton, version)
+                    VALUES(1, {SCHEMA_VERSION});
+                {_outbox_table_ddl("outbox", if_not_exists=True)}
+                {_OUTBOX_INDEX_DDL}
             """)
             db.execute("BEGIN IMMEDIATE")
             try:
@@ -172,13 +277,35 @@ class SQLiteOutbox:
                             "CHECK(payload_compacted IN (0, 1) AND "
                             "(payload_compacted = 0 OR state = 'completed'))"
                         )
-                    db.execute(
-                        "UPDATE outbox_schema SET version=? WHERE singleton=1",
-                        (SCHEMA_VERSION,),
-                    )
-                    version = SCHEMA_VERSION
+                    db.execute("UPDATE outbox_schema SET version=2 WHERE singleton=1")
+                    version = 2
                     columns.add("payload_compacted")
-                if version != SCHEMA_VERSION or "payload_compacted" not in columns:
+                if version == 2:
+                    # SQLite cannot widen a CHECK constraint in place, and the
+                    # v2 table pins ``state`` to three values.  Rebuild it so
+                    # 'retired' is a real state rather than a flag some reader
+                    # can forget to join against: a row that is not deliverable
+                    # must not be able to look deliverable to any query.
+                    #
+                    # The whole rebuild runs inside this one BEGIN IMMEDIATE,
+                    # and SQLite DDL is transactional, so a crash at any point
+                    # rolls back to an intact v2 database and the migration is
+                    # simply retried on the next open.  Explicit outbox_id
+                    # values are carried over, which also carries the
+                    # AUTOINCREMENT high-water mark to the rebuilt table.
+                    self._migrate_v2_to_v3(db)
+                    version = 3
+                    columns = {
+                        row["name"]
+                        for row in db.execute("PRAGMA table_info(outbox)").fetchall()
+                    }
+                required = {
+                    "payload_compacted",
+                    "retired_at",
+                    "retirement_reason",
+                    "retirement_dataset_id",
+                }
+                if version != SCHEMA_VERSION or not required <= columns:
                     raise FederationValidationError(
                         "unsupported-outbox-schema",
                         "version",
@@ -188,6 +315,28 @@ class SQLiteOutbox:
             except Exception:
                 db.rollback()
                 raise
+
+    @staticmethod
+    def _migrate_v2_to_v3(db: sqlite3.Connection) -> None:
+        """Rebuild the v2 table so terminal retirement becomes representable."""
+
+        db.execute(_outbox_table_ddl("outbox_v3", if_not_exists=False))
+        db.execute(
+            """INSERT INTO outbox_v3
+                (outbox_id,session_id,destination_id,schema_id,payload_json,
+                 idempotency_key,content_hash,state,payload_compacted,
+                 attempt_count,created_at,updated_at,next_attempt_at,last_error,
+                 retired_at,retirement_reason,retirement_dataset_id)
+               SELECT outbox_id,session_id,destination_id,schema_id,payload_json,
+                 idempotency_key,content_hash,state,payload_compacted,
+                 attempt_count,created_at,updated_at,next_attempt_at,last_error,
+                 NULL,NULL,NULL
+               FROM outbox"""
+        )
+        db.execute("DROP TABLE outbox")
+        db.execute("ALTER TABLE outbox_v3 RENAME TO outbox")
+        db.execute(_OUTBOX_INDEX_DDL)
+        db.execute("UPDATE outbox_schema SET version=3 WHERE singleton=1")
 
     def enqueue(
         self,
@@ -328,16 +477,30 @@ class SQLiteOutbox:
                     (session_id, destination_id, idempotency_key),
                 ).fetchone()
                 completed = row["state"] == OutboxState.COMPLETED.value
+                # A compacted row stores a bounded identity receipt in place of
+                # its payload.  Comparing that receipt against the payload
+                # reconciliation just rebuilt would report a false
+                # idempotency conflict on every archive scan, so a receipt is
+                # never compared.  The identity columns below still are, and
+                # they are what duplicate suppression actually depends on.
+                receipt = row["payload_compacted"] == 1
                 if (
                     row["content_hash"] != content_hash
                     or row["schema_id"] != schema_id
-                    or (not completed and row["payload_json"] != payload_json)
+                    or (
+                        not completed
+                        and not receipt
+                        and row["payload_json"] != payload_json
+                    )
                 ):
                     raise FederationValidationError(
                         "idempotency-conflict",
                         "idempotency_key",
                         "identity was reused with different content",
                     )
+                # Only unactivated routing intent is promoted.  A retired row
+                # is deliberately terminal: re-observing the same archive must
+                # never turn a withdrawn identity back into deliverable work.
                 if (
                     state is OutboxState.PENDING
                     and row["state"] == OutboxState.PREPARED.value
@@ -420,6 +583,15 @@ class SQLiteOutbox:
                         "outbox_id",
                         "prepared entry cannot be acknowledged",
                     )
+                if row["state"] == OutboxState.RETIRED.value:
+                    # Retirement is terminal in the other direction.  Letting a
+                    # racing worker acknowledge a withdrawn row would record a
+                    # commit that never happened.
+                    raise FederationValidationError(
+                        "outbox-retired",
+                        "outbox_id",
+                        "retired entry cannot be acknowledged",
+                    )
                 receipt_json = self._receipt_for_row(row)
                 compacted = row["payload_compacted"]
                 if compacted not in (0, 1):
@@ -467,6 +639,28 @@ class SQLiteOutbox:
         immediate transaction so callers can schedule it incrementally.
         """
 
+        return self._compact(OutboxState.COMPLETED, limit=limit)
+
+    def compact_retired(self, *, limit: int = 100) -> int:
+        """Reduce a tombstone to its bounded identity receipt.
+
+        A row is usually retired because its payload is the problem, so leaving
+        that payload durable forever is exactly the growth the retirement design
+        has to answer.  Compaction bounds the bytes without deleting the row:
+        the identity that suppresses re-enqueue, the ordering-gap dataset, the
+        retirement reason, the recorded cause and the timestamps all survive,
+        because those live in columns rather than in the payload.
+
+        Nothing is deleted or vacuumed, and the underlying primary recorder
+        evidence is untouched -- a compacted tombstone's content remains
+        reconstructible from the archive it was built from.  The trade is
+        explicit and one-way: :meth:`reinstate` refuses a compacted row rather
+        than inventing a payload it cannot prove.
+        """
+
+        return self._compact(OutboxState.RETIRED, limit=limit)
+
+    def _compact(self, state: OutboxState, *, limit: int) -> int:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
             raise FederationValidationError(
                 "invalid-compaction-limit",
@@ -479,17 +673,21 @@ class SQLiteOutbox:
             try:
                 rows = db.execute(
                     "SELECT * FROM outbox "
-                    "WHERE state='completed' AND payload_compacted=0 "
+                    "WHERE state=? AND payload_compacted=0 "
                     "ORDER BY outbox_id LIMIT ?",
-                    (bounded_limit,),
+                    (state.value, bounded_limit),
                 ).fetchall()
                 compacted = 0
                 for row in rows:
                     cursor = db.execute(
                         "UPDATE outbox SET payload_json=?,payload_compacted=1 "
-                        "WHERE outbox_id=? AND state='completed' "
+                        "WHERE outbox_id=? AND state=? "
                         "AND payload_compacted=0",
-                        (self._receipt_for_row(row), row["outbox_id"]),
+                        (
+                            self._receipt_for_row(row),
+                            row["outbox_id"],
+                            state.value,
+                        ),
                     )
                     compacted += cursor.rowcount
                 db.commit()
@@ -533,6 +731,10 @@ class SQLiteOutbox:
                 raise FederationValidationError(
                     "outbox-completed", "outbox_id", "cannot retry completed entry"
                 )
+            if row["state"] == OutboxState.RETIRED.value:
+                raise FederationValidationError(
+                    "outbox-retired", "outbox_id", "cannot retry retired entry"
+                )
             attempts = row["attempt_count"] + 1
             delay = min(
                 max_delay_seconds, base_delay_seconds * (2 ** min(attempts - 1, 30))
@@ -544,6 +746,233 @@ class SQLiteOutbox:
             )
             db.commit()
         return self.get(outbox_id)  # type: ignore[return-value]
+
+    def retire(
+        self,
+        outbox_id: int,
+        *,
+        reason: str,
+        now: datetime,
+        dataset_id: str | None = None,
+        verify: Callable[[OutboxEntry], bool] | None = None,
+    ) -> OutboxEntry:
+        """Withdraw one pending entry from delivery, permanently and durably.
+
+        This is the only transition that ends delivery without a commit, and it
+        is deliberately not reachable by counting attempts or by waiting: a
+        retryable failure must stay retryable no matter how long it has been
+        failing, because "the remote has been down for a week" and "this row can
+        never be sent" are different facts.  The caller supplies the second one.
+
+        The row is not deleted.  It keeps its ``(session_id, destination_id,
+        idempotency_key)`` identity, so the reconciler that re-reads the same
+        durable archive still collides with it and still declines to enqueue the
+        same evidence as new work.  A tombstone that was deleted would be
+        re-enqueued forever by the next scan.
+
+        ``verify`` is re-evaluated against the freshly re-read durable row
+        inside this transaction.  A caller that decided to retire from an
+        earlier snapshot therefore cannot retire a row that has since been
+        repaired underneath it; the transition fails closed instead.
+        """
+
+        if not isinstance(reason, str) or RETIREMENT_REASON.fullmatch(reason) is None:
+            raise FederationValidationError(
+                "invalid-retirement",
+                "reason",
+                "must be a bounded lowercase classification token",
+            )
+        if dataset_id is not None and (
+            not isinstance(dataset_id, str)
+            or not dataset_id
+            or len(dataset_id) > MAX_RETIREMENT_DATASET_LENGTH
+        ):
+            raise FederationValidationError(
+                "invalid-retirement",
+                "dataset_id",
+                "must be bounded non-empty text when supplied",
+            )
+        stamp = _time(now)
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                row = db.execute(
+                    "SELECT * FROM outbox WHERE outbox_id=?", (outbox_id,)
+                ).fetchone()
+                if row is None:
+                    raise FederationValidationError(
+                        "outbox-not-found", "outbox_id", "does not exist"
+                    )
+                if row["state"] != OutboxState.PENDING.value:
+                    raise FederationValidationError(
+                        "outbox-not-pending",
+                        "outbox_id",
+                        "only a pending entry can be retired",
+                    )
+                # Decode before writing so a corrupt row fails closed rather
+                # than being quietly converted into an authoritative tombstone.
+                entry = self._decode(row)
+                if verify is not None and not verify(entry):
+                    raise FederationValidationError(
+                        "outbox-retirement-unverified",
+                        "outbox_id",
+                        "the durable row no longer justifies retirement",
+                    )
+                db.execute(
+                    "UPDATE outbox SET state='retired',retired_at=?,"
+                    "retirement_reason=?,retirement_dataset_id=?,updated_at=? "
+                    "WHERE outbox_id=? AND state='pending'",
+                    (stamp, reason, dataset_id, stamp, outbox_id),
+                )
+                retired = self._decode(
+                    db.execute(
+                        "SELECT * FROM outbox WHERE outbox_id=?", (outbox_id,)
+                    ).fetchone()
+                )
+                db.commit()
+                return retired
+            except Exception:
+                db.rollback()
+                raise
+
+    def reinstate(self, outbox_id: int, *, now: datetime) -> OutboxEntry:
+        """Return a retired entry to ordinary retryable delivery.
+
+        Repair is an explicit operator transition, never an automatic one: a
+        tombstone that could expire back into work on its own would reproduce
+        the endless retry it was created to stop.  Backoff and the recorded
+        cause are reset because the isolation, not the row's history, is what
+        the operator resolved.
+
+        A compacted tombstone is refused.  Its payload was reduced to an
+        identity receipt, and fabricating a delivery from a receipt would be a
+        false publication; the durable archive remains the recovery path.
+        """
+
+        stamp = _time(now)
+        with self._connect() as db:
+            db.execute("BEGIN IMMEDIATE")
+            try:
+                row = db.execute(
+                    "SELECT * FROM outbox WHERE outbox_id=?", (outbox_id,)
+                ).fetchone()
+                if row is None:
+                    raise FederationValidationError(
+                        "outbox-not-found", "outbox_id", "does not exist"
+                    )
+                if row["state"] != OutboxState.RETIRED.value:
+                    raise FederationValidationError(
+                        "outbox-not-retired",
+                        "outbox_id",
+                        "only a retired entry can be reinstated",
+                    )
+                if row["payload_compacted"] == 1:
+                    raise FederationValidationError(
+                        "outbox-payload-compacted",
+                        "outbox_id",
+                        "a compacted tombstone has no payload to deliver",
+                    )
+                # Fail closed on corrupt retirement metadata rather than
+                # laundering it back into deliverable work.
+                self._decode(row)
+                db.execute(
+                    "UPDATE outbox SET state='pending',retired_at=NULL,"
+                    "retirement_reason=NULL,retirement_dataset_id=NULL,"
+                    "attempt_count=0,last_error=NULL,updated_at=?,"
+                    "next_attempt_at=? WHERE outbox_id=? AND state='retired'",
+                    (stamp, stamp, outbox_id),
+                )
+                reinstated = self._decode(
+                    db.execute(
+                        "SELECT * FROM outbox WHERE outbox_id=?", (outbox_id,)
+                    ).fetchone()
+                )
+                db.commit()
+                return reinstated
+            except Exception:
+                db.rollback()
+                raise
+
+    def retired(
+        self,
+        *,
+        session_id: str | None = None,
+        destination_id: str | None = None,
+        schema_id: str | None = None,
+    ) -> tuple[OutboxEntry, ...]:
+        """Return the durable tombstones, oldest first."""
+
+        query = "SELECT * FROM outbox WHERE state='retired'"
+        args: list[str] = []
+        for column, value in (
+            ("session_id", session_id),
+            ("destination_id", destination_id),
+            ("schema_id", schema_id),
+        ):
+            if value is not None:
+                query += f" AND {column}=?"
+                args.append(value)
+        query += " ORDER BY outbox_id"
+        with self._connect() as db:
+            return tuple(self._decode(row) for row in db.execute(query, args))
+
+    def retired_summary(
+        self,
+        *,
+        session_id: str | None = None,
+        destination_id: str | None = None,
+        schema_id: str | None = None,
+        limit: int = 64,
+    ) -> RetiredSummary:
+        """Aggregate terminal isolation without materialising every tombstone.
+
+        Health surfaces run this on every cycle, so it must stay O(1) in
+        memory no matter how much terminal history has accumulated.  The
+        per-dataset rows are truncated to ``limit``; ``total`` is counted
+        separately and is never truncated, so "is this recorder degraded?"
+        is always answered from complete durable truth.
+        """
+
+        if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
+            raise FederationValidationError(
+                "invalid-limit",
+                "limit",
+                "must be a positive integer",
+            )
+        bounded = min(limit, MAX_RETIRED_SUMMARY_DATASETS)
+        where = " WHERE state='retired'"
+        args: list[str] = []
+        for column, value in (
+            ("session_id", session_id),
+            ("destination_id", destination_id),
+            ("schema_id", schema_id),
+        ):
+            if value is not None:
+                where += f" AND {column}=?"
+                args.append(value)
+        with self._connect() as db:
+            total = int(
+                db.execute(
+                    "SELECT COUNT(*) AS total FROM outbox" + where, args
+                ).fetchone()["total"]
+            )
+            grouped = db.execute(
+                "SELECT retirement_dataset_id AS dataset_id, "
+                "COUNT(*) AS row_count FROM outbox"
+                + where
+                + " GROUP BY retirement_dataset_id"
+                " ORDER BY (dataset_id IS NULL), dataset_id LIMIT ?",
+                [*args, bounded + 1],
+            ).fetchall()
+        truncated = len(grouped) > bounded
+        return RetiredSummary(
+            total=total,
+            datasets=tuple(
+                RetiredDatasetCount(row["dataset_id"], int(row["row_count"]))
+                for row in grouped[:bounded]
+            ),
+            truncated=truncated,
+        )
 
     @staticmethod
     def _receipt_for_row(row: sqlite3.Row) -> str:
@@ -572,13 +1001,48 @@ class SQLiteOutbox:
             if payload_compacted not in (0, 1):
                 raise ValueError("payload compaction marker is invalid")
             if payload_compacted == 1:
-                if state is not OutboxState.COMPLETED:
-                    raise ValueError("only completed rows may contain receipts")
+                if state not in TERMINAL_STATES:
+                    raise ValueError("only terminal rows may contain receipts")
                 expected_receipt = SQLiteOutbox._receipt_for_row(row)
                 if row["payload_json"] != expected_receipt:
                     raise ValueError(
-                        "completed receipt does not match immutable identity"
+                        "terminal receipt does not match immutable identity"
                     )
+            # Retirement metadata is validated as a unit.  A tombstone that
+            # says "retired" without a timestamp and reason, or metadata left
+            # behind on a row that is no longer retired, is corruption: it
+            # would let a reader either lose the ordering gap or believe in a
+            # withdrawal that never happened.  Both fail closed here rather
+            # than being normalised into a plausible-looking answer.
+            retired = state is OutboxState.RETIRED
+            retired_at_text = row["retired_at"]
+            reason = row["retirement_reason"]
+            retirement_dataset_id = row["retirement_dataset_id"]
+            if retired is not (retired_at_text is not None) or retired is not (
+                reason is not None
+            ):
+                raise ValueError(
+                    "retirement metadata must be present exactly when retired"
+                )
+            if not retired and retirement_dataset_id is not None:
+                raise ValueError("only a retired row may name a retirement dataset")
+            retired_at: datetime | None = None
+            if retired:
+                retired_at = datetime.fromisoformat(retired_at_text)
+                if retired_at.tzinfo is None or retired_at.utcoffset() is None:
+                    raise ValueError("retired_at must be timezone-aware")
+                if (
+                    not isinstance(reason, str)
+                    or RETIREMENT_REASON.fullmatch(reason) is None
+                ):
+                    raise ValueError("retirement reason is not a bounded token")
+                if retirement_dataset_id is not None and (
+                    not isinstance(retirement_dataset_id, str)
+                    or not 0
+                    < len(retirement_dataset_id)
+                    <= MAX_RETIREMENT_DATASET_LENGTH
+                ):
+                    raise ValueError("retirement dataset id is not bounded text")
             return OutboxEntry(
                 row["outbox_id"],
                 row["session_id"],
@@ -593,6 +1057,9 @@ class SQLiteOutbox:
                 parsed_times[1],
                 parsed_times[2],
                 row["last_error"],
+                retired_at,
+                reason,
+                retirement_dataset_id,
             )
         except (
             IndexError,

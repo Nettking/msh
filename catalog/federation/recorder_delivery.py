@@ -8,11 +8,98 @@ from datetime import datetime, timezone
 from typing import Protocol
 
 from .errors import FederationValidationError
-from .outbox import SQLiteOutbox
+from .outbox import OutboxEntry, SQLiteOutbox
 from .phase_d_client import PhaseDIngestOutcome
 from .storage_protocol import BatchIngestRequest
 
 RECORDER_STORAGE_SCHEMA = "fcp.recorder.storage_delivery.v1"
+
+#: Payload fields a durable row must carry before a request can even be built.
+_REQUIRED_PAYLOAD_FIELDS = (
+    "group_id",
+    "dataset_id",
+    "batch_id",
+    "idempotency_key",
+    "content",
+    "created_at",
+)
+
+
+class RecorderPayloadDefect(Exception):
+    """A durable row cannot be turned into a delivery request at all.
+
+    This is deliberately a different kind of failure from "delivery did not
+    succeed".  It is decided before any network call, purely from the row's own
+    payload, so it is a property of the stored evidence rather than of the
+    remote authority, the transport or the disk.  The same row fails the same
+    way on every future attempt, on every restart, forever -- which is exactly
+    the condition that makes unbounded retrying pointless and makes durable
+    isolation the honest answer.
+
+    ``reason`` is the bounded token persisted on the tombstone.
+    """
+
+    def __init__(self, reason: str, message: str) -> None:
+        self.reason = reason
+        self.message = message
+        super().__init__(f"{message} ({reason})")
+
+
+def _delivery_request(payload: object) -> dict[str, object]:
+    """Build one ingest request from a durable payload, or name the defect.
+
+    Pure and total with respect to the payload: no clock, no filesystem, no
+    network.  That is what lets the caller re-run it against the freshly
+    re-read durable row inside the retirement transaction and prove the defect
+    is still there.
+
+    It raises on exactly the conditions the delivery path already failed on, so
+    no row that used to be deliverable becomes a defect here.
+    """
+
+    if not isinstance(payload, dict):
+        raise RecorderPayloadDefect(
+            "payload-not-an-object",
+            "durable delivery payload is not an object",
+        )
+    for field in _REQUIRED_PAYLOAD_FIELDS:
+        if field not in payload:
+            raise RecorderPayloadDefect(
+                "payload-field-missing",
+                f"durable delivery payload has no {field}",
+            )
+    try:
+        created_at = datetime.fromisoformat(
+            str(payload["created_at"]).replace("Z", "+00:00")
+        )
+        dataset_schema_version = int(payload.get("dataset_schema_version", 1))
+    except (TypeError, ValueError) as exc:
+        raise RecorderPayloadDefect(
+            "payload-field-invalid",
+            f"durable delivery payload cannot be decoded: {exc}",
+        ) from exc
+    return {
+        "group_id": str(payload["group_id"]),
+        "dataset_id": str(payload["dataset_id"]),
+        "dataset_schema_name": str(
+            payload.get("dataset_schema_name", "fcp.storage.dataset.opaque")
+        ),
+        "dataset_schema_version": dataset_schema_version,
+        "batch_id": str(payload["batch_id"]),
+        "idempotency_key": str(payload["idempotency_key"]),
+        "content": payload["content"],
+        "created_at": created_at,
+    }
+
+
+def _is_still_defective(entry: OutboxEntry) -> bool:
+    """Whether the durable row still cannot produce a request."""
+
+    try:
+        _delivery_request(entry.payload)
+    except RecorderPayloadDefect:
+        return True
+    return False
 
 
 def _now() -> datetime:
@@ -44,6 +131,12 @@ class RecorderDeliveryRunResult:
     # than stored, so it can never go stale or need its own retirement. This is
     # how a stuck historical item is surfaced while it is still being retried.
     blocked_datasets: tuple[str, ...] = ()
+    # Rows withdrawn from delivery during this cycle, and the datasets whose
+    # ordering they punched a hole in. Both describe this cycle only; the
+    # authoritative, restart-surviving answer is the durable tombstone set,
+    # which health surfaces read from the outbox rather than from here.
+    retired: int = 0
+    retired_datasets: tuple[str, ...] = ()
 
 
 class DurableRecorderDeliveryQueue:
@@ -218,9 +311,11 @@ class DurableRecorderDeliveryQueue:
         blocked: set[tuple[str, str, str]] = set()
         deferred_retry_used: set[tuple[str, str, str]] = set()
         startup_probe_used: set[tuple[str, str, str]] = set()
+        retired_datasets: set[str] = set()
         attempted = 0
         committed = 0
         pending = 0
+        retired = 0
 
         for entry in pending_entries:
             if attempted >= limit:
@@ -251,61 +346,66 @@ class DurableRecorderDeliveryQueue:
                 deferred_retry_used.add(ordering_key)
 
             attempted += 1
-            payload = entry.payload
             failed = False
+
+            # The network call is the boundary between "this row is wrong" and
+            # "the world is wrong". Everything above it is a pure function of
+            # the durable payload; everything at or below it depends on the
+            # remote authority, the transport and the disk. Only the first kind
+            # can ever justify withdrawing evidence from delivery, so the two
+            # are separated here rather than being caught together.
             try:
-                if not isinstance(payload, dict):
-                    raise FederationValidationError(
-                        "invalid-recorder-delivery",
-                        "payload",
-                        "must be an object",
-                    )
-                created_at = datetime.fromisoformat(
-                    str(payload["created_at"]).replace("Z", "+00:00")
-                )
-                outcome = await self.client.ingest_batch(
-                    group_id=str(payload["group_id"]),
-                    dataset_id=str(payload["dataset_id"]),
-                    dataset_schema_name=str(
-                        payload.get(
-                            "dataset_schema_name",
-                            "fcp.storage.dataset.opaque",
+                request = _delivery_request(entry.payload)
+            except RecorderPayloadDefect as defect:
+                if self._withdraw(entry, defect, ordering_key):
+                    retired += 1
+                    if ordering_key is not None:
+                        retired_datasets.add(ordering_key[2])
+                    # The fence this row held is released with it: the dataset
+                    # is deliberately *not* marked blocked, so newer evidence
+                    # behind it moves in this same cycle.
+                    continue
+                # The withdrawal itself did not commit. The row is exactly as
+                # it was -- durable, pending, fenced and retried -- which is the
+                # safe outcome, never a silent drop.
+                pending += 1
+                failed = True
+            else:
+                try:
+                    outcome = await self.client.ingest_batch(**request)
+                    if outcome.committed:
+                        self.outbox.acknowledge(entry.outbox_id, now=self.clock())
+                        committed += 1
+                    else:
+                        self.outbox.record_failure(
+                            entry.outbox_id,
+                            error=(
+                                outcome.message
+                                or "storage acknowledgement is pending"
+                            ),
+                            now=self.clock(),
                         )
-                    ),
-                    dataset_schema_version=int(
-                        payload.get("dataset_schema_version", 1)
-                    ),
-                    batch_id=str(payload["batch_id"]),
-                    idempotency_key=str(payload["idempotency_key"]),
-                    content=payload["content"],
-                    created_at=created_at,
-                )
-                if outcome.committed:
-                    self.outbox.acknowledge(entry.outbox_id, now=self.clock())
-                    committed += 1
-                else:
+                        pending += 1
+                        failed = True
+                except (
+                    FederationValidationError,
+                    KeyError,
+                    TypeError,
+                    ValueError,
+                    OSError,
+                    RuntimeError,
+                ) as exc:
+                    # Storage/database/transport failure. It stays pending and
+                    # retryable however long it persists; time and attempt count
+                    # never promote it to a terminal state, and it is never
+                    # reported as a commit.
                     self.outbox.record_failure(
                         entry.outbox_id,
-                        error=outcome.message or "storage acknowledgement is pending",
+                        error=str(exc),
                         now=self.clock(),
                     )
                     pending += 1
                     failed = True
-            except (
-                FederationValidationError,
-                KeyError,
-                TypeError,
-                ValueError,
-                OSError,
-                RuntimeError,
-            ) as exc:
-                self.outbox.record_failure(
-                    entry.outbox_id,
-                    error=str(exc),
-                    now=self.clock(),
-                )
-                pending += 1
-                failed = True
 
             if failed and ordering_key is not None:
                 blocked.add(ordering_key)
@@ -315,4 +415,46 @@ class DurableRecorderDeliveryQueue:
             committed,
             pending,
             tuple(sorted({key[2] for key in blocked})),
+            retired,
+            tuple(sorted(retired_datasets)),
         )
+
+    def _withdraw(
+        self,
+        entry,
+        defect: RecorderPayloadDefect,
+        ordering_key: tuple[str, str, str] | None,
+    ) -> bool:
+        """Durably retire one deterministically undeliverable row.
+
+        The cause is recorded first and the withdrawal second, as two separate
+        durable transactions. A crash between them leaves an ordinary pending
+        row that has recorded why it failed; the next cycle re-derives the same
+        defect from the same payload and retires it then. A crash inside either
+        transaction rolls that transaction back. There is no ordering of these
+        two writes that can lose the row or fabricate a delivery.
+
+        The retirement re-checks the defect against the freshly re-read durable
+        row inside the transaction, so a row repaired underneath this cycle is
+        not retired on the strength of a stale snapshot.
+        """
+
+        try:
+            self.outbox.record_failure(
+                entry.outbox_id,
+                error=defect.message,
+                now=self.clock(),
+            )
+            self.outbox.retire(
+                entry.outbox_id,
+                reason=defect.reason,
+                dataset_id=None if ordering_key is None else ordering_key[2],
+                now=self.clock(),
+                verify=_is_still_defective,
+            )
+            return True
+        except (FederationValidationError, OSError, RuntimeError):
+            # Could not withdraw -- for instance the row was completed by
+            # another worker, its retirement metadata is corrupt, or the
+            # database is unavailable. Leaving it pending is always safe.
+            return False

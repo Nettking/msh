@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
+from catalog.federation.outbox import RetiredSummary
 from catalog.federation.recorder_delivery import (
     RECORDER_STORAGE_SCHEMA,
     DurableRecorderDeliveryQueue,
@@ -28,6 +29,11 @@ class _BacklogOutbox:
         # stub holds models a recovered backlog, which is due immediately.
         self.pending_thread_ids.append(threading.get_ident())
         return tuple(self.entries)
+
+    def retired_summary(self, **_kwargs):
+        # This stub models a recorder with no permanently withdrawn evidence,
+        # so restart ordering is exercised without degraded health in the way.
+        return RetiredSummary(total=0, datasets=(), truncated=False)
 
 
 class _Queue:
