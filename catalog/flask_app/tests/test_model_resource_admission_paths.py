@@ -1,0 +1,121 @@
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+from catalog.flask_app.services import capability_ai_service
+from catalog.flask_app.services.capability_config_service import CapabilityConfig
+from catalog.flask_app.services.host_model_install_handoff import (
+    HostModelInstallHandoff,
+    MODEL_REQUEST_SCHEMA,
+)
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def _config(*, mode: str = "local") -> CapabilityConfig:
+    return CapabilityConfig(
+        ai_provider_mode=mode,
+        ai_provider_name="Provider" if mode == "connected" else "",
+        ai_profile="laptop-standard",
+        ai_model="llama3.2:3b",
+        ollama_base_url=(
+            "http://192.168.1.50:11434" if mode == "connected" else "http://ollama:11434"
+        ),
+        recorder_sources="",
+        recorder_poll_interval="0.2",
+        recorder_include_condition=False,
+        updated_at="2026-08-25T19:00:00Z",
+    )
+
+
+def test_browser_local_pull_is_a_declarative_host_request(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    ok, message = capability_ai_service.pull_ollama_model(_config())
+
+    assert ok is True
+    assert "queued" in message.lower()
+    request_file = tmp_path / "data" / "federation" / "update-agent" / "request.json"
+    request = json.loads(request_file.read_text(encoding="utf-8"))
+    assert request["schema"] == MODEL_REQUEST_SCHEMA
+    assert request["action"] == "install"
+    assert request["model"] == "llama3.2:3b"
+    assert request["target"] == "ollama"
+    assert "command" not in request
+    assert "arguments" not in request
+
+
+def test_connected_provider_is_never_mutated_from_the_consumer_host(tmp_path, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
+
+    ok, message = capability_ai_service.pull_ollama_model(_config(mode="connected"))
+
+    assert ok is False
+    assert "cannot enforce that host's disk reserve" in message
+    assert not (tmp_path / "data" / "federation" / "update-agent" / "request.json").exists()
+
+
+def test_model_handoff_serializes_with_host_update_requests(tmp_path) -> None:
+    handoff = HostModelInstallHandoff(tmp_path)
+    handoff.request_file.parent.mkdir(parents=True, exist_ok=True)
+    handoff.request_file.write_text("{}", encoding="utf-8")
+    handoff.timeout = 0.05
+    handoff.poll_interval = 0.02
+
+    ok, message = handoff.queue(model="llama3.2:3b")
+
+    assert ok is False
+    assert "already processing" in message
+
+
+def test_supported_model_install_paths_have_no_direct_pull_bypass() -> None:
+    start_cmd = (ROOT / "start.cmd").read_text(encoding="utf-8")
+    start_sh = (ROOT / "start.sh").read_text(encoding="utf-8")
+    setup = (ROOT / "setup_fcp.py").read_text(encoding="utf-8")
+    ai_service = (
+        ROOT / "catalog/flask_app/services/capability_ai_service.py"
+    ).read_text(encoding="utf-8")
+    command_setup = (ROOT / "catalog/command_setup.py").read_text(encoding="utf-8")
+    headless = (ROOT / "headless_fcp.py").read_text(encoding="utf-8")
+
+    assert "fcp_model_pull.ps1" in start_cmd
+    assert "catalog.federation.model_resource_pull" in start_sh
+    assert "admitted_model_pull" in setup
+    assert "/api/pull" not in ai_service
+    assert "/api/pull" not in command_setup
+    assert "ollama-pull" not in start_cmd
+    assert "ollama-pull" not in start_sh
+    assert '"ollama-pull"' not in setup
+    assert '"ollama-pull"' not in headless
+
+
+def test_update_agents_treat_ollama_as_optional_and_under_host_admission() -> None:
+    windows = (ROOT / "scripts/windows/fcp_update_agent.ps1").read_text(
+        encoding="utf-8"
+    )
+    posix = (ROOT / "scripts/posix/fcp_update_agent.py").read_text(encoding="utf-8")
+
+    assert "fcp.host-model-install-request.v1" in windows
+    assert "fcp.host-model-install-request.v1" in posix
+    assert "fcp_model_pull.ps1" in windows
+    assert "catalog.federation.model_resource_pull" in posix
+    assert "'compose', 'up', '-d', 'relay', 'recorder'" in windows
+    assert '["docker", "compose", "up", "-d", "relay", "recorder"]' in posix
+    assert "'compose', 'up', '-d', 'relay', 'ollama', 'recorder'" not in windows
+    assert '"relay",\n                "ollama",\n                "recorder"' not in posix
+    assert "AI remains optional" in windows
+    assert "AI remains optional" in posix
+
+
+def test_windows_and_python_model_runners_share_pressure_thresholds() -> None:
+    windows = (ROOT / "scripts/windows/fcp_model_pull.ps1").read_text(
+        encoding="utf-8"
+    )
+    host = (ROOT / "catalog/federation/host_resources.py").read_text(encoding="utf-8")
+
+    assert "$CriticalFreeBytes = [int64]10737418240" in windows
+    assert "$PressureFreeBytes = [int64]12884901888" in windows
+    assert "10 * 1024**3" in host
+    assert "12 * 1024**3" in host
+    assert "'compose', 'stop', '--timeout', '5', $service" in windows
