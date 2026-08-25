@@ -101,14 +101,6 @@ if not defined FCP_BUILD_COMMIT (
     )
 )
 
-call :start_update_agent
-if errorlevel 1 (
-    echo.
-    echo The FCP host update agent could not be started safely.
-    pause
-    exit /b 1
-)
-
 echo.
 echo Starting the required FCP background services...
 echo   - Federation relay
@@ -222,6 +214,17 @@ echo First-time onboarding is required on this machine.
 goto :resume_complete
 
 :resume_complete
+rem All launcher Compose reads for this activation are complete before the update
+rem agent is allowed to mutate the checkout. This keeps runtime configuration on
+rem the same exact candidate that produced the verified core images.
+call :start_update_agent
+if errorlevel 1 (
+    echo.
+    echo The FCP host update agent could not be started safely.
+    pause
+    exit /b 1
+)
+
 echo.
 echo FCP is running:        %FCP_BASE_URL%
 echo Onboarding:            "%FCP_ONBOARDING_URL%"
