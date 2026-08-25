@@ -104,28 +104,34 @@ nonzero process exit so the existing Compose restart policy can act. Together
 these are **B06 2/8 properties automated-proven; B06 remains open**.
 
 The recorder path-confinement, finite-transaction, incremental recovery-frontier,
-and healthy-source progress-isolation deliveries together advance **B02 7/9
-properties automated-proven; B02 remains open**. Timestamp-derived storage days
-are validated/confined before writes. `/current`, `/probe`, and `/sample` have
-finite decoded response-byte ceilings and a finite total request deadline;
-accepted XML is structurally budgeted before retained-tree parsing; parsed sample
-batches have hard observation and sequence-span ceilings; and continuity
-validation is bounded by accepted observation count rather than materializing an
-arbitrary remote integer range. Detailed observation NDJSON and wide
-compatibility JSONL are streamed through byte-bounded atomic publications, and
-carried compatibility checkpoint state has a finite serialized ceiling, so
+healthy-source progress-isolation, and durable event-storm deliveries together
+advance **B02 8/9 properties automated-proven; B02 remains open**.
+Timestamp-derived storage days are validated/confined before writes. `/current`,
+`/probe`, and `/sample` have finite decoded response-byte ceilings and a finite
+total request deadline; accepted XML is structurally budgeted before retained-tree
+parsing; parsed sample batches have hard observation and sequence-span ceilings;
+and continuity validation is bounded by accepted observation count rather than
+materializing an arbitrary remote integer range. Detailed observation NDJSON and
+wide compatibility JSONL are streamed through byte-bounded atomic publications,
+and carried compatibility checkpoint state has a finite serialized ceiling, so
 bounded ingress cannot amplify into an effectively quadratic in-memory/disk
 batch. Ordinary crash recovery publishes one atomic per-source/per-Agent-instance
 frontier before raw publication and consults that fixed path instead of
 recursively rescanning lifetime history on every healthy poll. A pre-frontier
 archive is scanned once and migrated to a clear frontier; explicit state-loss
 rebuilds and offline canonical projection retain their deliberate historical
-scans. Source scheduling now keeps at most one capture transaction in flight per
+scans. Source scheduling keeps at most one capture transaction in flight per
 source and harvests only completed work, so a bounded slow/bad source no longer
 forms a global barrier in front of recorder heartbeat publication or subsequent
 polls of healthy sources. Shutdown still drains already-scheduled bounded source
-transactions without cancelling raw-first/checkpoint-last work. B02 remains open
-for durable event-storm deduplication/rate bounds and pressure/critical behavior.
+transactions without cancelling raw-first/checkpoint-last work. Recorder
+pathology/discontinuity events are now coalesced into atomic hourly summaries per
+source/event type: repeated identical evidence and rapidly changing source payload
+values cannot create durable event files at poll rate, while first/latest payload
+samples and occurrence/change counters remain bounded operational evidence. The
+summary writer uses `fcp.mtconnect.recorder_event.v2`; historical v1 event files
+remain untouched and have no authoritative reader. B02 remains open only for
+pressure/critical behavior preserving raw-first/checkpoint-last semantics.
 P04/P05/P09 physical evidence remains open; B01 still owns aggregate host-resource
 admission across concurrent writers. No physical acceptance state changed.
 
