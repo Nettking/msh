@@ -39,6 +39,11 @@ class RecorderDeliveryRunResult:
     attempted: int
     committed: int
     pending: int
+    # Datasets whose oldest row did not commit this cycle, so their newer rows
+    # stayed fenced behind it. Recomputed from durable rows every cycle rather
+    # than stored, so it can never go stale or need its own retirement. This is
+    # how a stuck historical item is surfaced while it is still being retried.
+    blocked_datasets: tuple[str, ...] = ()
 
 
 class DurableRecorderDeliveryQueue:
@@ -292,4 +297,9 @@ class DurableRecorderDeliveryQueue:
             if failed and ordering_key is not None:
                 blocked.add(ordering_key)
 
-        return RecorderDeliveryRunResult(attempted, committed, pending)
+        return RecorderDeliveryRunResult(
+            attempted,
+            committed,
+            pending,
+            tuple(sorted({key[2] for key in blocked})),
+        )

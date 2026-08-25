@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -21,7 +22,10 @@ class _BacklogOutbox:
         self.entries = entries
         self.pending_thread_ids: list[int] = []
 
-    def pending(self):
+    def pending(self, *, now=None):
+        # The worker now asks only for backlog that is due, so a row waiting
+        # out its retry backoff cannot defer reconciliation. Every entry this
+        # stub holds models a recovered backlog, which is due immediately.
         self.pending_thread_ids.append(threading.get_ident())
         return tuple(self.entries)
 
@@ -33,6 +37,10 @@ class _Queue:
     def __init__(self, outbox: _BacklogOutbox) -> None:
         self.outbox = outbox
         self.calls = 0
+
+    @staticmethod
+    def clock() -> datetime:
+        return datetime.now(timezone.utc)
 
     async def run_once(self, *, limit: int = 100) -> RecorderDeliveryRunResult:
         self.calls += 1
