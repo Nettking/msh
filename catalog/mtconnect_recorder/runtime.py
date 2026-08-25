@@ -53,6 +53,7 @@ from .parsing import (
     plan_sequence,
     validate_batch_continuity,
 )
+from .recovery_frontier import RecorderRecoveryFrontier
 from .schema_compat import CHECKPOINT_SCHEMA, LEGACY_CHECKPOINT_SCHEMAS
 from .storage import DurableRecorderStore
 
@@ -720,28 +721,67 @@ class RecorderRuntime:
     ) -> int:
         """Finish raw batches that were archived before a crash.
 
-        Raw manifests are the recovery journal. A batch is only selected when
-        its first sequence equals the current durable checkpoint, which makes
-        recovery deterministic and prevents skipping an unresolved range.
+        Normal capture consults one fixed recovery frontier per source/instance.
+        An installation that predates the frontier performs one legacy archive
+        scan and writes a clear frontier afterwards.  Complete state loss keeps
+        the explicit full-scan rebuild path because no durable checkpoint exists
+        from which a bounded next-batch lookup could start.
         """
 
         lookup_names = archive_source_names or (source_name,)
-        refs = []
+        frontier = RecorderRecoveryFrontier(self.store)
+        full_rebuild = self.checkpoints.get(source_name) is None
+        refs: list[tuple[str, Any]] = []
+        legacy_names: set[str] = set()
         seen_manifests: set[Path] = set()
+
         for archive_source_name in lookup_names:
-            for ref in self.store.iter_raw_batches(
-                source_name=archive_source_name,
-                instance_id=instance_id,
-            ):
+            if full_rebuild:
+                archive_refs = self.store.iter_raw_batches(
+                    source_name=archive_source_name,
+                    instance_id=instance_id,
+                )
+                legacy_names.add(archive_source_name)
+            else:
+                lookup = frontier.lookup(
+                    source_name=archive_source_name,
+                    instance_id=instance_id,
+                    expected=expected,
+                )
+                if lookup.initialized:
+                    archive_refs = [lookup.ref] if lookup.ref is not None else []
+                else:
+                    # Upgrade compatibility: pay the lifetime scan once, then
+                    # persist a fixed clear frontier for all later healthy polls.
+                    archive_refs = self.store.iter_raw_batches(
+                        source_name=archive_source_name,
+                        instance_id=instance_id,
+                    )
+                    legacy_names.add(archive_source_name)
+            for ref in archive_refs:
                 if ref.manifest_path in seen_manifests:
                     continue
                 seen_manifests.add(ref.manifest_path)
-                refs.append(ref)
+                refs.append((archive_source_name, ref))
+
         while True:
-            candidates = [ref for ref in refs if ref.first_sequence == expected]
+            candidates = [
+                (archive_source_name, ref)
+                for archive_source_name, ref in refs
+                if ref.first_sequence == expected
+            ]
             if not candidates:
+                for archive_source_name in legacy_names:
+                    frontier.mark_clear(
+                        source_name=archive_source_name,
+                        instance_id=instance_id,
+                        next_sequence=expected,
+                    )
                 return expected
-            ref = max(candidates, key=lambda item: (item.last_sequence, item.raw_sha256))
+            archive_source_name, ref = max(
+                candidates,
+                key=lambda item: (item[1].last_sequence, item[1].raw_sha256),
+            )
             xml_text = self.store.read_raw_batch(ref)
             batch = parse_streams(
                 xml_text,
@@ -794,6 +834,11 @@ class RecorderRuntime:
                 count_raw_batch=False,
             )
             expected = batch.header.next_sequence
+            frontier.mark_clear(
+                source_name=archive_source_name,
+                instance_id=instance_id,
+                next_sequence=expected,
+            )
             log.warning(
                 "[%s] recovered archived sequences %s-%s after an incomplete commit",
                 source_name,
@@ -969,6 +1014,13 @@ class RecorderRuntime:
                     break
 
                 validate_batch_continuity(batch, expected)
+                recovery_frontier = RecorderRecoveryFrontier(self.store)
+                recovery_frontier.mark_pending(
+                    source_name=source_name,
+                    requested_from=expected,
+                    xml_text=sample_xml,
+                    batch=batch,
+                )
                 stored = self.store.store_batch(
                     source_name=source_name,
                     requested_from=expected,
@@ -986,6 +1038,11 @@ class RecorderRuntime:
                     next_sequence=batch.header.next_sequence,
                     probe_sha256=current_probe.sha256,
                     stored=stored,
+                )
+                recovery_frontier.mark_clear(
+                    source_name=source_name,
+                    instance_id=batch.header.instance_id,
+                    next_sequence=batch.header.next_sequence,
                 )
                 expected = batch.header.next_sequence
                 compatibility_values = stored.latest_values
