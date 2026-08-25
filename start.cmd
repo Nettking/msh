@@ -117,14 +117,13 @@ if errorlevel 1 (
 )
 
 echo.
-echo Starting the FCP background services...
+echo Starting the required FCP background services...
 echo   - Federation relay
-echo   - Ollama service
 echo   - Managed recorder
-docker compose up -d relay ollama recorder
+docker compose up -d relay recorder
 if errorlevel 1 (
     echo.
-    echo FCP background services could not be started. Review the Docker error above.
+    echo Required FCP background services could not be started. Review the Docker error above.
     pause
     exit /b 1
 )
@@ -144,15 +143,24 @@ if errorlevel 1 (
 )
 
 rem The language model is an optional capability. Core FCP is already running
-rem before model installation, so model/Ollama/network failure cannot block the
-rem workbench, Federation, recorder, or control surfaces.
+rem before Ollama or model installation, so Ollama image/service, model, or
+rem network failure cannot block the workbench, Federation, recorder, or control surfaces.
 set "FCP_AI_DEGRADED=0"
-call :ensure_ollama_model
+echo Starting optional Ollama service...
+docker compose up -d ollama
 if errorlevel 1 (
     set "FCP_AI_DEGRADED=1"
     echo.
-    echo WARNING: AI capability is unavailable; core FCP remains running.
-    echo Model installation can be retried later without resetting Federation state.
+    echo WARNING: Ollama is unavailable; core FCP remains running.
+    echo AI capability can be repaired later without resetting Federation state.
+) else (
+    call :ensure_ollama_model
+    if errorlevel 1 (
+        set "FCP_AI_DEGRADED=1"
+        echo.
+        echo WARNING: AI capability is unavailable; core FCP remains running.
+        echo Model installation can be retried later without resetting Federation state.
+    )
 )
 
 echo.
