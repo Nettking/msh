@@ -19,7 +19,7 @@ import time
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 
 from .host_resources import PressureLevel, ProcessResourceAdmission, ResourceAssessment
 
@@ -104,21 +104,38 @@ def _docker_backing_resource_path(
                     docker / "data" / "ext4.vhdx",
                 ]
             )
-        program_data = str(environment.get("PROGRAMDATA") or "").strip()
-        if program_data:
-            native_root = Path(program_data) / "docker"
-            try:
-                if native_root.is_dir():
-                    return native_root.resolve()
-            except OSError:
-                pass
         for candidate in candidates:
             try:
                 if candidate.is_file():
                     return candidate.parent.resolve()
             except OSError:
                 continue
-        return None
+
+        # Do not infer native Docker storage from the mere existence of a
+        # ProgramData directory. Only accept a Windows host path that the active
+        # Docker engine itself reports as its data root.
+        info = _run(
+            root,
+            ["docker", "info", "--format", "{{.OSType}}|{{.DockerRootDir}}"],
+            env=environment,
+            timeout=30.0,
+        )
+        if info.returncode != 0:
+            return None
+        parts = info.stdout.strip().split("|", maxsplit=1)
+        if len(parts) != 2 or parts[0].strip().casefold() != "windows":
+            return None
+        raw = parts[1].strip()
+        candidate = PureWindowsPath(raw)
+        if not candidate.is_absolute():
+            return None
+        host_path = Path(str(candidate))
+        try:
+            if not host_path.exists():
+                return None
+            return host_path.resolve()
+        except OSError:
+            return None
 
     if sys.platform == "darwin":
         home = str(environment.get("HOME") or "").strip()
