@@ -181,7 +181,7 @@ The resume operation is evidence-preserving:
 - it loads saved benchmark results rather than executing benchmark probes; and
 - it leaves contribution authority to the long-running capability-first runtime reconciliation path.
 
-`update.cmd` performs a safe approved-main fast-forward and then invokes this resume behavior on Windows.
+`update.cmd` is retained only as a non-mutating retirement shim. It exits with code `2` and directs the operator to **Federation -> Check for updates -> Update all devices**. It does not fetch, fast-forward, build, start, stop, or resume FCP.
 
 Normal product composition treats inspection and benchmark evidence as run-once evidence until a relevant structural dependency changes or an operator explicitly reruns it. Old evidence is not rewritten to appear newer merely because time passed.
 
@@ -504,13 +504,9 @@ Stop containers while preserving mounted data and named volumes:
 docker compose down
 ```
 
-On Windows, perform a supported local update with:
+Software updates are performed from the current leader's Federation surface: **Check for updates** -> **Update all devices**. The same path applies to a one-device Federation.
 
-```cmd
-update.cmd
-```
-
-For a multi-device Federation, prefer the current leader's **Check for updates** -> **Update all devices** flow once every participating normal FCP device has the current update agent.
+`update.cmd` is retained only as a non-mutating retirement shim and returns nonzero rather than performing an update.
 
 ## Related documentation
 
