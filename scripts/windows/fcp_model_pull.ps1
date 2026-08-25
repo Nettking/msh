@@ -108,8 +108,9 @@ while (-not $process.HasExited) {
             $process.WaitForExit()
         }
         Write-Warning (
-            "Model installation stopped at host resource pressure. " +
-            "The $CriticalFreeBytes-byte emergency floor remains reserved for core recovery."
+            "Model installation stopped when free space reached the shared " +
+            "pressure threshold ($PressureFreeBytes bytes; critical threshold " +
+            "is $CriticalFreeBytes bytes). Core FCP can continue without AI."
         )
         exit 2
     }
