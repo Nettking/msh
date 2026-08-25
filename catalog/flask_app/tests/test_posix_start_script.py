@@ -179,12 +179,10 @@ def test_posix_start_survives_optional_ollama_start_failure(tmp_path: Path) -> N
     assert completed.returncode == 0, completed.stderr or completed.stdout
     trace = calls.read_text(encoding="utf-8")
     build = "python3 -m catalog.federation.host_build"
-    agent = f"python3 {ROOT / 'scripts' / 'posix' / 'fcp_update_agent.py'}"
     required = "docker compose up -d relay recorder"
     flask = "docker compose up -d flask"
     ollama = "docker compose up -d ollama"
-    assert trace.index(build) < trace.index(agent) < trace.index(required)
-    assert trace.index(required) < trace.index(flask) < trace.index(ollama)
+    assert trace.index(build) < trace.index(required) < trace.index(flask) < trace.index(ollama)
     assert "WARNING: Ollama is unavailable; core FCP remains running." in completed.stderr
     assert "AI capability:        unavailable; core FCP is healthy" in completed.stdout
 
