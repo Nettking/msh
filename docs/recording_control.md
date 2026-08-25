@@ -18,12 +18,11 @@ start.cmd
 ```
 
 Do not fast-forward the checkout by hand as part of an ordinary start. Software
-updates have their own supported paths: on a Federation, the current leader's
-**Check for updates** -> **Update all devices** flow updates every reachable
-device, including this one, and proves the running build afterwards. For a
-device that is updating only itself, `update.cmd` performs the same safe
-fast-forward and then resumes the saved setup. See
-[Manual Federation-wide FCP updates](implementation/federation/active/manual_updates.md).
+updates use the current leader's **Check for updates** -> **Update all devices**
+flow, which also applies to a one-device Federation and proves the running build
+after activation. `update.cmd` is retained only as a non-mutating retirement
+shim; it performs no fast-forward, build, restart, or resume and exits nonzero.
+See [Manual Federation-wide FCP updates](implementation/federation/active/manual_updates.md).
 
 `start.cmd` starts both containers in the background and opens:
 
