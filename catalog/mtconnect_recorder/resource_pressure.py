@@ -43,36 +43,46 @@ from .limits import (
     MAX_COMPATIBILITY_BATCH_BYTES,
     MAX_COMPATIBILITY_STATE_BYTES,
     MAX_OBSERVATION_ARCHIVE_BYTES,
+    MAX_PROBE_RESPONSE_BYTES,
     MAX_SAMPLE_RESPONSE_BYTES,
 )
-from .model import ParsedBatch, _slug, _utc_now, _write_bytes_atomic
-from .schema_compat import CHECKPOINT_SCHEMA, RAW_BATCH_MANIFEST_SCHEMA
+from .model import ParsedBatch, ProbeModel, _slug, _utc_now, _write_bytes_atomic
+from .schema_compat import (
+    CHECKPOINT_SCHEMA,
+    PROBE_MANIFEST_SCHEMA,
+    RAW_BATCH_MANIFEST_SCHEMA,
+)
 from .storage import _confined_storage_path, _observation_storage_day
 
 RESOURCE_PRESSURE_RETRY_SECONDS = 1.0
 RECORDER_DATA_TRANSACTION_INODES = 32
 RECORDER_STATE_TRANSACTION_INODES = 8
+RECORDER_PROBE_TRANSACTION_INODES = 8
 
 
 @dataclass(frozen=True)
 class RecorderResourceBudget:
     """Finite maxima used to reserve one recorder transaction."""
 
+    probe_bytes: int = MAX_PROBE_RESPONSE_BYTES
     sample_bytes: int = MAX_SAMPLE_RESPONSE_BYTES
     observation_bytes: int = MAX_OBSERVATION_ARCHIVE_BYTES
     compatibility_bytes: int = MAX_COMPATIBILITY_BATCH_BYTES
     compatibility_state_bytes: int = MAX_COMPATIBILITY_STATE_BYTES
     data_inodes: int = RECORDER_DATA_TRANSACTION_INODES
     state_inodes: int = RECORDER_STATE_TRANSACTION_INODES
+    probe_inodes: int = RECORDER_PROBE_TRANSACTION_INODES
 
     def __post_init__(self) -> None:
         values = (
+            self.probe_bytes,
             self.sample_bytes,
             self.observation_bytes,
             self.compatibility_bytes,
             self.compatibility_state_bytes,
             self.data_inodes,
             self.state_inodes,
+            self.probe_inodes,
         )
         if any(not _valid_nonnegative_integer(value) for value in values):
             raise ValueError(
@@ -234,6 +244,39 @@ def _raw_manifest_size(
             "raw_sha256": raw_sha256,
             "raw_file": str(raw_path),
         }
+    )
+
+
+def _probe_requirement(
+    store: Any,
+    budget: RecorderResourceBudget,
+    *,
+    source_name: str,
+    instance_id: int,
+    probe: ProbeModel,
+) -> _Requirement:
+    probe_path = _confined_storage_path(
+        store.probe_root,
+        _slug(source_name),
+        str(instance_id),
+        f"probe-{probe.sha256}.xml.gz",
+    )
+    manifest_size = _json_atomic_size(
+        {
+            "schema": PROBE_MANIFEST_SCHEMA,
+            "source_name": source_name,
+            "agent_instance_id": instance_id,
+            "probe_sha256": probe.sha256,
+            "stored_at": _utc_now(),
+            "raw_file": str(probe_path),
+            "device_count": len(probe.devices),
+            "data_item_count": len(probe.data_items),
+        }
+    )
+    return _Requirement(
+        path=Path(store.data_dir),
+        bytes_required=_gzip_upper_bound(budget.probe_bytes) + manifest_size,
+        inodes_required=budget.probe_inodes,
     )
 
 
@@ -539,6 +582,39 @@ class RecorderResourceGuard:
                 current.inodes_required += requirement.inodes_required
         return tuple(grouped.values())
 
+    def _record_refusal(self, refusal: HostResourceRefused) -> None:
+        with self._lock:
+            self._refusals[threading.get_ident()] = RecorderResourcePause(
+                code=refusal.code,
+                assessment=refusal.assessment,
+            )
+
+    @contextmanager
+    def reserve_probe(
+        self,
+        *,
+        source_name: str,
+        instance_id: int,
+        probe: ProbeModel,
+    ) -> Iterator[None]:
+        requirement = _probe_requirement(
+            self._store,
+            self.budget,
+            source_name=source_name,
+            instance_id=instance_id,
+            probe=probe,
+        )
+        try:
+            with self.controller.reserve(
+                requirement.path,
+                bytes_required=requirement.bytes_required,
+                inodes_required=requirement.inodes_required,
+            ):
+                yield
+        except HostResourceRefused as exc:
+            self._record_refusal(exc)
+            raise _RecorderPauseSignal from None
+
     def _begin(
         self,
         requirements: tuple[_Requirement, ...],
@@ -566,11 +642,7 @@ class RecorderResourceGuard:
                 )
         except HostResourceRefused as exc:
             stack.close()
-            with self._lock:
-                self._refusals[thread_id] = RecorderResourcePause(
-                    code=exc.code,
-                    assessment=exc.assessment,
-                )
+            self._record_refusal(exc)
             raise _RecorderPauseSignal from None
         with self._lock:
             self._transactions[thread_id] = stack
@@ -712,6 +784,7 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
     original_harvest = runtime_class._harvest_capture_results
     original_save_state = runtime_class.save_state
     store_class = runtime_module.DurableRecorderStore
+    original_store_probe = store_class.store_probe
     original_store_observation = store_class.store_observation_batch
     frontier_class = runtime_module.RecorderRecoveryFrontier
 
@@ -738,6 +811,36 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
                 },
             }
             _write_bytes_atomic(Path(runtime_module.STATE_FILE), _compact_json(payload))
+
+    def resource_store_probe(
+        self: Any,
+        *,
+        source_name: str,
+        instance_id: int,
+        xml_text: str,
+        probe: ProbeModel,
+    ) -> Path:
+        guard = getattr(self, "_recorder_resource_guard", None)
+        if guard is None:
+            return original_store_probe(
+                self,
+                source_name=source_name,
+                instance_id=instance_id,
+                xml_text=xml_text,
+                probe=probe,
+            )
+        with guard.reserve_probe(
+            source_name=source_name,
+            instance_id=instance_id,
+            probe=probe,
+        ):
+            return original_store_probe(
+                self,
+                source_name=source_name,
+                instance_id=instance_id,
+                xml_text=xml_text,
+                probe=probe,
+            )
 
     def resource_store_observation(
         self: Any,
@@ -872,6 +975,7 @@ def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
     runtime_class.capture_source = resource_capture
     runtime_class._recover_archived_batches = resource_recover
     runtime_class._harvest_capture_results = resource_harvest
+    store_class.store_probe = resource_store_probe
     store_class.store_observation_batch = resource_store_observation
     runtime_module.RecorderRecoveryFrontier = ResourceAwareRecoveryFrontier
     runtime_module._RESOURCE_PRESSURE_INSTALLED = True
