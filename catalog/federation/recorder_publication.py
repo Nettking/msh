@@ -764,7 +764,33 @@ class RecorderFederationDeliveryWorker:
         # catch anything that was committed locally but not yet enqueued.
         current_backlog = False
         if changed and not force_reconcile:
-            pending_snapshot = await asyncio.to_thread(self.queue.outbox.pending)
+            # Only backlog that is *due* may defer reconciliation.
+            #
+            # A row waiting out its retry backoff is not drainable work. Asking
+            # for every pending row regardless of when it is next due conflated
+            # "there is a backlog" with "there is work to drain now", and a
+            # single permanently unprocessable historical item is pending
+            # forever: there is no terminal state for it to reach. That
+            # suppressed reconciliation on every subsequent cycle, so newly
+            # committed recorder evidence never became durable outbox rows at
+            # all -- including evidence from sources the stuck item has nothing
+            # to do with. The restart intent below is unchanged, because a real
+            # recovered backlog is due immediately.
+            #
+            # Until this queue has spent its startup route probe, though, a
+            # backlog that is not yet due is still worth deferring for. That
+            # probe is the whole reason the restart ordering exists: on a fresh
+            # runtime it retries one deferred head per dataset, so an outage
+            # that has since been repaired is proven in seconds instead of
+            # waited out behind a full archive scan. Asking only for due rows
+            # made a restart whose backlog was entirely in backoff look like no
+            # backlog at all, and the scan ran first. The probe is spent after
+            # one cycle, so this can delay reconciliation by exactly one cycle
+            # per restart and never by a permanently failing row.
+            now = None if self.queue.startup_probe_pending else self.queue.clock()
+            pending_snapshot = await asyncio.to_thread(
+                self.queue.outbox.pending, now=now
+            )
             current_backlog = any(
                 self._belongs_to_queue(entry, self.queue)
                 for entry in pending_snapshot

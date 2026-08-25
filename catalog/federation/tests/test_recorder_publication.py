@@ -2,12 +2,15 @@ from __future__ import annotations
 
 import asyncio
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
-from catalog.federation.outbox import SQLiteOutbox
+from catalog.federation.outbox import OutboxState, SQLiteOutbox
 from catalog.federation.phase_d_client import PhaseDIngestOutcome
-from catalog.federation.recorder_delivery import DurableRecorderDeliveryQueue
+from catalog.federation.recorder_delivery import (
+    RECORDER_STORAGE_SCHEMA,
+    DurableRecorderDeliveryQueue,
+)
 from catalog.federation.recorder_publication import (
     RECORDER_DATASET_SCHEMA_NAME,
     RecorderArchiveReconciler,
@@ -21,7 +24,6 @@ from catalog.mtconnect_recorder import (
     parse_probe,
     parse_streams,
 )
-
 
 PROBE_XML = """<?xml version="1.0" encoding="UTF-8"?>
 <MTConnectDevices xmlns="urn:mtconnect.org:MTConnectDevices:1.3">
@@ -554,3 +556,270 @@ def test_worker_reconciles_immediately_when_recorder_checkpoint_changes(tmp_path
     assert third.reconcile.already_enqueued == 1
     assert third.delivery.committed == 1
     assert len(client.calls) == 2
+
+# --------------------------------------------------------------------------
+# B03: a stuck historical item must not stop newer evidence making progress
+# --------------------------------------------------------------------------
+
+
+class _PoisonClient:
+    """The first batch ever offered is permanently unprocessable.
+
+    This models the B03 case directly: a historical item that is malformed,
+    oversized or otherwise refused by the authority every single time. It has
+    no terminal state to reach, so it stays pending for the life of the
+    recorder.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list[dict[str, object]] = []
+        self.poison_dataset: str | None = None
+
+    async def ingest_batch(self, **kwargs):
+        self.calls.append(dict(kwargs))
+        if self.poison_dataset is None:
+            self.poison_dataset = str(kwargs.get("dataset_id"))
+        if str(kwargs.get("dataset_id")) == self.poison_dataset:
+            raise OSError("permanently unprocessable historical item")
+        return PhaseDIngestOutcome(committed=True, message=None)
+
+
+def test_a_stuck_item_does_not_starve_reconciliation_of_newer_evidence(tmp_path):
+    """The regression this delivery closes.
+
+    ``run_cycle`` deferred reconciliation whenever the outbox held *any*
+    pending row for this queue, asking for them without a due filter. A
+    permanently failing row is pending forever, so reconciliation was
+    suppressed on every later cycle and newly committed recorder evidence
+    never became a durable outbox row at all -- the recorder kept capturing,
+    the checkpoint kept advancing, and none of it was ever queued for
+    delivery.
+
+    Against the previous implementation this test hangs at one pending row
+    with ``reconcile`` ``None`` on every cycle after the first.
+    """
+
+    client = _PoisonClient()
+    store, checkpoint_file, outbox, queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+    worker = RecorderFederationDeliveryWorker(reconciler=reconciler, queue=queue)
+
+    first = asyncio.run(worker.run_cycle())
+    assert first.reconcile is not None and first.reconcile.enqueued == 1
+    assert first.delivery.committed == 0
+    stuck = outbox.pending()
+    assert len(stuck) == 1
+    stuck_id = stuck[0].outbox_id
+
+    # It keeps failing, and its durable backoff pushes it past due.
+    for _ in range(2):
+        asyncio.run(worker.run_cycle())
+
+    # Newer evidence is committed locally and the checkpoint advances.
+    _probe, second_batch, _stored = _store_sample(store, _second_sample())
+    assert second_batch.first_observation_sequence == 13
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=16)
+
+    reconciled = None
+    for _ in range(5):
+        result = asyncio.run(worker.run_cycle())
+        if result.reconcile is not None and result.reconcile.enqueued:
+            reconciled = result
+            break
+
+    assert reconciled is not None, (
+        "a stuck item suppressed reconciliation of newer recorder evidence"
+    )
+    assert reconciled.reconcile.enqueued == 1
+    # The newer evidence is durable now, which is what the stuck item used to
+    # prevent entirely.
+    assert len(outbox.pending()) == 2
+
+    # And the stuck item is still exactly where it was: never deleted, never
+    # completed, still carrying its failure for replay.
+    still = outbox.get(stuck_id)
+    assert still is not None
+    assert still.state is OutboxState.PENDING
+    assert still.attempt_count >= 1
+    assert still.last_error
+
+
+def test_a_stuck_dataset_does_not_fence_an_unrelated_dataset(tmp_path):
+    """Other datasets keep committing, and the fenced one is surfaced."""
+
+    client = _PoisonClient()
+    outbox = SQLiteOutbox(tmp_path / "publisher" / "outbox.sqlite3")
+    outbox.initialize()
+    queue = DurableRecorderDeliveryQueue(
+        outbox=outbox, client=client, session_id="session-1"
+    )
+    now = datetime(2026, 8, 9, 3, 0, tzinfo=UTC)
+
+    def _enqueue(dataset_id: str, batch_id: str) -> int:
+        payload = {
+            "group_id": "telemetry-storage",
+            "dataset_id": dataset_id,
+            "batch_id": batch_id,
+            "idempotency_key": batch_id,
+            "content": {"observations": []},
+            "created_at": "2026-08-09T03:00:00Z",
+        }
+        entry, _created = outbox.enqueue(
+            session_id="session-1",
+            destination_id="fcp-local-storage",
+            schema_id=RECORDER_STORAGE_SCHEMA,
+            payload=payload,
+            idempotency_key=batch_id,
+            content_hash="c" * 64,
+            now=now,
+        )
+        return entry.outbox_id
+
+    poison_id = _enqueue("mtconnect:node-recorder-1:Mazak", "mazak-1")
+    healthy_id = _enqueue("mtconnect:node-recorder-1:Okuma", "okuma-1")
+
+    result = asyncio.run(queue.run_once())
+
+    assert client.poison_dataset == "mtconnect:node-recorder-1:Mazak"
+    # The healthy dataset commits in the very same cycle as the stuck one.
+    assert result.committed == 1
+    assert outbox.get(healthy_id).state is OutboxState.COMPLETED
+    # The stuck one stays durable and retryable, and is named as fenced.
+    assert outbox.get(poison_id).state is OutboxState.PENDING
+    assert result.blocked_datasets == ("mtconnect:node-recorder-1:Mazak",)
+
+
+def test_a_storage_failure_never_looks_like_a_successful_publication(tmp_path):
+    """A refused item is retryable, not silently completed or dropped."""
+
+    client = _PoisonClient()
+    store, checkpoint_file, outbox, queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+    worker = RecorderFederationDeliveryWorker(reconciler=reconciler, queue=queue)
+
+    asyncio.run(worker.run_cycle())
+    entry = outbox.pending()[0]
+    first_attempts = entry.attempt_count
+
+    # Bounded work per cycle: the stuck row is attempted at most once per due
+    # window, and never disappears.
+    for _ in range(3):
+        asyncio.run(worker.run_cycle())
+
+    after = outbox.get(entry.outbox_id)
+    assert after is not None
+    assert after.state is OutboxState.PENDING
+    assert after.attempt_count >= first_attempts
+    assert after.payload == entry.payload
+    # Duplicate suppression still keys off the same durable identity, so a
+    # replay of the same evidence is still recognised rather than re-sent.
+    assert after.idempotency_key == entry.idempotency_key
+    assert after.content_hash == entry.content_hash
+
+def test_restart_probes_deferred_backlog_before_full_archive_reconcile(tmp_path):
+    """A deferred backlog still gets its route probe first on a fresh runtime.
+
+    Two invariants meet here and pull in opposite directions:
+
+    * a permanently failing row must never suppress reconciliation forever,
+      which is why the backlog gate asks only for rows that are *due*; and
+    * on a process restart an existing backlog must get its bounded
+      one-head-per-dataset route probe before the expensive archive scan,
+      which is why ``run_once`` retries one deferred head per dataset on a
+      fresh queue.
+
+    Asking only for due rows made a restart with a wholly deferred backlog
+    look like no backlog at all, so the archive reconcile ran first and the
+    startup probe -- the thing that proves the route and lets the recorder
+    report a live heartbeat quickly -- was pushed behind it.
+    """
+
+    order: list[str] = []
+
+    class _OrderedClient:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+
+        async def ingest_batch(self, **kwargs):
+            self.calls.append(dict(kwargs))
+            order.append("deliver")
+            raise OSError("Federation still unavailable")
+
+    client = _OrderedClient()
+    # The queue this helper builds is discarded: the restart below needs a
+    # fresh one over the same durable outbox.
+    store, checkpoint_file, outbox, _queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+
+    # A durable row that is already deferred: enqueued, attempted, and pushed
+    # into exponential backoff so its next attempt is in the future.
+    # Anchored to the queue's real clock, so the backoff genuinely lands in
+    # the future rather than in a fixture's past.
+    started = datetime.now(UTC)
+    entry, _created = outbox.enqueue(
+        session_id="session-1",
+        destination_id="fcp-local-storage",
+        schema_id=RECORDER_STORAGE_SCHEMA,
+        payload={
+            "group_id": "telemetry-storage",
+            "dataset_id": "mtconnect:node-recorder-1:Mazak",
+            "batch_id": "mazak-backlog-1",
+            "idempotency_key": "mazak-backlog-1",
+            "content": {"observations": []},
+            "created_at": "2026-08-09T03:00:00Z",
+        },
+        idempotency_key="mazak-backlog-1",
+        content_hash="d" * 64,
+        now=started,
+    )
+    for _ in range(6):
+        outbox.record_failure(
+            entry.outbox_id, error="Federation unavailable", now=started
+        )
+    deferred = outbox.get(entry.outbox_id)
+    assert deferred.next_attempt_at > datetime.now(UTC), (
+        "the fixture must model a backlog that is not yet due"
+    )
+    assert outbox.pending(now=datetime.now(UTC)) == ()
+
+    # New local evidence and an advanced checkpoint, exactly as a recorder
+    # that kept capturing through the outage would leave them.
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+
+    # A fresh queue and worker over the same durable outbox: a process restart.
+    restarted_queue = DurableRecorderDeliveryQueue(
+        outbox=outbox, client=client, session_id="session-1"
+    )
+    original_reconcile = reconciler.reconcile
+
+    def _tracked_reconcile():
+        order.append("reconcile")
+        return original_reconcile()
+
+    reconciler.reconcile = _tracked_reconcile
+    worker = RecorderFederationDeliveryWorker(
+        reconciler=reconciler, queue=restarted_queue
+    )
+
+    asyncio.run(worker.run_cycle())
+
+    assert order, "the first cycle did neither delivery nor reconciliation"
+    assert order[0] == "deliver", (
+        "the startup route probe must run before the archive reconcile; "
+        f"observed order {order}"
+    )
+    # The probe is bounded: one head for the one deferred dataset.
+    assert len(client.calls) == 1
+    # And it changed nothing durable beyond the ordinary failure record.
+    still = outbox.get(entry.outbox_id)
+    assert still.state is OutboxState.PENDING
+    assert still.payload == deferred.payload
+    assert still.idempotency_key == deferred.idempotency_key

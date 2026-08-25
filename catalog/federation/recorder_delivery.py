@@ -39,6 +39,11 @@ class RecorderDeliveryRunResult:
     attempted: int
     committed: int
     pending: int
+    # Datasets whose oldest row did not commit this cycle, so their newer rows
+    # stayed fenced behind it. Recomputed from durable rows every cycle rather
+    # than stored, so it can never go stale or need its own retirement. This is
+    # how a stuck historical item is surfaced while it is still being retried.
+    blocked_datasets: tuple[str, ...] = ()
 
 
 class DurableRecorderDeliveryQueue:
@@ -120,6 +125,19 @@ class DurableRecorderDeliveryQueue:
             content_hash=content_hash,
             now=self.clock(),
         )
+
+    @property
+    def startup_probe_pending(self) -> bool:
+        """Whether this queue still owes its first bounded route probe.
+
+        A new queue object is a new process/runtime delivery session, and its
+        first pass deliberately retries one deferred head per ordered dataset
+        so an outage that has since been repaired is proven quickly rather
+        than waited out. The worker asks this to decide whether a backlog
+        that is not yet due is still worth deferring reconciliation for.
+        """
+
+        return self._startup_probe_available
 
     @staticmethod
     def _ordering_key(entry) -> tuple[str, str, str] | None:
@@ -292,4 +310,9 @@ class DurableRecorderDeliveryQueue:
             if failed and ordering_key is not None:
                 blocked.add(ordering_key)
 
-        return RecorderDeliveryRunResult(attempted, committed, pending)
+        return RecorderDeliveryRunResult(
+            attempted,
+            committed,
+            pending,
+            tuple(sorted({key[2] for key in blocked})),
+        )
