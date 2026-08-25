@@ -1,0 +1,857 @@
+#!/usr/bin/env python3
+"""Host-owned exact-commit FCP update agent for Linux/POSIX launchers."""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import hashlib
+import json
+import os
+import re
+import shutil
+import subprocess
+import sys
+import tempfile
+import time
+from datetime import datetime, timezone
+from pathlib import Path
+from urllib.parse import urlsplit
+
+APPROVED_REPOSITORY = "Nettking/msh"
+APPROVED_BRANCH = "main"
+REQUEST_SCHEMA = "fcp.host-update-request.v1"
+RESULT_SCHEMA = "fcp.host-update-result.v1"
+MODEL_REQUEST_SCHEMA = "fcp.host-model-install-request.v1"
+MODEL_RESULT_SCHEMA = "fcp.host-model-install-result.v1"
+MODEL_REQUEST_TTL_SECONDS = 120
+#: Read-only branch discovery for the Federation software-version dropdown.
+#: The Flask process runs no Git, so it asks this host-owned agent instead.
+BRANCHES_REQUEST_SCHEMA = "fcp.host-branches-request.v1"
+BRANCHES_RESULT_SCHEMA = "fcp.host-branches-result.v1"
+MAX_LISTED_BRANCHES = 60
+MAX_BYTES = 8192
+OID_RE = re.compile(r"^[0-9a-f]{40}$")
+REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
+BRANCH_RE = re.compile(
+    r"^(?![./-])(?!.*\.\.)(?!.*//)(?!.*@\{)(?!.*\.lock(?:/|$))"
+    r"[A-Za-z0-9][A-Za-z0-9._/-]{0,180}(?<![./])$"
+)
+MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
+MODEL_TARGETS = frozenset({"ollama", "model-provider"})
+
+UPDATE_REQUIRED_FREE_BYTES = 10 * 1024**3
+BUILD_CACHE_KEEP_BYTES = 8 * 1024**3
+
+
+def utc(value: str) -> datetime:
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.tzinfo is None or parsed.utcoffset() is None:
+        raise ValueError("timestamp must be timezone-aware")
+    return parsed.astimezone(timezone.utc)
+
+
+def run(
+    argv: list[str],
+    *,
+    cwd: Path,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    completed = subprocess.run(
+        argv,
+        cwd=cwd,
+        shell=False,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=180,
+    )
+    if check and completed.returncode:
+        raise RuntimeError(f"command_failed:{argv[0]}:{completed.returncode}")
+    return completed
+
+
+def git(
+    root: Path,
+    *args: str,
+    check: bool = True,
+) -> subprocess.CompletedProcess[str]:
+    return run(["git", *args], cwd=root, check=check)
+
+
+def approved_remote(value: str) -> bool:
+    value = value.strip().removesuffix("/").removesuffix(".git")
+    if value.startswith("git@github.com:"):
+        return (
+            value[len("git@github.com:") :].casefold()
+            == APPROVED_REPOSITORY.casefold()
+        )
+    parsed = urlsplit(value)
+    return (
+        parsed.scheme in {"https", "ssh"}
+        and parsed.hostname == "github.com"
+        and parsed.username in {None, "git"}
+        and parsed.password is None
+        and not parsed.query
+        and not parsed.fragment
+        and parsed.path.strip("/").casefold()
+        == APPROVED_REPOSITORY.casefold()
+    )
+
+
+def ancestor(root: Path, older: str, newer: str) -> bool:
+    return (
+        git(
+            root,
+            "merge-base",
+            "--is-ancestor",
+            older,
+            newer,
+            check=False,
+        ).returncode
+        == 0
+    )
+
+
+def running_commit(root: Path) -> str | None:
+    try:
+        result = run(
+            [
+                "docker",
+                "compose",
+                "exec",
+                "-T",
+                "flask",
+                "python",
+                "-c",
+                "import os; print(os.environ.get('FCP_BUILD_COMMIT',''))",
+            ],
+            cwd=root,
+        )
+        value = result.stdout.strip().splitlines()[-1].strip().lower()
+        return value if OID_RE.fullmatch(value) else None
+    except (RuntimeError, subprocess.SubprocessError, IndexError):
+        return None
+
+
+def inspect_checkout(
+    root: Path,
+    requested_target: str | None,
+) -> dict[str, str | None]:
+    top = Path(git(root, "rev-parse", "--show-toplevel").stdout.strip()).resolve()
+    if top != root:
+        raise RuntimeError("unsupported_checkout")
+    if not approved_remote(git(root, "remote", "get-url", "origin").stdout):
+        raise RuntimeError("unapproved_remote")
+    branch = git(
+        root,
+        "symbolic-ref",
+        "--quiet",
+        "--short",
+        "HEAD",
+    ).stdout.strip()
+    if branch != APPROVED_BRANCH:
+        raise RuntimeError("detached_head")
+    current = git(root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip().lower()
+    if not OID_RE.fullmatch(current):
+        raise RuntimeError("unsupported_checkout")
+    status = git(root, "status", "--porcelain=v1", "--untracked-files=all").stdout
+    if status:
+        return {
+            "state": "dirty",
+            "current": current,
+            "target": requested_target,
+            "code": "dirty",
+            "message": "Local changes must be reviewed before updating.",
+        }
+    git(root, "fetch", "--no-tags", "origin", APPROVED_BRANCH)
+    approved_tip = git(root, "rev-parse", "--verify", "FETCH_HEAD^{commit}").stdout.strip().lower()
+    target = requested_target.lower() if requested_target else approved_tip
+    if not OID_RE.fullmatch(target):
+        raise RuntimeError("target_unavailable")
+    if (
+        git(root, "cat-file", "-e", f"{target}^{{commit}}", check=False).returncode
+        or not ancestor(root, target, approved_tip)
+    ):
+        raise RuntimeError("target_unavailable")
+    if current == target:
+        state, code, message = "up_to_date", None, None
+    elif ancestor(root, current, target):
+        state, code, message = "update_available", None, None
+    elif ancestor(root, target, current):
+        state = "ahead"
+        code = "ahead"
+        message = "This checkout is ahead of approved main."
+    else:
+        state = "diverged"
+        code = "diverged"
+        message = "This checkout has diverged from approved main."
+    return {
+        "state": state,
+        "current": current,
+        "target": target,
+        "code": code,
+        "message": message,
+    }
+
+
+def atomic_json(path: Path, value: dict[str, object]) -> None:
+    encoded = json.dumps(
+        value,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    ).encode()
+    if len(encoded) > MAX_BYTES:
+        raise ValueError("result_too_large")
+    path.parent.mkdir(parents=True, exist_ok=True)
+    fd, name = tempfile.mkstemp(prefix=f".{path.name}.", dir=path.parent)
+    temporary = Path(name)
+    try:
+        os.fchmod(fd, 0o600)
+        with os.fdopen(fd, "wb") as stream:
+            fd = -1
+            stream.write(encoded)
+            stream.flush()
+            os.fsync(stream.fileno())
+        os.replace(temporary, path)
+    finally:
+        if fd >= 0:
+            os.close(fd)
+        temporary.unlink(missing_ok=True)
+
+
+def approved_branches(root: Path) -> list[dict[str, str]]:
+    if not approved_remote(git(root, "remote", "get-url", "origin").stdout):
+        raise RuntimeError("unapproved_remote")
+    listed = git(root, "ls-remote", "--heads", "--", "origin", check=False)
+    if listed.returncode != 0:
+        raise RuntimeError("remote_unavailable")
+    found: dict[str, str] = {}
+    for line in listed.stdout.splitlines():
+        commit, _, reference = line.strip().partition("\t")
+        commit = commit.strip().lower()
+        name = reference.strip().removeprefix("refs/heads/")
+        if reference.strip() == name or not OID_RE.fullmatch(commit):
+            continue
+        if not BRANCH_RE.fullmatch(name):
+            continue
+        found[name] = commit
+    ordered = sorted(found.items(), key=lambda item: (item[0] != APPROVED_BRANCH, item[0]))
+    return [
+        {"name": name, "commit": commit}
+        for name, commit in ordered[:MAX_LISTED_BRANCHES]
+    ]
+
+
+def write_branches_result(
+    result_file: Path,
+    *,
+    request_id: str,
+    branches: list[dict[str, str]],
+    code: str | None = None,
+    message: str = "",
+) -> None:
+    digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+    atomic_json(
+        result_file.with_name(f"branches-result-{digest}.json"),
+        {
+            "schema": BRANCHES_RESULT_SCHEMA,
+            "request_id": request_id,
+            "action": "branches",
+            "state": "error" if code else "branches",
+            "repository": APPROVED_REPOSITORY,
+            "branches": branches,
+            "code": code,
+            "message": message[:512],
+        },
+    )
+
+
+def handle_branches_request(
+    root: Path,
+    result_file: Path,
+    value: dict[str, object],
+) -> bool:
+    request_id = value.get("request_id")
+    if not isinstance(request_id, str) or not REQUEST_ID_RE.fullmatch(request_id):
+        return True
+    try:
+        write_branches_result(
+            result_file,
+            request_id=request_id,
+            branches=approved_branches(root),
+        )
+    except (RuntimeError, ValueError, OSError, subprocess.SubprocessError) as exc:
+        write_branches_result(
+            result_file,
+            request_id=request_id,
+            branches=[],
+            code=str(exc) if isinstance(exc, RuntimeError) else "branches_failed",
+            message="The approved FCP source branch list is unavailable.",
+        )
+    return True
+
+
+def _request_result_path(result_file: Path, request_id: str) -> Path:
+    digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+    return result_file.with_name(f"result-{digest}.json")
+
+
+def write_result(
+    path: Path,
+    *,
+    request_id: str,
+    action: str,
+    state: str,
+    current: str | None,
+    target: str | None,
+    running: str | None,
+    code: str | None,
+    message: str,
+) -> None:
+    value: dict[str, object] = {
+        "schema": RESULT_SCHEMA,
+        "request_id": request_id,
+        "action": action,
+        "state": state,
+        "current_commit": current,
+        "target_commit": target,
+        "running_commit": running,
+        "code": code,
+        "message": message,
+        "completed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+    atomic_json(_request_result_path(path, request_id), value)
+    atomic_json(path, value)
+
+
+def _write_model_result(
+    result_file: Path,
+    *,
+    request_id: str,
+    model: str,
+    target: str,
+    ok: bool,
+    code: str,
+    message: str,
+) -> None:
+    digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+    value: dict[str, object] = {
+        "schema": MODEL_RESULT_SCHEMA,
+        "request_id": request_id,
+        "action": "install",
+        "model": model,
+        "target": target,
+        "state": "ready" if ok else "degraded",
+        "code": code,
+        "message": message[:512],
+        "completed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+    atomic_json(result_file.with_name(f"model-result-{digest}.json"), value)
+    atomic_json(result_file.with_name("model-result.json"), value)
+
+
+def _model_request_fields(value: dict[str, object]) -> tuple[str, str, str]:
+    request_id = value.get("request_id")
+    model = value.get("model")
+    target = value.get("target")
+    if value.get("action") != "install":
+        raise ValueError("malformed_model_action")
+    if not isinstance(request_id, str) or not REQUEST_ID_RE.fullmatch(request_id):
+        raise ValueError("malformed_request_id")
+    if not isinstance(model, str) or not MODEL_RE.fullmatch(model):
+        raise ValueError("invalid_model_identifier")
+    if target not in MODEL_TARGETS:
+        raise ValueError("invalid_model_target")
+    created_raw = value.get("created_at")
+    expires_raw = value.get("expires_at")
+    if not isinstance(created_raw, str) or not isinstance(expires_raw, str):
+        raise ValueError("malformed_timestamp")
+    created = utc(created_raw)
+    expires = utc(expires_raw)
+    now = datetime.now(timezone.utc)
+    if (
+        created.timestamp() > now.timestamp() + 60
+        or expires <= now
+        or (expires - created).total_seconds() > MODEL_REQUEST_TTL_SECONDS
+    ):
+        raise ValueError("expired_or_invalid_request")
+    return request_id, model, str(target)
+
+
+def handle_model_request(
+    root: Path,
+    result_file: Path,
+    value: dict[str, object],
+) -> bool:
+    request_id, model, target = _model_request_fields(value)
+    try:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "catalog.federation.model_resource_pull",
+                "--repo-root",
+                str(root),
+                "--target",
+                target,
+                "--model",
+                model,
+            ],
+            cwd=root,
+            shell=False,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=3700,
+        )
+        ok = completed.returncode == 0
+        code = (
+            "installed"
+            if ok
+            else ("resource_pressure" if completed.returncode == 2 else "model_install_failed")
+        )
+        message = (completed.stdout or completed.stderr or code).strip().splitlines()[-1]
+    except (OSError, subprocess.SubprocessError) as exc:
+        ok = False
+        code = "model_install_failed"
+        message = f"Host model installation failed: {type(exc).__name__}"
+    _write_model_result(
+        result_file,
+        request_id=request_id,
+        model=model,
+        target=target,
+        ok=ok,
+        code=code,
+        message=message,
+    )
+    return True
+
+
+def wait_runtime(root: Path, target: str) -> str:
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        try:
+            value = running_commit(root)
+            if value == target:
+                run(
+                    [
+                        "docker",
+                        "compose",
+                        "exec",
+                        "-T",
+                        "flask",
+                        "python",
+                        "-c",
+                        (
+                            "import urllib.request; "
+                            "r=urllib.request.urlopen("
+                            "'http://127.0.0.1:5000/federation',timeout=3); "
+                            "assert 200 <= r.status < 500"
+                        ),
+                    ],
+                    cwd=root,
+                )
+                services = set(
+                    run(
+                        [
+                            "docker",
+                            "compose",
+                            "ps",
+                            "--status",
+                            "running",
+                            "--services",
+                        ],
+                        cwd=root,
+                    ).stdout.splitlines()
+                )
+                if {"relay", "recorder", "flask"}.issubset(services):
+                    return value
+        except (RuntimeError, subprocess.SubprocessError):
+            pass
+        time.sleep(2)
+    raise RuntimeError("runtime_verification_timeout")
+
+
+def ensure_ollama_model(root: Path, env: dict[str, str]) -> bool:
+    """Best-effort model readiness through the shared host admission primitive."""
+
+    model_probe = subprocess.run(
+        [
+            "docker",
+            "compose",
+            "run",
+            "--rm",
+            "--no-deps",
+            "--entrypoint",
+            "python",
+            "flask",
+            "-c",
+            "import os; print(os.environ.get('FCP_AI_MODEL') or 'llama3.2:3b')",
+        ],
+        cwd=root,
+        env=env,
+        shell=False,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=300,
+    )
+    if model_probe.returncode:
+        return False
+    lines = [line.strip() for line in model_probe.stdout.splitlines() if line.strip()]
+    if not lines or not MODEL_RE.fullmatch(lines[-1]):
+        return False
+    completed = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "catalog.federation.model_resource_pull",
+            "--repo-root",
+            str(root),
+            "--target",
+            "ollama",
+            "--model",
+            lines[-1],
+        ],
+        cwd=root,
+        env=env,
+        shell=False,
+        check=False,
+        timeout=3700,
+    )
+    return completed.returncode == 0
+
+
+def free_bytes(root: Path) -> int:
+    """Free space on the supported host volume backing checkout and Docker."""
+
+    return shutil.disk_usage(root).free
+
+
+def prune_build_cache(root: Path, env: dict[str, str]) -> bool:
+    try:
+        subprocess.run(
+            [
+                "docker",
+                "builder",
+                "prune",
+                "--force",
+                f"--keep-storage={BUILD_CACHE_KEEP_BYTES}",
+            ],
+            cwd=root,
+            env=env,
+            shell=False,
+            check=True,
+            timeout=300,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return True
+
+
+def preflight_disk(root: Path, env: dict[str, str]) -> None:
+    if free_bytes(root) >= UPDATE_REQUIRED_FREE_BYTES:
+        return
+    prune_build_cache(root, env)
+    if free_bytes(root) >= UPDATE_REQUIRED_FREE_BYTES:
+        return
+    raise RuntimeError("insufficient_disk_for_update")
+
+
+def validate_request(
+    value: object,
+) -> tuple[str, str, str | None, datetime | None]:
+    if not isinstance(value, dict) or value.get("schema") != REQUEST_SCHEMA:
+        raise ValueError("malformed_message")
+    request_id = value.get("request_id")
+    action = value.get("action")
+    target = value.get("target_commit")
+    if not isinstance(request_id, str) or not REQUEST_ID_RE.fullmatch(request_id):
+        raise ValueError("malformed_request_id")
+    if action not in {"check", "apply"}:
+        raise ValueError("malformed_action")
+    if (
+        value.get("repository") != APPROVED_REPOSITORY
+        or value.get("branch") != APPROVED_BRANCH
+    ):
+        raise ValueError("unapproved_source")
+    if target is not None and (
+        not isinstance(target, str) or not OID_RE.fullmatch(target)
+    ):
+        raise ValueError("malformed_target")
+    if action == "apply" and target is None:
+        raise ValueError("malformed_target")
+    raw_created = value.get("created_at")
+    raw_expires = value.get("expires_at")
+    created = utc(raw_created) if isinstance(raw_created, str) else None
+    expires = utc(raw_expires) if isinstance(raw_expires, str) else None
+    if created is None or expires is None:
+        raise ValueError("malformed_timestamp")
+    now = datetime.now(timezone.utc)
+    if (
+        created.timestamp() > now.timestamp() + 60
+        or expires <= now
+        or (expires - created).total_seconds() > 900
+    ):
+        raise ValueError("expired_or_invalid_request")
+    activate_after: datetime | None = None
+    if action == "apply":
+        raw_activate_after = value.get("activate_after")
+        if not isinstance(raw_activate_after, str):
+            raise ValueError("malformed_activation_grace")
+        activate_after = utc(raw_activate_after)
+        if (
+            activate_after < created
+            or activate_after > expires
+            or (activate_after - created).total_seconds() > 30
+        ):
+            raise ValueError("invalid_activation_grace")
+    return request_id, action, target, activate_after
+
+
+def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
+    processing = request_file.with_name(
+        f"processing-{os.getpid()}-{time.time_ns()}.json"
+    )
+    try:
+        os.replace(request_file, processing)
+    except FileNotFoundError:
+        return False
+    request_id, action, target = "invalid-request", "unknown", None
+    try:
+        if processing.stat().st_size > MAX_BYTES:
+            return True
+        try:
+            value = json.loads(processing.read_text(encoding="utf-8"))
+        except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+            return True
+
+        if (
+            isinstance(value, dict)
+            and value.get("schema") == BRANCHES_REQUEST_SCHEMA
+        ):
+            return handle_branches_request(root, result_file, value)
+        if (
+            isinstance(value, dict)
+            and value.get("schema") == MODEL_REQUEST_SCHEMA
+        ):
+            return handle_model_request(root, result_file, value)
+
+        request_id, action, target, activate_after = validate_request(value)
+        if activate_after is not None:
+            delay = (activate_after - datetime.now(timezone.utc)).total_seconds()
+            if delay > 0:
+                time.sleep(min(delay, 30.0))
+        inspection = inspect_checkout(root, target)
+        before = running_commit(root)
+        if action == "check":
+            write_result(
+                result_file,
+                request_id=request_id,
+                action=action,
+                state=str(inspection["state"]),
+                current=inspection["current"],
+                target=inspection["target"],
+                running=before,
+                code=inspection["code"],
+                message=str(inspection["message"] or ""),
+            )
+            return True
+        if inspection["state"] not in {"update_available", "up_to_date"}:
+            write_result(
+                result_file,
+                request_id=request_id,
+                action=action,
+                state=str(inspection["state"]),
+                current=inspection["current"],
+                target=inspection["target"],
+                running=before,
+                code=inspection["code"],
+                message=str(
+                    inspection["message"]
+                    or "The checkout is not eligible for activation."
+                ),
+            )
+            return True
+        if inspection["state"] == "update_available":
+            git(root, "merge", "--ff-only", target)
+        proven = git(root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip().lower()
+        if proven != target:
+            raise RuntimeError("source_verification_failed")
+        if git(
+            root,
+            "status",
+            "--porcelain=v1",
+            "--untracked-files=all",
+        ).stdout:
+            raise RuntimeError("dirty_build_context")
+        env = os.environ.copy()
+        env["FCP_BUILD_COMMIT"] = target
+        preflight_disk(root, env)
+        subprocess.run(
+            ["docker", "compose", "build", "relay", "flask", "recorder"],
+            cwd=root,
+            env=env,
+            shell=False,
+            check=True,
+            timeout=900,
+        )
+        prune_build_cache(root, env)
+        subprocess.run(
+            ["docker", "compose", "up", "-d", "relay", "recorder"],
+            cwd=root,
+            env=env,
+            shell=False,
+            check=True,
+            timeout=900,
+        )
+        ollama_start = subprocess.run(
+            ["docker", "compose", "up", "-d", "ollama"],
+            cwd=root,
+            env=env,
+            shell=False,
+            check=False,
+            timeout=900,
+        )
+        ai_ready = ollama_start.returncode == 0 and ensure_ollama_model(root, env)
+        subprocess.run(
+            ["docker", "compose", "stop", "flask"],
+            cwd=root,
+            env=env,
+            shell=False,
+            check=True,
+            timeout=300,
+        )
+        resume = subprocess.run(
+            [
+                "docker",
+                "compose",
+                "run",
+                "--rm",
+                "--no-deps",
+                "--entrypoint",
+                "python",
+                "flask",
+                "-m",
+                "catalog.flask_app.services.existing_setup_resume",
+            ],
+            cwd=root,
+            env=env,
+            shell=False,
+            check=False,
+            timeout=300,
+        )
+        if resume.returncode not in {0, 4}:
+            raise RuntimeError(f"resume_failed:{resume.returncode}")
+        subprocess.run(
+            ["docker", "compose", "up", "-d", "flask"],
+            cwd=root,
+            env=env,
+            shell=False,
+            check=True,
+            timeout=300,
+        )
+        running = wait_runtime(root, target)
+        write_result(
+            result_file,
+            request_id=request_id,
+            action=action,
+            state="runtime_verified",
+            current=target,
+            target=target,
+            running=running,
+            code="updated",
+            message=(
+                "FCP source, core images, services, and running commit were updated "
+                "and verified; the optional AI model is ready."
+                if ai_ready
+                else "FCP source, core images, services, and running commit were updated "
+                "and verified; AI remains optional and unavailable or resource-paused."
+            ),
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001 - emit only safe result text
+        current = None
+        try:
+            current = git(root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip().lower()
+        except Exception:  # noqa: BLE001
+            pass
+        write_result(
+            result_file,
+            request_id=(
+                request_id if REQUEST_ID_RE.fullmatch(request_id) else "invalid-request"
+            ),
+            action=action if action in {"check", "apply"} else "unknown",
+            state="error",
+            current=current,
+            target=target,
+            running=running_commit(root),
+            code="host_update_failed",
+            message=(
+                "The host update agent stopped safely before it could verify "
+                "the requested runtime."
+            ),
+        )
+        print(
+            f"FCP update request failed: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
+        return True
+    finally:
+        processing.unlink(missing_ok=True)
+
+
+def _digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo-root", required=True)
+    parser.add_argument("--data-directory", required=True)
+    parser.add_argument("--poll-seconds", type=float, default=1.0)
+    parser.add_argument("--once", action="store_true")
+    args = parser.parse_args()
+    root = Path(args.repo_root).resolve()
+    data_directory = Path(args.data_directory).resolve()
+    directory = data_directory / "federation" / "update-agent"
+    directory.mkdir(parents=True, exist_ok=True)
+    script_path = Path(__file__).resolve()
+    initial_digest = _digest(script_path)
+    lock_path = directory / "agent.lock"
+    with lock_path.open("a+") as lock:
+        try:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except BlockingIOError:
+            return 0
+        while True:
+            processed = process_once(
+                root,
+                directory / "request.json",
+                directory / "result.json",
+            )
+            if args.once:
+                return 0
+            if processed and _digest(script_path) != initial_digest:
+                fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
+                os.execv(
+                    sys.executable,
+                    [
+                        sys.executable,
+                        str(script_path),
+                        "--repo-root",
+                        str(root),
+                        "--data-directory",
+                        str(data_directory),
+                        "--poll-seconds",
+                        str(args.poll_seconds),
+                    ],
+                )
+            if not processed:
+                time.sleep(max(0.1, min(args.poll_seconds, 30.0)))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
