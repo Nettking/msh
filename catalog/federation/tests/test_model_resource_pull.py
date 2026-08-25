@@ -2,10 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from types import SimpleNamespace
 
-from catalog.federation.host_resources import PressureLevel, ResourceAssessment
 from catalog.federation import model_resource_pull as model_pull
+from catalog.federation.host_resources import PressureLevel, ResourceAssessment
 
 
 def _assessment(level: PressureLevel, free: int) -> ResourceAssessment:
