@@ -26,10 +26,16 @@ function Normalize-DirectoryPath([string]$Value) {
 function Invoke-NativeResult {
     param([string]$FilePath, [string[]]$Arguments)
     $previous = $ErrorActionPreference
+    $output = @()
+    $exitCode = 127
     try {
         $ErrorActionPreference = 'Continue'
         $output = & $FilePath @Arguments 2>&1
-        $exitCode = $LASTEXITCODE
+        $exitCode = if ($null -eq $LASTEXITCODE) { 0 } else { [int]$LASTEXITCODE }
+    }
+    catch {
+        $output = @($_.Exception.Message)
+        $exitCode = 127
     }
     finally {
         $ErrorActionPreference = $previous
@@ -51,9 +57,12 @@ function Get-DockerBackingPath {
             (Join-Path $env:LOCALAPPDATA 'Docker\wsl\data\ext4.vhdx')
         )
         foreach ($candidate in $candidates) {
-            if (Test-Path -LiteralPath $candidate -PathType Leaf) {
-                return (Get-Item -LiteralPath $candidate).Directory.FullName
+            try {
+                if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                    return (Get-Item -LiteralPath $candidate).Directory.FullName
+                }
             }
+            catch {}
         }
     }
 
@@ -61,16 +70,26 @@ function Get-DockerBackingPath {
     # host directory. This is intentionally a fallback after Docker Desktop.
     if (-not [string]::IsNullOrWhiteSpace($env:PROGRAMDATA)) {
         $nativeRoot = Join-Path $env:PROGRAMDATA 'docker'
-        if (Test-Path -LiteralPath $nativeRoot -PathType Container) {
-            return (Resolve-Path -LiteralPath $nativeRoot).Path
+        try {
+            if (Test-Path -LiteralPath $nativeRoot -PathType Container) {
+                return (Resolve-Path -LiteralPath $nativeRoot).Path
+            }
         }
+        catch {}
     }
     return $null
 }
 
 function Get-FreeBytes([string]$BackingPath) {
-    $drive = [System.IO.Path]::GetPathRoot((Resolve-Path -LiteralPath $BackingPath).Path)
-    return [int64]([System.IO.DriveInfo]::New($drive)).AvailableFreeSpace
+    try {
+        $resolved = (Resolve-Path -LiteralPath $BackingPath).Path
+        $drive = [System.IO.Path]::GetPathRoot($resolved)
+        return [int64]([System.IO.DriveInfo]::New($drive)).AvailableFreeSpace
+    }
+    catch {
+        # Measurement failure while a pull is active is unsafe, not healthy.
+        return [int64]-1
+    }
 }
 
 function Test-ModelWriterStopped([string]$Service, [string]$ContainerName) {
@@ -98,9 +117,12 @@ function Stop-ModelWriter([string]$Service, [string]$ContainerName) {
         return $true
     }
 
-    # Escalate once, then verify again. Docker command failure must never be
-    # translated into a false claim that the unknown-size writer stopped.
-    Invoke-NativeResult 'docker' @('compose', 'kill', $Service) | Out-Null
+    # Retry a graceful Compose stop once with a longer bound. Do not use
+    # ``docker kill`` here: the service has restart=unless-stopped and a kill can
+    # race a restart, making a momentary stopped observation insufficient proof.
+    Invoke-NativeResult 'docker' @(
+        'compose', 'stop', '--timeout', '15', $Service
+    ) | Out-Null
     Invoke-NativeResult 'docker' @('rm', '-f', $ContainerName) | Out-Null
     return [bool](Test-ModelWriterStopped $Service $ContainerName)
 }
@@ -133,7 +155,7 @@ if ($existing.ExitCode -eq 0) {
 
 $backingPath = Get-DockerBackingPath
 if ([string]::IsNullOrWhiteSpace($backingPath)) {
-    Write-Error (
+    Write-Warning (
         'Model installation was not started because FCP could not prove the ' +
         'Windows host resource backing Docker model storage.'
     )
@@ -141,6 +163,13 @@ if ([string]::IsNullOrWhiteSpace($backingPath)) {
 }
 
 $before = Get-FreeBytes $backingPath
+if ($before -lt 0) {
+    Write-Warning (
+        'Model installation was not started because the Docker backing ' +
+        'resource could not be measured safely.'
+    )
+    exit 3
+}
 if ($before -le $PressureFreeBytes) {
     Write-Warning (
         "Model installation was not started because the Docker backing " +
@@ -160,16 +189,23 @@ $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
 while (-not $process.HasExited) {
     Start-Sleep -Milliseconds $PollMilliseconds
     $free = Get-FreeBytes $backingPath
-    if ($free -le $PressureFreeBytes) {
+    if ($free -lt 0 -or $free -le $PressureFreeBytes) {
         $stopped = Stop-ModelWriter $service $containerName
         if (-not $process.WaitForExit(30000)) {
             $process.Kill()
             $process.WaitForExit()
         }
         if (-not $stopped) {
-            Write-Error (
-                'Docker reached host resource pressure and FCP could not prove ' +
+            Write-Warning (
+                'Docker resource state became unsafe and FCP could not prove ' +
                 'that the optional model writer stopped.'
+            )
+            exit 3
+        }
+        if ($free -lt 0) {
+            Write-Warning (
+                'Model installation stopped because the Docker backing ' +
+                'resource could no longer be measured safely.'
             )
             exit 3
         }
@@ -187,7 +223,7 @@ while (-not $process.HasExited) {
             $process.WaitForExit()
         }
         if (-not $stopped) {
-            Write-Error (
+            Write-Warning (
                 'The model pull deadline expired and FCP could not prove that ' +
                 'the optional model writer stopped.'
             )
