@@ -66,17 +66,25 @@ function Get-DockerBackingPath {
         }
     }
 
-    # Native Windows Docker engines can expose their data root as an ordinary
-    # host directory. This is intentionally a fallback after Docker Desktop.
-    if (-not [string]::IsNullOrWhiteSpace($env:PROGRAMDATA)) {
-        $nativeRoot = Join-Path $env:PROGRAMDATA 'docker'
-        try {
-            if (Test-Path -LiteralPath $nativeRoot -PathType Container) {
-                return (Resolve-Path -LiteralPath $nativeRoot).Path
-            }
-        }
-        catch {}
+    # Never infer the active data root from an unrelated ProgramData folder.
+    # A native Windows engine is accepted only when Docker itself reports both
+    # Windows OSType and a concrete absolute host DockerRootDir.
+    $info = Invoke-NativeResult 'docker' @(
+        'info', '--format', '{{.OSType}}|{{.DockerRootDir}}'
+    )
+    if ($info.ExitCode -ne 0) { return $null }
+    $raw = (($info.Output -join '').Trim()).Split('|', 2)
+    if ($raw.Count -ne 2 -or $raw[0].Trim().ToLowerInvariant() -ne 'windows') {
+        return $null
     }
+    $nativeRoot = $raw[1].Trim()
+    if (-not [System.IO.Path]::IsPathRooted($nativeRoot)) { return $null }
+    try {
+        if (Test-Path -LiteralPath $nativeRoot -PathType Container) {
+            return (Resolve-Path -LiteralPath $nativeRoot).Path
+        }
+    }
+    catch {}
     return $null
 }
 
