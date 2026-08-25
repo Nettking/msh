@@ -47,6 +47,10 @@ from .contracts import (
 )
 from .gateway import AnalysisArtifactTransport, retrieve_authorized_artifact
 from .packaging import extract_slice_archive
+from .workspace_reconciliation import (
+    prepare_owned_workspace,
+    reconcile_stale_workspaces,
+)
 
 MAX_REPORTED_SCRIPTS = 32
 MAX_REPORTED_TEXT = 96
@@ -115,6 +119,10 @@ class FederatedAnalysisHandler:
         self.data_owner_node_id = data_owner_node_id
         self.endpoint_id = endpoint_id
         self.max_slice_bytes = int(max_slice_bytes)
+        self.workspace_reconciliation = reconcile_stale_workspaces(
+            self.workspace_root,
+            now=self.clock(),
+        )
 
     async def execute(self, job: JobContract) -> ExecutionResult:
         try:
@@ -141,10 +149,19 @@ class FederatedAnalysisHandler:
         attempt = self._active_attempt(job)
         grant_id = analysis_grant_id(job.job_id, attempt.attempt_id)
         owner_node_id = self.data_owner_node_id(job)
-        workspace = self.workspace_root / job.job_id / attempt.attempt_id
-        if workspace.exists():
-            shutil.rmtree(workspace, ignore_errors=True)
-        workspace.mkdir(parents=True, exist_ok=True)
+        try:
+            workspace = prepare_owned_workspace(
+                self.workspace_root,
+                job_id=job.job_id,
+                attempt_id=attempt.attempt_id,
+                created_at=self.clock(),
+            )
+        except ValueError as exc:
+            raise FederationValidationError(
+                "analysis-workspace-unsafe",
+                "workspace",
+                str(exc),
+            ) from exc
         try:
             plan = await self._resolve_plan(
                 job, grant_id=grant_id, owner=owner_node_id, workspace=workspace
