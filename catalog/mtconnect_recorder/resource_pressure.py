@@ -19,6 +19,7 @@ tests or other callers are unaffected unless explicitly attached.
 from __future__ import annotations
 
 import json
+import sys
 import threading
 import time
 from collections.abc import Iterator
@@ -29,11 +30,9 @@ from pathlib import Path
 from types import ModuleType
 from typing import Any
 
-from catalog.federation import host_resources
 from catalog.federation.host_resources import (
     HostResourceRefused,
     PressureLevel,
-    PressureThresholds,
     ProcessResourceAdmission,
     ResourceAssessment,
     ResourceReservation,
@@ -47,9 +46,9 @@ from .limits import (
     MAX_SAMPLE_RESPONSE_BYTES,
 )
 from .model import ParsedBatch, _slug, _utc_now, _write_bytes_atomic
+from .schema_compat import CHECKPOINT_SCHEMA, RAW_BATCH_MANIFEST_SCHEMA
 from .storage import _confined_storage_path, _observation_storage_day
 
-MEBIBYTE = 1024 * 1024
 RESOURCE_PRESSURE_RETRY_SECONDS = 1.0
 RECORDER_DATA_TRANSACTION_INODES = 32
 RECORDER_STATE_TRANSACTION_INODES = 8
@@ -75,11 +74,10 @@ class RecorderResourceBudget:
             self.data_inodes,
             self.state_inodes,
         )
-        if any(
-            isinstance(value, bool) or not isinstance(value, int) or value < 0
-            for value in values
-        ):
-            raise ValueError("recorder resource budget values must be non-negative integers")
+        if any(not _valid_nonnegative_integer(value) for value in values):
+            raise ValueError(
+                "recorder resource budget values must be non-negative integers"
+            )
 
 
 @dataclass(frozen=True)
@@ -91,7 +89,7 @@ class RecorderResourcePause:
 
 
 class RecorderResourcePaused(RuntimeError):
-    """Public direct-call result when recovery is paused by local resources."""
+    """Direct-call result when recovery is paused by local host resources."""
 
     def __init__(self, pause: RecorderResourcePause) -> None:
         super().__init__(pause.code)
@@ -99,7 +97,7 @@ class RecorderResourcePaused(RuntimeError):
 
 
 class _RecorderPauseSignal(BaseException):
-    """Internal control signal that deliberately bypasses the source-error catch.
+    """Internal control signal that bypasses the remote-source error boundary.
 
     ``RecorderRuntime.capture_source`` catches ``Exception`` because one remote
     source must never kill the worker. Host admission is not a remote-source
@@ -121,6 +119,10 @@ class _GroupedRequirement:
     path: Path
     bytes_required: int
     inodes_required: int
+
+
+def _valid_nonnegative_integer(value: object) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and value >= 0
 
 
 def _gzip_upper_bound(payload_bytes: int) -> int:
@@ -218,7 +220,7 @@ def _raw_manifest_size(
         raise ValueError("Recorder transaction requires sequence-bounded observations.")
     return _json_atomic_size(
         {
-            "schema": "fcp.mtconnect.raw_batch_manifest.v1",
+            "schema": RAW_BATCH_MANIFEST_SCHEMA,
             "source_name": source_name,
             "agent_instance_id": batch.header.instance_id,
             "requested_from": requested_from,
@@ -279,8 +281,7 @@ def _frontier_sizes(
             "updated_at": _utc_now(),
         }
     )
-    # Touch the path derivation here as part of the pre-write validation. This
-    # proves the pointer itself remains confined before admission begins.
+    # Prove the pointer path itself is confined before admission begins.
     _confined_storage_path(
         store.raw_root,
         _slug(source_name),
@@ -301,16 +302,15 @@ class RecorderAdmissionController(ProcessResourceAdmission):
         bytes_required: int,
         inodes_required: int = 0,
     ) -> Iterator[ResourceReservation]:
-        if (
-            not host_resources._valid_capacity(bytes_required)
-            or not host_resources._valid_capacity(inodes_required)
-        ):
+        if not _valid_nonnegative_integer(
+            bytes_required
+        ) or not _valid_nonnegative_integer(inodes_required):
             raise ValueError("resource requirement must be non-negative integers")
 
-        measurement = self._measure(path)
+        measurement = self._measure(path)  # noqa: SLF001
         resource_id = measurement.resource_id
-        with self._lock:
-            active_bytes, active_inodes = self._active_for(resource_id)
+        with self._lock:  # noqa: SLF001
+            active_bytes, active_inodes = self._active_for(resource_id)  # noqa: SLF001
             before = assess_measurement(
                 measurement,
                 thresholds=self.thresholds,
@@ -331,7 +331,7 @@ class RecorderAdmissionController(ProcessResourceAdmission):
             if after.level == PressureLevel.CRITICAL:
                 raise HostResourceRefused("emergency_reserve", after)
 
-            self._reserved[resource_id] = (
+            self._reserved[resource_id] = (  # noqa: SLF001
                 active_bytes + bytes_required,
                 active_inodes + inodes_required,
             )
@@ -343,16 +343,18 @@ class RecorderAdmissionController(ProcessResourceAdmission):
         try:
             yield reservation
         finally:
-            with self._lock:
-                current_bytes, current_inodes = self._active_for(resource_id)
+            with self._lock:  # noqa: SLF001
+                current_bytes, current_inodes = self._active_for(  # noqa: SLF001
+                    resource_id
+                )
                 remaining = (
                     max(current_bytes - bytes_required, 0),
                     max(current_inodes - inodes_required, 0),
                 )
                 if remaining == (0, 0):
-                    self._reserved.pop(resource_id, None)
+                    self._reserved.pop(resource_id, None)  # noqa: SLF001
                 else:
-                    self._reserved[resource_id] = remaining
+                    self._reserved[resource_id] = remaining  # noqa: SLF001
 
 
 class RecorderResourceGuard:
@@ -454,7 +456,7 @@ class RecorderResourceGuard:
         }
         sources[source_name] = target
         skeleton = {
-            "schema": "fcp.mtconnect.recorder_checkpoint.v2",
+            "schema": CHECKPOINT_SCHEMA,
             "updated_at": _utc_now(),
             "sources": dict(sorted(sources.items())),
         }
@@ -630,13 +632,10 @@ class RecorderResourceGuard:
 
 
 def _state_file_for_runtime(runtime: Any) -> Path:
-    module = runtime.__class__.__module__
-    # The installer stores the exact configured path on every attached runtime;
-    # the module-name fallback only exists for defensive direct construction.
     configured = getattr(runtime, "_resource_state_file", None)
-    if configured is not None:
-        return Path(configured)
-    raise RuntimeError(f"Recorder resource state file is unavailable for {module}.")
+    if configured is None:
+        raise RuntimeError("Recorder resource state file is unavailable.")
+    return Path(configured)
 
 
 def attach_runtime_resource_pressure(
@@ -660,15 +659,25 @@ def attach_runtime_resource_pressure(
     return guard
 
 
-def _apply_pause_status(runtime: Any, source_name: str, base_url: str, pause: RecorderResourcePause) -> None:
+def _runtime_module_value(runtime: Any, name: str, default: Any) -> Any:
+    module = sys.modules.get(runtime.__class__.__module__)
+    return getattr(module, name, default) if module is not None else default
+
+
+def _apply_pause_status(
+    runtime: Any,
+    source_name: str,
+    base_url: str,
+    pause: RecorderResourcePause,
+) -> None:
     assessment = pause.assessment
     with runtime.lock:
         source = runtime.source_status.setdefault(source_name, {"base_url": base_url})
-        source.pop("last_error", None)
-        source.pop("next_retry_seconds", None)
         source.update(
             {
                 "base_url": base_url,
+                "last_error": "",
+                "next_retry_seconds": RESOURCE_PRESSURE_RETRY_SECONDS,
                 "resource_admission": {
                     "state": "paused",
                     "level": assessment.level.name.lower(),
@@ -680,7 +689,7 @@ def _apply_pause_status(runtime: Any, source_name: str, base_url: str, pause: Re
                 },
             }
         )
-        runtime.backoff[source_name] = runtime_module_value(
+        runtime.backoff[source_name] = _runtime_module_value(
             runtime,
             "BACKOFF_INITIAL",
             0.5,
@@ -688,13 +697,6 @@ def _apply_pause_status(runtime: Any, source_name: str, base_url: str, pause: Re
         runtime.next_attempt_at[source_name] = (
             time.monotonic() + RESOURCE_PRESSURE_RETRY_SECONDS
         )
-
-
-def runtime_module_value(runtime: Any, name: str, default: Any) -> Any:
-    import sys
-
-    module = sys.modules.get(runtime.__class__.__module__)
-    return getattr(module, name, default) if module is not None else default
 
 
 def install_runtime_resource_pressure(runtime_module: ModuleType) -> None:
