@@ -68,6 +68,35 @@ public static class FakeRecorder
         if (joined.Contains("fcp_native_recorder_update_agent.py"))
         {
             File.AppendAllText(log + ".agent", joined + Environment.NewLine);
+            if (joined.Contains("--finalize"))
+            {
+                // A scripted sequence of launch plans, one per finalize, so the
+                // real trial -> rollback transition can be driven end to end.
+                string plans = Environment.GetEnvironmentVariable("FCP_FAKE_AGENT_PLANS");
+                if (String.IsNullOrWhiteSpace(plans)) { return 1; }
+                int f = 0;
+                string finPath = log + ".fin";
+                if (File.Exists(finPath)) { Int32.TryParse(File.ReadAllText(finPath).Trim(), out f); }
+                f++;
+                File.WriteAllText(finPath, f.ToString());
+                string[] steps = plans.Split(';');
+                string step = f <= steps.Length ? steps[f - 1] : steps[steps.Length - 1];
+                string root = Environment.GetEnvironmentVariable("FCP_FAKE_LAUNCH_ROOT");
+                string commit = Environment.GetEnvironmentVariable("FCP_FAKE_BUILD_COMMIT");
+                if (step == "none") { return 1; }
+                if (step == "rollback_failed")
+                {
+                    Console.WriteLine("{\"relaunch\": false, \"mode\": \"rollback\", " +
+                        "\"code\": \"rollback_failed\", \"launch_root\": \"\", " +
+                        "\"data_directory\": \"\", \"build_commit\": \"\"}");
+                    return 0;
+                }
+                Console.WriteLine("{\"relaunch\": true, \"mode\": \"" + step + "\", " +
+                    "\"code\": \"" + step + "_launch\", \"launch_root\": \"" +
+                    root.Replace("\\", "\\\\") + "\", \"data_directory\": \"\", " +
+                    "\"build_commit\": \"" + commit + "\"}");
+                return 0;
+            }
             return 1;
         }
 
@@ -86,6 +115,10 @@ public static class FakeRecorder
 '@
     Add-Type -TypeDefinition $fakeSource -OutputAssembly $fakeChild -OutputType ConsoleApplication
 
+    # The supervisor refuses a plan that does not name an exact commit, so the
+    # scripted plans answer with this checkout's real head.
+    $headCommit = (& git -C $repoRoot rev-parse --verify 'HEAD^{commit}').Trim()
+
     $scenario = 0
     function Invoke-Supervisor(
         [string]$Exits,
@@ -98,6 +131,8 @@ public static class FakeRecorder
         $script:scenario++
         $log = Join-Path $tempRoot ('run-' + $script:scenario + '.log')
         $env:FCP_FAKE_RECORDER_LOG = $log
+        $env:FCP_FAKE_LAUNCH_ROOT = $repoRoot
+        $env:FCP_FAKE_BUILD_COMMIT = $headCommit
         $env:FCP_FAKE_RECORDER_EXITS = $Exits
         $env:FCP_FAKE_RECORDER_RUNTIME = $Runtime
         try {
@@ -114,6 +149,9 @@ public static class FakeRecorder
             Remove-Item Env:FCP_FAKE_RECORDER_LOG -ErrorAction SilentlyContinue
             Remove-Item Env:FCP_FAKE_RECORDER_EXITS -ErrorAction SilentlyContinue
             Remove-Item Env:FCP_FAKE_RECORDER_RUNTIME -ErrorAction SilentlyContinue
+            Remove-Item Env:FCP_FAKE_AGENT_PLANS -ErrorAction SilentlyContinue
+            Remove-Item Env:FCP_FAKE_LAUNCH_ROOT -ErrorAction SilentlyContinue
+            Remove-Item Env:FCP_FAKE_BUILD_COMMIT -ErrorAction SilentlyContinue
         }
         $starts = 0
         if (Test-Path -LiteralPath ($log + '.count')) {
@@ -201,6 +239,56 @@ public static class FakeRecorder
         }
         Write-Host '  ok   finalize was called with its existing arguments'
     }
+
+    Write-Host 'Scenario 10: a failed rollback goes back to the agent, never to ordinary restart'
+    # The regression this scenario exists for. In order:
+    #   child 1  ordinary, runs past the started threshold, then fails
+    #            -> one ordinary restart, and $everStarted becomes true
+    #   child 2  exits 75 -> finalize #1 plans a TRIAL
+    #   child 3  the trial child fails -> finalize #2 plans a ROLLBACK
+    #   child 4  the rollback child fails
+    #
+    # Child 4 must go back to the agent, not into the restart machine that
+    # child 1 already armed. Keying transition state off "trial" alone made
+    # child 4 look ordinary, so it was restarted to the fence and the agent
+    # never got to record ROLLBACK_VERIFYING -> ROLLBACK_FAILED.
+    $env:FCP_FAKE_AGENT_PLANS = 'trial;rollback;rollback_failed'
+    $r = Invoke-Supervisor '1,75,1,1' '2,0,0,0' @(0) 5 120 1
+    # The agent refused the last plan, so the supervisor takes its refusal exit.
+    Assert-Equal 'rollback verdict exit code' 5 $r.ExitCode
+    Assert-Equal 'children started through the transition' 4 $r.Starts
+
+    $agentLog = Join-Path $tempRoot ('run-' + $scenario + '.log.agent')
+    $agentCalls = @(Get-Content -LiteralPath $agentLog)
+    $finalizes = @($agentCalls | Where-Object { $_ -like '*--finalize*' }).Count
+    # Three finalizes: plan the trial, plan the rollback, and record the
+    # rollback failure. The third is the one the regression lost entirely.
+    Assert-Equal 'finalize calls (the third records the rollback verdict)' 3 $finalizes
+
+    # Exactly one rollback launch: the agent is asked once and answers once.
+    $marked = @($agentCalls | Where-Object { $_ -like '*--mark-relaunched*' }).Count
+    Assert-Equal 'relaunches recorded (trial + rollback)' 2 $marked
+    # And the watchdog is still trial-only: a rollback child never adds a second
+    # one. This is a ceiling rather than an equality because the watchdog is the
+    # one agent call the supervisor starts asynchronously, so its log line can
+    # lag; two would prove a rollback started one, which is what matters here.
+    # That it is started *only* for a trial child is pinned statically by
+    # test_the_supervisor_starts_nothing_before_the_recorder.
+    $watched = @($agentCalls | Where-Object { $_ -like '*--watch-trial*' }).Count
+    if ($watched -gt 1) {
+        $failures.Add("a rollback child started a trial watchdog: $watched")
+        Write-Host "  FAIL a rollback child started a trial watchdog: $watched"
+    }
+    else {
+        Write-Host "  ok   trial watchdogs started = $watched (never more than one)"
+    }
+
+    # The child count carries the restart evidence on its own, and it is exact
+    # in both directions. Four children is only reachable if child 1 *was*
+    # ordinarily restarted -- without that, supervision ends at one child and
+    # $everStarted is never armed -- and only if child 4 was *not*, because an
+    # ordinarily restarted rollback child would keep going to the fence. The
+    # pre-fix supervisor ran eight children here and never reached finalize #3.
 
     if ($failures.Count -gt 0) {
         Write-Host ''

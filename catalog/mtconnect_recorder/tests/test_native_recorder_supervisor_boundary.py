@@ -92,7 +92,7 @@ def test_the_supervisor_starts_nothing_before_the_recorder() -> None:
     watchdog = supervisor.index("Start-Process")
     assert supervisor.rindex("function Start-TrialWatchdog {") < watchdog
     assert "$replacementPending = $false\n" in supervisor
-    assert "$trialActive = $false\n" in supervisor
+    assert "$childOwner = $OrdinaryChild\n" in supervisor
 
     loop = supervisor[supervisor.index("while ($true) {") :]
     launch = loop.index("$exitCode = Start-Recorder")
@@ -104,8 +104,12 @@ def test_the_supervisor_starts_nothing_before_the_recorder() -> None:
     assert loop.index("Set-RelaunchedNonce $nonce") < launch
     assert "if ($replacementPending) {" in loop
     guarded = loop[loop.index("if ($replacementPending) {") : launch]
-    assert "if ($trialActive) {" in guarded
-    assert guarded.index("if ($trialActive) {") < guarded.index("Start-TrialWatchdog")
+    # The watchdog is still started for a trial child and nothing else -- a
+    # rollback child is transition-owned but gets no trial watchdog.
+    assert "if ($childOwner -eq $TrialChild) {" in guarded
+    assert guarded.index("if ($childOwner -eq $TrialChild) {") < guarded.index(
+        "Start-TrialWatchdog"
+    )
 
 
 def test_the_supervisor_guarantees_one_recorder_per_checkout() -> None:
@@ -216,7 +220,7 @@ def test_the_supervisor_relaunches_only_for_the_approved_exit_code() -> None:
 
     assert "$ApprovedUpdateRestartExitCode = 75" in supervisor
     assert (
-        "if ($exitCode -ne $ApprovedUpdateRestartExitCode -and -not $trialActive) {"
+        "if ($exitCode -ne $ApprovedUpdateRestartExitCode -and $childOwner -eq $OrdinaryChild) {"
         in supervisor
     )
     # Everything that is neither the approved code nor a trial is handled inside
@@ -224,12 +228,13 @@ def test_the_supervisor_relaunches_only_for_the_approved_exit_code() -> None:
     # exit -- the finalize/plan sequence still runs only for 75 or a trial.
     loop = supervisor[supervisor.index("while ($true) {") :]
     ordinary = loop.index(
-        "if ($exitCode -ne $ApprovedUpdateRestartExitCode -and -not $trialActive) {"
+        "if ($exitCode -ne $ApprovedUpdateRestartExitCode -and $childOwner -eq $OrdinaryChild) {"
     )
     assert ordinary < loop.index("$finalize = Invoke-Finalize")
-    # And a trial is only ever "active" because the host agent said the child it
-    # just planned is one. The supervisor never decides that for itself.
-    assert "$trialActive = ([string]$plan.mode -eq 'trial')" in supervisor
+    # And a child is only ever transition-owned because the host agent said the
+    # child it just planned is one. The supervisor never decides that itself.
+    assert "if ([string]$plan.mode -eq $TrialChild) {" in supervisor
+    assert "elseif ([string]$plan.mode -eq $RollbackChild) {" in supervisor
 
 
 # --------------------------------------------------------------------------
@@ -243,7 +248,7 @@ def _ordinary_exit_branch() -> str:
     supervisor = _text(SUPERVISOR)
     loop = supervisor[supervisor.index("while ($true) {") :]
     start = loop.index(
-        "if ($exitCode -ne $ApprovedUpdateRestartExitCode -and -not $trialActive) {"
+        "if ($exitCode -ne $ApprovedUpdateRestartExitCode -and $childOwner -eq $OrdinaryChild) {"
     )
     return loop[start : loop.index("$finalize = Invoke-Finalize")]
 
@@ -353,7 +358,8 @@ def test_an_ordinary_restart_adds_no_update_or_trial_bookkeeping() -> None:
         "Invoke-Finalize",
         "Read-LaunchPlan",
         "$replacementPending = $true",
-        "$trialActive = $true",
+        "$childOwner = $TrialChild",
+        "$childOwner = $RollbackChild",
         "$launchRoot =",
         "$launchBuildCommit =",
     ):
@@ -433,6 +439,64 @@ def test_the_child_exit_code_is_an_integer_and_never_the_child_output() -> None:
     # The decision helper binds a real integer, which is what makes an array
     # here a hard failure rather than a silently wrong comparison.
     assert "function Test-IntentionalStop([int]$ExitCode)" in supervisor
+
+
+def test_a_rollback_child_is_transition_owned_and_never_ordinarily_restarted() -> None:
+    """Rollback is the agent's verdict to make, not the restart machine's.
+
+    ``NativeRecorderTrialAgent`` answers a failed trial with a launch plan whose
+    mode is ``rollback``. Keying the supervisor's transition state off ``trial``
+    alone left that child looking ordinary, so a rollback that also failed could
+    be restarted and fenced instead of handed back to the agent -- and whether
+    it was depended on unrelated earlier history, because only a previous
+    ordinary failure sets ``$everStarted``. That breaks the branch-trial
+    invariant that a safe version which also fails is reported once, never
+    looped, and it means ``ROLLBACK_STARTING``/``ROLLBACK_VERIFYING`` never
+    reaches ``ROLLBACK_FAILED``.
+    """
+
+    supervisor = _text(SUPERVISOR)
+    branch = _ordinary_exit_branch()
+
+    # The three owners are named, not inferred from a single boolean.
+    assert "$OrdinaryChild = 'ordinary'" in supervisor
+    assert "$TrialChild = 'trial'" in supervisor
+    assert "$RollbackChild = 'rollback'" in supervisor
+
+    # The restart machine is entered only by an ordinary child, so a trial or
+    # rollback child cannot reach the streak, the backoff or the fence.
+    assert "$childOwner -eq $OrdinaryChild) {" in supervisor
+    for owned in ("$everStarted", "$rapidFailureStreak", "Start-Sleep"):
+        assert owned in branch, f"{owned} must live inside the ordinary branch"
+
+    # Both transition modes come from the agent's plan.
+    loop = supervisor[supervisor.index("while ($true) {") :]
+    assert "if ([string]$plan.mode -eq $TrialChild) {" in loop
+    assert "elseif ([string]$plan.mode -eq $RollbackChild) {" in loop
+
+    # A rollback child's exit therefore falls through to the agent's finalize,
+    # which is where ROLLBACK_VERIFYING -> ROLLBACK_FAILED is recorded.
+    assert loop.index("$childOwner -eq $OrdinaryChild) {") < loop.index(
+        "$finalize = Invoke-Finalize"
+    )
+
+
+def test_the_rollback_mode_the_supervisor_reads_is_the_one_the_agent_writes() -> None:
+    """The two sides of this contract must not drift apart again."""
+
+    supervisor = _text(SUPERVISOR)
+    agent = _text(ROOT / "catalog/mtconnect_recorder/native_trial_agent.py")
+
+    # The agent plans a rollback launch, and answers a rollback child's exit
+    # with the terminal rollback failure rather than another launch.
+    assert 'TrialPlan(\n            True,\n            "rollback",' in agent
+    assert 'code="rollback_launch",' in agent
+    assert "if stage in {ROLLBACK_STARTING, ROLLBACK_VERIFYING}:" in agent
+    assert "_finish_rollback_failure(" in agent
+    assert 'TrialPlan(False, "rollback", code="rollback_failed")' in agent
+
+    # The supervisor recognises exactly that mode string.
+    assert "$RollbackChild = 'rollback'" in supervisor
 
 
 def test_the_restart_state_machine_never_signals_or_waits_on_a_process() -> None:

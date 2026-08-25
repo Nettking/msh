@@ -83,6 +83,18 @@ Set-StrictMode -Version Latest
 $ApprovedUpdateRestartExitCode = 75
 $UpdateAgentScript = 'scripts/fcp_native_recorder_update_agent.py'
 
+# Which transition owns the child that is about to start. A trial or rollback
+# child belongs to the branch-trial transition: its exit is the host agent's
+# verdict to make, and the agent's own finalize path already answers for it --
+# ROLLBACK_STARTING/ROLLBACK_VERIFYING records ROLLBACK_FAILED, which is how a
+# safe version that also fails is reported once instead of retried. Only an
+# ordinary child -- the one the operator started, or the replacement after an
+# approved update -- is the restart machine's business. The agent names these
+# in its launch plan: "update" for the ordinary path, "trial", "rollback".
+$OrdinaryChild = 'ordinary'
+$TrialChild = 'trial'
+$RollbackChild = 'rollback'
+
 # A console Ctrl+C that never reached the recorder's own handler surfaces as
 # STATUS_CONTROL_C_EXIT (0xC000013A) rather than a graceful zero.
 $WindowsControlCExitCode = -1073741510
@@ -304,7 +316,7 @@ $replacementPending = $false
 $launchRoot = $RepoRoot
 $launchDataDirectory = ''
 $launchBuildCommit = ''
-$trialActive = $false
+$childOwner = $OrdinaryChild
 # Consecutive ordinary failures that did not reach a healthy runtime. Reset by a
 # healthy child and by the update path; only this counter can reach the fence.
 $rapidFailureStreak = 0
@@ -336,7 +348,7 @@ try {
                 # proven to be exactly this process and not an earlier survivor.
                 Set-RelaunchedNonce $nonce
                 $replacementPending = $false
-                if ($trialActive) {
+                if ($childOwner -eq $TrialChild) {
                     # Only for a trial child, and only after the journal names
                     # the instance the watchdog has to judge.
                     Start-TrialWatchdog
@@ -350,10 +362,12 @@ try {
             $exitCode = Start-Recorder $nonce $buildCommit $launchRoot $launchDataDirectory
             $childRuntimeSeconds = $childClock.Elapsed.TotalSeconds
 
-            # A trial child that exits for *any* reason is asked about, because
-            # "the branch crashed on startup" is exactly the case the pinned
-            # fallback exists for and it never reaches the approved exit code.
-            if ($exitCode -ne $ApprovedUpdateRestartExitCode -and -not $trialActive) {
+            # A trial or rollback child that exits for *any* reason is asked
+            # about, because "the branch crashed on startup" is exactly the case
+            # the pinned fallback exists for and it never reaches the approved
+            # exit code -- and a restored safe version that also fails is the
+            # case the agent reports once rather than retrying.
+            if ($exitCode -ne $ApprovedUpdateRestartExitCode -and $childOwner -eq $OrdinaryChild) {
                 # An ordinary child exit, and the one decision this supervisor
                 # owns outright. Three outcomes, in this order:
                 #
@@ -431,7 +445,7 @@ try {
             $launchRoot = $RepoRoot
             $launchDataDirectory = ''
             $launchBuildCommit = ''
-            $trialActive = $false
+            $childOwner = $OrdinaryChild
             if (-not [string]::IsNullOrWhiteSpace([string]$plan.launch_root)) {
                 $launchRoot = Normalize-DirectoryPath ([string]$plan.launch_root)
             }
@@ -447,7 +461,15 @@ try {
                     exit 5
                 }
             }
-            $trialActive = ([string]$plan.mode -eq 'trial')
+            # Both transition modes are read from the plan the agent returned.
+            # Anything else -- "update", or a mode this supervisor predates --
+            # is an ordinary child, which is the pre-branch-trial behavior.
+            if ([string]$plan.mode -eq $TrialChild) {
+                $childOwner = $TrialChild
+            }
+            elseif ([string]$plan.mode -eq $RollbackChild) {
+                $childOwner = $RollbackChild
+            }
             $replacementPending = $true
         }
     }
