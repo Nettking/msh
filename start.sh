@@ -7,12 +7,21 @@ cd "$ROOT"
 MODE=normal
 case "${1:-}" in
   "") ;;
+  --fresh) MODE=fresh ;;
   --resume) MODE=resume ;;
   --help|-h)
     cat <<'EOF'
 Usage:
   bash start.sh            Start FCP and preserve existing state.
   bash start.sh --resume   Reconnect saved Federation state before opening FCP.
+  bash start.sh --fresh    Factory-reset mutable FCP state, verify it, then start FCP.
+
+Normal and resume modes preserve identity, Federation membership, recordings,
+source configuration, recorder checkpoints, results, and downloaded models.
+Resume mode never runs inspection or benchmarks and never replaces Federation authority.
+The --fresh option requires typing RESET. Machine recordings, integrity metadata,
+Docker/model resources, source code, deployment settings, and immutable checkout
+scaffolding are preserved.
 
 The supported launcher also starts the bounded host-owned update agent used by
 Federation > Update all. Linux/macOS hosts therefore require python3 in addition
@@ -26,6 +35,11 @@ EOF
     exit 2
     ;;
 esac
+if [ "$#" -gt 1 ]; then
+  echo "Unknown option: $2" >&2
+  echo "Run: bash start.sh --help" >&2
+  exit 2
+fi
 
 command -v git >/dev/null 2>&1 || { echo "Git was not found." >&2; exit 1; }
 command -v docker >/dev/null 2>&1 || { echo "Docker was not found." >&2; exit 1; }
@@ -62,6 +76,55 @@ if [ -n "$(git status --porcelain=v1 --untracked-files=all)" ]; then
 fi
 FCP_BUILD_COMMIT=$(printf '%s' "$FCP_BUILD_COMMIT" | tr 'A-F' 'a-f')
 export FCP_BUILD_COMMIT
+
+if [ "$MODE" = fresh ]; then
+  echo
+  echo "FRESH DEVICE INSTALL"
+  echo "This permanently removes this checkout's mutable FCP application state:"
+  echo "  - human administrators, passwords, authentication secrets, and login sessions"
+  echo "  - FCP device identity and keys"
+  echo "  - Federation membership, trust, pairing, discovery, onboarding, and authority state"
+  echo "  - capability, contribution, benchmark, provider, Activity, and job state"
+  echo "  - source configuration and recorder configuration, checkpoints, status, and runtime state"
+  echo "  - analyses, results, digital-twin projections, and retained legacy setup state"
+  echo
+  echo "It preserves the machine recording corpus and its integrity metadata."
+  echo "Docker images, downloaded model volumes, source code, and deployment settings are not application state and are not reset."
+  echo
+  printf 'Type RESET to continue: '
+  IFS= read -r FCP_RESET_CONFIRM || FCP_RESET_CONFIRM=""
+  FCP_RESET_CONFIRM=$(printf '%s' "$FCP_RESET_CONFIRM" | tr '[:lower:]' '[:upper:]')
+  if [ "$FCP_RESET_CONFIRM" != RESET ]; then
+    echo "Fresh install cancelled. No state was removed."
+    exit 2
+  fi
+
+  echo
+  echo "Stopping FCP before resetting mutable application state..."
+  if ! python3 "$ROOT/scripts/posix/stop_fcp_for_fresh_reset.py"; then
+    echo "FCP containers could not be stopped safely. Nothing else was removed." >&2
+    exit 1
+  fi
+
+  echo "Resolving and clearing mutable FCP state while preserving recordings..."
+  if ! docker compose run --rm --no-deps --build --entrypoint python flask \
+    -m catalog.flask_app.services.device_state_reset; then
+    echo "Fresh factory reset did not complete. Review the specific path or recording-integrity error above." >&2
+    echo "No FCP service will be started from an unverified reset." >&2
+    exit 1
+  fi
+
+  echo "Verifying factory-reset state before any FCP service can recreate runtime state..."
+  if ! docker compose run --rm --no-deps --entrypoint python flask \
+    -m catalog.flask_app.services.device_state_reset --verify-fresh; then
+    echo "Fresh factory reset could not be verified." >&2
+    echo "No FCP service will be started. Review the specific verification failure above." >&2
+    exit 1
+  fi
+
+  echo "Fresh factory reset completed and verified. FCP will now start with first-administrator bootstrap."
+  echo
+fi
 
 AGENT_DIR="$FCP_DATA_DIR/federation/update-agent"
 mkdir -p "$AGENT_DIR"
