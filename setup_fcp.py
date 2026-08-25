@@ -201,6 +201,7 @@ def _run_compose(
                     Path.cwd(),
                     model=plan.config.ai_model,
                     target_name="model-provider",
+                    env=env,
                 )
             )
         return
@@ -257,6 +258,7 @@ def _run_compose(
             Path.cwd(),
             model=plan.config.ai_model,
             target_name="ollama",
+            env=env,
         )
     )
 
