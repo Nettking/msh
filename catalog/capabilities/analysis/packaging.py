@@ -84,6 +84,18 @@ def _validated_members(
     )
 
 
+def validate_slice_members(files: Sequence[Path], root: Path) -> tuple[str, ...]:
+    """Validate declared slice inputs without reading a single content byte.
+
+    Confinement, safe naming and the entry-count bound are properties of the
+    *declared inputs*, not of any archive, so they must be enforced even on the
+    path that deliberately never opens the source -- validating an already
+    registered slice against its durable identity.
+    """
+
+    return tuple(name for name, _path in _validated_members(files, root))
+
+
 def slice_archive_matches(
     archive_path: Path,
     *,
@@ -348,5 +360,6 @@ __all__ = [
     "MAX_SLICE_ENTRIES",
     "extract_slice_archive",
     "slice_archive_matches",
+    "validate_slice_members",
     "write_slice_archive",
 ]
