@@ -188,6 +188,31 @@ def test_posix_normal_and_resume_modes_remain_non_destructive() -> None:
     )
 
 
+def test_posix_core_starts_before_optional_model_installation() -> None:
+    start = (ROOT / "start.sh").read_text(encoding="utf-8")
+    background = "docker compose up -d relay ollama recorder"
+    flask = "docker compose up -d flask"
+    model = 'docker compose exec -T ollama ollama show "$FCP_AI_MODEL"'
+
+    assert start.index(background) < start.index(flask) < start.index(model)
+    assert "FCP_AI_DEGRADED=0" in start
+    assert "FCP_AI_DEGRADED=1" in start
+    assert "WARNING: AI capability is unavailable; core FCP remains running." in start
+    assert "AI capability:        unavailable; core FCP is healthy" in start
+
+
+def test_posix_optional_model_failure_path_has_no_fatal_exit() -> None:
+    start = (ROOT / "start.sh").read_text(encoding="utf-8")
+    optional_block = start.split(
+        "# The language model is an optional capability.",
+        maxsplit=1,
+    )[1].split("\nBASE_URL=", maxsplit=1)[0]
+
+    assert "if ! docker compose --profile model-install run --rm ollama-pull; then" in optional_block
+    assert "if ! docker compose exec -T ollama ollama show" in optional_block
+    assert "exit 1" not in optional_block
+
+
 def test_posix_shutdown_helper_clean_path_is_project_scoped(tmp_path: Path) -> None:
     calls = tmp_path / "docker.log"
     docker = _make_fake_docker(tmp_path, exit_codes=(0,), calls=calls)
