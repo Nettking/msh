@@ -370,39 +370,20 @@ set "FCP_AI_MODEL_RESOLVED="
 for /f "usebackq delims=" %%M in (`docker compose run --rm --no-deps --entrypoint python flask -c "import os; print(os.environ.get('FCP_AI_MODEL') or 'llama3.2:3b')"`) do set "FCP_AI_MODEL_RESOLVED=%%M"
 if not defined FCP_AI_MODEL_RESOLVED set "FCP_AI_MODEL_RESOLVED=llama3.2:3b"
 
-echo Ensuring optional Ollama model is installed: %FCP_AI_MODEL_RESOLVED%
-docker compose exec -T ollama ollama show "%FCP_AI_MODEL_RESOLVED%" >nul 2>&1
-if not errorlevel 1 (
-    echo Ollama model is ready.
-    echo.
-    exit /b 0
-)
-
-set "FCP_MODEL_ATTEMPT=1"
-:pull_ollama_model
-echo Pulling %FCP_AI_MODEL_RESOLVED% ^(attempt %FCP_MODEL_ATTEMPT% of 3^) ...
-docker compose --profile model-install run --rm --entrypoint /bin/ollama ollama-pull pull "%FCP_AI_MODEL_RESOLVED%"
+echo Ensuring optional Ollama model through host resource admission: %FCP_AI_MODEL_RESOLVED%
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_model_pull.ps1" -RepoRoot "%~dp0" -Model "%FCP_AI_MODEL_RESOLVED%" -Target ollama
 set "FCP_MODEL_PULL_EXIT=%ERRORLEVEL%"
-
-docker compose exec -T ollama ollama show "%FCP_AI_MODEL_RESOLVED%" >nul 2>&1
-if not errorlevel 1 (
+if "%FCP_MODEL_PULL_EXIT%"=="0" (
     echo Ollama model is installed and verified.
     echo.
     exit /b 0
 )
-
-if %FCP_MODEL_ATTEMPT% GEQ 3 (
-    echo.
-    echo AI capability remains unavailable because Ollama does not contain: %FCP_AI_MODEL_RESOLVED%
-    if not "%FCP_MODEL_PULL_EXIT%"=="0" echo The final pull command exited with code %FCP_MODEL_PULL_EXIT%.
-    echo Installed Ollama models:
-    docker compose exec -T ollama ollama list
-    exit /b 1
+if "%FCP_MODEL_PULL_EXIT%"=="2" (
+    echo AI model installation is paused by host resource pressure.
+) else (
+    echo AI model installation failed with code %FCP_MODEL_PULL_EXIT%.
 )
-
-set /a FCP_MODEL_ATTEMPT+=1
-powershell -NoProfile -Command "Start-Sleep -Seconds 3"
-goto :pull_ollama_model
+exit /b 1
 
 :reset_device_state
 echo.

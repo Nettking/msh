@@ -28,6 +28,8 @@ import time
 from pathlib import Path
 from typing import Sequence
 
+from catalog.federation.model_resource_pull import admitted_model_pull
+
 ROOT = Path(__file__).resolve().parent
 _FULL_SHA = re.compile(r"^[0-9a-fA-F]{40}$")
 _LOOPBACKS = {"127.0.0.1", "localhost", "::1"}
@@ -243,36 +245,14 @@ def _fresh_reset(env: dict[str, str]) -> None:
     )
 
 
-def _ensure_model(env: dict[str, str]) -> None:
-    model = env["FCP_AI_MODEL"]
-    existing = _compose(
-        env,
-        "exec",
-        "-T",
-        "ollama",
-        "ollama",
-        "show",
-        model,
-        check=False,
-        capture=True,
+def _ensure_model(env: dict[str, str]) -> bool:
+    result = admitted_model_pull(
+        ROOT,
+        model=env["FCP_AI_MODEL"],
+        target_name="ollama",
     )
-    if existing.returncode == 0:
-        return
-    print(f"Installing required Ollama model: {model}")
-    _compose(env, "--profile", "model-install", "run", "--rm", "ollama-pull")
-    verified = _compose(
-        env,
-        "exec",
-        "-T",
-        "ollama",
-        "ollama",
-        "show",
-        model,
-        check=False,
-        capture=True,
-    )
-    if verified.returncode != 0:
-        raise HeadlessStartError(f"configured Ollama model is unavailable: {model}")
+    print(result.message)
+    return result.ok
 
 
 def _wait_for_flask(env: dict[str, str], *, seconds: int = 90) -> None:
@@ -307,9 +287,8 @@ def _start_runtime(env: dict[str, str], *, fresh: bool) -> None:
     if fresh:
         _fresh_reset(env)
     _start_update_agent(env)
-    print("Starting Federation relay, Ollama, managed recorder, and Flask ...")
-    _compose(env, "up", "-d", "relay", "ollama", "recorder")
-    _ensure_model(env)
+    print("Starting required Federation relay, managed recorder, and Flask ...")
+    _compose(env, "up", "-d", "relay", "recorder")
     _compose(env, "up", "-d", "flask")
     _wait_for_flask(env)
     if fresh:
@@ -323,6 +302,12 @@ def _start_runtime(env: dict[str, str], *, fresh: bool) -> None:
             "catalog.flask_app.services.device_state_reset",
             "--verify-fresh",
         )
+
+    ollama = _compose(env, "up", "-d", "ollama", check=False, capture=True)
+    if ollama.returncode != 0:
+        print("AI capability unavailable: optional Ollama service did not start.")
+    elif not _ensure_model(env):
+        print("AI capability unavailable or resource-paused; core headless FCP is ready.")
 
 
 def _inside_flask(
@@ -404,8 +389,6 @@ def _connect_command(args: argparse.Namespace) -> int:
         _print_runtime(env)
         return 0
 
-    # No code means "mint a code on the existing first/local-authority node".
-    # Starting the runtime is idempotent and makes this usable after a reboot.
     _start_runtime(env, fresh=False)
     relay_url = _reachable_relay_url(env, args.relay_url)
     if relay_url is None:

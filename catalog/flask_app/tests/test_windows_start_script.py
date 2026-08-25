@@ -40,7 +40,8 @@ def test_start_cmd_builds_required_services_before_optional_ai() -> None:
     assert "docker compose up -d flask" in script
     assert "docker compose up -d ollama" in script
     assert "call :ensure_ollama_model" in script
-    assert "Ollama model is ready" in script
+    assert "scripts\\windows\\fcp_model_pull.ps1" in script
+    assert "Ollama model is installed and verified" in script
     assert "docker compose port flask 5000" in script
     assert 'set "FCP_WEB_CLIENT_HOST=%FCP_WEB_BIND%"' in script
     assert 'set "FCP_BASE_URL=http://%FCP_WEB_CLIENT_HOST%:%FCP_WEB_PORT_RESOLVED%"' in script
@@ -159,15 +160,12 @@ def test_start_cmd_treats_ollama_and_model_as_optional_after_core_start() -> Non
 
     assert ":ensure_ollama_model" in script
     assert "os.environ.get('FCP_AI_MODEL') or 'llama3.2:3b'" in script
-    assert 'ollama show "%FCP_AI_MODEL_RESOLVED%"' in script
-    assert (
-        "docker compose --profile model-install run --rm --entrypoint "
-        "/bin/ollama ollama-pull pull \"%FCP_AI_MODEL_RESOLVED%\""
-        in script
-    )
-    assert "attempt %FCP_MODEL_ATTEMPT% of 3" in script
-    assert "if %FCP_MODEL_ATTEMPT% GEQ 3" in script
-    assert "AI capability remains unavailable" in script
+    assert "scripts\\windows\\fcp_model_pull.ps1" in script
+    assert '-Model "%FCP_AI_MODEL_RESOLVED%" -Target ollama' in script
+    assert "host resource admission" in script
+    assert "AI model installation is paused by host resource pressure" in script
+    assert "ollama-pull" not in script
+    assert 'ollama show "%FCP_AI_MODEL_RESOLVED%"' not in script
     assert "WARNING: Ollama is unavailable; core FCP remains running" in script
     assert "WARNING: AI capability is unavailable; core FCP remains running" in script
     assert "AI capability can be repaired later without resetting Federation state" in script

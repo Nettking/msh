@@ -234,26 +234,33 @@ def test_posix_core_starts_before_optional_model_installation() -> None:
     required = "docker compose up -d relay recorder"
     flask = "docker compose up -d flask"
     ollama = "docker compose up -d ollama"
-    model = 'docker compose exec -T ollama ollama show "$FCP_AI_MODEL"'
+    model = "python3 -m catalog.federation.model_resource_pull"
 
     assert start.index(required) < start.index(flask) < start.index(ollama) < start.index(model)
+    assert "--target ollama --model \"$FCP_AI_MODEL\"" in start
+    assert "host resource admission" in start
     assert "FCP_AI_DEGRADED=0" in start
     assert "FCP_AI_DEGRADED=1" in start
     assert "WARNING: Ollama is unavailable; core FCP remains running." in start
-    assert "WARNING: AI capability is unavailable; core FCP remains running." in start
+    assert (
+        "WARNING: AI capability is unavailable or resource-paused; core FCP remains running."
+        in start
+    )
     assert "AI capability:        unavailable; core FCP is healthy" in start
+    assert "ollama-pull" not in start
 
 
 def test_posix_optional_model_failure_path_has_no_fatal_exit() -> None:
     start = (ROOT / "start.sh").read_text(encoding="utf-8")
     optional_block = start.split(
-        "# The language model is an optional capability.",
+        'FCP_AI_DEGRADED=0\necho "Starting optional Ollama service ..."',
         maxsplit=1,
     )[1].split("\nBASE_URL=", maxsplit=1)[0]
 
     assert "if ! docker compose up -d ollama; then" in optional_block
-    assert "if ! docker compose --profile model-install run --rm ollama-pull; then" in optional_block
-    assert "if ! docker compose exec -T ollama ollama show" in optional_block
+    assert "python3 -m catalog.federation.model_resource_pull" in optional_block
+    assert "ollama-pull" not in optional_block
+    assert "ollama show" not in optional_block
     assert "exit 1" not in optional_block
 
 
