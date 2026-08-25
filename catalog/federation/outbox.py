@@ -476,22 +476,25 @@ class SQLiteOutbox:
                     "SELECT * FROM outbox WHERE session_id=? AND destination_id=? AND idempotency_key=?",
                     (session_id, destination_id, idempotency_key),
                 ).fetchone()
-                completed = row["state"] == OutboxState.COMPLETED.value
-                # A compacted row stores a bounded identity receipt in place of
-                # its payload.  Comparing that receipt against the payload
-                # reconciliation just rebuilt would report a false
-                # idempotency conflict on every archive scan, so a receipt is
-                # never compared.  The identity columns below still are, and
-                # they are what duplicate suppression actually depends on.
-                receipt = row["payload_compacted"] == 1
+                # A terminal row's payload is no longer authoritative: it will
+                # never be delivered from it again, and it may be a bounded
+                # identity receipt or the very corruption that got the row
+                # retired.  Comparing it against the payload reconciliation
+                # just rebuilt would raise a false idempotency conflict on
+                # every archive scan -- and because that conflict propagates
+                # out of the scan, one tombstone would abort reconciliation of
+                # the entire archive.  Identity is compared instead, and
+                # identity is what duplicate suppression depends on: a key
+                # genuinely reused for different content still has a different
+                # content hash and still fails closed.
+                terminal = row["state"] in (
+                    OutboxState.COMPLETED.value,
+                    OutboxState.RETIRED.value,
+                )
                 if (
                     row["content_hash"] != content_hash
                     or row["schema_id"] != schema_id
-                    or (
-                        not completed
-                        and not receipt
-                        and row["payload_json"] != payload_json
-                    )
+                    or (not terminal and row["payload_json"] != payload_json)
                 ):
                     raise FederationValidationError(
                         "idempotency-conflict",
