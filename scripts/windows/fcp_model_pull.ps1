@@ -13,9 +13,7 @@ param(
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
-# Same shared host-resource thresholds as catalog/federation/host_resources.py.
-# Model pulls are optional, unknown-size writes: they may start only above
-# PRESSURE and are stopped if the host reaches PRESSURE while downloading.
+# Same host-resource thresholds as catalog/federation/host_resources.py.
 $CriticalFreeBytes = [int64]10737418240
 $PressureFreeBytes = [int64]12884901888
 $PollMilliseconds = 250
@@ -42,12 +40,69 @@ function Invoke-NativeResult {
     }
 }
 
-function Get-FreeBytes {
-    # Supported Windows layout: Docker Desktop's growing data image and this
-    # checkout consume the same host system volume. A different Docker backing
-    # resource is outside the v1 supported-layout evidence boundary.
-    $drive = [System.IO.Path]::GetPathRoot((Resolve-Path $RepoRoot).Path)
+function Get-DockerBackingPath {
+    # Docker Desktop persists Linux-container volumes in a host VHDX. Measure
+    # the Windows volume containing that file, not the checkout drive. Support
+    # both current and legacy default Docker Desktop locations. A custom or
+    # otherwise unprovable location fails closed for a new model download.
+    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
+        $candidates = @(
+            (Join-Path $env:LOCALAPPDATA 'Docker\wsl\disk\docker_data.vhdx'),
+            (Join-Path $env:LOCALAPPDATA 'Docker\wsl\data\ext4.vhdx')
+        )
+        foreach ($candidate in $candidates) {
+            if (Test-Path -LiteralPath $candidate -PathType Leaf) {
+                return (Get-Item -LiteralPath $candidate).Directory.FullName
+            }
+        }
+    }
+
+    # Native Windows Docker engines can expose their data root as an ordinary
+    # host directory. This is intentionally a fallback after Docker Desktop.
+    if (-not [string]::IsNullOrWhiteSpace($env:PROGRAMDATA)) {
+        $nativeRoot = Join-Path $env:PROGRAMDATA 'docker'
+        if (Test-Path -LiteralPath $nativeRoot -PathType Container) {
+            return (Resolve-Path -LiteralPath $nativeRoot).Path
+        }
+    }
+    return $null
+}
+
+function Get-FreeBytes([string]$BackingPath) {
+    $drive = [System.IO.Path]::GetPathRoot((Resolve-Path -LiteralPath $BackingPath).Path)
     return [int64]([System.IO.DriveInfo]::New($drive)).AvailableFreeSpace
+}
+
+function Test-ModelWriterStopped([string]$Service, [string]$ContainerName) {
+    $serviceProbe = Invoke-NativeResult 'docker' @(
+        'compose', 'ps', '--status', 'running', '-q', $Service
+    )
+    $pullProbe = Invoke-NativeResult 'docker' @(
+        'ps', '-q', '--filter', "name=^/$ContainerName$"
+    )
+    if ($serviceProbe.ExitCode -ne 0 -or $pullProbe.ExitCode -ne 0) {
+        return $false
+    }
+    return (
+        [string]::IsNullOrWhiteSpace(($serviceProbe.Output -join '')) -and
+        [string]::IsNullOrWhiteSpace(($pullProbe.Output -join ''))
+    )
+}
+
+function Stop-ModelWriter([string]$Service, [string]$ContainerName) {
+    Invoke-NativeResult 'docker' @(
+        'compose', 'stop', '--timeout', '5', $Service
+    ) | Out-Null
+    Invoke-NativeResult 'docker' @('rm', '-f', $ContainerName) | Out-Null
+    if (Test-ModelWriterStopped $Service $ContainerName) {
+        return $true
+    }
+
+    # Escalate once, then verify again. Docker command failure must never be
+    # translated into a false claim that the unknown-size writer stopped.
+    Invoke-NativeResult 'docker' @('compose', 'kill', $Service) | Out-Null
+    Invoke-NativeResult 'docker' @('rm', '-f', $ContainerName) | Out-Null
+    return [bool](Test-ModelWriterStopped $Service $ContainerName)
 }
 
 $RepoRoot = Normalize-DirectoryPath $RepoRoot
@@ -76,7 +131,16 @@ if ($existing.ExitCode -eq 0) {
     exit 0
 }
 
-$before = Get-FreeBytes
+$backingPath = Get-DockerBackingPath
+if ([string]::IsNullOrWhiteSpace($backingPath)) {
+    Write-Error (
+        'Model installation was not started because FCP could not prove the ' +
+        'Windows host resource backing Docker model storage.'
+    )
+    exit 3
+}
+
+$before = Get-FreeBytes $backingPath
 if ($before -le $PressureFreeBytes) {
     Write-Warning (
         "Model installation was not started because the Docker backing " +
@@ -95,17 +159,19 @@ $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
 
 while (-not $process.HasExited) {
     Start-Sleep -Milliseconds $PollMilliseconds
-    $free = Get-FreeBytes
+    $free = Get-FreeBytes $backingPath
     if ($free -le $PressureFreeBytes) {
-        # Disconnecting only the CLI does not prove the Ollama daemon stopped
-        # writing. Stop the optional writer itself before releasing this pull.
-        Invoke-NativeResult 'docker' @(
-            'compose', 'stop', '--timeout', '5', $service
-        ) | Out-Null
-        Invoke-NativeResult 'docker' @('rm', '-f', $containerName) | Out-Null
+        $stopped = Stop-ModelWriter $service $containerName
         if (-not $process.WaitForExit(30000)) {
             $process.Kill()
             $process.WaitForExit()
+        }
+        if (-not $stopped) {
+            Write-Error (
+                'Docker reached host resource pressure and FCP could not prove ' +
+                'that the optional model writer stopped.'
+            )
+            exit 3
         }
         Write-Warning (
             "Model installation stopped when free space reached the shared " +
@@ -115,13 +181,17 @@ while (-not $process.HasExited) {
         exit 2
     }
     if ([DateTimeOffset]::UtcNow -ge $deadline) {
-        Invoke-NativeResult 'docker' @(
-            'compose', 'stop', '--timeout', '5', $service
-        ) | Out-Null
-        Invoke-NativeResult 'docker' @('rm', '-f', $containerName) | Out-Null
+        $stopped = Stop-ModelWriter $service $containerName
         if (-not $process.WaitForExit(30000)) {
             $process.Kill()
             $process.WaitForExit()
+        }
+        if (-not $stopped) {
+            Write-Error (
+                'The model pull deadline expired and FCP could not prove that ' +
+                'the optional model writer stopped.'
+            )
+            exit 3
         }
         Write-Error 'Model installation exceeded its bounded host-side deadline.'
         exit 1
