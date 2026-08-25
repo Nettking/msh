@@ -205,20 +205,199 @@ def test_the_supervisor_updates_source_only_after_the_child_exits() -> None:
 
 
 def test_the_supervisor_relaunches_only_for_the_approved_exit_code() -> None:
+    """The *update* relaunch stays keyed to exactly one exit code.
+
+    Ordinary restart is a separate decision with its own state machine below.
+    This test pins the boundary between them: reaching the update path still
+    requires the approved code or an active trial, and nothing else.
+    """
+
     supervisor = _text(SUPERVISOR)
 
     assert "$ApprovedUpdateRestartExitCode = 75" in supervisor
-    # Any other exit code, including 0 and Ctrl+C, ends supervision -- unless a
-    # *trial* child exited, which is precisely the case the pinned fallback
-    # exists for and which the branch never reaches when it crashes on startup.
     assert (
         "if ($exitCode -ne $ApprovedUpdateRestartExitCode -and -not $trialActive) {"
         in supervisor
     )
-    assert "exit $exitCode" in supervisor
+    # Everything that is neither the approved code nor a trial is handled inside
+    # that branch, so the update path below it is unreachable for an ordinary
+    # exit -- the finalize/plan sequence still runs only for 75 or a trial.
+    loop = supervisor[supervisor.index("while ($true) {") :]
+    ordinary = loop.index(
+        "if ($exitCode -ne $ApprovedUpdateRestartExitCode -and -not $trialActive) {"
+    )
+    assert ordinary < loop.index("$finalize = Invoke-Finalize")
     # And a trial is only ever "active" because the host agent said the child it
     # just planned is one. The supervisor never decides that for itself.
     assert "$trialActive = ([string]$plan.mode -eq 'trial')" in supervisor
+
+
+# --------------------------------------------------------------------------
+# ordinary-failure supervision: restart, bounded backoff, deterministic fence
+# --------------------------------------------------------------------------
+
+
+def _ordinary_exit_branch() -> str:
+    """The body that decides what an ordinary (non-update, non-trial) exit means."""
+
+    supervisor = _text(SUPERVISOR)
+    loop = supervisor[supervisor.index("while ($true) {") :]
+    start = loop.index(
+        "if ($exitCode -ne $ApprovedUpdateRestartExitCode -and -not $trialActive) {"
+    )
+    return loop[start : loop.index("$finalize = Invoke-Finalize")]
+
+
+def test_an_unexpected_ordinary_failure_is_restarted_rather_than_ending_supervision() -> None:
+    """The defect this delivery closes.
+
+    The supervisor used to ``exit $exitCode`` for *every* ordinary child exit,
+    so a single unhandled recorder exception ended supervision and left the
+    host with no recorder until an operator noticed. Restart is now the
+    supervisor's own decision, which is what makes it the child's owner.
+    """
+
+    branch = _ordinary_exit_branch()
+
+    # The branch no longer ends supervision unconditionally: it can loop.
+    assert "continue" in branch
+    # And the restart re-enters the same loop, so the child is started by the
+    # one existing launch site rather than a second one.
+    supervisor = _text(SUPERVISOR)
+    assert supervisor.count("Start-Recorder $nonce $buildCommit") == 1
+
+
+def test_an_operator_stop_is_never_restarted() -> None:
+    branch = _ordinary_exit_branch()
+    supervisor = _text(SUPERVISOR)
+
+    # The intentional-stop check is the first thing the branch does, before any
+    # counter moves, so an operator stop can never contribute to a crash streak.
+    assert branch.index("Test-IntentionalStop $exitCode") < branch.index(
+        "$rapidFailureStreak += 1"
+    )
+    assert "exit $exitCode" in branch[: branch.index("$rapidFailureStreak += 1")]
+
+    # A graceful zero is the recorder's own Ctrl+C path; a console interrupt
+    # that bypassed its handler arrives as STATUS_CONTROL_C_EXIT instead.
+    assert "$WindowsControlCExitCode = -1073741510" in supervisor
+    stop = supervisor[supervisor.index("function Test-IntentionalStop") :]
+    stop = stop.split("\n}\n", 1)[0]
+    assert "if ($ExitCode -eq 0) { return $true }" in stop
+    assert "if ($ExitCode -eq $WindowsControlCExitCode) { return $true }" in stop
+
+
+def test_repeated_rapid_failures_fence_supervision_instead_of_looping() -> None:
+    branch = _ordinary_exit_branch()
+    supervisor = _text(SUPERVISOR)
+
+    # The fence is checked before the backoff wait, so the fencing failure does
+    # not first sleep for a restart it will never make.
+    assert branch.index("if ($rapidFailureStreak -ge $MaxRapidRestarts) {") < branch.index(
+        "Start-Sleep"
+    )
+    # It stops with a code of its own rather than the child's, so an external
+    # service manager can tell a fenced host from a normal recorder stop.
+    assert "$CrashFenceExitCode = 6" in supervisor
+    assert "exit $CrashFenceExitCode" in branch
+    # The fence lives in memory for the life of this supervisor. A state file
+    # would be one more thing a crash could leave behind and go stale.
+    assert "$rapidFailureStreak = 0" in supervisor
+    for persisted in ("Out-File", "Set-Content", "Export-Clixml", "New-Item"):
+        assert persisted not in supervisor
+
+
+def test_the_restart_backoff_is_bounded_by_construction() -> None:
+    supervisor = _text(SUPERVISOR)
+
+    # A finite ladder whose last entry is the ceiling, not a doubling that a
+    # cap has to catch: there is no expression here that can grow at all.
+    assert "[int[]]$RestartBackoffLadderSeconds = @(5, 15, 45, 120)" in supervisor
+    delay = supervisor[supervisor.index("function Get-RestartDelaySeconds") :]
+    delay = delay.split("\n}\n", 1)[0]
+    # The index is clamped to the last rung in both directions.
+    assert "if ($index -lt 0) { $index = 0 }" in delay
+    assert "$last = $RestartBackoffLadderSeconds.Count - 1" in delay
+    assert "if ($index -gt $last) { $index = $last }" in delay
+    # No arithmetic that could compound the delay.
+    for growth in ("*", "[math]::Pow", "-shl"):
+        assert growth not in delay
+
+
+def test_a_healthy_runtime_decays_the_crash_fence() -> None:
+    branch = _ordinary_exit_branch()
+    supervisor = _text(SUPERVISOR)
+
+    assert "[int]$HealthyRuntimeSeconds = 120" in supervisor
+    # Measured across the child, not guessed from the exit code.
+    assert "$childClock = [System.Diagnostics.Stopwatch]::StartNew()" in supervisor
+    assert "$childRuntimeSeconds = $childClock.Elapsed.TotalSeconds" in supervisor
+    # The reset happens before this failure is counted, so a healthy runtime
+    # followed by a crash starts a fresh streak at one rather than continuing.
+    reset = branch.index("if ($childRuntimeSeconds -ge $HealthyRuntimeSeconds) {")
+    assert reset < branch.index("$rapidFailureStreak += 1")
+    # An approved update or trial verdict is not a failure either.
+    loop = supervisor[supervisor.index("while ($true) {") :]
+    assert loop.count("$rapidFailureStreak = 0") == 2
+
+
+def test_an_ordinary_restart_adds_no_update_or_trial_bookkeeping() -> None:
+    """A crash restart is not an update, and must not borrow its authority."""
+
+    branch = _ordinary_exit_branch()
+
+    # No relaunch journal entry, no watchdog, no plan, no Git.
+    for forbidden in (
+        "Set-RelaunchedNonce",
+        "Start-TrialWatchdog",
+        "Invoke-Finalize",
+        "Read-LaunchPlan",
+        "$replacementPending = $true",
+        "$trialActive = $true",
+        "$launchRoot =",
+        "$launchBuildCommit =",
+    ):
+        assert forbidden not in branch, f"an ordinary restart must not do {forbidden}"
+
+
+def test_the_supervision_policy_is_never_supplied_by_the_launcher() -> None:
+    """Production always runs the defaults; the parameters exist for tests.
+
+    They are range-validated too, so even a hand-run supervisor cannot be given
+    a value that removes the fence or unbounds the wait.
+    """
+
+    supervisor = _text(SUPERVISOR)
+    launcher = _text(LAUNCHER)
+
+    for policy in (
+        "HealthyRuntimeSeconds",
+        "RestartBackoffLadderSeconds",
+        "MaxRapidRestarts",
+    ):
+        assert f"-{policy}" not in launcher, f"the launcher must not pass {policy}"
+
+    assert "[ValidateRange(1, 3600)]\n    [int]$HealthyRuntimeSeconds" in supervisor
+    assert "[ValidateCount(1, 16)]" in supervisor
+    assert "[ValidateRange(2, 100)]\n    [int]$MaxRapidRestarts" in supervisor
+
+
+def test_the_restart_state_machine_never_signals_or_waits_on_a_process() -> None:
+    """Restart is reached only because the child already exited on its own."""
+
+    branch = _ordinary_exit_branch()
+
+    for forbidden in (
+        "Stop-Process",
+        "Wait-Process",
+        "Get-Process",
+        "taskkill",
+        ".Kill",
+        "CloseMainWindow",
+    ):
+        assert forbidden not in branch
+    # The only wait is the backoff itself.
+    assert branch.count("Start-Sleep") == 1
 
 
 def test_a_failed_finalize_never_relaunches() -> None:
