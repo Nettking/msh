@@ -158,6 +158,8 @@ def test_posix_start_survives_optional_ollama_start_failure(tmp_path: Path) -> N
     calls = tmp_path / "calls.log"
     env = _fake_start_tools_with_ollama_failure(tmp_path, calls)
     env["FCP_SUPPRESS_BROWSER"] = "1"
+    env["FCP_DATA_DIR"] = str(tmp_path / "data")
+    env["FCP_RESULTS_DIR"] = str(tmp_path / "results")
 
     completed = subprocess.run(
         ["sh", str(ROOT / "start.sh")],
