@@ -12,6 +12,7 @@ from catalog.flask_app.services import capability_ai_service
 from catalog.flask_app.services.capability_config_service import CapabilityConfig
 from catalog.flask_app.services.host_model_install_handoff import (
     HOST_OPERATION_STALE_SECONDS,
+    MODEL_REQUEST_ID,
     HostModelInstallHandoff,
     MODEL_REQUEST_SCHEMA,
 )
@@ -45,6 +46,7 @@ def test_browser_local_pull_is_a_declarative_host_request(tmp_path, monkeypatch)
     request_file = tmp_path / "data" / "federation" / "update-agent" / "request.json"
     request = json.loads(request_file.read_text(encoding="utf-8"))
     assert request["schema"] == MODEL_REQUEST_SCHEMA
+    assert request["request_id"] == MODEL_REQUEST_ID == "host-model-install"
     assert request["action"] == "install"
     assert request["model"] == "llama3.2:3b"
     assert request["target"] == "ollama"
