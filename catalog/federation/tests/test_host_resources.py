@@ -54,6 +54,14 @@ def measurement(
     )
 
 
+def _keep_byte_measurement_independent(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        host_resources.shutil,
+        "disk_usage",
+        lambda _path: SimpleNamespace(total=2000, used=1000, free=1000),
+    )
+
+
 def test_thresholds_are_ordered_and_integer_bounded() -> None:
     with pytest.raises(ValueError, match="byte thresholds must be ordered"):
         PressureThresholds(
@@ -319,10 +327,11 @@ def test_inode_probe_failure_keeps_valid_byte_measurement(
     def broken_statvfs(_path: Path) -> object:
         raise OSError("unsupported")
 
+    _keep_byte_measurement_independent(monkeypatch)
     monkeypatch.setattr(host_resources.os, "statvfs", broken_statvfs, raising=False)
     result = measure_filesystem(tmp_path, observed_at=NOW)
     assert result.available is True
-    assert result.free_bytes is not None
+    assert result.free_bytes == 1000
     assert result.total_inodes is None
     assert result.free_inodes is None
 
@@ -345,6 +354,7 @@ def test_inode_measurement_prefers_available_inodes(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    _keep_byte_measurement_independent(monkeypatch)
     monkeypatch.setattr(
         host_resources.os,
         "statvfs",
@@ -352,6 +362,7 @@ def test_inode_measurement_prefers_available_inodes(
         raising=False,
     )
     result = measure_filesystem(tmp_path, observed_at=NOW)
+    assert result.free_bytes == 1000
     assert result.total_inodes == 1000
     assert result.free_inodes == 321
 
@@ -360,6 +371,7 @@ def test_zero_available_inodes_never_falls_back_to_root_reserved_inodes(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
 ) -> None:
+    _keep_byte_measurement_independent(monkeypatch)
     monkeypatch.setattr(
         host_resources.os,
         "statvfs",
@@ -367,6 +379,7 @@ def test_zero_available_inodes_never_falls_back_to_root_reserved_inodes(
         raising=False,
     )
     result = measure_filesystem(tmp_path, observed_at=NOW)
+    assert result.free_bytes == 1000
     assert result.total_inodes == 1000
     assert result.free_inodes == 0
     assessed = assess_measurement(result, thresholds=thresholds(), now=NOW)
