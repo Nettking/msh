@@ -1130,7 +1130,7 @@ class RecorderRuntime:
         for source_name, base_url, future in completed:
             try:
                 _reported_source, ok, error = future.result()
-            except Exception as exc:  # noqa: BLE001 - scheduler must isolate a source task
+            except Exception as exc:
                 ok = False
                 error = f"{type(exc).__name__}: {exc}"
                 with self.lock:
