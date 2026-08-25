@@ -110,7 +110,8 @@ jobs:
             'scripts/windows/fcp_update_agent.ps1',
             'scripts/windows/fcp_recorder_update_agent.ps1',
             'scripts/windows/fcp_recorder_supervisor.ps1',
-            'scripts/windows/start_tailscale_recorder.ps1'
+            'scripts/windows/start_tailscale_recorder.ps1',
+            'scripts/windows/tests/fcp_recorder_supervisor_restart_smoke.ps1'
           )) {
             $tokens = $null
             $errors = $null
@@ -221,6 +222,13 @@ jobs:
         run: >-
           powershell -NoProfile -ExecutionPolicy Bypass
           -File .\scripts\windows\tests\fcp_update_agent_activation_smoke.ps1
+
+      - name: Smoke Windows recorder supervisor restart policy
+        if: runner.os == 'Windows'
+        shell: powershell
+        run: >-
+          powershell -NoProfile -ExecutionPolicy Bypass
+          -File .\scripts\windows\tests\fcp_recorder_supervisor_restart_smoke.ps1
 
       - name: Parse and smoke POSIX host agent
         if: runner.os == 'Linux'
