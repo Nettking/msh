@@ -11,8 +11,13 @@ from catalog.mtconnect_recorder.resource_pressure import (
     RecorderAdmissionController,
     RecorderResourceBudget,
     attach_runtime_resource_pressure,
+    install_runtime_resource_pressure,
 )
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
+
+# Match production startup even if another full-suite test imported the runtime
+# submodule directly before this module was collected.
+install_runtime_resource_pressure(recorder_runtime)
 
 NOW = datetime(2026, 8, 25, 16, 0, tzinfo=timezone.utc)
 SOURCE = "machine"
