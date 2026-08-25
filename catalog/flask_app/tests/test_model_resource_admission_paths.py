@@ -4,6 +4,10 @@ import json
 import os
 from pathlib import Path
 
+from catalog.federation.host_resources import (
+    DEFAULT_CRITICAL_FREE_BYTES,
+    DEFAULT_PRESSURE_FREE_BYTES,
+)
 from catalog.flask_app.services import capability_ai_service
 from catalog.flask_app.services.capability_config_service import CapabilityConfig
 from catalog.flask_app.services.host_model_install_handoff import (
@@ -141,10 +145,9 @@ def test_windows_and_python_model_runners_share_pressure_thresholds() -> None:
     windows = (ROOT / "scripts/windows/fcp_model_pull.ps1").read_text(
         encoding="utf-8"
     )
-    host = (ROOT / "catalog/federation/host_resources.py").read_text(encoding="utf-8")
 
     assert "$CriticalFreeBytes = [int64]10737418240" in windows
     assert "$PressureFreeBytes = [int64]12884901888" in windows
-    assert "10 * 1024**3" in host
-    assert "12 * 1024**3" in host
+    assert DEFAULT_CRITICAL_FREE_BYTES == 10737418240
+    assert DEFAULT_PRESSURE_FREE_BYTES == 12884901888
     assert "'compose', 'stop', '--timeout', '5', $service" in windows
