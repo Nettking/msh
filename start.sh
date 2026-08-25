@@ -59,23 +59,15 @@ docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2 was not foun
 : "${FCP_AI_MODEL:=llama3.2:3b}"
 export FCP_WEB_BIND FCP_RELAY_BIND FCP_WEB_PORT COMPOSE_PROJECT_NAME FCP_DATA_DIR FCP_RESULTS_DIR FCP_AI_MODEL
 
-FCP_BUILD_COMMIT=$(git rev-parse --verify 'HEAD^{commit}')
-case "$FCP_BUILD_COMMIT" in
-  *[!0-9a-fA-F]*|'')
-    echo "FCP could not determine an immutable build commit." >&2
-    exit 1
-    ;;
-esac
-if [ "${#FCP_BUILD_COMMIT}" -ne 40 ]; then
-  echo "FCP build commit is not a full Git object ID." >&2
-  exit 1
-fi
-if [ -n "$(git status --porcelain=v1 --untracked-files=all)" ]; then
-  echo "FCP refuses to label a build from a checkout with local changes." >&2
-  exit 1
-fi
-FCP_BUILD_COMMIT=$(printf '%s' "$FCP_BUILD_COMMIT" | tr 'A-F' 'a-f')
-export FCP_BUILD_COMMIT
+build_core_images() {
+  echo "Building FCP core services through the serialized host build lifecycle ..."
+  if ! FCP_BUILD_COMMIT=$(python3 -m catalog.federation.host_build --repo-root "$ROOT"); then
+    echo "FCP images could not be built safely. Review the host-build error above." >&2
+    return 1
+  fi
+  export FCP_BUILD_COMMIT
+  echo "Built FCP core images from $FCP_BUILD_COMMIT."
+}
 
 if [ "$MODE" = fresh ]; then
   echo
@@ -99,6 +91,11 @@ if [ "$MODE" = fresh ]; then
     exit 2
   fi
 
+  # Build while the current runtime is still available. The build primitive
+  # owns the checkout lock, disk preflight and cache lifecycle; the reset then
+  # consumes that verified image without starting another implicit build.
+  build_core_images
+
   echo
   echo "Stopping FCP before resetting mutable application state..."
   if ! python3 "$ROOT/scripts/posix/stop_fcp_for_fresh_reset.py"; then
@@ -107,7 +104,7 @@ if [ "$MODE" = fresh ]; then
   fi
 
   echo "Resolving and clearing mutable FCP state while preserving recordings..."
-  if ! docker compose run --rm --no-deps --build --entrypoint python flask \
+  if ! docker compose run --rm --no-deps --entrypoint python flask \
     -m catalog.flask_app.services.device_state_reset; then
     echo "Fresh factory reset did not complete. Review the specific path or recording-integrity error above." >&2
     echo "No FCP service will be started from an unverified reset." >&2
@@ -126,6 +123,10 @@ if [ "$MODE" = fresh ]; then
   echo
 fi
 
+if [ -z "${FCP_BUILD_COMMIT:-}" ]; then
+  build_core_images
+fi
+
 AGENT_DIR="$FCP_DATA_DIR/federation/update-agent"
 mkdir -p "$AGENT_DIR"
 nohup python3 "$ROOT/scripts/posix/fcp_update_agent.py" \
@@ -134,9 +135,6 @@ nohup python3 "$ROOT/scripts/posix/fcp_update_agent.py" \
   >>"$AGENT_DIR/agent.log" 2>&1 </dev/null &
 
 sleep 0.1
-
-echo "Building FCP services from $FCP_BUILD_COMMIT ..."
-docker compose build relay flask recorder
 
 echo "Starting required Federation relay and managed recorder ..."
 docker compose up -d relay recorder
