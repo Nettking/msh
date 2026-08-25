@@ -20,9 +20,17 @@ from catalog.mtconnect_recorder.resource_pressure import (
     RecorderResourceBudget,
     RecorderResourcePaused,
     attach_runtime_resource_pressure,
+    install_runtime_resource_pressure,
 )
 from catalog.mtconnect_recorder.schema_compat import CHECKPOINT_SCHEMA
 from catalog.mtconnect_recorder.storage import DurableRecorderStore
+
+# Production startup reaches runtime through catalog.mtconnect_recorder.run(),
+# which installs the boundary after launcher configuration is established. The
+# full suite may have imported the runtime submodule directly earlier, so make
+# this test module explicitly exercise the same installed production boundary
+# instead of depending on collection/import order.
+install_runtime_resource_pressure(recorder_runtime)
 
 NOW = datetime(2026, 8, 25, 16, 0, tzinfo=timezone.utc)
 SOURCE = "machine"
