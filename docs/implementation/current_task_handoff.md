@@ -2,7 +2,7 @@
 
 Status: **current repository handoff**
 
-Reviewed: **2026-08-24 Europe/Oslo**
+Reviewed: **2026-08-25 Europe/Oslo**
 
 ## Repository state
 
@@ -120,17 +120,23 @@ behavior. P04/P05/P09 physical evidence remains open; B01 still owns aggregate
 host-resource admission across concurrent writers. No physical acceptance state
 changed.
 
-The analysis-slice and upload crash-correctness deliveries together advance
-**B08 4/5 properties automated-proven**. Deterministic analysis slice archives
-are atomically published or fully verified/rebuilt before reuse. Upload staging
-has a durable ownership record plus exact legacy-layout orphan recovery;
-publication startup reconciliation hides non-ready batches behind an exact
-`.fcp-importing` ownership marker and repairs supported database/filesystem crash
-windows; cleanup validates confined batch/file paths, regular non-reparse types,
-expected sizes and content digests before unlinking and preserves ambiguous or
-unrelated content. B08 remains open only for bounded stale per-attempt analysis
-workspace/partial lifecycle. P05/P09 physical evidence remains open, including
-exact-host power-loss behavior; no physical acceptance state changed.
+The analysis-slice, upload crash-correctness, and analysis-workspace
+reconciliation deliveries together provide **B08 5/5 properties
+automated-proven**. Deterministic analysis slice archives are atomically
+published or fully verified/rebuilt before reuse. Upload staging has a durable
+ownership record plus exact legacy-layout orphan recovery; publication startup
+reconciliation hides non-ready batches behind an exact `.fcp-importing`
+ownership marker and repairs supported database/filesystem crash windows; upload
+cleanup validates confined batch/file paths, regular non-reparse types, expected
+sizes and content digests before unlinking and preserves ambiguous or unrelated
+content. Federated analysis workspaces now receive an ownership marker before
+large materialization; provider startup performs age-bounded, scan-bounded
+reconciliation of stale owned or exact legacy attempt layouts, never follows
+symlinks/reparse points, and preserves ambiguous content. Same-attempt retry
+reset is also ownership- and path-confined rather than blindly deleting the
+expected pathname. B08's automated implementation properties are complete;
+P05/P09 exact-host hard-kill/power-loss evidence remains open and no physical
+acceptance state changed.
 
 1. Continue the reconciled robustness blockers B01-B10 from [the authoritative reconciliation](v1_robustness_reconciliation.md), one named delivery/PR at a time and in the recommended dependency order.
 2. Keep the documented non-goals and accepted boundaries out of the v1 implementation unless new concrete evidence invalidates them.
