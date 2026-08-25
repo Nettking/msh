@@ -231,21 +231,23 @@ def test_start_cmd_resume_runs_before_long_running_flask_container() -> None:
     )
 
 
-def test_update_cmd_fast_forwards_then_resumes_without_resetting_state() -> None:
-    script = _update_script()
+def test_update_cmd_is_retired_without_source_or_runtime_mutation() -> None:
+    script = _update_script().lower()
 
-    assert "git pull --ff-only" in script
-    assert "chcp 65001 >nul" in script
-    assert "call start.cmd --resume" in script
-    assert script.index("git pull --ff-only") < script.index(
-        "call start.cmd --resume"
-    )
-    assert "git reset --hard" not in script
+    assert "update.cmd is retired" in script
+    assert "check for updates" in script
+    assert "update all devices" in script
+    assert "exit /b 2" in script
+    assert "git pull --ff-only" not in script
+    assert "git fetch" not in script
+    assert "git merge" not in script
+    assert "git reset" not in script
     assert "git clean" not in script
+    assert "call start.cmd" not in script
+    assert "docker compose" not in script
+    assert "powershell" not in script
     assert "start.cmd --fresh" not in script
-    assert "docker compose down" not in script
-    assert "docker compose down -v" not in script
-    assert "Remove-Item" not in script
+    assert "remove-item" not in script
     assert "rmdir" not in script
 
 
