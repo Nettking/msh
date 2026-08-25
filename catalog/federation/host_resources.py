@@ -1,10 +1,10 @@
 """Shared host-resource pressure and admission primitives for FCP.
 
 The robustness contract distinguishes four states for any backing filesystem:
-NORMAL, WARNING, PRESSURE and CRITICAL.  The state is deliberately conservative:
+NORMAL, WARNING, PRESSURE and CRITICAL. The state is deliberately conservative:
 an unavailable, stale or time-invalid measurement is CRITICAL rather than healthy.
 
-This module is intentionally narrower than a host daemon.  It provides:
+This module is intentionally narrower than a host daemon. It provides:
 
 * path -> backing-filesystem measurement with byte and, where exposed, inode state;
 * one shared pressure vocabulary and threshold policy;
@@ -15,14 +15,15 @@ This module is intentionally narrower than a host daemon.  It provides:
   free-space reserve.
 
 Cross-process/host writers still have to use the same contract at their host-owned
-boundary.  This module does not claim that an in-process reservation can reserve
+boundary. This module does not claim that an in-process reservation can reserve
 space against an unrelated process; consumers must remeasure immediately before
-large work and the later host-integration deliveries must cover their actual
-backing resources.
+large work and later host-integration deliveries must cover their actual backing
+resources.
 """
 
 from __future__ import annotations
 
+import math
 import os
 import shutil
 import threading
@@ -36,8 +37,8 @@ from pathlib import Path
 GIBIBYTE = 1024**3
 
 # Existing v1 storage/update safety work already converged on a 10 GiB emergency
-# floor.  Keep that value as the CRITICAL boundary rather than creating a third,
-# incompatible floor.  PRESSURE adds 2 GiB so bounded active recorder work can
+# floor. Keep that value as the CRITICAL boundary rather than creating a third,
+# incompatible floor. PRESSURE adds 2 GiB so bounded active recorder work can
 # finish after new large writers are stopped; WARNING adds one measured update
 # cycle (4 GiB) so the host signals shrinking headroom before PRESSURE.
 DEFAULT_CRITICAL_FREE_BYTES = 10 * GIBIBYTE
@@ -45,10 +46,10 @@ DEFAULT_PRESSURE_FREE_BYTES = 12 * GIBIBYTE
 DEFAULT_WARNING_FREE_BYTES = 16 * GIBIBYTE
 
 # Inode/file exhaustion is independent of byte exhaustion on filesystems that
-# expose inode accounting.  These values are intentionally small absolute
+# expose inode accounting. These values are intentionally small absolute
 # reserves: CRITICAL leaves enough file identities for atomic temp/final,
 # checkpoint/status/WAL/journal completion; PRESSURE/WARNING stop new large work
-# progressively earlier.  Filesystems without inode accounting do not fabricate
+# progressively earlier. Filesystems without inode accounting do not fabricate
 # a number and are judged on bytes only.
 DEFAULT_CRITICAL_FREE_INODES = 128
 DEFAULT_PRESSURE_FREE_INODES = 512
@@ -102,18 +103,30 @@ class PressureThresholds:
             self.pressure_free_inodes,
             self.warning_free_inodes,
         )
-        if any(isinstance(value, bool) or value < 0 for value in byte_values):
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 0
+            for value in byte_values
+        ):
             raise ValueError("resource byte thresholds must be non-negative integers")
-        if any(isinstance(value, bool) or value < 0 for value in inode_values):
+        if any(
+            isinstance(value, bool) or not isinstance(value, int) or value < 0
+            for value in inode_values
+        ):
             raise ValueError("resource inode thresholds must be non-negative integers")
         if not byte_values[0] <= byte_values[1] <= byte_values[2]:
             raise ValueError("resource byte thresholds must be ordered")
         if not inode_values[0] <= inode_values[1] <= inode_values[2]:
             raise ValueError("resource inode thresholds must be ordered")
-        if self.max_measurement_age_seconds <= 0:
-            raise ValueError("resource measurement age must be positive")
-        if self.future_measurement_tolerance_seconds < 0:
-            raise ValueError("resource future tolerance must be non-negative")
+        if (
+            not math.isfinite(self.max_measurement_age_seconds)
+            or self.max_measurement_age_seconds <= 0
+        ):
+            raise ValueError("resource measurement age must be finite and positive")
+        if (
+            not math.isfinite(self.future_measurement_tolerance_seconds)
+            or self.future_measurement_tolerance_seconds < 0
+        ):
+            raise ValueError("resource future tolerance must be finite and non-negative")
 
 
 @dataclass(frozen=True)
@@ -168,7 +181,7 @@ def _resource_identity(path: Path) -> str:
 
     stat = path.stat()
     # ``st_dev`` is the mount/device identity on POSIX and is also populated by
-    # CPython on supported Windows filesystems.  It is intentionally local only;
+    # CPython on supported Windows filesystems. It is intentionally local only;
     # no filesystem layout is published to Federation peers.
     return f"device:{int(stat.st_dev)}"
 
@@ -181,13 +194,30 @@ def _inode_measurement(path: Path) -> tuple[int | None, int | None]:
         value = statvfs(path)
     except OSError:
         # Some mounted filesystems expose byte capacity but no usable inode
-        # accounting.  That is different from the whole measurement failing.
+        # accounting. That is different from the whole measurement failing.
         return None, None
     total = int(getattr(value, "f_files", 0) or 0)
     free = int(getattr(value, "f_favail", 0) or getattr(value, "f_ffree", 0) or 0)
     if total <= 0:
         return None, None
     return total, max(free, 0)
+
+
+def _unavailable_measurement(
+    *,
+    observed_at: datetime,
+    error_code: str = "measurement_unavailable",
+) -> FilesystemMeasurement:
+    return FilesystemMeasurement(
+        resource_id="unavailable",
+        observed_at=observed_at.astimezone(timezone.utc),
+        total_bytes=None,
+        free_bytes=None,
+        total_inodes=None,
+        free_inodes=None,
+        available=False,
+        error_code=error_code,
+    )
 
 
 def measure_filesystem(
@@ -212,16 +242,7 @@ def measure_filesystem(
         resource_id = _resource_identity(existing)
         total_inodes, free_inodes = _inode_measurement(existing)
     except (OSError, RuntimeError, ValueError):
-        return FilesystemMeasurement(
-            resource_id="unavailable",
-            observed_at=now.astimezone(timezone.utc),
-            total_bytes=None,
-            free_bytes=None,
-            total_inodes=None,
-            free_inodes=None,
-            available=False,
-            error_code="measurement_unavailable",
-        )
+        return _unavailable_measurement(observed_at=now)
     return FilesystemMeasurement(
         resource_id=resource_id,
         observed_at=now.astimezone(timezone.utc),
@@ -250,6 +271,10 @@ def _level_for_remaining(
     return PressureLevel.NORMAL
 
 
+def _valid_aware_timestamp(value: datetime) -> bool:
+    return value.tzinfo is not None and value.utcoffset() is not None
+
+
 def assess_measurement(
     measurement: FilesystemMeasurement,
     *,
@@ -263,55 +288,64 @@ def assess_measurement(
     policy = thresholds or PressureThresholds()
     if (
         isinstance(reserved_bytes, bool)
+        or not isinstance(reserved_bytes, int)
         or isinstance(reserved_inodes, bool)
+        or not isinstance(reserved_inodes, int)
         or reserved_bytes < 0
         or reserved_inodes < 0
     ):
         raise ValueError("resource reservations must be non-negative integers")
     current = now or datetime.now(timezone.utc)
-    if current.tzinfo is None or current.utcoffset() is None:
+    if not _valid_aware_timestamp(current):
         raise ValueError("resource assessment requires a timezone-aware timestamp")
     current = current.astimezone(timezone.utc)
-    observed = measurement.observed_at.astimezone(timezone.utc)
-    age = (current - observed).total_seconds()
 
     reasons: list[str] = []
     effective_bytes: int | None = None
     effective_inodes: int | None = None
 
-    if not measurement.available or measurement.free_bytes is None:
-        reasons.append(measurement.error_code or "measurement_unavailable")
-        level = PressureLevel.CRITICAL
-    elif age < -policy.future_measurement_tolerance_seconds:
+    if not _valid_aware_timestamp(measurement.observed_at):
         reasons.append("measurement_time_invalid")
         level = PressureLevel.CRITICAL
-    elif age > policy.max_measurement_age_seconds:
-        reasons.append("measurement_stale")
+    elif not measurement.available or measurement.free_bytes is None:
+        reasons.append(measurement.error_code or "measurement_unavailable")
         level = PressureLevel.CRITICAL
     else:
-        effective_bytes = max(int(measurement.free_bytes) - reserved_bytes, 0)
-        byte_level = _level_for_remaining(
-            effective_bytes,
-            critical=policy.critical_free_bytes,
-            pressure=policy.pressure_free_bytes,
-            warning=policy.warning_free_bytes,
-        )
-        level = byte_level
-        if byte_level != PressureLevel.NORMAL:
-            reasons.append(f"bytes_{byte_level.name.lower()}")
-
-        if measurement.free_inodes is not None:
-            effective_inodes = max(int(measurement.free_inodes) - reserved_inodes, 0)
-            inode_level = _level_for_remaining(
-                effective_inodes,
-                critical=policy.critical_free_inodes,
-                pressure=policy.pressure_free_inodes,
-                warning=policy.warning_free_inodes,
+        observed = measurement.observed_at.astimezone(timezone.utc)
+        age = (current - observed).total_seconds()
+        if age < -policy.future_measurement_tolerance_seconds:
+            reasons.append("measurement_time_invalid")
+            level = PressureLevel.CRITICAL
+        elif age > policy.max_measurement_age_seconds:
+            reasons.append("measurement_stale")
+            level = PressureLevel.CRITICAL
+        else:
+            effective_bytes = max(int(measurement.free_bytes) - reserved_bytes, 0)
+            byte_level = _level_for_remaining(
+                effective_bytes,
+                critical=policy.critical_free_bytes,
+                pressure=policy.pressure_free_bytes,
+                warning=policy.warning_free_bytes,
             )
-            if inode_level > level:
-                level = inode_level
-            if inode_level != PressureLevel.NORMAL:
-                reasons.append(f"inodes_{inode_level.name.lower()}")
+            level = byte_level
+            if byte_level != PressureLevel.NORMAL:
+                reasons.append(f"bytes_{byte_level.name.lower()}")
+
+            if measurement.free_inodes is not None:
+                effective_inodes = max(
+                    int(measurement.free_inodes) - reserved_inodes,
+                    0,
+                )
+                inode_level = _level_for_remaining(
+                    effective_inodes,
+                    critical=policy.critical_free_inodes,
+                    pressure=policy.pressure_free_inodes,
+                    warning=policy.warning_free_inodes,
+                )
+                if inode_level > level:
+                    level = inode_level
+                if inode_level != PressureLevel.NORMAL:
+                    reasons.append(f"inodes_{inode_level.name.lower()}")
 
     return ResourceAssessment(
         resource_id=measurement.resource_id,
@@ -329,7 +363,7 @@ class ProcessResourceAdmission:
     """Aggregate active bounded work sharing one process and filesystem.
 
     The controller deliberately refuses *new* reservations at PRESSURE or
-    CRITICAL.  Work that already owns a reservation keeps it until its context
+    CRITICAL. Work that already owns a reservation keeps it until its context
     exits, which is the primitive needed by raw-first/checkpoint-last callers:
     pressure stops new transactions without invalidating completion capacity that
     was admitted before the transaction started.
@@ -351,8 +385,14 @@ class ProcessResourceAdmission:
     def _active_for(self, resource_id: str) -> tuple[int, int]:
         return self._reserved.get(resource_id, (0, 0))
 
+    def _measure(self, path: Path | str) -> FilesystemMeasurement:
+        try:
+            return self.measurer(path)
+        except (OSError, RuntimeError, ValueError):
+            return _unavailable_measurement(observed_at=self.clock())
+
     def assessment(self, path: Path | str) -> ResourceAssessment:
-        measurement = self.measurer(path)
+        measurement = self._measure(path)
         with self._lock:
             reserved_bytes, reserved_inodes = self._active_for(measurement.resource_id)
             return assess_measurement(
@@ -380,21 +420,23 @@ class ProcessResourceAdmission:
         * subtracting this transaction's declared maximum must still leave the
           CRITICAL byte/inode reserve intact.
 
-        The reservation is accounting, not a sparse/preallocated disk file.  It
+        The reservation is accounting, not a sparse/preallocated disk file. It
         prevents this process's own concurrent writers from double-spending the
-        same measured headroom.  Host-wide consumers still need fresh host-side
+        same measured headroom. Host-wide consumers still need fresh host-side
         measurement/serialization at their own boundary.
         """
 
         if (
             isinstance(bytes_required, bool)
+            or not isinstance(bytes_required, int)
             or isinstance(inodes_required, bool)
+            or not isinstance(inodes_required, int)
             or bytes_required < 0
             or inodes_required < 0
         ):
             raise ValueError("resource requirement must be non-negative integers")
 
-        measurement = self.measurer(path)
+        measurement = self._measure(path)
         resource_id = measurement.resource_id
         with self._lock:
             active_bytes, active_inodes = self._active_for(resource_id)
