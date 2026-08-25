@@ -133,8 +133,6 @@ nohup python3 "$ROOT/scripts/posix/fcp_update_agent.py" \
   --data-directory "$FCP_DATA_DIR" \
   >>"$AGENT_DIR/agent.log" 2>&1 </dev/null &
 
-# The agent uses a non-blocking file lock, so repeated normal starts do not
-# create multiple host mutators.
 sleep 0.1
 
 echo "Building FCP services from $FCP_BUILD_COMMIT ..."
@@ -161,23 +159,17 @@ fi
 echo "Starting Flask workbench ..."
 docker compose up -d flask
 
-# The language model is an optional capability. Core FCP is already running
-# before Ollama or model installation is attempted, so Ollama image/service,
-# model, or network failure cannot gate Federation, recorder, control, or
-# workbench availability.
 FCP_AI_DEGRADED=0
 echo "Starting optional Ollama service ..."
 if ! docker compose up -d ollama; then
   FCP_AI_DEGRADED=1
   echo "WARNING: Ollama is unavailable; core FCP remains running." >&2
-elif ! docker compose exec -T ollama ollama show "$FCP_AI_MODEL" >/dev/null 2>&1; then
-  echo "Installing optional Ollama model: $FCP_AI_MODEL"
-  if ! docker compose --profile model-install run --rm ollama-pull; then
+else
+  echo "Ensuring optional Ollama model through host resource admission: $FCP_AI_MODEL"
+  if ! python3 -m catalog.federation.model_resource_pull \
+    --repo-root "$ROOT" --target ollama --model "$FCP_AI_MODEL"; then
     FCP_AI_DEGRADED=1
-  fi
-  if ! docker compose exec -T ollama ollama show "$FCP_AI_MODEL" >/dev/null 2>&1; then
-    FCP_AI_DEGRADED=1
-    echo "WARNING: AI capability is unavailable; core FCP remains running." >&2
+    echo "WARNING: AI capability is unavailable or resource-paused; core FCP remains running." >&2
   fi
 fi
 

@@ -16,8 +16,9 @@ $ApprovedRepository = 'Nettking/msh'
 $ApprovedBranch = 'main'
 $RequestSchema = 'fcp.host-update-request.v1'
 $ResultSchema = 'fcp.host-update-result.v1'
-# Read-only branch discovery for the Federation software-version dropdown. The
-# Flask process runs no Git, so it asks this host-owned agent instead.
+$ModelRequestSchema = 'fcp.host-model-install-request.v1'
+$ModelResultSchema = 'fcp.host-model-install-result.v1'
+$ModelRequestTtlSeconds = 120
 $BranchesRequestSchema = 'fcp.host-branches-request.v1'
 $BranchesResultSchema = 'fcp.host-branches-result.v1'
 $MaxListedBranches = 60
@@ -26,14 +27,7 @@ $OidPattern = '^[0-9a-f]{40}$'
 $RequestIdPattern = '^[A-Za-z0-9._:-]{1,128}$'
 $BranchPattern = '^(?![./-])(?!.*\.\.)(?!.*//)(?!.*@\{)(?!.*\.lock(?:/|$))[A-Za-z0-9][A-Za-z0-9._/-]{0,180}(?<![./])$'
 $ModelPattern = '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$'
-# Free space an activation needs before it may start. An update rebuilds three
-# images and replaces the running Flask container; discovering there is no room
-# for that *after* Flask has been stopped is the failure this prevents. Keep
-# these two in step with scripts/posix/fcp_update_agent.py, which a test pins.
 $UpdateRequiredFreeBytes = 10737418240
-# Ceiling for the BuildKit cache. Large enough that a build still reuses the
-# dependency layer it just wrote, far below the 21 GB an unbounded cache
-# reached on the host that filled its drive.
 $BuildCacheKeepBytes = 8589934592
 
 function Normalize-DirectoryPath([string]$Value) {
@@ -77,6 +71,18 @@ function Get-RequestResultFile([string]$RequestId) {
         $bytes = [System.Text.Encoding]::UTF8.GetBytes($RequestId)
         $digest = ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
         return Join-Path $AgentDirectory "result-$digest.json"
+    }
+    finally {
+        $sha.Dispose()
+    }
+}
+
+function Get-ModelResultFile([string]$RequestId) {
+    $sha = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $bytes = [System.Text.Encoding]::UTF8.GetBytes($RequestId)
+        $digest = ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
+        return Join-Path $AgentDirectory "model-result-$digest.json"
     }
     finally {
         $sha.Dispose()
@@ -168,9 +174,33 @@ function Write-AgentResult {
     if ([System.Text.Encoding]::UTF8.GetByteCount($json) -gt $MaxBytes) {
         throw 'result_too_large'
     }
-    $requestResultFile = Get-RequestResultFile $RequestId
-    Write-AtomicJsonFile $requestResultFile $json
+    Write-AtomicJsonFile (Get-RequestResultFile $RequestId) $json
     Write-AtomicJsonFile $ResultFile $json
+}
+
+function Write-ModelResult {
+    param(
+        [string]$RequestId,
+        [string]$Model,
+        [string]$Target,
+        [bool]$Ok,
+        [string]$Code,
+        [string]$Message
+    )
+    $value = [ordered]@{
+        schema = $ModelResultSchema
+        request_id = $RequestId
+        action = 'install'
+        model = $Model
+        target = $Target
+        state = if ($Ok) { 'ready' } else { 'degraded' }
+        code = $Code
+        message = if ($Message.Length -gt 512) { $Message.Substring(0, 512) } else { $Message }
+        completed_at = [DateTimeOffset]::UtcNow.ToString('o')
+    }
+    $json = $value | ConvertTo-Json -Compress -Depth 5
+    Write-AtomicJsonFile (Get-ModelResultFile $RequestId) $json
+    Write-AtomicJsonFile (Join-Path $AgentDirectory 'model-result.json') $json
 }
 
 function Get-BranchesResultFile([string]$RequestId) {
@@ -188,8 +218,6 @@ function Get-BranchesResultFile([string]$RequestId) {
 }
 
 function Get-ApprovedBranches {
-    # Behind the same approved-remote check as every other operation here, and
-    # read-only: a listing, never a fetch, a checkout or a mutation.
     if (-not (Test-ApprovedRemote (Last-Text (Invoke-Git @('remote', 'get-url', 'origin'))))) {
         throw 'unapproved_remote'
     }
@@ -257,11 +285,6 @@ function Invoke-BranchesRequest([object]$Request) {
 
 function Invoke-ExternalResult {
     param([string]$FilePath, [string[]]$Arguments)
-    # Windows PowerShell 5.1 can promote native stderr redirected with 2>&1
-    # into an ErrorRecord. With the agent-wide Stop preference that turns
-    # harmless progress diagnostics into terminating PowerShell errors before
-    # LASTEXITCODE can be inspected. Always capture native output under
-    # Continue and make the process exit code the only success authority.
     $previousErrorActionPreference = $ErrorActionPreference
     try {
         $ErrorActionPreference = 'Continue'
@@ -287,20 +310,56 @@ function Invoke-External {
     return @($result.Output)
 }
 
+function Invoke-ModelRequest([object]$Request) {
+    $requestId = [string]$Request.request_id
+    if ($requestId -notmatch $RequestIdPattern) { return $true }
+    $model = [string]$Request.model
+    $target = [string]$Request.target
+    try {
+        if ([string]$Request.action -ne 'install') { throw 'malformed_model_action' }
+        if ($model -notmatch $ModelPattern) { throw 'invalid_model_identifier' }
+        if ($target -notin @('ollama', 'model-provider')) { throw 'invalid_model_target' }
+        $created = [DateTimeOffset]::Parse([string]$Request.created_at).ToUniversalTime()
+        $expires = [DateTimeOffset]::Parse([string]$Request.expires_at).ToUniversalTime()
+        $now = [DateTimeOffset]::UtcNow
+        if (
+            $created -gt $now.AddMinutes(1) -or
+            $expires -le $now -or
+            ($expires - $created).TotalSeconds -gt $ModelRequestTtlSeconds
+        ) {
+            throw 'expired_or_invalid_request'
+        }
+        $script = Join-Path $RepoRoot 'scripts\windows\fcp_model_pull.ps1'
+        $result = Invoke-ExternalResult 'powershell.exe' @(
+            '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script,
+            '-RepoRoot', $RepoRoot, '-Model', $model, '-Target', $target
+        )
+        $ok = $result.ExitCode -eq 0
+        $code = if ($ok) {
+            'installed'
+        } elseif ($result.ExitCode -eq 2) {
+            'resource_pressure'
+        } else {
+            'model_install_failed'
+        }
+        $message = (Last-Text $result.Output).Trim()
+        if ([string]::IsNullOrWhiteSpace($message)) { $message = $code }
+        Write-ModelResult $requestId $model $target $ok $code $message
+    }
+    catch {
+        Write-ModelResult $requestId $model $target $false 'model_install_failed' (
+            'The host rejected or could not complete the model installation request.'
+        )
+    }
+    return $true
+}
+
 function Get-FreeBytes {
-    # The checkout and the Docker data root share the system volume on the
-    # supported Windows layout, so this is the number that decides whether a
-    # build can finish. Docker Desktop's disk image grows on demand from the
-    # same volume and does not shrink when files inside it are deleted.
     $drive = [System.IO.Path]::GetPathRoot((Resolve-Path $RepoRoot).Path)
     return ([System.IO.DriveInfo]::New($drive)).AvailableFreeSpace
 }
 
 function Invoke-BuildCachePrune {
-    # ``--keep-storage`` retains recent cache, so the dependency layer a build
-    # wants to reuse survives while stale entries from earlier commits are
-    # released. Cache is reconstructible by definition, so a failure here is
-    # reported rather than thrown: it must never become an update failure.
     $result = Invoke-ExternalResult 'docker' @(
         'builder', 'prune', '--force', "--keep-storage=$BuildCacheKeepBytes"
     )
@@ -308,11 +367,6 @@ function Invoke-BuildCachePrune {
 }
 
 function Assert-DiskPreflight {
-    # A host that is short on space gets one chance to recover from its own
-    # build cache first: pruning is non-destructive, and a cache past its bound
-    # is the usual reason the room went missing. Only if space is still short
-    # does the activation refuse -- and it refuses here, while the running FCP
-    # is still whole.
     if ((Get-FreeBytes) -ge $UpdateRequiredFreeBytes) { return }
     Invoke-BuildCachePrune | Out-Null
     if ((Get-FreeBytes) -ge $UpdateRequiredFreeBytes) { return }
@@ -355,17 +409,13 @@ function Get-RunningCommit {
         $value = (Last-Text $output).Trim().ToLowerInvariant()
         if ($value -match $OidPattern) { return $value }
     }
-    catch {
-        return $null
-    }
+    catch { return $null }
     return $null
 }
 
 function Get-ServiceRelayVolume([string]$Service) {
     try {
-        $ids = Invoke-External 'docker' @(
-            'compose', 'ps', '-a', '-q', $Service
-        )
+        $ids = Invoke-External 'docker' @('compose', 'ps', '-a', '-q', $Service)
         $containerId = (Last-Text $ids).Trim()
         if ([string]::IsNullOrWhiteSpace($containerId)) { return $null }
         $raw = (Invoke-External 'docker' @('inspect', $containerId)) -join "`n"
@@ -383,31 +433,23 @@ function Get-ServiceRelayVolume([string]$Service) {
         if ([string]::IsNullOrWhiteSpace($name)) { return $null }
         return $name
     }
-    catch {
-        return $null
-    }
+    catch { return $null }
 }
 
 function Preserve-RelayVolumeSelection {
     $mounted = @()
     foreach ($service in @('flask', 'relay')) {
         $value = Get-ServiceRelayVolume $service
-        if (-not [string]::IsNullOrWhiteSpace($value)) {
-            $mounted += $value
-        }
+        if (-not [string]::IsNullOrWhiteSpace($value)) { $mounted += $value }
     }
     $mounted = @($mounted | Select-Object -Unique)
-    if ($mounted.Count -gt 1) {
-        throw 'relay_state_ambiguous'
-    }
+    if ($mounted.Count -gt 1) { throw 'relay_state_ambiguous' }
     if ($mounted.Count -eq 1) {
         $env:FCP_RELAY_VOLUME_NAME = [string]$mounted[0]
         return [string]$mounted[0]
     }
     $inherited = [string]$env:FCP_RELAY_VOLUME_NAME
-    if (-not [string]::IsNullOrWhiteSpace($inherited)) {
-        return $inherited
-    }
+    if (-not [string]::IsNullOrWhiteSpace($inherited)) { return $inherited }
     throw 'relay_state_unresolved'
 }
 
@@ -420,9 +462,7 @@ function Test-Ancestor([string]$Older, [string]$Newer) {
 
 function Inspect-Checkout([AllowNull()][string]$RequestedTarget) {
     $top = (Last-Text (Invoke-Git @('rev-parse', '--show-toplevel'))).Trim()
-    if ((Normalize-DirectoryPath $top) -ne $RepoRoot) {
-        throw 'unsupported_checkout'
-    }
+    if ((Normalize-DirectoryPath $top) -ne $RepoRoot) { throw 'unsupported_checkout' }
     $remote = (Last-Text (Invoke-Git @('remote', 'get-url', 'origin'))).Trim()
     if (-not (Test-ApprovedRemote $remote)) { throw 'unapproved_remote' }
     $branch = (Last-Text (
@@ -444,32 +484,19 @@ function Inspect-Checkout([AllowNull()][string]$RequestedTarget) {
     $approvedTip = (Last-Text (
         Invoke-Git @('rev-parse', '--verify', 'FETCH_HEAD^{commit}')
     )).Trim().ToLowerInvariant()
-    $target = if ($RequestedTarget) {
-        $RequestedTarget.ToLowerInvariant()
-    } else {
-        $approvedTip
-    }
+    $target = if ($RequestedTarget) { $RequestedTarget.ToLowerInvariant() } else { $approvedTip }
     if ($target -notmatch $OidPattern) { throw 'target_unavailable' }
     $targetProbe = Invoke-ExternalResult 'git' @(
         '-C', $RepoRoot, 'cat-file', '-e', "$target^{commit}"
     )
-    if (
-        $targetProbe.ExitCode -ne 0 -or
-        -not (Test-Ancestor $target $approvedTip)
-    ) {
+    if ($targetProbe.ExitCode -ne 0 -or -not (Test-Ancestor $target $approvedTip)) {
         throw 'target_unavailable'
     }
     if ($current -eq $target) {
-        return [ordered]@{
-            state='up_to_date'; current=$current; target=$target;
-            code=$null; message=$null
-        }
+        return [ordered]@{ state='up_to_date'; current=$current; target=$target; code=$null; message=$null }
     }
     if (Test-Ancestor $current $target) {
-        return [ordered]@{
-            state='update_available'; current=$current; target=$target;
-            code=$null; message=$null
-        }
+        return [ordered]@{ state='update_available'; current=$current; target=$target; code=$null; message=$null }
     }
     if (Test-Ancestor $target $current) {
         return [ordered]@{
@@ -509,42 +536,27 @@ function Wait-RuntimeVerified([string]$Target) {
                 return $running
             }
         }
-        catch {
-            # The old Flask container is expected to disappear while activation
-            # is in progress.
-        }
+        catch {}
         Start-Sleep -Seconds 2
     }
     throw 'runtime_verification_timeout'
 }
 
 function Ensure-OllamaModel {
-    $probe = Invoke-External 'docker' @(
+    $probe = Invoke-ExternalResult 'docker' @(
         'compose', 'run', '--rm', '--no-deps', '--entrypoint', 'python',
         'flask', '-c',
         "import os; print(os.environ.get('FCP_AI_MODEL') or 'llama3.2:3b')"
     )
-    $model = (Last-Text $probe).Trim()
-    if ($model -notmatch $ModelPattern) {
-        throw 'invalid_model_identifier'
-    }
-    $existing = Invoke-ExternalResult 'docker' @(
-        'compose', 'exec', '-T', 'ollama', 'ollama', 'show', $model
+    if ($probe.ExitCode -ne 0) { return $false }
+    $model = (Last-Text $probe.Output).Trim()
+    if ($model -notmatch $ModelPattern) { return $false }
+    $script = Join-Path $RepoRoot 'scripts\windows\fcp_model_pull.ps1'
+    $result = Invoke-ExternalResult 'powershell.exe' @(
+        '-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script,
+        '-RepoRoot', $RepoRoot, '-Model', $model, '-Target', 'ollama'
     )
-    if ($existing.ExitCode -eq 0) {
-        return $model
-    }
-    Invoke-External 'docker' @(
-        'compose', '--profile', 'model-install', 'run', '--rm',
-        '--entrypoint', '/bin/ollama', 'ollama-pull', 'pull', $model
-    ) | Out-Null
-    $verified = Invoke-ExternalResult 'docker' @(
-        'compose', 'exec', '-T', 'ollama', 'ollama', 'show', $model
-    )
-    if ($verified.ExitCode -ne 0) {
-        throw 'model_verification_failed'
-    }
-    return $model
+    return ($result.ExitCode -eq 0)
 }
 
 function Process-Request {
@@ -565,20 +577,17 @@ function Process-Request {
     $target = $null
     try {
         $info = Get-Item -LiteralPath $processing
-        if ($info.Length -gt $MaxBytes) {
-            return $true
-        }
+        if ($info.Length -gt $MaxBytes) { return $true }
         $raw = [System.IO.File]::ReadAllText($processing)
-        try {
-            $request = $raw | ConvertFrom-Json
-        }
-        catch {
-            return $true
-        }
+        try { $request = $raw | ConvertFrom-Json } catch { return $true }
 
         if ($request.PSObject.Properties.Name -contains 'schema' -and
             [string]$request.schema -eq $BranchesRequestSchema) {
             return Invoke-BranchesRequest $request
+        }
+        if ($request.PSObject.Properties.Name -contains 'schema' -and
+            [string]$request.schema -eq $ModelRequestSchema) {
+            return Invoke-ModelRequest $request
         }
 
         $requestId = [string]$request.request_id
@@ -589,45 +598,29 @@ function Process-Request {
             ([string]$request.target_commit).ToLowerInvariant()
         }
         if ($request.schema -ne $RequestSchema) { throw 'malformed_message' }
-        if ($requestId -notmatch $RequestIdPattern) {
-            throw 'malformed_request_id'
-        }
+        if ($requestId -notmatch $RequestIdPattern) { throw 'malformed_request_id' }
         if ($action -notin @('check', 'apply')) { throw 'malformed_action' }
         if (
             [string]$request.repository -ne $ApprovedRepository -or
             [string]$request.branch -ne $ApprovedBranch
-        ) {
-            throw 'unapproved_source'
-        }
+        ) { throw 'unapproved_source' }
         if (
             $action -eq 'apply' -and
             ($null -eq $target -or $target -notmatch $OidPattern)
-        ) {
-            throw 'malformed_target'
-        }
-        if ($target -and $target -notmatch $OidPattern) {
-            throw 'malformed_target'
-        }
-        $created = [DateTimeOffset]::Parse(
-            [string]$request.created_at
-        ).ToUniversalTime()
-        $expires = [DateTimeOffset]::Parse(
-            [string]$request.expires_at
-        ).ToUniversalTime()
+        ) { throw 'malformed_target' }
+        if ($target -and $target -notmatch $OidPattern) { throw 'malformed_target' }
+        $created = [DateTimeOffset]::Parse([string]$request.created_at).ToUniversalTime()
+        $expires = [DateTimeOffset]::Parse([string]$request.expires_at).ToUniversalTime()
         $now = [DateTimeOffset]::UtcNow
         if (
             $created -gt $now.AddMinutes(1) -or
             $expires -le $now -or
             ($expires - $created).TotalMinutes -gt 15
-        ) {
-            throw 'expired_or_invalid_request'
-        }
+        ) { throw 'expired_or_invalid_request' }
 
         if ($action -eq 'apply') {
             $activateProperty = $request.PSObject.Properties['activate_after']
-            if ($null -eq $activateProperty) {
-                throw 'malformed_activation_grace'
-            }
+            if ($null -eq $activateProperty) { throw 'malformed_activation_grace' }
             $activateAfter = [DateTimeOffset]::Parse(
                 [string]$activateProperty.Value
             ).ToUniversalTime()
@@ -635,28 +628,19 @@ function Process-Request {
                 $activateAfter -lt $created -or
                 $activateAfter -gt $expires -or
                 ($activateAfter - $created).TotalSeconds -gt 30
-            ) {
-                throw 'invalid_activation_grace'
-            }
+            ) { throw 'invalid_activation_grace' }
             $delayMilliseconds = [Math]::Ceiling(
                 ($activateAfter - [DateTimeOffset]::UtcNow).TotalMilliseconds
             )
             if ($delayMilliseconds -gt 0) {
-                Start-Sleep -Milliseconds ([int][Math]::Min(
-                    $delayMilliseconds,
-                    30000
-                ))
+                Start-Sleep -Milliseconds ([int][Math]::Min($delayMilliseconds, 30000))
             }
         }
 
         $inspection = Inspect-Checkout $target
         $runningBefore = Get-RunningCommit
         if ($action -eq 'check') {
-            $message = if ($null -eq $inspection.message) {
-                ''
-            } else {
-                [string]$inspection.message
-            }
+            $message = if ($null -eq $inspection.message) { '' } else { [string]$inspection.message }
             Write-AgentResult `
                 -RequestId $requestId `
                 -Action $action `
@@ -671,9 +655,7 @@ function Process-Request {
         if ($inspection.state -notin @('update_available', 'up_to_date')) {
             $message = if ($null -eq $inspection.message) {
                 'The checkout is not eligible for activation.'
-            } else {
-                [string]$inspection.message
-            }
+            } else { [string]$inspection.message }
             Write-AgentResult `
                 -RequestId $requestId `
                 -Action $action `
@@ -692,43 +674,41 @@ function Process-Request {
             Invoke-Git @('rev-parse', '--verify', 'HEAD^{commit}')
         )).Trim().ToLowerInvariant()
         if ($proven -ne $target) { throw 'source_verification_failed' }
-        $buildStatus = Invoke-Git @(
-            'status', '--porcelain=v1', '--untracked-files=all'
-        )
-        if (($buildStatus -join '').Length -gt 0) {
-            throw 'dirty_build_context'
-        }
+        $buildStatus = Invoke-Git @('status', '--porcelain=v1', '--untracked-files=all')
+        if (($buildStatus -join '').Length -gt 0) { throw 'dirty_build_context' }
 
         Preserve-RelayVolumeSelection | Out-Null
         $env:FCP_BUILD_COMMIT = $target
-        # Before the build, because the build is what consumes the space and
-        # the running FCP is still whole at this point.
         Assert-DiskPreflight
         Invoke-External 'docker' @(
             'compose', 'build', 'relay', 'flask', 'recorder'
         ) | Out-Null
-        # And again after, so the cache this build just wrote is bounded rather
-        # than left for the next update to trip over.
         Invoke-BuildCachePrune | Out-Null
         Invoke-External 'docker' @(
-            'compose', 'up', '-d', 'relay', 'ollama', 'recorder'
+            'compose', 'up', '-d', 'relay', 'recorder'
         ) | Out-Null
-        Ensure-OllamaModel | Out-Null
-        Invoke-External 'docker' @(
-            'compose', 'stop', 'flask'
-        ) | Out-Null
+        $ollamaStart = Invoke-ExternalResult 'docker' @(
+            'compose', 'up', '-d', 'ollama'
+        )
+        $aiReady = $false
+        if ($ollamaStart.ExitCode -eq 0) {
+            $aiReady = [bool](Ensure-OllamaModel)
+        }
+        Invoke-External 'docker' @('compose', 'stop', 'flask') | Out-Null
         $resume = Invoke-ExternalResult 'docker' @(
             'compose', 'run', '--rm', '--no-deps', '--entrypoint', 'python',
-            'flask', '-m',
-            'catalog.flask_app.services.existing_setup_resume'
+            'flask', '-m', 'catalog.flask_app.services.existing_setup_resume'
         )
         if ($resume.ExitCode -notin @(0, 4)) {
             throw "resume_failed:$($resume.ExitCode)"
         }
-        Invoke-External 'docker' @(
-            'compose', 'up', '-d', 'flask'
-        ) | Out-Null
+        Invoke-External 'docker' @('compose', 'up', '-d', 'flask') | Out-Null
         $running = Wait-RuntimeVerified $target
+        $message = if ($aiReady) {
+            'FCP source, core images, services, running commit, and optional AI model were updated and verified.'
+        } else {
+            'FCP source, core images, services, and running commit were updated and verified; AI remains optional and unavailable or resource-paused.'
+        }
         Write-AgentResult `
             -RequestId $requestId `
             -Action $action `
@@ -737,22 +717,14 @@ function Process-Request {
             -TargetCommit $target `
             -RunningCommit $running `
             -Code 'updated' `
-            -Message 'FCP source, images, services, required model, and running commit were updated and verified.'
+            -Message $message
         return $true
     }
     catch {
         $safeRequestId = if (
             $requestId -and $requestId -match $RequestIdPattern
-        ) {
-            $requestId
-        } else {
-            'invalid-request'
-        }
-        $safeAction = if ($action -in @('check', 'apply')) {
-            $action
-        } else {
-            'unknown'
-        }
+        ) { $requestId } else { 'invalid-request' }
+        $safeAction = if ($action -in @('check', 'apply')) { $action } else { 'unknown' }
         $current = $null
         try {
             $current = (Last-Text (
@@ -774,10 +746,7 @@ function Process-Request {
         return $true
     }
     finally {
-        Remove-Item `
-            -LiteralPath $processing `
-            -Force `
-            -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $processing -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -787,17 +756,13 @@ try {
         $processed = Process-Request
         if ($Once) { break }
         if ($processed -and (Get-AgentHash) -ne $InitialAgentHash) {
-            # Git may have updated this updater. Spawn the newly checked-out
-            # script with a short delay, then release this process's mutex.
             Start-ReplacementAgent
             $mutex.ReleaseMutex() | Out-Null
             $mutexReleased = $true
             $mutex.Dispose()
             exit 0
         }
-        if (-not $processed) {
-            Start-Sleep -Seconds $PollSeconds
-        }
+        if (-not $processed) { Start-Sleep -Seconds $PollSeconds }
     }
 }
 finally {

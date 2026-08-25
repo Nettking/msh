@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import json
 import time
+from pathlib import Path
 from typing import Any
 from urllib import request
 
 from .capability_config_service import AI_MODEL_CHOICES, CapabilityConfig
+from .host_model_install_handoff import HostModelInstallHandoff
 
 AI_BENCHMARK_PROMPT = "Reply with exactly: FCP_OK"
 AI_RESPONSE_TIME_BANDS: list[dict[str, object]] = [
@@ -130,9 +132,7 @@ def ollama_status(
         choice["model"]: installed_by_profile[key]
         for key, choice in AI_MODEL_CHOICES.items()
     }
-    selected_installed = bool(
-        installed_names & _model_aliases(config.ai_model)
-    )
+    selected_installed = bool(installed_names & _model_aliases(config.ai_model))
     return {
         **base_status,
         "running": True,
@@ -198,9 +198,7 @@ def benchmark_ollama_response_time(
             "message": f"Could not test {selected_model}: {exc}",
         }
 
-    content = str(
-        response_payload.get("message", {}).get("content") or ""
-    ).strip()
+    content = str(response_payload.get("message", {}).get("content") or "").strip()
     assessment = response_time_assessment(elapsed_ms)
     return {
         "ok": True,
@@ -220,24 +218,20 @@ def pull_ollama_model(
     config: CapabilityConfig,
     timeout_seconds: int = 900,
 ) -> tuple[bool, str]:
-    """Install the configured model at the configured endpoint."""
+    """Queue a local admitted pull; never mutate an unmanaged remote provider."""
 
-    payload = json.dumps({"name": config.ai_model, "stream": False}).encode("utf-8")
-    req = request.Request(
-        f"{config.ollama_base_url.rstrip('/')}/api/pull",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with request.urlopen(req, timeout=timeout_seconds) as response:
-            body = response.read().decode("utf-8")
-    except Exception as exc:  # noqa: BLE001  # pragma: no cover - depends on local/remote Ollama
-        return False, f"Could not pull {config.ai_model}: {exc}"
-    return True, (
-        f"Ollama model is installed or updated on {ai_provider_label(config)}: "
-        f"{config.ai_model}. Response: {body[:200]}"
-    )
+    # Retain the compatibility parameter for callers while moving ownership to
+    # the asynchronous host agent. The host operation has its own bounded TTL
+    # and pull deadline.
+    del timeout_seconds
+    if config.ai_provider_mode == "connected":
+        return False, (
+            "FCP will not install a model on a connected computer because this "
+            "device cannot enforce that host's disk reserve. Install the selected "
+            "model on the provider FCP host, then reconnect it here."
+        )
+    handoff = HostModelInstallHandoff(Path("data") / "federation" / "update-agent")
+    return handoff.queue(model=config.ai_model, target="ollama")
 
 
 __all__ = [

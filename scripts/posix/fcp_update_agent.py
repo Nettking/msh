@@ -22,6 +22,9 @@ APPROVED_REPOSITORY = "Nettking/msh"
 APPROVED_BRANCH = "main"
 REQUEST_SCHEMA = "fcp.host-update-request.v1"
 RESULT_SCHEMA = "fcp.host-update-result.v1"
+MODEL_REQUEST_SCHEMA = "fcp.host-model-install-request.v1"
+MODEL_RESULT_SCHEMA = "fcp.host-model-install-result.v1"
+MODEL_REQUEST_TTL_SECONDS = 120
 #: Read-only branch discovery for the Federation software-version dropdown.
 #: The Flask process runs no Git, so it asks this host-owned agent instead.
 BRANCHES_REQUEST_SCHEMA = "fcp.host-branches-request.v1"
@@ -35,18 +38,9 @@ BRANCH_RE = re.compile(
     r"[A-Za-z0-9][A-Za-z0-9._/-]{0,180}(?<![./])$"
 )
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
+MODEL_TARGETS = frozenset({"ollama", "model-provider"})
 
-#: Free space an activation needs before it may start. An update rebuilds three
-#: images and replaces the running Flask container; discovering there is no room
-#: for that *after* Flask has been stopped is the failure this prevents. The
-#: figure matches the storage floor's platform minimum in
-#: ``catalog/federation/storage_allocation.py``: one update cycle, operating
-#: headroom, and the margin Docker Desktop needs on Windows.
 UPDATE_REQUIRED_FREE_BYTES = 10 * 1024**3
-
-#: Ceiling for the BuildKit cache. Large enough that a build still reuses the
-#: dependency layer it just wrote, far below the 21 GB an unbounded cache
-#: reached on the host that filled its drive.
 BUILD_CACHE_KEEP_BYTES = 8 * 1024**3
 
 
@@ -144,9 +138,7 @@ def inspect_checkout(
     root: Path,
     requested_target: str | None,
 ) -> dict[str, str | None]:
-    top = Path(
-        git(root, "rev-parse", "--show-toplevel").stdout.strip()
-    ).resolve()
+    top = Path(git(root, "rev-parse", "--show-toplevel").stdout.strip()).resolve()
     if top != root:
         raise RuntimeError("unsupported_checkout")
     if not approved_remote(git(root, "remote", "get-url", "origin").stdout):
@@ -160,19 +152,10 @@ def inspect_checkout(
     ).stdout.strip()
     if branch != APPROVED_BRANCH:
         raise RuntimeError("detached_head")
-    current = (
-        git(root, "rev-parse", "--verify", "HEAD^{commit}")
-        .stdout.strip()
-        .lower()
-    )
+    current = git(root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip().lower()
     if not OID_RE.fullmatch(current):
         raise RuntimeError("unsupported_checkout")
-    status = git(
-        root,
-        "status",
-        "--porcelain=v1",
-        "--untracked-files=all",
-    ).stdout
+    status = git(root, "status", "--porcelain=v1", "--untracked-files=all").stdout
     if status:
         return {
             "state": "dirty",
@@ -182,11 +165,7 @@ def inspect_checkout(
             "message": "Local changes must be reviewed before updating.",
         }
     git(root, "fetch", "--no-tags", "origin", APPROVED_BRANCH)
-    approved_tip = (
-        git(root, "rev-parse", "--verify", "FETCH_HEAD^{commit}")
-        .stdout.strip()
-        .lower()
-    )
+    approved_tip = git(root, "rev-parse", "--verify", "FETCH_HEAD^{commit}").stdout.strip().lower()
     target = requested_target.lower() if requested_target else approved_tip
     if not OID_RE.fullmatch(target):
         raise RuntimeError("target_unavailable")
@@ -243,12 +222,6 @@ def atomic_json(path: Path, value: dict[str, object]) -> None:
 
 
 def approved_branches(root: Path) -> list[dict[str, str]]:
-    """List branches published by the approved repository, tips included.
-
-    Behind the same approved-remote check every other operation here is behind,
-    and read-only: no fetch, no checkout, nothing mutated.
-    """
-
     if not approved_remote(git(root, "remote", "get-url", "origin").stdout):
         raise RuntimeError("unapproved_remote")
     listed = git(root, "ls-remote", "--heads", "--", "origin", check=False)
@@ -264,10 +237,7 @@ def approved_branches(root: Path) -> list[dict[str, str]]:
         if not BRANCH_RE.fullmatch(name):
             continue
         found[name] = commit
-    ordered = sorted(
-        found.items(),
-        key=lambda item: (item[0] != APPROVED_BRANCH, item[0]),
-    )
+    ordered = sorted(found.items(), key=lambda item: (item[0] != APPROVED_BRANCH, item[0]))
     return [
         {"name": name, "commit": commit}
         for name, commit in ordered[:MAX_LISTED_BRANCHES]
@@ -350,12 +320,113 @@ def write_result(
         "running_commit": running,
         "code": code,
         "message": message,
-        "completed_at": datetime.now(timezone.utc)
-        .isoformat()
-        .replace("+00:00", "Z"),
+        "completed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
     }
     atomic_json(_request_result_path(path, request_id), value)
     atomic_json(path, value)
+
+
+def _write_model_result(
+    result_file: Path,
+    *,
+    request_id: str,
+    model: str,
+    target: str,
+    ok: bool,
+    code: str,
+    message: str,
+) -> None:
+    digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+    value: dict[str, object] = {
+        "schema": MODEL_RESULT_SCHEMA,
+        "request_id": request_id,
+        "action": "install",
+        "model": model,
+        "target": target,
+        "state": "ready" if ok else "degraded",
+        "code": code,
+        "message": message[:512],
+        "completed_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+    }
+    atomic_json(result_file.with_name(f"model-result-{digest}.json"), value)
+    atomic_json(result_file.with_name("model-result.json"), value)
+
+
+def _model_request_fields(value: dict[str, object]) -> tuple[str, str, str]:
+    request_id = value.get("request_id")
+    model = value.get("model")
+    target = value.get("target")
+    if value.get("action") != "install":
+        raise ValueError("malformed_model_action")
+    if not isinstance(request_id, str) or not REQUEST_ID_RE.fullmatch(request_id):
+        raise ValueError("malformed_request_id")
+    if not isinstance(model, str) or not MODEL_RE.fullmatch(model):
+        raise ValueError("invalid_model_identifier")
+    if target not in MODEL_TARGETS:
+        raise ValueError("invalid_model_target")
+    created_raw = value.get("created_at")
+    expires_raw = value.get("expires_at")
+    if not isinstance(created_raw, str) or not isinstance(expires_raw, str):
+        raise ValueError("malformed_timestamp")
+    created = utc(created_raw)
+    expires = utc(expires_raw)
+    now = datetime.now(timezone.utc)
+    if (
+        created.timestamp() > now.timestamp() + 60
+        or expires <= now
+        or (expires - created).total_seconds() > MODEL_REQUEST_TTL_SECONDS
+    ):
+        raise ValueError("expired_or_invalid_request")
+    return request_id, model, str(target)
+
+
+def handle_model_request(
+    root: Path,
+    result_file: Path,
+    value: dict[str, object],
+) -> bool:
+    request_id, model, target = _model_request_fields(value)
+    try:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "catalog.federation.model_resource_pull",
+                "--repo-root",
+                str(root),
+                "--target",
+                target,
+                "--model",
+                model,
+            ],
+            cwd=root,
+            shell=False,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=3700,
+        )
+        ok = completed.returncode == 0
+        code = (
+            "installed"
+            if ok
+            else ("resource_pressure" if completed.returncode == 2 else "model_install_failed")
+        )
+        message = (completed.stdout or completed.stderr or code).strip().splitlines()[-1]
+    except (OSError, subprocess.SubprocessError) as exc:
+        ok = False
+        code = "model_install_failed"
+        message = f"Host model installation failed: {type(exc).__name__}"
+    _write_model_result(
+        result_file,
+        request_id=request_id,
+        model=model,
+        target=target,
+        ok=ok,
+        code=code,
+        message=message,
+    )
+    return True
 
 
 def wait_runtime(root: Path, target: str) -> str:
@@ -403,8 +474,8 @@ def wait_runtime(root: Path, target: str) -> str:
     raise RuntimeError("runtime_verification_timeout")
 
 
-def ensure_ollama_model(root: Path, env: dict[str, str]) -> str:
-    """Match the supported launcher model-readiness step for the new image."""
+def ensure_ollama_model(root: Path, env: dict[str, str]) -> bool:
+    """Best-effort model readiness through the shared host admission primitive."""
 
     model_probe = subprocess.run(
         [
@@ -428,80 +499,38 @@ def ensure_ollama_model(root: Path, env: dict[str, str]) -> str:
         timeout=300,
     )
     if model_probe.returncode:
-        raise RuntimeError("model_configuration_unavailable")
+        return False
     lines = [line.strip() for line in model_probe.stdout.splitlines() if line.strip()]
     if not lines or not MODEL_RE.fullmatch(lines[-1]):
-        raise RuntimeError("invalid_model_identifier")
-    model = lines[-1]
-    shown = subprocess.run(
-        ["docker", "compose", "exec", "-T", "ollama", "ollama", "show", model],
-        cwd=root,
-        env=env,
-        shell=False,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    if shown.returncode == 0:
-        return model
-    pulled = subprocess.run(
+        return False
+    completed = subprocess.run(
         [
-            "docker",
-            "compose",
-            "--profile",
-            "model-install",
-            "run",
-            "--rm",
-            "--entrypoint",
-            "/bin/ollama",
-            "ollama-pull",
-            "pull",
-            model,
+            sys.executable,
+            "-m",
+            "catalog.federation.model_resource_pull",
+            "--repo-root",
+            str(root),
+            "--target",
+            "ollama",
+            "--model",
+            lines[-1],
         ],
         cwd=root,
         env=env,
         shell=False,
         check=False,
-        timeout=3600,
+        timeout=3700,
     )
-    if pulled.returncode:
-        raise RuntimeError("model_install_failed")
-    verified = subprocess.run(
-        ["docker", "compose", "exec", "-T", "ollama", "ollama", "show", model],
-        cwd=root,
-        env=env,
-        shell=False,
-        check=False,
-        capture_output=True,
-        text=True,
-        timeout=60,
-    )
-    if verified.returncode:
-        raise RuntimeError("model_verification_failed")
-    return model
+    return completed.returncode == 0
 
 
 def free_bytes(root: Path) -> int:
-    """Free space on the volume holding the checkout and the Docker data root.
-
-    Docker's storage lives on the system volume on the supported platforms, so
-    this is the number that decides whether a build can finish. A host whose
-    Docker root is elsewhere is outside the supported layout.
-    """
+    """Free space on the supported host volume backing checkout and Docker."""
 
     return shutil.disk_usage(root).free
 
 
 def prune_build_cache(root: Path, env: dict[str, str]) -> bool:
-    """Bound the BuildKit cache, keeping the most recently used entries.
-
-    ``--keep-storage`` retains recent cache, so the dependency layer a build
-    wants to reuse survives while stale entries from earlier commits are
-    released. Cache is by definition reconstructible, so a failure here is
-    reported rather than raised: it must never turn into an update failure.
-    """
-
     try:
         subprocess.run(
             [
@@ -523,15 +552,6 @@ def prune_build_cache(root: Path, env: dict[str, str]) -> bool:
 
 
 def preflight_disk(root: Path, env: dict[str, str]) -> None:
-    """Refuse an activation that cannot finish, before anything is stopped.
-
-    A host that is short on space is given one chance to recover from its own
-    build cache first: pruning is non-destructive, and a cache that grew past
-    its bound is the usual reason the room went missing. Only if space is still
-    short after that does the activation refuse -- and it refuses here, while
-    the running FCP is still untouched.
-    """
-
     if free_bytes(root) >= UPDATE_REQUIRED_FREE_BYTES:
         return
     prune_build_cache(root, env)
@@ -613,12 +633,15 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             and value.get("schema") == BRANCHES_REQUEST_SCHEMA
         ):
             return handle_branches_request(root, result_file, value)
+        if (
+            isinstance(value, dict)
+            and value.get("schema") == MODEL_REQUEST_SCHEMA
+        ):
+            return handle_model_request(root, result_file, value)
 
         request_id, action, target, activate_after = validate_request(value)
         if activate_after is not None:
-            delay = (
-                activate_after - datetime.now(timezone.utc)
-            ).total_seconds()
+            delay = (activate_after - datetime.now(timezone.utc)).total_seconds()
             if delay > 0:
                 time.sleep(min(delay, 30.0))
         inspection = inspect_checkout(root, target)
@@ -654,11 +677,7 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             return True
         if inspection["state"] == "update_available":
             git(root, "merge", "--ff-only", target)
-        proven = (
-            git(root, "rev-parse", "--verify", "HEAD^{commit}")
-            .stdout.strip()
-            .lower()
-        )
+        proven = git(root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip().lower()
         if proven != target:
             raise RuntimeError("source_verification_failed")
         if git(
@@ -670,8 +689,6 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             raise RuntimeError("dirty_build_context")
         env = os.environ.copy()
         env["FCP_BUILD_COMMIT"] = target
-        # Before the build, because the build is what consumes the space and
-        # the running FCP is still whole at this point.
         preflight_disk(root, env)
         subprocess.run(
             ["docker", "compose", "build", "relay", "flask", "recorder"],
@@ -681,26 +698,24 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             check=True,
             timeout=900,
         )
-        # And again after, so the cache this build just wrote is bounded rather
-        # than left for the next update to trip over.
         prune_build_cache(root, env)
         subprocess.run(
-            [
-                "docker",
-                "compose",
-                "up",
-                "-d",
-                "relay",
-                "ollama",
-                "recorder",
-            ],
+            ["docker", "compose", "up", "-d", "relay", "recorder"],
             cwd=root,
             env=env,
             shell=False,
             check=True,
             timeout=900,
         )
-        ensure_ollama_model(root, env)
+        ollama_start = subprocess.run(
+            ["docker", "compose", "up", "-d", "ollama"],
+            cwd=root,
+            env=env,
+            shell=False,
+            check=False,
+            timeout=900,
+        )
+        ai_ready = ollama_start.returncode == 0 and ensure_ollama_model(root, env)
         subprocess.run(
             ["docker", "compose", "stop", "flask"],
             cwd=root,
@@ -749,27 +764,24 @@ def process_once(root: Path, request_file: Path, result_file: Path) -> bool:
             running=running,
             code="updated",
             message=(
-                "FCP source, images, services, required model, and running "
-                "commit were updated and verified."
+                "FCP source, core images, services, and running commit were updated "
+                "and verified; the optional AI model is ready."
+                if ai_ready
+                else "FCP source, core images, services, and running commit were updated "
+                "and verified; AI remains optional and unavailable or resource-paused."
             ),
         )
         return True
     except Exception as exc:  # noqa: BLE001 - emit only safe result text
         current = None
         try:
-            current = (
-                git(root, "rev-parse", "--verify", "HEAD^{commit}")
-                .stdout.strip()
-                .lower()
-            )
+            current = git(root, "rev-parse", "--verify", "HEAD^{commit}").stdout.strip().lower()
         except Exception:  # noqa: BLE001
             pass
         write_result(
             result_file,
             request_id=(
-                request_id
-                if REQUEST_ID_RE.fullmatch(request_id)
-                else "invalid-request"
+                request_id if REQUEST_ID_RE.fullmatch(request_id) else "invalid-request"
             ),
             action=action if action in {"check", "apply"} else "unknown",
             state="error",
@@ -823,9 +835,6 @@ def main() -> int:
             if args.once:
                 return 0
             if processed and _digest(script_path) != initial_digest:
-                # Git may have updated the updater itself. Replace this process
-                # with the newly checked-out implementation so future requests
-                # do not continue under stale host mutation code.
                 fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
                 os.execv(
                     sys.executable,
