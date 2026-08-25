@@ -12,6 +12,7 @@ from scripts import first_federation_start as first
 
 ROOT = Path(__file__).resolve().parents[3]
 HELPER = ROOT / "scripts" / "posix" / "stop_fcp_for_fresh_reset.py"
+BUILD_COMMIT = "0123456789abcdef0123456789abcdef01234567"
 
 
 def _write_executable(path: Path, content: str) -> None:
@@ -26,7 +27,7 @@ def _fake_host_tools(tmp_path: Path, calls: Path) -> dict[str, str]:
         bin_dir / "git",
         "#!/bin/sh\n"
         'case "$1" in\n'
-        "  rev-parse) echo 0123456789abcdef0123456789abcdef01234567 ;;\n"
+        f"  rev-parse) echo {BUILD_COMMIT} ;;\n"
         "  status) : ;;\n"
         "esac\n",
     )
@@ -40,6 +41,9 @@ def _fake_host_tools(tmp_path: Path, calls: Path) -> dict[str, str]:
         bin_dir / "python3",
         "#!/bin/sh\n"
         f'printf "python3 %s\\n" "$*" >> "{calls}"\n'
+        'if [ "$1 $2" = "-m catalog.federation.host_build" ]; then\n'
+        f"  echo {BUILD_COMMIT}\n"
+        "fi\n"
         "exit 0\n",
     )
     _write_executable(
@@ -117,9 +121,10 @@ def test_posix_tailscale_fresh_path_reaches_verified_reset_before_discovery(
     assert "Unknown option: --fresh" not in completed.stderr
 
     trace = calls.read_text(encoding="utf-8")
+    build = "python3 -m catalog.federation.host_build"
     stop = f"python3 {ROOT / 'scripts' / 'posix' / 'stop_fcp_for_fresh_reset.py'}"
     reset = (
-        "docker compose run --rm --no-deps --build --entrypoint python flask "
+        "docker compose run --rm --no-deps --entrypoint python flask "
         "-m catalog.flask_app.services.device_state_reset"
     )
     verify = (
@@ -128,7 +133,7 @@ def test_posix_tailscale_fresh_path_reaches_verified_reset_before_discovery(
     )
     services = "docker compose up -d relay recorder"
     discovery = f"python3 {ROOT / 'scripts' / 'zero_touch_federation_start.py'}"
-    assert trace.index(stop) < trace.index(reset) < trace.index(verify)
+    assert trace.index(build) < trace.index(stop) < trace.index(reset) < trace.index(verify)
     assert trace.index(verify) < trace.index(services) < trace.index(discovery)
 
 
@@ -173,9 +178,12 @@ def test_posix_start_survives_optional_ollama_start_failure(tmp_path: Path) -> N
 
     assert completed.returncode == 0, completed.stderr or completed.stdout
     trace = calls.read_text(encoding="utf-8")
+    build = "python3 -m catalog.federation.host_build"
+    agent = f"python3 {ROOT / 'scripts' / 'posix' / 'fcp_update_agent.py'}"
     required = "docker compose up -d relay recorder"
     flask = "docker compose up -d flask"
     ollama = "docker compose up -d ollama"
+    assert trace.index(build) < trace.index(agent) < trace.index(required)
     assert trace.index(required) < trace.index(flask) < trace.index(ollama)
     assert "WARNING: Ollama is unavailable; core FCP remains running." in completed.stderr
     assert "AI capability:        unavailable; core FCP is healthy" in completed.stdout
@@ -205,12 +213,14 @@ def test_posix_fresh_uses_shared_reset_contract_and_never_deletes_volumes() -> N
     assert "--fresh) MODE=fresh" in start
     assert "catalog.flask_app.services.device_state_reset" in start
     assert "--verify-fresh" in start
+    assert start.index("build_core_images") < start.index("stop_fcp_for_fresh_reset.py")
     assert start.index("stop_fcp_for_fresh_reset.py") < start.index(
         "catalog.flask_app.services.device_state_reset"
     )
     assert start.index("--verify-fresh") < start.index(
         "docker compose up -d relay recorder"
     )
+    assert "--no-deps --build --entrypoint python flask" not in start
     assert '["compose", "down", "--remove-orphans", "--timeout", "10"]' in helper
     assert '["compose", "kill"]' in helper
     assert "docker compose down -v" not in start
