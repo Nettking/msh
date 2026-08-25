@@ -414,8 +414,8 @@ try {
         ) {
             throw (
                 "Multiple Federation coordinator volumes exist, but none could be selected safely. " +
-                "No state was changed. Set FCP_RELAY_VOLUME_NAME explicitly or run update.cmd " +
-                "after reviewing the retained volumes."
+                "No state was changed. Review the retained volumes, set FCP_RELAY_VOLUME_NAME " +
+                "explicitly to the intended coordinator volume, and run start.cmd again."
             )
         }
         if ([string]::IsNullOrWhiteSpace($selectedRelayVolume)) {
