@@ -162,9 +162,11 @@ def test_windows_and_python_model_runners_share_pressure_and_stop_contract() -> 
     assert "docker_data.vhdx" in windows
     assert "ext4.vhdx" in windows
     assert "Get-FreeBytes $backingPath" in windows
+    assert "return [int64]-1" in windows
     assert "Test-ModelWriterStopped" in windows
     assert "'compose', 'stop', '--timeout', '5', $Service" in windows
-    assert "'compose', 'kill', $Service" in windows
+    assert "'compose', 'stop', '--timeout', '15', $Service" in windows
+    assert "'compose', 'kill'" not in windows
     assert "could not prove" in windows
     assert "exit 3" in windows
 
