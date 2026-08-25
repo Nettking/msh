@@ -12,7 +12,7 @@ import asyncio
 import json
 import re
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -702,6 +702,9 @@ class RecorderPublicationCycleReport:
     result: RecorderWorkerCycleResult | None = None
     error_code: str | None = None
     consecutive_failures: int = 0
+    # Cycle outcomes that could not be handed to the owner because the health
+    # sink itself raised. Carried into the first report that gets through.
+    dropped_reports: int = 0
 
     @property
     def state(self) -> str:
@@ -772,6 +775,7 @@ class RecorderFederationDeliveryWorker:
         self._last_checkpoint_stamp: tuple[int, int] | None = None
         self._reconciled_once = False
         self._consecutive_failures = 0
+        self._dropped_reports = 0
 
     def _checkpoint_stamp(self) -> tuple[int, int] | None:
         try:
@@ -886,13 +890,19 @@ class RecorderFederationDeliveryWorker:
         observer = self.cycle_observer
         if observer is None:
             return
+        if self._dropped_reports:
+            report = replace(report, dropped_reports=self._dropped_reports)
         try:
             observer(report)
         except Exception:  # noqa: BLE001 - a health sink cannot kill the loop
-            # Reporting health must never be able to strand durable delivery
-            # work. The next cycle reports again from durable truth, so one
-            # failed hand-off loses nothing.
-            pass
+            # A broken health sink must never be able to strand durable
+            # delivery work, so the hand-off failure is absorbed -- but not
+            # discarded. It is counted and carried into the first report that
+            # gets through, because a delivery about not swallowing failures
+            # has no business swallowing this one.
+            self._dropped_reports += 1
+            return
+        self._dropped_reports = 0
 
     async def run_forever(self, stop_event: asyncio.Event) -> None:
         if not isinstance(stop_event, asyncio.Event):

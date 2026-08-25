@@ -1293,22 +1293,27 @@ def test_a_health_sink_that_raises_cannot_strand_durable_delivery(tmp_path):
     probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
     _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
     stop = asyncio.Event()
-    seen = {"count": 0}
+    seen: list[object] = []
+    hostile = {"active": True}
 
-    def _hostile(_report: object) -> None:
-        seen["count"] += 1
-        raise RuntimeError("health sink is broken")
+    def _sink(report: object) -> None:
+        seen.append(report)
+        if hostile["active"]:
+            raise RuntimeError("health sink is broken")
 
     worker = RecorderFederationDeliveryWorker(
         reconciler=reconciler,
         queue=queue,
         poll_interval_seconds=0.01,
-        cycle_observer=_hostile,
+        cycle_observer=_sink,
     )
 
     async def _drive() -> None:
         task = asyncio.create_task(worker.run_forever(stop))
-        while seen["count"] < 2:
+        while len(seen) < 2:
+            await asyncio.sleep(0)
+        hostile["active"] = False
+        while len(seen) < 3:
             await asyncio.sleep(0)
         stop.set()
         await task
@@ -1318,6 +1323,10 @@ def test_a_health_sink_that_raises_cannot_strand_durable_delivery(tmp_path):
     # The evidence was still delivered while the health sink was failing.
     assert client.calls
     assert outbox.pending() == ()
+    # And the hand-offs it dropped were counted, not discarded: the first
+    # report that gets through carries them.
+    assert seen[0].dropped_reports == 0
+    assert seen[2].dropped_reports == 2
 
 
 def test_one_tombstone_cannot_abort_reconciliation_of_the_rest_of_the_archive(

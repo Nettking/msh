@@ -7,7 +7,13 @@ import pytest
 from flask import Flask
 
 from catalog.federation.errors import FederationOperationError
+from catalog.federation.outbox import RetiredDatasetCount, RetiredSummary
 from catalog.federation.phase_d_client import PhaseDIngestOutcome
+from catalog.federation.recorder_delivery import RecorderDeliveryRunResult
+from catalog.federation.recorder_publication import (
+    RecorderPublicationCycleReport,
+    RecorderWorkerCycleResult,
+)
 from catalog.flask_app.services.recorder_federation_publication_install import (
     install_recorder_federation_publication,
 )
@@ -216,13 +222,6 @@ def test_a_recovering_publication_loop_reports_running_again(tmp_path):
 
 
 def test_degraded_publication_is_visible_in_the_monitor_snapshot(tmp_path):
-    from catalog.federation.recorder_publication import (
-        RecorderPublicationCycleReport,
-        RecorderWorkerCycleResult,
-    )
-    from catalog.federation.outbox import RetiredDatasetCount, RetiredSummary
-    from catalog.federation.recorder_delivery import RecorderDeliveryRunResult
-
     _app, monitor = _configured_app(tmp_path)
 
     def _report(*, retired: int, blocked: tuple[str, ...] = ()):

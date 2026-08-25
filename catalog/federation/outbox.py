@@ -6,11 +6,11 @@ import hashlib
 import json
 import re
 import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
 from pathlib import Path
-from collections.abc import Callable
 from typing import Any
 
 from .errors import FederationValidationError
@@ -30,7 +30,7 @@ COMPLETED_RECEIPT_SCHEMA = "fcp.outbox.completed_receipt.v1"
 #: compared, indexed and rendered without ever carrying remote text.  The
 #: free-text cause stays in ``last_error``, which retirement preserves.
 RETIREMENT_REASON = re.compile(
-    r"\A[a-z][a-z0-9-]{0,%d}\Z" % (MAX_RETIREMENT_REASON_LENGTH - 1,)
+    rf"\A[a-z][a-z0-9-]{{0,{MAX_RETIREMENT_REASON_LENGTH - 1}}}\Z"
 )
 
 
