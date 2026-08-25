@@ -2,6 +2,8 @@
 
 This module deliberately owns only the checkout/build critical section. Runtime
 activation remains the responsibility of the launcher or host update agent.
+The serialized update runner calls ``host_build.host_mutation_lock(root)`` while
+this module's launcher path enters the same local ``host_mutation_lock`` below.
 """
 
 from __future__ import annotations
