@@ -14,6 +14,7 @@ import argparse
 import os
 import re
 import subprocess
+import sys
 import time
 import uuid
 from collections.abc import Mapping
@@ -50,8 +51,13 @@ class ModelPullResult:
     assessment: ResourceAssessment | None = None
 
 
-def _subprocess_env(env: Mapping[str, str] | None) -> dict[str, str] | None:
-    return dict(env) if env is not None else None
+def _subprocess_env(env: Mapping[str, str] | None) -> dict[str, str]:
+    environment = dict(os.environ if env is None else env)
+    # Supported launchers use the stable project name ``fcp``. Keeping the same
+    # default here prevents headless/direct callers from probing or mutating a
+    # second Compose project merely because the parent shell omitted the value.
+    environment.setdefault("COMPOSE_PROJECT_NAME", "fcp")
+    return environment
 
 
 def _run(
@@ -80,13 +86,13 @@ def _docker_backing_resource_path(
 ) -> Path | None:
     """Return a host path whose filesystem actually backs Docker model writes.
 
-    POSIX Docker exposes its data root directly. Docker Desktop on Windows stores
-    Linux-container data in a VHDX; admission therefore measures the host volume
-    containing that VHDX rather than assuming the checkout drive is equivalent.
-    If the backing resource cannot be proven, a *new* model pull fails closed.
+    Native POSIX Docker exposes its data root directly. Docker Desktop persists
+    Linux-container storage in a host disk image; for known supported default
+    locations we measure the host directory containing that image. If the
+    backing resource cannot be proven, a *new* model pull fails closed.
     """
 
-    environment = os.environ if env is None else env
+    environment = _subprocess_env(env)
     if os.name == "nt":
         local_app_data = str(environment.get("LOCALAPPDATA") or "").strip()
         candidates: list[Path] = []
@@ -100,19 +106,46 @@ def _docker_backing_resource_path(
             )
         program_data = str(environment.get("PROGRAMDATA") or "").strip()
         if program_data:
-            candidates.append(Path(program_data) / "docker")
+            native_root = Path(program_data) / "docker"
+            try:
+                if native_root.is_dir():
+                    return native_root.resolve()
+            except OSError:
+                pass
         for candidate in candidates:
             try:
-                if candidate.exists():
-                    return candidate.resolve()
+                if candidate.is_file():
+                    return candidate.parent.resolve()
             except OSError:
                 continue
+        return None
+
+    if sys.platform == "darwin":
+        home = str(environment.get("HOME") or "").strip()
+        if home:
+            docker_data = (
+                Path(home)
+                / "Library"
+                / "Containers"
+                / "com.docker.docker"
+                / "Data"
+                / "vms"
+                / "0"
+                / "data"
+            )
+            for name in ("Docker.raw", "Docker.qcow2"):
+                candidate = docker_data / name
+                try:
+                    if candidate.is_file():
+                        return candidate.parent.resolve()
+                except OSError:
+                    continue
         return None
 
     info = _run(
         root,
         ["docker", "info", "--format", "{{.DockerRootDir}}"],
-        env=env,
+        env=environment,
         timeout=30.0,
     )
     if info.returncode != 0:
