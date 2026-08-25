@@ -220,9 +220,11 @@ def test_one_transaction_cannot_spend_the_emergency_reserve() -> None:
         measurer=lambda _path: source,
         clock=lambda: NOW,
     )
-    with pytest.raises(HostResourceRefused) as raised:
-        with controller.reserve("/data", bytes_required=250):
-            pass
+    with (
+        pytest.raises(HostResourceRefused) as raised,
+        controller.reserve("/data", bytes_required=250),
+    ):
+        pass
     assert raised.value.code == "emergency_reserve"
     assert raised.value.assessment.effective_free_bytes == 100
 
@@ -234,11 +236,13 @@ def test_paths_on_same_resource_share_one_active_envelope() -> None:
         measurer=lambda _path: source,
         clock=lambda: NOW,
     )
-    with controller.reserve("/data", bytes_required=100):
-        with controller.reserve("/results", bytes_required=50):
-            result = controller.assessment("/uploads")
-            assert result.resource_id == "device:77"
-            assert result.reserved_bytes == 150
+    with (
+        controller.reserve("/data", bytes_required=100),
+        controller.reserve("/results", bytes_required=50),
+    ):
+        result = controller.assessment("/uploads")
+        assert result.resource_id == "device:77"
+        assert result.reserved_bytes == 150
 
 
 def test_distinct_backing_resources_do_not_share_reservations() -> None:
@@ -271,9 +275,11 @@ def test_reservation_is_released_when_writer_raises() -> None:
         measurer=lambda _path: source,
         clock=lambda: NOW,
     )
-    with pytest.raises(RuntimeError, match="boom"):
-        with controller.reserve("/data", bytes_required=100):
-            raise RuntimeError("boom")
+    with (
+        pytest.raises(RuntimeError, match="boom"),
+        controller.reserve("/data", bytes_required=100),
+    ):
+        raise RuntimeError("boom")
     assert controller.assessment("/data").reserved_bytes == 0
 
 
@@ -286,9 +292,11 @@ def test_measurer_failure_is_conservatively_refused() -> None:
         measurer=broken,
         clock=lambda: NOW,
     )
-    with pytest.raises(HostResourceRefused) as raised:
-        with controller.reserve("/data", bytes_required=1):
-            pass
+    with (
+        pytest.raises(HostResourceRefused) as raised,
+        controller.reserve("/data", bytes_required=1),
+    ):
+        pass
     assert raised.value.code == "resource_pressure"
     assert raised.value.assessment.level == PressureLevel.CRITICAL
 
