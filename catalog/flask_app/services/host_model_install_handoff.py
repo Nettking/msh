@@ -12,7 +12,6 @@ from __future__ import annotations
 import os
 import tempfile
 import time
-import uuid
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -22,6 +21,7 @@ from .federation_update_handoff import HostUpdateBusyError, HostUpdateHandoff
 
 MODEL_REQUEST_SCHEMA = "fcp.host-model-install-request.v1"
 MODEL_REQUEST_TTL_SECONDS = 120
+MODEL_REQUEST_ID = "host-model-install"
 HOST_OPERATION_STALE_SECONDS = 3 * 60 * 60
 
 
@@ -100,7 +100,10 @@ class HostModelInstallHandoff(HostUpdateHandoff):
         now = datetime.now(timezone.utc)
         request = {
             "schema": MODEL_REQUEST_SCHEMA,
-            "request_id": f"host-model-{uuid.uuid4().hex}",
+            # Model installation is one serialized host-operation slot. Reusing
+            # one request identity keeps the agent's per-request result filename
+            # bounded instead of introducing an unbounded result history.
+            "request_id": MODEL_REQUEST_ID,
             "action": "install",
             "model": selected,
             "target": target,
@@ -123,6 +126,7 @@ class HostModelInstallHandoff(HostUpdateHandoff):
 __all__ = [
     "HOST_OPERATION_STALE_SECONDS",
     "HostModelInstallHandoff",
+    "MODEL_REQUEST_ID",
     "MODEL_REQUEST_SCHEMA",
     "MODEL_REQUEST_TTL_SECONDS",
 ]
