@@ -15,9 +15,9 @@ import shutil
 import subprocess
 import sys
 import time
+from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator, Mapping
 
 try:  # pragma: no cover - exercised only on supported POSIX hosts
     import fcntl
