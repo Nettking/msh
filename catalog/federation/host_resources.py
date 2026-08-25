@@ -118,12 +118,16 @@ class PressureThresholds:
         if not inode_values[0] <= inode_values[1] <= inode_values[2]:
             raise ValueError("resource inode thresholds must be ordered")
         if (
-            not math.isfinite(self.max_measurement_age_seconds)
+            isinstance(self.max_measurement_age_seconds, bool)
+            or not isinstance(self.max_measurement_age_seconds, (int, float))
+            or not math.isfinite(self.max_measurement_age_seconds)
             or self.max_measurement_age_seconds <= 0
         ):
             raise ValueError("resource measurement age must be finite and positive")
         if (
-            not math.isfinite(self.future_measurement_tolerance_seconds)
+            isinstance(self.future_measurement_tolerance_seconds, bool)
+            or not isinstance(self.future_measurement_tolerance_seconds, (int, float))
+            or not math.isfinite(self.future_measurement_tolerance_seconds)
             or self.future_measurement_tolerance_seconds < 0
         ):
             raise ValueError("resource future tolerance must be finite and non-negative")
@@ -179,10 +183,17 @@ def _nearest_existing(path: Path) -> Path:
 def _resource_identity(path: Path) -> str:
     """Return a local identity shared by paths on the same mounted resource."""
 
+    if os.name == "nt":
+        # A drive/share root is the relevant Windows backing-resource identity.
+        # Do not rely on ``st_dev`` being unique across every supported Python /
+        # filesystem combination on Windows.
+        anchor = path.anchor.casefold()
+        if not anchor:
+            raise OSError("Windows resource path has no volume/share anchor")
+        return f"volume:{anchor}"
     stat = path.stat()
-    # ``st_dev`` is the mount/device identity on POSIX and is also populated by
-    # CPython on supported Windows filesystems. It is intentionally local only;
-    # no filesystem layout is published to Federation peers.
+    # ``st_dev`` identifies the mounted resource on POSIX. It is deliberately
+    # local only; no filesystem layout is published to Federation peers.
     return f"device:{int(stat.st_dev)}"
 
 
@@ -197,10 +208,16 @@ def _inode_measurement(path: Path) -> tuple[int | None, int | None]:
         # accounting. That is different from the whole measurement failing.
         return None, None
     total = int(getattr(value, "f_files", 0) or 0)
-    free = int(getattr(value, "f_favail", 0) or getattr(value, "f_ffree", 0) or 0)
-    if total <= 0:
+    available = getattr(value, "f_favail", None)
+    if available is None:
+        available = getattr(value, "f_ffree", None)
+    if total <= 0 or available is None:
         return None, None
-    return total, max(free, 0)
+    free = int(available)
+    if free < 0:
+        # Negative/sentinel inode counts are not usable capacity evidence.
+        return None, None
+    return total, free
 
 
 def _unavailable_measurement(
@@ -275,6 +292,10 @@ def _valid_aware_timestamp(value: datetime) -> bool:
     return value.tzinfo is not None and value.utcoffset() is not None
 
 
+def _valid_capacity(value: object) -> bool:
+    return not isinstance(value, bool) and isinstance(value, int) and value >= 0
+
+
 def assess_measurement(
     measurement: FilesystemMeasurement,
     *,
@@ -286,14 +307,7 @@ def assess_measurement(
     """Classify a measurement after subtracting active FCP reservations."""
 
     policy = thresholds or PressureThresholds()
-    if (
-        isinstance(reserved_bytes, bool)
-        or not isinstance(reserved_bytes, int)
-        or isinstance(reserved_inodes, bool)
-        or not isinstance(reserved_inodes, int)
-        or reserved_bytes < 0
-        or reserved_inodes < 0
-    ):
+    if not _valid_capacity(reserved_bytes) or not _valid_capacity(reserved_inodes):
         raise ValueError("resource reservations must be non-negative integers")
     current = now or datetime.now(timezone.utc)
     if not _valid_aware_timestamp(current):
@@ -310,6 +324,14 @@ def assess_measurement(
     elif not measurement.available or measurement.free_bytes is None:
         reasons.append(measurement.error_code or "measurement_unavailable")
         level = PressureLevel.CRITICAL
+    elif not _valid_capacity(measurement.free_bytes):
+        reasons.append("measurement_invalid")
+        level = PressureLevel.CRITICAL
+    elif measurement.free_inodes is not None and not _valid_capacity(
+        measurement.free_inodes
+    ):
+        reasons.append("measurement_invalid")
+        level = PressureLevel.CRITICAL
     else:
         observed = measurement.observed_at.astimezone(timezone.utc)
         age = (current - observed).total_seconds()
@@ -320,7 +342,7 @@ def assess_measurement(
             reasons.append("measurement_stale")
             level = PressureLevel.CRITICAL
         else:
-            effective_bytes = max(int(measurement.free_bytes) - reserved_bytes, 0)
+            effective_bytes = max(measurement.free_bytes - reserved_bytes, 0)
             byte_level = _level_for_remaining(
                 effective_bytes,
                 critical=policy.critical_free_bytes,
@@ -332,10 +354,7 @@ def assess_measurement(
                 reasons.append(f"bytes_{byte_level.name.lower()}")
 
             if measurement.free_inodes is not None:
-                effective_inodes = max(
-                    int(measurement.free_inodes) - reserved_inodes,
-                    0,
-                )
+                effective_inodes = max(measurement.free_inodes - reserved_inodes, 0)
                 inode_level = _level_for_remaining(
                     effective_inodes,
                     critical=policy.critical_free_inodes,
@@ -426,14 +445,7 @@ class ProcessResourceAdmission:
         measurement/serialization at their own boundary.
         """
 
-        if (
-            isinstance(bytes_required, bool)
-            or not isinstance(bytes_required, int)
-            or isinstance(inodes_required, bool)
-            or not isinstance(inodes_required, int)
-            or bytes_required < 0
-            or inodes_required < 0
-        ):
+        if not _valid_capacity(bytes_required) or not _valid_capacity(inodes_required):
             raise ValueError("resource requirement must be non-negative integers")
 
         measurement = self._measure(path)
