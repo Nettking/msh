@@ -295,7 +295,7 @@ def test_windows_build_commit_resolution_delegates_to_serialized_host_build() ->
 
     assert "scripts\\windows\\fcp_host_build.ps1" in resolver
     assert "-RepoRoot \"%~dp0\"" in resolver
-    assert "-ResultFile \"%FCP_BUILD_RESULT%\"" in resolver
+    assert "-OutputFile \"%FCP_BUILD_RESULT%\"" in resolver
     assert "FCP_BUILD_COMMIT" in resolver
     assert "git rev-parse" not in resolver
     assert "docker compose build" not in resolver
