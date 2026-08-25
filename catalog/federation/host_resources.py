@@ -71,7 +71,7 @@ class PressureLevel(IntEnum):
 class HostResourceRefused(RuntimeError):
     """Raised before new large work when the emergency reserve would be unsafe."""
 
-    def __init__(self, code: str, assessment: "ResourceAssessment") -> None:
+    def __init__(self, code: str, assessment: ResourceAssessment) -> None:
         super().__init__(code)
         self.code = code
         self.assessment = assessment
@@ -119,14 +119,14 @@ class PressureThresholds:
             raise ValueError("resource inode thresholds must be ordered")
         if (
             isinstance(self.max_measurement_age_seconds, bool)
-            or not isinstance(self.max_measurement_age_seconds, (int, float))
+            or not isinstance(self.max_measurement_age_seconds, int | float)
             or not math.isfinite(self.max_measurement_age_seconds)
             or self.max_measurement_age_seconds <= 0
         ):
             raise ValueError("resource measurement age must be finite and positive")
         if (
             isinstance(self.future_measurement_tolerance_seconds, bool)
-            or not isinstance(self.future_measurement_tolerance_seconds, (int, float))
+            or not isinstance(self.future_measurement_tolerance_seconds, int | float)
             or not math.isfinite(self.future_measurement_tolerance_seconds)
             or self.future_measurement_tolerance_seconds < 0
         ):
@@ -324,11 +324,9 @@ def assess_measurement(
     elif not measurement.available or measurement.free_bytes is None:
         reasons.append(measurement.error_code or "measurement_unavailable")
         level = PressureLevel.CRITICAL
-    elif not _valid_capacity(measurement.free_bytes):
-        reasons.append("measurement_invalid")
-        level = PressureLevel.CRITICAL
-    elif measurement.free_inodes is not None and not _valid_capacity(
-        measurement.free_inodes
+    elif not _valid_capacity(measurement.free_bytes) or (
+        measurement.free_inodes is not None
+        and not _valid_capacity(measurement.free_inodes)
     ):
         reasons.append("measurement_invalid")
         level = PressureLevel.CRITICAL
@@ -361,8 +359,7 @@ def assess_measurement(
                     pressure=policy.pressure_free_inodes,
                     warning=policy.warning_free_inodes,
                 )
-                if inode_level > level:
-                    level = inode_level
+                level = max(level, inode_level)
                 if inode_level != PressureLevel.NORMAL:
                     reasons.append(f"inodes_{inode_level.name.lower()}")
 
