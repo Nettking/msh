@@ -1,7 +1,7 @@
 # Quick start
 
 Status: **current user guide**
-Reviewed: **2026-08-18**
+Reviewed: **2026-08-25**
 
 FCP is capability-first: devices are not assigned one permanent role. The normal multi-device v1 setup is **initialize one Federation once, then let trusted Tailscale devices discover, join, benchmark, and activate their available services automatically**.
 
@@ -37,7 +37,7 @@ start-tailscale.cmd --fresh --initialize-federation
 sh start-tailscale.sh --fresh --initialize-federation
 ```
 
-`--fresh` displays the complete reset boundary and requires typing:
+For `--fresh --initialize-federation`, the launcher collects the reset confirmation and first-administrator credentials **before** the reset/build work begins. Type:
 
 ```text
 RESET
@@ -45,14 +45,14 @@ RESET
 
 The reset removes mutable FCP identity, Federation, auth, onboarding, benchmark, provider, recorder runtime/configuration, analysis, and job state. It preserves the machine recording corpus and its integrity metadata, Docker/model resources, source code, and deployment settings.
 
-After FCP starts, the terminal asks once for:
+Then enter the first Federation administrator credentials:
 
 ```text
 Federation administrator email:
 Federation administrator password:
 ```
 
-The password prompt is hidden. The password is never a device-enrollment credential and is not accepted as a launcher argument.
+The password prompt is hidden and the password remains only in the host orchestrator's memory until the initialized service is ready. A joining-device `--fresh` start asks only for `RESET`; it never asks for Federation human credentials. The password is never a device-enrollment credential and is not accepted as a launcher argument.
 
 The first-device startup then:
 
