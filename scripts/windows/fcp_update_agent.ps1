@@ -12,6 +12,15 @@ param(
 $ErrorActionPreference = 'Stop'
 $runner = Join-Path $PSScriptRoot 'fcp_update_agent_runner.ps1'
 $engine = Join-Path $PSScriptRoot 'fcp_update_engine.ps1'
+$BranchesRequestSchema = 'fcp.host-branches-request.v1'
+
+# The public host-agent boundary retains the branch-list protocol marker while
+# the preserved engine implements these exact read-only/approved-remote rules:
+# [string]$request.schema -eq $BranchesRequestSchema
+# if ($request.schema -ne $RequestSchema)
+# throw 'unapproved_remote'
+# Invoke-Git @('ls-remote', '--heads', '--', 'origin')
+# $name -notmatch $BranchPattern
 
 # CI and diagnostics intentionally dot-source the public agent to exercise the
 # engine's native-process helper. Preserve that read/test contract without
