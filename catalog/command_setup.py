@@ -8,9 +8,7 @@ never enables a contribution or marks onboarding complete.
 
 from __future__ import annotations
 
-import json
 from dataclasses import dataclass
-from urllib import request
 
 from catalog.flask_app.services.capability_config_service import (
     AI_MODEL_CHOICES,
@@ -60,8 +58,6 @@ COMMAND_PROFILES: dict[str, dict[str, object]] = {
     },
 }
 
-# Existing scripts may keep their old spelling. These aliases are command-line
-# compatibility only; they are never persisted as device roles.
 LEGACY_PROFILE_ALIASES = {
     "full-server": "workbench",
     "web-workbench": "workbench",
@@ -207,26 +203,16 @@ def pull_connected_model(
     *,
     timeout_seconds: int = 900,
 ) -> tuple[bool, str]:
-    """Request model installation from an explicitly connected Ollama endpoint."""
+    """Refuse remote writes that this FCP cannot admit on the provider host."""
 
+    del timeout_seconds
     if config.ai_provider_mode != "connected":
         return False, "The configured AI provider is not a connected computer."
-    payload = json.dumps({"name": config.ai_model, "stream": False}).encode("utf-8")
-    req = request.Request(
-        f"{config.ollama_base_url.rstrip('/')}/api/pull",
-        data=payload,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    try:
-        with request.urlopen(req, timeout=timeout_seconds) as response:
-            body = response.read().decode("utf-8")
-    except (OSError, TimeoutError) as exc:  # pragma: no cover - remote runtime
-        return False, f"Could not pull {config.ai_model}: {exc}"
     provider_name = config.ai_provider_name or "Connected computer"
-    return True, (
-        f"Ollama model is installed or updated on {provider_name}: "
-        f"{config.ai_model}. Response: {body[:200]}"
+    return False, (
+        f"FCP will not install {config.ai_model} on {provider_name} from this device "
+        "because it cannot enforce that host's disk reserve. Run the provider "
+        "setup on that FCP host, then reuse the already-installed model here."
     )
 
 
