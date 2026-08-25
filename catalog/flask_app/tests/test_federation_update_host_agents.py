@@ -9,7 +9,7 @@ ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_windows_agent_has_fixed_safe_mutation_boundary() -> None:
-    text = (ROOT / "scripts/windows/fcp_update_agent.ps1").read_text(
+    text = (ROOT / "scripts/windows/fcp_update_engine.ps1").read_text(
         encoding="utf-8"
     )
 
@@ -52,12 +52,11 @@ def test_windows_agent_has_fixed_safe_mutation_boundary() -> None:
     assert "$request.command" not in text
     assert "$request.arguments" not in text
     assert "$request.remote" not in text
-    # Repository/branch fields are read only to compare against local constants.
     assert "[string]$request.branch -ne $ApprovedBranch" in text
 
 
 def test_posix_agent_never_executes_peer_supplied_process_shape() -> None:
-    text = (ROOT / "scripts/posix/fcp_update_agent.py").read_text(encoding="utf-8")
+    text = (ROOT / "scripts/posix/fcp_update_engine.py").read_text(encoding="utf-8")
 
     assert 'APPROVED_REPOSITORY = "Nettking/msh"' in text
     assert 'APPROVED_BRANCH = "main"' in text
@@ -80,6 +79,35 @@ def test_posix_agent_never_executes_peer_supplied_process_shape() -> None:
     assert 'value.get("arguments")' not in text
     assert 'value.get("remote")' not in text
     assert 'value.get("branch") != APPROVED_BRANCH' in text
+
+
+def test_public_agents_delegate_to_serialized_runners() -> None:
+    windows = (ROOT / "scripts/windows/fcp_update_agent.ps1").read_text(
+        encoding="utf-8"
+    )
+    posix = (ROOT / "scripts/posix/fcp_update_agent.py").read_text(encoding="utf-8")
+    windows_runner = (ROOT / "scripts/windows/fcp_update_agent_runner.ps1").read_text(
+        encoding="utf-8"
+    )
+    posix_runner = (ROOT / "scripts/posix/fcp_update_agent_runner.py").read_text(
+        encoding="utf-8"
+    )
+    windows_build = (ROOT / "scripts/windows/fcp_host_build.ps1").read_text(
+        encoding="utf-8"
+    )
+
+    assert "fcp_update_agent_runner.ps1" in windows
+    assert "fcp_update_agent_runner.py" in posix
+    assert "fcp_update_engine.ps1" in windows_runner
+    assert 'ENGINE_NAME = "fcp_update_engine.py"' in posix_runner
+    assert "Global\\FCPHostMutation-" in windows_runner
+    assert "Global\\FCPHostMutation-" in windows_build
+    assert "host_build.host_mutation_lock(root)" in posix_runner
+    assert "host_build.host_mutation_lock(root" in (
+        ROOT / "catalog/federation/host_build.py"
+    ).read_text(encoding="utf-8")
+    assert "Invoke-PostBuildCachePrune" in windows_runner
+    assert "build_phase_entered and not prune_called" in posix_runner
 
 
 def test_recorder_only_host_agents_rebuild_only_the_recorder() -> None:
@@ -127,18 +155,23 @@ def test_recorder_only_host_agents_rebuild_only_the_recorder() -> None:
     assert "ensure_ollama_model" not in posix
 
 
-def test_supported_launchers_start_agent_and_embed_build_commit() -> None:
+def test_supported_launchers_use_serialized_host_build_before_agent() -> None:
     windows = (ROOT / "start.cmd").read_text(encoding="utf-8")
     posix = (ROOT / "start.sh").read_text(encoding="utf-8")
 
-    assert "fcp_update_agent.ps1" in windows
+    assert "fcp_host_build.ps1" in windows
     assert "FCP_BUILD_COMMIT" in windows
-    assert "docker compose build relay flask recorder" in windows
-    assert "git status --porcelain=v1 --untracked-files=all" in windows
-    assert "fcp_update_agent.py" in posix
+    assert "docker compose build relay flask recorder" not in windows
+    assert windows.index("call :resolve_build_commit") < windows.index(
+        "call :start_update_agent"
+    )
+
+    assert "catalog.federation.host_build" in posix
     assert "FCP_BUILD_COMMIT" in posix
-    assert "docker compose build relay flask recorder" in posix
-    assert "git status --porcelain=v1 --untracked-files=all" in posix
+    assert "docker compose build relay flask recorder" not in posix
+    assert posix.index("build_core_images") < posix.index(
+        'AGENT_DIR="$FCP_DATA_DIR/federation/update-agent"'
+    )
 
 
 def test_runtime_images_bake_build_identity() -> None:
@@ -154,21 +187,9 @@ def test_runtime_images_bake_build_identity() -> None:
 
 
 # -- update disk lifecycle -----------------------------------------------
-#
-# The physical host that filled its drive did it through repeated update
-# builds: 21 GB of BuildKit cache in ~1 GB entries, while every FCP data path
-# together was under 1% of the disk. These pin the three properties that stop
-# it recurring.
 
 
 def test_the_build_commit_is_declared_below_the_dependency_install() -> None:
-    """This ordering is the whole fix; reversing it re-breaks the cache.
-
-    A build argument invalidates the layer that consumes it and every layer
-    after it. Declared above the install, each changed commit re-ran the whole
-    dependency install and wrote roughly a gigabyte of fresh cache per image.
-    """
-
     for name in ("Dockerfile", "Dockerfile.cli"):
         text = (ROOT / name).read_text(encoding="utf-8")
         install = text.index("python -m pip install")
@@ -179,20 +200,16 @@ def test_the_build_commit_is_declared_below_the_dependency_install() -> None:
         )
 
 
-def test_both_agents_preflight_disk_before_building() -> None:
-    """Refusing after Flask is stopped is the state this must never reach."""
-
-    windows = (ROOT / "scripts/windows/fcp_update_agent.ps1").read_text(
+def test_update_engines_preflight_disk_before_building() -> None:
+    windows = (ROOT / "scripts/windows/fcp_update_engine.ps1").read_text(
         encoding="utf-8"
     )
-    posix = (ROOT / "scripts/posix/fcp_update_agent.py").read_text(
+    posix = (ROOT / "scripts/posix/fcp_update_engine.py").read_text(
         encoding="utf-8"
     )
 
     assert "insufficient_disk_for_update" in windows
     assert "insufficient_disk_for_update" in posix
-
-    # The preflight must sit before the build, and the build before the stop.
     assert (
         windows.index("Assert-DiskPreflight")
         < windows.index("'compose', 'build', 'relay', 'flask', 'recorder'")
@@ -203,57 +220,60 @@ def test_both_agents_preflight_disk_before_building() -> None:
     )
 
 
-def test_both_agents_bound_the_build_cache() -> None:
-    windows = (ROOT / "scripts/windows/fcp_update_agent.ps1").read_text(
+def test_launchers_and_update_engines_bound_build_cache() -> None:
+    windows_engine = (ROOT / "scripts/windows/fcp_update_engine.ps1").read_text(
         encoding="utf-8"
     )
-    posix = (ROOT / "scripts/posix/fcp_update_agent.py").read_text(
+    posix_engine = (ROOT / "scripts/posix/fcp_update_engine.py").read_text(
         encoding="utf-8"
     )
-
-    assert "'builder', 'prune', '--force'" in windows
-    assert '"builder",' in posix and '"prune",' in posix
-    assert "keep-storage" in windows
-    assert "keep-storage" in posix
-
-
-def test_the_two_agents_agree_on_the_disk_figures() -> None:
-    """Two languages, one policy. A drift here is a silent inconsistency."""
-
-    windows = (ROOT / "scripts/windows/fcp_update_agent.ps1").read_text(
+    windows_build = (ROOT / "scripts/windows/fcp_host_build.ps1").read_text(
         encoding="utf-8"
     )
-    posix = (ROOT / "scripts/posix/fcp_update_agent.py").read_text(
+    posix_build = (ROOT / "catalog/federation/host_build.py").read_text(
         encoding="utf-8"
     )
 
-    assert "UPDATE_REQUIRED_FREE_BYTES = 10 * 1024**3" in posix
-    assert "$UpdateRequiredFreeBytes = 10737418240" in windows
-    assert 10 * 1024**3 == 10737418240
-
-    assert "BUILD_CACHE_KEEP_BYTES = 8 * 1024**3" in posix
-    assert "$BuildCacheKeepBytes = 8589934592" in windows
-    assert 8 * 1024**3 == 8589934592
+    for text in (windows_engine, windows_build):
+        assert "builder" in text and "prune" in text and "keep-storage" in text
+    for text in (posix_engine, posix_build):
+        assert '"builder",' in text and '"prune",' in text and "keep-storage" in text
 
 
+def test_all_core_build_paths_agree_on_disk_figures() -> None:
+    windows_engine = (ROOT / "scripts/windows/fcp_update_engine.ps1").read_text(
+        encoding="utf-8"
+    )
+    posix_engine = (ROOT / "scripts/posix/fcp_update_engine.py").read_text(
+        encoding="utf-8"
+    )
+    windows_build = (ROOT / "scripts/windows/fcp_host_build.ps1").read_text(
+        encoding="utf-8"
+    )
+    posix_build = (ROOT / "catalog/federation/host_build.py").read_text(
+        encoding="utf-8"
+    )
 
-#: The POSIX agent imports ``fcntl`` for its single-instance lock, so it cannot
-#: be loaded on Windows at all. That is by design -- it is the POSIX launcher's
-#: agent, and Windows hosts run the PowerShell one. The cross-platform
-#: assertions above read both agents as text and so still cover this policy on
-#: Windows; only the tests that execute the module are skipped.
+    assert "UPDATE_REQUIRED_FREE_BYTES = 10 * 1024**3" in posix_engine
+    assert "UPDATE_REQUIRED_FREE_BYTES = 10 * 1024**3" in posix_build
+    assert "$UpdateRequiredFreeBytes = 10737418240" in windows_engine
+    assert "$UpdateRequiredFreeBytes = 10737418240" in windows_build
+    assert "BUILD_CACHE_KEEP_BYTES = 8 * 1024**3" in posix_engine
+    assert "BUILD_CACHE_KEEP_BYTES = 8 * 1024**3" in posix_build
+    assert "$BuildCacheKeepBytes = 8589934592" in windows_engine
+    assert "$BuildCacheKeepBytes = 8589934592" in windows_build
+
+
 _POSIX_AGENT_ONLY = pytest.mark.skipif(
     importlib.util.find_spec("fcntl") is None,
-    reason="the POSIX update agent imports fcntl, which Windows does not provide",
+    reason="the POSIX update engine imports fcntl, which Windows does not provide",
 )
 
 
 def _load_posix_agent():
-    """Import the standalone POSIX agent by path, as its launcher runs it."""
-
     spec = importlib.util.spec_from_file_location(
-        "_fcp_update_agent_under_test",
-        ROOT / "scripts/posix/fcp_update_agent.py",
+        "_fcp_update_engine_under_test",
+        ROOT / "scripts/posix/fcp_update_engine.py",
     )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
@@ -279,8 +299,6 @@ def test_preflight_passes_when_there_is_room(tmp_path, monkeypatch) -> None:
 
 @_POSIX_AGENT_ONLY
 def test_preflight_recovers_from_its_own_build_cache(tmp_path, monkeypatch) -> None:
-    """A cache past its bound is the usual reason the room went missing."""
-
     agent = _load_posix_agent()
     readings = iter([0, agent.UPDATE_REQUIRED_FREE_BYTES])
     monkeypatch.setattr(agent, "free_bytes", lambda _root: next(readings))
@@ -296,8 +314,6 @@ def test_preflight_recovers_from_its_own_build_cache(tmp_path, monkeypatch) -> N
 
 @_POSIX_AGENT_ONLY
 def test_preflight_refuses_when_pruning_is_not_enough(tmp_path, monkeypatch) -> None:
-    """The refusal must land before anything is stopped, not during."""
-
     agent = _load_posix_agent()
     monkeypatch.setattr(agent, "free_bytes", lambda _root: 0)
     monkeypatch.setattr(agent, "prune_build_cache", lambda *_a: True)
@@ -310,8 +326,6 @@ def test_preflight_refuses_when_pruning_is_not_enough(tmp_path, monkeypatch) -> 
 
 @_POSIX_AGENT_ONLY
 def test_a_failed_prune_never_becomes_an_update_failure(tmp_path, monkeypatch) -> None:
-    """Cache is reconstructible; failing to prune it must not fail the update."""
-
     agent = _load_posix_agent()
 
     def _explode(*_args, **_kwargs):

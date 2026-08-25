@@ -35,12 +35,14 @@ def _port_resolver_script() -> str:
 def test_start_cmd_builds_required_services_before_optional_ai() -> None:
     script = _start_script()
 
-    assert "docker compose build relay flask recorder" in script
+    assert "scripts\\windows\\fcp_host_build.ps1" in script
+    assert "docker compose build relay flask recorder" not in script
     assert "docker compose up -d relay recorder" in script
     assert "docker compose up -d flask" in script
     assert "docker compose up -d ollama" in script
     assert "call :ensure_ollama_model" in script
-    assert "Ollama model is ready" in script
+    assert "scripts\\windows\\fcp_model_pull.ps1" in script
+    assert "Ollama model is installed and verified" in script
     assert "docker compose port flask 5000" in script
     assert 'set "FCP_WEB_CLIENT_HOST=%FCP_WEB_BIND%"' in script
     assert 'set "FCP_BASE_URL=http://%FCP_WEB_CLIENT_HOST%:%FCP_WEB_PORT_RESOLVED%"' in script
@@ -55,6 +57,9 @@ def test_start_cmd_builds_required_services_before_optional_ai() -> None:
     assert 'set "FCP_WEB_BIND=127.0.0.1"' in script
     assert 'set "COMPOSE_PROJECT_NAME=fcp"' in script
     assert "Invoke-WebRequest" in script
+    assert script.index("call :resolve_build_commit") < script.index(
+        "call :start_update_agent"
+    )
     assert script.index("docker compose up -d relay recorder") < script.index(
         "docker compose up -d flask"
     )
@@ -74,7 +79,7 @@ def test_start_cmd_builds_required_services_before_optional_ai() -> None:
     assert "docker compose up -d relay ollama recorder" not in script
 
 
-def test_start_cmd_recovers_runtime_state_before_compose_start() -> None:
+def test_start_cmd_recovers_runtime_state_before_host_build() -> None:
     script = _start_script()
     resolver = _port_resolver_script()
 
@@ -92,7 +97,7 @@ def test_start_cmd_recovers_runtime_state_before_compose_start() -> None:
     assert "Runtime-state resolver omitted FCP_WEB_PORT" in script
     assert "Resolver output was:" in script
     assert script.index("call :resolve_runtime_state") < script.index(
-        "docker compose build relay flask recorder"
+        "call :resolve_build_commit"
     )
 
     assert '[string]$CurrentProjectName = "fcp"' in resolver
@@ -130,13 +135,18 @@ def test_compose_uses_selected_state_and_host_data_locations() -> None:
 
 
 @pytest.mark.skipif(os.name != "nt", reason="Windows PowerShell parser check")
-def test_windows_port_resolver_has_valid_powershell_syntax() -> None:
-    path = (
-        _repository_root()
-        / "scripts"
-        / "windows"
-        / "resolve_fcp_web_port.ps1"
-    )
+@pytest.mark.parametrize(
+    "relative_path",
+    [
+        "scripts/windows/resolve_fcp_web_port.ps1",
+        "scripts/windows/fcp_host_build.ps1",
+        "scripts/windows/fcp_update_agent.ps1",
+        "scripts/windows/fcp_update_agent_runner.ps1",
+        "scripts/windows/fcp_update_engine.ps1",
+    ],
+)
+def test_windows_host_scripts_have_valid_powershell_syntax(relative_path: str) -> None:
+    path = _repository_root() / relative_path
     escaped_path = str(path).replace("'", "''")
     command = (
         "$errors = $null; "
@@ -159,15 +169,12 @@ def test_start_cmd_treats_ollama_and_model_as_optional_after_core_start() -> Non
 
     assert ":ensure_ollama_model" in script
     assert "os.environ.get('FCP_AI_MODEL') or 'llama3.2:3b'" in script
-    assert 'ollama show "%FCP_AI_MODEL_RESOLVED%"' in script
-    assert (
-        "docker compose --profile model-install run --rm --entrypoint "
-        "/bin/ollama ollama-pull pull \"%FCP_AI_MODEL_RESOLVED%\""
-        in script
-    )
-    assert "attempt %FCP_MODEL_ATTEMPT% of 3" in script
-    assert "if %FCP_MODEL_ATTEMPT% GEQ 3" in script
-    assert "AI capability remains unavailable" in script
+    assert "scripts\\windows\\fcp_model_pull.ps1" in script
+    assert '-Model "%FCP_AI_MODEL_RESOLVED%" -Target ollama' in script
+    assert "host resource admission" in script
+    assert "AI model installation is paused by host resource pressure" in script
+    assert "ollama-pull" not in script
+    assert 'ollama show "%FCP_AI_MODEL_RESOLVED%"' not in script
     assert "WARNING: Ollama is unavailable; core FCP remains running" in script
     assert "WARNING: AI capability is unavailable; core FCP remains running" in script
     assert "AI capability can be repaired later without resetting Federation state" in script
@@ -256,14 +263,11 @@ def test_start_cmd_fresh_mode_resets_and_verifies_authoritative_state() -> None:
 
     assert 'if /I "%~1"=="--fresh"' in script
     assert "Type RESET to continue" in script
-    # The fresh-reset shutdown stays in a bounded helper. Reset and verification
-    # then run in isolated one-shot containers while every long-running FCP
-    # service is still stopped, so no new runtime state can race verification.
     assert "scripts\\windows\\stop_fcp_for_fresh_reset.ps1" in script
     assert "FCP containers could not be stopped safely" in script
 
     reset_command = (
-        "docker compose run --rm --no-deps --build --entrypoint python flask -m "
+        "docker compose run --rm --no-deps --entrypoint python flask -m "
         "catalog.flask_app.services.device_state_reset"
     )
     verify_command = (
@@ -272,6 +276,7 @@ def test_start_cmd_fresh_mode_resets_and_verifies_authoritative_state() -> None:
     )
     assert reset_command in script
     assert verify_command in script
+    assert "--no-deps --build --entrypoint python flask" not in script
     assert (
         "docker compose exec -T flask python -m "
         "catalog.flask_app.services.device_state_reset --verify-fresh"
@@ -282,6 +287,9 @@ def test_start_cmd_fresh_mode_resets_and_verifies_authoritative_state() -> None:
         "\n:show_help", maxsplit=1
     )[0]
     main_body = script.split("\n:resolve_build_commit", maxsplit=1)[0]
+    assert reset_block.index("call :resolve_build_commit") < reset_block.index(
+        "stop_fcp_for_fresh_reset.ps1"
+    )
     assert reset_block.index(reset_command) < reset_block.index(verify_command)
     assert main_body.index("call :reset_device_state") < main_body.index(
         "docker compose up -d relay recorder"

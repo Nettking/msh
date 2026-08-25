@@ -91,29 +91,14 @@ if "%FCP_FRESH_INSTALL%"=="1" (
     )
 )
 
-call :resolve_build_commit
-if errorlevel 1 (
-    echo.
-    echo FCP could not determine an immutable build commit from this checkout.
-    pause
-    exit /b 1
-)
-
-call :start_update_agent
-if errorlevel 1 (
-    echo.
-    echo The FCP host update agent could not be started safely.
-    pause
-    exit /b 1
-)
-
-echo Building the current FCP services from %FCP_BUILD_COMMIT%...
-docker compose build relay flask recorder
-if errorlevel 1 (
-    echo.
-    echo FCP images could not be built. Review the Docker error above.
-    pause
-    exit /b 1
+if not defined FCP_BUILD_COMMIT (
+    call :resolve_build_commit
+    if errorlevel 1 (
+        echo.
+        echo FCP core images could not be built through the serialized host lifecycle.
+        pause
+        exit /b 1
+    )
 )
 
 echo.
@@ -229,6 +214,17 @@ echo First-time onboarding is required on this machine.
 goto :resume_complete
 
 :resume_complete
+rem All launcher Compose reads for this activation are complete before the update
+rem agent is allowed to mutate the checkout. This keeps runtime configuration on
+rem the same exact candidate that produced the verified core images.
+call :start_update_agent
+if errorlevel 1 (
+    echo.
+    echo The FCP host update agent could not be started safely.
+    pause
+    exit /b 1
+)
+
 echo.
 echo FCP is running:        %FCP_BASE_URL%
 echo Onboarding:            "%FCP_ONBOARDING_URL%"
@@ -277,21 +273,31 @@ for %%F in ("data/.gitkeep" "data/README.md" "results/.gitkeep" "results/README.
 exit /b 0
 
 :resolve_build_commit
+if not exist "%~dp0scripts\windows\fcp_host_build.ps1" exit /b 1
+set "FCP_BUILD_RESULT=%TEMP%\fcp-host-build-%RANDOM%-%RANDOM%.txt"
+if exist "%FCP_BUILD_RESULT%" del /q "%FCP_BUILD_RESULT%" >nul 2>&1
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_host_build.ps1" -RepoRoot "%~dp0" -OutputFile "%FCP_BUILD_RESULT%"
+set "FCP_BUILD_EXIT=%ERRORLEVEL%"
+if not "%FCP_BUILD_EXIT%"=="0" (
+    if exist "%FCP_BUILD_RESULT%" del /q "%FCP_BUILD_RESULT%" >nul 2>&1
+    set "FCP_BUILD_COMMIT="
+    exit /b %FCP_BUILD_EXIT%
+)
+if not exist "%FCP_BUILD_RESULT%" (
+    echo Serialized host build did not create its commit result.
+    set "FCP_BUILD_COMMIT="
+    exit /b 1
+)
 set "FCP_BUILD_COMMIT="
-for /f "usebackq delims=" %%C in (`git rev-parse --verify HEAD 2^>nul`) do set "FCP_BUILD_COMMIT=%%C"
+set /p "FCP_BUILD_COMMIT="<"%FCP_BUILD_RESULT%"
+del /q "%FCP_BUILD_RESULT%" >nul 2>&1
 if not defined FCP_BUILD_COMMIT exit /b 1
-powershell -NoProfile -Command "if ('%FCP_BUILD_COMMIT%' -match '^[0-9a-fA-F]{40}$') { exit 0 } else { exit 1 }"
+powershell -NoProfile -Command "if ('%FCP_BUILD_COMMIT%' -match '^[0-9a-f]{40}$') { exit 0 } else { exit 1 }"
 if errorlevel 1 (
     set "FCP_BUILD_COMMIT="
     exit /b 1
 )
-powershell -NoProfile -Command "$status = @(git status --porcelain=v1 --untracked-files=all 2>$null); if ($LASTEXITCODE -eq 0 -and $status.Count -eq 0) { exit 0 } else { exit 1 }"
-if errorlevel 1 (
-    echo FCP refuses to label a build from a checkout with local changes.
-    set "FCP_BUILD_COMMIT="
-    exit /b 1
-)
-for /f "usebackq delims=" %%C in (`powershell -NoProfile -Command "'%FCP_BUILD_COMMIT%'.ToLowerInvariant()"`) do set "FCP_BUILD_COMMIT=%%C"
+echo Built FCP core images from %FCP_BUILD_COMMIT% through the serialized host lifecycle.
 exit /b 0
 
 :start_update_agent
@@ -370,39 +376,20 @@ set "FCP_AI_MODEL_RESOLVED="
 for /f "usebackq delims=" %%M in (`docker compose run --rm --no-deps --entrypoint python flask -c "import os; print(os.environ.get('FCP_AI_MODEL') or 'llama3.2:3b')"`) do set "FCP_AI_MODEL_RESOLVED=%%M"
 if not defined FCP_AI_MODEL_RESOLVED set "FCP_AI_MODEL_RESOLVED=llama3.2:3b"
 
-echo Ensuring optional Ollama model is installed: %FCP_AI_MODEL_RESOLVED%
-docker compose exec -T ollama ollama show "%FCP_AI_MODEL_RESOLVED%" >nul 2>&1
-if not errorlevel 1 (
-    echo Ollama model is ready.
-    echo.
-    exit /b 0
-)
-
-set "FCP_MODEL_ATTEMPT=1"
-:pull_ollama_model
-echo Pulling %FCP_AI_MODEL_RESOLVED% ^(attempt %FCP_MODEL_ATTEMPT% of 3^) ...
-docker compose --profile model-install run --rm --entrypoint /bin/ollama ollama-pull pull "%FCP_AI_MODEL_RESOLVED%"
+echo Ensuring optional Ollama model through host resource admission: %FCP_AI_MODEL_RESOLVED%
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_model_pull.ps1" -RepoRoot "%~dp0" -Model "%FCP_AI_MODEL_RESOLVED%" -Target ollama
 set "FCP_MODEL_PULL_EXIT=%ERRORLEVEL%"
-
-docker compose exec -T ollama ollama show "%FCP_AI_MODEL_RESOLVED%" >nul 2>&1
-if not errorlevel 1 (
+if "%FCP_MODEL_PULL_EXIT%"=="0" (
     echo Ollama model is installed and verified.
     echo.
     exit /b 0
 )
-
-if %FCP_MODEL_ATTEMPT% GEQ 3 (
-    echo.
-    echo AI capability remains unavailable because Ollama does not contain: %FCP_AI_MODEL_RESOLVED%
-    if not "%FCP_MODEL_PULL_EXIT%"=="0" echo The final pull command exited with code %FCP_MODEL_PULL_EXIT%.
-    echo Installed Ollama models:
-    docker compose exec -T ollama ollama list
-    exit /b 1
+if "%FCP_MODEL_PULL_EXIT%"=="2" (
+    echo AI model installation is paused by host resource pressure.
+) else (
+    echo AI model installation failed with code %FCP_MODEL_PULL_EXIT%.
 )
-
-set /a FCP_MODEL_ATTEMPT+=1
-powershell -NoProfile -Command "Start-Sleep -Seconds 3"
-goto :pull_ollama_model
+exit /b 1
 
 :reset_device_state
 echo.
@@ -425,6 +412,18 @@ if /I not "%FCP_RESET_CONFIRM%"=="RESET" (
     exit /b 2
 )
 
+rem Build while the current runtime is still available. The host-build helper
+rem owns the checkout lock, disk preflight, exact source identity and cache
+rem lifecycle. The reset consumes that verified image without a second build.
+if not defined FCP_BUILD_COMMIT (
+    call :resolve_build_commit
+    if errorlevel 1 (
+        echo FCP core images could not be built safely. No application state was removed.
+        pause
+        exit /b 1
+    )
+)
+
 echo.
 echo Stopping FCP before resetting mutable application state...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\stop_fcp_for_fresh_reset.ps1"
@@ -435,7 +434,7 @@ if errorlevel 1 (
 )
 
 echo Resolving and clearing mutable FCP state while preserving recordings...
-docker compose run --rm --no-deps --build --entrypoint python flask -m catalog.flask_app.services.device_state_reset
+docker compose run --rm --no-deps --entrypoint python flask -m catalog.flask_app.services.device_state_reset
 if errorlevel 1 (
     echo.
     echo Fresh factory reset did not complete. Review the specific path or recording-integrity error above.

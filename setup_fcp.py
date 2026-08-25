@@ -21,6 +21,7 @@ from catalog.command_setup import (
     env_lines_for_plan,
     pull_connected_model,
 )
+from catalog.federation.model_resource_pull import admitted_model_pull
 from catalog.flask_app.services.capability_config_service import (
     AI_MODEL_CHOICES,
     AI_PROVIDER_MODES,
@@ -160,6 +161,15 @@ def _interactive_plan() -> tuple[CommandDeploymentPlan, str, str, bool, bool]:
     return plan, web_bind, web_port, pull_model, start
 
 
+def _report_optional_pull(result) -> None:
+    print(result.message)
+    if not result.ok:
+        print(
+            "Model provisioning remains unavailable, but no unrelated FCP "
+            "state or capability authority was changed."
+        )
+
+
 def _run_compose(
     plan: CommandDeploymentPlan,
     *,
@@ -186,18 +196,13 @@ def _run_compose(
                 check=True,
             )
         if pull_model:
-            subprocess.run(
-                [
-                    "docker",
-                    "compose",
-                    "--profile",
-                    "provider",
-                    "run",
-                    "--rm",
-                    "model-provider-install",
-                ],
-                env=env,
-                check=True,
+            _report_optional_pull(
+                admitted_model_pull(
+                    Path.cwd(),
+                    model=plan.config.ai_model,
+                    target_name="model-provider",
+                    env=env,
+                )
             )
         return
 
@@ -233,8 +238,8 @@ def _run_compose(
         print(message)
         if not ok:
             print(
-                "The connected model was not installed; technical configuration "
-                "was still saved and can be retried later."
+                "The connected provider was not mutated; technical configuration "
+                "was still saved and an already-installed model can be used."
             )
         return
     if not plan.provision_local_model:
@@ -248,10 +253,13 @@ def _run_compose(
         env=env,
         check=False,
     )
-    subprocess.run(
-        ["docker", "compose", "run", "--rm", "ollama-pull"],
-        env=env,
-        check=False,
+    _report_optional_pull(
+        admitted_model_pull(
+            Path.cwd(),
+            model=plan.config.ai_model,
+            target_name="ollama",
+            env=env,
+        )
     )
 
 
