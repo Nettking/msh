@@ -129,12 +129,6 @@ fi
 
 AGENT_DIR="$FCP_DATA_DIR/federation/update-agent"
 mkdir -p "$AGENT_DIR"
-nohup python3 "$ROOT/scripts/posix/fcp_update_agent.py" \
-  --repo-root "$ROOT" \
-  --data-directory "$FCP_DATA_DIR" \
-  >>"$AGENT_DIR/agent.log" 2>&1 </dev/null &
-
-sleep 0.1
 
 echo "Starting required Federation relay and managed recorder ..."
 docker compose up -d relay recorder
@@ -188,6 +182,15 @@ while :; do
 done
 
 docker compose ps relay ollama flask recorder
+
+# Do not allow the update agent to mutate the checkout until every launcher
+# Compose read for this activation has completed. This keeps the activated
+# runtime configuration on the same exact candidate that produced the images.
+nohup python3 "$ROOT/scripts/posix/fcp_update_agent.py" \
+  --repo-root "$ROOT" \
+  --data-directory "$FCP_DATA_DIR" \
+  >>"$AGENT_DIR/agent.log" 2>&1 </dev/null &
+
 printf '\nFCP is running:       %s\n' "$BASE_URL"
 printf 'Federation:           %s/federation\n' "$BASE_URL"
 printf 'Running build commit: %s\n' "$FCP_BUILD_COMMIT"
