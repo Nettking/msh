@@ -172,13 +172,13 @@ def test_provider_node_starts_only_provider_and_uses_admitted_model_pull(
 ) -> None:
     plan = _plan(profile="language-model-provider", ai_profile="edge-small")
     process_calls: list[tuple[list[str], dict[str, str], bool]] = []
-    pull_calls: list[tuple[str, str]] = []
+    pull_calls: list[tuple[str, str, dict[str, str]]] = []
 
     def fake_run(command, *, env, check):
         process_calls.append((command, env, check))
 
-    def fake_pull(_root, *, model, target_name):
-        pull_calls.append((model, target_name))
+    def fake_pull(_root, *, model, target_name, env):
+        pull_calls.append((model, target_name, dict(env)))
         return ModelPullResult(True, "installed", "model ready")
 
     monkeypatch.setattr(setup_fcp.subprocess, "run", fake_run)
@@ -199,7 +199,11 @@ def test_provider_node_starts_only_provider_and_uses_admitted_model_pull(
     ]
     assert process_calls[0][2] is True
     assert process_calls[0][1]["FCP_PROVIDER_MODEL"] == "smollm2:360m"
-    assert pull_calls == [("smollm2:360m", "model-provider")]
+    assert len(pull_calls) == 1
+    model, target, pull_env = pull_calls[0]
+    assert (model, target) == ("smollm2:360m", "model-provider")
+    assert pull_env["COMPOSE_PROFILES"] == "provider"
+    assert pull_env["FCP_PROVIDER_MODEL"] == "smollm2:360m"
 
 
 def test_one_shot_profile_does_not_persist_product_configuration(
