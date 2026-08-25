@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from catalog.flask_app.services import capability_ai_service
 from catalog.flask_app.services.capability_config_service import CapabilityConfig
 from catalog.flask_app.services.host_model_install_handoff import (
+    HOST_OPERATION_STALE_SECONDS,
     HostModelInstallHandoff,
     MODEL_REQUEST_SCHEMA,
 )
@@ -56,17 +58,44 @@ def test_connected_provider_is_never_mutated_from_the_consumer_host(tmp_path, mo
     assert not (tmp_path / "data" / "federation" / "update-agent" / "request.json").exists()
 
 
-def test_model_handoff_serializes_with_host_update_requests(tmp_path) -> None:
+def test_model_handoff_serializes_with_pending_host_update_request(tmp_path) -> None:
     handoff = HostModelInstallHandoff(tmp_path)
     handoff.request_file.parent.mkdir(parents=True, exist_ok=True)
     handoff.request_file.write_text("{}", encoding="utf-8")
-    handoff.timeout = 0.05
-    handoff.poll_interval = 0.02
 
     ok, message = handoff.queue(model="llama3.2:3b")
 
     assert ok is False
     assert "already processing" in message
+
+
+def test_model_handoff_does_not_queue_behind_active_host_operation(tmp_path) -> None:
+    handoff = HostModelInstallHandoff(tmp_path)
+    handoff.directory.mkdir(parents=True, exist_ok=True)
+    processing = handoff.directory / "processing-active.json"
+    processing.write_text("{}", encoding="utf-8")
+
+    ok, message = handoff.queue(model="llama3.2:3b")
+
+    assert ok is False
+    assert "already processing" in message
+    assert not handoff.request_file.exists()
+
+
+def test_stale_processing_claim_cannot_permanently_fence_model_repair(tmp_path) -> None:
+    handoff = HostModelInstallHandoff(tmp_path)
+    handoff.directory.mkdir(parents=True, exist_ok=True)
+    processing = handoff.directory / "processing-interrupted.json"
+    processing.write_text("{}", encoding="utf-8")
+    stale = 1.0
+    os.utime(processing, (stale, stale))
+
+    ok, message = handoff.queue(model="llama3.2:3b")
+
+    assert HOST_OPERATION_STALE_SECONDS > 0
+    assert ok is True
+    assert "queued" in message.lower()
+    assert handoff.request_file.exists()
 
 
 def test_supported_model_install_paths_have_no_direct_pull_bypass() -> None:
