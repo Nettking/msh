@@ -1,24 +1,22 @@
 """Host-owned, pressure-aware Ollama model installation.
 
 Model downloads are intentionally treated as unbounded optional writes. FCP does
-not guess a model size and reserve that guess. Instead a host-owned caller starts
-only while the Docker backing resource is NORMAL/WARNING and remeasures while the
-pull is active. Entering PRESSURE stops the Ollama writer before the shared
-CRITICAL emergency floor is intentionally spent.
-
-The supported layout stores Docker's growing data image/volumes on the same host
-resource as the checkout path supplied here. Windows launchers implement the same
-threshold policy in PowerShell because normal Windows startup does not require a
-host Python installation.
+not guess a model size and reserve that guess. Instead a host-owned caller proves
+which host resource backs Docker's persistent model storage, starts only while
+that resource is NORMAL/WARNING, and remeasures it throughout the pull. Entering
+PRESSURE stops the optional Ollama writer before the shared CRITICAL emergency
+floor is intentionally spent.
 """
 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import subprocess
 import time
 import uuid
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -52,15 +50,21 @@ class ModelPullResult:
     assessment: ResourceAssessment | None = None
 
 
+def _subprocess_env(env: Mapping[str, str] | None) -> dict[str, str] | None:
+    return dict(env) if env is not None else None
+
+
 def _run(
     root: Path,
     args: list[str],
     *,
+    env: Mapping[str, str] | None = None,
     timeout: float = 120.0,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
         args,
         cwd=root,
+        env=_subprocess_env(env),
         shell=False,
         check=False,
         capture_output=True,
@@ -69,7 +73,71 @@ def _run(
     )
 
 
-def _model_ready(root: Path, target: ModelPullTarget, model: str) -> bool:
+def _docker_backing_resource_path(
+    root: Path,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> Path | None:
+    """Return a host path whose filesystem actually backs Docker model writes.
+
+    POSIX Docker exposes its data root directly. Docker Desktop on Windows stores
+    Linux-container data in a VHDX; admission therefore measures the host volume
+    containing that VHDX rather than assuming the checkout drive is equivalent.
+    If the backing resource cannot be proven, a *new* model pull fails closed.
+    """
+
+    environment = os.environ if env is None else env
+    if os.name == "nt":
+        local_app_data = str(environment.get("LOCALAPPDATA") or "").strip()
+        candidates: list[Path] = []
+        if local_app_data:
+            docker = Path(local_app_data) / "Docker" / "wsl"
+            candidates.extend(
+                [
+                    docker / "disk" / "docker_data.vhdx",
+                    docker / "data" / "ext4.vhdx",
+                ]
+            )
+        program_data = str(environment.get("PROGRAMDATA") or "").strip()
+        if program_data:
+            candidates.append(Path(program_data) / "docker")
+        for candidate in candidates:
+            try:
+                if candidate.exists():
+                    return candidate.resolve()
+            except OSError:
+                continue
+        return None
+
+    info = _run(
+        root,
+        ["docker", "info", "--format", "{{.DockerRootDir}}"],
+        env=env,
+        timeout=30.0,
+    )
+    if info.returncode != 0:
+        return None
+    raw = info.stdout.strip()
+    if not raw:
+        return None
+    candidate = Path(raw)
+    if not candidate.is_absolute():
+        return None
+    try:
+        if not candidate.exists():
+            return None
+        return candidate.resolve()
+    except OSError:
+        return None
+
+
+def _model_ready(
+    root: Path,
+    target: ModelPullTarget,
+    model: str,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> bool:
     result = _run(
         root,
         [
@@ -82,22 +150,86 @@ def _model_ready(root: Path, target: ModelPullTarget, model: str) -> bool:
             "show",
             model,
         ],
+        env=env,
         timeout=60.0,
     )
     return result.returncode == 0
 
 
-def _stop_model_writer(root: Path, target: ModelPullTarget, container_name: str) -> None:
-    # Stopping the server is deliberate: disconnecting only the pull client does
-    # not prove the Ollama daemon stopped writing model blobs. The model is an
-    # optional capability, so resource safety wins over keeping that capability
-    # alive while the host is under pressure.
+def _writer_stopped(
+    root: Path,
+    target: ModelPullTarget,
+    container_name: str,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> bool:
+    service = _run(
+        root,
+        ["docker", "compose", "ps", "--status", "running", "-q", target.service],
+        env=env,
+        timeout=30.0,
+    )
+    pull = _run(
+        root,
+        ["docker", "ps", "-q", "--filter", f"name=^/{container_name}$"],
+        env=env,
+        timeout=30.0,
+    )
+    if service.returncode != 0 or pull.returncode != 0:
+        return False
+    return not service.stdout.strip() and not pull.stdout.strip()
+
+
+def _stop_model_writer(
+    root: Path,
+    target: ModelPullTarget,
+    container_name: str,
+    *,
+    env: Mapping[str, str] | None = None,
+) -> bool:
+    """Stop the optional writer and positively verify that it is no longer live."""
+
     _run(
         root,
         ["docker", "compose", "stop", "--timeout", "5", target.service],
+        env=env,
         timeout=30.0,
     )
-    _run(root, ["docker", "rm", "-f", container_name], timeout=30.0)
+    _run(
+        root,
+        ["docker", "rm", "-f", container_name],
+        env=env,
+        timeout=30.0,
+    )
+    if _writer_stopped(root, target, container_name, env=env):
+        return True
+
+    # Escalate once. A failed Docker command must never be translated into a
+    # false claim that the unknown-size writer stopped.
+    _run(
+        root,
+        ["docker", "compose", "kill", target.service],
+        env=env,
+        timeout=30.0,
+    )
+    _run(
+        root,
+        ["docker", "rm", "-f", container_name],
+        env=env,
+        timeout=30.0,
+    )
+    return _writer_stopped(root, target, container_name, env=env)
+
+
+def _settle_pull_client(process: subprocess.Popen[object]) -> None:
+    try:
+        process.wait(timeout=30.0)
+    except subprocess.TimeoutExpired:
+        process.terminate()
+        try:
+            process.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            process.kill()
 
 
 def admitted_model_pull(
@@ -106,14 +238,15 @@ def admitted_model_pull(
     model: str,
     target_name: str = "ollama",
     controller: ProcessResourceAdmission | None = None,
+    env: Mapping[str, str] | None = None,
     timeout_seconds: float = MODEL_PULL_TIMEOUT_SECONDS,
     poll_seconds: float = MODEL_PRESSURE_POLL_SECONDS,
 ) -> ModelPullResult:
     """Install one local model without consuming the shared emergency reserve.
 
     Existing models are accepted without a new-write admission because no model
-    download is needed. New pulls are refused at PRESSURE/CRITICAL and monitored
-    for their whole lifetime because their final size is not assumed in advance.
+    download is needed. A new pull starts only after FCP can identify and admit
+    the actual host resource backing Docker's persistent model storage.
     """
 
     resolved_root = Path(root).resolve()
@@ -126,15 +259,23 @@ def admitted_model_pull(
     if timeout_seconds <= 0 or poll_seconds <= 0:
         raise ValueError("model pull timing bounds must be positive")
 
-    if _model_ready(resolved_root, target, selected_model):
+    if _model_ready(resolved_root, target, selected_model, env=env):
         return ModelPullResult(
             True,
             "already_present",
             f"Ollama model is already installed: {selected_model}",
         )
 
+    backing_path = _docker_backing_resource_path(resolved_root, env=env)
+    if backing_path is None:
+        return ModelPullResult(
+            False,
+            "resource_unproven",
+            "Model installation was not started because FCP could not prove the host resource backing Docker model storage.",
+        )
+
     admission = controller or ProcessResourceAdmission()
-    assessment = admission.assessment(resolved_root)
+    assessment = admission.assessment(backing_path)
     if assessment.level >= PressureLevel.PRESSURE:
         return ModelPullResult(
             False,
@@ -160,7 +301,12 @@ def admitted_model_pull(
         selected_model,
     ]
     try:
-        process = subprocess.Popen(command, cwd=resolved_root, shell=False)
+        process = subprocess.Popen(
+            command,
+            cwd=resolved_root,
+            env=_subprocess_env(env),
+            shell=False,
+        )
     except OSError as exc:
         return ModelPullResult(False, "model_install_failed", f"Could not start model installation: {exc}")
 
@@ -169,13 +315,22 @@ def admitted_model_pull(
         returncode = process.poll()
         if returncode is not None:
             break
-        current = admission.assessment(resolved_root)
+        current = admission.assessment(backing_path)
         if current.level >= PressureLevel.PRESSURE:
-            _stop_model_writer(resolved_root, target, container_name)
-            try:
-                process.wait(timeout=30.0)
-            except subprocess.TimeoutExpired:
-                process.terminate()
+            stopped = _stop_model_writer(
+                resolved_root,
+                target,
+                container_name,
+                env=env,
+            )
+            _settle_pull_client(process)
+            if not stopped:
+                return ModelPullResult(
+                    False,
+                    "writer_stop_unverified",
+                    "Docker reached host resource pressure and FCP could not prove that the optional model writer stopped.",
+                    current,
+                )
             return ModelPullResult(
                 False,
                 "resource_pressure",
@@ -183,11 +338,19 @@ def admitted_model_pull(
                 current,
             )
         if time.monotonic() >= deadline:
-            _stop_model_writer(resolved_root, target, container_name)
-            try:
-                process.wait(timeout=30.0)
-            except subprocess.TimeoutExpired:
-                process.terminate()
+            stopped = _stop_model_writer(
+                resolved_root,
+                target,
+                container_name,
+                env=env,
+            )
+            _settle_pull_client(process)
+            if not stopped:
+                return ModelPullResult(
+                    False,
+                    "writer_stop_unverified",
+                    "The model pull deadline expired and FCP could not prove that the optional model writer stopped.",
+                )
             return ModelPullResult(
                 False,
                 "model_install_timeout",
@@ -201,7 +364,7 @@ def admitted_model_pull(
             "model_install_failed",
             f"Model installation exited with code {returncode}.",
         )
-    if not _model_ready(resolved_root, target, selected_model):
+    if not _model_ready(resolved_root, target, selected_model, env=env):
         return ModelPullResult(
             False,
             "model_verification_failed",
@@ -228,7 +391,11 @@ def main() -> int:
     print(result.message)
     if result.ok:
         return 0
-    return 2 if result.code == "resource_pressure" else 1
+    if result.code == "resource_pressure":
+        return 2
+    if result.code in {"resource_unproven", "writer_stop_unverified"}:
+        return 3
+    return 1
 
 
 if __name__ == "__main__":
