@@ -204,9 +204,11 @@ def test_new_work_is_refused_once_existing_reservations_reach_pressure() -> None
         clock=lambda: NOW,
     )
     with controller.reserve("/data/a", bytes_required=150):
-        with pytest.raises(HostResourceRefused) as raised:
-            with controller.reserve("/data/b", bytes_required=1):
-                pass
+        with (
+            pytest.raises(HostResourceRefused) as raised,
+            controller.reserve("/data/b", bytes_required=1),
+        ):
+            pass
         assert raised.value.code == "resource_pressure"
         assert raised.value.assessment.level == PressureLevel.PRESSURE
 
