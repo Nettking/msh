@@ -39,7 +39,7 @@ def test_start_cmd_builds_background_services_then_starts_web() -> None:
     assert "docker compose up -d relay ollama recorder" in script
     assert "docker compose up -d flask" in script
     assert "call :ensure_ollama_model" in script
-    assert "Ollama benchmark model is ready" in script
+    assert "Ollama model is ready" in script
     assert "docker compose port flask 5000" in script
     assert 'set "FCP_WEB_CLIENT_HOST=%FCP_WEB_BIND%"' in script
     assert 'set "FCP_BASE_URL=http://%FCP_WEB_CLIENT_HOST%:%FCP_WEB_PORT_RESOLVED%"' in script
@@ -55,10 +55,13 @@ def test_start_cmd_builds_background_services_then_starts_web() -> None:
     assert 'set "COMPOSE_PROJECT_NAME=fcp"' in script
     assert "Invoke-WebRequest" in script
     assert script.index("docker compose up -d relay ollama recorder") < script.index(
+        "docker compose up -d flask"
+    )
+    assert script.index("docker compose up -d flask") < script.index(
         "call :ensure_ollama_model"
     )
     assert script.index("call :ensure_ollama_model") < script.index(
-        "docker compose up -d flask"
+        "Invoke-WebRequest"
     )
     assert script.index("Invoke-WebRequest") < script.index(
         'start "" "%FCP_OPEN_URL%"'
@@ -146,7 +149,7 @@ def test_windows_port_resolver_has_valid_powershell_syntax() -> None:
     assert completed.returncode == 0, completed.stderr or completed.stdout
 
 
-def test_start_cmd_verifies_the_exact_ollama_model_before_opening_browser() -> None:
+def test_start_cmd_treats_ollama_model_as_optional_after_core_start() -> None:
     script = _start_script()
 
     assert ":ensure_ollama_model" in script
@@ -159,16 +162,14 @@ def test_start_cmd_verifies_the_exact_ollama_model_before_opening_browser() -> N
     )
     assert "attempt %FCP_MODEL_ATTEMPT% of 3" in script
     assert "if %FCP_MODEL_ATTEMPT% GEQ 3" in script
-    assert "Ollama does not contain the required model" in script
-    assert "webapp will not be opened with a missing benchmark model" in script
-    assert script.index("call :ensure_ollama_model") < script.index(
-        'start "" "%FCP_OPEN_URL%"'
+    assert "AI capability remains unavailable" in script
+    assert "AI capability is unavailable; core FCP remains running" in script
+    assert "Model installation can be retried later without resetting Federation state" in script
+    assert 'set "FCP_AI_DEGRADED=1"' in script
+    assert script.index("docker compose up -d flask") < script.index(
+        "call :ensure_ollama_model"
     )
-
-    assert (
-        "FCP will continue, but the language-model benchmark may be unavailable"
-        not in script
-    )
+    assert "webapp will not be opened with a missing benchmark model" not in script
 
 
 def test_start_cmd_resume_runs_before_long_running_flask_container() -> None:
