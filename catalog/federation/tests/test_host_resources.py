@@ -127,7 +127,22 @@ def test_unavailable_measurement_is_critical_not_healthy() -> None:
     assert result.reasons == ("measurement_unavailable",)
 
 
-def test_stale_and_impossibly_future_measurements_fail_critical() -> None:
+def test_malformed_capacity_is_critical_not_an_exception() -> None:
+    malformed = FilesystemMeasurement(
+        resource_id="device:bad",
+        observed_at=NOW,
+        total_bytes=2000,
+        free_bytes=-1,
+        total_inodes=2000,
+        free_inodes=100,
+        available=True,
+    )
+    result = assess_measurement(malformed, thresholds=thresholds(), now=NOW)
+    assert result.level == PressureLevel.CRITICAL
+    assert result.reasons == ("measurement_invalid",)
+
+
+def test_stale_future_and_naive_measurements_fail_critical() -> None:
     policy = thresholds()
     stale = assess_measurement(
         measurement(observed_at=NOW - timedelta(seconds=11)),
@@ -139,10 +154,17 @@ def test_stale_and_impossibly_future_measurements_fail_critical() -> None:
         thresholds=policy,
         now=NOW,
     )
+    naive = assess_measurement(
+        measurement(observed_at=NOW.replace(tzinfo=None)),
+        thresholds=policy,
+        now=NOW,
+    )
     assert stale.level == PressureLevel.CRITICAL
     assert stale.reasons == ("measurement_stale",)
     assert future.level == PressureLevel.CRITICAL
     assert future.reasons == ("measurement_time_invalid",)
+    assert naive.level == PressureLevel.CRITICAL
+    assert naive.reasons == ("measurement_time_invalid",)
 
 
 def test_active_reservations_change_pressure_before_new_work() -> None:
@@ -253,13 +275,29 @@ def test_reservation_is_released_when_writer_raises() -> None:
     assert controller.assessment("/data").reserved_bytes == 0
 
 
+def test_measurer_failure_is_conservatively_refused() -> None:
+    def broken(_path: Path | str) -> FilesystemMeasurement:
+        raise OSError("gone")
+
+    controller = ProcessResourceAdmission(
+        thresholds=thresholds(),
+        measurer=broken,
+        clock=lambda: NOW,
+    )
+    with pytest.raises(HostResourceRefused) as raised:
+        with controller.reserve("/data", bytes_required=1):
+            pass
+    assert raised.value.code == "resource_pressure"
+    assert raised.value.assessment.level == PressureLevel.CRITICAL
+
+
 def test_measurement_uses_nearest_existing_parent_and_backing_device(
     tmp_path: Path,
 ) -> None:
     target = tmp_path / "not-created" / "yet"
     result = measure_filesystem(target, observed_at=NOW)
     assert result.available is True
-    assert result.resource_id.startswith("device:")
+    assert result.resource_id.startswith(("device:", "volume:"))
     assert result.total_bytes is not None and result.total_bytes > 0
     assert result.free_bytes is not None and result.free_bytes >= 0
 
@@ -306,3 +344,21 @@ def test_inode_measurement_prefers_available_inodes(
     result = measure_filesystem(tmp_path, observed_at=NOW)
     assert result.total_inodes == 1000
     assert result.free_inodes == 321
+
+
+def test_zero_available_inodes_never_falls_back_to_root_reserved_inodes(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setattr(
+        host_resources.os,
+        "statvfs",
+        lambda _path: SimpleNamespace(f_files=1000, f_favail=0, f_ffree=400),
+        raising=False,
+    )
+    result = measure_filesystem(tmp_path, observed_at=NOW)
+    assert result.total_inodes == 1000
+    assert result.free_inodes == 0
+    assessed = assess_measurement(result, thresholds=thresholds(), now=NOW)
+    assert assessed.level == PressureLevel.CRITICAL
+    assert "inodes_critical" in assessed.reasons
