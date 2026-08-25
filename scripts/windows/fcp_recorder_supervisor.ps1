@@ -15,6 +15,10 @@ param(
     # parameters only so the restart state machine can be driven end-to-end by a
     # test instead of being asserted at a distance. Every one is range-validated,
     # so no value that would defeat the fence or unbound the delay can be bound.
+    # The child got past startup. A first failure below this never enters the
+    # restart machine at all: see $everStarted below.
+    [ValidateRange(1, 3600)]
+    [int]$StartedRuntimeSeconds = 10,
     [ValidateRange(1, 3600)]
     [int]$HealthyRuntimeSeconds = 120,
     [ValidateCount(1, 16)]
@@ -279,7 +283,12 @@ function Start-Recorder(
     }
     Push-Location $LaunchRoot
     try {
-        & $PythonExecutable @PythonPrefix -m scripts.start_tailscale_recorder @arguments
+        # Out-Host keeps the recorder's own output on the operator's console
+        # instead of collecting it as this function's return value. Without it
+        # the caller receives the child's stdout *and* the exit code as one
+        # Object[], which silently swallows everything the recorder printed and
+        # leaves every later exit-code decision reading an array.
+        & $PythonExecutable @PythonPrefix -m scripts.start_tailscale_recorder @arguments | Out-Host
         return [int]$LASTEXITCODE
     }
     finally {
@@ -299,6 +308,10 @@ $trialActive = $false
 # Consecutive ordinary failures that did not reach a healthy runtime. Reset by a
 # healthy child and by the update path; only this counter can reach the fence.
 $rapidFailureStreak = 0
+# Whether a recorder has ever got past startup under this supervisor. Restart is
+# for a recorder that has been seen working; a checkout that has never run one is
+# a startup or configuration failure the operator needs to see directly.
+$everStarted = $false
 try {
     Push-Location $RepoRoot
     try {
@@ -351,6 +364,19 @@ try {
                 # The child is already gone in every case, so nothing is ever
                 # signalled or terminated to reach any of them.
                 if (Test-IntentionalStop $exitCode) {
+                    exit $exitCode
+                }
+                if ($childRuntimeSeconds -ge $StartedRuntimeSeconds) {
+                    $everStarted = $true
+                }
+                if (-not $everStarted) {
+                    # No recorder has run here yet, so there is nothing to
+                    # restore and nothing to learn from trying again: a bad
+                    # interpreter, an unimportable entry point or a refused
+                    # preflight fails exactly this way every time. The operator
+                    # gets the child's own exit code, immediately and unchanged,
+                    # rather than the same failure four more times and a code
+                    # that hides it.
                     exit $exitCode
                 }
                 if ($childRuntimeSeconds -ge $HealthyRuntimeSeconds) {

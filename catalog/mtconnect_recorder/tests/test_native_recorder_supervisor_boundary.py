@@ -371,6 +371,7 @@ def test_the_supervision_policy_is_never_supplied_by_the_launcher() -> None:
     launcher = _text(LAUNCHER)
 
     for policy in (
+        "StartedRuntimeSeconds",
         "HealthyRuntimeSeconds",
         "RestartBackoffLadderSeconds",
         "MaxRapidRestarts",
@@ -380,6 +381,58 @@ def test_the_supervision_policy_is_never_supplied_by_the_launcher() -> None:
     assert "[ValidateRange(1, 3600)]\n    [int]$HealthyRuntimeSeconds" in supervisor
     assert "[ValidateCount(1, 16)]" in supervisor
     assert "[ValidateRange(2, 100)]\n    [int]$MaxRapidRestarts" in supervisor
+
+
+def test_a_recorder_that_never_started_is_not_restarted() -> None:
+    """Restart is for a recorder that has been seen working.
+
+    A checkout whose recorder has never got past startup -- a bad interpreter,
+    an unimportable entry point, a refused preflight -- fails exactly the same
+    way every time. Retrying it four more times only delays the operator and
+    replaces the child's own exit code with the fence code, so the first
+    failure is propagated unchanged instead.
+    """
+
+    branch = _ordinary_exit_branch()
+    supervisor = _text(SUPERVISOR)
+
+    assert "[int]$StartedRuntimeSeconds = 10" in supervisor
+    assert "$everStarted = $false" in supervisor
+    # The gate is evaluated before any streak arithmetic, so a never-started
+    # failure cannot contribute to the fence either.
+    gate = branch.index("if (-not $everStarted) {")
+    assert gate < branch.index("$rapidFailureStreak += 1")
+    # It exits with the child's own code, not the fence code.
+    refusal = branch[gate : gate + 600]
+    assert "exit $exitCode" in refusal
+    assert "$CrashFenceExitCode" not in refusal
+    # And the flag is only ever set by a child that actually ran that long.
+    assert "if ($childRuntimeSeconds -ge $StartedRuntimeSeconds) {" in branch
+    assert branch.count("$everStarted = $true") == 1
+
+
+def test_the_child_exit_code_is_an_integer_and_never_the_child_output() -> None:
+    """``Start-Recorder`` must return the exit code alone.
+
+    A native command's stdout inside a PowerShell function becomes part of that
+    function's return value, so without this the caller receives the recorder's
+    printed output *and* the exit code as one ``Object[]``. That silently
+    swallowed everything the recorder printed, and left every exit-code
+    comparison reading an array rather than a number.
+    """
+
+    supervisor = _text(SUPERVISOR)
+
+    launch = supervisor.index("function Start-Recorder(")
+    body = supervisor[launch:].split("\n}\n", 1)[0]
+    assert (
+        "& $PythonExecutable @PythonPrefix -m scripts.start_tailscale_recorder "
+        "@arguments | Out-Host" in body
+    )
+    assert "return [int]$LASTEXITCODE" in body
+    # The decision helper binds a real integer, which is what makes an array
+    # here a hard failure rather than a silently wrong comparison.
+    assert "function Test-IntentionalStop([int]$ExitCode)" in supervisor
 
 
 def test_the_restart_state_machine_never_signals_or_waits_on_a_process() -> None:

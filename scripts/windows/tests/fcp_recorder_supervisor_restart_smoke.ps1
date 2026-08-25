@@ -92,7 +92,8 @@ public static class FakeRecorder
         [string]$Runtime,
         [int[]]$Ladder,
         [int]$Max,
-        [int]$Healthy
+        [int]$Healthy,
+        [int]$Started
     ) {
         $script:scenario++
         $log = Join-Path $tempRoot ('run-' + $script:scenario + '.log')
@@ -105,7 +106,8 @@ public static class FakeRecorder
                 -PythonExecutable $fakeChild `
                 -RestartBackoffLadderSeconds $Ladder `
                 -MaxRapidRestarts $Max `
-                -HealthyRuntimeSeconds $Healthy 2>&1 | Out-Null
+                -HealthyRuntimeSeconds $Healthy `
+                -StartedRuntimeSeconds $Started 2>&1 | Out-Null
             $code = $LASTEXITCODE
         }
         finally {
@@ -121,39 +123,49 @@ public static class FakeRecorder
     }
 
     Write-Host 'Scenario 1: a clean operator stop is never restarted'
-    $r = Invoke-Supervisor '0' '0' @(0) 5 120
+    $r = Invoke-Supervisor '0' '0' @(0) 5 120 1
     Assert-Equal 'clean stop exit code' 0 $r.ExitCode
     Assert-Equal 'clean stop child starts' 1 $r.Starts
 
     Write-Host 'Scenario 2: Ctrl+C that bypassed the handler is never restarted'
-    # -1073741510 is STATUS_CONTROL_C_EXIT (0xC000013A) as a signed int.
-    $r = Invoke-Supervisor '-1073741510' '0' @(0) 5 120
+    # -1073741510 is STATUS_CONTROL_C_EXIT (0xC000013A) as a signed int. No
+    # POSIX child can return this, which is why this case is Windows-only.
+    $r = Invoke-Supervisor '-1073741510' '0' @(0) 5 120 1
     Assert-Equal 'ctrl+c exit code' -1073741510 $r.ExitCode
     Assert-Equal 'ctrl+c child starts' 1 $r.Starts
 
-    Write-Host 'Scenario 3: one unexpected failure is restarted'
-    $r = Invoke-Supervisor '1,0' '0' @(0) 5 120
+    Write-Host 'Scenario 3: a recorder that never started propagates its own code'
+    # Startup failure: the child never reaches the started threshold, so the
+    # operator gets exit code 7 at once rather than the same failure four more
+    # times and a fence code that hides it.
+    $r = Invoke-Supervisor '7' '0' @(5, 15, 45, 120) 5 120 10
+    Assert-Equal 'never-started exit code' 7 $r.ExitCode
+    Assert-Equal 'never-started child starts' 1 $r.Starts
+
+    Write-Host 'Scenario 4: a started recorder that fails is restarted'
+    $r = Invoke-Supervisor '1,0' '2,0' @(0) 5 120 1
     Assert-Equal 'restart-then-stop exit code' 0 $r.ExitCode
     Assert-Equal 'restart-then-stop child starts' 2 $r.Starts
 
-    Write-Host 'Scenario 4: repeated rapid deterministic failures fence supervision'
-    $r = Invoke-Supervisor '1' '0' @(0) 5 120
+    Write-Host 'Scenario 5: repeated rapid failures fence supervision'
+    $r = Invoke-Supervisor '1' '2,0,0,0,0' @(0) 5 120 1
     Assert-Equal 'fenced exit code' 6 $r.ExitCode
     Assert-Equal 'fenced child starts' 5 $r.Starts
 
-    Write-Host 'Scenario 5: the fence honours its threshold exactly'
-    $r = Invoke-Supervisor '1' '0' @(0) 3 120
+    Write-Host 'Scenario 6: the fence honours its threshold exactly'
+    $r = Invoke-Supervisor '1' '2,0,0' @(0) 3 120 1
     Assert-Equal 'fence-at-3 exit code' 6 $r.ExitCode
     Assert-Equal 'fence-at-3 child starts' 3 $r.Starts
 
-    Write-Host 'Scenario 6: backoff is bounded -- a two-rung ladder clamps'
+    Write-Host 'Scenario 7: backoff is bounded -- a two-rung ladder clamps'
     $clock = [System.Diagnostics.Stopwatch]::StartNew()
-    $r = Invoke-Supervisor '1' '0' @(1, 2) 5 120
+    $r = Invoke-Supervisor '1' '2,0,0,0,0' @(1, 2) 5 120 1
     $elapsed = $clock.Elapsed.TotalSeconds
     Assert-Equal 'bounded backoff exit code' 6 $r.ExitCode
     Assert-Equal 'bounded backoff child starts' 5 $r.Starts
-    # Four waits of 1,2,2,2 = 7s. Doubling without a ceiling would be 1+2+4+8=15s.
-    if ($elapsed -gt 13) {
+    # Four waits of 1,2,2,2 = 7s, plus a 2s first child. Doubling without a
+    # ceiling would be 1+2+4+8 = 15s.
+    if ($elapsed -gt 14) {
         $failures.Add("backoff grew beyond the ladder ceiling: ${elapsed}s")
         Write-Host "  FAIL backoff grew beyond the ladder ceiling: ${elapsed}s"
     }
@@ -161,16 +173,16 @@ public static class FakeRecorder
         Write-Host ("  ok   backoff stayed within the ladder ceiling: " + [int]$elapsed + "s")
     }
 
-    Write-Host 'Scenario 7: a healthy runtime decays the crash fence'
+    Write-Host 'Scenario 8: a healthy runtime decays the crash fence'
     # Without decay the third rapid failure would fence at 3 starts. The third
     # child stays up past the healthy threshold, so the streak restarts there
     # and the fence is only reached two failures later.
-    $r = Invoke-Supervisor '1,1,1,1,1' '0,0,2,0,0' @(0) 3 1
+    $r = Invoke-Supervisor '1,1,1,1,1' '2,0,3,0,0' @(0) 3 2 1
     Assert-Equal 'healthy-decay exit code' 6 $r.ExitCode
     Assert-Equal 'healthy-decay child starts' 5 $r.Starts
 
-    Write-Host 'Scenario 8: the approved update path still runs finalize unchanged'
-    $r = Invoke-Supervisor '75' '0' @(0) 5 120
+    Write-Host 'Scenario 9: the approved update path still runs finalize unchanged'
+    $r = Invoke-Supervisor '75' '0' @(0) 5 120 1
     # The fake agent refuses, so the supervisor takes its existing refusal exit.
     Assert-Equal 'approved update refusal exit code' 5 $r.ExitCode
     Assert-Equal 'approved update child starts' 1 $r.Starts
