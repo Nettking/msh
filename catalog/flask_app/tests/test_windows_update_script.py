@@ -38,6 +38,16 @@ def test_update_cmd_is_a_non_mutating_retirement_shim() -> None:
         assert command not in lowered
 
 
+def test_runtime_recovery_never_directs_to_retired_update_cmd() -> None:
+    resolver = (
+        _repository_root() / "scripts" / "windows" / "resolve_fcp_web_port.ps1"
+    ).read_text(encoding="utf-8")
+
+    assert "run update.cmd" not in resolver.lower()
+    assert "set FCP_RELAY_VOLUME_NAME" in resolver
+    assert "run start.cmd again" in resolver
+
+
 @pytest.mark.skipif(os.name != "nt", reason="Windows batch execution regression")
 def test_update_cmd_exits_without_external_dependencies(tmp_path: Path) -> None:
     root = tmp_path / "retired update fixture"
