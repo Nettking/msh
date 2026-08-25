@@ -127,11 +127,11 @@ def test_eight_recorder_workers_share_one_pressure_envelope(tmp_path: Path) -> N
         assert 0 < admitted < WORKERS
         assert refused == WORKERS - admitted
         assert during.reserved_bytes > 0
-        # Aggregate reservations may consume WARNING headroom, but no later
-        # worker can independently spend the same apparent free space once the
-        # shared envelope reaches PRESSURE.
-        assert during.effective_free_bytes >= 20_000
-        assert during.level.name in {"WARNING", "PRESSURE"}
+        # One admitted transaction may cross from WARNING into PRESSURE. Once
+        # that happens, every later new transaction is refused. The invariant is
+        # therefore the CRITICAL emergency floor, not the PRESSURE threshold.
+        assert during.level.name == "PRESSURE"
+        assert during.effective_free_bytes >= 10_000
     finally:
         release.set()
         for thread in threads:
