@@ -174,4 +174,5 @@ def test_windows_and_python_model_runners_share_pressure_and_stop_contract() -> 
     assert "Docker.raw" in python_runner
     assert "docker_data.vhdx" in python_runner
     assert "writer_stop_unverified" in python_runner
-    assert '["docker", "compose", "kill", target.service]' in python_runner
+    assert '["docker", "compose", "stop", "--timeout", "15", target.service]' in python_runner
+    assert '["docker", "compose", "kill", target.service]' not in python_runner
