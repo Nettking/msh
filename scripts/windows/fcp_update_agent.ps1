@@ -1,7 +1,12 @@
-[CmdletBinding(PositionalBinding = $false)]
+[CmdletBinding()]
 param(
-    [Parameter(ValueFromRemainingArguments = $true)]
-    [object[]]$RemainingArguments
+    [Parameter(Mandatory = $true)]
+    [string]$RepoRoot,
+    [Parameter(Mandatory = $true)]
+    [string]$DataDirectory,
+    [ValidateRange(1, 30)]
+    [int]$PollSeconds = 1,
+    [switch]$Once
 )
 
 $ErrorActionPreference = 'Stop'
@@ -11,13 +16,15 @@ if (-not (Test-Path -LiteralPath $runner)) {
     exit 1
 }
 
-# Preserve every named argument supplied by start.cmd or by the previous
-# release's self-reload process. The runner intentionally keeps the public
-# agent CLI unchanged.
-$forward = @($RemainingArguments | ForEach-Object { [string]$_ })
-& powershell.exe `
-    -NoProfile `
-    -ExecutionPolicy Bypass `
-    -File $runner `
-    @forward
+$arguments = @(
+    '-NoProfile',
+    '-ExecutionPolicy', 'Bypass',
+    '-File', $runner,
+    '-RepoRoot', $RepoRoot,
+    '-DataDirectory', $DataDirectory,
+    '-PollSeconds', [string]$PollSeconds
+)
+if ($Once) { $arguments += '-Once' }
+
+& powershell.exe @arguments
 exit $LASTEXITCODE
