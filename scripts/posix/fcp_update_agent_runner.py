@@ -129,7 +129,14 @@ def process_once(
     target = _apply_target(request_file, engine)
     if target is None:
         return bool(engine.process_once(root, request_file, result_file))
-    return _serialized_apply(engine, root, request_file, result_file, target)
+    try:
+        return _serialized_apply(engine, root, request_file, result_file, target)
+    except RuntimeError as exc:
+        if str(exc) == "host_mutation_busy":
+            # The launcher/update transaction holding the lock owns the host.
+            # Leave the durable request untouched and retry on the next poll.
+            return False
+        raise
 
 
 def main() -> int:
