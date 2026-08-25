@@ -1,7 +1,7 @@
 # Server setup and deployment
 
 Status: **current administrator guide**
-Reviewed: **2026-08-12**
+Reviewed: **2026-08-25**
 
 FCP is designed to run as a persistent device that may host several independent capabilities. The normal product setup does not assign the device one permanent role.
 
@@ -118,25 +118,25 @@ After pairing, the joining installation persists a stable identity and public-sa
 
 See [Federation operations](federation_operations.md).
 
-## Optional Tailscale Federation discovery
+## Tailscale zero-touch Federation startup
 
-If both FCP hosts are already signed in to the same Tailscale tailnet, a joining device can use:
+For the normal multi-device v1 path, sign the hosts in to the same intended Tailscale tailnet. The first device uses `--fresh --initialize-federation`; each additional trusted workbench device uses `--fresh` once. Normal restarts use no startup mode, while `--resume` explicitly verifies saved state before reconciliation.
 
 ### Windows
 
 ```cmd
-start-tailscale.cmd
+start-tailscale.cmd --fresh
 ```
 
 ### Linux/macOS
 
 ```bash
-bash start-tailscale.sh
+bash start-tailscale.sh --fresh
 ```
 
-The wrapper uses only the local already-authenticated Tailscale CLI, resolves the host's Tailscale IPv4 address, performs a bounded peer scan for public-safe FCP advertisements, writes the discovery snapshot below `data/federation/onboarding/`, and then delegates to the normal supported launcher.
+The wrapper uses only the local already-authenticated Tailscale CLI and delegates the reset/start boundary to the normal platform launcher. A fresh reset completes and verifies before discovery or enrollment begins. In the reviewed same-tailnet, same-owner, non-shared, non-tagged case, the joining device receives a signed, short-lived, one-use grant from the existing host responder and does not require a manually copied `FCP1-...` code. Manual signed pairing remains the explicit fallback for deployments where that trust path is intentionally not applicable.
 
-FCP does not need a Tailscale API key, auth key, or OAuth credential. Tailscale discovery is reachability only; the joining device must still use the normal signed `FCP1-...` pairing flow.
+FCP does not need a Tailscale API key, auth key, or OAuth credential for this normal zero-touch path.
 
 See [Tailscale Federation discovery](tailscale_federation_discovery.md).
 
@@ -209,25 +209,32 @@ It does not use `git reset`, `git clean`, stash, rebase, branch switching, `down
 
 ## Fresh-device reset
 
-On Windows:
+Windows:
 
 ```cmd
 start.cmd --fresh
 ```
 
+Linux/macOS:
+
+```bash
+bash start.sh --fresh
+```
+
 The launcher shows the exact reset boundary and requires typing `RESET`.
 
-It removes device identity, Federation membership and pairing state, onboarding progress, inspection and benchmark state, local relay authority state, and retained migration/setup state tied to the replaced device identity.
+It removes human-auth/session state; device identity and keys; Federation membership, trust, pairing, discovery, onboarding, and authority state; capability, contribution, benchmark, provider, Activity, and job state; source and recorder configuration, recorder checkpoints/status/runtime state; analysis/results/digital-twin projections; and retained legacy setup state.
 
 It intentionally preserves:
 
-- human accounts and authentication secrets;
-- recorded and imported data;
-- source configuration;
-- recorder checkpoints;
-- workflow and analysis results;
-- Docker images; and
-- downloaded Ollama and provider models.
+- the machine recording corpus under `data/sources` and its integrity metadata;
+- immutable checkout scaffolding in the mounted application roots;
+- Docker images;
+- downloaded Ollama and provider model volumes;
+- source code; and
+- deployment settings such as `.env`.
+
+The reset service validates every configured mutable path and recording integrity before its first deletion, then verifies the fresh state before any long-running FCP service can recreate runtime state.
 
 Do not manually delete only part of Federation or human-auth state. Partial deletion can leave contradictory identity, membership, authority, or credential records.
 
