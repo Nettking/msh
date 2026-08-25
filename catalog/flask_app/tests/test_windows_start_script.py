@@ -32,14 +32,15 @@ def _port_resolver_script() -> str:
     ).read_text(encoding="utf-8")
 
 
-def test_start_cmd_builds_background_services_then_starts_web() -> None:
+def test_start_cmd_builds_required_services_before_optional_ai() -> None:
     script = _start_script()
 
     assert "docker compose build relay flask recorder" in script
-    assert "docker compose up -d relay ollama recorder" in script
+    assert "docker compose up -d relay recorder" in script
     assert "docker compose up -d flask" in script
+    assert "docker compose up -d ollama" in script
     assert "call :ensure_ollama_model" in script
-    assert "Ollama benchmark model is ready" in script
+    assert "Ollama model is ready" in script
     assert "docker compose port flask 5000" in script
     assert 'set "FCP_WEB_CLIENT_HOST=%FCP_WEB_BIND%"' in script
     assert 'set "FCP_BASE_URL=http://%FCP_WEB_CLIENT_HOST%:%FCP_WEB_PORT_RESOLVED%"' in script
@@ -54,16 +55,23 @@ def test_start_cmd_builds_background_services_then_starts_web() -> None:
     assert 'set "FCP_WEB_BIND=127.0.0.1"' in script
     assert 'set "COMPOSE_PROJECT_NAME=fcp"' in script
     assert "Invoke-WebRequest" in script
-    assert script.index("docker compose up -d relay ollama recorder") < script.index(
+    assert script.index("docker compose up -d relay recorder") < script.index(
+        "docker compose up -d flask"
+    )
+    assert script.index("docker compose up -d flask") < script.index(
+        "docker compose up -d ollama"
+    )
+    assert script.index("docker compose up -d ollama") < script.index(
         "call :ensure_ollama_model"
     )
     assert script.index("call :ensure_ollama_model") < script.index(
-        "docker compose up -d flask"
+        "Invoke-WebRequest"
     )
     assert script.index("Invoke-WebRequest") < script.index(
         'start "" "%FCP_OPEN_URL%"'
     )
     assert "docker compose up --build" not in script
+    assert "docker compose up -d relay ollama recorder" not in script
 
 
 def test_start_cmd_recovers_runtime_state_before_compose_start() -> None:
@@ -146,7 +154,7 @@ def test_windows_port_resolver_has_valid_powershell_syntax() -> None:
     assert completed.returncode == 0, completed.stderr or completed.stdout
 
 
-def test_start_cmd_verifies_the_exact_ollama_model_before_opening_browser() -> None:
+def test_start_cmd_treats_ollama_and_model_as_optional_after_core_start() -> None:
     script = _start_script()
 
     assert ":ensure_ollama_model" in script
@@ -159,16 +167,19 @@ def test_start_cmd_verifies_the_exact_ollama_model_before_opening_browser() -> N
     )
     assert "attempt %FCP_MODEL_ATTEMPT% of 3" in script
     assert "if %FCP_MODEL_ATTEMPT% GEQ 3" in script
-    assert "Ollama does not contain the required model" in script
-    assert "webapp will not be opened with a missing benchmark model" in script
-    assert script.index("call :ensure_ollama_model") < script.index(
-        'start "" "%FCP_OPEN_URL%"'
+    assert "AI capability remains unavailable" in script
+    assert "WARNING: Ollama is unavailable; core FCP remains running" in script
+    assert "WARNING: AI capability is unavailable; core FCP remains running" in script
+    assert "AI capability can be repaired later without resetting Federation state" in script
+    assert "Model installation can be retried later without resetting Federation state" in script
+    assert 'set "FCP_AI_DEGRADED=1"' in script
+    assert script.index("docker compose up -d relay recorder") < script.index(
+        "docker compose up -d flask"
     )
-
-    assert (
-        "FCP will continue, but the language-model benchmark may be unavailable"
-        not in script
+    assert script.index("docker compose up -d flask") < script.index(
+        "docker compose up -d ollama"
     )
+    assert "webapp will not be opened with a missing benchmark model" not in script
 
 
 def test_start_cmd_resume_runs_before_long_running_flask_container() -> None:
@@ -271,7 +282,7 @@ def test_start_cmd_fresh_mode_resets_and_verifies_authoritative_state() -> None:
     main_body = script.split("\n:resolve_build_commit", maxsplit=1)[0]
     assert reset_block.index(reset_command) < reset_block.index(verify_command)
     assert main_body.index("call :reset_device_state") < main_body.index(
-        "docker compose up -d relay ollama recorder"
+        "docker compose up -d relay recorder"
     )
     assert "Fresh factory reset could not be verified" in script
     assert "?fresh=1&reset=%RANDOM%%RANDOM%" in script

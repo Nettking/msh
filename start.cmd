@@ -117,23 +117,13 @@ if errorlevel 1 (
 )
 
 echo.
-echo Starting the FCP background services...
+echo Starting the required FCP background services...
 echo   - Federation relay
-echo   - Ollama service
 echo   - Managed recorder
-docker compose up -d relay ollama recorder
+docker compose up -d relay recorder
 if errorlevel 1 (
     echo.
-    echo FCP background services could not be started. Review the Docker error above.
-    pause
-    exit /b 1
-)
-
-call :ensure_ollama_model
-if errorlevel 1 (
-    echo.
-    echo FCP background services remain running, but the webapp will not be opened with a missing benchmark model.
-    echo Correct the network or Ollama error above, then run start.cmd again.
+    echo Required FCP background services could not be started. Review the Docker error above.
     pause
     exit /b 1
 )
@@ -150,6 +140,27 @@ if errorlevel 1 (
     echo The FCP webapp could not be started. Review the Docker error above.
     pause
     exit /b 1
+)
+
+rem The language model is an optional capability. Core FCP is already running
+rem before Ollama or model installation, so Ollama image/service, model, or
+rem network failure cannot block the workbench, Federation, recorder, or control surfaces.
+set "FCP_AI_DEGRADED=0"
+echo Starting optional Ollama service...
+docker compose up -d ollama
+if errorlevel 1 (
+    set "FCP_AI_DEGRADED=1"
+    echo.
+    echo WARNING: Ollama is unavailable; core FCP remains running.
+    echo AI capability can be repaired later without resetting Federation state.
+) else (
+    call :ensure_ollama_model
+    if errorlevel 1 (
+        set "FCP_AI_DEGRADED=1"
+        echo.
+        echo WARNING: AI capability is unavailable; core FCP remains running.
+        echo Model installation can be retried later without resetting Federation state.
+    )
 )
 
 echo.
@@ -227,6 +238,11 @@ echo Documentation:         %FCP_BASE_URL%/docs
 echo Device data:           %FCP_DATA_DIR%
 echo Federation state:      %FCP_RELAY_VOLUME_NAME%
 echo Running build commit:  %FCP_BUILD_COMMIT%
+if "%FCP_AI_DEGRADED%"=="1" (
+    echo AI capability:         unavailable; core FCP is healthy
+) else (
+    echo AI capability:         ready
+)
 echo.
 echo Web and Federation relay access are limited to this FCP machine by default.
 echo For Tailscale pairing, use start-tailscale.cmd.
@@ -354,10 +370,10 @@ set "FCP_AI_MODEL_RESOLVED="
 for /f "usebackq delims=" %%M in (`docker compose run --rm --no-deps --entrypoint python flask -c "import os; print(os.environ.get('FCP_AI_MODEL') or 'llama3.2:3b')"`) do set "FCP_AI_MODEL_RESOLVED=%%M"
 if not defined FCP_AI_MODEL_RESOLVED set "FCP_AI_MODEL_RESOLVED=llama3.2:3b"
 
-echo Ensuring Ollama benchmark model is installed: %FCP_AI_MODEL_RESOLVED%
+echo Ensuring optional Ollama model is installed: %FCP_AI_MODEL_RESOLVED%
 docker compose exec -T ollama ollama show "%FCP_AI_MODEL_RESOLVED%" >nul 2>&1
 if not errorlevel 1 (
-    echo Ollama benchmark model is ready.
+    echo Ollama model is ready.
     echo.
     exit /b 0
 )
@@ -370,14 +386,14 @@ set "FCP_MODEL_PULL_EXIT=%ERRORLEVEL%"
 
 docker compose exec -T ollama ollama show "%FCP_AI_MODEL_RESOLVED%" >nul 2>&1
 if not errorlevel 1 (
-    echo Ollama benchmark model is installed and verified.
+    echo Ollama model is installed and verified.
     echo.
     exit /b 0
 )
 
 if %FCP_MODEL_ATTEMPT% GEQ 3 (
     echo.
-    echo ERROR: Ollama does not contain the required model: %FCP_AI_MODEL_RESOLVED%
+    echo AI capability remains unavailable because Ollama does not contain: %FCP_AI_MODEL_RESOLVED%
     if not "%FCP_MODEL_PULL_EXIT%"=="0" echo The final pull command exited with code %FCP_MODEL_PULL_EXIT%.
     echo Installed Ollama models:
     docker compose exec -T ollama ollama list
@@ -451,7 +467,7 @@ echo.
 echo Normal and resume modes preserve identity, Federation membership, recordings,
 echo source configuration, recorder checkpoints, results, and downloaded models.
 echo Resume mode never runs inspection or benchmarks and never replaces Federation authority.
-echo All modes install and verify the exact configured Ollama benchmark model.
+echo All modes attempt to install the configured Ollama model, but AI is optional for core startup.
 echo The supported launcher also keeps a bounded local host update agent running.
 echo The --fresh option requires typing RESET. Machine recordings, integrity metadata,
 echo and immutable checkout scaffolding survive within the mounted application roots.

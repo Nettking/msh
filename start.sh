@@ -140,17 +140,8 @@ sleep 0.1
 echo "Building FCP services from $FCP_BUILD_COMMIT ..."
 docker compose build relay flask recorder
 
-echo "Starting Federation relay, Ollama, and managed recorder ..."
-docker compose up -d relay ollama recorder
-
-if ! docker compose exec -T ollama ollama show "$FCP_AI_MODEL" >/dev/null 2>&1; then
-  echo "Installing required Ollama model: $FCP_AI_MODEL"
-  docker compose --profile model-install run --rm ollama-pull
-  docker compose exec -T ollama ollama show "$FCP_AI_MODEL" >/dev/null 2>&1 || {
-    echo "The configured Ollama model could not be verified." >&2
-    exit 1
-  }
-fi
+echo "Starting required Federation relay and managed recorder ..."
+docker compose up -d relay recorder
 
 RESUME_EXIT=0
 if [ "$MODE" = resume ]; then
@@ -169,6 +160,26 @@ fi
 
 echo "Starting Flask workbench ..."
 docker compose up -d flask
+
+# The language model is an optional capability. Core FCP is already running
+# before Ollama or model installation is attempted, so Ollama image/service,
+# model, or network failure cannot gate Federation, recorder, control, or
+# workbench availability.
+FCP_AI_DEGRADED=0
+echo "Starting optional Ollama service ..."
+if ! docker compose up -d ollama; then
+  FCP_AI_DEGRADED=1
+  echo "WARNING: Ollama is unavailable; core FCP remains running." >&2
+elif ! docker compose exec -T ollama ollama show "$FCP_AI_MODEL" >/dev/null 2>&1; then
+  echo "Installing optional Ollama model: $FCP_AI_MODEL"
+  if ! docker compose --profile model-install run --rm ollama-pull; then
+    FCP_AI_DEGRADED=1
+  fi
+  if ! docker compose exec -T ollama ollama show "$FCP_AI_MODEL" >/dev/null 2>&1; then
+    FCP_AI_DEGRADED=1
+    echo "WARNING: AI capability is unavailable; core FCP remains running." >&2
+  fi
+fi
 
 BASE_URL="http://127.0.0.1:$FCP_WEB_PORT"
 DEADLINE=$(( $(date +%s) + 90 ))
@@ -192,6 +203,11 @@ printf 'Federation:           %s/federation\n' "$BASE_URL"
 printf 'Running build commit: %s\n' "$FCP_BUILD_COMMIT"
 printf 'Device data:          %s\n' "$FCP_DATA_DIR"
 printf 'Update agent log:     %s/agent.log\n' "$AGENT_DIR"
+if [ "$FCP_AI_DEGRADED" -eq 0 ]; then
+  printf 'AI capability:        ready (%s)\n' "$FCP_AI_MODEL"
+else
+  printf 'AI capability:        unavailable; core FCP is healthy\n'
+fi
 
 if [ "$MODE" = resume ]; then
   case "$RESUME_EXIT" in
