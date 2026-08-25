@@ -183,18 +183,23 @@ def _nearest_existing(path: Path) -> Path:
 def _resource_identity(path: Path) -> str:
     """Return a local identity shared by paths on the same mounted resource."""
 
+    stat = path.stat()
+    device_id = int(stat.st_dev)
     if os.name == "nt":
-        # A drive/share root is the relevant Windows backing-resource identity.
-        # Do not rely on ``st_dev`` being unique across every supported Python /
-        # filesystem combination on Windows.
+        # CPython 3.12 exposes the Windows volume serial number through st_dev.
+        # Prefer it over a drive/share anchor so a directory-mounted volume is
+        # distinct from its host drive, while two mount paths to the same volume
+        # still share one admission envelope. Keep an anchor fallback for a
+        # filesystem/runtime that cannot provide a non-zero device identifier.
+        if device_id:
+            return f"volume:{device_id}"
         anchor = path.anchor.casefold()
         if not anchor:
-            raise OSError("Windows resource path has no volume/share anchor")
-        return f"volume:{anchor}"
-    stat = path.stat()
-    # ``st_dev`` identifies the mounted resource on POSIX. It is deliberately
-    # local only; no filesystem layout is published to Federation peers.
-    return f"device:{int(stat.st_dev)}"
+            raise OSError("Windows resource path has no device id or volume/share anchor")
+        return f"volume-anchor:{anchor}"
+    # st_dev identifies the mounted resource on POSIX. It is deliberately local
+    # only; no filesystem layout is published to Federation peers.
+    return f"device:{device_id}"
 
 
 def _inode_measurement(path: Path) -> tuple[int | None, int | None]:
