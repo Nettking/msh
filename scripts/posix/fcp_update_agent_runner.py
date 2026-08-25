@@ -72,7 +72,7 @@ def _serialized_apply(
     lock.__enter__()
     lock_held = True
     build_phase_entered = False
-    post_build_prune_called = False
+    prune_called = False
     original_preflight = engine.preflight_disk
     original_prune = engine.prune_build_cache
 
@@ -83,8 +83,8 @@ def _serialized_apply(
             lock_held = False
 
     def guarded_post_build_prune(*args, **kwargs):
-        nonlocal post_build_prune_called
-        post_build_prune_called = True
+        nonlocal prune_called
+        prune_called = True
         ok = bool(original_prune(*args, **kwargs))
         if not ok:
             raise RuntimeError("build_cache_prune_failed")
@@ -114,7 +114,7 @@ def _serialized_apply(
     finally:
         engine.preflight_disk = original_preflight
         engine.prune_build_cache = original_prune
-        if build_phase_entered and not post_build_prune_called:
+        if build_phase_entered and not prune_called:
             # The build/preflight raised before the ordinary post-build prune.
             # Cache is reconstructible, so make one bounded cleanup attempt even
             # though the request has already been recorded as failed.
