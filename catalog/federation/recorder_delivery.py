@@ -126,6 +126,19 @@ class DurableRecorderDeliveryQueue:
             now=self.clock(),
         )
 
+    @property
+    def startup_probe_pending(self) -> bool:
+        """Whether this queue still owes its first bounded route probe.
+
+        A new queue object is a new process/runtime delivery session, and its
+        first pass deliberately retries one deferred head per ordered dataset
+        so an outage that has since been repaired is proven quickly rather
+        than waited out. The worker asks this to decide whether a backlog
+        that is not yet due is still worth deferring reconciliation for.
+        """
+
+        return self._startup_probe_available
+
     @staticmethod
     def _ordering_key(entry) -> tuple[str, str, str] | None:
         payload = entry.payload

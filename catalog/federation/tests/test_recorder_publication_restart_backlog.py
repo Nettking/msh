@@ -37,6 +37,11 @@ class _Queue:
     def __init__(self, outbox: _BacklogOutbox) -> None:
         self.outbox = outbox
         self.calls = 0
+        self._startup_probe_available = True
+
+    @property
+    def startup_probe_pending(self) -> bool:
+        return self._startup_probe_available
 
     @staticmethod
     def clock() -> datetime:
@@ -44,6 +49,7 @@ class _Queue:
 
     async def run_once(self, *, limit: int = 100) -> RecorderDeliveryRunResult:
         self.calls += 1
+        self._startup_probe_available = False
         if self.outbox.entries:
             self.outbox.entries.clear()
             return RecorderDeliveryRunResult(attempted=1, committed=1, pending=0)

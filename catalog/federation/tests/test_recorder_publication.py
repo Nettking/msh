@@ -721,3 +721,105 @@ def test_a_storage_failure_never_looks_like_a_successful_publication(tmp_path):
     # replay of the same evidence is still recognised rather than re-sent.
     assert after.idempotency_key == entry.idempotency_key
     assert after.content_hash == entry.content_hash
+
+def test_restart_probes_deferred_backlog_before_full_archive_reconcile(tmp_path):
+    """A deferred backlog still gets its route probe first on a fresh runtime.
+
+    Two invariants meet here and pull in opposite directions:
+
+    * a permanently failing row must never suppress reconciliation forever,
+      which is why the backlog gate asks only for rows that are *due*; and
+    * on a process restart an existing backlog must get its bounded
+      one-head-per-dataset route probe before the expensive archive scan,
+      which is why ``run_once`` retries one deferred head per dataset on a
+      fresh queue.
+
+    Asking only for due rows made a restart with a wholly deferred backlog
+    look like no backlog at all, so the archive reconcile ran first and the
+    startup probe -- the thing that proves the route and lets the recorder
+    report a live heartbeat quickly -- was pushed behind it.
+    """
+
+    order: list[str] = []
+
+    class _OrderedClient:
+        def __init__(self) -> None:
+            self.calls: list[dict[str, object]] = []
+
+        async def ingest_batch(self, **kwargs):
+            self.calls.append(dict(kwargs))
+            order.append("deliver")
+            raise OSError("Federation still unavailable")
+
+    client = _OrderedClient()
+    # The queue this helper builds is discarded: the restart below needs a
+    # fresh one over the same durable outbox.
+    store, checkpoint_file, outbox, _queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+
+    # A durable row that is already deferred: enqueued, attempted, and pushed
+    # into exponential backoff so its next attempt is in the future.
+    # Anchored to the queue's real clock, so the backoff genuinely lands in
+    # the future rather than in a fixture's past.
+    started = datetime.now(UTC)
+    entry, _created = outbox.enqueue(
+        session_id="session-1",
+        destination_id="fcp-local-storage",
+        schema_id=RECORDER_STORAGE_SCHEMA,
+        payload={
+            "group_id": "telemetry-storage",
+            "dataset_id": "mtconnect:node-recorder-1:Mazak",
+            "batch_id": "mazak-backlog-1",
+            "idempotency_key": "mazak-backlog-1",
+            "content": {"observations": []},
+            "created_at": "2026-08-09T03:00:00Z",
+        },
+        idempotency_key="mazak-backlog-1",
+        content_hash="d" * 64,
+        now=started,
+    )
+    for _ in range(6):
+        outbox.record_failure(
+            entry.outbox_id, error="Federation unavailable", now=started
+        )
+    deferred = outbox.get(entry.outbox_id)
+    assert deferred.next_attempt_at > datetime.now(UTC), (
+        "the fixture must model a backlog that is not yet due"
+    )
+    assert outbox.pending(now=datetime.now(UTC)) == ()
+
+    # New local evidence and an advanced checkpoint, exactly as a recorder
+    # that kept capturing through the outage would leave them.
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+
+    # A fresh queue and worker over the same durable outbox: a process restart.
+    restarted_queue = DurableRecorderDeliveryQueue(
+        outbox=outbox, client=client, session_id="session-1"
+    )
+    original_reconcile = reconciler.reconcile
+
+    def _tracked_reconcile():
+        order.append("reconcile")
+        return original_reconcile()
+
+    reconciler.reconcile = _tracked_reconcile
+    worker = RecorderFederationDeliveryWorker(
+        reconciler=reconciler, queue=restarted_queue
+    )
+
+    asyncio.run(worker.run_cycle())
+
+    assert order, "the first cycle did neither delivery nor reconciliation"
+    assert order[0] == "deliver", (
+        "the startup route probe must run before the archive reconcile; "
+        f"observed order {order}"
+    )
+    # The probe is bounded: one head for the one deferred dataset.
+    assert len(client.calls) == 1
+    # And it changed nothing durable beyond the ordinary failure record.
+    still = outbox.get(entry.outbox_id)
+    assert still.state is OutboxState.PENDING
+    assert still.payload == deferred.payload
+    assert still.idempotency_key == deferred.idempotency_key
