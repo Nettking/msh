@@ -237,11 +237,12 @@ def _stop_model_writer(
     if _writer_stopped(root, target, container_name, env=env):
         return True
 
-    # Escalate once. A failed Docker command must never be translated into a
-    # false claim that the unknown-size writer stopped.
+    # Retry a Compose stop with a longer bound. Do not use ``docker kill``:
+    # these services use restart=unless-stopped and a kill can race a restart,
+    # making a momentary stopped observation insufficient proof.
     _run(
         root,
-        ["docker", "compose", "kill", target.service],
+        ["docker", "compose", "stop", "--timeout", "15", target.service],
         env=env,
         timeout=30.0,
     )
@@ -350,6 +351,11 @@ def admitted_model_pull(
             break
         current = admission.assessment(backing_path)
         if current.level >= PressureLevel.PRESSURE:
+            # The client can finish between the first poll and the resource
+            # measurement. If so, it is no longer an active unknown-size writer.
+            returncode = process.poll()
+            if returncode is not None:
+                break
             stopped = _stop_model_writer(
                 resolved_root,
                 target,
@@ -371,6 +377,9 @@ def admitted_model_pull(
                 current,
             )
         if time.monotonic() >= deadline:
+            returncode = process.poll()
+            if returncode is not None:
+                break
             stopped = _stop_model_writer(
                 resolved_root,
                 target,
