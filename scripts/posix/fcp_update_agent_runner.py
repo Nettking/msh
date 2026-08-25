@@ -72,7 +72,7 @@ def _serialized_apply(
     lock.__enter__()
     lock_held = True
     build_phase_entered = False
-    prune_called = False
+    post_build_prune_called = False
     original_preflight = engine.preflight_disk
     original_prune = engine.prune_build_cache
 
@@ -82,14 +82,9 @@ def _serialized_apply(
             lock.__exit__(None, None, None)
             lock_held = False
 
-    def guarded_preflight(*args, **kwargs):
-        nonlocal build_phase_entered
-        build_phase_entered = True
-        return original_preflight(*args, **kwargs)
-
-    def guarded_prune(*args, **kwargs):
-        nonlocal prune_called
-        prune_called = True
+    def guarded_post_build_prune(*args, **kwargs):
+        nonlocal post_build_prune_called
+        post_build_prune_called = True
         ok = bool(original_prune(*args, **kwargs))
         if not ok:
             raise RuntimeError("build_cache_prune_failed")
@@ -99,15 +94,28 @@ def _serialized_apply(
         release_after_build()
         return True
 
+    def guarded_preflight(*args, **kwargs):
+        nonlocal build_phase_entered
+        build_phase_entered = True
+        # preflight_disk may prune before a build to recover space. That prune
+        # must NOT end the source/build critical section. Temporarily restore the
+        # engine's original prune function only for preflight, then arm the
+        # post-build guard again before control returns to the engine.
+        engine.prune_build_cache = original_prune
+        try:
+            return original_preflight(*args, **kwargs)
+        finally:
+            engine.prune_build_cache = guarded_post_build_prune
+
     engine.preflight_disk = guarded_preflight
-    engine.prune_build_cache = guarded_prune
+    engine.prune_build_cache = guarded_post_build_prune
     try:
         return bool(engine.process_once(root, request_file, result_file))
     finally:
         engine.preflight_disk = original_preflight
         engine.prune_build_cache = original_prune
-        if build_phase_entered and not prune_called:
-            # The engine's build raised before its ordinary post-build prune.
+        if build_phase_entered and not post_build_prune_called:
+            # The build/preflight raised before the ordinary post-build prune.
             # Cache is reconstructible, so make one bounded cleanup attempt even
             # though the request has already been recorded as failed.
             try:
