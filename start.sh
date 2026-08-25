@@ -140,8 +140,8 @@ sleep 0.1
 echo "Building FCP services from $FCP_BUILD_COMMIT ..."
 docker compose build relay flask recorder
 
-echo "Starting Federation relay, Ollama, and managed recorder ..."
-docker compose up -d relay ollama recorder
+echo "Starting required Federation relay and managed recorder ..."
+docker compose up -d relay recorder
 
 RESUME_EXIT=0
 if [ "$MODE" = resume ]; then
@@ -162,10 +162,15 @@ echo "Starting Flask workbench ..."
 docker compose up -d flask
 
 # The language model is an optional capability. Core FCP is already running
-# before any model installation is attempted, so Ollama/model/network failure
-# cannot gate Federation, recorder, control, or workbench availability.
+# before Ollama or model installation is attempted, so Ollama image/service,
+# model, or network failure cannot gate Federation, recorder, control, or
+# workbench availability.
 FCP_AI_DEGRADED=0
-if ! docker compose exec -T ollama ollama show "$FCP_AI_MODEL" >/dev/null 2>&1; then
+echo "Starting optional Ollama service ..."
+if ! docker compose up -d ollama; then
+  FCP_AI_DEGRADED=1
+  echo "WARNING: Ollama is unavailable; core FCP remains running." >&2
+elif ! docker compose exec -T ollama ollama show "$FCP_AI_MODEL" >/dev/null 2>&1; then
   echo "Installing optional Ollama model: $FCP_AI_MODEL"
   if ! docker compose --profile model-install run --rm ollama-pull; then
     FCP_AI_DEGRADED=1
