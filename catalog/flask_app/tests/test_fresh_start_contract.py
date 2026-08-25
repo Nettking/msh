@@ -19,15 +19,19 @@ def test_fresh_reset_is_verified_before_any_long_running_service_starts() -> Non
     assert reset_call < script.index("docker compose up -d flask")
     assert reset_call < script.index("docker compose up -d ollama")
     reset_command = (
-        "docker compose run --rm --no-deps --build --entrypoint python flask -m "
+        "docker compose run --rm --no-deps --entrypoint python flask -m "
         "catalog.flask_app.services.device_state_reset"
     )
     verify_command = (
         "docker compose run --rm --no-deps --entrypoint python flask -m "
         "catalog.flask_app.services.device_state_reset --verify-fresh"
     )
+    assert "--no-deps --build --entrypoint python flask" not in reset_block
     assert reset_command in reset_block
     assert verify_command in reset_block
+    assert reset_block.index("call :resolve_build_commit") < reset_block.index(
+        "stop_fcp_for_fresh_reset.ps1"
+    )
     assert reset_block.index(reset_command) < reset_block.index(verify_command)
     assert "docker compose exec -T flask python -m catalog.flask_app.services.device_state_reset --verify-fresh" not in script
 
