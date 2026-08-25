@@ -21,6 +21,10 @@ import time
 from pathlib import Path
 from types import ModuleType
 
+REPO_ROOT = Path(__file__).resolve().parents[2]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
+
 from catalog.federation import host_build
 
 ENGINE_NAME = "fcp_update_engine.py"
@@ -149,9 +153,8 @@ def main() -> int:
     initial_engine_digest = _digest(engine_path)
 
     # Preserve the existing singleton boundary. An agent process from the
-    # immediately previous release may hold this until it processes its first
-    # request; ordinary product flow performs a read-only check before apply,
-    # after which that legacy process self-reloads through the public shim.
+    # immediately previous release self-reloads this public entrypoint after it
+    # completes the update that installs the new shim/runner.
     lock_path = directory / "agent.lock"
     with lock_path.open("a+", encoding="utf-8") as singleton:
         try:
