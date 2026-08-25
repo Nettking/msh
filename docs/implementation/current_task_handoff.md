@@ -103,27 +103,31 @@ stale-heartbeat sweep now wakes both supported relay owners and produces a
 nonzero process exit so the existing Compose restart policy can act. Together
 these are **B06 2/8 properties automated-proven; B06 remains open**.
 
-The recorder path-confinement, finite-transaction, and incremental recovery
-frontier deliveries together advance **B02 6/9 properties automated-proven; B02
-remains open**. Timestamp-derived storage days are validated/confined before
-writes. `/current`, `/probe`, and `/sample` have finite decoded response-byte
-ceilings and a finite total request deadline; accepted XML is structurally
-budgeted before retained-tree parsing; parsed sample batches have hard
-observation and sequence-span ceilings; and continuity validation is bounded by
-accepted observation count rather than materializing an arbitrary remote integer
-range. Detailed observation NDJSON and wide compatibility JSONL are streamed
-through byte-bounded atomic publications, and carried compatibility checkpoint
-state has a finite serialized ceiling, so bounded ingress cannot amplify into an
-effectively quadratic in-memory/disk batch. Ordinary crash recovery now publishes
-one atomic per-source/per-Agent-instance frontier before raw publication and
-consults that fixed path instead of recursively rescanning lifetime history on
-every healthy poll. A pre-frontier archive is scanned once and migrated to a
-clear frontier; explicit state-loss rebuilds and offline canonical projection
-retain their deliberate historical scans. B02 remains open for healthy-source
-progress isolation, durable event-storm deduplication/rate bounds, and
-pressure/critical behavior. P04/P05/P09 physical evidence remains open; B01 still
-owns aggregate host-resource admission across concurrent writers. No physical
-acceptance state changed.
+The recorder path-confinement, finite-transaction, incremental recovery-frontier,
+and healthy-source progress-isolation deliveries together advance **B02 7/9
+properties automated-proven; B02 remains open**. Timestamp-derived storage days
+are validated/confined before writes. `/current`, `/probe`, and `/sample` have
+finite decoded response-byte ceilings and a finite total request deadline;
+accepted XML is structurally budgeted before retained-tree parsing; parsed sample
+batches have hard observation and sequence-span ceilings; and continuity
+validation is bounded by accepted observation count rather than materializing an
+arbitrary remote integer range. Detailed observation NDJSON and wide
+compatibility JSONL are streamed through byte-bounded atomic publications, and
+carried compatibility checkpoint state has a finite serialized ceiling, so
+bounded ingress cannot amplify into an effectively quadratic in-memory/disk
+batch. Ordinary crash recovery publishes one atomic per-source/per-Agent-instance
+frontier before raw publication and consults that fixed path instead of
+recursively rescanning lifetime history on every healthy poll. A pre-frontier
+archive is scanned once and migrated to a clear frontier; explicit state-loss
+rebuilds and offline canonical projection retain their deliberate historical
+scans. Source scheduling now keeps at most one capture transaction in flight per
+source and harvests only completed work, so a bounded slow/bad source no longer
+forms a global barrier in front of recorder heartbeat publication or subsequent
+polls of healthy sources. Shutdown still drains already-scheduled bounded source
+transactions without cancelling raw-first/checkpoint-last work. B02 remains open
+for durable event-storm deduplication/rate bounds and pressure/critical behavior.
+P04/P05/P09 physical evidence remains open; B01 still owns aggregate host-resource
+admission across concurrent writers. No physical acceptance state changed.
 
 The analysis-slice, upload crash-correctness, and analysis-workspace
 reconciliation deliveries together provide **B08 5/5 properties

@@ -8,7 +8,11 @@ soon as the agent appears — with no manual restart.
 
 from __future__ import annotations
 
+import json
+import threading
+from collections import Counter
 from pathlib import Path
+from time import perf_counter, sleep
 
 import pytest
 
@@ -93,6 +97,21 @@ class _Agent:
         return _Client()
 
 
+def _complete_scheduled_cycle(service: rt.RecorderRuntime, *, timeout: float = 2.0) -> None:
+    """Schedule one non-blocking cycle, then harvest only that scheduled work."""
+
+    service.run_fetch_cycle()
+    deadline = perf_counter() + timeout
+    while True:
+        service._harvest_capture_results()
+        with service.lock:
+            if not service._capture_futures:
+                return
+        if perf_counter() >= deadline:
+            pytest.fail("recorder capture did not finish within the test deadline")
+        sleep(0.005)
+
+
 @pytest.fixture
 def recorder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     agent = _Agent()
@@ -106,7 +125,13 @@ def recorder(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
     service.enabled = True
     service.configuration_ready = True
     service.sources = {SOURCE: BASE_URL}
-    return service, agent, clock
+    try:
+        yield service, agent, clock
+    finally:
+        service.stop_event.set()
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        service._harvest_capture_results()
+        rt.unregister_stop_target(service)
 
 
 def test_recorder_started_before_its_source_retries_with_bounded_backoff(
@@ -114,7 +139,7 @@ def test_recorder_started_before_its_source_retries_with_bounded_backoff(
 ) -> None:
     service, agent, clock = recorder
 
-    service.run_fetch_cycle()
+    _complete_scheduled_cycle(service)
 
     assert agent.current_fetches == 1
     assert service.state == "error"
@@ -124,27 +149,27 @@ def test_recorder_started_before_its_source_retries_with_bounded_backoff(
     assert service.observations_written == 0
 
     # The source is not due again yet, so the recorder must not busy-poll it.
-    service.run_fetch_cycle()
+    _complete_scheduled_cycle(service)
     assert agent.current_fetches == 1
 
     # Backoff grows while the agent stays offline, and stays bounded.
     for _ in range(12):
         clock["now"] += rt.BACKOFF_MAX
-        service.run_fetch_cycle()
+        _complete_scheduled_cycle(service)
     assert service.source_status[SOURCE]["next_retry_seconds"] <= rt.BACKOFF_MAX
 
 
 def test_recorder_starts_recording_when_the_source_appears(recorder) -> None:
     service, agent, clock = recorder
 
-    service.run_fetch_cycle()
+    _complete_scheduled_cycle(service)
     assert service.state == "error"
     offline_attempts = agent.current_fetches
 
     # The machine is powered on. No operator restarts the recorder.
     agent.online = True
     clock["now"] += rt.BACKOFF_MAX
-    service.run_fetch_cycle()
+    _complete_scheduled_cycle(service)
 
     assert agent.current_fetches > offline_attempts
     assert service.state == "recording"
@@ -167,7 +192,7 @@ def test_first_real_data_is_durably_written_with_its_raw_manifest(recorder) -> N
 
     agent.online = True
     clock["now"] += rt.BACKOFF_MAX
-    service.run_fetch_cycle()
+    _complete_scheduled_cycle(service)
 
     archived = service.store.iter_raw_batches(
         source_name=SOURCE,
@@ -176,3 +201,107 @@ def test_first_real_data_is_durably_written_with_its_raw_manifest(recorder) -> N
     assert archived
     assert service.checkpoints[SOURCE].agent_instance_id == INSTANCE_ID
     assert service.checkpoints[SOURCE].next_sequence > 1
+
+
+def test_slow_source_does_not_block_healthy_polling_or_status(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = rt.RecorderRuntime()
+    service.enabled = True
+    service.configuration_ready = True
+    service.sources = {
+        "slow": "http://slow.invalid:5000",
+        "healthy": "http://healthy.invalid:5000",
+    }
+    monkeypatch.setattr(rt, "STATUS_FILE", tmp_path / "status.json")
+
+    calls: Counter[str] = Counter()
+    slow_started = threading.Event()
+    release_slow = threading.Event()
+    slow_finished = threading.Event()
+    calls_lock = threading.Lock()
+
+    def capture(source_name: str, base_url: str) -> tuple[str, bool, str]:
+        del base_url
+        with calls_lock:
+            calls[source_name] += 1
+        if source_name == "slow":
+            slow_started.set()
+            assert release_slow.wait(2.0)
+            slow_finished.set()
+        return source_name, True, ""
+
+    monkeypatch.setattr(service, "capture_source", capture)
+    try:
+        service.run_fetch_cycle()
+        assert slow_started.wait(1.0)
+
+        deadline = perf_counter() + 1.0
+        while True:
+            service.run_fetch_cycle()
+            with calls_lock:
+                healthy_calls = calls["healthy"]
+                slow_calls = calls["slow"]
+            if healthy_calls >= 2:
+                break
+            if perf_counter() >= deadline:
+                pytest.fail("healthy source did not make progress while slow source was blocked")
+            sleep(0.005)
+
+        service.publish_status(force=True)
+        status = json.loads(rt.STATUS_FILE.read_text(encoding="utf-8"))
+
+        assert slow_calls == 1
+        assert healthy_calls >= 2
+        assert not slow_finished.is_set()
+        assert status["heartbeat_at"]
+        assert status["state"] == "recording"
+        assert status["sources"] == ["healthy", "slow"]
+    finally:
+        release_slow.set()
+        service.stop_event.set()
+        service.executor.shutdown(wait=True, cancel_futures=False)
+        service._harvest_capture_results()
+        rt.unregister_stop_target(service)
+
+
+def test_run_once_drains_inflight_capture_before_shutdown(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    service = rt.RecorderRuntime()
+    service.enabled = True
+    service.configuration_ready = True
+    service.sources = {"slow": "http://slow.invalid:5000"}
+
+    started = threading.Event()
+    release = threading.Event()
+    finished = threading.Event()
+
+    def capture(source_name: str, base_url: str) -> tuple[str, bool, str]:
+        del base_url
+        started.set()
+        assert release.wait(2.0)
+        finished.set()
+        return source_name, True, ""
+
+    monkeypatch.setattr(service, "capture_source", capture)
+    monkeypatch.setattr(service, "load_state", lambda: None)
+    monkeypatch.setattr(service, "refresh_configuration", lambda **_kwargs: None)
+    monkeypatch.setattr(service, "publish_status", lambda **_kwargs: None)
+    monkeypatch.setattr(rt, "DATA_DIR", tmp_path / "data")
+    monkeypatch.setattr(rt, "STATE_FILE", tmp_path / "state.json")
+    monkeypatch.setattr(rt, "RUN_ONCE", True)
+
+    runner = threading.Thread(target=service.run, daemon=True)
+    runner.start()
+    assert started.wait(1.0)
+    sleep(0.02)
+    assert runner.is_alive()
+    assert not finished.is_set()
+
+    release.set()
+    runner.join(timeout=2.0)
+    assert not runner.is_alive()
+    assert finished.is_set()

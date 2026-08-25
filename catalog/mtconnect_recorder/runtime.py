@@ -9,7 +9,7 @@ import signal
 import threading
 import time
 from collections.abc import Mapping
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import replace
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
@@ -474,6 +474,10 @@ class RecorderRuntime:
         self.last_status_write = 0.0
         self.store = DurableRecorderStore(DATA_DIR)
         self.executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="mtconnect")
+        self._capture_futures: dict[
+            str, tuple[str, Future[tuple[str, bool, str]]]
+        ] = {}
+        self._capture_outcomes: dict[str, bool] = {}
         register_stop_target(self)
 
     def load_state(self) -> None:
@@ -600,6 +604,8 @@ class RecorderRuntime:
             self.sources = sources
 
             for name, base_url in sources.items():
+                if previous_sources.get(name) != base_url:
+                    self._capture_outcomes.pop(name, None)
                 self.backoff.setdefault(name, BACKOFF_INITIAL)
                 self.next_attempt_at.setdefault(name, 0.0)
                 source = self.source_status.setdefault(name, {})
@@ -612,6 +618,7 @@ class RecorderRuntime:
                 self.backoff.pop(removed, None)
                 self.next_attempt_at.pop(removed, None)
                 self.probes.pop(removed, None)
+                self._capture_outcomes.pop(removed, None)
 
             active = self.enabled and self.configuration_ready
             if active and not previous_enabled:
@@ -1103,7 +1110,96 @@ class RecorderRuntime:
             log.warning("[%s] recorder error: %s; retrying in %.1fs", source_name, error, delay)
             return source_name, False, error
 
+    def _harvest_capture_results(self) -> None:
+        """Collect finished source work without waiting for a slower peer."""
+
+        completed: list[
+            tuple[str, str, Future[tuple[str, bool, str]]]
+        ] = []
+        with self.lock:
+            for source_name, (base_url, future) in list(self._capture_futures.items()):
+                if not future.done():
+                    continue
+                self._capture_futures.pop(source_name, None)
+                completed.append((source_name, base_url, future))
+
+        if not completed:
+            return
+
+        outcomes: list[tuple[str, str, bool]] = []
+        for source_name, base_url, future in completed:
+            try:
+                _reported_source, ok, error = future.result()
+            except Exception as exc:  # noqa: BLE001 - scheduler must isolate a source task
+                ok = False
+                error = f"{type(exc).__name__}: {exc}"
+                with self.lock:
+                    if self.sources.get(source_name) == base_url:
+                        delay = min(
+                            self.backoff.get(source_name, BACKOFF_INITIAL) * 2,
+                            BACKOFF_MAX,
+                        )
+                        self.backoff[source_name] = delay
+                        self.next_attempt_at[source_name] = time.monotonic() + delay
+                        source = self.source_status.setdefault(
+                            source_name,
+                            {"base_url": base_url},
+                        )
+                        source.update(
+                            {
+                                "base_url": base_url,
+                                "last_error": error,
+                                "next_retry_seconds": delay,
+                            }
+                        )
+                log.exception("[%s] recorder source task escaped its error boundary", source_name)
+            outcomes.append((source_name, base_url, ok))
+
+        with self.lock:
+            for source_name, scheduled_url, ok in outcomes:
+                current_url = self.sources.get(source_name)
+                if current_url is None:
+                    self._capture_outcomes.pop(source_name, None)
+                    self.source_status.pop(source_name, None)
+                    self.backoff.pop(source_name, None)
+                    self.next_attempt_at.pop(source_name, None)
+                    self.probes.pop(source_name, None)
+                    continue
+                if current_url != scheduled_url:
+                    # A configuration refresh replaced this endpoint while its
+                    # previous bounded transaction was draining. Do not let the
+                    # stale result authorize health for the replacement source.
+                    self._capture_outcomes.pop(source_name, None)
+                    source = self.source_status.setdefault(source_name, {})
+                    source.update(
+                        {
+                            "base_url": current_url,
+                            "last_success_at": None,
+                            "last_error": "",
+                        }
+                    )
+                    self.backoff[source_name] = BACKOFF_INITIAL
+                    self.next_attempt_at[source_name] = 0.0
+                    continue
+                self._capture_outcomes[source_name] = ok
+
+            if not (self.enabled and self.configuration_ready and self.sources):
+                return
+
+            configured = set(self.sources)
+            if any(self._capture_outcomes.get(name) is True for name in configured):
+                self.state = "recording"
+                self.message = f"Recording {len(self.sources)} MTConnect source(s) by sequence."
+                self.last_error = ""
+            elif all(self._capture_outcomes.get(name) is False for name in configured):
+                self.state = "error"
+                self.last_error = "No configured MTConnect source responded successfully."
+                self.message = self.last_error
+
     def run_fetch_cycle(self) -> None:
+        """Harvest completed sources and start due work without a global barrier."""
+
+        self._harvest_capture_results()
         with self.lock:
             if not (self.enabled and self.configuration_ready and self.sources):
                 return
@@ -1111,34 +1207,18 @@ class RecorderRuntime:
             due_sources = {
                 name: url
                 for name, url in self.sources.items()
-                if now >= self.next_attempt_at.get(name, 0.0)
+                if name not in self._capture_futures
+                and now >= self.next_attempt_at.get(name, 0.0)
             }
+            for name, url in due_sources.items():
+                self._capture_futures[name] = (
+                    url,
+                    self.executor.submit(self.capture_source, name, url),
+                )
 
-        if not due_sources:
-            return
-
-        futures = {
-            self.executor.submit(self.capture_source, name, url): name
-            for name, url in due_sources.items()
-        }
-        successful = 0
-        errors: list[str] = []
-        for future in as_completed(futures):
-            _, ok, error = future.result()
-            if ok:
-                successful += 1
-            elif error:
-                errors.append(error)
-
-        with self.lock:
-            if successful:
-                self.state = "recording"
-                self.message = f"Recording {len(self.sources)} MTConnect source(s) by sequence."
-                self.last_error = ""
-            elif errors and len(due_sources) == len(self.sources):
-                self.state = "error"
-                self.last_error = "No configured MTConnect source responded successfully."
-                self.message = self.last_error
+        # Fast sources may already have completed. Harvest them opportunistically,
+        # but never wait for another source before returning to status publication.
+        self._harvest_capture_results()
 
     def publish_status(self, *, force: bool = False) -> None:
         now = time.monotonic()
@@ -1213,11 +1293,15 @@ class RecorderRuntime:
                 elapsed = time.monotonic() - cycle_started
                 self.stop_event.wait(max(0.01, interval - elapsed))
         finally:
+            # Do not cancel a source in the middle of raw-first/checkpoint-last.
+            # A stop prevents another batch from starting inside capture_source;
+            # the executor then drains every already-started/queued bounded task.
+            self.executor.shutdown(wait=True, cancel_futures=False)
+            self._harvest_capture_results()
             with self.lock:
                 self.state = "stopped"
                 self.message = "Recorder service is shutting down."
             self.publish_status(force=True)
-            self.executor.shutdown(wait=True, cancel_futures=True)
             unregister_stop_target(self)
             log.info("Loss-aware MTConnect recorder stopped")
 
