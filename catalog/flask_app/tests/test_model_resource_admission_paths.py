@@ -111,16 +111,21 @@ def test_supported_model_install_paths_have_no_direct_pull_bypass() -> None:
     ).read_text(encoding="utf-8")
     command_setup = (ROOT / "catalog/command_setup.py").read_text(encoding="utf-8")
     headless = (ROOT / "headless_fcp.py").read_text(encoding="utf-8")
+    model_pull = (ROOT / "catalog/federation/model_resource_pull.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "fcp_model_pull.ps1" in start_cmd
     assert "catalog.federation.model_resource_pull" in start_sh
     assert "admitted_model_pull" in setup
+    assert "env=env" in setup
     assert "/api/pull" not in ai_service
     assert "/api/pull" not in command_setup
     assert "ollama-pull" not in start_cmd
     assert "ollama-pull" not in start_sh
     assert '"ollama-pull"' not in setup
     assert '"ollama-pull"' not in headless
+    assert 'environment.setdefault("COMPOSE_PROJECT_NAME", "fcp")' in model_pull
 
 
 def test_update_agents_treat_ollama_as_optional_and_under_host_admission() -> None:
@@ -141,8 +146,11 @@ def test_update_agents_treat_ollama_as_optional_and_under_host_admission() -> No
     assert "AI remains optional" in posix
 
 
-def test_windows_and_python_model_runners_share_pressure_thresholds() -> None:
+def test_windows_and_python_model_runners_share_pressure_and_stop_contract() -> None:
     windows = (ROOT / "scripts/windows/fcp_model_pull.ps1").read_text(
+        encoding="utf-8"
+    )
+    python_runner = (ROOT / "catalog/federation/model_resource_pull.py").read_text(
         encoding="utf-8"
     )
 
@@ -150,4 +158,18 @@ def test_windows_and_python_model_runners_share_pressure_thresholds() -> None:
     assert "$PressureFreeBytes = [int64]12884901888" in windows
     assert DEFAULT_CRITICAL_FREE_BYTES == 10737418240
     assert DEFAULT_PRESSURE_FREE_BYTES == 12884901888
-    assert "'compose', 'stop', '--timeout', '5', $service" in windows
+
+    assert "docker_data.vhdx" in windows
+    assert "ext4.vhdx" in windows
+    assert "Get-FreeBytes $backingPath" in windows
+    assert "Test-ModelWriterStopped" in windows
+    assert "'compose', 'stop', '--timeout', '5', $Service" in windows
+    assert "'compose', 'kill', $Service" in windows
+    assert "could not prove" in windows
+    assert "exit 3" in windows
+
+    assert "{{.DockerRootDir}}" in python_runner
+    assert "Docker.raw" in python_runner
+    assert "docker_data.vhdx" in python_runner
+    assert "writer_stop_unverified" in python_runner
+    assert '["docker", "compose", "kill", target.service]' in python_runner
