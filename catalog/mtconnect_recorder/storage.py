@@ -37,6 +37,8 @@ from .schema_compat import (
 )
 
 _STORAGE_DAY_PATTERN = re.compile(r"\A[0-9]{4}-[0-9]{2}-[0-9]{2}\Z")
+_EVENT_TYPE_PATTERN = re.compile(r"\A[a-z0-9_]{1,64}\Z")
+_RECORDER_EVENT_SCHEMA = "fcp.mtconnect.recorder_event.v2"
 
 
 def _observation_storage_day(batch: ParsedBatch) -> str:
@@ -592,17 +594,92 @@ class DurableRecorderStore:
         event_type: str,
         payload: Mapping[str, Any],
     ) -> Path:
+        """Coalesce recorder pathology evidence into one bounded hourly summary.
+
+        Raw MTConnect capture remains the evidence authority. These event files are
+        operational summaries, so a broken source must not create one inode per poll.
+        One source/event-type can create at most one file per UTC hour; repeated or
+        changing payloads inside that hour update counters and retain only the first
+        and latest bounded samples.
+        """
+
+        if not _EVENT_TYPE_PATTERN.fullmatch(event_type):
+            raise ValueError("Recorder event_type must be lowercase identifier text.")
+        detected_at = _utc_now()
+        hour_bucket = detected_at[:13]
+        event_data = dict(payload)
+        fingerprint = sha256(
+            json.dumps(
+                event_data,
+                sort_keys=True,
+                separators=(",", ":"),
+                ensure_ascii=False,
+                allow_nan=False,
+            ).encode("utf-8")
+        ).hexdigest()
+        path = _confined_storage_path(
+            self.event_root,
+            _slug(source_name),
+            _slug(event_type),
+            f"{hour_bucket}.json",
+        )
+
+        occurrence_count = 1
+        coalesced_occurrence_count = 0
+        payload_change_count = 0
+        first_seen_at = detected_at
+        first_payload = event_data
+        previous_fingerprint: str | None = None
+        if path.exists():
+            try:
+                previous = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, json.JSONDecodeError) as exc:
+                raise MtconnectProtocolError(
+                    f"Recorder event summary is unreadable: {path}"
+                ) from exc
+            if (
+                not isinstance(previous, dict)
+                or previous.get("schema") != _RECORDER_EVENT_SCHEMA
+                or previous.get("source_name") != source_name
+                or previous.get("event_type") != event_type
+                or previous.get("hour_bucket") != hour_bucket
+            ):
+                raise MtconnectProtocolError(
+                    f"Recorder event summary identity mismatch: {path}"
+                )
+            try:
+                occurrence_count = int(previous["occurrence_count"]) + 1
+                coalesced_occurrence_count = (
+                    int(previous["coalesced_occurrence_count"]) + 1
+                )
+                payload_change_count = int(previous["payload_change_count"])
+            except (KeyError, TypeError, ValueError) as exc:
+                raise MtconnectProtocolError(
+                    f"Recorder event summary counters are invalid: {path}"
+                ) from exc
+            first_seen_at = str(previous.get("first_seen_at") or detected_at)
+            prior_first_payload = previous.get("first_payload")
+            if isinstance(prior_first_payload, dict):
+                first_payload = prior_first_payload
+            previous_fingerprint = str(previous.get("latest_payload_sha256") or "")
+            if previous_fingerprint != fingerprint:
+                payload_change_count += 1
+
         event_payload = {
-            "schema": "fcp.mtconnect.recorder_event.v1",
+            "schema": _RECORDER_EVENT_SCHEMA,
             "source": "mtconnect_recorder",
             "source_name": source_name,
             "event_type": event_type,
-            "timestamp": _utc_now(),
-            **dict(payload),
+            "hour_bucket": hour_bucket,
+            "timestamp": detected_at,
+            "first_seen_at": first_seen_at,
+            "last_seen_at": detected_at,
+            "occurrence_count": occurrence_count,
+            "coalesced_occurrence_count": coalesced_occurrence_count,
+            "payload_change_count": payload_change_count,
+            "first_payload": first_payload,
+            "latest_payload": event_data,
+            "latest_payload_sha256": fingerprint,
         }
-        digest = sha256(
-            json.dumps(event_payload, sort_keys=True).encode("utf-8")
-        ).hexdigest()[:12]
-        path = self.event_root / _slug(source_name) / f"{event_type}-{digest}.json"
         _write_json_atomic(path, event_payload)
         return path
