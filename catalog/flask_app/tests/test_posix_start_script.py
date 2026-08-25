@@ -81,6 +81,19 @@ def _make_fake_docker(
     return docker
 
 
+def _fake_start_tools_with_ollama_failure(tmp_path: Path, calls: Path) -> dict[str, str]:
+    env = _fake_host_tools(tmp_path, calls)
+    docker = Path(env["PATH"].split(os.pathsep, maxsplit=1)[0]) / "docker"
+    _write_executable(
+        docker,
+        "#!/bin/sh\n"
+        f'printf "docker %s\\n" "$*" >> "{calls}"\n'
+        'if [ "$*" = "compose up -d ollama" ]; then exit 1; fi\n'
+        "exit 0\n",
+    )
+    return env
+
+
 @pytest.mark.skipif(os.name == "nt", reason="POSIX launcher execution")
 def test_posix_tailscale_fresh_path_reaches_verified_reset_before_discovery(
     tmp_path: Path,
@@ -113,7 +126,7 @@ def test_posix_tailscale_fresh_path_reaches_verified_reset_before_discovery(
         "docker compose run --rm --no-deps --entrypoint python flask "
         "-m catalog.flask_app.services.device_state_reset --verify-fresh"
     )
-    services = "docker compose up -d relay ollama recorder"
+    services = "docker compose up -d relay recorder"
     discovery = f"python3 {ROOT / 'scripts' / 'zero_touch_federation_start.py'}"
     assert trace.index(stop) < trace.index(reset) < trace.index(verify)
     assert trace.index(verify) < trace.index(services) < trace.index(discovery)
@@ -138,6 +151,32 @@ def test_posix_start_fresh_requires_confirmation_before_reset(tmp_path: Path) ->
     assert "Type RESET to continue:" in completed.stdout
     assert "Fresh install cancelled. No state was removed." in completed.stdout
     assert "device_state_reset" not in calls.read_text(encoding="utf-8")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="POSIX launcher execution")
+def test_posix_start_survives_optional_ollama_start_failure(tmp_path: Path) -> None:
+    calls = tmp_path / "calls.log"
+    env = _fake_start_tools_with_ollama_failure(tmp_path, calls)
+    env["FCP_SUPPRESS_BROWSER"] = "1"
+
+    completed = subprocess.run(
+        ["sh", str(ROOT / "start.sh")],
+        cwd=ROOT,
+        env=env,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=10,
+    )
+
+    assert completed.returncode == 0, completed.stderr or completed.stdout
+    trace = calls.read_text(encoding="utf-8")
+    required = "docker compose up -d relay recorder"
+    flask = "docker compose up -d flask"
+    ollama = "docker compose up -d ollama"
+    assert trace.index(required) < trace.index(flask) < trace.index(ollama)
+    assert "WARNING: Ollama is unavailable; core FCP remains running." in completed.stderr
+    assert "AI capability:        unavailable; core FCP is healthy" in completed.stdout
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX launcher execution")
@@ -168,7 +207,7 @@ def test_posix_fresh_uses_shared_reset_contract_and_never_deletes_volumes() -> N
         "catalog.flask_app.services.device_state_reset"
     )
     assert start.index("--verify-fresh") < start.index(
-        "docker compose up -d relay ollama recorder"
+        "docker compose up -d relay recorder"
     )
     assert '["compose", "down", "--remove-orphans", "--timeout", "10"]' in helper
     assert '["compose", "kill"]' in helper
@@ -190,13 +229,15 @@ def test_posix_normal_and_resume_modes_remain_non_destructive() -> None:
 
 def test_posix_core_starts_before_optional_model_installation() -> None:
     start = (ROOT / "start.sh").read_text(encoding="utf-8")
-    background = "docker compose up -d relay ollama recorder"
+    required = "docker compose up -d relay recorder"
     flask = "docker compose up -d flask"
+    ollama = "docker compose up -d ollama"
     model = 'docker compose exec -T ollama ollama show "$FCP_AI_MODEL"'
 
-    assert start.index(background) < start.index(flask) < start.index(model)
+    assert start.index(required) < start.index(flask) < start.index(ollama) < start.index(model)
     assert "FCP_AI_DEGRADED=0" in start
     assert "FCP_AI_DEGRADED=1" in start
+    assert "WARNING: Ollama is unavailable; core FCP remains running." in start
     assert "WARNING: AI capability is unavailable; core FCP remains running." in start
     assert "AI capability:        unavailable; core FCP is healthy" in start
 
@@ -208,6 +249,7 @@ def test_posix_optional_model_failure_path_has_no_fatal_exit() -> None:
         maxsplit=1,
     )[1].split("\nBASE_URL=", maxsplit=1)[0]
 
+    assert "if ! docker compose up -d ollama; then" in optional_block
     assert "if ! docker compose --profile model-install run --rm ollama-pull; then" in optional_block
     assert "if ! docker compose exec -T ollama ollama show" in optional_block
     assert "exit 1" not in optional_block
