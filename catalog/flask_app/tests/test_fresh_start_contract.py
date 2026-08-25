@@ -14,9 +14,10 @@ def test_fresh_reset_is_verified_before_any_long_running_service_starts() -> Non
         "\n:show_help", maxsplit=1
     )[0]
 
-    assert main_body.index("call :reset_device_state") < script.index(
-        "docker compose up -d relay ollama recorder"
-    )
+    reset_call = main_body.index("call :reset_device_state")
+    assert reset_call < script.index("docker compose up -d relay recorder")
+    assert reset_call < script.index("docker compose up -d flask")
+    assert reset_call < script.index("docker compose up -d ollama")
     reset_command = (
         "docker compose run --rm --no-deps --build --entrypoint python flask -m "
         "catalog.flask_app.services.device_state_reset"
