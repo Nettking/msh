@@ -10,7 +10,12 @@ recorder, plus a bounded self-check for CI:
 ``--finalize``
     Fast-forward the checkout after the supervised recorder has exited. This is
     the only mode that mutates the checkout, and it refuses to run while the
-    recorder process it was activated for is still alive.
+    recorder process it was activated for is still alive. An ordinary update
+    also enters the same checkout-scoped host-mutation boundary used by normal
+    launcher builds. If that finite lock is busy, the unchanged recorder is
+    relaunched and the pending update fails safely after replacement identity is
+    observed; capture is not left down merely because another supported host
+    operation owns the checkout.
 ``--mark-relaunched``
     Record the exact process-instance nonce the supervisor just started, so the
     replacement must be proven to be that process and not a survivor.
@@ -43,6 +48,10 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 if str(REPOSITORY_ROOT) not in sys.path:
     sys.path.insert(0, str(REPOSITORY_ROOT))
 
+from catalog.federation.host_mutation import (
+    HostMutationLockError,
+    host_mutation_lock,
+)
 from catalog.federation.software_trial import (
     TRIAL_FAILED,
     TRIAL_RUNNING,
@@ -158,6 +167,53 @@ def watch_trial(
     return {"watched": True, "outcome": outcome, "stopped": False}
 
 
+def _unchanged_relaunch_plan(code: str) -> dict[str, object]:
+    """Keep capture recoverable when checkout serialization is unavailable.
+
+    The active update journal intentionally remains at its pre-mutation stage.
+    The replacement recorder has a fresh nonce and therefore rejects the stale
+    activation marker; the in-process agent then closes that pending activation
+    as superseded. No target commit is claimed because the checkout never moved.
+    """
+
+    return {
+        "relaunch": True,
+        "mode": "update",
+        "code": code,
+        "target_commit": None,
+        "launch_root": None,
+        "data_directory": None,
+        "build_commit": None,
+    }
+
+
+def finalize_with_host_mutation(
+    agent: NativeRecorderUpdateAgent,
+    *,
+    repo_root: Path,
+) -> dict[str, object]:
+    """Finalize one transition, serializing only real production source updates."""
+
+    update_active = agent.journal.active() is not None
+    trial_active = agent.trial.journal.active() is not None
+    if not update_active or trial_active:
+        # A branch trial owns its prepared worktree and deliberately leaves the
+        # production checkout untouched. It must not be blocked by a launcher
+        # building the production checkout merely because both transitions use
+        # the same supervisor exit path.
+        return agent.finalize_after_exit()
+
+    try:
+        with host_mutation_lock(repo_root):
+            return agent.finalize_after_exit()
+    except HostMutationLockError as exc:
+        # The recorder has already exited at this point. Failing the supervisor
+        # here would turn harmless lock contention into capture downtime. Leave
+        # source untouched and relaunch the same checkout; the fresh process
+        # identity makes the pending activation fail closed on its next pass.
+        return _unchanged_relaunch_plan(str(exc))
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -184,7 +240,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     if args.finalize:
-        outcome = agent.finalize_after_exit()
+        outcome = finalize_with_host_mutation(
+            agent,
+            repo_root=Path(args.repo_root),
+        )
         print(json.dumps(outcome, sort_keys=True))
         return 0 if outcome.get("relaunch") else 1
 
