@@ -14,18 +14,22 @@ import argparse
 import os
 import re
 import subprocess
-import sys
 import time
 import uuid
 from collections.abc import Mapping
 from dataclasses import dataclass
-from pathlib import Path, PureWindowsPath
+from pathlib import Path
 
+from .docker_resources import docker_backing_resource_path
 from .host_resources import PressureLevel, ProcessResourceAdmission, ResourceAssessment
 
 MODEL_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$")
 MODEL_PULL_TIMEOUT_SECONDS = 3600.0
 MODEL_PRESSURE_POLL_SECONDS = 0.25
+
+# Preserve the existing private test seam while making the implementation share
+# one backing-resource resolver with host builds.
+_docker_backing_resource_path = docker_backing_resource_path
 
 
 @dataclass(frozen=True)
@@ -77,108 +81,6 @@ def _run(
         text=True,
         timeout=timeout,
     )
-
-
-def _docker_backing_resource_path(
-    root: Path,
-    *,
-    env: Mapping[str, str] | None = None,
-) -> Path | None:
-    """Return a host path whose filesystem actually backs Docker model writes.
-
-    Native POSIX Docker exposes its data root directly. Docker Desktop persists
-    Linux-container storage in a host disk image; for known supported default
-    locations we measure the host directory containing that image. If the
-    backing resource cannot be proven, a *new* model pull fails closed.
-    """
-
-    environment = _subprocess_env(env)
-    if os.name == "nt":
-        local_app_data = str(environment.get("LOCALAPPDATA") or "").strip()
-        candidates: list[Path] = []
-        if local_app_data:
-            docker = Path(local_app_data) / "Docker" / "wsl"
-            candidates.extend(
-                [
-                    docker / "disk" / "docker_data.vhdx",
-                    docker / "data" / "ext4.vhdx",
-                ]
-            )
-        for candidate in candidates:
-            try:
-                if candidate.is_file():
-                    return candidate.parent.resolve()
-            except OSError:
-                continue
-
-        # Do not infer native Docker storage from the mere existence of a
-        # ProgramData directory. Only accept a Windows host path that the active
-        # Docker engine itself reports as its data root.
-        info = _run(
-            root,
-            ["docker", "info", "--format", "{{.OSType}}|{{.DockerRootDir}}"],
-            env=environment,
-            timeout=30.0,
-        )
-        if info.returncode != 0:
-            return None
-        parts = info.stdout.strip().split("|", maxsplit=1)
-        if len(parts) != 2 or parts[0].strip().casefold() != "windows":
-            return None
-        raw = parts[1].strip()
-        candidate = PureWindowsPath(raw)
-        if not candidate.is_absolute():
-            return None
-        host_path = Path(str(candidate))
-        try:
-            if not host_path.exists():
-                return None
-            return host_path.resolve()
-        except OSError:
-            return None
-
-    if sys.platform == "darwin":
-        home = str(environment.get("HOME") or "").strip()
-        if home:
-            docker_data = (
-                Path(home)
-                / "Library"
-                / "Containers"
-                / "com.docker.docker"
-                / "Data"
-                / "vms"
-                / "0"
-                / "data"
-            )
-            for name in ("Docker.raw", "Docker.qcow2"):
-                candidate = docker_data / name
-                try:
-                    if candidate.is_file():
-                        return candidate.parent.resolve()
-                except OSError:
-                    continue
-        return None
-
-    info = _run(
-        root,
-        ["docker", "info", "--format", "{{.DockerRootDir}}"],
-        env=environment,
-        timeout=30.0,
-    )
-    if info.returncode != 0:
-        return None
-    raw = info.stdout.strip()
-    if not raw:
-        return None
-    candidate = Path(raw)
-    if not candidate.is_absolute():
-        return None
-    try:
-        if not candidate.exists():
-            return None
-        return candidate.resolve()
-    except OSError:
-        return None
 
 
 def _model_ready(

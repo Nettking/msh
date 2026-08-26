@@ -18,6 +18,12 @@ $CriticalFreeBytes = [int64]10737418240
 $PressureFreeBytes = [int64]12884901888
 $PollMilliseconds = 250
 $ModelPattern = '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$'
+$DockerResourceHelper = Join-Path $PSScriptRoot 'fcp_docker_resource.ps1'
+if (-not (Test-Path -LiteralPath $DockerResourceHelper -PathType Leaf)) {
+    Write-Warning 'Model installation was not started because the Docker resource helper is unavailable.'
+    exit 3
+}
+. $DockerResourceHelper
 
 function Normalize-DirectoryPath([string]$Value) {
     return [System.IO.Path]::GetFullPath($Value)
@@ -43,60 +49,6 @@ function Invoke-NativeResult {
     return [pscustomobject]@{
         Output = @($output | ForEach-Object { [string]$_ })
         ExitCode = [int]$exitCode
-    }
-}
-
-function Get-DockerBackingPath {
-    # Docker Desktop persists Linux-container volumes in a host VHDX. Measure
-    # the Windows volume containing that file, not the checkout drive. Support
-    # both current and legacy default Docker Desktop locations. A custom or
-    # otherwise unprovable location fails closed for a new model download.
-    if (-not [string]::IsNullOrWhiteSpace($env:LOCALAPPDATA)) {
-        $candidates = @(
-            (Join-Path $env:LOCALAPPDATA 'Docker\wsl\disk\docker_data.vhdx'),
-            (Join-Path $env:LOCALAPPDATA 'Docker\wsl\data\ext4.vhdx')
-        )
-        foreach ($candidate in $candidates) {
-            try {
-                if (Test-Path -LiteralPath $candidate -PathType Leaf) {
-                    return (Get-Item -LiteralPath $candidate).Directory.FullName
-                }
-            }
-            catch {}
-        }
-    }
-
-    # Never infer the active data root from an unrelated ProgramData folder.
-    # A native Windows engine is accepted only when Docker itself reports both
-    # Windows OSType and a concrete absolute host DockerRootDir.
-    $info = Invoke-NativeResult 'docker' @(
-        'info', '--format', '{{.OSType}}|{{.DockerRootDir}}'
-    )
-    if ($info.ExitCode -ne 0) { return $null }
-    $raw = (($info.Output -join '').Trim()).Split('|', 2)
-    if ($raw.Count -ne 2 -or $raw[0].Trim().ToLowerInvariant() -ne 'windows') {
-        return $null
-    }
-    $nativeRoot = $raw[1].Trim()
-    if (-not [System.IO.Path]::IsPathRooted($nativeRoot)) { return $null }
-    try {
-        if (Test-Path -LiteralPath $nativeRoot -PathType Container) {
-            return (Resolve-Path -LiteralPath $nativeRoot).Path
-        }
-    }
-    catch {}
-    return $null
-}
-
-function Get-FreeBytes([string]$BackingPath) {
-    try {
-        $resolved = (Resolve-Path -LiteralPath $BackingPath).Path
-        $drive = [System.IO.Path]::GetPathRoot($resolved)
-        return [int64]([System.IO.DriveInfo]::New($drive)).AvailableFreeSpace
-    }
-    catch {
-        # Measurement failure while a pull is active is unsafe, not healthy.
-        return [int64]-1
     }
 }
 
@@ -161,8 +113,8 @@ if ($existing.ExitCode -eq 0) {
     exit 0
 }
 
-$backingPath = Get-DockerBackingPath
-if ([string]::IsNullOrWhiteSpace($backingPath)) {
+$backingPath = Get-FcpDockerBackingPath -RepoRoot $RepoRoot
+if ([string]::IsNullOrWhiteSpace([string]$backingPath)) {
     Write-Warning (
         'Model installation was not started because FCP could not prove the ' +
         'Windows host resource backing Docker model storage.'
@@ -170,7 +122,7 @@ if ([string]::IsNullOrWhiteSpace($backingPath)) {
     exit 3
 }
 
-$before = Get-FreeBytes $backingPath
+$before = Get-FcpResourceFreeBytes -BackingPath $backingPath
 if ($before -lt 0) {
     Write-Warning (
         'Model installation was not started because the Docker backing ' +
@@ -196,7 +148,7 @@ $deadline = [DateTimeOffset]::UtcNow.AddSeconds($TimeoutSeconds)
 
 while (-not $process.HasExited) {
     Start-Sleep -Milliseconds $PollMilliseconds
-    $free = Get-FreeBytes $backingPath
+    $free = Get-FcpResourceFreeBytes -BackingPath $backingPath
     if ($free -lt 0 -or $free -le $PressureFreeBytes) {
         $stopped = Stop-ModelWriter $service $containerName
         if (-not $process.WaitForExit(30000)) {

@@ -43,14 +43,12 @@ def test_low_disk_preflight_prune_keeps_lock_until_post_build_prune(
         OID_RE=re.compile(r"^[0-9a-f]{40}$"),
     )
 
-    def prune(_root, _env):
+    def engine_prune(_root, _env):
         events.append("prune")
         return True
 
-    def preflight(root, env):
-        events.append("preflight")
-        # Simulate the existing low-disk path, which recovers room by pruning.
-        engine.prune_build_cache(root, env)
+    def legacy_preflight(_root, _env):
+        events.append("legacy-preflight")
 
     def process_once(root, _request, _result):
         engine.preflight_disk(root, {})
@@ -59,8 +57,8 @@ def test_low_disk_preflight_prune_keeps_lock_until_post_build_prune(
         events.append("activation")
         return True
 
-    engine.prune_build_cache = prune
-    engine.preflight_disk = preflight
+    engine.prune_build_cache = engine_prune
+    engine.preflight_disk = legacy_preflight
     engine.process_once = process_once
 
     class Lock:
@@ -73,6 +71,17 @@ def test_low_disk_preflight_prune_keeps_lock_until_post_build_prune(
 
     monkeypatch.setattr(runner.host_build, "host_mutation_lock", lambda _root: Lock())
 
+    def host_prune(_root, _env):
+        events.append("preflight-prune")
+        return True
+
+    def host_preflight(root, env):
+        events.append("preflight")
+        assert runner.host_build.prune_build_cache(root, env) is True
+
+    monkeypatch.setattr(runner.host_build, "prune_build_cache", host_prune)
+    monkeypatch.setattr(runner.host_build, "preflight_disk", host_preflight)
+
     def reprove(_root):
         events.append("reproof")
         return target
@@ -83,9 +92,9 @@ def test_low_disk_preflight_prune_keeps_lock_until_post_build_prune(
     assert events == [
         "lock-enter",
         "preflight",
-        "prune",  # preflight cleanup: lock remains held
+        "preflight-prune",  # host cleanup: lock remains held
         "build",
-        "prune",  # post-build cleanup: now source can be re-proved
+        "prune",  # post-build engine cleanup: source can now be re-proved
         "reproof",
         "lock-exit",
         "activation",

@@ -29,6 +29,11 @@ $BranchPattern = '^(?![./-])(?!.*\.\.)(?!.*//)(?!.*@\{)(?!.*\.lock(?:/|$))[A-Za-
 $ModelPattern = '^[A-Za-z0-9][A-Za-z0-9._:/-]{0,255}$'
 $UpdateRequiredFreeBytes = 10737418240
 $BuildCacheKeepBytes = 8589934592
+$DockerResourceHelper = Join-Path $PSScriptRoot 'fcp_docker_resource.ps1'
+if (-not (Test-Path -LiteralPath $DockerResourceHelper -PathType Leaf)) {
+    throw 'docker_resource_helper_unavailable'
+}
+. $DockerResourceHelper
 
 function Normalize-DirectoryPath([string]$Value) {
     $full = [System.IO.Path]::GetFullPath($Value)
@@ -367,9 +372,18 @@ function Invoke-BuildCachePrune {
 }
 
 function Assert-DiskPreflight {
-    if ((Get-FreeBytes) -ge $UpdateRequiredFreeBytes) { return }
+    $backingPath = Get-FcpDockerBackingPath -RepoRoot $RepoRoot
+    if ([string]::IsNullOrWhiteSpace([string]$backingPath)) {
+        throw 'docker_backing_resource_unproven'
+    }
+    $freeBytes = Get-FcpResourceFreeBytes -BackingPath $backingPath
+    $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
+    if ($level -in @('normal', 'warning')) { return }
+
     Invoke-BuildCachePrune | Out-Null
-    if ((Get-FreeBytes) -ge $UpdateRequiredFreeBytes) { return }
+    $freeBytes = Get-FcpResourceFreeBytes -BackingPath $backingPath
+    $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
+    if ($level -in @('normal', 'warning')) { return }
     throw 'insufficient_disk_for_update'
 }
 

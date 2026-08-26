@@ -27,7 +27,7 @@ def _engine(events: list[str], *, fail_before_prune: bool = False):
     engine.OID_RE = re.compile(r"^[0-9a-f]{40}$")
 
     def preflight(_root, _env):
-        events.append("preflight")
+        events.append("legacy-preflight")
 
     def prune(_root, _env):
         events.append("prune")
@@ -80,6 +80,11 @@ def test_apply_releases_host_lock_only_after_prune_and_source_reproof(
             events.append("lock-exit")
 
     monkeypatch.setattr(runner.host_build, "host_mutation_lock", lambda _root: Lock())
+    monkeypatch.setattr(
+        runner.host_build,
+        "preflight_disk",
+        lambda _root, _env: events.append("preflight"),
+    )
 
     def reprove(_root):
         events.append("reproof")
@@ -118,6 +123,11 @@ def test_failed_build_still_attempts_cache_cleanup_before_unlock(
             events.append("lock-exit")
 
     monkeypatch.setattr(runner.host_build, "host_mutation_lock", lambda _root: Lock())
+    monkeypatch.setattr(
+        runner.host_build,
+        "preflight_disk",
+        lambda _root, _env: events.append("preflight"),
+    )
 
     with pytest.raises(RuntimeError, match="build_failed"):
         runner.process_once(engine, tmp_path, request, result)
