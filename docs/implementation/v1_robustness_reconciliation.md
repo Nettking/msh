@@ -245,6 +245,33 @@ Required properties:
 
 Do not introduce distributed clock consensus. Existing owner/term/fencing checks remain valuable and must be preserved.
 
+Robustness progress: **B09 1/7 properties automated-proven; B09 remains `OPEN`.**
+The authoritative-replay completeness delivery adds one shared bounded reader
+that folds a caller's own pages and returns only once the coordinator's reported
+current revision has been reached; every other exit raises an explicit
+`authoritative-replay-incomplete` bounded error. Both consumers named above are
+wired onto it, so no authority/security projection presents a bounded prefix as
+current truth any more: a leadership handover recorded past the page budget now
+refuses leader authority instead of granting it to the demoted node, and
+human-auth authority endpoints and per-user role/active state are refused rather
+than answered from a prefix in which the newest change had not happened.
+Accelerated automated tests cross the shipped `MAX_LEADERSHIP_REPLAY_PAGES` and
+`MAX_EVENT_PAGES` ceilings against a real coordinator and a real leadership
+handover; only page size is accelerated. No page ceiling was widened, no
+additional history is read, and coordinator authority, fencing, revision-gap,
+lease and membership checks are unchanged.
+
+The explicit fail-closed requirement is proven only for those authority/security
+consumers. The shared-knowledge reader and the capability-request, update,
+software-version and recorder-control report aggregators still return what they
+accumulated at their own ceilings; each under-reports rather than granting
+authority, but none of them fails closed yet. The remaining five properties are
+untouched: snapshot/base-revision compaction, member-replicated history
+lifetime and request-history retirement horizons all depend on retirement
+mechanisms that do not exist, and the control-plane unavailable/reconnecting
+representation and the bounded-clock-skew/NTP prerequisite are still open. No
+physical evidence or acceptance state changed.
+
 ### B10 — quiesced, capacity-safe backup/recovery and host-process identity
 
 **State:** `OPEN`  
