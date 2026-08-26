@@ -124,7 +124,7 @@ Required properties:
 
 ### B04 — one supported update/start contract and one host-mutation serialization boundary
 
-**State:** `CLOSED`  
+**State:** `CLOSED`
 **Severity:** release blocker
 
 Required properties:
