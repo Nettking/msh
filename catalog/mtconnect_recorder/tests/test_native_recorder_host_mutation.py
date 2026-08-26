@@ -55,8 +55,8 @@ class _Agent:
 
 
 def test_windows_mutex_identity_matches_the_supported_host_build_contract() -> None:
-    root = r"C:\FCP\msh\\"
-    normalized = r"C:\FCP\msh"
+    root = r"C:\FCP\checkout\\"
+    normalized = r"C:\FCP\checkout"
     digest = hashlib.sha256(normalized.lower().encode("utf-8")).hexdigest()
 
     assert normalize_windows_directory(root) == normalized
