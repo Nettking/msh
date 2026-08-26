@@ -1,4 +1,4 @@
-"""Checkout-scoped host mutation serialization shared by supported actors.
+r"""Checkout-scoped host mutation serialization shared by supported actors.
 
 The normal launchers and host update agents must agree on one checkout mutation
 boundary. Windows actors share the named ``Global\FCPHostMutation-...`` mutex;
