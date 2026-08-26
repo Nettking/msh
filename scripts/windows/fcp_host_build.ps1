@@ -6,7 +6,8 @@ param(
     [string]$OutputFile,
     [ValidateRange(0, 600)]
     [int]$LockTimeoutSeconds = 30,
-    [AllowNull()][string]$ExpectedCommit = $null
+    [AllowNull()][string]$ExpectedCommit = $null,
+    [switch]$LeaseAlreadyHeld
 )
 
 $ErrorActionPreference = 'Stop'
@@ -96,17 +97,27 @@ $RepoRoot = Normalize-DirectoryPath $RepoRoot
 $OutputFile = [System.IO.Path]::GetFullPath($OutputFile)
 Set-Location -LiteralPath $RepoRoot
 
-$mutexName = 'Global\FCPHostMutation-' + (Get-PathHash $RepoRoot)
-$mutationMutex = [System.Threading.Mutex]::new($false, $mutexName)
+$mutationMutex = $null
 $acquired = $false
+$ownsMutationMutex = $false
 try {
-    try {
-        $acquired = $mutationMutex.WaitOne([TimeSpan]::FromSeconds($LockTimeoutSeconds))
+    if ($LeaseAlreadyHeld) {
+        if ($env:FCP_HOST_MUTATION_LEASE_ACTIVE -ne '1') {
+            throw 'host_mutation_lease_missing'
+        }
     }
-    catch [System.Threading.AbandonedMutexException] {
-        $acquired = $true
+    else {
+        $mutexName = 'Global\FCPHostMutation-' + (Get-PathHash $RepoRoot)
+        $mutationMutex = [System.Threading.Mutex]::new($false, $mutexName)
+        try {
+            $acquired = $mutationMutex.WaitOne([TimeSpan]::FromSeconds($LockTimeoutSeconds))
+        }
+        catch [System.Threading.AbandonedMutexException] {
+            $acquired = $true
+        }
+        if (-not $acquired) { throw 'host_mutation_busy' }
+        $ownsMutationMutex = $true
     }
-    if (-not $acquired) { throw 'host_mutation_busy' }
 
     $commit = Get-CleanCommit
     if (-not [string]::IsNullOrWhiteSpace($ExpectedCommit)) {
@@ -141,8 +152,10 @@ catch {
     exit 1
 }
 finally {
-    if ($acquired) {
+    if ($ownsMutationMutex -and $acquired -and $null -ne $mutationMutex) {
         try { $mutationMutex.ReleaseMutex() | Out-Null } catch {}
     }
-    $mutationMutex.Dispose()
+    if ($null -ne $mutationMutex) {
+        $mutationMutex.Dispose()
+    }
 }
