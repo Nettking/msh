@@ -186,6 +186,17 @@ cleanup. Physical reboot/PID-reuse coverage remains in P05/P09, and P05 still
 must inject the relay database failure through the exact Compose candidate. No
 physical evidence or acceptance state changed.
 
+The analysis-scheduler half of the publication/scheduler driver property is now
+automated-proven separately. `AnalysisWorkService`'s persistent lifecycle driver
+treats durable-store failure as an expected condition instead of dying on it,
+reads its backlog inside that guarded pass, and records consecutive failures,
+the last error code and its time behind `driver_health()`. An unexpected fault
+still stops that driver rather than becoming a restart loop, but it is recorded
+instead of leaving a stderr traceback and silently stranded queued work.
+**The count stays 2/8:** that bullet also covers recorder publication, whose
+loop reports cycle failures but does not yet treat `sqlite3.Error` as expected,
+so the property is not closed. No physical evidence or acceptance state changed.
+
 ### B07 — bounded reconstructible and cumulative metadata growth
 
 **State:** `OPEN`  
