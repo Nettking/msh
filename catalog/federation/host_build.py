@@ -212,6 +212,8 @@ def ensure_controllable_builder(root: Path, env: Mapping[str, str]) -> str:
         )
         if driver != "docker-container":
             raise RuntimeError("controllable_builder_conflict")
+        if not _builder_stopped(root, name, env) and not stop_build_writer(root, name, env):
+            raise RuntimeError("build_writer_stop_unverified")
         return name
 
     try:
@@ -358,17 +360,22 @@ def prune_build_cache(
 def preflight_disk(root: Path, env: Mapping[str, str]) -> None:
     """Admit a core build against Docker's proven host backing resource.
 
-    NORMAL/WARNING may start. PRESSURE/CRITICAL first discard the checkout-scoped
-    FCP builder (which reclaims its cache without booting another writer), then
-    remeasure the same backing resource. An unproven or still-pressured resource
-    fails closed before a new BuildKit daemon starts.
+    Every start first proves the checkout-scoped FCP builder is quiescent, so an
+    abandoned BuildKit daemon cannot outlive the host-mutation owner and overlap a
+    later build. NORMAL/WARNING preserves its cache. PRESSURE/CRITICAL additionally
+    discards reconstructible FCP builder cache before remeasuring the same backing
+    resource. An unproven or still-pressured resource fails closed before a new
+    BuildKit writer starts.
     """
 
     admission = ProcessResourceAdmission()
     backing_path, before = docker_resource_assessment(root, env, controller=admission)
+    name = builder_name(root)
     if before.level < PressureLevel.PRESSURE:
+        if not stop_build_writer(root, name, env):
+            raise RuntimeError("build_writer_stop_unverified")
         return
-    if not _remove_builder(root, builder_name(root), env):
+    if not stop_build_writer(root, name, env, discard_cache=True):
         raise RuntimeError("build_writer_stop_unverified")
     after = admission.assessment(backing_path)
     if after.level < PressureLevel.PRESSURE:

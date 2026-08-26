@@ -244,6 +244,9 @@ function Ensure-FcpControllableBuilder {
         if ((Get-FcpBuilderDriver $inspection) -ne 'docker-container') {
             throw 'controllable_builder_conflict'
         }
+        if (-not (Test-FcpBuilderStopped $name) -and -not (Stop-FcpBuildWriter $name)) {
+            throw 'build_writer_stop_unverified'
+        }
         return $name
     }
 
@@ -344,8 +347,12 @@ function Invoke-ControlledCoreBuild([string]$BackingPath) {
 
     $exit = [int]$process.ExitCode
     if ($exit -ne 0) {
-        if (-not (Stop-FcpBuildWriter $name)) {
-            throw 'build_writer_stop_unverified'
+        $cleanupOk = Invoke-BuildCachePrune
+        if (-not $cleanupOk) {
+            if (-not (Stop-FcpBuildWriter $name)) {
+                throw 'build_writer_stop_unverified'
+            }
+            throw 'build_failed_and_cache_prune_failed'
         }
         throw "core_image_build_failed:$exit"
     }
@@ -388,10 +395,16 @@ function Assert-DiskPreflight {
     }
     $freeBytes = Get-FcpResourceFreeBytes -BackingPath $backingPath
     $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
-    if ($level -in @('normal', 'warning')) { return $backingPath }
+    $name = Get-FcpBuilderName
+    if ($level -in @('normal', 'warning')) {
+        if (-not (Test-FcpBuilderStopped $name) -and -not (Stop-FcpBuildWriter $name)) {
+            throw 'build_writer_stop_unverified'
+        }
+        return $backingPath
+    }
 
-    if (-not (Invoke-BuildCachePrune)) {
-        throw 'build_cache_prune_failed'
+    if (-not (Stop-FcpBuildWriter $name -DiscardCache)) {
+        throw 'build_writer_stop_unverified'
     }
     $freeBytes = Get-FcpResourceFreeBytes -BackingPath $backingPath
     $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes

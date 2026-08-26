@@ -98,10 +98,37 @@ def test_pressure_preflight_refuses_when_old_writer_cannot_be_quiesced(
         lambda *_args, **_kwargs: (backing, _assessment(PressureLevel.PRESSURE)),
     )
     monkeypatch.setattr(host_build, "builder_name", lambda _root: "fcp-build-test")
-    monkeypatch.setattr(host_build, "_remove_builder", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(host_build, "stop_build_writer", lambda *_args, **_kwargs: False)
 
     with pytest.raises(RuntimeError, match="build_writer_stop_unverified"):
         host_build.preflight_disk(tmp_path, {})
+
+
+def test_existing_builder_must_be_reproved_quiescent_before_reuse(
+    monkeypatch, tmp_path: Path
+) -> None:
+    monkeypatch.setattr(host_build, "builder_name", lambda _root: "fcp-build-test")
+    monkeypatch.setattr(
+        host_build,
+        "_builder_inspection",
+        lambda *_args, **_kwargs: SimpleNamespace(
+            returncode=0,
+            stdout="Driver: docker-container\nStatus: running\n",
+            stderr="",
+        ),
+    )
+    monkeypatch.setattr(host_build, "_builder_stopped", lambda *_args, **_kwargs: False)
+    attempts: list[str] = []
+    monkeypatch.setattr(
+        host_build,
+        "stop_build_writer",
+        lambda _root, name, _env, **_kwargs: attempts.append(name) or False,
+    )
+
+    with pytest.raises(RuntimeError, match="build_writer_stop_unverified"):
+        host_build.ensure_controllable_builder(tmp_path, {})
+
+    assert attempts == ["fcp-build-test"]
 
 
 class _Admission:

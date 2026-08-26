@@ -50,7 +50,7 @@ def _install_admission(
     return admission
 
 
-def test_build_admission_measures_docker_resource_not_checkout(
+def test_build_admission_measures_docker_resource_and_reproves_old_writer(
     monkeypatch, tmp_path: Path
 ) -> None:
     backing = tmp_path / "docker-backing"
@@ -60,17 +60,20 @@ def test_build_admission_measures_docker_resource_not_checkout(
         backing=backing,
         assessments=[_assessment(PressureLevel.WARNING, 15 * 1024**3)],
     )
-    removed: list[str] = []
+    stopped: list[tuple[str, bool]] = []
+    monkeypatch.setattr(host_build, "builder_name", lambda _root: "fcp-build-test")
     monkeypatch.setattr(
         host_build,
-        "_remove_builder",
-        lambda *_args, **_kwargs: removed.append("remove") or True,
+        "stop_build_writer",
+        lambda _root, name, _env, *, discard_cache=False: (
+            stopped.append((name, discard_cache)) or True
+        ),
     )
 
     host_build.preflight_disk(tmp_path, {"COMPOSE_PROJECT_NAME": "fcp"})
 
     assert admission.paths == [backing]
-    assert removed == []
+    assert stopped == [("fcp-build-test", False)]
 
 
 def test_build_pressure_discards_fcp_builder_then_remeasures_same_resource(
@@ -86,18 +89,20 @@ def test_build_pressure_discards_fcp_builder_then_remeasures_same_resource(
             _assessment(PressureLevel.WARNING, 15 * 1024**3),
         ],
     )
-    removed: list[str] = []
+    stopped: list[tuple[str, bool]] = []
     monkeypatch.setattr(host_build, "builder_name", lambda _root: "fcp-build-test")
     monkeypatch.setattr(
         host_build,
-        "_remove_builder",
-        lambda _root, name, _env: removed.append(name) or True,
+        "stop_build_writer",
+        lambda _root, name, _env, *, discard_cache=False: (
+            stopped.append((name, discard_cache)) or True
+        ),
     )
 
     host_build.preflight_disk(tmp_path, {})
 
     assert admission.paths == [backing, backing]
-    assert removed == ["fcp-build-test"]
+    assert stopped == [("fcp-build-test", True)]
 
 
 def test_build_refuses_if_docker_resource_stays_under_pressure(
@@ -113,7 +118,7 @@ def test_build_refuses_if_docker_resource_stays_under_pressure(
             _assessment(PressureLevel.CRITICAL, 10 * 1024**3),
         ],
     )
-    monkeypatch.setattr(host_build, "_remove_builder", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(host_build, "stop_build_writer", lambda *_args, **_kwargs: True)
 
     with pytest.raises(RuntimeError, match="insufficient_disk_for_update"):
         host_build.preflight_disk(tmp_path, {})
@@ -129,18 +134,18 @@ def test_build_refuses_when_docker_backing_resource_cannot_be_proven(
         backing=None,
         assessments=[_assessment(PressureLevel.NORMAL, 100 * 1024**3)],
     )
-    removed: list[bool] = []
+    stopped: list[bool] = []
     monkeypatch.setattr(
         host_build,
-        "_remove_builder",
-        lambda *_args, **_kwargs: removed.append(True) or True,
+        "stop_build_writer",
+        lambda *_args, **_kwargs: stopped.append(True) or True,
     )
 
     with pytest.raises(RuntimeError, match="docker_backing_resource_unproven"):
         host_build.preflight_disk(tmp_path, {})
 
     assert admission.paths == []
-    assert removed == []
+    assert stopped == []
 
 
 def test_controllable_builder_rejects_wrong_driver(monkeypatch, tmp_path: Path) -> None:
