@@ -47,7 +47,7 @@ def test_windows_launcher_enters_same_mutex_before_checkout_and_compose_reads() 
     handoff = start.index(
         'if "%FCP_HOST_MUTATION_LEASE_ACTIVE%"=="1" goto :host_mutation_lease_ready'
     )
-    leased_body = start.index(":host_mutation_lease_ready", handoff)
+    leased_body = start.index("\n:host_mutation_lease_ready\n", handoff)
     repair = start.index("call :repair_checkout_scaffolding", leased_body)
     resolve = start.index("call :resolve_runtime_state", leased_body)
     host_build = start.index("call :resolve_build_commit", leased_body)
