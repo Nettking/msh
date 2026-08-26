@@ -124,7 +124,7 @@ Required properties:
 
 ### B04 — one supported update/start contract and one host-mutation serialization boundary
 
-**State:** `OPEN`  
+**State:** `CLOSED`  
 **Severity:** release blocker
 
 Required properties:
@@ -135,6 +135,8 @@ Required properties:
 - launchers and host update agents must not mutate/read-build the same checkout concurrently; use one host-mutation lock/lease covering source mutation and image build identity;
 - the image label/runtime proof must identify exactly the source tree that was built; and
 - `source ahead / runtime old` remains an explicitly supported resumable state. Do not add source rollback for U03.
+
+Robustness closure: **B04 is automated-proven and closed.** PR #343 retired the unsafe `update.cmd` mutation path. PR #345 moved ordinary launcher builds onto the shared host build preflight/cache lifecycle and serialized full-platform update mutation/build work. PR #347 extended the same production-checkout host-mutation boundary to supervised native-recorder activation and held launcher leases across source proof, build and activation while keeping branch trials isolated. The supported image/runtime proof remains tied to `FCP_BUILD_COMMIT`, and source-current/runtime-old remains an `activation_required` retryable state rather than triggering source rollback. PR #350 retires the final independent recorder-only host mutators and pins their absence with a regression guard. Exact-head automated gates were green on the retirement candidate before this closure was recorded. No physical acceptance state or evidence claim changes with B04 closure.
 
 Local administrator authority is not being restricted. This blocker is about preventing supported commands from contradicting the product's own release/update guarantees.
 
