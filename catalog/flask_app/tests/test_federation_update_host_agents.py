@@ -199,8 +199,13 @@ def test_launchers_and_update_engines_bound_build_cache() -> None:
 
     for text in (windows_engine, windows_build):
         assert "builder" in text and "prune" in text and "keep-storage" in text
-    for text in (posix_engine, posix_build):
-        assert '"builder",' in text and '"prune",' in text and "keep-storage" in text
+    assert '"builder",' in posix_engine and '"prune",' in posix_engine
+    assert "keep-storage" in posix_engine
+    assert '"buildx",' in posix_build
+    assert '"prune",' in posix_build
+    assert '"--builder",' in posix_build
+    assert "keep-storage" in posix_build
+    assert '"docker", "builder", "prune"' not in posix_build
 
 
 def test_all_core_build_paths_agree_on_disk_figures() -> None:
