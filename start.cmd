@@ -62,21 +62,21 @@ rem Keep the human confirmation outside the host-mutation critical section so an
 rem unattended --fresh prompt cannot block unrelated update activity indefinitely.
 if "%FCP_FRESH_INSTALL%"=="1" if not "%FCP_FRESH_RESET_CONFIRMED%"=="1" (
     call :confirm_fresh_reset
-    if errorlevel 1 exit /b %ERRORLEVEL%
+    if errorlevel 1 exit /b 2
 )
 
 rem The outer invocation owns the one checkout mutation lease while an inner
 rem start.cmd performs source repair/proof, build, reset/resume, every Compose
 rem read, readiness, and update-agent startup. Existing update agents and the
 rem native recorder updater therefore cannot change the checkout mid-activation.
-if not "%FCP_HOST_MUTATION_LEASE_ACTIVE%"=="1" (
-    set "FCP_BUILD_COMMIT="
-    call :run_under_host_mutation_lease
-    set "FCP_LEASE_EXIT=%ERRORLEVEL%"
-    if not "%FCP_LEASE_EXIT%"=="0" pause
-    exit /b %FCP_LEASE_EXIT%
-)
+if "%FCP_HOST_MUTATION_LEASE_ACTIVE%"=="1" goto :host_mutation_lease_ready
+set "FCP_BUILD_COMMIT="
+call :run_under_host_mutation_lease
+set "FCP_LEASE_EXIT=%ERRORLEVEL%"
+if not "%FCP_LEASE_EXIT%"=="0" pause
+exit /b %FCP_LEASE_EXIT%
 
+:host_mutation_lease_ready
 rem A previous interrupted --fresh from an older build may have removed these
 rem four Git-tracked runtime-root scaffolding files. They are immutable checkout
 rem content, not FCP application state. Restore only missing canonical copies.
@@ -463,7 +463,7 @@ exit /b 1
 :reset_device_state
 if not "%FCP_FRESH_RESET_CONFIRMED%"=="1" (
     call :confirm_fresh_reset
-    if errorlevel 1 exit /b %ERRORLEVEL%
+    if errorlevel 1 exit /b 2
 )
 
 rem Build while the current runtime is still available. The parent launcher owns
