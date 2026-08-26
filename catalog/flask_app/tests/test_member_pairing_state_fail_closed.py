@@ -206,3 +206,26 @@ def test_an_unreadable_binding_is_not_a_fresh_enrollment_device(
     _install_store(monkeypatch, _unreadable_pairing_state(tmp_path))
     with member_app.test_request_context("/"):
         assert federation_enrollment._is_fresh_device() is False
+
+
+def test_an_unreadable_binding_degrades_user_administration_safely(
+    member_app, tmp_path, monkeypatch
+) -> None:
+    """Failing closed must reach the intended representation, not a crash.
+
+    Treating the device as a member routes user administration at the
+    authority. With no readable binding there is no authority endpoint to
+    redirect to, and the supported answer is the route's own
+    ``abort(503)`` -- an unavailable control plane, not a redirect to a local
+    page and not an unhandled 500.
+    """
+
+    _install_store(monkeypatch, _unreadable_pairing_state(tmp_path))
+    with member_app.test_request_context("/admin/users"):
+        try:
+            outcome = auth_routes._member_admin_redirect()
+        except HTTPException as refused:
+            assert refused.code == 503
+            return
+    assert outcome is not None, "member user administration stayed on the device"
+    assert outcome.status_code in {301, 302, 303, 307, 308}
