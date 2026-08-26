@@ -381,11 +381,19 @@ def _settle_build_client(process: subprocess.Popen[object]) -> bool:
 
     if process.poll() is not None:
         return True
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return process.poll() is not None
-    except OSError:
+    killpg = getattr(os, "killpg", None)
+    pid = getattr(process, "pid", None)
+    if callable(killpg) and isinstance(pid, int):
+        try:
+            killpg(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return process.poll() is not None
+        except OSError:
+            try:
+                process.terminate()
+            except OSError:
+                pass
+    else:
         try:
             process.terminate()
         except OSError:
@@ -393,11 +401,17 @@ def _settle_build_client(process: subprocess.Popen[object]) -> bool:
     try:
         process.wait(timeout=BUILD_CLIENT_SETTLE_SECONDS)
     except subprocess.TimeoutExpired:
-        try:
-            os.killpg(process.pid, signal.SIGKILL)
-        except ProcessLookupError:
-            pass
-        except OSError:
+        if callable(killpg) and isinstance(pid, int):
+            try:
+                killpg(pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            except OSError:
+                try:
+                    process.kill()
+                except OSError:
+                    pass
+        else:
             try:
                 process.kill()
             except OSError:
@@ -508,8 +522,12 @@ def controlled_core_build(
         time.sleep(poll_seconds)
 
     if returncode != 0:
-        if not stop_build_writer(root, name, env):
+        prune_ok = prune_build_cache(root, env, name=name)
+        writer_stopped = stop_build_writer(root, name, env)
+        if not writer_stopped:
             raise RuntimeError("build_writer_stop_unverified")
+        if not prune_ok:
+            raise RuntimeError("build_failed_and_cache_prune_failed")
         raise RuntimeError("core_image_build_failed")
     if not prune_build_cache(root, env, name=name):
         if not stop_build_writer(root, name, env):

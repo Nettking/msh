@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -25,6 +26,7 @@ def _engine(events: list[str], *, fail_before_prune: bool = False):
     engine = SimpleNamespace()
     engine.REQUEST_SCHEMA = "fcp.host-update-request.v1"
     engine.OID_RE = re.compile(r"^[0-9a-f]{40}$")
+    engine.subprocess = subprocess
 
     def preflight(_root, _env):
         events.append("legacy-preflight")
