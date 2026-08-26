@@ -1,9 +1,9 @@
 """Host-owned build lifecycle shared by supported POSIX start/update paths.
 
-This module deliberately owns only the checkout/build critical section. Runtime
-activation remains the responsibility of the launcher or host update agent.
-The serialized update runner calls ``host_build.host_mutation_lock(root)`` while
-this module's launcher path enters the same local ``host_mutation_lock`` below.
+This module owns the exact-source proof, build resource policy and cache
+lifecycle. A normal standalone invocation acquires the checkout mutation lock
+itself. The supported launcher may instead call it while its parent lease
+already owns that same boundary across the wider activation transaction.
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ OID_RE = re.compile(r"^[0-9a-f]{40}$")
 UPDATE_REQUIRED_FREE_BYTES = 10 * 1024**3
 BUILD_CACHE_KEEP_BYTES = 8 * 1024**3
 HOST_MUTATION_LOCK_TIMEOUT_SECONDS = 30.0
+HOST_MUTATION_LEASE_ENV = "FCP_HOST_MUTATION_LEASE_ACTIVE"
 
 
 def _run_git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -198,9 +199,18 @@ def build_core_images(
     *,
     expected_commit: str | None = None,
     lock_timeout_seconds: float = HOST_MUTATION_LOCK_TIMEOUT_SECONDS,
+    lease_already_held: bool = False,
 ) -> str:
     root = root.resolve()
     build_env = os.environ.copy() if env is None else dict(env)
+    if lease_already_held:
+        if build_env.get(HOST_MUTATION_LEASE_ENV) != "1":
+            raise RuntimeError("host_mutation_lease_missing")
+        return build_core_images_locked(
+            root,
+            build_env,
+            expected_commit=expected_commit,
+        )
     with host_mutation_lock(root, timeout_seconds=lock_timeout_seconds):
         return build_core_images_locked(
             root,
@@ -213,6 +223,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo-root", required=True)
     parser.add_argument("--expected-commit")
+    parser.add_argument("--lease-already-held", action="store_true")
     parser.add_argument(
         "--lock-timeout-seconds",
         type=float,
@@ -224,6 +235,7 @@ def main() -> int:
             Path(args.repo_root),
             expected_commit=args.expected_commit,
             lock_timeout_seconds=args.lock_timeout_seconds,
+            lease_already_held=args.lease_already_held,
         )
     except (RuntimeError, ValueError) as exc:
         print(f"FCP host build refused: {exc}", file=sys.stderr)

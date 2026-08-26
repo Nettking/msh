@@ -58,6 +58,25 @@ if errorlevel 1 (
     exit /b 1
 )
 
+rem Keep the human confirmation outside the host-mutation critical section so an
+rem unattended --fresh prompt cannot block unrelated update activity indefinitely.
+if "%FCP_FRESH_INSTALL%"=="1" if not "%FCP_FRESH_RESET_CONFIRMED%"=="1" (
+    call :confirm_fresh_reset
+    if errorlevel 1 exit /b 2
+)
+
+rem The outer invocation owns the one checkout mutation lease while an inner
+rem start.cmd performs source repair/proof, build, reset/resume, every Compose
+rem read, readiness, and update-agent startup. Existing update agents and the
+rem native recorder updater therefore cannot change the checkout mid-activation.
+if "%FCP_HOST_MUTATION_LEASE_ACTIVE%"=="1" goto :host_mutation_lease_ready
+set "FCP_BUILD_COMMIT="
+call :run_under_host_mutation_lease
+set "FCP_LEASE_EXIT=%ERRORLEVEL%"
+if not "%FCP_LEASE_EXIT%"=="0" pause
+exit /b %FCP_LEASE_EXIT%
+
+:host_mutation_lease_ready
 rem A previous interrupted --fresh from an older build may have removed these
 rem four Git-tracked runtime-root scaffolding files. They are immutable checkout
 rem content, not FCP application state. Restore only missing canonical copies.
@@ -65,7 +84,7 @@ call :repair_checkout_scaffolding
 if errorlevel 1 (
     echo.
     echo FCP could not restore immutable checkout scaffolding safely.
-    pause
+    call :maybe_pause
     exit /b 1
 )
 
@@ -73,7 +92,7 @@ call :resolve_runtime_state
 if errorlevel 1 (
     echo.
     echo FCP could not resolve its existing runtime state safely.
-    pause
+    call :maybe_pause
     exit /b 1
 )
 
@@ -86,7 +105,7 @@ if "%FCP_FRESH_INSTALL%"=="1" (
     if errorlevel 1 (
         echo.
         echo Fresh reset completed, but immutable checkout scaffolding could not be restored.
-        pause
+        call :maybe_pause
         exit /b 1
     )
 )
@@ -96,7 +115,7 @@ if not defined FCP_BUILD_COMMIT (
     if errorlevel 1 (
         echo.
         echo FCP core images could not be built through the serialized host lifecycle.
-        pause
+        call :maybe_pause
         exit /b 1
     )
 )
@@ -109,7 +128,7 @@ docker compose up -d relay recorder
 if errorlevel 1 (
     echo.
     echo Required FCP background services could not be started. Review the Docker error above.
-    pause
+    call :maybe_pause
     exit /b 1
 )
 
@@ -123,7 +142,7 @@ docker compose up -d flask
 if errorlevel 1 (
     echo.
     echo The FCP webapp could not be started. Review the Docker error above.
-    pause
+    call :maybe_pause
     exit /b 1
 )
 
@@ -157,7 +176,7 @@ for /f "usebackq delims=" %%P in (`powershell -NoProfile -Command "$lines = @(do
 if not defined FCP_WEB_PORT_RESOLVED (
     echo Could not determine the published Flask port.
     docker compose ps flask
-    pause
+    call :maybe_pause
     exit /b 1
 )
 set "FCP_WEB_CLIENT_HOST=%FCP_WEB_BIND%"
@@ -180,7 +199,7 @@ if errorlevel 1 (
     echo.
     echo Recent Federation relay log:
     docker compose logs --tail 40 relay
-    pause
+    call :maybe_pause
     exit /b 1
 )
 
@@ -214,14 +233,14 @@ echo First-time onboarding is required on this machine.
 goto :resume_complete
 
 :resume_complete
-rem All launcher Compose reads for this activation are complete before the update
-rem agent is allowed to mutate the checkout. This keeps runtime configuration on
-rem the same exact candidate that produced the verified core images.
+rem The outer launcher still owns the host-mutation lease here. The new agent is
+rem started only after every source-dependent Compose/readiness read is complete,
+rem and its process does not inherit the internal lease marker.
 call :start_update_agent
 if errorlevel 1 (
     echo.
     echo The FCP host update agent could not be started safely.
-    pause
+    call :maybe_pause
     exit /b 1
 )
 
@@ -255,6 +274,45 @@ if /I "%FCP_SUPPRESS_BROWSER%"=="1" (
 )
 exit /b 0
 
+:confirm_fresh_reset
+echo.
+echo FRESH DEVICE INSTALL
+echo This permanently removes this checkout's mutable FCP application state:
+echo   - human administrators, passwords, authentication secrets, and login sessions
+echo   - FCP device identity and keys
+echo   - Federation membership, trust, pairing, discovery, onboarding, and authority state
+echo   - capability, contribution, benchmark, provider, Activity, and job state
+echo   - source configuration and recorder configuration, checkpoints, status, and runtime state
+echo   - analyses, results, digital-twin projections, and retained legacy setup state
+echo.
+echo It preserves the machine recording corpus and its integrity metadata.
+echo Docker images, downloaded model volumes, source code, and deployment settings are not application state and are not reset.
+echo.
+set "FCP_RESET_CONFIRM="
+set /p "FCP_RESET_CONFIRM=Type RESET to continue: "
+if /I not "%FCP_RESET_CONFIRM%"=="RESET" (
+    echo Fresh install cancelled. No state was removed.
+    exit /b 2
+)
+set "FCP_FRESH_RESET_CONFIRMED=1"
+exit /b 0
+
+:run_under_host_mutation_lease
+if not exist "%~dp0scripts\windows\fcp_host_activation_lease.ps1" (
+    echo FCP host activation lease helper is missing.
+    exit /b 1
+)
+set "FCP_LEASE_MODE=normal"
+if "%FCP_FRESH_INSTALL%"=="1" set "FCP_LEASE_MODE=fresh"
+if "%FCP_RESUME_EXISTING%"=="1" set "FCP_LEASE_MODE=resume"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_host_activation_lease.ps1" -RepoRoot "%~dp0" -Mode "%FCP_LEASE_MODE%"
+exit /b %ERRORLEVEL%
+
+:maybe_pause
+if "%FCP_HOST_MUTATION_LEASE_ACTIVE%"=="1" exit /b 0
+pause
+exit /b 0
+
 :repair_checkout_scaffolding
 for %%F in ("data/.gitkeep" "data/README.md" "results/.gitkeep" "results/README.md") do (
     if not exist "%~dp0%%~F" (
@@ -276,7 +334,9 @@ exit /b 0
 if not exist "%~dp0scripts\windows\fcp_host_build.ps1" exit /b 1
 set "FCP_BUILD_RESULT=%TEMP%\fcp-host-build-%RANDOM%-%RANDOM%.txt"
 if exist "%FCP_BUILD_RESULT%" del /q "%FCP_BUILD_RESULT%" >nul 2>&1
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_host_build.ps1" -RepoRoot "%~dp0" -OutputFile "%FCP_BUILD_RESULT%"
+set "FCP_BUILD_LEASE_ARG="
+if "%FCP_HOST_MUTATION_LEASE_ACTIVE%"=="1" set "FCP_BUILD_LEASE_ARG=-LeaseAlreadyHeld"
+powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_host_build.ps1" -RepoRoot "%~dp0" -OutputFile "%FCP_BUILD_RESULT%" %FCP_BUILD_LEASE_ARG%
 set "FCP_BUILD_EXIT=%ERRORLEVEL%"
 if not "%FCP_BUILD_EXIT%"=="0" (
     if exist "%FCP_BUILD_RESULT%" del /q "%FCP_BUILD_RESULT%" >nul 2>&1
@@ -304,8 +364,17 @@ exit /b 0
 if not exist "%~dp0scripts\windows\fcp_update_agent.ps1" exit /b 1
 where powershell >nul 2>&1
 if errorlevel 1 exit /b 1
+set "FCP_LEASE_ACTIVE_SAVED=%FCP_HOST_MUTATION_LEASE_ACTIVE%"
+set "FCP_LEASE_OWNER_SAVED=%FCP_HOST_MUTATION_LEASE_OWNER_PID%"
+set "FCP_HOST_MUTATION_LEASE_ACTIVE="
+set "FCP_HOST_MUTATION_LEASE_OWNER_PID="
 start "FCP Update Agent" /b powershell -NoProfile -WindowStyle Hidden -ExecutionPolicy Bypass -File "%~dp0scripts\windows\fcp_update_agent.ps1" -RepoRoot "%~dp0" -DataDirectory "%FCP_DATA_DIR%" >nul 2>&1
-if errorlevel 1 exit /b 1
+set "FCP_AGENT_START_EXIT=%ERRORLEVEL%"
+set "FCP_HOST_MUTATION_LEASE_ACTIVE=%FCP_LEASE_ACTIVE_SAVED%"
+set "FCP_HOST_MUTATION_LEASE_OWNER_PID=%FCP_LEASE_OWNER_SAVED%"
+set "FCP_LEASE_ACTIVE_SAVED="
+set "FCP_LEASE_OWNER_SAVED="
+if not "%FCP_AGENT_START_EXIT%"=="0" exit /b %FCP_AGENT_START_EXIT%
 exit /b 0
 
 :resolve_runtime_state
@@ -392,34 +461,19 @@ if "%FCP_MODEL_PULL_EXIT%"=="2" (
 exit /b 1
 
 :reset_device_state
-echo.
-echo FRESH DEVICE INSTALL
-echo This permanently removes this checkout's mutable FCP application state:
-echo   - human administrators, passwords, authentication secrets, and login sessions
-echo   - FCP device identity and keys
-echo   - Federation membership, trust, pairing, discovery, onboarding, and authority state
-echo   - capability, contribution, benchmark, provider, Activity, and job state
-echo   - source configuration and recorder configuration, checkpoints, status, and runtime state
-echo   - analyses, results, digital-twin projections, and retained legacy setup state
-echo.
-echo It preserves the machine recording corpus and its integrity metadata.
-echo Docker images, downloaded model volumes, source code, and deployment settings are not application state and are not reset.
-echo.
-set "FCP_RESET_CONFIRM="
-set /p "FCP_RESET_CONFIRM=Type RESET to continue: "
-if /I not "%FCP_RESET_CONFIRM%"=="RESET" (
-    echo Fresh install cancelled. No state was removed.
-    exit /b 2
+if not "%FCP_FRESH_RESET_CONFIRMED%"=="1" (
+    call :confirm_fresh_reset
+    if errorlevel 1 exit /b 2
 )
 
-rem Build while the current runtime is still available. The host-build helper
-rem owns the checkout lock, disk preflight, exact source identity and cache
-rem lifecycle. The reset consumes that verified image without a second build.
+rem Build while the current runtime is still available. The parent launcher owns
+rem the host-mutation lease across this build, reset, and later activation. The
+rem build helper therefore reuses that lease rather than reacquiring the mutex.
 if not defined FCP_BUILD_COMMIT (
     call :resolve_build_commit
     if errorlevel 1 (
         echo FCP core images could not be built safely. No application state was removed.
-        pause
+        call :maybe_pause
         exit /b 1
     )
 )
@@ -429,7 +483,7 @@ echo Stopping FCP before resetting mutable application state...
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\windows\stop_fcp_for_fresh_reset.ps1"
 if errorlevel 1 (
     echo FCP containers could not be stopped safely. Nothing else was removed.
-    pause
+    call :maybe_pause
     exit /b 1
 )
 
@@ -439,7 +493,7 @@ if errorlevel 1 (
     echo.
     echo Fresh factory reset did not complete. Review the specific path or recording-integrity error above.
     echo No FCP service will be started from an unverified reset.
-    pause
+    call :maybe_pause
     exit /b 1
 )
 
@@ -449,7 +503,7 @@ if errorlevel 1 (
     echo.
     echo Fresh factory reset could not be verified.
     echo No FCP service will be started. Review the specific verification failure above.
-    pause
+    call :maybe_pause
     exit /b 1
 )
 

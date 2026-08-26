@@ -59,17 +59,7 @@ docker compose version >/dev/null 2>&1 || { echo "Docker Compose v2 was not foun
 : "${FCP_AI_MODEL:=llama3.2:3b}"
 export FCP_WEB_BIND FCP_RELAY_BIND FCP_WEB_PORT COMPOSE_PROJECT_NAME FCP_DATA_DIR FCP_RESULTS_DIR FCP_AI_MODEL
 
-build_core_images() {
-  echo "Building FCP core services through the serialized host build lifecycle ..."
-  if ! FCP_BUILD_COMMIT=$(python3 -m catalog.federation.host_build --repo-root "$ROOT"); then
-    echo "FCP images could not be built safely. Review the host-build error above." >&2
-    return 1
-  fi
-  export FCP_BUILD_COMMIT
-  echo "Built FCP core images from $FCP_BUILD_COMMIT."
-}
-
-if [ "$MODE" = fresh ]; then
+confirm_fresh_reset() {
   echo
   echo "FRESH DEVICE INSTALL"
   echo "This permanently removes this checkout's mutable FCP application state:"
@@ -88,12 +78,62 @@ if [ "$MODE" = fresh ]; then
   FCP_RESET_CONFIRM=$(printf '%s' "$FCP_RESET_CONFIRM" | tr '[:lower:]' '[:upper:]')
   if [ "$FCP_RESET_CONFIRM" != RESET ]; then
     echo "Fresh install cancelled. No state was removed."
-    exit 2
+    return 2
   fi
+  FCP_FRESH_RESET_CONFIRMED=1
+  export FCP_FRESH_RESET_CONFIRMED
+}
 
-  # Build while the current runtime is still available. The build primitive
-  # owns the checkout lock, disk preflight and cache lifecycle; the reset then
-  # consumes that verified image without starting another implicit build.
+build_core_images() {
+  echo "Building FCP core services through the serialized host build lifecycle ..."
+  if [ "${FCP_HOST_MUTATION_LEASE_ACTIVE:-}" = "1" ]; then
+    if ! FCP_BUILD_COMMIT=$(python3 -m catalog.federation.host_build \
+      --repo-root "$ROOT" --lease-already-held); then
+      echo "FCP images could not be built safely. Review the host-build error above." >&2
+      return 1
+    fi
+  else
+    if ! FCP_BUILD_COMMIT=$(python3 -m catalog.federation.host_build --repo-root "$ROOT"); then
+      echo "FCP images could not be built safely. Review the host-build error above." >&2
+      return 1
+    fi
+  fi
+  export FCP_BUILD_COMMIT
+  echo "Built FCP core images from $FCP_BUILD_COMMIT."
+}
+
+# Keep the human confirmation outside the host-mutation critical section so an
+# unattended --fresh prompt cannot block unrelated update activity indefinitely.
+if [ "$MODE" = fresh ] && [ "${FCP_FRESH_RESET_CONFIRMED:-}" != "1" ]; then
+  confirm_fresh_reset || exit $?
+fi
+
+# The outer launcher becomes a tiny lease owner. The child reruns this same
+# script with a marker inherited only from the lease process; from that point
+# source proof/build, reset/resume, every Compose read, readiness, and updater
+# startup all happen before the one checkout mutation boundary is released.
+if [ "${FCP_HOST_MUTATION_LEASE_ACTIVE:-}" != "1" ]; then
+  unset FCP_BUILD_COMMIT
+  case "$MODE" in
+    fresh)
+      exec python3 -m catalog.federation.host_mutation \
+        --repo-root "$ROOT" -- sh "$ROOT/start.sh" --fresh
+      ;;
+    resume)
+      exec python3 -m catalog.federation.host_mutation \
+        --repo-root "$ROOT" -- sh "$ROOT/start.sh" --resume
+      ;;
+    *)
+      exec python3 -m catalog.federation.host_mutation \
+        --repo-root "$ROOT" -- sh "$ROOT/start.sh"
+      ;;
+  esac
+fi
+
+if [ "$MODE" = fresh ]; then
+  # Build while the current runtime is still available. The parent launcher
+  # owns the checkout lease across this build, reset, and later activation; the
+  # build primitive therefore reuses that lease rather than reacquiring it.
   build_core_images
 
   echo
@@ -183,9 +223,10 @@ done
 
 docker compose ps relay ollama flask recorder
 
-# Do not allow the update agent to mutate the checkout until every launcher
-# Compose read for this activation has completed. This keeps the activated
-# runtime configuration on the same exact candidate that produced the images.
+# The update agent must not inherit the launcher's lease marker: the outer lease
+# process still owns the real lock for the few remaining lines, and later apply
+# work must acquire that lock independently after this launcher returns.
+FCP_HOST_MUTATION_LEASE_ACTIVE= FCP_HOST_MUTATION_LEASE_OWNER_PID= \
 nohup python3 "$ROOT/scripts/posix/fcp_update_agent.py" \
   --repo-root "$ROOT" \
   --data-directory "$FCP_DATA_DIR" \

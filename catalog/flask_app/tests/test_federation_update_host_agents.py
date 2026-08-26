@@ -95,6 +95,9 @@ def test_public_agents_delegate_to_serialized_runners() -> None:
     windows_build = (ROOT / "scripts/windows/fcp_host_build.ps1").read_text(
         encoding="utf-8"
     )
+    posix_build = (ROOT / "catalog/federation/host_build.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "fcp_update_agent_runner.ps1" in windows
     assert "fcp_update_agent_runner.py" in posix
@@ -103,9 +106,9 @@ def test_public_agents_delegate_to_serialized_runners() -> None:
     assert "Global\\FCPHostMutation-" in windows_runner
     assert "Global\\FCPHostMutation-" in windows_build
     assert "host_build.host_mutation_lock(root)" in posix_runner
-    assert "host_build.host_mutation_lock(root" in (
-        ROOT / "catalog/federation/host_build.py"
-    ).read_text(encoding="utf-8")
+    assert "with host_mutation_lock(root, timeout_seconds=lock_timeout_seconds):" in posix_build
+    assert "lease_already_held" in posix_build
+    assert "host_mutation_lease_missing" in posix_build
     assert "Invoke-PostBuildCachePrune" in windows_runner
     assert "build_phase_entered and not prune_called" in posix_runner
 
