@@ -55,4 +55,9 @@ jobs:
           catalog/flask_app/tests/test_tailscale_compose_project.py
       - name: Diff hygiene
         shell: bash
-        run: git diff --check "origin/${{ github.base_ref }}...HEAD"
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            git diff --check "origin/${{ github.base_ref }}...HEAD"
+          else
+            git diff --check "${{ github.event.before }}...HEAD"
+          fi
