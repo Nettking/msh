@@ -41,7 +41,6 @@ jobs:
           catalog/flask_app/tests/test_termux_federation_update_agent.py
           catalog/flask_app/tests/test_windows_migration_script.py
           catalog/flask_app/tests/test_windows_relay_volume_selector.py
-          scripts/posix/fcp_recorder_update_agent.py
           scripts/fcp_native_recorder_update_agent.py
           catalog/mtconnect_recorder/native_identity.py
           catalog/mtconnect_recorder/native_update.py
@@ -71,7 +70,7 @@ jobs:
         # BLE001/S110: host-agent failure boundaries deliberately collapse
         # unexpected local failures into bounded non-sensitive result records.
         # RUF100 follows from ignoring BLE001 on those explicit boundaries.
-        # EXE001: the POSIX recorder agent is invoked explicitly with Python;
+        # EXE001: the native recorder agent is invoked explicitly with Python;
         # GitHub's contents API does not preserve an executable mode on creation.
         run: >-
           python -m ruff check --ignore TRY004,BLE001,S110,RUF100,EXE001
@@ -88,7 +87,6 @@ jobs:
           catalog/flask_app/tests/test_termux_federation_update_agent.py
           catalog/flask_app/tests/test_windows_migration_script.py
           catalog/flask_app/tests/test_windows_relay_volume_selector.py
-          scripts/posix/fcp_recorder_update_agent.py
           scripts/fcp_native_recorder_update_agent.py
           catalog/mtconnect_recorder/native_identity.py
           catalog/mtconnect_recorder/native_update.py
@@ -108,7 +106,6 @@ jobs:
         run: |
           foreach ($script in @(
             'scripts/windows/fcp_update_agent.ps1',
-            'scripts/windows/fcp_recorder_update_agent.ps1',
             'scripts/windows/fcp_recorder_supervisor.ps1',
             'scripts/windows/start_tailscale_recorder.ps1',
             'scripts/windows/tests/fcp_recorder_supervisor_restart_smoke.ps1'
@@ -130,14 +127,6 @@ jobs:
           powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\fcp_update_agent.ps1 `
             -RepoRoot (Resolve-Path '.').Path `
             -DataDirectory $state `
-            -Once
-          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-          $recorderState = Join-Path $env:RUNNER_TEMP 'fcp-recorder-update-agent-smoke'
-          powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\windows\fcp_recorder_update_agent.ps1 `
-            -RepoRoot (Resolve-Path '.').Path `
-            -DataDirectory $recorderState `
-            -ComposeProjectName recorder-smoke `
             -Once
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
@@ -240,9 +229,4 @@ jobs:
           python scripts/posix/fcp_update_agent.py \
             --repo-root "$PWD" \
             --data-directory "$RUNNER_TEMP/fcp-update-agent-smoke" \
-            --once
-          python scripts/posix/fcp_recorder_update_agent.py \
-            --repo-root "$PWD" \
-            --data-directory "$RUNNER_TEMP/fcp-recorder-update-agent-smoke" \
-            --compose-project-name recorder-smoke \
             --once
