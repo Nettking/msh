@@ -1,23 +1,28 @@
 """Checkout-scoped host mutation serialization shared by supported actors.
 
-The normal Windows launcher owns this mutex from PowerShell while it proves and
-builds one exact source tree. Native Python actors cannot inherit that mutex, so
-this module reproduces the *same named object* for source mutation performed by
-the supervised standalone recorder. POSIX callers delegate to the existing
-``host_build.host_mutation_lock`` and therefore share its Git lock file exactly.
+The normal launchers and host update agents must agree on one checkout mutation
+boundary. Windows actors share the named ``Global\FCPHostMutation-...`` mutex;
+POSIX actors share the Git-scoped ``fcp-host-mutation.lock`` file from
+``host_build``. The launcher entrypoint below can hold that same boundary while
+a child launcher performs build, Compose activation, and readiness checks.
 """
 
 from __future__ import annotations
 
+import argparse
 import ctypes
 import hashlib
 import ntpath
 import os
-from collections.abc import Iterator
+import subprocess
+import sys
+from collections.abc import Iterator, Sequence
 from contextlib import contextmanager
 from pathlib import Path
 
 HOST_MUTATION_LOCK_TIMEOUT_SECONDS = 30.0
+HOST_MUTATION_LEASE_ENV = "FCP_HOST_MUTATION_LEASE_ACTIVE"
+HOST_MUTATION_LEASE_OWNER_ENV = "FCP_HOST_MUTATION_LEASE_OWNER_PID"
 _WINDOWS_MUTEX_PREFIX = "Global\\FCPHostMutation-"
 _WAIT_OBJECT_0 = 0x00000000
 _WAIT_ABANDONED = 0x00000080
@@ -125,3 +130,56 @@ def host_mutation_lock(
         yield
     finally:
         context.__exit__(None, None, None)
+
+
+def run_command_under_host_mutation_lock(
+    root: Path,
+    command: Sequence[str],
+    *,
+    timeout_seconds: float = HOST_MUTATION_LOCK_TIMEOUT_SECONDS,
+) -> int:
+    """Run one supported launcher child while this process owns the host lease."""
+
+    if not command:
+        raise ValueError("host_mutation_command_required")
+    root = root.resolve()
+    environment = os.environ.copy()
+    environment[HOST_MUTATION_LEASE_ENV] = "1"
+    environment[HOST_MUTATION_LEASE_OWNER_ENV] = str(os.getpid())
+    with host_mutation_lock(root, timeout_seconds=timeout_seconds):
+        completed = subprocess.run(
+            list(command),
+            cwd=root,
+            env=environment,
+            shell=False,
+            check=False,
+        )
+    return int(completed.returncode)
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo-root", required=True)
+    parser.add_argument(
+        "--lock-timeout-seconds",
+        type=float,
+        default=HOST_MUTATION_LOCK_TIMEOUT_SECONDS,
+    )
+    parser.add_argument("command", nargs=argparse.REMAINDER)
+    args = parser.parse_args()
+    command = list(args.command)
+    if command and command[0] == "--":
+        command = command[1:]
+    try:
+        return run_command_under_host_mutation_lock(
+            Path(args.repo_root),
+            command,
+            timeout_seconds=args.lock_timeout_seconds,
+        )
+    except (HostMutationLockError, RuntimeError, ValueError, OSError) as exc:
+        print(f"FCP host mutation lease refused: {exc}", file=sys.stderr)
+        return 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
