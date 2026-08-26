@@ -31,6 +31,7 @@ _FIXED_MODE = 0o644
 _SAFE_MEMBER_RE = re.compile(r"^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$")
 _COPY_CHUNK_BYTES = 1024 * 1024
 _SOURCE_STABILITY_ATTEMPTS = 8
+_STABLE_MISMATCH_CONFIRMATIONS = 2
 
 
 class SliceArchiveComparison(Enum):
@@ -93,22 +94,27 @@ def _validated_members(
     )
 
 
-def validate_slice_members(files: Sequence[Path], root: Path) -> tuple[str, ...]:
-    """Validate declared slice inputs without reading a single content byte."""
-
-    return tuple(name for name, _path in _validated_members(files, root))
-
-
 def _source_changed(before: os.stat_result, handle, path: Path) -> bool:
-    """Return whether an open source or its path changed during comparison."""
+    """Return whether an open source changed or its path now names other bytes.
+
+    Full ``stat`` identity is comparable before/after on the same open handle.
+    It is not portable to compare handle identity with ``Path.stat()`` on
+    Windows, where inode/ctime semantics differ. For the path re-check, size and
+    mtime are the conservative portable signals; byte mismatches still remain a
+    fail-closed mismatch when those signals cannot distinguish a replacement.
+    """
 
     try:
         after = os.fstat(handle.fileno())
         current = path.stat()
     except OSError:
         return True
-    signature = _stat_signature(before)
-    return signature != _stat_signature(after) or signature != _stat_signature(current)
+    if _stat_signature(before) != _stat_signature(after):
+        return True
+    return (int(after.st_size), int(after.st_mtime_ns)) != (
+        int(current.st_size),
+        int(current.st_mtime_ns),
+    )
 
 
 def _compare_slice_archive_once(
@@ -134,6 +140,8 @@ def _compare_slice_archive_once(
             iterator = iter(archive)
             for expected_name, expected_path in members:
                 info = next(iterator, None)
+                if not expected_path.is_file():
+                    return SliceArchiveComparison.MISMATCH
                 try:
                     expected = expected_path.open("rb")
                 except OSError:
@@ -206,13 +214,15 @@ def compare_slice_archive(
 ) -> SliceArchiveComparison:
     """Compare an archive with live source using a finite stability window.
 
-    A stable mismatch is authoritative evidence that the archive is not the
-    declared source. A source that changes while comparison is in progress is
-    neither a match nor corruption, so comparison is retried. If the source
-    never stabilizes within the same finite bound used by packing, fail closed
-    with ``analysis-slice-source-changing`` instead of misreporting corruption.
+    A mutation observed while reading is retried. A mismatch is also confirmed
+    on a second consecutive observation before it is treated as stable. That
+    confirmation matters on filesystems whose timestamp/inode resolution cannot
+    always expose a same-length rewrite in one sampling interval. A source that
+    never settles within the finite packing bound fails with a distinct source
+    instability error rather than being misreported as registered corruption.
     """
 
+    stable_mismatches = 0
     for _attempt in range(_SOURCE_STABILITY_ATTEMPTS):
         comparison = _compare_slice_archive_once(
             archive_path,
@@ -220,8 +230,14 @@ def compare_slice_archive(
             root=root,
             max_bytes=max_bytes,
         )
-        if comparison is not SliceArchiveComparison.SOURCE_CHANGED:
+        if comparison is SliceArchiveComparison.MATCH:
             return comparison
+        if comparison is SliceArchiveComparison.MISMATCH:
+            stable_mismatches += 1
+            if stable_mismatches >= _STABLE_MISMATCH_CONFIRMATIONS:
+                return comparison
+            continue
+        stable_mismatches = 0
     raise FederationValidationError(
         "analysis-slice-source-changing",
         "files",
@@ -442,6 +458,5 @@ __all__ = [
     "compare_slice_archive",
     "extract_slice_archive",
     "slice_archive_matches",
-    "validate_slice_members",
     "write_slice_archive",
 ]
