@@ -96,8 +96,7 @@ def test_low_disk_preflight_prune_keeps_lock_until_post_build_prune(
         "preflight",
         "preflight-prune",  # host cleanup: lock remains held
         "build",
-        "prune",  # post-build engine cleanup: source can now be re-proved
-        "reproof",
+        "reproof",  # controlled builder already owned post-build cache cleanup
         "lock-exit",
         "activation",
     ]
