@@ -16,17 +16,21 @@ def test_windows_host_build_owns_a_checkout_scoped_buildkit_writer() -> None:
     assert "'fcp-build-' + (Get-PathHash $RepoRoot)" in text
     assert "'--driver', 'docker-container'" in text
     assert "'--driver-opt', 'default-load=true'" in text
+    assert "'compose', 'build', '--help'" in text
+    assert "controllable_builder_unavailable" in text
     assert "'compose', 'build'" in text
     assert "'--builder', $name" in text
     assert "'relay', 'flask', 'recorder'" in text
     assert "& docker compose build relay flask recorder" not in text
 
 
-def test_windows_active_build_stops_and_proves_writer_at_pressure() -> None:
+def test_windows_active_build_stops_client_tree_and_proves_writer_at_pressure() -> None:
     text = _read("scripts/windows/fcp_host_build.ps1")
+    stop_client = text[text.index("function Stop-BuildClient") : text.index("function Invoke-ControlledCoreBuild")]
     build = text[text.index("function Invoke-ControlledCoreBuild") : text.index("function Assert-CoreImageCommits")]
 
     assert "$BuildPollMilliseconds = 250" in text
+    assert "taskkill.exe /PID $Process.Id /T /F" in stop_client
     assert "while (-not $process.HasExited)" in build
     assert "Get-FcpResourceFreeBytes -BackingPath $BackingPath" in build
     assert "$level -in @('pressure', 'critical')" in build
@@ -47,7 +51,7 @@ def test_windows_build_cache_is_scoped_and_writer_is_stopped_after_success() -> 
     assert "'--builder', $name" in prune
     assert "--keep-storage=$BuildCacheKeepBytes" in prune
     assert "'builder', 'prune'" not in prune
-    assert "Stop-FcpBuildWriter $name" in prune
+    assert prune.count("Stop-FcpBuildWriter $name") >= 2
     assert build.rindex("Stop-FcpBuildWriter $name") > build.index("Invoke-BuildCachePrune")
 
 
@@ -62,6 +66,15 @@ def test_windows_build_requires_exact_image_identity_before_success() -> None:
     assert text.index("Invoke-ControlledCoreBuild $backingPath") < text.index(
         "Assert-CoreImageCommits $commit"
     ) < text.index("Write-AtomicText $OutputFile $commit")
+
+
+def test_windows_proxy_real_docker_override_is_private_to_controlled_build() -> None:
+    text = _read("scripts/windows/fcp_host_build.ps1")
+    resolve = text[text.index("function Resolve-DockerExecutable") : text.index("function Invoke-DockerResult")]
+
+    assert "$env:FCP_CONTROLLED_BUILD_ACTIVE -eq '1'" in resolve
+    assert "$env:FCP_REAL_DOCKER_EXE" in resolve
+    assert "Get-Command docker -CommandType Application" in resolve
 
 
 def test_windows_update_proxy_intercepts_only_fixed_build_shapes() -> None:
