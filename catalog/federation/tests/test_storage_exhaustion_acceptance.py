@@ -259,17 +259,26 @@ def test_an_unbudgeted_authority_stops_at_the_floor_with_the_volume_intact(
     _assert_local_capture_continues(tmp_path / "recorder-data")
 
 
-def test_the_floor_holds_even_with_budget_remaining(tmp_path: Path) -> None:
+def test_the_floor_holds_even_with_budget_remaining(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A budget larger than the disk must not override the host's headroom."""
 
     root = tmp_path / "authority"
     allocation = StorageAllocation(root, budget_bytes=256 * 1024, floor_bytes=0)
     provider = FilesystemBatchStorageProvider(root, allocation=allocation)
     provider.ingest(_request(0))
-    assert allocation.snapshot().remaining_bytes > 0
+    snapshot = allocation.snapshot()
+    assert snapshot.remaining_bytes > 0
 
-    # The volume is now declared to be at its floor while budget remains.
-    allocation.floor_bytes = allocation.snapshot().volume_free_bytes + 1
+    # This test isolates precedence between the two allocation bounds. The
+    # adjacent acceptance test exercises the floor against live ``disk_usage``;
+    # here a changing shared-host free-space reading would make the +1-byte
+    # boundary nondeterministic and can hide the condition this test asserts.
+    stable_free = snapshot.volume_free_bytes
+    monkeypatch.setattr(allocation, "_volume_free", lambda: stable_free)
+    allocation.floor_bytes = stable_free + 1
 
     with pytest.raises(FederationValidationError) as caught:
         provider.ingest(_request(1))
