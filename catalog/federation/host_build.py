@@ -1,14 +1,16 @@
 """Host-owned build lifecycle shared by supported POSIX start/update paths.
 
-This module owns the exact-source proof, Docker backing-resource admission and
-cache lifecycle. A normal standalone invocation acquires the checkout mutation lock
-itself. The supported launcher may instead call it while its parent lease
-already owns that same boundary across the wider activation transaction.
+This module owns exact-source proof, Docker backing-resource admission, the
+pressure-aware BuildKit lifecycle, and cache cleanup. A normal standalone
+invocation acquires the checkout mutation lock itself. Supported launchers or
+update runners may call it while their parent lease already owns that same
+boundary across the wider activation transaction.
 """
 
 from __future__ import annotations
 
 import argparse
+import hashlib
 import os
 import re
 import subprocess
@@ -33,6 +35,12 @@ UPDATE_REQUIRED_FREE_BYTES = 10 * 1024**3
 BUILD_CACHE_KEEP_BYTES = 8 * 1024**3
 HOST_MUTATION_LOCK_TIMEOUT_SECONDS = 30.0
 HOST_MUTATION_LEASE_ENV = "FCP_HOST_MUTATION_LEASE_ACTIVE"
+BUILD_TIMEOUT_SECONDS = 900.0
+BUILD_PRESSURE_POLL_SECONDS = 0.25
+BUILD_CLIENT_SETTLE_SECONDS = 10.0
+BUILDER_STOP_TIMEOUT_SECONDS = 30.0
+BUILDER_PREFIX = "fcp-build-"
+CORE_BUILD_SERVICES = ("relay", "flask", "recorder")
 
 
 def _run_git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -121,46 +129,326 @@ def docker_resource_assessment(
     return backing_path, admission.assessment(backing_path)
 
 
-def prune_build_cache(root: Path, env: Mapping[str, str]) -> bool:
+def builder_name(root: Path) -> str:
+    """Return a deterministic builder identity scoped to this checkout."""
+
+    digest = hashlib.sha256(str(root.resolve()).encode("utf-8")).hexdigest()[:20]
+    return f"{BUILDER_PREFIX}{digest}"
+
+
+def _docker_run(
+    root: Path,
+    args: list[str],
+    *,
+    env: Mapping[str, str],
+    timeout: float = 120.0,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        args,
+        cwd=root,
+        env=dict(env),
+        shell=False,
+        check=False,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
+def _builder_inspection(
+    root: Path,
+    name: str,
+    env: Mapping[str, str],
+) -> subprocess.CompletedProcess[str]:
+    return _docker_run(
+        root,
+        ["docker", "buildx", "inspect", name],
+        env=env,
+        timeout=30.0,
+    )
+
+
+def ensure_controllable_builder(root: Path, env: Mapping[str, str]) -> str:
+    """Ensure the checkout has one independently stoppable BuildKit daemon.
+
+    FCP intentionally requires the docker-container driver. The default Docker
+    builder embeds BuildKit inside the Docker daemon, so stopping the CLI cannot
+    prove that build writes have ceased. New builders request ``default-load`` so
+    Compose retains its existing local-image behavior.
+    """
+
+    name = builder_name(root)
+    inspected = _builder_inspection(root, name, env)
+    if inspected.returncode == 0:
+        driver = next(
+            (
+                line.partition(":")[2].strip()
+                for line in inspected.stdout.splitlines()
+                if line.strip().startswith("Driver:")
+            ),
+            "",
+        )
+        if driver != "docker-container":
+            raise RuntimeError("controllable_builder_conflict")
+        return name
+
+    created = _docker_run(
+        root,
+        [
+            "docker",
+            "buildx",
+            "create",
+            "--name",
+            name,
+            "--driver",
+            "docker-container",
+            "--driver-opt",
+            "default-load=true",
+        ],
+        env=env,
+        timeout=60.0,
+    )
+    if created.returncode != 0:
+        raise RuntimeError("controllable_builder_unavailable")
+    inspected = _builder_inspection(root, name, env)
+    if inspected.returncode != 0 or "Driver:" not in inspected.stdout:
+        raise RuntimeError("controllable_builder_unavailable")
+    driver = next(
+        (
+            line.partition(":")[2].strip()
+            for line in inspected.stdout.splitlines()
+            if line.strip().startswith("Driver:")
+        ),
+        "",
+    )
+    if driver != "docker-container":
+        raise RuntimeError("controllable_builder_conflict")
+    return name
+
+
+def _builder_stopped(root: Path, name: str, env: Mapping[str, str]) -> bool:
+    inspected = _builder_inspection(root, name, env)
+    if inspected.returncode != 0:
+        # A removed builder cannot own a live BuildKit node.
+        return True
+    statuses = [
+        line.partition(":")[2].strip().casefold()
+        for line in inspected.stdout.splitlines()
+        if line.strip().startswith("Status:")
+    ]
+    return bool(statuses) and all(value not in {"running", "starting"} for value in statuses)
+
+
+def _remove_builder(root: Path, name: str, env: Mapping[str, str]) -> bool:
+    removed = _docker_run(
+        root,
+        ["docker", "buildx", "rm", "--force", "--timeout", "20s", name],
+        env=env,
+        timeout=30.0,
+    )
+    return removed.returncode == 0 and _builder_inspection(root, name, env).returncode != 0
+
+
+def stop_build_writer(
+    root: Path,
+    name: str,
+    env: Mapping[str, str],
+    *,
+    discard_cache: bool = False,
+) -> bool:
+    """Stop the FCP BuildKit daemon and positively verify quiescence."""
+
+    stopped = _docker_run(
+        root,
+        ["docker", "buildx", "stop", name],
+        env=env,
+        timeout=BUILDER_STOP_TIMEOUT_SECONDS,
+    )
+    if stopped.returncode == 0 and _builder_stopped(root, name, env):
+        if not discard_cache:
+            return True
+        # Under pressure, deleting FCP's own builder cache is a bounded cleanup.
+        # Failure to delete cache does not make a positively stopped writer live.
+        _remove_builder(root, name, env)
+        return True
+    return _remove_builder(root, name, env)
+
+
+def prune_build_cache(
+    root: Path,
+    env: Mapping[str, str],
+    *,
+    name: str | None = None,
+) -> bool:
+    """Bound only FCP-owned build cache, never unrelated host builder state."""
+
+    selected = name or builder_name(root)
+    inspected = _builder_inspection(root, selected, env)
+    if inspected.returncode != 0:
+        return True
     try:
-        subprocess.run(
+        completed = subprocess.run(
             [
                 "docker",
-                "builder",
+                "buildx",
                 "prune",
+                "--builder",
+                selected,
                 "--force",
                 f"--keep-storage={BUILD_CACHE_KEEP_BYTES}",
             ],
             cwd=root,
             env=dict(env),
             shell=False,
-            check=True,
+            check=False,
             timeout=300,
             stdout=sys.stderr,
             stderr=sys.stderr,
         )
     except (OSError, subprocess.SubprocessError):
         return False
-    return True
+    return completed.returncode == 0
 
 
 def preflight_disk(root: Path, env: Mapping[str, str]) -> None:
     """Admit a core build against Docker's proven host backing resource.
 
-    NORMAL/WARNING may start. PRESSURE/CRITICAL first get one bounded BuildKit
-    cleanup attempt, then the same backing resource is remeasured. An unproven
-    or still-pressured resource fails closed before ``docker compose build``.
+    NORMAL/WARNING may start. PRESSURE/CRITICAL first discard the checkout-scoped
+    FCP builder (which reclaims its cache without booting another writer), then
+    remeasure the same backing resource. An unproven or still-pressured resource
+    fails closed before a new BuildKit daemon starts.
     """
 
     admission = ProcessResourceAdmission()
     backing_path, before = docker_resource_assessment(root, env, controller=admission)
     if before.level < PressureLevel.PRESSURE:
         return
-    prune_build_cache(root, env)
+    _remove_builder(root, builder_name(root), env)
     after = admission.assessment(backing_path)
     if after.level < PressureLevel.PRESSURE:
         return
     raise RuntimeError("insufficient_disk_for_update")
+
+
+def _settle_build_client(process: subprocess.Popen[object]) -> None:
+    if process.poll() is not None:
+        return
+    process.terminate()
+    try:
+        process.wait(timeout=BUILD_CLIENT_SETTLE_SECONDS)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        try:
+            process.wait(timeout=5.0)
+        except subprocess.TimeoutExpired:
+            pass
+
+
+def _verify_core_image_commits(
+    root: Path,
+    env: Mapping[str, str],
+    expected_commit: str,
+) -> None:
+    """Require every local Compose core image to carry the exact source identity."""
+
+    for service in CORE_BUILD_SERVICES:
+        image = _docker_run(
+            root,
+            ["docker", "compose", "images", "-q", service],
+            env=env,
+            timeout=30.0,
+        )
+        image_id = image.stdout.strip().splitlines()[-1].strip() if image.returncode == 0 and image.stdout.strip() else ""
+        if not image_id:
+            raise RuntimeError("built_image_identity_unavailable")
+        label = _docker_run(
+            root,
+            [
+                "docker",
+                "image",
+                "inspect",
+                "--format",
+                '{{ index .Config.Labels "no.fcp.build_commit" }}',
+                image_id,
+            ],
+            env=env,
+            timeout=30.0,
+        )
+        if label.returncode != 0 or label.stdout.strip().lower() != expected_commit:
+            raise RuntimeError("built_image_identity_mismatch")
+
+
+def controlled_core_build(
+    root: Path,
+    env: Mapping[str, str],
+    *,
+    controller: ProcessResourceAdmission | None = None,
+    timeout_seconds: float = BUILD_TIMEOUT_SECONDS,
+    poll_seconds: float = BUILD_PRESSURE_POLL_SECONDS,
+) -> None:
+    """Run one unknown-size build and stop its writer before CRITICAL reserve use."""
+
+    if timeout_seconds <= 0 or poll_seconds <= 0:
+        raise ValueError("build timing bounds must be positive")
+    admission = controller or ProcessResourceAdmission()
+    backing_path, initial = docker_resource_assessment(root, env, controller=admission)
+    if initial.level >= PressureLevel.PRESSURE:
+        raise RuntimeError("insufficient_disk_for_update")
+    name = ensure_controllable_builder(root, env)
+    command = [
+        "docker",
+        "compose",
+        "build",
+        "--builder",
+        name,
+        *CORE_BUILD_SERVICES,
+    ]
+    try:
+        process = subprocess.Popen(
+            command,
+            cwd=root,
+            env=dict(env),
+            shell=False,
+            stdout=sys.stderr,
+            stderr=sys.stderr,
+        )
+    except OSError as exc:
+        raise RuntimeError("core_image_build_failed") from exc
+
+    deadline = time.monotonic() + timeout_seconds
+    while True:
+        returncode = process.poll()
+        if returncode is not None:
+            break
+        current = admission.assessment(backing_path)
+        if current.level >= PressureLevel.PRESSURE:
+            returncode = process.poll()
+            if returncode is not None:
+                break
+            _settle_build_client(process)
+            if not stop_build_writer(root, name, env, discard_cache=True):
+                raise RuntimeError("build_writer_stop_unverified")
+            raise RuntimeError("build_resource_pressure")
+        if time.monotonic() >= deadline:
+            returncode = process.poll()
+            if returncode is not None:
+                break
+            _settle_build_client(process)
+            if not stop_build_writer(root, name, env, discard_cache=True):
+                raise RuntimeError("build_writer_stop_unverified")
+            raise RuntimeError("core_image_build_timeout")
+        time.sleep(poll_seconds)
+
+    if returncode != 0:
+        if not stop_build_writer(root, name, env):
+            raise RuntimeError("build_writer_stop_unverified")
+        raise RuntimeError("core_image_build_failed")
+    if not prune_build_cache(root, env, name=name):
+        if not stop_build_writer(root, name, env):
+            raise RuntimeError("build_writer_stop_unverified")
+        raise RuntimeError("build_cache_prune_failed")
+    if not stop_build_writer(root, name, env):
+        raise RuntimeError("build_writer_stop_unverified")
 
 
 def build_core_images_locked(
@@ -169,41 +457,17 @@ def build_core_images_locked(
     *,
     expected_commit: str | None = None,
 ) -> str:
-    """Build core images while the caller holds ``host_mutation_lock``.
-
-    The cache prune is attempted after every build attempt. A successful build
-    is not accepted if its cache lifecycle or post-build source proof fails.
-    """
+    """Build core images while the caller holds ``host_mutation_lock``."""
 
     commit = resolve_clean_commit(root)
     if expected_commit is not None and commit != expected_commit.lower():
         raise RuntimeError("source_verification_failed")
     build_env = dict(env)
+    build_env.setdefault("COMPOSE_PROJECT_NAME", "fcp")
     build_env["FCP_BUILD_COMMIT"] = commit
     preflight_disk(root, build_env)
-
-    build_error: BaseException | None = None
-    try:
-        subprocess.run(
-            ["docker", "compose", "build", "relay", "flask", "recorder"],
-            cwd=root,
-            env=build_env,
-            shell=False,
-            check=True,
-            timeout=900,
-            stdout=sys.stderr,
-            stderr=sys.stderr,
-        )
-    except (OSError, subprocess.SubprocessError) as exc:
-        build_error = exc
-
-    prune_ok = prune_build_cache(root, build_env)
-    if not prune_ok:
-        if build_error is not None:
-            raise RuntimeError("build_failed_and_cache_prune_failed") from build_error
-        raise RuntimeError("build_cache_prune_failed")
-    if build_error is not None:
-        raise RuntimeError("core_image_build_failed") from build_error
+    controlled_core_build(root, build_env)
+    _verify_core_image_commits(root, build_env, commit)
 
     after = resolve_clean_commit(root)
     if after != commit:
@@ -262,5 +526,5 @@ def main() -> int:
     return 0
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: no cover - CLI wrapper
     raise SystemExit(main())
