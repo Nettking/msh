@@ -4,12 +4,12 @@
 The engine is preserved separately so its mature request/activation semantics stay
 unchanged. This runner adds the B04 host-mutation boundary around update apply:
 source inspection/mutation and the core image build share the same checkout lock
-as ordinary launcher builds. The lock is released after successful build cache
-cleanup and exact source re-proof, before optional AI/model activation work.
+as ordinary launcher builds. The lock is released after successful controlled
+build cleanup and exact source re-proof, before optional AI/model activation work.
 
-B01 build admission is injected at this runner seam so both ordinary launcher
-builds and Update-All assess Docker's proven host backing resource without
-rewriting the mature update engine.
+B01 build admission and live pressure handling are injected at this runner seam so
+ordinary launcher builds and Update-All share one Docker-backing-resource contract
+without duplicating the mature update engine.
 """
 
 from __future__ import annotations
@@ -20,6 +20,7 @@ import hashlib
 import importlib.util
 import json
 import os
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -33,6 +34,7 @@ from catalog.federation import host_build
 
 ENGINE_NAME = "fcp_update_engine.py"
 MAX_REQUEST_BYTES = 8192
+CORE_BUILD_COMMAND = ["docker", "compose", "build", "relay", "flask", "recorder"]
 
 
 def _digest(path: Path) -> str:
@@ -65,6 +67,26 @@ def _apply_target(path: Path, engine: ModuleType) -> str | None:
     return target.lower()
 
 
+class _ControlledSubprocess:
+    """Module-shaped subprocess proxy that intercepts only the core build."""
+
+    SubprocessError = subprocess.SubprocessError
+    CompletedProcess = subprocess.CompletedProcess
+
+    def __init__(self, root: Path, original_run) -> None:
+        self.root = root
+        self.original_run = original_run
+
+    def run(self, argv, **kwargs):
+        command = list(argv)
+        if command == CORE_BUILD_COMMAND:
+            environment = kwargs.get("env")
+            build_env = os.environ.copy() if environment is None else dict(environment)
+            host_build.controlled_core_build(self.root, build_env)
+            return subprocess.CompletedProcess(command, 0)
+        return self.original_run(argv, **kwargs)
+
+
 def _serialized_apply(
     engine: ModuleType,
     root: Path,
@@ -79,6 +101,7 @@ def _serialized_apply(
     prune_called = False
     original_preflight = engine.preflight_disk
     original_prune = engine.prune_build_cache
+    original_subprocess = engine.subprocess
 
     def release_after_build() -> None:
         nonlocal lock_held
@@ -86,12 +109,12 @@ def _serialized_apply(
             lock.__exit__(None, None, None)
             lock_held = False
 
-    def guarded_post_build_prune(*args, **kwargs):
+    def guarded_post_build_prune(*_args, **_kwargs):
         nonlocal prune_called
         prune_called = True
-        ok = bool(original_prune(*args, **kwargs))
-        if not ok:
-            raise RuntimeError("build_cache_prune_failed")
+        # controlled_core_build already pruned the checkout-scoped Buildx cache
+        # and positively stopped the BuildKit writer. Do not wake it again merely
+        # to repeat the legacy default-builder prune.
         proven = host_build.resolve_clean_commit(root)
         if proven != target:
             raise RuntimeError("build_context_changed")
@@ -101,29 +124,28 @@ def _serialized_apply(
     def guarded_preflight(*args, **kwargs):
         nonlocal build_phase_entered
         build_phase_entered = True
-        # Host build owns the B01 Docker-backing-resource admission. Keep the
-        # engine's own prune function restored while preflight runs so this
-        # recovery cleanup cannot be mistaken for the post-build B04 release
-        # point. The post-build guard is re-armed before returning to the engine.
-        engine.prune_build_cache = original_prune
-        try:
-            return host_build.preflight_disk(*args, **kwargs)
-        finally:
-            engine.prune_build_cache = guarded_post_build_prune
+        return host_build.preflight_disk(*args, **kwargs)
 
     engine.preflight_disk = guarded_preflight
     engine.prune_build_cache = guarded_post_build_prune
+    engine.subprocess = _ControlledSubprocess(root, original_subprocess.run)
     try:
         return bool(engine.process_once(root, request_file, result_file))
     finally:
         engine.preflight_disk = original_preflight
         engine.prune_build_cache = original_prune
+        engine.subprocess = original_subprocess
         if build_phase_entered and not prune_called:
-            # The build/preflight raised before the ordinary post-build prune.
-            # Cache is reconstructible, so make one bounded cleanup attempt even
-            # though the request has already been recorded as failed.
+            # A build/preflight raised before the ordinary post-build release
+            # point. The controlled builder is reconstructible, so discard only
+            # its own cache while proving no BuildKit writer remains live.
             try:
-                original_prune(root, os.environ.copy())
+                host_build.stop_build_writer(
+                    root,
+                    host_build.builder_name(root),
+                    os.environ.copy(),
+                    discard_cache=True,
+                )
             except Exception as exc:  # noqa: BLE001 - host cleanup boundary
                 print(
                     f"FCP update cleanup warning: {type(exc).__name__}: {exc}",
