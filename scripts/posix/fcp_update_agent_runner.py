@@ -6,6 +6,10 @@ unchanged. This runner adds the B04 host-mutation boundary around update apply:
 source inspection/mutation and the core image build share the same checkout lock
 as ordinary launcher builds. The lock is released after successful build cache
 cleanup and exact source re-proof, before optional AI/model activation work.
+
+B01 build admission is injected at this runner seam so both ordinary launcher
+builds and Update-All assess Docker's proven host backing resource without
+rewriting the mature update engine.
 """
 
 from __future__ import annotations
@@ -97,13 +101,13 @@ def _serialized_apply(
     def guarded_preflight(*args, **kwargs):
         nonlocal build_phase_entered
         build_phase_entered = True
-        # preflight_disk may prune before a build to recover space. That prune
-        # must NOT end the source/build critical section. Temporarily restore the
-        # engine's original prune function only for preflight, then arm the
-        # post-build guard again before control returns to the engine.
+        # Host build owns the B01 Docker-backing-resource admission. Keep the
+        # engine's own prune function restored while preflight runs so this
+        # recovery cleanup cannot be mistaken for the post-build B04 release
+        # point. The post-build guard is re-armed before returning to the engine.
         engine.prune_build_cache = original_prune
         try:
-            return original_preflight(*args, **kwargs)
+            return host_build.preflight_disk(*args, **kwargs)
         finally:
             engine.prune_build_cache = guarded_post_build_prune
 

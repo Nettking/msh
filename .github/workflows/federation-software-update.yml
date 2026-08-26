@@ -31,6 +31,12 @@ jobs:
           python -m compileall -q
           catalog/federation/software_update.py
           catalog/federation/software_trial.py
+          catalog/federation/docker_resources.py
+          catalog/federation/host_build.py
+          catalog/federation/model_resource_pull.py
+          catalog/federation/tests/test_docker_resources.py
+          catalog/federation/tests/test_host_build_resource_admission.py
+          catalog/federation/tests/test_windows_docker_resource_contract.py
           catalog/flask_app/services/federation_update_handoff.py
           catalog/flask_app/services/federation_software_version_service.py
           catalog/flask_app/services/federation_update_events.py
@@ -53,6 +59,11 @@ jobs:
         run: >-
           python -m pytest -o addopts= -q
           catalog/federation/tests/test_software_update.py
+          catalog/federation/tests/test_docker_resources.py
+          catalog/federation/tests/test_host_build.py
+          catalog/federation/tests/test_host_build_resource_admission.py
+          catalog/federation/tests/test_windows_docker_resource_contract.py
+          catalog/federation/tests/test_model_resource_pull.py
           catalog/flask_app/tests/test_federation_update_runtime.py
           catalog/flask_app/tests/test_federation_update_orchestration.py
           catalog/flask_app/tests/test_federation_update_host_agents.py
@@ -76,6 +87,12 @@ jobs:
           python -m ruff check --ignore TRY004,BLE001,S110,RUF100,EXE001
           catalog/federation/software_update.py
           catalog/federation/software_trial.py
+          catalog/federation/docker_resources.py
+          catalog/federation/host_build.py
+          catalog/federation/model_resource_pull.py
+          catalog/federation/tests/test_docker_resources.py
+          catalog/federation/tests/test_host_build_resource_admission.py
+          catalog/federation/tests/test_windows_docker_resource_contract.py
           catalog/flask_app/services/federation_update_handoff.py
           catalog/flask_app/services/federation_software_version_service.py
           catalog/flask_app/tests/test_federation_software_version.py
@@ -106,6 +123,11 @@ jobs:
         run: |
           foreach ($script in @(
             'scripts/windows/fcp_update_agent.ps1',
+            'scripts/windows/fcp_update_agent_runner.ps1',
+            'scripts/windows/fcp_update_engine.ps1',
+            'scripts/windows/fcp_host_build.ps1',
+            'scripts/windows/fcp_docker_resource.ps1',
+            'scripts/windows/fcp_model_pull.ps1',
             'scripts/windows/fcp_recorder_supervisor.ps1',
             'scripts/windows/start_tailscale_recorder.ps1',
             'scripts/windows/tests/fcp_recorder_supervisor_restart_smoke.ps1'

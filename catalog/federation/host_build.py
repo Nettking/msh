@@ -1,7 +1,7 @@
 """Host-owned build lifecycle shared by supported POSIX start/update paths.
 
-This module owns the exact-source proof, build resource policy and cache
-lifecycle. A normal standalone invocation acquires the checkout mutation lock
+This module owns the exact-source proof, Docker backing-resource admission and
+cache lifecycle. A normal standalone invocation acquires the checkout mutation lock
 itself. The supported launcher may instead call it while its parent lease
 already owns that same boundary across the wider activation transaction.
 """
@@ -11,7 +11,6 @@ from __future__ import annotations
 import argparse
 import os
 import re
-import shutil
 import subprocess
 import sys
 import time
@@ -19,12 +18,17 @@ from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from pathlib import Path
 
+from .docker_resources import docker_backing_resource_path
+from .host_resources import PressureLevel, ProcessResourceAdmission, ResourceAssessment
+
 try:  # pragma: no cover - exercised only on supported POSIX hosts
     import fcntl
 except ImportError:  # pragma: no cover - Windows uses the PowerShell primitive
     fcntl = None  # type: ignore[assignment]
 
 OID_RE = re.compile(r"^[0-9a-f]{40}$")
+# Compatibility alias for the long-standing update minimum. Build admission now
+# uses the shared B01 PRESSURE boundary, whose CRITICAL floor remains 10 GiB.
 UPDATE_REQUIRED_FREE_BYTES = 10 * 1024**3
 BUILD_CACHE_KEEP_BYTES = 8 * 1024**3
 HOST_MUTATION_LOCK_TIMEOUT_SECONDS = 30.0
@@ -102,15 +106,19 @@ def resolve_clean_commit(root: Path) -> str:
     return commit
 
 
-def free_bytes(root: Path) -> int:
-    """Preserve the supported activation preflight policy for B04.
+def docker_resource_assessment(
+    root: Path,
+    env: Mapping[str, str],
+    *,
+    controller: ProcessResourceAdmission | None = None,
+) -> tuple[Path, ResourceAssessment]:
+    """Assess the host filesystem that actually backs Docker build writes."""
 
-    The wider B01 audit still owns proving/covering distinct Docker/build backing
-    resources. B04 requires ordinary builds to use the same policy as supported
-    activation rather than bypassing it.
-    """
-
-    return shutil.disk_usage(root).free
+    backing_path = docker_backing_resource_path(root, env=env)
+    if backing_path is None:
+        raise RuntimeError("docker_backing_resource_unproven")
+    admission = controller or ProcessResourceAdmission()
+    return backing_path, admission.assessment(backing_path)
 
 
 def prune_build_cache(root: Path, env: Mapping[str, str]) -> bool:
@@ -137,10 +145,20 @@ def prune_build_cache(root: Path, env: Mapping[str, str]) -> bool:
 
 
 def preflight_disk(root: Path, env: Mapping[str, str]) -> None:
-    if free_bytes(root) >= UPDATE_REQUIRED_FREE_BYTES:
+    """Admit a core build against Docker's proven host backing resource.
+
+    NORMAL/WARNING may start. PRESSURE/CRITICAL first get one bounded BuildKit
+    cleanup attempt, then the same backing resource is remeasured. An unproven
+    or still-pressured resource fails closed before ``docker compose build``.
+    """
+
+    admission = ProcessResourceAdmission()
+    backing_path, before = docker_resource_assessment(root, env, controller=admission)
+    if before.level < PressureLevel.PRESSURE:
         return
     prune_build_cache(root, env)
-    if free_bytes(root) >= UPDATE_REQUIRED_FREE_BYTES:
+    after = admission.assessment(backing_path)
+    if after.level < PressureLevel.PRESSURE:
         return
     raise RuntimeError("insufficient_disk_for_update")
 

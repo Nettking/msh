@@ -155,7 +155,13 @@ def test_windows_and_python_model_runners_share_pressure_and_stop_contract() -> 
     windows = (ROOT / "scripts/windows/fcp_model_pull.ps1").read_text(
         encoding="utf-8"
     )
+    windows_resource = (ROOT / "scripts/windows/fcp_docker_resource.ps1").read_text(
+        encoding="utf-8"
+    )
     python_runner = (ROOT / "catalog/federation/model_resource_pull.py").read_text(
+        encoding="utf-8"
+    )
+    python_resource = (ROOT / "catalog/federation/docker_resources.py").read_text(
         encoding="utf-8"
     )
 
@@ -164,10 +170,13 @@ def test_windows_and_python_model_runners_share_pressure_and_stop_contract() -> 
     assert DEFAULT_CRITICAL_FREE_BYTES == 10737418240
     assert DEFAULT_PRESSURE_FREE_BYTES == 12884901888
 
-    assert "docker_data.vhdx" in windows
-    assert "ext4.vhdx" in windows
-    assert "Get-FreeBytes $backingPath" in windows
-    assert "return [int64]-1" in windows
+    assert "fcp_docker_resource.ps1" in windows
+    assert "Get-FcpDockerBackingPath -RepoRoot $RepoRoot" in windows
+    assert "Get-FcpResourceFreeBytes -BackingPath $backingPath" in windows
+    assert "docker_data.vhdx" in windows_resource
+    assert "ext4.vhdx" in windows_resource
+    assert "{{.OSType}}|{{.DockerRootDir}}" in windows_resource
+    assert "return [int64]-1" in windows_resource
     assert "Test-ModelWriterStopped" in windows
     assert "'compose', 'stop', '--timeout', '5', $Service" in windows
     assert "'compose', 'stop', '--timeout', '15', $Service" in windows
@@ -175,9 +184,11 @@ def test_windows_and_python_model_runners_share_pressure_and_stop_contract() -> 
     assert "could not prove" in windows
     assert "exit 3" in windows
 
-    assert "{{.DockerRootDir}}" in python_runner
-    assert "Docker.raw" in python_runner
-    assert "docker_data.vhdx" in python_runner
+    assert "from .docker_resources import docker_backing_resource_path" in python_runner
+    assert "_docker_backing_resource_path = docker_backing_resource_path" in python_runner
+    assert "{{.DockerRootDir}}" in python_resource
+    assert "Docker.raw" in python_resource
+    assert "docker_data.vhdx" in python_resource
     assert "writer_stop_unverified" in python_runner
     assert '["docker", "compose", "stop", "--timeout", "15", target.service]' in python_runner
     assert '["docker", "compose", "kill", target.service]' not in python_runner
