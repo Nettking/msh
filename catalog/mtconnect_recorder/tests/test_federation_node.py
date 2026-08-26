@@ -23,6 +23,7 @@ from catalog.mtconnect_recorder.federation_node import (
     RecorderFederationSnapshot,
     _publication_cycle_status,
     select_storage_authority,
+    sharing_state_detail,
 )
 from start_recorder import build_parser
 
@@ -589,3 +590,75 @@ def test_publication_cycle_status_is_session_scoped_and_failure_aware() -> None:
         group_id="group-current",
         delivery=RecorderDeliveryRunResult(attempted=1, committed=1, pending=0),
     ) == ("publishing", 1, None)
+
+
+def test_degraded_outranks_up_to_date_when_evidence_was_withdrawn() -> None:
+    """A recorder missing evidence permanently is not "up-to-date".
+
+    Nothing is pending and the last cycle committed cleanly, so every other
+    signal says healthy. Reporting healthy here would be the exact silent
+    disappearance the durable tombstone exists to prevent.
+    """
+
+    assert _publication_cycle_status(
+        pending_entries=(),
+        session_id="session-current",
+        group_id="group-current",
+        delivery=RecorderDeliveryRunResult(attempted=1, committed=1, pending=0),
+        retired_total=1,
+    ) == ("degraded", 0, "recorder-delivery-retired")
+
+
+def test_degraded_outranks_backlogged() -> None:
+    """A retryable backlog resolves itself; a withdrawal waits for a person."""
+
+    failing = SimpleNamespace(
+        session_id="session-current",
+        schema_id=RECORDER_STORAGE_SCHEMA,
+        destination_id="group-current",
+        last_error="storage rejected",
+    )
+
+    assert _publication_cycle_status(
+        pending_entries=(failing,),
+        session_id="session-current",
+        group_id="group-current",
+        delivery=RecorderDeliveryRunResult(attempted=1, committed=0, pending=1),
+        retired_total=2,
+    ) == ("degraded", 1, "recorder-delivery-retired")
+
+
+def test_no_withdrawn_evidence_leaves_the_existing_states_unchanged() -> None:
+    assert _publication_cycle_status(
+        pending_entries=(),
+        session_id="session-current",
+        group_id="group-current",
+        delivery=RecorderDeliveryRunResult(attempted=0, committed=0, pending=0),
+        retired_total=0,
+    ) == ("up-to-date", 0, None)
+
+
+def test_sharing_readiness_accepts_degraded_publication() -> None:
+    """Degraded is ready.
+
+    Publication is working and newer evidence is flowing; some older evidence
+    was permanently withdrawn and is reported as such. Refusing readiness here
+    would let one ancient poisoned row block recorder startup forever --
+    reintroducing at the readiness gate the starvation that durable retirement
+    removed from the delivery loop.
+    """
+
+    node = _sharing_node("degraded")
+
+    snapshot = node.wait_until_sharing_ready(timeout_seconds=0.1)
+
+    assert snapshot.storage_state == "degraded"
+
+
+def test_degraded_sharing_state_has_an_operator_remedy() -> None:
+    detail = sharing_state_detail("degraded")
+
+    assert detail.startswith("degraded; ")
+    assert "permanently withdrawn" in detail
+    # An operator must not be told to go looking in the recorder archive.
+    assert "primary archive was not touched" in detail

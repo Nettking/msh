@@ -21,6 +21,7 @@ from catalog.federation.recorder_delivery import DurableRecorderDeliveryQueue
 from catalog.federation.recorder_publication import (
     RecorderArchiveReconciler,
     RecorderFederationDeliveryWorker,
+    RecorderPublicationCycleReport,
     RecorderPublicationTarget,
     RecorderWorkerCycleResult,
 )
@@ -61,6 +62,12 @@ class RecorderFederationPublicationSnapshot:
     status: str
     enabled: bool
     last_error_code: str | None = None
+    # Durable tombstones owned by this session/group, re-read from the outbox
+    # on every cycle. Never accumulated here, so a restart cannot forget it and
+    # an operator repair clears it without anything having to invalidate it.
+    retired_batches: int = 0
+    # Consecutive failed worker cycles. Zero whenever the last cycle completed.
+    consecutive_failures: int = 0
 
 
 class RecorderFederationPublicationMonitor:
@@ -89,13 +96,59 @@ class RecorderFederationPublicationMonitor:
         *,
         enabled: bool,
         error_code: str | None = None,
+        retired_batches: int = 0,
+        consecutive_failures: int = 0,
     ) -> None:
         with self._lock:
             self._snapshot = RecorderFederationPublicationSnapshot(
                 status=status,
                 enabled=enabled,
                 last_error_code=error_code,
+                retired_batches=retired_batches,
+                consecutive_failures=consecutive_failures,
             )
+
+    def _observe_cycle(self, report: RecorderPublicationCycleReport) -> None:
+        """Publish one worker cycle outcome into the app-visible snapshot.
+
+        This is the required-thread boundary the publication loop reports
+        through. Before it existed the loop caught every cycle failure and
+        discarded it, so a recorder whose outbox had become unreadable kept
+        this snapshot on "running" indefinitely while no evidence moved at all.
+
+        Every value here is derived from the cycle that just ran, so the
+        snapshot is replaced rather than merged: a state that has been repaired
+        cannot survive in it, and a state that is still true is re-asserted on
+        the very next cycle.
+        """
+
+        state = report.state
+        result = report.result
+        retired = 0 if result is None else result.retirement.total
+        if state == "failing":
+            self._set_snapshot(
+                "failing",
+                enabled=True,
+                error_code=report.error_code,
+                consecutive_failures=report.consecutive_failures,
+            )
+            return
+        if state == "degraded":
+            self._set_snapshot(
+                "degraded",
+                enabled=True,
+                error_code="recorder-delivery-retired",
+                retired_batches=retired,
+            )
+            return
+        if state == "blocked":
+            self._set_snapshot(
+                "running",
+                enabled=True,
+                error_code="recorder-delivery-pending",
+            )
+            return
+        self._set_snapshot("running", enabled=True)
 
     def _enabled(self) -> bool:
         return bool(
@@ -190,6 +243,7 @@ class RecorderFederationPublicationMonitor:
             delivery_limit=int(
                 self.app.config["RECORDER_FEDERATION_DELIVERY_LIMIT"]
             ),
+            cycle_observer=self._observe_cycle,
         )
 
     async def _run_worker(self, worker: RecorderFederationDeliveryWorker) -> None:
