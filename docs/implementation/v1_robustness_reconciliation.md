@@ -193,9 +193,10 @@ reads its backlog inside that guarded pass, and records consecutive failures,
 the last error code and its time behind `driver_health()`. An unexpected fault
 still stops that driver rather than becoming a restart loop, but it is recorded
 instead of leaving a stderr traceback and silently stranded queued work.
-**The count stays 2/8:** that bullet also covers recorder publication, whose
-loop reports cycle failures but does not yet treat `sqlite3.Error` as expected,
-so the property is not closed. No physical evidence or acceptance state changed.
+**This does not add a proven property to the count:** that bullet also covers
+recorder publication, whose loop reports cycle failures but does not yet treat
+`sqlite3.Error` as expected, so the property is not closed. No physical
+evidence or acceptance state changed.
 
 ### B07 — bounded reconstructible and cumulative metadata growth
 
