@@ -73,7 +73,10 @@ $script:DockerExe = $null
 
 function Resolve-DockerExecutable {
     $inherited = [string]$env:FCP_REAL_DOCKER_EXE
-    if (-not [string]::IsNullOrWhiteSpace($inherited)) {
+    if (
+        $env:FCP_CONTROLLED_BUILD_ACTIVE -eq '1' -and
+        -not [string]::IsNullOrWhiteSpace($inherited)
+    ) {
         $candidate = [System.IO.Path]::GetFullPath($inherited)
         if (Test-Path -LiteralPath $candidate -PathType Leaf) {
             $script:DockerExe = $candidate
@@ -125,7 +128,6 @@ function Get-FcpBuilderDriver([object]$Inspection) {
 function Test-FcpBuilderStopped([string]$Name) {
     $inspection = Get-FcpBuilderInspection $Name
     if ($inspection.ExitCode -ne 0) {
-        # A removed builder cannot own a live BuildKit node.
         return $true
     }
     $statuses = @()
@@ -156,8 +158,6 @@ function Stop-FcpBuildWriter([string]$Name, [switch]$DiscardCache) {
     $stopped = Invoke-DockerResult @('buildx', 'stop', $Name)
     if ($stopped.ExitCode -eq 0 -and (Test-FcpBuilderStopped $Name)) {
         if ($DiscardCache) {
-            # Once the BuildKit writer is positively stopped, cache deletion is
-            # reconstructible cleanup. A deletion failure does not make it live.
             Remove-FcpBuilder $Name | Out-Null
         }
         return $true
@@ -166,6 +166,14 @@ function Stop-FcpBuildWriter([string]$Name, [switch]$DiscardCache) {
 }
 
 function Ensure-FcpControllableBuilder {
+    $composeHelp = Invoke-DockerResult @('compose', 'build', '--help')
+    if (
+        $composeHelp.ExitCode -ne 0 -or
+        -not ((@($composeHelp.Output) -join "`n") -match '(?m)^\s*--builder(?:\s|$)')
+    ) {
+        throw 'controllable_builder_unavailable'
+    }
+
     $name = Get-FcpBuilderName
     $inspection = Get-FcpBuilderInspection $name
     if ($inspection.ExitCode -eq 0) {
@@ -203,17 +211,27 @@ function Invoke-BuildCachePrune {
         '--force',
         "--keep-storage=$BuildCacheKeepBytes"
     )
-    if ($pruned.ExitCode -ne 0) { return $false }
+    if ($pruned.ExitCode -ne 0) {
+        Stop-FcpBuildWriter $name | Out-Null
+        return $false
+    }
     return Stop-FcpBuildWriter $name
 }
 
 function Stop-BuildClient([System.Diagnostics.Process]$Process) {
     if ($Process.HasExited) { return }
     try {
-        Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
+        & taskkill.exe /PID $Process.Id /T /F 2>&1 | Out-Null
     }
     catch {}
     try { $Process.WaitForExit(5000) | Out-Null } catch {}
+    if (-not $Process.HasExited) {
+        try {
+            Stop-Process -Id $Process.Id -Force -ErrorAction SilentlyContinue
+        }
+        catch {}
+        try { $Process.WaitForExit(2000) | Out-Null } catch {}
+    }
 }
 
 function Invoke-ControlledCoreBuild([string]$BackingPath) {
