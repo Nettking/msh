@@ -193,10 +193,16 @@ reads its backlog inside that guarded pass, and records consecutive failures,
 the last error code and its time behind `driver_health()`. An unexpected fault
 still stops that driver rather than becoming a restart loop, but it is recorded
 instead of leaving a stderr traceback and silently stranded queued work.
-**This does not add a proven property to the count:** that bullet also covers
-recorder publication, whose loop reports cycle failures but does not yet treat
-`sqlite3.Error` as expected, so the property is not closed. No physical
-evidence or acceptance state changed.
+The recorder-publication half of the same bullet is supervised one layer above
+its loop: `RecorderFederationPublicationMonitor._run` catches anything escaping
+`run_forever`, publishes a `retrying` snapshot carrying the error code, and
+retries on a bounded delay, while ordinary cycle failures surface as `failing`
+with a consecutive-failure count. That is why the analysis driver was the
+outlier -- its thread target *was* the loop, with no supervisor above it to
+record or restart anything. **Counting is left to review:** this delivery adds
+no automated coverage for a durable-store failure reaching the publication
+monitor, so the bullet is recorded as evidenced on the analysis side rather
+than claimed closed. No physical evidence or acceptance state changed.
 
 ### B07 — bounded reconstructible and cumulative metadata growth
 
