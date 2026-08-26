@@ -16,6 +16,7 @@ import re
 import tarfile
 import tempfile
 from collections.abc import Sequence
+from enum import Enum
 from pathlib import Path
 
 from catalog.federation.errors import FederationValidationError
@@ -30,6 +31,14 @@ _FIXED_MODE = 0o644
 _SAFE_MEMBER_RE = re.compile(r"^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$")
 _COPY_CHUNK_BYTES = 1024 * 1024
 _SOURCE_STABILITY_ATTEMPTS = 8
+
+
+class SliceArchiveComparison(Enum):
+    """Result of comparing one deterministic archive with its declared source."""
+
+    MATCH = "match"
+    MISMATCH = "mismatch"
+    SOURCE_CHANGED = "source-changed"
 
 
 class _SourceChangedDuringPacking(RuntimeError):
@@ -85,38 +94,36 @@ def _validated_members(
 
 
 def validate_slice_members(files: Sequence[Path], root: Path) -> tuple[str, ...]:
-    """Validate declared slice inputs without reading a single content byte.
-
-    Confinement, safe naming and the entry-count bound are properties of the
-    *declared inputs*, not of any archive, so they must be enforced even on the
-    path that deliberately never opens the source -- validating an already
-    registered slice against its durable identity.
-    """
+    """Validate declared slice inputs without reading a single content byte."""
 
     return tuple(name for name, _path in _validated_members(files, root))
 
 
-def slice_archive_matches(
+def _source_changed(before: os.stat_result, handle, path: Path) -> bool:
+    """Return whether an open source or its path changed during comparison."""
+
+    try:
+        after = os.fstat(handle.fileno())
+        current = path.stat()
+    except OSError:
+        return True
+    signature = _stat_signature(before)
+    return signature != _stat_signature(after) or signature != _stat_signature(current)
+
+
+def _compare_slice_archive_once(
     archive_path: Path,
     *,
     files: Sequence[Path],
     root: Path,
-    max_bytes: int = DEFAULT_MAX_SLICE_BYTES,
-) -> bool:
-    """Fully verify that an existing archive is the requested deterministic slice.
-
-    This is intentionally stronger than checking that ``tarfile`` can open the
-    path. Every member, fixed metadata field, and byte is compared with the
-    declared source files, and the gzip stream is drained so truncation after
-    the tar end marker still fails its footer/CRC check. A source that changes
-    while it is being compared simply makes the archived snapshot non-current;
-    the caller can then rebuild from a bounded stable read.
-    """
+    max_bytes: int,
+) -> SliceArchiveComparison:
+    """Run one comparison, distinguishing stable mismatch from source mutation."""
 
     members = _validated_members(files, root)
     try:
         if not archive_path.is_file() or archive_path.stat().st_size > max_bytes:
-            return False
+            return SliceArchiveComparison.MISMATCH
         total = 0
         with (
             archive_path.open("rb") as raw,
@@ -127,8 +134,15 @@ def slice_archive_matches(
             iterator = iter(archive)
             for expected_name, expected_path in members:
                 info = next(iterator, None)
-                with expected_path.open("rb") as expected:
-                    before = os.fstat(expected.fileno())
+                try:
+                    expected = expected_path.open("rb")
+                except OSError:
+                    return SliceArchiveComparison.SOURCE_CHANGED
+                with expected:
+                    try:
+                        before = os.fstat(expected.fileno())
+                    except OSError:
+                        return SliceArchiveComparison.SOURCE_CHANGED
                     expected_size = int(before.st_size)
                     total += expected_size
                     if total > max_bytes:
@@ -149,28 +163,94 @@ def slice_archive_matches(
                         or info.uname != ""
                         or info.gname != ""
                     ):
-                        return False
+                        return (
+                            SliceArchiveComparison.SOURCE_CHANGED
+                            if _source_changed(before, expected, expected_path)
+                            else SliceArchiveComparison.MISMATCH
+                        )
                     packed = archive.extractfile(info)
                     if packed is None:  # pragma: no cover - defended by isreg above
-                        return False
+                        return SliceArchiveComparison.MISMATCH
                     with packed:
                         while True:
                             packed_chunk = packed.read(_COPY_CHUNK_BYTES)
-                            expected_chunk = expected.read(_COPY_CHUNK_BYTES)
+                            try:
+                                expected_chunk = expected.read(_COPY_CHUNK_BYTES)
+                            except OSError:
+                                return SliceArchiveComparison.SOURCE_CHANGED
                             if packed_chunk != expected_chunk:
-                                return False
+                                return (
+                                    SliceArchiveComparison.SOURCE_CHANGED
+                                    if _source_changed(before, expected, expected_path)
+                                    else SliceArchiveComparison.MISMATCH
+                                )
                             if not expected_chunk:
                                 break
-                    after = os.fstat(expected.fileno())
-                    if _stat_signature(before) != _stat_signature(after):
-                        return False
+                    if _source_changed(before, expected, expected_path):
+                        return SliceArchiveComparison.SOURCE_CHANGED
             if next(iterator, None) is not None:
-                return False
+                return SliceArchiveComparison.MISMATCH
             while compressed.read(_COPY_CHUNK_BYTES):
                 pass
     except (EOFError, OSError, tarfile.TarError):
-        return False
-    return True
+        return SliceArchiveComparison.MISMATCH
+    return SliceArchiveComparison.MATCH
+
+
+def compare_slice_archive(
+    archive_path: Path,
+    *,
+    files: Sequence[Path],
+    root: Path,
+    max_bytes: int = DEFAULT_MAX_SLICE_BYTES,
+) -> SliceArchiveComparison:
+    """Compare an archive with live source using a finite stability window.
+
+    A stable mismatch is authoritative evidence that the archive is not the
+    declared source. A source that changes while comparison is in progress is
+    neither a match nor corruption, so comparison is retried. If the source
+    never stabilizes within the same finite bound used by packing, fail closed
+    with ``analysis-slice-source-changing`` instead of misreporting corruption.
+    """
+
+    for _attempt in range(_SOURCE_STABILITY_ATTEMPTS):
+        comparison = _compare_slice_archive_once(
+            archive_path,
+            files=files,
+            root=root,
+            max_bytes=max_bytes,
+        )
+        if comparison is not SliceArchiveComparison.SOURCE_CHANGED:
+            return comparison
+    raise FederationValidationError(
+        "analysis-slice-source-changing",
+        "files",
+        "analysis slice source changed throughout the bounded comparison attempts",
+    )
+
+
+def slice_archive_matches(
+    archive_path: Path,
+    *,
+    files: Sequence[Path],
+    root: Path,
+    max_bytes: int = DEFAULT_MAX_SLICE_BYTES,
+) -> bool:
+    """Fully verify that an existing archive is the requested deterministic slice.
+
+    Stable source mismatches return ``False``. A source mutation observed during
+    comparison is retried finitely rather than being conflated with corruption.
+    """
+
+    return (
+        compare_slice_archive(
+            archive_path,
+            files=files,
+            root=root,
+            max_bytes=max_bytes,
+        )
+        is SliceArchiveComparison.MATCH
+    )
 
 
 def _sync_directory(path: Path) -> None:
@@ -358,6 +438,8 @@ def extract_slice_archive(
 
 __all__ = [
     "MAX_SLICE_ENTRIES",
+    "SliceArchiveComparison",
+    "compare_slice_archive",
     "extract_slice_archive",
     "slice_archive_matches",
     "validate_slice_members",

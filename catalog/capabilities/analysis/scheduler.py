@@ -46,11 +46,7 @@ from .contracts import (
     slice_artifact_id,
 )
 from .gateway import AnalysisArtifactGateway
-from .packaging import (
-    slice_archive_matches,
-    validate_slice_members,
-    write_slice_archive,
-)
+from .packaging import slice_archive_matches, write_slice_archive
 
 DEFAULT_HEARTBEAT_TIMEOUT_SECONDS = 15 * 60
 
@@ -226,125 +222,43 @@ class FederatedAnalysisScheduler:
         files: Sequence[Path],
         root: Path,
     ) -> ContentIdentity:
-        """Return the slice identity this submission must reference.
-
-        Registration is the boundary between two different questions.
-
-        Before registration nothing authoritative exists yet, so the only
-        available truth is the live source: pack it, or reuse an archive that
-        still matches it byte for byte.
-
-        After registration the durable descriptor is the truth, and it is
-        immutable. It represents the source identified by
-        ``work.source_signature``, which is itself part of the identity digest
-        that produced this artifact ID and object key -- materially changed
-        source data yields a different digest, so it becomes a *different*
-        artifact rather than a conflicting version of this one. Re-reading the
-        live source to judge a registered slice therefore answers a question
-        nobody asked, and answers it wrongly whenever a recorder has written to
-        the file since: the snapshot is merely non-current, which is exactly
-        what :func:`slice_archive_matches` documents its ``False`` to mean.
-        """
-
         store = self.gateway.content_store
         destination = store.resolve(object_key)
-        # Confinement, safe naming and entry bounds belong to the declared
-        # inputs, so they are enforced on both paths -- including the
-        # registered path below, which never opens the source.
-        validate_slice_members(files, root)
         try:
             registered = self.gateway.authority.artifact(artifact_id)
         except FederationValidationError as exc:
             if exc.code != "artifact-not-found":
                 raise
             registered = None
-
-        if registered is not None:
-            return self._registered_slice_identity(
-                registered,
-                object_key=object_key,
-                files=files,
-                root=root,
-            )
-
-        if not slice_archive_matches(
+        archive_matches = slice_archive_matches(
             destination,
             files=files,
             root=root,
             max_bytes=store.max_bytes,
-        ):
+        )
+        if not archive_matches and registered is not None:
+            raise FederationValidationError(
+                "analysis-slice-registered-content-invalid",
+                "object_key",
+                "registered analysis slice does not match its deterministic input",
+            )
+        if not archive_matches:
             write_slice_archive(
                 destination,
                 files=list(files),
                 root=root,
                 max_bytes=store.max_bytes,
             )
-        return store.identity(object_key)
-
-    def _registered_slice_identity(
-        self,
-        registered,
-        *,
-        object_key: str,
-        files: Sequence[Path],
-        root: Path,
-    ) -> ContentIdentity:
-        """Prove an already-registered slice is intact, or fail closed.
-
-        This is the proof a racing loser needs before reusing the winner's
-        artifact, and it is entirely self-contained: the stored body must still
-        hash to the identity the authority recorded. Nothing here consults the
-        live source, so a concurrent write to it can neither be mistaken for
-        corruption nor hide real corruption. There is no retry loop, because
-        there is nothing transient left to wait for.
-        """
-
-        store = self.gateway.content_store
-        destination = store.resolve(object_key)
-        if registered.object_key != object_key:
-            raise FederationValidationError(
-                "analysis-slice-registered-content-invalid",
-                "object_key",
-                "registered analysis slice is bound to a different object key",
-            )
-        if destination.is_file():
-            identity = store.identity(object_key)
-            if (
-                identity.content_hash == registered.content_hash
-                and identity.size_bytes == registered.size_bytes
-            ):
-                return identity
-            # The registered body exists and is wrong. It is never rewritten:
-            # an authoritative artifact that has been corrupted is an operator
-            # question, not something a resubmission may paper over.
-            raise FederationValidationError(
-                "analysis-slice-registered-content-invalid",
-                "object_key",
-                "registered analysis slice body does not match its registered identity",
-            )
-
-        # The descriptor survived but its body did not -- a crash window
-        # between publication and any later loss of the content root. The only
-        # safe repair is deterministic re-derivation that reproduces the exact
-        # registered identity; anything else is discarded rather than left
-        # standing in place of the artifact it failed to rebuild.
-        write_slice_archive(
-            destination,
-            files=list(files),
-            root=root,
-            max_bytes=store.max_bytes,
-        )
         identity = store.identity(object_key)
-        if (
-            identity.content_hash != registered.content_hash
-            or identity.size_bytes != registered.size_bytes
+        if registered is not None and (
+            registered.object_key != object_key
+            or registered.content_hash != identity.content_hash
+            or registered.size_bytes != identity.size_bytes
         ):
-            destination.unlink(missing_ok=True)
             raise FederationValidationError(
-                "analysis-slice-registered-body-unrecoverable",
+                "analysis-slice-registered-content-invalid",
                 "object_key",
-                "registered analysis slice body is missing and the current "
-                "source no longer reproduces its registered identity",
+                "registered analysis slice identity does not match its stored body",
             )
         return identity
 

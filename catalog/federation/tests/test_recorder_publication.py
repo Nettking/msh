@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sqlite3
 from datetime import UTC, datetime, timedelta, timezone
 from pathlib import Path
 
@@ -823,3 +824,556 @@ def test_restart_probes_deferred_backlog_before_full_archive_reconcile(tmp_path)
     assert still.state is OutboxState.PENDING
     assert still.payload == deferred.payload
     assert still.idempotency_key == deferred.idempotency_key
+
+
+# --------------------------------------------------------------------------
+# B03: durable retirement, and the degraded health it must make visible
+# --------------------------------------------------------------------------
+
+
+def _enqueue_row(
+    outbox: SQLiteOutbox,
+    *,
+    dataset_id: str,
+    batch_id: str,
+    poison: bool = False,
+) -> int:
+    """Enqueue one delivery row, optionally one that can never be sent.
+
+    The defect is a missing ``created_at``: the delivery path cannot build a
+    request from it at all, on this attempt or any future one, whatever the
+    remote authority is doing.
+    """
+
+    payload = {
+        "group_id": "telemetry-storage",
+        "dataset_id": dataset_id,
+        "batch_id": batch_id,
+        "idempotency_key": batch_id,
+        "content": {"observations": []},
+        "created_at": "2026-08-09T03:00:00Z",
+    }
+    if poison:
+        del payload["created_at"]
+    entry, _created = outbox.enqueue(
+        session_id="session-1",
+        destination_id="fcp-local-storage",
+        schema_id=RECORDER_STORAGE_SCHEMA,
+        payload=payload,
+        idempotency_key=batch_id,
+        content_hash="c" * 64,
+        now=datetime(2026, 8, 9, 3, 0, tzinfo=UTC),
+    )
+    return entry.outbox_id
+
+
+def test_an_undeliverable_row_stops_fencing_its_own_dataset(tmp_path):
+    """The regression this delivery closes.
+
+    A row whose payload cannot produce a request had no terminal state to
+    reach. It stayed pending forever and, because per-dataset ordering fences
+    newer rows behind an uncommitted older one, every later batch of *that same
+    dataset* stayed fenced behind it forever too. Correct ordering, permanent
+    starvation.
+
+    Against the previous implementation both assertions below fail: the
+    poisoned row is still ``PENDING`` and the newer batch of its dataset has
+    never been delivered.
+    """
+
+    client = RecordingClient()
+    outbox = SQLiteOutbox(tmp_path / "publisher" / "outbox.sqlite3")
+    queue = DurableRecorderDeliveryQueue(
+        outbox=outbox, client=client, session_id="session-1"
+    )
+    dataset = "mtconnect:node-recorder-1:Mazak"
+    poison_id = _enqueue_row(
+        outbox, dataset_id=dataset, batch_id="mazak-1", poison=True
+    )
+    newer_id = _enqueue_row(outbox, dataset_id=dataset, batch_id="mazak-2")
+
+    first = asyncio.run(queue.run_once())
+    second = asyncio.run(queue.run_once())
+
+    # The newer evidence of the same dataset is delivered.
+    assert outbox.get(newer_id).state is OutboxState.COMPLETED
+    # And the row that was fencing it is terminal, not pending.
+    assert outbox.get(poison_id).state is OutboxState.RETIRED
+
+    assert first.retired == 1
+    assert first.retired_datasets == (dataset,)
+    # The fence is released with the row, not held by a tombstone.
+    assert second.blocked_datasets == ()
+    # A withdrawal is never reported as a commit.
+    assert first.committed + second.committed == 1
+    assert [call["batch_id"] for call in client.calls] == ["mazak-2"]
+
+
+def test_retirement_records_the_dataset_ordering_gap_it_creates(tmp_path):
+    """Releasing the fence is only safe because the gap is durable."""
+
+    client = RecordingClient()
+    outbox = SQLiteOutbox(tmp_path / "publisher" / "outbox.sqlite3")
+    queue = DurableRecorderDeliveryQueue(
+        outbox=outbox, client=client, session_id="session-1"
+    )
+    dataset = "mtconnect:node-recorder-1:Mazak"
+    poison_id = _enqueue_row(
+        outbox, dataset_id=dataset, batch_id="mazak-1", poison=True
+    )
+
+    asyncio.run(queue.run_once())
+
+    tombstone = outbox.get(poison_id)
+    assert tombstone.state is OutboxState.RETIRED
+    assert tombstone.retirement_reason == "payload-field-missing"
+    # Which ordered dataset now has a hole in it, and where that hole is: the
+    # dataset in a column, the sequence span still inside the immutable
+    # idempotency key. Both survive receipt compaction.
+    assert tombstone.retirement_dataset_id == dataset
+    assert tombstone.idempotency_key == "mazak-1"
+    assert tombstone.last_error
+    assert outbox.retired_summary().datasets[0].dataset_id == dataset
+
+
+def test_a_storage_failure_is_never_converted_into_retirement(tmp_path):
+    """Time and attempt count must never promote a retryable failure.
+
+    "The remote has been down for a week" and "this row can never be sent" are
+    different facts, and only the second may end delivery. A federation outage
+    that quietly retired evidence would lose exactly what the outbox exists to
+    keep.
+    """
+
+    client = RecordingClient(fail=True)
+    outbox = SQLiteOutbox(tmp_path / "publisher" / "outbox.sqlite3")
+    dataset = "mtconnect:node-recorder-1:Mazak"
+    row_id = _enqueue_row(outbox, dataset_id=dataset, batch_id="mazak-1")
+
+    for _ in range(8):
+        # A fresh queue each cycle also spends a fresh startup probe, so the
+        # row is genuinely re-attempted rather than waiting out its backoff.
+        result = asyncio.run(
+            DurableRecorderDeliveryQueue(
+                outbox=outbox, client=client, session_id="session-1"
+            ).run_once()
+        )
+        assert result.retired == 0
+        assert result.committed == 0
+
+    survivor = outbox.get(row_id)
+    assert survivor.state is OutboxState.PENDING
+    assert survivor.attempt_count == 8
+    assert survivor.last_error == "Federation unavailable"
+    assert outbox.retired_summary().total == 0
+    # The payload is intact, so the evidence is still deliverable when the
+    # authority returns.
+    assert survivor.payload["batch_id"] == "mazak-1"
+
+
+def test_a_retired_dataset_does_not_fence_an_unrelated_dataset(tmp_path):
+    client = RecordingClient()
+    outbox = SQLiteOutbox(tmp_path / "publisher" / "outbox.sqlite3")
+    queue = DurableRecorderDeliveryQueue(
+        outbox=outbox, client=client, session_id="session-1"
+    )
+    poison_id = _enqueue_row(
+        outbox,
+        dataset_id="mtconnect:node-recorder-1:Mazak",
+        batch_id="mazak-1",
+        poison=True,
+    )
+    healthy_id = _enqueue_row(
+        outbox, dataset_id="mtconnect:node-recorder-1:Okuma", batch_id="okuma-1"
+    )
+
+    result = asyncio.run(queue.run_once())
+
+    assert outbox.get(healthy_id).state is OutboxState.COMPLETED
+    assert outbox.get(poison_id).state is OutboxState.RETIRED
+    assert result.blocked_datasets == ()
+    assert result.retired_datasets == ("mtconnect:node-recorder-1:Mazak",)
+
+
+def test_a_retirement_that_cannot_commit_leaves_the_row_exactly_as_it_was(
+    tmp_path,
+):
+    """Failing to withdraw is safe; it is never a silent drop."""
+
+    client = RecordingClient()
+    outbox = SQLiteOutbox(tmp_path / "publisher" / "outbox.sqlite3")
+    queue = DurableRecorderDeliveryQueue(
+        outbox=outbox, client=client, session_id="session-1"
+    )
+    dataset = "mtconnect:node-recorder-1:Mazak"
+    poison_id = _enqueue_row(
+        outbox, dataset_id=dataset, batch_id="mazak-1", poison=True
+    )
+
+    def _refuse(*_args, **_kwargs):
+        raise OSError("outbox database is unavailable")
+
+    outbox.retire = _refuse  # type: ignore[method-assign]
+    result = asyncio.run(queue.run_once())
+
+    assert result.retired == 0
+    assert result.pending == 1
+    # Still durable, still retryable, still fencing its own dataset -- which is
+    # the safe outcome, and still visible as blocked.
+    assert outbox.get(poison_id).state is OutboxState.PENDING
+    assert result.blocked_datasets == (dataset,)
+
+
+def test_a_retired_row_is_not_re_enqueued_by_archive_reconciliation(tmp_path):
+    """Duplicate reconciliation against the real archive cannot resurrect it.
+
+    Reconciliation re-derives rows from the durable recorder archive on every
+    scan. The archive is primary evidence and is never removed, so the only
+    thing that can stop the same batch being enqueued again forever is the
+    durable row itself.
+    """
+
+    client = RecordingClient()
+    store, checkpoint_file, outbox, queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+    assert reconciler.reconcile().enqueued == 1
+    row = outbox.pending()[0]
+
+    # Corrupt the durable payload the way a partially written or
+    # partially migrated historical row would be.
+    with sqlite3.connect(tmp_path / "publisher" / "outbox.sqlite3") as connection:
+        payload = dict(row.payload)
+        payload.pop("created_at")
+        connection.execute(
+            "UPDATE outbox SET payload_json=? WHERE outbox_id=?",
+            (json.dumps(payload, sort_keys=True, separators=(",", ":")),
+             row.outbox_id),
+        )
+
+    assert asyncio.run(queue.run_once()).retired == 1
+    assert outbox.get(row.outbox_id).state is OutboxState.RETIRED
+
+    # Every later scan of the same untouched archive collides with the
+    # tombstone instead of creating fresh work.
+    for _ in range(3):
+        again = reconciler.reconcile()
+        assert again.enqueued == 0
+        assert again.already_enqueued == 1
+    assert outbox.pending() == ()
+    assert len(outbox.retired()) == 1
+
+    # Even once the tombstone has been reduced to its identity receipt.
+    assert outbox.compact_retired(limit=10) == 1
+    compacted_scan = reconciler.reconcile()
+    assert compacted_scan.enqueued == 0
+    assert compacted_scan.already_enqueued == 1
+    assert outbox.pending() == ()
+
+
+def test_no_primary_recorder_evidence_is_deleted_by_retirement(tmp_path):
+    client = RecordingClient()
+    store, checkpoint_file, outbox, queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+    reconciler.reconcile()
+    row = outbox.pending()[0]
+
+    def _archive() -> dict[str, bytes]:
+        root = tmp_path / "data"
+        return {
+            str(path.relative_to(root)): path.read_bytes()
+            for path in sorted(root.rglob("*"))
+            if path.is_file()
+        }
+
+    before = _archive()
+    assert before
+
+    with sqlite3.connect(tmp_path / "publisher" / "outbox.sqlite3") as connection:
+        payload = dict(row.payload)
+        payload.pop("created_at")
+        connection.execute(
+            "UPDATE outbox SET payload_json=? WHERE outbox_id=?",
+            (json.dumps(payload, sort_keys=True, separators=(",", ":")),
+             row.outbox_id),
+        )
+    asyncio.run(queue.run_once())
+    outbox.compact_retired(limit=10)
+
+    assert outbox.get(row.outbox_id).state is OutboxState.RETIRED
+    # Retirement is a publication decision. The recorder's own evidence is
+    # byte-identical, so the withdrawn batch remains fully reconstructible.
+    assert _archive() == before
+
+
+# --------------------------------------------------------------------------
+# B03: degraded health is observed from durable truth, never remembered
+# --------------------------------------------------------------------------
+
+
+def test_degraded_publication_health_survives_restart(tmp_path):
+    client = RecordingClient()
+    store, checkpoint_file, outbox, queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+    reconciler.reconcile()
+    row = outbox.pending()[0]
+    with sqlite3.connect(tmp_path / "publisher" / "outbox.sqlite3") as connection:
+        payload = dict(row.payload)
+        payload.pop("created_at")
+        connection.execute(
+            "UPDATE outbox SET payload_json=? WHERE outbox_id=?",
+            (json.dumps(payload, sort_keys=True, separators=(",", ":")),
+             row.outbox_id),
+        )
+
+    worker = RecorderFederationDeliveryWorker(reconciler=reconciler, queue=queue)
+    first = asyncio.run(worker.run_cycle())
+    assert first.delivery.retired == 1
+    assert first.retirement.total == 1
+
+    # A restart: new worker, new queue, same durable database. Nothing about
+    # the degraded state was carried in memory, so nothing can be lost with it.
+    restarted_outbox = SQLiteOutbox(tmp_path / "publisher" / "outbox.sqlite3")
+    restarted_queue = DurableRecorderDeliveryQueue(
+        outbox=restarted_outbox, client=client, session_id="session-1"
+    )
+    restarted = RecorderFederationDeliveryWorker(
+        reconciler=reconciler, queue=restarted_queue
+    )
+    later = asyncio.run(restarted.run_cycle())
+
+    # This cycle retired nothing at all and still reports degraded, because it
+    # reports what the database says rather than what it just did.
+    assert later.delivery.retired == 0
+    assert later.retirement.total == 1
+    assert later.retirement.datasets[0].dataset_id.endswith("Mazak")
+
+
+def test_degraded_health_clears_only_from_durable_repair(tmp_path):
+    client = RecordingClient()
+    outbox = SQLiteOutbox(tmp_path / "publisher" / "outbox.sqlite3")
+    queue = DurableRecorderDeliveryQueue(
+        outbox=outbox, client=client, session_id="session-1"
+    )
+    poison_id = _enqueue_row(
+        outbox,
+        dataset_id="mtconnect:node-recorder-1:Mazak",
+        batch_id="mazak-1",
+        poison=True,
+    )
+    asyncio.run(queue.run_once())
+    assert outbox.retired_summary().total == 1
+
+    # Repairing the payload is not enough on its own: retirement is terminal
+    # until an operator explicitly reinstates the row.
+    with sqlite3.connect(tmp_path / "publisher" / "outbox.sqlite3") as connection:
+        payload = dict(outbox.get(poison_id).payload)
+        payload["created_at"] = "2026-08-09T03:00:00Z"
+        connection.execute(
+            "UPDATE outbox SET payload_json=? WHERE outbox_id=?",
+            (json.dumps(payload, sort_keys=True, separators=(",", ":")), poison_id),
+        )
+    assert outbox.retired_summary().total == 1
+
+    outbox.reinstate(poison_id, now=datetime(2026, 8, 9, 4, 0, tzinfo=UTC))
+
+    assert outbox.retired_summary().total == 0
+    assert len(outbox.pending()) == 1
+    result = asyncio.run(
+        DurableRecorderDeliveryQueue(
+            outbox=outbox, client=client, session_id="session-1"
+        ).run_once()
+    )
+    assert result.committed == 1
+    assert outbox.get(poison_id).state is OutboxState.COMPLETED
+
+
+def test_a_failing_publication_cycle_is_reported_not_swallowed(tmp_path):
+    """The required-loop boundary must not absorb failures in silence.
+
+    ``run_forever`` caught every cycle failure and discarded it, so a recorder
+    whose durable state had become unreadable spun this loop indefinitely while
+    every health surface still described an ordinary running publisher.
+    """
+
+    client = RecordingClient()
+    _store, _checkpoint, _outbox, queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+
+    def _unreadable():
+        raise OSError("recorder publication outbox is unreadable")
+
+    reconciler.reconcile = _unreadable  # type: ignore[method-assign]
+    reports: list[object] = []
+    stop = asyncio.Event()
+
+    class _FailingWorker(RecorderFederationDeliveryWorker):
+        async def run_cycle(self, *, force_reconcile: bool = False):
+            raise OSError("recorder publication outbox is unreadable")
+
+    worker = _FailingWorker(
+        reconciler=reconciler,
+        queue=queue,
+        poll_interval_seconds=0.01,
+        cycle_observer=reports.append,
+    )
+
+    async def _drive() -> None:
+        task = asyncio.create_task(worker.run_forever(stop))
+        while len(reports) < 3:
+            await asyncio.sleep(0)
+        stop.set()
+        await task
+
+    asyncio.run(_drive())
+
+    assert [report.state for report in reports[:3]] == ["failing"] * 3
+    assert reports[0].error_code == "OSError"
+    assert reports[0].result is None
+    # Consecutive failures are counted, so an owner can escalate rather than
+    # watch an identical failure scroll past forever.
+    assert [report.consecutive_failures for report in reports[:3]] == [1, 2, 3]
+
+
+def test_a_healthy_cycle_reports_publishing_and_clears_earlier_failure(tmp_path):
+    client = RecordingClient()
+    store, checkpoint_file, _outbox, queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+    reports: list[object] = []
+    stop = asyncio.Event()
+    failures = {"remaining": 1}
+    original = RecorderFederationDeliveryWorker.run_cycle
+
+    class _FlakyWorker(RecorderFederationDeliveryWorker):
+        async def run_cycle(self, *, force_reconcile: bool = False):
+            if failures["remaining"]:
+                failures["remaining"] -= 1
+                raise OSError("transient")
+            return await original(self, force_reconcile=force_reconcile)
+
+    worker = _FlakyWorker(
+        reconciler=reconciler,
+        queue=queue,
+        poll_interval_seconds=0.01,
+        cycle_observer=reports.append,
+    )
+
+    async def _drive() -> None:
+        task = asyncio.create_task(worker.run_forever(stop))
+        while len(reports) < 2:
+            await asyncio.sleep(0)
+        stop.set()
+        await task
+
+    asyncio.run(_drive())
+
+    assert reports[0].state == "failing"
+    assert reports[1].state == "publishing"
+    assert reports[1].healthy is True
+    assert reports[1].consecutive_failures == 0
+
+
+def test_a_health_sink_that_raises_cannot_strand_durable_delivery(tmp_path):
+    client = RecordingClient()
+    store, checkpoint_file, outbox, queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+    stop = asyncio.Event()
+    seen: list[object] = []
+    hostile = {"active": True}
+
+    def _sink(report: object) -> None:
+        seen.append(report)
+        if hostile["active"]:
+            raise RuntimeError("health sink is broken")
+
+    worker = RecorderFederationDeliveryWorker(
+        reconciler=reconciler,
+        queue=queue,
+        poll_interval_seconds=0.01,
+        cycle_observer=_sink,
+    )
+
+    async def _drive() -> None:
+        task = asyncio.create_task(worker.run_forever(stop))
+        while len(seen) < 2:
+            await asyncio.sleep(0)
+        hostile["active"] = False
+        while len(seen) < 3:
+            await asyncio.sleep(0)
+        stop.set()
+        await task
+
+    asyncio.run(_drive())
+
+    # The evidence was still delivered while the health sink was failing.
+    assert client.calls
+    assert outbox.pending() == ()
+    # And the hand-offs it dropped were counted, not discarded: the first
+    # report that gets through carries them.
+    assert seen[0].dropped_reports == 0
+    assert seen[2].dropped_reports == 2
+
+
+def test_one_tombstone_cannot_abort_reconciliation_of_the_rest_of_the_archive(
+    tmp_path,
+):
+    """A retired row's payload is no longer authoritative.
+
+    A row is often retired precisely because its stored payload is corrupt, so
+    it no longer matches what reconciliation rebuilds from the archive.
+    Comparing the two would raise an idempotency conflict out of the middle of
+    the scan and abort reconciliation of every remaining batch -- reproducing,
+    through the tombstone, the same global starvation the tombstone exists to
+    end. Identity is compared instead, so a key genuinely reused for different
+    content still fails closed.
+    """
+
+    client = RecordingClient()
+    store, checkpoint_file, outbox, queue, reconciler = _build_reconciler(
+        tmp_path, client=client
+    )
+    probe, _batch, _stored = _store_sample(store, SAMPLE_XML)
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=13)
+    assert reconciler.reconcile().enqueued == 1
+    first = outbox.pending()[0]
+
+    with sqlite3.connect(tmp_path / "publisher" / "outbox.sqlite3") as connection:
+        payload = dict(first.payload)
+        payload.pop("created_at")
+        connection.execute(
+            "UPDATE outbox SET payload_json=? WHERE outbox_id=?",
+            (
+                json.dumps(payload, sort_keys=True, separators=(",", ":")),
+                first.outbox_id,
+            ),
+        )
+    assert asyncio.run(queue.run_once()).retired == 1
+
+    # Later evidence is committed locally, and the scan that must pick it up
+    # walks straight past the tombstone of the earlier batch.
+    _probe, second_batch, _stored = _store_sample(store, _second_sample())
+    assert second_batch.first_observation_sequence == 13
+    _write_checkpoint(checkpoint_file, probe_sha256=probe.sha256, next_sequence=16)
+
+    result = reconciler.reconcile()
+
+    assert result.enqueued == 1
+    assert result.already_enqueued == 1
+    assert asyncio.run(queue.run_once()).committed == 1
+    assert outbox.get(first.outbox_id).state is OutboxState.RETIRED
+    assert outbox.pending() == ()
