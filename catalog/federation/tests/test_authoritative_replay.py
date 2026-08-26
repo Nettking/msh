@@ -98,6 +98,37 @@ def test_a_non_advancing_revision_cannot_masquerade_as_progress() -> None:
     assert "non-advancing" in failure.value.message
 
 
+def test_a_revision_gap_cannot_masquerade_as_complete_history() -> None:
+    with pytest.raises(AuthoritativeReplayIncomplete) as failure:
+        replay_authoritative_history(
+            lambda _last: ((_event(2),), 2),
+            apply_page=lambda _page: None,
+            max_pages=8,
+        )
+    assert "non-contiguous" in failure.value.message
+
+
+def test_an_event_cannot_run_ahead_of_the_reported_current_revision() -> None:
+    with pytest.raises(AuthoritativeReplayIncomplete) as failure:
+        replay_authoritative_history(
+            lambda _last: ((_event(1),), 0),
+            apply_page=lambda _page: None,
+            max_pages=8,
+        )
+    assert "beyond its current revision" in failure.value.message
+
+
+def test_the_current_revision_cannot_move_behind_applied_history() -> None:
+    with pytest.raises(AuthoritativeReplayIncomplete) as failure:
+        replay_authoritative_history(
+            lambda _last: ((), 2),
+            apply_page=lambda _page: None,
+            max_pages=8,
+            start_revision=3,
+        )
+    assert "behind applied history" in failure.value.message
+
+
 def test_a_withdrawn_replay_surface_fails_closed() -> None:
     with pytest.raises(AuthoritativeReplayIncomplete):
         replay_authoritative_history(
