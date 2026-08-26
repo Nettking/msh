@@ -13,6 +13,7 @@ import argparse
 import hashlib
 import os
 import re
+import signal
 import subprocess
 import sys
 import time
@@ -168,6 +169,24 @@ def _builder_inspection(
     )
 
 
+def _builder_absent(root: Path, name: str, env: Mapping[str, str]) -> bool:
+    """Prove the named builder is absent using a successful Buildx enumeration."""
+
+    try:
+        listed = _docker_run(
+            root,
+            ["docker", "buildx", "ls", "--format", "{{.Name}}"],
+            env=env,
+            timeout=30.0,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if listed.returncode != 0:
+        return False
+    names = {line.strip() for line in listed.stdout.splitlines() if line.strip()}
+    return name not in names
+
+
 def ensure_controllable_builder(root: Path, env: Mapping[str, str]) -> str:
     """Ensure the checkout has one independently stoppable BuildKit daemon.
 
@@ -178,7 +197,10 @@ def ensure_controllable_builder(root: Path, env: Mapping[str, str]) -> str:
     """
 
     name = builder_name(root)
-    inspected = _builder_inspection(root, name, env)
+    try:
+        inspected = _builder_inspection(root, name, env)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError("controllable_builder_unavailable") from exc
     if inspected.returncode == 0:
         driver = next(
             (
@@ -192,25 +214,31 @@ def ensure_controllable_builder(root: Path, env: Mapping[str, str]) -> str:
             raise RuntimeError("controllable_builder_conflict")
         return name
 
-    created = _docker_run(
-        root,
-        [
-            "docker",
-            "buildx",
-            "create",
-            "--name",
-            name,
-            "--driver",
-            "docker-container",
-            "--driver-opt",
-            "default-load=true",
-        ],
-        env=env,
-        timeout=60.0,
-    )
+    try:
+        created = _docker_run(
+            root,
+            [
+                "docker",
+                "buildx",
+                "create",
+                "--name",
+                name,
+                "--driver",
+                "docker-container",
+                "--driver-opt",
+                "default-load=true",
+            ],
+            env=env,
+            timeout=60.0,
+        )
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError("controllable_builder_unavailable") from exc
     if created.returncode != 0:
         raise RuntimeError("controllable_builder_unavailable")
-    inspected = _builder_inspection(root, name, env)
+    try:
+        inspected = _builder_inspection(root, name, env)
+    except (OSError, subprocess.SubprocessError) as exc:
+        raise RuntimeError("controllable_builder_unavailable") from exc
     if inspected.returncode != 0 or "Driver:" not in inspected.stdout:
         raise RuntimeError("controllable_builder_unavailable")
     driver = next(
@@ -227,10 +255,12 @@ def ensure_controllable_builder(root: Path, env: Mapping[str, str]) -> str:
 
 
 def _builder_stopped(root: Path, name: str, env: Mapping[str, str]) -> bool:
-    inspected = _builder_inspection(root, name, env)
+    try:
+        inspected = _builder_inspection(root, name, env)
+    except (OSError, subprocess.SubprocessError):
+        return False
     if inspected.returncode != 0:
-        # A removed builder cannot own a live BuildKit node.
-        return True
+        return _builder_absent(root, name, env)
     statuses = [
         line.partition(":")[2].strip().casefold()
         for line in inspected.stdout.splitlines()
@@ -240,13 +270,22 @@ def _builder_stopped(root: Path, name: str, env: Mapping[str, str]) -> bool:
 
 
 def _remove_builder(root: Path, name: str, env: Mapping[str, str]) -> bool:
-    removed = _docker_run(
-        root,
-        ["docker", "buildx", "rm", "--force", "--timeout", "20s", name],
-        env=env,
-        timeout=30.0,
-    )
-    return removed.returncode == 0 and _builder_inspection(root, name, env).returncode != 0
+    try:
+        inspected = _builder_inspection(root, name, env)
+    except (OSError, subprocess.SubprocessError):
+        return False
+    if inspected.returncode != 0:
+        return _builder_absent(root, name, env)
+    try:
+        removed = _docker_run(
+            root,
+            ["docker", "buildx", "rm", "--force", "--timeout", "20s", name],
+            env=env,
+            timeout=30.0,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return removed.returncode == 0 and _builder_absent(root, name, env)
 
 
 def stop_build_writer(
@@ -258,13 +297,16 @@ def stop_build_writer(
 ) -> bool:
     """Stop the FCP BuildKit daemon and positively verify quiescence."""
 
-    stopped = _docker_run(
-        root,
-        ["docker", "buildx", "stop", name],
-        env=env,
-        timeout=BUILDER_STOP_TIMEOUT_SECONDS,
-    )
-    if stopped.returncode == 0 and _builder_stopped(root, name, env):
+    try:
+        stopped = _docker_run(
+            root,
+            ["docker", "buildx", "stop", name],
+            env=env,
+            timeout=BUILDER_STOP_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError):
+        stopped = None
+    if stopped is not None and stopped.returncode == 0 and _builder_stopped(root, name, env):
         if not discard_cache:
             return True
         # Under pressure, deleting FCP's own builder cache is a bounded cleanup.
@@ -283,9 +325,12 @@ def prune_build_cache(
     """Bound only FCP-owned build cache, never unrelated host builder state."""
 
     selected = name or builder_name(root)
-    inspected = _builder_inspection(root, selected, env)
+    try:
+        inspected = _builder_inspection(root, selected, env)
+    except (OSError, subprocess.SubprocessError):
+        return False
     if inspected.returncode != 0:
-        return True
+        return _builder_absent(root, selected, env)
     try:
         completed = subprocess.run(
             [
@@ -323,25 +368,45 @@ def preflight_disk(root: Path, env: Mapping[str, str]) -> None:
     backing_path, before = docker_resource_assessment(root, env, controller=admission)
     if before.level < PressureLevel.PRESSURE:
         return
-    _remove_builder(root, builder_name(root), env)
+    if not _remove_builder(root, builder_name(root), env):
+        raise RuntimeError("build_writer_stop_unverified")
     after = admission.assessment(backing_path)
     if after.level < PressureLevel.PRESSURE:
         return
     raise RuntimeError("insufficient_disk_for_update")
 
 
-def _settle_build_client(process: subprocess.Popen[object]) -> None:
+def _settle_build_client(process: subprocess.Popen[object]) -> bool:
+    """Stop the isolated Compose/Buildx client process group and prove it exited."""
+
     if process.poll() is not None:
-        return
-    process.terminate()
+        return True
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return process.poll() is not None
+    except OSError:
+        try:
+            process.terminate()
+        except OSError:
+            pass
     try:
         process.wait(timeout=BUILD_CLIENT_SETTLE_SECONDS)
     except subprocess.TimeoutExpired:
-        process.kill()
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+        except OSError:
+            try:
+                process.kill()
+            except OSError:
+                pass
         try:
             process.wait(timeout=5.0)
         except subprocess.TimeoutExpired:
-            pass
+            return process.poll() is not None
+    return process.poll() is not None
 
 
 def _verify_core_image_commits(
@@ -411,6 +476,7 @@ def controlled_core_build(
             shell=False,
             stdout=sys.stderr,
             stderr=sys.stderr,
+            start_new_session=True,
         )
     except OSError as exc:
         raise RuntimeError("core_image_build_failed") from exc
@@ -425,16 +491,18 @@ def controlled_core_build(
             returncode = process.poll()
             if returncode is not None:
                 break
-            _settle_build_client(process)
-            if not stop_build_writer(root, name, env, discard_cache=True):
+            client_stopped = _settle_build_client(process)
+            writer_stopped = stop_build_writer(root, name, env, discard_cache=True)
+            if not client_stopped or not writer_stopped:
                 raise RuntimeError("build_writer_stop_unverified")
             raise RuntimeError("build_resource_pressure")
         if time.monotonic() >= deadline:
             returncode = process.poll()
             if returncode is not None:
                 break
-            _settle_build_client(process)
-            if not stop_build_writer(root, name, env, discard_cache=True):
+            client_stopped = _settle_build_client(process)
+            writer_stopped = stop_build_writer(root, name, env, discard_cache=True)
+            if not client_stopped or not writer_stopped:
                 raise RuntimeError("build_writer_stop_unverified")
             raise RuntimeError("core_image_build_timeout")
         time.sleep(poll_seconds)

@@ -17,6 +17,7 @@ $UpdateRequiredFreeBytes = 10737418240
 $BuildCacheKeepBytes = 8589934592
 $BuildTimeoutSeconds = 900
 $BuildPollMilliseconds = 250
+$DockerLifecycleTimeoutSeconds = 30
 $OidPattern = '^[0-9a-f]{40}$'
 $DockerResourceHelper = Join-Path $PSScriptRoot 'fcp_docker_resource.ps1'
 if (-not (Test-Path -LiteralPath $DockerResourceHelper -PathType Leaf)) {
@@ -107,12 +108,75 @@ function Invoke-DockerResult([string[]]$Arguments) {
     }
 }
 
+function Invoke-BoundedDockerResult(
+    [string[]]$Arguments,
+    [int]$TimeoutSeconds = $DockerLifecycleTimeoutSeconds
+) {
+    if ($TimeoutSeconds -le 0) { throw 'docker_lifecycle_timeout_invalid' }
+    $stdoutPath = [System.IO.Path]::GetTempFileName()
+    $stderrPath = [System.IO.Path]::GetTempFileName()
+    $process = $null
+    $exitCode = 127
+    $failure = $null
+    try {
+        $process = Start-Process `
+            -FilePath $script:DockerExe `
+            -ArgumentList $Arguments `
+            -NoNewWindow `
+            -PassThru `
+            -RedirectStandardOutput $stdoutPath `
+            -RedirectStandardError $stderrPath
+        if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
+            try { $process.Kill() } catch {}
+            try { $process.WaitForExit(2000) | Out-Null } catch {}
+            $exitCode = 124
+        }
+        else {
+            $exitCode = [int]$process.ExitCode
+        }
+    }
+    catch {
+        $failure = $_.Exception.Message
+        $exitCode = 127
+    }
+    finally {
+        $output = @()
+        try {
+            if (Test-Path -LiteralPath $stdoutPath) {
+                $output += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
+            }
+            if (Test-Path -LiteralPath $stderrPath) {
+                $output += @(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue)
+            }
+        }
+        catch {}
+        if (-not [string]::IsNullOrWhiteSpace([string]$failure)) {
+            $output += [string]$failure
+        }
+        Remove-Item -LiteralPath $stdoutPath -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
+    }
+    return [pscustomobject]@{
+        Output = @($output | ForEach-Object { [string]$_ })
+        ExitCode = [int]$exitCode
+    }
+}
+
 function Get-FcpBuilderName {
     return 'fcp-build-' + (Get-PathHash $RepoRoot)
 }
 
 function Get-FcpBuilderInspection([string]$Name) {
-    return Invoke-DockerResult @('buildx', 'inspect', $Name)
+    return Invoke-BoundedDockerResult @('buildx', 'inspect', $Name)
+}
+
+function Test-FcpBuilderAbsent([string]$Name) {
+    $listed = Invoke-BoundedDockerResult @('buildx', 'ls', '--format', '{{.Name}}')
+    if ($listed.ExitCode -ne 0) { return $false }
+    foreach ($line in @($listed.Output)) {
+        if (([string]$line).Trim() -eq $Name) { return $false }
+    }
+    return $true
 }
 
 function Get-FcpBuilderDriver([object]$Inspection) {
@@ -128,7 +192,7 @@ function Get-FcpBuilderDriver([object]$Inspection) {
 function Test-FcpBuilderStopped([string]$Name) {
     $inspection = Get-FcpBuilderInspection $Name
     if ($inspection.ExitCode -ne 0) {
-        return $true
+        return Test-FcpBuilderAbsent $Name
     }
     $statuses = @()
     foreach ($line in @($inspection.Output)) {
@@ -146,16 +210,16 @@ function Test-FcpBuilderStopped([string]$Name) {
 
 function Remove-FcpBuilder([string]$Name) {
     $inspection = Get-FcpBuilderInspection $Name
-    if ($inspection.ExitCode -ne 0) { return $true }
-    $removed = Invoke-DockerResult @(
+    if ($inspection.ExitCode -ne 0) { return Test-FcpBuilderAbsent $Name }
+    $removed = Invoke-BoundedDockerResult @(
         'buildx', 'rm', '--force', '--timeout', '20s', $Name
     )
     if ($removed.ExitCode -ne 0) { return $false }
-    return (Get-FcpBuilderInspection $Name).ExitCode -ne 0
+    return Test-FcpBuilderAbsent $Name
 }
 
 function Stop-FcpBuildWriter([string]$Name, [switch]$DiscardCache) {
-    $stopped = Invoke-DockerResult @('buildx', 'stop', $Name)
+    $stopped = Invoke-BoundedDockerResult @('buildx', 'stop', $Name)
     if ($stopped.ExitCode -eq 0 -and (Test-FcpBuilderStopped $Name)) {
         if ($DiscardCache) {
             Remove-FcpBuilder $Name | Out-Null
@@ -183,7 +247,7 @@ function Ensure-FcpControllableBuilder {
         return $name
     }
 
-    $created = Invoke-DockerResult @(
+    $created = Invoke-BoundedDockerResult @(
         'buildx', 'create',
         '--name', $name,
         '--driver', 'docker-container',
@@ -203,9 +267,9 @@ function Ensure-FcpControllableBuilder {
 function Invoke-BuildCachePrune {
     $name = Get-FcpBuilderName
     $inspection = Get-FcpBuilderInspection $name
-    if ($inspection.ExitCode -ne 0) { return $true }
+    if ($inspection.ExitCode -ne 0) { return Test-FcpBuilderAbsent $name }
 
-    $pruned = Invoke-DockerResult @(
+    $pruned = Invoke-BoundedDockerResult @(
         'buildx', 'prune',
         '--builder', $name,
         '--force',
@@ -219,7 +283,7 @@ function Invoke-BuildCachePrune {
 }
 
 function Stop-BuildClient([System.Diagnostics.Process]$Process) {
-    if ($Process.HasExited) { return }
+    if ($Process.HasExited) { return $true }
     try {
         & taskkill.exe /PID $Process.Id /T /F 2>&1 | Out-Null
     }
@@ -232,6 +296,7 @@ function Stop-BuildClient([System.Diagnostics.Process]$Process) {
         catch {}
         try { $Process.WaitForExit(2000) | Out-Null } catch {}
     }
+    return [bool]$Process.HasExited
 }
 
 function Invoke-ControlledCoreBuild([string]$BackingPath) {
@@ -259,15 +324,17 @@ function Invoke-ControlledCoreBuild([string]$BackingPath) {
         $freeBytes = Get-FcpResourceFreeBytes -BackingPath $BackingPath
         $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
         if ($level -in @('pressure', 'critical')) {
-            Stop-BuildClient $process
-            if (-not (Stop-FcpBuildWriter $name -DiscardCache)) {
+            $clientStopped = Stop-BuildClient $process
+            $writerStopped = Stop-FcpBuildWriter $name -DiscardCache
+            if (-not $clientStopped -or -not $writerStopped) {
                 throw 'build_writer_stop_unverified'
             }
             throw 'build_resource_pressure'
         }
         if ([DateTimeOffset]::UtcNow -ge $deadline) {
-            Stop-BuildClient $process
-            if (-not (Stop-FcpBuildWriter $name -DiscardCache)) {
+            $clientStopped = Stop-BuildClient $process
+            $writerStopped = Stop-FcpBuildWriter $name -DiscardCache
+            if (-not $clientStopped -or -not $writerStopped) {
                 throw 'build_writer_stop_unverified'
             }
             throw 'core_image_build_timeout'
@@ -323,7 +390,9 @@ function Assert-DiskPreflight {
     $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
     if ($level -in @('normal', 'warning')) { return $backingPath }
 
-    Invoke-BuildCachePrune | Out-Null
+    if (-not (Invoke-BuildCachePrune)) {
+        throw 'build_cache_prune_failed'
+    }
     $freeBytes = Get-FcpResourceFreeBytes -BackingPath $backingPath
     $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
     if ($level -in @('normal', 'warning')) { return $backingPath }
