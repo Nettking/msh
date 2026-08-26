@@ -54,6 +54,11 @@ def _fake_host_tools(tmp_path: Path, calls: Path) -> dict[str, str]:
     )
     env = os.environ.copy()
     env["PATH"] = str(bin_dir) + os.pathsep + env["PATH"]
+    # These execution fixtures exercise the child launcher body with fake host
+    # tools. The real outer lease process is covered independently by the B04
+    # host-mutation tests and cannot be emulated by this intentionally tiny fake
+    # Python executable.
+    env["FCP_HOST_MUTATION_LEASE_ACTIVE"] = "1"
     return env
 
 
