@@ -5,6 +5,13 @@ read-only remote coordinator facade used by paired members. The immutable
 session creator is term 1. Only coordinator-authored ``session.leader.changed``
 events may advance the active leader and every transition must form one
 contiguous monotonic chain.
+
+Leadership is an authority decision, so a bounded read of the authoritative log
+is only usable once it has reached the coordinator's current revision. A page
+budget that runs out before then is reported as an explicit bounded failure:
+answering from the prefix would keep granting leader authority to a node whose
+handover is recorded past the ceiling, and would refuse it to the node that
+actually holds it.
 """
 
 from __future__ import annotations
@@ -12,12 +19,17 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from catalog.federation.authoritative_replay import replay_authoritative_history
 from catalog.federation.errors import FederationOperationError
 from catalog.federation.session_leadership import (
     INITIAL_TERM,
     LEADER_CHANGED_EVENT,
     LEADERSHIP_SCHEMA,
 )
+
+#: One authoritative leadership read stays within this bounded page budget.
+MAX_LEADERSHIP_REPLAY_PAGES = 128
+LEADERSHIP_REPLAY_PAGE_EVENTS = 1_000
 
 
 @dataclass(frozen=True)
@@ -53,11 +65,15 @@ def _replay_page(
             session_id=session_id,
             actor_node_id=actor_node_id,
             last_applied_revision=last_revision,
-            limit=1_000,
+            limit=LEADERSHIP_REPLAY_PAGE_EVENTS,
         )
-        return tuple(page), int(current_revision)
+        return tuple(page), current_revision
     replay = getattr(coordinator, "replay", None)
     if callable(replay):
+        # Compatibility facades that expose only the unpaged reader answer in
+        # one window. ``EventLog.replay`` already fails closed above that
+        # window, so the revision the events carry is the whole answer; this
+        # branch claims no completeness beyond what that reader proved.
         events = tuple(
             replay(
                 session_id=session_id,
@@ -79,18 +95,13 @@ def resolve_federation_leader(context: Any) -> FederationLeaderAuthority:
     coordinator_id = str(getattr(coordinator, "coordinator_id", "") or "")
     leader = creator
     term = INITIAL_TERM
-    last_revision = 0
 
     # Some compatibility/test facades expose only the historical session row.
     # With no event replay surface there is provably no transferable-leadership
     # evidence to consume, so retain the established term-1 creator semantics.
-    first_page = _replay_page(
-        coordinator,
-        session_id=session_id,
-        actor_node_id=actor,
-        last_revision=last_revision,
-    )
-    if first_page is None:
+    if not callable(getattr(coordinator, "replay_page", None)) and not callable(
+        getattr(coordinator, "replay", None)
+    ):
         if not creator:
             raise FederationOperationError(
                 "federation-leadership-unavailable",
@@ -103,13 +114,9 @@ def resolve_federation_leader(context: Any) -> FederationLeaderAuthority:
             term=INITIAL_TERM,
         )
 
-    pending_page: tuple[tuple[Any, ...], int] | None = first_page
-    for _ in range(128):
-        if pending_page is None:
-            break
-        events, current_revision = pending_page
+    def _apply(events: tuple[Any, ...]) -> None:
+        nonlocal creator, leader, term
         for event in events:
-            last_revision = int(event.revision)
             if event.event_type == "session.created":
                 candidate = getattr(event, "actor_node_id", None)
                 if not isinstance(candidate, str) or not candidate:
@@ -153,14 +160,19 @@ def resolve_federation_leader(context: Any) -> FederationLeaderAuthority:
                 )
             leader = next_leader
             term = next_term
-        if not events or last_revision >= current_revision:
-            break
-        pending_page = _replay_page(
+
+    # A leader resolved from an unfinished read is not the current leader. The
+    # bounded reader raises rather than returning the prefix it managed to fold.
+    replay_authoritative_history(
+        lambda last_revision: _replay_page(
             coordinator,
             session_id=session_id,
             actor_node_id=actor,
             last_revision=last_revision,
-        )
+        ),
+        apply_page=_apply,
+        max_pages=MAX_LEADERSHIP_REPLAY_PAGES,
+    )
 
     if not creator or not leader:
         raise FederationOperationError(
@@ -185,6 +197,8 @@ def require_federation_leader(context: Any) -> FederationLeaderAuthority:
 
 __all__ = [
     "FederationLeaderAuthority",
+    "LEADERSHIP_REPLAY_PAGE_EVENTS",
+    "MAX_LEADERSHIP_REPLAY_PAGES",
     "require_federation_leader",
     "resolve_federation_leader",
 ]
