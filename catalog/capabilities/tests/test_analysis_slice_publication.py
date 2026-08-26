@@ -419,7 +419,14 @@ def test_a_source_rewritten_mid_comparison_reports_non_current_not_corrupt(
 def test_an_unstable_source_fails_closed_within_the_bounded_attempts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Packing retries are finite: an endlessly changing source is not a loop."""
+    """Packing retries are finite: an endlessly changing source is not a loop.
+
+    The instability is injected at the stability check itself rather than by
+    rewriting the file and hoping the filesystem notices. A same-length rewrite
+    is invisible to a platform whose inode and timestamp resolution cannot
+    separate two writes in the same tick, which would silently turn this into a
+    test of clock granularity instead of the retry bound.
+    """
 
     root = tmp_path / "input"
     root.mkdir()
@@ -427,22 +434,23 @@ def test_an_unstable_source_fails_closed_within_the_bounded_attempts(
     source.write_text('{"n":0}\n', encoding="utf-8")
     destination = tmp_path / "artifacts" / "slice.tar.gz"
     destination.parent.mkdir(parents=True, exist_ok=True)
-    attempts = {"count": 0}
-    real_addfile = packaging.tarfile.TarFile.addfile
+    calls = {"count": 0}
+    real_signature = packaging._stat_signature
 
-    def _rewrite_during_pack(self, tarinfo, fileobj=None):
-        attempts["count"] += 1
-        result = real_addfile(self, tarinfo, fileobj)
-        # The source is rewritten before this attempt's stability check.
-        source.write_text(f'{{"n":{attempts["count"]}}}\n', encoding="utf-8")
-        return result
+    def _always_moving(value):
+        calls["count"] += 1
+        signature = real_signature(value)
+        if calls["count"] % 2 == 0:  # every post-read stat sees a newer file
+            return (*signature[:3], signature[3] + 1, signature[4])
+        return signature
 
-    monkeypatch.setattr(packaging.tarfile.TarFile, "addfile", _rewrite_during_pack)
+    monkeypatch.setattr(packaging, "_stat_signature", _always_moving)
 
     with pytest.raises(FederationValidationError) as error:
         packaging.write_slice_archive(destination, files=(source,), root=root)
 
     assert error.value.code == "analysis-slice-source-changing"
-    assert attempts["count"] == packaging._SOURCE_STABILITY_ATTEMPTS
+    # Two stats per member per attempt, and never more attempts than the bound.
+    assert calls["count"] == 2 * packaging._SOURCE_STABILITY_ATTEMPTS
     assert not destination.exists()
     assert list(destination.parent.glob(f".{destination.name}.*.partial")) == []
