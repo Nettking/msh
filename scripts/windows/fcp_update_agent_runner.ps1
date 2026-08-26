@@ -13,6 +13,7 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
 
 $RequestSchema = 'fcp.host-update-request.v1'
+$BuildCacheKeepBytes = 8589934592
 $MaxBytes = 8192
 
 function Normalize-DirectoryPath([string]$Value) {
@@ -49,6 +50,25 @@ function Test-ApplyRequest([string]$Path) {
         )
     }
     catch { return $false }
+}
+
+function Invoke-PostBuildCachePrune {
+    # During an apply, PATH points at the private docker proxy. The legacy
+    # command shape is intentionally retained so the mature engine/runner
+    # contract stays stable, but the proxy maps it to checkout-scoped Buildx
+    # cleanup and never to Docker's global default-builder cache.
+    try {
+        & docker builder prune --force "--keep-storage=$BuildCacheKeepBytes" | Out-Null
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "FCP update cache cleanup returned exit code $LASTEXITCODE."
+            return $false
+        }
+        return $true
+    }
+    catch {
+        Write-Warning "FCP update cache cleanup failed: $($_.Exception.Message)"
+        return $false
+    }
 }
 
 function Start-ReplacementRunner {
@@ -192,6 +212,11 @@ try {
                 -Once
             $engineExit = $LASTEXITCODE
 
+            # Keep the old runner cleanup point, but while the private docker
+            # proxy is still active so this can only touch the FCP Buildx builder.
+            if ($isApply) {
+                Invoke-PostBuildCachePrune | Out-Null
+            }
             if ($engineExit -ne 0) {
                 Write-Warning "FCP update engine exited with code $engineExit."
             }
