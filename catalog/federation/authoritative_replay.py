@@ -62,13 +62,13 @@ def replay_authoritative_history(
 
     ``read_page`` receives the highest revision applied so far and returns the
     next bounded page together with the coordinator's current revision. Pages
-    are applied in order; the read succeeds only when the last applied revision
-    has caught up with that reported current revision.
+    are applied in exact contiguous revision order; the read succeeds only when
+    the last applied revision equals that reported current revision.
 
     Returns the proven revision. Raises :class:`AuthoritativeReplayIncomplete`
     when the page budget is exhausted first, when a page makes no forward
-    progress while history remains, or when the reader does not report usable
-    revisions at all.
+    progress, skips a revision, contradicts the coordinator's current revision,
+    or when the reader does not report usable revisions at all.
     """
 
     if isinstance(max_pages, bool) or not isinstance(max_pages, int) or max_pages < 1:
@@ -82,6 +82,10 @@ def replay_authoritative_history(
             )
         page, reported_revision = result
         current_revision = _revision(reported_revision, "current revision")
+        if current_revision < last_revision:
+            raise AuthoritativeReplayIncomplete(
+                "authoritative replay reported a current revision behind applied history"
+            )
         events = tuple(page)
         for event in events:
             revision = _revision(getattr(event, "revision", None), "event revision")
@@ -89,9 +93,17 @@ def replay_authoritative_history(
                 raise AuthoritativeReplayIncomplete(
                     "authoritative replay returned a non-advancing event revision"
                 )
+            if revision != last_revision + 1:
+                raise AuthoritativeReplayIncomplete(
+                    "authoritative replay returned a non-contiguous event revision"
+                )
+            if revision > current_revision:
+                raise AuthoritativeReplayIncomplete(
+                    "authoritative replay returned an event beyond its current revision"
+                )
             last_revision = revision
         apply_page(events)
-        if last_revision >= current_revision:
+        if last_revision == current_revision:
             return last_revision
         if not events:
             # The coordinator still reports later history than this reader
