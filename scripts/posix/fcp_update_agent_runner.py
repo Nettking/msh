@@ -31,6 +31,7 @@ if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
 from catalog.federation import host_build
+from catalog.federation.agent_log import bound_agent_log
 
 ENGINE_NAME = "fcp_update_engine.py"
 MAX_REQUEST_BYTES = 8192
@@ -204,6 +205,9 @@ def main() -> int:
             return 0
 
         while True:
+            # This process owns the singleton lock, so it is the one writer that
+            # can decide when its own log has grown past its bound.
+            bound_agent_log(directory)
             processed = process_once(engine, root, request_file, result_file)
             if args.once:
                 return 0
