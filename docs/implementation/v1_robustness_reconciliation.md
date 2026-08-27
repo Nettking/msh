@@ -186,6 +186,24 @@ cleanup. Physical reboot/PID-reuse coverage remains in P05/P09, and P05 still
 must inject the relay database failure through the exact Compose candidate. No
 physical evidence or acceptance state changed.
 
+The analysis-scheduler half of the publication/scheduler driver property is now
+automated-proven separately. `AnalysisWorkService`'s persistent lifecycle driver
+treats durable-store failure as an expected condition instead of dying on it,
+reads its backlog inside that guarded pass, and records consecutive failures,
+the last error code and its time behind `driver_health()`. An unexpected fault
+still stops that driver rather than becoming a restart loop, but it is recorded
+instead of leaving a stderr traceback and silently stranded queued work.
+The recorder-publication half of the same bullet is supervised one layer above
+its loop: `RecorderFederationPublicationMonitor._run` catches anything escaping
+`run_forever`, publishes a `retrying` snapshot carrying the error code, and
+retries on a bounded delay, while ordinary cycle failures surface as `failing`
+with a consecutive-failure count. That is why the analysis driver was the
+outlier -- its thread target *was* the loop, with no supervisor above it to
+record or restart anything. **Counting is left to review:** this delivery adds
+no automated coverage for a durable-store failure reaching the publication
+monitor, so the bullet is recorded as evidenced on the analysis side rather
+than claimed closed. No physical evidence or acceptance state changed.
+
 ### B07 — bounded reconstructible and cumulative metadata growth
 
 **State:** `OPEN`  

@@ -43,6 +43,39 @@ _SCHEDULING_ERRORS = (
     TimeoutError,
 )
 
+#: Failures the persistent lifecycle driver must survive rather than die on.
+#
+# The driver is the only thing that advances queue timeouts, provider
+# appearance, retry backoff and lease loss for durable work, and none of those
+# transitions is guaranteed to coincide with a new discovery or browser
+# request. Its durable stores are SQLite, so ``sqlite3.Error`` -- a locked
+# database, a transient disk I/O error -- is an ordinary condition for this
+# loop, not an unexpected one. It is deliberately absent from
+# ``_SCHEDULING_ERRORS`` above: there those errors would silently drop a job
+# from a read/projection surface, which is a different and worse trade.
+_DRIVER_RETRY_ERRORS = (*_SCHEDULING_ERRORS, sqlite3.Error)
+
+
+@dataclass(frozen=True)
+class AnalysisDriverHealth:
+    """What the persistent analysis lifecycle driver last did.
+
+    A required loop that dies leaves durable work stranded until an unrelated
+    external trigger happens to restart it. Recording why it stopped is what
+    separates "no analysis work is pending" from "nothing is driving the work
+    that is pending".
+    """
+
+    running: bool
+    stopped: bool
+    consecutive_failures: int
+    last_error_code: str | None
+    last_failure_at: datetime | None
+
+    @property
+    def failing(self) -> bool:
+        return self.consecutive_failures > 0
+
 
 def _stamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -248,6 +281,10 @@ class AnalysisWorkService:
         self._scheduling = threading.Event()
         self._scheduler_wake = threading.Event()
         self._scheduler_stop = threading.Event()
+        self._driver_lock = threading.Lock()
+        self._driver_failures = 0
+        self._driver_last_error: str | None = None
+        self._driver_last_failure_at: datetime | None = None
 
     # ------------------------------------------------------------------
 
@@ -355,18 +392,82 @@ class AnalysisWorkService:
         self._scheduler_stop.set()
         self._scheduler_wake.set()
 
+    # ------------------------------------------------------------------
+    # Required-loop health
+    # ------------------------------------------------------------------
+
+    def _record_driver_failure(self, exc: BaseException) -> None:
+        code = str(getattr(exc, "code", None) or type(exc).__name__)
+        try:
+            failed_at: datetime | None = self.scheduler.clock()
+        except Exception:  # noqa: BLE001 - never replace the failure being recorded
+            failed_at = None
+        with self._driver_lock:
+            self._driver_failures += 1
+            self._driver_last_error = code
+            self._driver_last_failure_at = failed_at
+
+    def _record_driver_success(self) -> None:
+        with self._driver_lock:
+            self._driver_failures = 0
+            self._driver_last_error = None
+            self._driver_last_failure_at = None
+
+    def driver_health(self) -> AnalysisDriverHealth:
+        """Report whether the persistent lifecycle driver is actually driving."""
+
+        with self._driver_lock:
+            return AnalysisDriverHealth(
+                running=self._scheduling.is_set(),
+                stopped=self._scheduler_stop.is_set(),
+                consecutive_failures=self._driver_failures,
+                last_error_code=self._driver_last_error,
+                last_failure_at=self._driver_last_failure_at,
+            )
+
+    def _pending_job_ids_or_none(self) -> tuple[str, ...] | None:
+        """Read pending work without letting a store failure escape cleanup."""
+
+        try:
+            return self.pending_job_ids()
+        except Exception:  # noqa: BLE001 - cleanup must not mask the real failure
+            return None
+
     def _background_pass(self) -> None:
         try:
             while not self._scheduler_stop.is_set():
                 self._scheduler_wake.clear()
                 try:
                     asyncio.run(self.schedule_pending())
-                except _SCHEDULING_ERRORS:
-                    # A transient scheduling/control failure is exactly the case
-                    # the persistent driver exists to revisit.
-                    pass
-                if self._scheduler_stop.is_set() or not self.pending_job_ids():
-                    return
+                    # Reading the remaining work is part of the pass, not of
+                    # the loop's scaffolding: a durable-store failure here used
+                    # to escape the guard below and kill the driver just as
+                    # surely as a failed scheduling attempt.
+                    pending = self.pending_job_ids()
+                except _DRIVER_RETRY_ERRORS as exc:
+                    # A transient scheduling/control/durable-store failure is
+                    # exactly the case the persistent driver exists to revisit.
+                    # It is retried, but it is no longer invisible: a loop that
+                    # keeps failing must not look like an idle healthy one.
+                    self._record_driver_failure(exc)
+                    # A failed pass must not be read as "there is nothing left
+                    # to drive", but a driver whose work has genuinely drained
+                    # must still be able to stop. Only a successful read of an
+                    # empty backlog ends the loop; an unreadable one keeps it.
+                    if self._pending_job_ids_or_none() == ():
+                        return
+                except BaseException as exc:
+                    # Unexpected: this driver stops. Record why, so the exit is
+                    # an observable degraded state rather than a stderr
+                    # traceback and silently stranded durable work. Re-arming
+                    # here instead would turn one deterministic fault into an
+                    # unbounded restart loop.
+                    self._record_driver_failure(exc)
+                    raise
+                else:
+                    self._record_driver_success()
+                    if self._scheduler_stop.is_set() or not pending:
+                        return
                 self._scheduler_wake.wait(self.scheduler_poll_seconds)
         finally:
             self._scheduling.clear()
@@ -375,8 +476,8 @@ class AnalysisWorkService:
             # stopped/superseded runtime must never resurrect its driver.
             if (
                 not self._scheduler_stop.is_set()
-                and self.pending_job_ids()
                 and self._scheduler_wake.is_set()
+                and self._pending_job_ids_or_none()
             ):
                 self.request_scheduling_pass()
 
@@ -399,6 +500,7 @@ class AnalysisWorkService:
 
 
 __all__ = [
+    "AnalysisDriverHealth",
     "AnalysisJobRecord",
     "AnalysisJobRegistry",
     "AnalysisWorkService",
