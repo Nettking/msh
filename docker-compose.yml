@@ -1,3 +1,37 @@
+# FCP-owned container log retention.
+#
+# Docker's json-file driver does not rotate at all unless max-size is set, so
+# without this every supported service writes a lifetime log to the host and
+# the only bound is whatever the host daemon happens to be configured with.
+# A host default is not an FCP cumulative bound.
+#
+# The recorder makes the gap concrete: catalog/mtconnect_recorder/runtime.py
+# attaches both a RotatingFileHandler(maxBytes=2_000_000, backupCount=3) and a
+# StreamHandler to the same logger at the same level, so FCP already decided
+# ~8 MB is the right retention for exactly those bytes -- while the identical
+# stdout copy grew without limit.
+#
+# This is a retention bound, not a health signal. `docker compose logs --tail`
+# keeps working, and the bound is per container, so the worst case is
+# max-size x max-file for each service. It is size-based, so no clock change
+# can retire a log early, and it deletes nothing itself: the daemon rotates its
+# own files, and no volume, image or unrelated container is touched.
+#
+# The driver is pinned deliberately rather than inherited, because these
+# options are only guaranteed to apply to a driver FCP chose. A host that
+# centralises logs elsewhere should override this per service in a
+# docker-compose.override.yml rather than unsetting the bound here.
+# The bound is literal, not substituted. An interpolated default is only a
+# default: the environment could supply max-size "-1", which json-file reads as
+# unlimited, and the cumulative bound FCP owns would disappear silently through
+# ordinary supported configuration. Nothing in the product asks for tunable
+# retention, so there is no requirement here to trade that away for.
+x-fcp-container-logging: &fcp-container-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   flask:
     build:
@@ -51,6 +85,7 @@ services:
         source: relay_state
         target: /var/lib/fcp-relay
     restart: unless-stopped
+    logging: *fcp-container-logging
 
   ollama:
     image: ollama/ollama:0.32.6@sha256:b88c73ace3e115f8ec53dc8761ae1c0aabfa675406e3681786b98757ce050f42
@@ -65,6 +100,7 @@ services:
       timeout: 5s
       retries: 30
       start_period: 5s
+    logging: *fcp-container-logging
 
   ollama-pull:
     profiles: ["model-install"]
@@ -76,6 +112,7 @@ services:
       - OLLAMA_HOST=http://ollama:11434
     entrypoint: ["/bin/ollama"]
     command: ["pull", "${FCP_AI_MODEL:-llama3.2:3b}"]
+    logging: *fcp-container-logging
 
   model-provider:
     profiles: ["provider"]
@@ -98,6 +135,7 @@ services:
     labels:
       - "no.fcp.capability=language-model"
       - "no.fcp.protocol=ollama"
+    logging: *fcp-container-logging
 
   model-provider-install:
     profiles: ["provider"]
@@ -109,6 +147,7 @@ services:
       - OLLAMA_HOST=http://model-provider:11434
     entrypoint: ["/bin/ollama"]
     command: ["pull", "${FCP_PROVIDER_MODEL:-smollm2:360m}"]
+    logging: *fcp-container-logging
 
   recorder:
     build:
@@ -139,6 +178,7 @@ services:
         source: ${FCP_DATA_DIR:-./data}
         target: /app/data
     restart: unless-stopped
+    logging: *fcp-container-logging
 
   relay:
     # Authenticated development relay for copy-and-paste pairing on a trusted
@@ -169,6 +209,7 @@ services:
         source: relay_state
         target: /var/lib/fcp-relay
     restart: unless-stopped
+    logging: *fcp-container-logging
 
   prep:
     profiles: ["prep"]
@@ -184,6 +225,7 @@ services:
       - type: bind
         source: ${FCP_RESULTS_DIR:-./results}
         target: /app/results
+    logging: *fcp-container-logging
 
   observer-sync:
     profiles: ["observer-sync"]
@@ -200,6 +242,7 @@ services:
       - type: bind
         source: ${FCP_RESULTS_DIR:-./results}
         target: /app/results
+    logging: *fcp-container-logging
 
 volumes:
   ollama_models:
