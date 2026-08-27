@@ -44,6 +44,24 @@ PROVIDER_HEALTH_OBSERVATION_SCHEMA = "fcp.provider-health-observation.v1"
 PROVIDER_HEALTH_AUDIT_SCHEMA = "fcp.provider-health-audit.v1"
 PROVIDER_HEALTH_STORE_SCHEMA_VERSION = 1
 MAX_HEALTH_AUDIT_READ = 10_000
+
+#: Retained rows in the recurring provider health audit history.
+#
+# This history is written once per accepted operation and never read in full:
+# the only consumer orders by ``audit_id`` descending and is itself capped at
+# ``MAX_HEALTH_AUDIT_READ``. Past that point every further row is unreadable by any
+# production consumer while still consuming pages forever.
+#
+# The bound mirrors the coordinator audit ring in
+# ``catalog/federation/persistence.py``: retire by monotonic ``audit_id`` in the
+# same transaction as the insert. Ordering by id rather than by timestamp means
+# no clock change can retire a row early, the work per insert is bounded, and
+# the retention frontier survives restart because it is the table's own id
+# order rather than separate state.
+#
+# This is a logical row bound. SQLite reuses the freed pages, so the database
+# stops growing; it does not shrink without an explicit VACUUM.
+MAX_HEALTH_AUDIT_ROWS = 100_000
 MAX_TEXT_BYTES = 512
 
 
@@ -640,6 +658,20 @@ class SQLiteProviderHealthStore:
                 record.report_revision,
                 _stamp(occurred_at),
             ),
+        )
+        database.execute(
+            """
+            DELETE FROM provider_health_audit
+            WHERE audit_id <= COALESCE(
+                (
+                    SELECT audit_id FROM provider_health_audit
+                    ORDER BY audit_id DESC
+                    LIMIT 1 OFFSET ?
+                ),
+                -1
+            )
+            """,
+            (MAX_HEALTH_AUDIT_ROWS,),
         )
 
     @staticmethod
