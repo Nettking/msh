@@ -64,8 +64,8 @@ def test_the_compose_file_declares_one_shared_retention_policy() -> None:
     # An explicit driver is the point: options are only guaranteed to apply to
     # a driver FCP chose, not to whichever driver the host daemon defaults to.
     assert 'driver: "json-file"' in text
-    assert 'max-size: "${FCP_CONTAINER_LOG_MAX_SIZE:-10m}"' in text
-    assert 'max-file: "${FCP_CONTAINER_LOG_MAX_FILE:-3}"' in text
+    assert 'max-size: "10m"' in text
+    assert 'max-file: "3"' in text
 
 
 def test_every_supported_service_is_bounded_by_that_policy() -> None:
@@ -102,8 +102,8 @@ def test_the_retention_bound_is_a_finite_size_and_count() -> None:
     """A bound that is not a finite size x count is not a bound."""
 
     text = COMPOSE.read_text(encoding="utf-8")
-    size = re.search(r"max-size: \"\$\{FCP_CONTAINER_LOG_MAX_SIZE:-([^}]+)\}\"", text)
-    count = re.search(r"max-file: \"\$\{FCP_CONTAINER_LOG_MAX_FILE:-([^}]+)\}\"", text)
+    size = re.search(r"max-size: \"([^\"]+)\"", text)
+    count = re.search(r"max-file: \"([^\"]+)\"", text)
     assert size is not None and count is not None
     assert re.fullmatch(r"\d+[kmg]", size.group(1)), size.group(1)
     assert int(count.group(1)) >= 1
@@ -125,10 +125,47 @@ def test_the_bound_still_leaves_the_diagnostic_tail_every_consumer_reads() -> No
     assert '"logs", "--tail", "80"' in headless
 
     text = COMPOSE.read_text(encoding="utf-8")
-    size = re.search(r"max-size: \"\$\{FCP_CONTAINER_LOG_MAX_SIZE:-(\d+)([kmg])\}\"", text)
+    size = re.search(r"max-size: \"(\d+)([kmg])\"", text)
     assert size is not None
     scale = {"k": 1024, "m": 1024**2, "g": 1024**3}[size.group(2)]
     retained_bytes = int(size.group(1)) * scale
     # 80 lines is trivially inside one rotation unit even at a generous
     # per-line size, so the bound cannot starve that consumer.
     assert retained_bytes > 80 * 4096
+
+
+def test_no_supported_environment_value_can_remove_the_bound() -> None:
+    """The consequence of an interpolated bound.
+
+    ``${FCP_CONTAINER_LOG_MAX_SIZE:-10m}`` only supplies 10m when the variable
+    is *unset*. Docker's json-file driver reads ``max-size: -1`` as unlimited,
+    so an ordinary environment value would silently delete the cumulative bound
+    FCP claims to own. A literal is not overridable that way, and nothing in the
+    product asks for tunable retention.
+    """
+
+    text = COMPOSE.read_text(encoding="utf-8")
+    policy = text[text.index(f"x-{ANCHOR}: &{ANCHOR}") : text.index("\nservices:")]
+
+    interpolated = re.findall(r"\$\{[^}]+\}", policy)
+    assert not interpolated, (
+        "the retention bound is environment-overridable and can be set to an "
+        f"unlimited value: {interpolated}"
+    )
+
+
+def test_the_declared_bound_is_a_finite_positive_size_and_count() -> None:
+    """Whatever the literals are, they have to describe finite retention."""
+
+    text = COMPOSE.read_text(encoding="utf-8")
+    policy = text[text.index(f"x-{ANCHOR}: &{ANCHOR}") : text.index("\nservices:")]
+
+    size = re.search(r'max-size: "([^"]+)"', policy)
+    count = re.search(r'max-file: "([^"]+)"', policy)
+    assert size is not None and count is not None
+
+    # -1, 0 and bare "unlimited" are all rejected by construction here.
+    matched = re.fullmatch(r"(\d+)([kmg])", size.group(1))
+    assert matched is not None, f"not a finite size: {size.group(1)}"
+    assert int(matched.group(1)) > 0
+    assert int(count.group(1)) >= 1

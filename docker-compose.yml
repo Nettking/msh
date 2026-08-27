@@ -21,11 +21,16 @@
 # options are only guaranteed to apply to a driver FCP chose. A host that
 # centralises logs elsewhere should override this per service in a
 # docker-compose.override.yml rather than unsetting the bound here.
+# The bound is literal, not substituted. An interpolated default is only a
+# default: the environment could supply max-size "-1", which json-file reads as
+# unlimited, and the cumulative bound FCP owns would disappear silently through
+# ordinary supported configuration. Nothing in the product asks for tunable
+# retention, so there is no requirement here to trade that away for.
 x-fcp-container-logging: &fcp-container-logging
   driver: "json-file"
   options:
-    max-size: "${FCP_CONTAINER_LOG_MAX_SIZE:-10m}"
-    max-file: "${FCP_CONTAINER_LOG_MAX_FILE:-3}"
+    max-size: "10m"
+    max-file: "3"
 
 services:
   flask:
