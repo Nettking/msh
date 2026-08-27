@@ -19,6 +19,7 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .docker_resources import docker_backing_resource_path
+from .image_retirement import retire_superseded_images
 from .host_resources import PressureLevel, ProcessResourceAdmission, ResourceAssessment
 
 try:  # pragma: no cover - exercised only on supported POSIX hosts
@@ -208,6 +209,14 @@ def build_core_images_locked(
     after = resolve_clean_commit(root)
     if after != commit:
         raise RuntimeError("build_context_changed")
+
+    # Only now is the transition verified: the build succeeded, its cache
+    # lifecycle completed, and the source identity still proves out. The images
+    # the Compose tags used to point at are superseded from this point, and
+    # nothing else in the product has ever removed one. Reclaiming that space
+    # is best effort and must never turn an accepted build into a failed one,
+    # so a refusal or an unreadable daemon simply leaves the images in place.
+    retire_superseded_images(root, build_env, active_commit=commit)
     return commit
 
 
