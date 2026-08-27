@@ -19,8 +19,8 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from .docker_resources import docker_backing_resource_path
-from .image_retirement import retire_superseded_images
 from .host_resources import PressureLevel, ProcessResourceAdmission, ResourceAssessment
+from .image_retirement import retire_superseded_images
 
 try:  # pragma: no cover - exercised only on supported POSIX hosts
     import fcntl
