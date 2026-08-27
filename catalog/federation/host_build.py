@@ -200,6 +200,47 @@ def _run_in_own_process_group(
     return subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
 
 
+def _process_group_exists(process: subprocess.Popen[str], pgid: int) -> bool:
+    """Return whether any process remains in the helper's isolated group.
+
+    ``Popen.poll`` reaps the direct child when it has exited. That matters because
+    a dead-but-unreaped Docker parent can otherwise make a signal-0 group probe
+    look live even after the parent has stopped.
+    """
+
+    try:
+        process.poll()
+    except OSError:
+        pass
+    killpg = getattr(os, "killpg", None)
+    if not callable(killpg):
+        return process.poll() is None
+    try:
+        killpg(pgid, 0)
+    except ProcessLookupError:
+        return False
+    except OSError:
+        # A group we cannot positively inspect is treated as still live.
+        return True
+    return True
+
+
+def _wait_for_process_group_exit(
+    process: subprocess.Popen[str],
+    pgid: int,
+    timeout: float,
+) -> bool:
+    """Wait a bounded interval for every member of one process group to exit."""
+
+    deadline = time.monotonic() + max(timeout, 0.0)
+    while _process_group_exists(process, pgid):
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(0.05, remaining))
+    return True
+
+
 def _terminate_process_group(process: subprocess.Popen[str]) -> None:
     """Take down the whole group so no Buildx plugin child survives."""
 
@@ -211,23 +252,27 @@ def _terminate_process_group(process: subprocess.Popen[str]) -> None:
                 stop()
             except OSError:
                 pass
+        try:
+            process.wait(timeout=BUILD_CLIENT_SETTLE_SECONDS)
+        except subprocess.TimeoutExpired as exc:
+            raise RuntimeError("docker_process_group_stop_unverified") from exc
         return
+
     for signal_number in (signal.SIGTERM, signal.SIGKILL):
         try:
             killpg(pid, signal_number)
         except ProcessLookupError:
             return
-        except OSError:
+        except OSError as exc:
             try:
                 process.kill()
             except OSError:
                 pass
+            raise RuntimeError("docker_process_group_stop_unverified") from exc
+        if _wait_for_process_group_exit(process, pid, BUILD_CLIENT_SETTLE_SECONDS):
             return
-        try:
-            process.wait(timeout=BUILD_CLIENT_SETTLE_SECONDS)
-            return
-        except subprocess.TimeoutExpired:
-            continue
+
+    raise RuntimeError("docker_process_group_stop_unverified")
 
 
 def _builder_inspection(

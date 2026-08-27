@@ -187,48 +187,66 @@ def test_an_unreadable_running_set_is_treated_as_a_possibly_live_writer(
 def test_a_bounded_docker_timeout_cannot_leave_a_buildx_plugin_child_running(
     monkeypatch, tmp_path: Path
 ) -> None:
-    """``docker buildx`` runs the Buildx plugin as a child process. Killing only
-    the CLI on timeout leaves that plugin free to keep mutating builder state and
-    cache after the host-mutation lock is released, which is precisely the
-    asynchronous writer B01 must not permit.
-    """
+    """A Docker parent exiting after SIGTERM is not proof its plugin child died."""
 
     observed: dict[str, object] = {}
     signals: list[int] = []
+    state = {"parent_alive": True, "group_alive": True}
 
     class _Hanging:
         pid = 4321
         returncode = None
 
         def communicate(self, timeout=None):
-            if "killed" not in observed:
+            if state["parent_alive"]:
                 raise host_build.subprocess.TimeoutExpired("docker", timeout or 0)
             return "", ""
 
         def wait(self, timeout=None):
+            if state["parent_alive"]:
+                raise host_build.subprocess.TimeoutExpired("docker", timeout or 0)
+            self.returncode = 0
+            return 0
+
+        def poll(self):
+            if state["parent_alive"]:
+                return None
+            self.returncode = 0
             return 0
 
         def kill(self):
             observed["killed"] = "direct-only"
+            state["parent_alive"] = False
 
     def fake_popen(_args, **kwargs):
         observed.update(kwargs)
         return _Hanging()
 
     def fake_killpg(_pid, signal_number):
-        observed["killed"] = "process-group"
+        if signal_number == 0:
+            if state["group_alive"]:
+                return
+            raise ProcessLookupError
         signals.append(signal_number)
+        if signal_number == host_build.signal.SIGTERM:
+            # The Docker CLI exits, but its Buildx plugin child remains in the
+            # process group. Parent exit alone must not settle the helper.
+            state["parent_alive"] = False
+            return
+        if signal_number == host_build.signal.SIGKILL:
+            state["group_alive"] = False
 
     monkeypatch.setattr(host_build.subprocess, "Popen", fake_popen)
     monkeypatch.setattr(host_build.os, "killpg", fake_killpg)
+    monkeypatch.setattr(host_build, "BUILD_CLIENT_SETTLE_SECONDS", 0.0)
 
     with pytest.raises(host_build.subprocess.TimeoutExpired):
         host_build._docker_run(
             tmp_path, ["docker", "buildx", "rm", "fcp-build-test"], env={}, timeout=1.0
         )
 
-    # Its own session, so the group that gets signalled is the Docker CLI and
-    # its plugin child rather than this process.
+    # Its own session makes PGID == PID. The parent exits on SIGTERM, but the
+    # still-live group forces an escalation that reaches the surviving plugin.
     assert observed["start_new_session"] is True
-    assert observed["killed"] == "process-group"
-    assert signals == [host_build.signal.SIGTERM]
+    assert observed.get("killed") != "direct-only"
+    assert signals == [host_build.signal.SIGTERM, host_build.signal.SIGKILL]
