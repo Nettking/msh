@@ -56,6 +56,10 @@ def test_failed_inspect_can_only_mean_absent_after_successful_enumeration(
             stderr="",
         )
         if args[:3] == ["docker", "buildx", "ls"]
+        # Absence is only absence once the driver container is also gone, so the
+        # clean host this case describes has to answer the running-set probe.
+        else SimpleNamespace(returncode=0, stdout="", stderr="")
+        if args[:2] == ["docker", "ps"]
         else SimpleNamespace(returncode=1, stdout="", stderr="unexpected"),
     )
 
@@ -182,8 +186,9 @@ def test_pressure_never_claims_safe_stop_when_client_process_group_survives(
     )
     monkeypatch.setattr(
         host_build,
-        "stop_build_writer",
-        lambda *_args, **_kwargs: events.append("writer-stop") or True,
+        "settle_build_writer",
+        lambda *_args, **_kwargs: events.append("writer-stop")
+        or host_build.BuildWriterSettlement(quiescent=True, cache_discarded=True),
     )
 
     with pytest.raises(RuntimeError, match="build_writer_stop_unverified"):

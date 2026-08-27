@@ -19,6 +19,11 @@ $BuildTimeoutSeconds = 900
 $BuildPollMilliseconds = 250
 $DockerLifecycleTimeoutSeconds = 30
 $OidPattern = '^[0-9a-f]{40}$'
+# Only these Buildx node states positively establish a stopped writer. Anything
+# else, including an unparseable or newly introduced state, is refused.
+$BuilderQuiescentStates = @('inactive', 'stopped')
+# The docker-container driver backs a builder with a container named after it.
+$BuildKitContainerPrefix = 'buildx_buildkit_'
 $DockerResourceHelper = Join-Path $PSScriptRoot 'fcp_docker_resource.ps1'
 if (-not (Test-Path -LiteralPath $DockerResourceHelper -PathType Leaf)) {
     throw 'docker_resource_helper_unavailable'
@@ -113,12 +118,18 @@ function Invoke-BoundedDockerResult(
     [int]$TimeoutSeconds = $DockerLifecycleTimeoutSeconds
 ) {
     if ($TimeoutSeconds -le 0) { throw 'docker_lifecycle_timeout_invalid' }
-    $stdoutPath = [System.IO.Path]::GetTempFileName()
-    $stderrPath = [System.IO.Path]::GetTempFileName()
+    $stdoutPath = $null
+    $stderrPath = $null
     $process = $null
     $exitCode = 127
     $failure = $null
     try {
+        # Created inside the guarded region: a temp-file failure out here would
+        # escape as an unhandled exception and skip required stop/prune work,
+        # instead of being reported as the ordinary bounded failure that every
+        # caller already treats fail-closed.
+        $stdoutPath = [System.IO.Path]::GetTempFileName()
+        $stderrPath = [System.IO.Path]::GetTempFileName()
         $process = Start-Process `
             -FilePath $script:DockerExe `
             -ArgumentList $Arguments `
@@ -127,8 +138,15 @@ function Invoke-BoundedDockerResult(
             -RedirectStandardOutput $stdoutPath `
             -RedirectStandardError $stderrPath
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-            try { $process.Kill() } catch {}
+            # Kill the tree, not just the CLI: "docker buildx" runs the Buildx
+            # plugin as a child, and a surviving plugin would keep mutating
+            # builder state and cache after the mutation lock is released.
+            try { & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Null } catch {}
             try { $process.WaitForExit(2000) | Out-Null } catch {}
+            if (-not $process.HasExited) {
+                try { $process.Kill() } catch {}
+                try { $process.WaitForExit(2000) | Out-Null } catch {}
+            }
             $exitCode = 124
         }
         else {
@@ -142,10 +160,16 @@ function Invoke-BoundedDockerResult(
     finally {
         $output = @()
         try {
-            if (Test-Path -LiteralPath $stdoutPath) {
+            if (
+                -not [string]::IsNullOrWhiteSpace([string]$stdoutPath) -and
+                (Test-Path -LiteralPath $stdoutPath)
+            ) {
                 $output += @(Get-Content -LiteralPath $stdoutPath -ErrorAction SilentlyContinue)
             }
-            if (Test-Path -LiteralPath $stderrPath) {
+            if (
+                -not [string]::IsNullOrWhiteSpace([string]$stderrPath) -and
+                (Test-Path -LiteralPath $stderrPath)
+            ) {
                 $output += @(Get-Content -LiteralPath $stderrPath -ErrorAction SilentlyContinue)
             }
         }
@@ -153,8 +177,12 @@ function Invoke-BoundedDockerResult(
         if (-not [string]::IsNullOrWhiteSpace([string]$failure)) {
             $output += [string]$failure
         }
-        Remove-Item -LiteralPath $stdoutPath -Force -ErrorAction SilentlyContinue
-        Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
+        if (-not [string]::IsNullOrWhiteSpace([string]$stdoutPath)) {
+            Remove-Item -LiteralPath $stdoutPath -Force -ErrorAction SilentlyContinue
+        }
+        if (-not [string]::IsNullOrWhiteSpace([string]$stderrPath)) {
+            Remove-Item -LiteralPath $stderrPath -Force -ErrorAction SilentlyContinue
+        }
     }
     return [pscustomobject]@{
         Output = @($output | ForEach-Object { [string]$_ })
@@ -170,13 +198,28 @@ function Get-FcpBuilderInspection([string]$Name) {
     return Invoke-BoundedDockerResult @('buildx', 'inspect', $Name)
 }
 
+function Test-FcpBuildKitContainerRunning([string]$Name) {
+    # Fails closed: if the running set cannot be established the writer is
+    # treated as possibly live rather than assumed gone.
+    $listed = Invoke-BoundedDockerResult @('ps', '--format', '{{.Names}}')
+    if ($listed.ExitCode -ne 0) { return $true }
+    $prefix = $BuildKitContainerPrefix + $Name
+    foreach ($line in @($listed.Output)) {
+        if (([string]$line).Trim().StartsWith($prefix)) { return $true }
+    }
+    return $false
+}
+
 function Test-FcpBuilderAbsent([string]$Name) {
     $listed = Invoke-BoundedDockerResult @('buildx', 'ls', '--format', '{{.Name}}')
     if ($listed.ExitCode -ne 0) { return $false }
     foreach ($line in @($listed.Output)) {
         if (([string]$line).Trim() -eq $Name) { return $false }
     }
-    return $true
+    # Buildx can drop its own store entry while the docker-container driver's
+    # BuildKit container keeps running, so disappearing from enumeration does
+    # not by itself prove the writer is gone.
+    return -not (Test-FcpBuildKitContainerRunning $Name)
 }
 
 function Get-FcpBuilderDriver([object]$Inspection) {
@@ -202,10 +245,15 @@ function Test-FcpBuilderStopped([string]$Name) {
         }
     }
     if ($statuses.Count -eq 0) { return $false }
+    # Whitelist, not blacklist: an unrecognised or newly introduced Buildx state
+    # is refused rather than read as safe, because cache is discarded on the
+    # strength of this reading.
     foreach ($status in $statuses) {
-        if ($status -in @('running', 'starting')) { return $false }
+        if ($status -notin $BuilderQuiescentStates) { return $false }
     }
-    return $true
+    # The builder record saying "stopped" describes the record, not the process
+    # holding the cache open, so the driver container is checked as well.
+    return -not (Test-FcpBuildKitContainerRunning $Name)
 }
 
 function Remove-FcpBuilder([string]$Name) {
@@ -218,15 +266,26 @@ function Remove-FcpBuilder([string]$Name) {
     return Test-FcpBuilderAbsent $Name
 }
 
-function Stop-FcpBuildWriter([string]$Name, [switch]$DiscardCache) {
+function Settle-FcpBuildWriter([string]$Name, [switch]$DiscardCache) {
+    # Quiescence and cache discard are separate claims. A caller that promises
+    # the cache was bounded must not be handed a result that only proves the
+    # writer stopped, so both facts are reported rather than collapsed.
     $stopped = Invoke-BoundedDockerResult @('buildx', 'stop', $Name)
     if ($stopped.ExitCode -eq 0 -and (Test-FcpBuilderStopped $Name)) {
-        if ($DiscardCache) {
-            Remove-FcpBuilder $Name | Out-Null
+        if (-not $DiscardCache) {
+            return [pscustomobject]@{ Quiescent = $true; CacheDiscarded = $false }
         }
-        return $true
+        return [pscustomobject]@{
+            Quiescent = $true
+            CacheDiscarded = [bool](Remove-FcpBuilder $Name)
+        }
     }
-    return Remove-FcpBuilder $Name
+    $removed = [bool](Remove-FcpBuilder $Name)
+    return [pscustomobject]@{ Quiescent = $removed; CacheDiscarded = $removed }
+}
+
+function Stop-FcpBuildWriter([string]$Name, [switch]$DiscardCache) {
+    return (Settle-FcpBuildWriter $Name -DiscardCache:$DiscardCache).Quiescent
 }
 
 function Ensure-FcpControllableBuilder {
@@ -328,17 +387,23 @@ function Invoke-ControlledCoreBuild([string]$BackingPath) {
         $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
         if ($level -in @('pressure', 'critical')) {
             $clientStopped = Stop-BuildClient $process
-            $writerStopped = Stop-FcpBuildWriter $name -DiscardCache
-            if (-not $clientStopped -or -not $writerStopped) {
+            $settled = Settle-FcpBuildWriter $name -DiscardCache
+            if (-not $clientStopped -or -not $settled.Quiescent) {
                 throw 'build_writer_stop_unverified'
+            }
+            if (-not $settled.CacheDiscarded) {
+                throw 'build_cache_discard_failed'
             }
             throw 'build_resource_pressure'
         }
         if ([DateTimeOffset]::UtcNow -ge $deadline) {
             $clientStopped = Stop-BuildClient $process
-            $writerStopped = Stop-FcpBuildWriter $name -DiscardCache
-            if (-not $clientStopped -or -not $writerStopped) {
+            $settled = Settle-FcpBuildWriter $name -DiscardCache
+            if (-not $clientStopped -or -not $settled.Quiescent) {
                 throw 'build_writer_stop_unverified'
+            }
+            if (-not $settled.CacheDiscarded) {
+                throw 'build_cache_discard_failed'
             }
             throw 'core_image_build_timeout'
         }
@@ -403,8 +468,12 @@ function Assert-DiskPreflight {
         return $backingPath
     }
 
-    if (-not (Stop-FcpBuildWriter $name -DiscardCache)) {
+    $settled = Settle-FcpBuildWriter $name -DiscardCache
+    if (-not $settled.Quiescent) {
         throw 'build_writer_stop_unverified'
+    }
+    if (-not $settled.CacheDiscarded) {
+        throw 'build_cache_discard_failed'
     }
     $freeBytes = Get-FcpResourceFreeBytes -BackingPath $backingPath
     $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
@@ -465,15 +534,18 @@ try {
         }
         $freeBytes = Get-FcpResourceFreeBytes -BackingPath $backingPath
         $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
+        # Quiescence is proved on every branch before anything is discarded.
+        # Pruning is the branch that destroys cache, so it is the branch that
+        # most needs the writer proven dead first: an abandoned checkout-scoped
+        # BuildKit daemon left by an earlier crash would otherwise still be
+        # writing into the cache being pruned.
+        $name = Get-FcpBuilderName
+        if (-not (Test-FcpBuilderStopped $name) -and -not (Stop-FcpBuildWriter $name)) {
+            throw 'build_writer_stop_unverified'
+        }
         if ($level -in @('pressure', 'critical')) {
             if (-not (Invoke-BuildCachePrune)) {
                 throw 'build_cache_prune_failed'
-            }
-        }
-        else {
-            $name = Get-FcpBuilderName
-            if (-not (Test-FcpBuilderStopped $name) -and -not (Stop-FcpBuildWriter $name)) {
-                throw 'build_writer_stop_unverified'
             }
         }
         exit 0

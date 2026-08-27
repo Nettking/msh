@@ -93,9 +93,10 @@ def test_build_pressure_discards_fcp_builder_then_remeasures_same_resource(
     monkeypatch.setattr(host_build, "builder_name", lambda _root: "fcp-build-test")
     monkeypatch.setattr(
         host_build,
-        "stop_build_writer",
+        "settle_build_writer",
         lambda _root, name, _env, *, discard_cache=False: (
-            stopped.append((name, discard_cache)) or True
+            stopped.append((name, discard_cache))
+            or host_build.BuildWriterSettlement(quiescent=True, cache_discarded=True)
         ),
     )
 
@@ -118,7 +119,13 @@ def test_build_refuses_if_docker_resource_stays_under_pressure(
             _assessment(PressureLevel.CRITICAL, 10 * 1024**3),
         ],
     )
-    monkeypatch.setattr(host_build, "stop_build_writer", lambda *_args, **_kwargs: True)
+    monkeypatch.setattr(
+        host_build,
+        "settle_build_writer",
+        lambda *_args, **_kwargs: host_build.BuildWriterSettlement(
+            quiescent=True, cache_discarded=True
+        ),
+    )
 
     with pytest.raises(RuntimeError, match="insufficient_disk_for_update"):
         host_build.preflight_disk(tmp_path, {})
@@ -248,9 +255,10 @@ def test_active_build_stops_at_pressure_and_proves_writer_quiescent(
     stopped: list[tuple[str, bool]] = []
     monkeypatch.setattr(
         host_build,
-        "stop_build_writer",
+        "settle_build_writer",
         lambda _root, name, _env, *, discard_cache=False: (
-            stopped.append((name, discard_cache)) or True
+            stopped.append((name, discard_cache))
+            or host_build.BuildWriterSettlement(quiescent=True, cache_discarded=True)
         ),
     )
     monkeypatch.setattr(host_build.time, "sleep", lambda _seconds: None)
@@ -295,7 +303,13 @@ def test_pressure_stop_failure_is_distinct_from_ordinary_resource_pressure(
         "Popen",
         lambda *_args, **_kwargs: _Process([None, None, None]),
     )
-    monkeypatch.setattr(host_build, "stop_build_writer", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        host_build,
+        "settle_build_writer",
+        lambda *_args, **_kwargs: host_build.BuildWriterSettlement(
+            quiescent=False, cache_discarded=False
+        ),
+    )
     monkeypatch.setattr(host_build.time, "sleep", lambda _seconds: None)
 
     with pytest.raises(RuntimeError, match="build_writer_stop_unverified"):

@@ -35,7 +35,7 @@ def test_windows_active_build_stops_client_tree_and_proves_writer_at_pressure() 
     assert "Get-FcpResourceFreeBytes -BackingPath $BackingPath" in build
     assert "$level -in @('pressure', 'critical')" in build
     assert build.index("Stop-BuildClient $process") < build.index(
-        "Stop-FcpBuildWriter $name -DiscardCache"
+        "Settle-FcpBuildWriter $name -DiscardCache"
     )
     assert "build_writer_stop_unverified" in build
     assert "build_resource_pressure" in build

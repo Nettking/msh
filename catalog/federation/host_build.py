@@ -19,6 +19,7 @@ import sys
 import time
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 
 from .docker_resources import docker_backing_resource_path
@@ -42,6 +43,16 @@ BUILD_CLIENT_SETTLE_SECONDS = 10.0
 BUILDER_STOP_TIMEOUT_SECONDS = 30.0
 BUILDER_PREFIX = "fcp-build-"
 CORE_BUILD_SERVICES = ("relay", "flask", "recorder")
+# Only these Buildx node states positively establish that the BuildKit writer is
+# not running. Treating "anything that is not running" as quiescent is a
+# blacklist: an unparseable, empty, or newly introduced state would silently be
+# read as safe, and cache is discarded on the strength of that reading. Anything
+# outside this set is refused instead.
+BUILDER_QUIESCENT_STATES = frozenset({"inactive", "stopped"})
+# The docker-container driver backs a builder with a container named after the
+# builder itself. Buildx can drop its own store entry while that container
+# survives, so builder-store absence alone is not writer absence.
+BUILDKIT_CONTAINER_PREFIX = "buildx_buildkit_"
 
 
 def _run_git(root: Path, *args: str) -> subprocess.CompletedProcess[str]:
@@ -144,16 +155,79 @@ def _docker_run(
     env: Mapping[str, str],
     timeout: float = 120.0,
 ) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
+    # ``subprocess.run`` kills only the process it spawned when a timeout
+    # expires. ``docker buildx`` execs the Buildx plugin as a child, so killing
+    # the CLI alone can leave that plugin running: it would keep mutating
+    # builder state and cache after this process released the host-mutation
+    # lock. Give every bounded Docker invocation its own process group and take
+    # the whole group down, the same way the long-lived build client is settled.
+    return _run_in_own_process_group(
         args,
         cwd=root,
         env=dict(env),
-        shell=False,
-        check=False,
-        capture_output=True,
-        text=True,
         timeout=timeout,
     )
+
+
+def _run_in_own_process_group(
+    args: list[str],
+    *,
+    cwd: Path,
+    env: dict[str, str],
+    timeout: float,
+) -> subprocess.CompletedProcess[str]:
+    """Run a bounded command so a timeout cannot orphan a plugin child."""
+
+    process = subprocess.Popen(
+        args,
+        cwd=cwd,
+        env=env,
+        shell=False,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        text=True,
+        start_new_session=True,
+    )
+    try:
+        stdout, stderr = process.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _terminate_process_group(process)
+        try:
+            stdout, stderr = process.communicate(timeout=BUILD_CLIENT_SETTLE_SECONDS)
+        except subprocess.TimeoutExpired:
+            stdout, stderr = "", ""
+        raise subprocess.TimeoutExpired(args, timeout, output=stdout, stderr=stderr)
+    return subprocess.CompletedProcess(args, process.returncode, stdout, stderr)
+
+
+def _terminate_process_group(process: subprocess.Popen[str]) -> None:
+    """Take down the whole group so no Buildx plugin child survives."""
+
+    killpg = getattr(os, "killpg", None)
+    pid = getattr(process, "pid", None)
+    if not (callable(killpg) and isinstance(pid, int)):
+        for stop in (process.terminate, process.kill):
+            try:
+                stop()
+            except OSError:
+                pass
+        return
+    for signal_number in (signal.SIGTERM, signal.SIGKILL):
+        try:
+            killpg(pid, signal_number)
+        except ProcessLookupError:
+            return
+        except OSError:
+            try:
+                process.kill()
+            except OSError:
+                pass
+            return
+        try:
+            process.wait(timeout=BUILD_CLIENT_SETTLE_SECONDS)
+            return
+        except subprocess.TimeoutExpired:
+            continue
 
 
 def _builder_inspection(
@@ -184,7 +258,12 @@ def _builder_absent(root: Path, name: str, env: Mapping[str, str]) -> bool:
     if listed.returncode != 0:
         return False
     names = {line.strip() for line in listed.stdout.splitlines() if line.strip()}
-    return name not in names
+    if name in names:
+        return False
+    # Buildx can remove its own store entry while the docker-container driver's
+    # BuildKit container keeps running, so the builder disappearing from
+    # enumeration does not by itself prove the writer is gone.
+    return not _buildkit_container_running(root, name, env)
 
 
 def ensure_controllable_builder(root: Path, env: Mapping[str, str]) -> str:
@@ -268,7 +347,42 @@ def _builder_stopped(root: Path, name: str, env: Mapping[str, str]) -> bool:
         for line in inspected.stdout.splitlines()
         if line.strip().startswith("Status:")
     ]
-    return bool(statuses) and all(value not in {"running", "starting"} for value in statuses)
+    if not statuses:
+        return False
+    # Whitelist, not blacklist: a state this build does not recognise is refused
+    # rather than read as safe.
+    if not all(value in BUILDER_QUIESCENT_STATES for value in statuses):
+        return False
+    # A reported-stopped node still has to be checked against the actual driver
+    # container, because the report describes the builder record rather than the
+    # process holding the cache open.
+    return not _buildkit_container_running(root, name, env)
+
+
+def _buildkit_container_running(root: Path, name: str, env: Mapping[str, str]) -> bool:
+    """Report whether this builder's own BuildKit container is still running.
+
+    Fails closed: if the running set cannot be established, the writer is
+    treated as possibly live rather than assumed gone.
+    """
+
+    try:
+        listed = _docker_run(
+            root,
+            ["docker", "ps", "--format", "{{.Names}}"],
+            env=env,
+            timeout=30.0,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return True
+    if listed.returncode != 0:
+        return True
+    prefix = f"{BUILDKIT_CONTAINER_PREFIX}{name}"
+    return any(
+        line.strip() == prefix or line.strip().startswith(prefix)
+        for line in listed.stdout.splitlines()
+        if line.strip()
+    )
 
 
 def _remove_builder(root: Path, name: str, env: Mapping[str, str]) -> bool:
@@ -290,14 +404,28 @@ def _remove_builder(root: Path, name: str, env: Mapping[str, str]) -> bool:
     return removed.returncode == 0 and _builder_absent(root, name, env)
 
 
-def stop_build_writer(
+@dataclass(frozen=True)
+class BuildWriterSettlement:
+    """Two separate facts about one settle attempt.
+
+    A stopped writer and a discarded cache are different claims with different
+    consequences, and one does not imply the other. Collapsing them lets a path
+    that promises the cache is bounded report success after only proving the
+    writer stopped.
+    """
+
+    quiescent: bool
+    cache_discarded: bool
+
+
+def settle_build_writer(
     root: Path,
     name: str,
     env: Mapping[str, str],
     *,
     discard_cache: bool = False,
-) -> bool:
-    """Stop the FCP BuildKit daemon and positively verify quiescence."""
+) -> BuildWriterSettlement:
+    """Stop the FCP BuildKit writer, reporting quiescence and discard separately."""
 
     try:
         stopped = _docker_run(
@@ -310,12 +438,27 @@ def stop_build_writer(
         stopped = None
     if stopped is not None and stopped.returncode == 0 and _builder_stopped(root, name, env):
         if not discard_cache:
-            return True
-        # Under pressure, deleting FCP's own builder cache is a bounded cleanup.
-        # Failure to delete cache does not make a positively stopped writer live.
-        _remove_builder(root, name, env)
-        return True
-    return _remove_builder(root, name, env)
+            return BuildWriterSettlement(quiescent=True, cache_discarded=False)
+        # The writer is proven stopped. Whether its cache actually went away is
+        # a separate outcome and is reported as one.
+        return BuildWriterSettlement(
+            quiescent=True,
+            cache_discarded=_remove_builder(root, name, env),
+        )
+    removed = _remove_builder(root, name, env)
+    return BuildWriterSettlement(quiescent=removed, cache_discarded=removed)
+
+
+def stop_build_writer(
+    root: Path,
+    name: str,
+    env: Mapping[str, str],
+    *,
+    discard_cache: bool = False,
+) -> bool:
+    """Return only whether the writer was positively proven quiescent."""
+
+    return settle_build_writer(root, name, env, discard_cache=discard_cache).quiescent
 
 
 def prune_build_cache(
@@ -375,8 +518,11 @@ def preflight_disk(root: Path, env: Mapping[str, str]) -> None:
         if not stop_build_writer(root, name, env):
             raise RuntimeError("build_writer_stop_unverified")
         return
-    if not stop_build_writer(root, name, env, discard_cache=True):
+    settled = settle_build_writer(root, name, env, discard_cache=True)
+    if not settled.quiescent:
         raise RuntimeError("build_writer_stop_unverified")
+    if not settled.cache_discarded:
+        raise RuntimeError("build_cache_discard_failed")
     after = admission.assessment(backing_path)
     if after.level < PressureLevel.PRESSURE:
         return
@@ -513,18 +659,22 @@ def controlled_core_build(
             if returncode is not None:
                 break
             client_stopped = _settle_build_client(process)
-            writer_stopped = stop_build_writer(root, name, env, discard_cache=True)
-            if not client_stopped or not writer_stopped:
+            settled = settle_build_writer(root, name, env, discard_cache=True)
+            if not client_stopped or not settled.quiescent:
                 raise RuntimeError("build_writer_stop_unverified")
+            if not settled.cache_discarded:
+                raise RuntimeError("build_cache_discard_failed")
             raise RuntimeError("build_resource_pressure")
         if time.monotonic() >= deadline:
             returncode = process.poll()
             if returncode is not None:
                 break
             client_stopped = _settle_build_client(process)
-            writer_stopped = stop_build_writer(root, name, env, discard_cache=True)
-            if not client_stopped or not writer_stopped:
+            settled = settle_build_writer(root, name, env, discard_cache=True)
+            if not client_stopped or not settled.quiescent:
                 raise RuntimeError("build_writer_stop_unverified")
+            if not settled.cache_discarded:
+                raise RuntimeError("build_cache_discard_failed")
             raise RuntimeError("core_image_build_timeout")
         time.sleep(poll_seconds)
 

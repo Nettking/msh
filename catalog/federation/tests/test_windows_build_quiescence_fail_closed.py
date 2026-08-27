@@ -48,9 +48,13 @@ def test_windows_pressure_requires_both_client_and_writer_quiescence() -> None:
 
     assert "return [bool]$Process.HasExited" in stop_client
     assert "$clientStopped = Stop-BuildClient $process" in build
-    assert "$writerStopped = Stop-FcpBuildWriter $name -DiscardCache" in build
-    assert "if (-not $clientStopped -or -not $writerStopped)" in build
+    assert "$settled = Settle-FcpBuildWriter $name -DiscardCache" in build
+    assert "if (-not $clientStopped -or -not $settled.Quiescent)" in build
     assert "build_writer_stop_unverified" in build
+    # Discarding the cache is a separate claim from stopping the writer, so a
+    # failed discard must not be reported through a quiescence-only success.
+    assert "if (-not $settled.CacheDiscarded)" in build
+    assert "build_cache_discard_failed" in build
 
 
 def test_windows_preflight_reproves_quiescence_at_all_pressure_levels() -> None:
@@ -60,8 +64,9 @@ def test_windows_preflight_reproves_quiescence_at_all_pressure_levels() -> None:
     assert "$name = Get-FcpBuilderName" in preflight
     assert "Test-FcpBuilderStopped $name" in preflight
     assert "Stop-FcpBuildWriter $name" in preflight
-    assert "Stop-FcpBuildWriter $name -DiscardCache" in preflight
+    assert "Settle-FcpBuildWriter $name -DiscardCache" in preflight
     assert "throw 'build_writer_stop_unverified'" in preflight
+    assert "throw 'build_cache_discard_failed'" in preflight
     assert "Invoke-BuildCachePrune" not in preflight
 
 
@@ -75,3 +80,27 @@ def test_windows_failed_build_attempt_still_bounds_its_fcp_cache() -> None:
     assert "build_writer_stop_unverified" in failed
     assert "build_failed_and_cache_prune_failed" in failed
     assert failed.index("Invoke-BuildCachePrune") < failed.index("core_image_build_failed:$exit")
+
+
+def test_windows_cache_only_cleanup_proves_quiescence_before_it_prunes() -> None:
+    """The Update-All cache-only path reaches this branch through the private
+    docker proxy. Pruning is what destroys cache, so it is the branch that most
+    needs the writer proven dead first: an abandoned checkout-scoped BuildKit
+    daemon left by an earlier crash would otherwise still be writing into the
+    cache being pruned.
+    """
+
+    text = _read("scripts/windows/fcp_host_build.ps1")
+    cleanup = text[
+        text.index("if ($CacheCleanupOnly) {") : text.index("$commit = Get-CleanCommit")
+    ]
+
+    quiescence = cleanup.index("throw 'build_writer_stop_unverified'")
+    prune = cleanup.index("Invoke-BuildCachePrune")
+    assert quiescence < prune, (
+        "cache-only cleanup pruned before proving the writer quiescent"
+    )
+    # Quiescence is proved unconditionally, not only on the branch that happens
+    # not to prune.
+    assert cleanup.count("Test-FcpBuilderStopped $name") == 1
+    assert cleanup.index("Test-FcpBuilderStopped $name") < prune

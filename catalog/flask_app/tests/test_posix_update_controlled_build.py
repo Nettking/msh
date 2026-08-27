@@ -3,10 +3,26 @@ from __future__ import annotations
 import importlib.util
 import subprocess
 from contextlib import contextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+
+from catalog.federation.host_resources import PressureLevel, ResourceAssessment
+
+
+def _normal_assessment() -> ResourceAssessment:
+    return ResourceAssessment(
+        resource_id="device:docker",
+        level=PressureLevel.NORMAL,
+        reasons=(),
+        effective_free_bytes=100 * 1024**3,
+        effective_free_inodes=1_000_000,
+        reserved_bytes=0,
+        reserved_inodes=0,
+        observed_at=datetime.now(timezone.utc),
+    )
 
 ROOT = Path(__file__).resolve().parents[3]
 
@@ -87,7 +103,18 @@ def test_serialized_apply_releases_lock_only_after_controlled_build(
     monkeypatch.setattr(
         runner.host_build,
         "stop_build_writer",
-        lambda *_args, **_kwargs: events.append("cleanup") or True,
+        lambda *_args, **_kwargs: events.append("preflight-quiescence") or True,
+    )
+    # The serialized apply now runs the real controlled preflight, which proves
+    # the Docker backing resource before anything else. Give it one so the
+    # ordering under test is reached instead of failing on an unproven resource.
+    monkeypatch.setattr(
+        runner.host_build,
+        "docker_resource_assessment",
+        lambda _root, _env, **_kwargs: (
+            tmp_path,
+            _normal_assessment(),
+        ),
     )
 
     original_subprocess = SimpleNamespace(
@@ -132,8 +159,12 @@ def test_serialized_apply_releases_lock_only_after_controlled_build(
         is True
     )
 
+    # The preflight quiescence proof is production behaviour that runs inside
+    # the lock and before the controlled build, so it belongs in the expected
+    # ordering rather than being stubbed away.
     assert events == [
         "lock-enter",
+        "preflight-quiescence",
         "controlled-build",
         "lock-exit",
         "activation-after-build",
