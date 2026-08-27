@@ -102,7 +102,14 @@ def test_pressure_preflight_refuses_when_old_writer_cannot_be_quiesced(
         lambda *_args, **_kwargs: (backing, _assessment(PressureLevel.PRESSURE)),
     )
     monkeypatch.setattr(host_build, "builder_name", lambda _root: "fcp-build-test")
-    monkeypatch.setattr(host_build, "stop_build_writer", lambda *_args, **_kwargs: False)
+    monkeypatch.setattr(
+        host_build,
+        "settle_build_writer",
+        lambda *_args, **_kwargs: host_build.BuildWriterSettlement(
+            quiescent=False,
+            cache_discarded=False,
+        ),
+    )
 
     with pytest.raises(RuntimeError, match="build_writer_stop_unverified"):
         host_build.preflight_disk(tmp_path, {})
