@@ -115,6 +115,42 @@ class SQLiteJobLifecycleStore(SQLiteJobStore):
             )
 
     @staticmethod
+    def _discard_attempt_liveness(
+        connection: sqlite3.Connection, job_id: str
+    ) -> None:
+        """Drop the liveness state an attempt that has just terminalized owned.
+
+        The heartbeat row was already dropped here. Its command rows were not,
+        and there is one of those per heartbeat rather than one per job, so on a
+        device that keeps running jobs they are the store's fastest-growing
+        table and the only one nothing ever retires.
+
+        Retiring them does not weaken duplicate suppression, because after this
+        point the suppression row cannot be reached. It is read in exactly one
+        place - ``record_heartbeat`` - and only after ``_exact_ownership`` has
+        succeeded. ``_exact_ownership`` requires ``snapshot.ownership`` to be
+        present, and ``DurableJobSnapshot`` permits that only while the job has
+        exactly one non-terminal attempt naming that same attempt id and lease.
+        Every row that exists when an attempt terminalizes belongs to that
+        attempt or an earlier one, all of them terminal and terminal being
+        absorbing, so a replay of any of them is refused with ``job-not-owned``
+        or ``stale-job-attempt`` before the table is consulted - exactly as it
+        is refused today, with or without the row.
+
+        Cancellations and committed results are deliberately not touched here:
+        those are authoritative outcomes, not liveness.
+        """
+
+        connection.execute(
+            "DELETE FROM capability_job_heartbeats WHERE job_id=?",
+            (job_id,),
+        )
+        connection.execute(
+            "DELETE FROM capability_job_heartbeat_commands WHERE job_id=?",
+            (job_id,),
+        )
+
+    @staticmethod
     def _exact_ownership(
         snapshot: DurableJobSnapshot,
         *,
@@ -613,10 +649,7 @@ class SQLiteJobLifecycleStore(SQLiteJobStore):
                         ownership.lease_id,
                     ),
                 )
-                connection.execute(
-                    "DELETE FROM capability_job_heartbeats WHERE job_id=?",
-                    (job_id,),
-                )
+                self._discard_attempt_liveness(connection, job_id)
                 connection.execute(
                     """UPDATE capability_job_cancellations
                        SET state='cancelled', completed_at=?
@@ -882,10 +915,7 @@ class SQLiteJobLifecycleStore(SQLiteJobStore):
                         ownership.lease_id,
                     ),
                 )
-                connection.execute(
-                    "DELETE FROM capability_job_heartbeats WHERE job_id=?",
-                    (job_id,),
-                )
+                self._discard_attempt_liveness(connection, job_id)
                 connection.execute(
                     "DELETE FROM capability_job_retry_state WHERE job_id=?",
                     (job_id,),
@@ -1483,10 +1513,7 @@ class SQLiteJobLifecycleStore(SQLiteJobStore):
                             ownership.lease_id,
                         ),
                     )
-                    connection.execute(
-                        "DELETE FROM capability_job_heartbeats WHERE job_id=?",
-                        (job_id,),
-                    )
+                    self._discard_attempt_liveness(connection, job_id)
                     updated = self._snapshot_from_row(
                         connection, self._row(connection, job_id)
                     )
