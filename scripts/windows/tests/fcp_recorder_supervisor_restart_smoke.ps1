@@ -47,6 +47,74 @@ using System.Threading;
 
 public static class FakeRecorder
 {
+    // Two fake recorders can be alive at once: the supervisor starts the trial
+    // watchdog agent call asynchronously while a recorder child is still
+    // running, which is exactly what scenario 10 drives. File.AppendAllText
+    // opens with FileShare.Read, so the second writer takes a sharing violation
+    // and the process dies with an unhandled IOException. The supervisor then
+    // reads that as a failed agent call and the scenario's assertions collapse.
+    // Share the handle and retry instead.
+    private const int ShareRetryMilliseconds = 5000;
+    private const int ShareRetryStepMilliseconds = 25;
+
+    private static void WithRetry(Action action)
+    {
+        int waited = 0;
+        while (true)
+        {
+            try
+            {
+                action();
+                return;
+            }
+            catch (IOException)
+            {
+                if (waited >= ShareRetryMilliseconds) { throw; }
+                Thread.Sleep(ShareRetryStepMilliseconds);
+                waited += ShareRetryStepMilliseconds;
+            }
+        }
+    }
+
+    private static void AppendShared(string path, string text)
+    {
+        WithRetry(delegate
+        {
+            using (FileStream stream = new FileStream(
+                path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite))
+            using (StreamWriter writer = new StreamWriter(stream))
+            {
+                writer.Write(text);
+            }
+        });
+    }
+
+    // Read-modify-write of a counter is not atomic either, so two overlapping
+    // processes could both claim the same ordinal and the scripted per-start
+    // runtime/exit tables would be read off by one. One exclusive handle per
+    // bump keeps the sequence a sequence.
+    private static int NextCount(string path)
+    {
+        int value = 0;
+        WithRetry(delegate
+        {
+            using (FileStream stream = new FileStream(
+                path, FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None))
+            {
+                StreamReader reader = new StreamReader(stream);
+                int parsed;
+                value = Int32.TryParse(reader.ReadToEnd().Trim(), out parsed) ? parsed : 0;
+                value++;
+                stream.SetLength(0);
+                stream.Position = 0;
+                StreamWriter writer = new StreamWriter(stream);
+                writer.Write(value.ToString());
+                writer.Flush();
+            }
+        });
+        return value;
+    }
+
     private static int Nth(string name, int index, int fallback)
     {
         string raw = Environment.GetEnvironmentVariable(name);
@@ -67,18 +135,14 @@ public static class FakeRecorder
         // start count stays a count of recorder children only.
         if (joined.Contains("fcp_native_recorder_update_agent.py"))
         {
-            File.AppendAllText(log + ".agent", joined + Environment.NewLine);
+            AppendShared(log + ".agent", joined + Environment.NewLine);
             if (joined.Contains("--finalize"))
             {
                 // A scripted sequence of launch plans, one per finalize, so the
                 // real trial -> rollback transition can be driven end to end.
                 string plans = Environment.GetEnvironmentVariable("FCP_FAKE_AGENT_PLANS");
                 if (String.IsNullOrWhiteSpace(plans)) { return 1; }
-                int f = 0;
-                string finPath = log + ".fin";
-                if (File.Exists(finPath)) { Int32.TryParse(File.ReadAllText(finPath).Trim(), out f); }
-                f++;
-                File.WriteAllText(finPath, f.ToString());
+                int f = NextCount(log + ".fin");
                 string[] steps = plans.Split(';');
                 string step = f <= steps.Length ? steps[f - 1] : steps[steps.Length - 1];
                 string root = Environment.GetEnvironmentVariable("FCP_FAKE_LAUNCH_ROOT");
@@ -100,12 +164,8 @@ public static class FakeRecorder
             return 1;
         }
 
-        int n = 0;
-        string countPath = log + ".count";
-        if (File.Exists(countPath)) { Int32.TryParse(File.ReadAllText(countPath).Trim(), out n); }
-        n++;
-        File.WriteAllText(countPath, n.ToString());
-        File.AppendAllText(log, "start " + n + ": " + joined + Environment.NewLine);
+        int n = NextCount(log + ".count");
+        AppendShared(log, "start " + n + ": " + joined + Environment.NewLine);
 
         int runtime = Nth("FCP_FAKE_RECORDER_RUNTIME", n, 0);
         if (runtime > 0) { Thread.Sleep(runtime * 1000); }
