@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -41,6 +42,7 @@ def test_low_disk_preflight_prune_keeps_lock_until_post_build_prune(
     engine = SimpleNamespace(
         REQUEST_SCHEMA="fcp.host-update-request.v1",
         OID_RE=re.compile(r"^[0-9a-f]{40}$"),
+        subprocess=subprocess,
     )
 
     def engine_prune(_root, _env):
@@ -94,8 +96,7 @@ def test_low_disk_preflight_prune_keeps_lock_until_post_build_prune(
         "preflight",
         "preflight-prune",  # host cleanup: lock remains held
         "build",
-        "prune",  # post-build engine cleanup: source can now be re-proved
-        "reproof",
+        "reproof",  # controlled builder already owned post-build cache cleanup
         "lock-exit",
         "activation",
     ]

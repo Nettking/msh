@@ -53,6 +53,10 @@ function Test-ApplyRequest([string]$Path) {
 }
 
 function Invoke-PostBuildCachePrune {
+    # During an apply, PATH points at the private docker proxy. The legacy
+    # command shape is intentionally retained so the mature engine/runner
+    # contract stays stable, but the proxy maps it to checkout-scoped Buildx
+    # cleanup and never to Docker's global default-builder cache.
     try {
         & docker builder prune --force "--keep-storage=$BuildCacheKeepBytes" | Out-Null
         if ($LASTEXITCODE -ne 0) {
@@ -87,6 +91,10 @@ function Start-ReplacementRunner {
         -WindowStyle Hidden | Out-Null
 }
 
+function Restore-ProcessEnvironment([string]$Name, [AllowNull()][string]$Value) {
+    [Environment]::SetEnvironmentVariable($Name, $Value, 'Process')
+}
+
 $RepoRoot = Normalize-DirectoryPath $RepoRoot
 $DataDirectory = Normalize-DirectoryPath $DataDirectory
 $AgentDirectory = Join-Path $DataDirectory 'federation\update-agent'
@@ -94,9 +102,16 @@ $RequestFile = Join-Path $AgentDirectory 'request.json'
 New-Item -ItemType Directory -Path $AgentDirectory -Force | Out-Null
 $RunnerPath = [System.IO.Path]::GetFullPath($PSCommandPath)
 $EnginePath = Join-Path (Split-Path -Parent $RunnerPath) 'fcp_update_engine.ps1'
-if (-not (Test-Path -LiteralPath $EnginePath)) { throw 'update_engine_unavailable' }
+$ProxySource = Join-Path (Split-Path -Parent $RunnerPath) 'fcp_docker_build_proxy.cmd'
+if (-not (Test-Path -LiteralPath $EnginePath -PathType Leaf)) {
+    throw 'update_engine_unavailable'
+}
+if (-not (Test-Path -LiteralPath $ProxySource -PathType Leaf)) {
+    throw 'controlled_build_proxy_unavailable'
+}
 $InitialRunnerHash = (Get-FileHash -LiteralPath $RunnerPath -Algorithm SHA256).Hash
 $InitialEngineHash = (Get-FileHash -LiteralPath $EnginePath -Algorithm SHA256).Hash
+$InitialProxyHash = (Get-FileHash -LiteralPath $ProxySource -Algorithm SHA256).Hash
 
 $pathHash = Get-PathHash $RepoRoot
 $runnerMutex = [System.Threading.Mutex]::new($false, "Global\FCPUpdateAgentRunner-$pathHash")
@@ -117,6 +132,14 @@ try {
         $isApply = Test-ApplyRequest $RequestFile
         $mutationMutex = $null
         $mutationAcquired = $false
+        $proxyDirectory = $null
+        $buildOutput = $null
+        $previousPath = $null
+        $previousRealDocker = $null
+        $previousControlledActive = $null
+        $previousControlledRoot = $null
+        $previousControlledOutput = $null
+        $previousLeaseMarker = $null
         try {
             if ($isApply) {
                 $mutationMutex = [System.Threading.Mutex]::new(
@@ -134,6 +157,49 @@ try {
                     Start-Sleep -Milliseconds 250
                     continue
                 }
+
+                # Keep the mature engine unchanged. During an apply, a private
+                # docker.cmd shim intercepts only its exact core-build and build-
+                # cache cleanup commands; every other Docker command is forwarded
+                # to the already-resolved real executable.
+                $dockerCommand = Get-Command docker -CommandType Application -ErrorAction Stop |
+                    Select-Object -First 1
+                if (
+                    $null -eq $dockerCommand -or
+                    [string]::IsNullOrWhiteSpace([string]$dockerCommand.Source)
+                ) {
+                    throw 'docker_executable_unavailable'
+                }
+                $previousPath = $env:PATH
+                $previousRealDocker = $env:FCP_REAL_DOCKER_EXE
+                $previousControlledActive = $env:FCP_CONTROLLED_BUILD_ACTIVE
+                $previousControlledRoot = $env:FCP_CONTROLLED_BUILD_REPO_ROOT
+                $previousControlledOutput = $env:FCP_CONTROLLED_BUILD_OUTPUT
+                $previousLeaseMarker = $env:FCP_HOST_MUTATION_LEASE_ACTIVE
+
+                $proxyDirectory = Join-Path $AgentDirectory (
+                    "docker-proxy-$PID-$([guid]::NewGuid().ToString('N'))"
+                )
+                New-Item -ItemType Directory -Path $proxyDirectory -Force | Out-Null
+                Copy-Item -LiteralPath $ProxySource -Destination (
+                    Join-Path $proxyDirectory 'docker.cmd'
+                ) -Force
+                Copy-Item -LiteralPath (
+                    Join-Path (Split-Path -Parent $RunnerPath) 'fcp_host_build.ps1'
+                ) -Destination (Join-Path $proxyDirectory 'fcp_host_build.ps1') -Force
+                Copy-Item -LiteralPath (
+                    Join-Path (Split-Path -Parent $RunnerPath) 'fcp_docker_resource.ps1'
+                ) -Destination (Join-Path $proxyDirectory 'fcp_docker_resource.ps1') -Force
+
+                $buildOutput = Join-Path $AgentDirectory (
+                    "controlled-build-$PID-$([guid]::NewGuid().ToString('N')).txt"
+                )
+                $env:FCP_REAL_DOCKER_EXE = [string]$dockerCommand.Source
+                $env:FCP_CONTROLLED_BUILD_ACTIVE = '1'
+                $env:FCP_CONTROLLED_BUILD_REPO_ROOT = $RepoRoot
+                $env:FCP_CONTROLLED_BUILD_OUTPUT = $buildOutput
+                $env:FCP_HOST_MUTATION_LEASE_ACTIVE = '1'
+                $env:PATH = $proxyDirectory + [System.IO.Path]::PathSeparator + $previousPath
             }
 
             & powershell.exe `
@@ -146,9 +212,8 @@ try {
                 -Once
             $engineExit = $LASTEXITCODE
 
-            # The preserved engine already prunes after a successful build.
-            # An apply whose build raised before that point still gets the same
-            # bounded cache cleanup attempt here before the shared lock is released.
+            # Keep the old runner cleanup point, but while the private docker
+            # proxy is still active so this can only touch the FCP Buildx builder.
             if ($isApply) {
                 Invoke-PostBuildCachePrune | Out-Null
             }
@@ -157,6 +222,20 @@ try {
             }
         }
         finally {
+            if ($isApply) {
+                Restore-ProcessEnvironment 'PATH' $previousPath
+                Restore-ProcessEnvironment 'FCP_REAL_DOCKER_EXE' $previousRealDocker
+                Restore-ProcessEnvironment 'FCP_CONTROLLED_BUILD_ACTIVE' $previousControlledActive
+                Restore-ProcessEnvironment 'FCP_CONTROLLED_BUILD_REPO_ROOT' $previousControlledRoot
+                Restore-ProcessEnvironment 'FCP_CONTROLLED_BUILD_OUTPUT' $previousControlledOutput
+                Restore-ProcessEnvironment 'FCP_HOST_MUTATION_LEASE_ACTIVE' $previousLeaseMarker
+                if (-not [string]::IsNullOrWhiteSpace([string]$buildOutput)) {
+                    Remove-Item -LiteralPath $buildOutput -Force -ErrorAction SilentlyContinue
+                }
+                if (-not [string]::IsNullOrWhiteSpace([string]$proxyDirectory)) {
+                    Remove-Item -LiteralPath $proxyDirectory -Recurse -Force -ErrorAction SilentlyContinue
+                }
+            }
             if ($mutationAcquired -and $null -ne $mutationMutex) {
                 try { $mutationMutex.ReleaseMutex() | Out-Null } catch {}
             }
@@ -166,7 +245,8 @@ try {
         if ($Once) { break }
         if (
             (Get-FileHash -LiteralPath $RunnerPath -Algorithm SHA256).Hash -ne $InitialRunnerHash -or
-            (Get-FileHash -LiteralPath $EnginePath -Algorithm SHA256).Hash -ne $InitialEngineHash
+            (Get-FileHash -LiteralPath $EnginePath -Algorithm SHA256).Hash -ne $InitialEngineHash -or
+            (Get-FileHash -LiteralPath $ProxySource -Algorithm SHA256).Hash -ne $InitialProxyHash
         ) {
             Start-ReplacementRunner
             break
