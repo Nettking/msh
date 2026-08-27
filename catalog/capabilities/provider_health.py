@@ -62,6 +62,22 @@ MAX_HEALTH_AUDIT_READ = 10_000
 # This is a logical row bound. SQLite reuses the freed pages, so the database
 # stops growing; it does not shrink without an explicit VACUUM.
 MAX_HEALTH_AUDIT_ROWS = 100_000
+
+#: Rows one foreground operation may retire while catching up on legacy history.
+#
+# A storage bound is not a work bound. Retiring "everything past the window" is
+# a single statement, but on a device that has been running since before the
+# window existed that one statement deletes the whole lifetime overflow inside
+# ``BEGIN IMMEDIATE`` -- an arbitrarily long writer lock and an arbitrarily
+# large rollback journal, reached through an ordinary health publication. A
+# routine write must not become lifetime-sized maintenance, so each operation
+# retires at most this many rows.
+#
+# Convergence: an operation appends exactly one row and may retire up to this
+# many, so while any overflow remains it strictly shrinks, and normal recurring
+# writes cannot outrun cleanup. Progress is monotonic and restart-safe because
+# the frontier is the table's own ``audit_id`` order, not separate state.
+AUDIT_MAINTENANCE_BATCH_ROWS = 1_000
 MAX_TEXT_BYTES = 512
 
 
@@ -403,7 +419,14 @@ class ProviderHealthObservation:
 
 @dataclass(frozen=True)
 class ProviderHealthAuditEvent:
-    """Safe append-only evidence for accepted health mutations."""
+    """Safe bounded-recent evidence for accepted health mutations.
+
+    Immutable while retained: a row is never rewritten once written. It is not
+    retained for the life of the device -- B07 requires this recurring history
+    to be bounded, so the oldest rows past the retention window are retired by
+    ``audit_id``. Duplicate suppression and idempotent replay do not depend on
+    these rows; they live in ``provider_health_commands``, which is untouched.
+    """
 
     SCHEMA: ClassVar[str] = PROVIDER_HEALTH_AUDIT_SCHEMA
 
@@ -662,16 +685,21 @@ class SQLiteProviderHealthStore:
         database.execute(
             """
             DELETE FROM provider_health_audit
-            WHERE audit_id <= COALESCE(
-                (
-                    SELECT audit_id FROM provider_health_audit
-                    ORDER BY audit_id DESC
-                    LIMIT 1 OFFSET ?
-                ),
-                -1
+            WHERE audit_id IN (
+                SELECT audit_id FROM provider_health_audit
+                WHERE audit_id <= COALESCE(
+                    (
+                        SELECT audit_id FROM provider_health_audit
+                        ORDER BY audit_id DESC
+                        LIMIT 1 OFFSET ?
+                    ),
+                    -1
+                )
+                ORDER BY audit_id ASC
+                LIMIT ?
             )
             """,
-            (MAX_HEALTH_AUDIT_ROWS,),
+            (MAX_HEALTH_AUDIT_ROWS, AUDIT_MAINTENANCE_BATCH_ROWS),
         )
 
     @staticmethod

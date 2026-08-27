@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timezone
+from itertools import pairwise
 from pathlib import Path
 
 import pytest
@@ -328,3 +329,220 @@ def test_retiring_by_id_leaves_no_room_for_a_clock_change_to_matter(
         ]
     # The last three inserted survive, even though they carry the oldest dates.
     assert kept == ["reason-2", "reason-3", "reason-4"]
+
+
+# ----------------------------------------------------------------------
+# Legacy catch-up must be finite work, not merely a finite result.
+# ----------------------------------------------------------------------
+
+
+def _seed_legacy_audit_rows(database: Path, table: str, rows: int) -> None:
+    """Write a pre-existing history from before any bound existed."""
+
+    connection = sqlite3.connect(database)
+    try:
+        columns = [
+            str(row[1])
+            for row in connection.execute(f"PRAGMA table_info({table})").fetchall()
+        ]
+        template = connection.execute(
+            f"SELECT * FROM {table} ORDER BY audit_id DESC LIMIT 1"
+        ).fetchone()
+        assert template is not None, "expected at least one real audit row to copy"
+        audit_index = columns.index("audit_id")
+        values = list(template)
+        placeholders = ",".join("?" for _ in columns)
+        highest = int(
+            connection.execute(f"SELECT MAX(audit_id) FROM {table}").fetchone()[0]
+        )
+        for offset in range(1, rows + 1):
+            values[audit_index] = highest + offset
+            connection.execute(
+                f"INSERT INTO {table}({','.join(columns)}) VALUES({placeholders})",
+                tuple(values),
+            )
+        connection.commit()
+    finally:
+        connection.close()
+
+
+def test_one_operation_cannot_retire_unlimited_legacy_history(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The consequence.
+
+    A device that ran before this bound existed can hold an arbitrarily large
+    overflow. Retiring all of it in the one statement that an ordinary health
+    publication runs would hold the writer lock and build a rollback journal
+    proportional to lifetime history, not to the work being done. One operation
+    must retire at most the maintenance batch.
+    """
+
+    monkeypatch.setattr(health_module, "MAX_HEALTH_AUDIT_ROWS", 5, raising=False)
+    monkeypatch.setattr(
+        health_module, "AUDIT_MAINTENANCE_BATCH_ROWS", 10, raising=False
+    )
+    (
+        coordinator,
+        _enrollment_store,
+        enrollment_service,
+        health_store,
+        health_service,
+        owner,
+        provider,
+        _second,
+        _outsider,
+        _current,
+    ) = environment(tmp_path)
+    approve(
+        coordinator,
+        enrollment_service,
+        owner=owner,
+        provider=provider,
+        capability_id="provider-health",
+        request_suffix="provider-health",
+    )
+
+    # One real publish so the table has a row to model legacy history on.
+    health_service.publish(
+        report(provider, "provider-health", revision=1),
+        actor_node_id=provider.identity.node_id,
+        command_id="publish-provider-health-1-1",
+        provider_generation=1,
+    )
+    database = Path(health_store.database)
+    _seed_legacy_audit_rows(database, "provider_health_audit", 200)
+    before = _audit_rows(database, "provider_health_audit")
+    assert before == 201
+
+    health_service.publish(
+        report(provider, "provider-health", revision=2),
+        actor_node_id=provider.identity.node_id,
+        command_id="publish-provider-health-1-2",
+        provider_generation=1,
+    )
+
+    after = _audit_rows(database, "provider_health_audit")
+    # One append, at most one maintenance batch retired.
+    assert after == before + 1 - 10, (
+        f"one operation retired {before + 1 - after} rows, "
+        "which is not bounded by the maintenance batch"
+    )
+
+
+def test_repeated_ordinary_operations_converge_on_the_retained_window(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bounded work still has to finish: overflow must shrink monotonically and
+    normal recurring writes must not outrun cleanup."""
+
+    monkeypatch.setattr(health_module, "MAX_HEALTH_AUDIT_ROWS", 5, raising=False)
+    monkeypatch.setattr(
+        health_module, "AUDIT_MAINTENANCE_BATCH_ROWS", 10, raising=False
+    )
+    (
+        coordinator,
+        _enrollment_store,
+        enrollment_service,
+        health_store,
+        health_service,
+        owner,
+        provider,
+        _second,
+        _outsider,
+        _current,
+    ) = environment(tmp_path)
+    approve(
+        coordinator,
+        enrollment_service,
+        owner=owner,
+        provider=provider,
+        capability_id="provider-health",
+        request_suffix="provider-health",
+    )
+
+    health_service.publish(
+        report(provider, "provider-health", revision=1),
+        actor_node_id=provider.identity.node_id,
+        command_id="publish-provider-health-1-1",
+        provider_generation=1,
+    )
+    database = Path(health_store.database)
+    _seed_legacy_audit_rows(database, "provider_health_audit", 100)
+
+    counts = [_audit_rows(database, "provider_health_audit")]
+    for revision in range(2, 30):
+        health_service.publish(
+            report(provider, "provider-health", revision=revision),
+            actor_node_id=provider.identity.node_id,
+            command_id=f"publish-provider-health-1-{revision}",
+            provider_generation=1,
+        )
+        counts.append(_audit_rows(database, "provider_health_audit"))
+
+    # Strictly shrinking while overflow remains, then parked at the window.
+    assert counts[-1] == 5, f"did not converge on the retained window: {counts}"
+    shrinking = counts[: counts.index(5) + 1]
+    assert all(
+        later <= earlier for earlier, later in pairwise(shrinking)
+    ), f"overflow did not shrink monotonically: {shrinking}"
+    # Cleanup outpaces the append it accompanies, so it terminates.
+    assert len(shrinking) < len(counts), "convergence never completed"
+
+
+def test_command_replay_still_works_after_a_bounded_catch_up(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Bounded catch-up must not touch idempotency evidence."""
+
+    monkeypatch.setattr(health_module, "MAX_HEALTH_AUDIT_ROWS", 5, raising=False)
+    monkeypatch.setattr(
+        health_module, "AUDIT_MAINTENANCE_BATCH_ROWS", 10, raising=False
+    )
+    (
+        coordinator,
+        _enrollment_store,
+        enrollment_service,
+        health_store,
+        health_service,
+        owner,
+        provider,
+        _second,
+        _outsider,
+        _current,
+    ) = environment(tmp_path)
+    approve(
+        coordinator,
+        enrollment_service,
+        owner=owner,
+        provider=provider,
+        capability_id="provider-health",
+        request_suffix="provider-health",
+    )
+
+    first = health_service.publish(
+        report(provider, "provider-health", revision=1),
+        actor_node_id=provider.identity.node_id,
+        command_id="publish-provider-health-1-1",
+        provider_generation=1,
+    )
+    database = Path(health_store.database)
+    _seed_legacy_audit_rows(database, "provider_health_audit", 100)
+
+    for revision in range(2, 12):
+        health_service.publish(
+            report(provider, "provider-health", revision=revision),
+            actor_node_id=provider.identity.node_id,
+            command_id=f"publish-provider-health-1-{revision}",
+            provider_generation=1,
+        )
+
+    # The very first command still replays to its stored result even though its
+    # own audit row was retired during catch-up.
+    replayed = health_service.publish(
+        report(provider, "provider-health", revision=1),
+        actor_node_id=provider.identity.node_id,
+        command_id="publish-provider-health-1-1",
+        provider_generation=1,
+    )
+    assert replayed == first
