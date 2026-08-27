@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import re
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -25,6 +26,7 @@ def _engine(events: list[str], *, fail_before_prune: bool = False):
     engine = SimpleNamespace()
     engine.REQUEST_SCHEMA = "fcp.host-update-request.v1"
     engine.OID_RE = re.compile(r"^[0-9a-f]{40}$")
+    engine.subprocess = subprocess
 
     def preflight(_root, _env):
         events.append("legacy-preflight")
@@ -97,7 +99,6 @@ def test_apply_releases_host_lock_only_after_prune_and_source_reproof(
         "lock-enter",
         "preflight",
         "build",
-        "prune",
         "reproof",
         "lock-exit",
         "activation",
@@ -129,10 +130,23 @@ def test_failed_build_still_attempts_cache_cleanup_before_unlock(
         lambda _root, _env: events.append("preflight"),
     )
 
+    def controlled_cleanup(_root, _name, _env, *, discard_cache=False):
+        assert discard_cache is True
+        events.append("controlled-cleanup")
+        return True
+
+    monkeypatch.setattr(runner.host_build, "stop_build_writer", controlled_cleanup)
+
     with pytest.raises(RuntimeError, match="build_failed"):
         runner.process_once(engine, tmp_path, request, result)
 
-    assert events == ["lock-enter", "preflight", "build", "prune", "lock-exit"]
+    assert events == [
+        "lock-enter",
+        "preflight",
+        "build",
+        "controlled-cleanup",
+        "lock-exit",
+    ]
 
 
 def test_busy_host_lock_leaves_apply_request_for_retry(
