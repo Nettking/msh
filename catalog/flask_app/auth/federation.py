@@ -42,6 +42,7 @@ from flask import (
 from flask_login import login_user, logout_user
 from flask_security import current_user
 
+from catalog.federation.authoritative_replay import replay_authoritative_history
 from catalog.federation.errors import FederationOperationError
 from catalog.federation.human_auth import (
     AUTHORITY_EVENT,
@@ -367,21 +368,22 @@ class FederationHumanAuthService:
 
         replay_page = getattr(coordinator, "replay_page", None)
         if callable(replay_page):
+            # Human-auth authority, member endpoints and per-user role/active
+            # state are all "latest event wins" projections. A page budget that
+            # runs out before the coordinator's current revision would hand back
+            # a prefix in which a later rotation or role change never happened,
+            # so the bounded reader fails closed instead.
             events: list[SessionEvent] = []
-            last_revision = 0
-            for _ in range(MAX_EVENT_PAGES):
-                page, current_revision = replay_page(
+            replay_authoritative_history(
+                lambda last_revision: replay_page(
                     session_id=session_id,
                     actor_node_id=actor_node_id,
                     last_applied_revision=last_revision,
                     limit=EVENT_PAGE_SIZE,
-                )
-                if not page:
-                    break
-                events.extend(page)
-                last_revision = page[-1].revision
-                if last_revision >= current_revision:
-                    break
+                ),
+                apply_page=events.extend,
+                max_pages=MAX_EVENT_PAGES,
+            )
             return tuple(events)
 
         replay = getattr(coordinator, "replay", None)

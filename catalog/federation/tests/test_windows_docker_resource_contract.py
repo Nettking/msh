@@ -51,13 +51,24 @@ def test_windows_build_preflights_never_use_checkout_free_space() -> None:
     build_preflight = _function(build, "Assert-DiskPreflight", "Write-AtomicText")
     update_preflight = _function(update, "Assert-DiskPreflight", "Invoke-Git")
 
+    # Both preflights must measure the same real Docker backing resource and
+    # never the checkout drive. That part is genuinely shared.
     for preflight in (build_preflight, update_preflight):
         assert "Get-FcpDockerBackingPath" in preflight
         assert preflight.count("Get-FcpResourceFreeBytes") == 2
         assert "Get-FcpResourcePressureLevel" in preflight
         assert "Get-FreeBytes" not in preflight
-        assert "Invoke-BuildCachePrune" in preflight
         assert "insufficient_disk_for_update" in preflight
+
+    # How each one bounds cache is deliberately different, so asserting a single
+    # shared mechanism would pin the wrong contract on the controlled build.
+    # The controlled build owns a checkout-scoped builder: it stops that writer
+    # and discards its cache, and refuses when the discard did not happen.
+    assert "Settle-FcpBuildWriter $name -DiscardCache" in build_preflight
+    assert "build_cache_discard_failed" in build_preflight
+    assert "Invoke-BuildCachePrune" not in build_preflight
+    # The mature update engine keeps pruning through its own helper.
+    assert "Invoke-BuildCachePrune" in update_preflight
 
 
 def test_windows_update_refuses_resource_pressure_before_build_or_runtime_stop() -> None:
