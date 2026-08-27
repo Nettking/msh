@@ -42,6 +42,24 @@ ACTIVATION_GRACE_SECONDS = 2
 HOST_REQUEST_TTL_SECONDS = 120
 WRITER_LOCK_STALE_SECONDS = 30
 
+#: Branch-listing results kept on disk after their reader has finished.
+#
+# ``approved_branches`` mints a fresh request id per call, the host agent writes
+# one ``branches-result-<digest>.json`` for it, and the poll returns as soon as
+# it reads that file. The id is a local ``uuid4`` that is never persisted, so
+# the moment the call returns nothing can address the file again -- but nothing
+# has ever deleted one either, and the Federation view calls this on every
+# render. A small number are kept only to absorb readers that timed out or
+# crashed mid-poll; the consumer deletes the file it actually consumed.
+#
+# Update and trial results are deliberately NOT covered here. Their request ids
+# are durable state re-read to reconcile a pending update or trial across
+# calls, so retiring them would change restart recovery.
+MAX_RETAINED_BRANCH_RESULTS = 8
+
+#: Orphaned branch results one call may retire, so cleanup stays bounded work.
+MAX_BRANCH_RESULT_SWEEP = 32
+
 
 def _stamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -327,12 +345,53 @@ class HostUpdateHandoff:
         except HostUpdateBusyError:
             return ()
         deadline = time.monotonic() + self.timeout
-        while time.monotonic() < deadline:
-            value = self._read(self._branches_result_path(request_id))
-            if value is not None and value.get("schema") == BRANCHES_RESULT_SCHEMA:
-                return branches_from_result(value)
-            time.sleep(self.poll_interval)
-        return ()
+        try:
+            while time.monotonic() < deadline:
+                value = self._read(self._branches_result_path(request_id))
+                if value is not None and value.get("schema") == BRANCHES_RESULT_SCHEMA:
+                    return branches_from_result(value)
+                time.sleep(self.poll_interval)
+            return ()
+        finally:
+            # This request id was never persisted, so once this call returns
+            # nothing can address its result again. Retire it here rather than
+            # leaving one file per Federation render on disk forever, and take
+            # a bounded pass at results whose own reader never got this far.
+            self._retire_branch_result(request_id)
+            self._sweep_orphaned_branch_results()
+
+    def _retire_branch_result(self, request_id: str) -> None:
+        """Delete one consumed branch result. Never raises."""
+
+        try:
+            self._branches_result_path(request_id).unlink(missing_ok=True)
+        except OSError:
+            # Reclaiming space is best effort; a dropdown never fails a page.
+            pass
+
+    def _sweep_orphaned_branch_results(self) -> None:
+        """Bound branch results left behind by readers that timed out or died.
+
+        Bounded in both directions: at most ``MAX_BRANCH_RESULT_SWEEP`` files
+        are considered for removal in one call, so a directory that accumulated
+        for a long time is drained across calls rather than in one of them.
+        """
+
+        try:
+            candidates = sorted(
+                self.directory.glob("branches-result-*.json"),
+                key=lambda path: path.stat().st_mtime,
+            )
+        except OSError:
+            return
+        excess = len(candidates) - MAX_RETAINED_BRANCH_RESULTS
+        if excess <= 0:
+            return
+        for path in candidates[: min(excess, MAX_BRANCH_RESULT_SWEEP)]:
+            try:
+                path.unlink(missing_ok=True)
+            except OSError:
+                continue
 
     def _branches_result_path(self, request_id: str) -> Path:
         digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
