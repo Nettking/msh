@@ -24,6 +24,7 @@ import time
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode, urlsplit, urlunsplit
 
@@ -41,6 +42,7 @@ from flask import (
 from flask_login import login_user, logout_user
 from flask_security import current_user
 
+from catalog.federation.authoritative_replay import replay_authoritative_history
 from catalog.federation.errors import FederationOperationError
 from catalog.federation.human_auth import (
     AUTHORITY_EVENT,
@@ -185,14 +187,42 @@ def local_fallback_enabled() -> bool:
     return str(value).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _pairing_state_present(remote_store: object) -> bool:
+    """Return whether persisted pairing state exists, ignoring whether it parses.
+
+    ``RemotePairingStore.load`` returns ``None`` only when the file is absent;
+    a file that exists but cannot be read or validated raises instead. That
+    distinction is the whole point here, so it is answered from the path.
+    """
+
+    path = getattr(remote_store, "path", None)
+    if not isinstance(path, Path):
+        return False
+    try:
+        return path.exists()
+    except OSError:
+        return False
+
+
 def saved_remote_member() -> bool:
     """Return whether this installation has a persisted remote Federation binding.
 
     This deliberately does not require the relay to be reachable. It prevents a
     network outage from silently re-enabling device-local password login on a
     member that is configured to trust the Federation human-auth authority.
+
+    Unreadable pairing state is not the same answer as absent pairing state. A
+    member whose binding file exists but cannot be parsed -- a bad read, a
+    truncated or foreign file, an unsupported schema -- is still a member, and
+    every caller of this uses it to keep device-local password login, local user
+    administration, first-run admin bootstrap and pre-auth pairing endpoints
+    shut on an established member. Answering ``False`` there does not degrade
+    one surface; it reopens all of them, and it does so behind the callers' own
+    ``except ... - must fail closed`` guards, which never see the failure
+    because it was already turned into an answer.
     """
 
+    remote_store: object | None = None
     try:
         from catalog.flask_app.services.capability_onboarding_service import (
             get_capability_onboarding_service,
@@ -204,7 +234,11 @@ def saved_remote_member() -> bool:
             return False
         return remote_store.load() is not None
     except Exception:  # noqa: BLE001 - absence of pairing state is not fatal
-        return False
+        # Fail closed only on positive evidence that this device is paired.
+        # Without that evidence a standalone installation whose onboarding
+        # service cannot be constructed would be locked out of its own local
+        # sign-in, which is a worse failure than the one being prevented.
+        return _pairing_state_present(remote_store)
 
 
 @dataclass(frozen=True)
@@ -334,21 +368,22 @@ class FederationHumanAuthService:
 
         replay_page = getattr(coordinator, "replay_page", None)
         if callable(replay_page):
+            # Human-auth authority, member endpoints and per-user role/active
+            # state are all "latest event wins" projections. A page budget that
+            # runs out before the coordinator's current revision would hand back
+            # a prefix in which a later rotation or role change never happened,
+            # so the bounded reader fails closed instead.
             events: list[SessionEvent] = []
-            last_revision = 0
-            for _ in range(MAX_EVENT_PAGES):
-                page, current_revision = replay_page(
+            replay_authoritative_history(
+                lambda last_revision: replay_page(
                     session_id=session_id,
                     actor_node_id=actor_node_id,
                     last_applied_revision=last_revision,
                     limit=EVENT_PAGE_SIZE,
-                )
-                if not page:
-                    break
-                events.extend(page)
-                last_revision = page[-1].revision
-                if last_revision >= current_revision:
-                    break
+                ),
+                apply_page=events.extend,
+                max_pages=MAX_EVENT_PAGES,
+            )
             return tuple(events)
 
         replay = getattr(coordinator, "replay", None)

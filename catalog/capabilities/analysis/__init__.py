@@ -45,7 +45,12 @@ from .scheduler import (
     SchedulingOutcome,
     SubmissionOutcome,
 )
-from .service import AnalysisJobRecord, AnalysisJobRegistry, AnalysisWorkService
+from .service import (
+    AnalysisDriverHealth,
+    AnalysisJobRecord,
+    AnalysisJobRegistry,
+    AnalysisWorkService,
+)
 from .worker import (
     AnalysisExecutionReport,
     AnalysisSliceExecutor,
@@ -72,6 +77,7 @@ __all__ = [
     "SLICE_KIND_UPLOAD_BATCH",
     "AnalysisArtifactGateway",
     "AnalysisArtifactTransport",
+    "AnalysisDriverHealth",
     "AnalysisExecutionReport",
     "AnalysisJobRecord",
     "AnalysisJobRegistry",
