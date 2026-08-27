@@ -44,6 +44,40 @@ PROVIDER_HEALTH_OBSERVATION_SCHEMA = "fcp.provider-health-observation.v1"
 PROVIDER_HEALTH_AUDIT_SCHEMA = "fcp.provider-health-audit.v1"
 PROVIDER_HEALTH_STORE_SCHEMA_VERSION = 1
 MAX_HEALTH_AUDIT_READ = 10_000
+
+#: Retained rows in the recurring provider health audit history.
+#
+# This history is written once per accepted operation and never read in full:
+# the only consumer orders by ``audit_id`` descending and is itself capped at
+# ``MAX_HEALTH_AUDIT_READ``. Past that point every further row is unreadable by any
+# production consumer while still consuming pages forever.
+#
+# The bound mirrors the coordinator audit ring in
+# ``catalog/federation/persistence.py``: retire by monotonic ``audit_id`` in the
+# same transaction as the insert. Ordering by id rather than by timestamp means
+# no clock change can retire a row early, the work per insert is bounded, and
+# the retention frontier survives restart because it is the table's own id
+# order rather than separate state.
+#
+# This is a logical row bound. SQLite reuses the freed pages, so the database
+# stops growing; it does not shrink without an explicit VACUUM.
+MAX_HEALTH_AUDIT_ROWS = 100_000
+
+#: Rows one foreground operation may retire while catching up on legacy history.
+#
+# A storage bound is not a work bound. Retiring "everything past the window" is
+# a single statement, but on a device that has been running since before the
+# window existed that one statement deletes the whole lifetime overflow inside
+# ``BEGIN IMMEDIATE`` -- an arbitrarily long writer lock and an arbitrarily
+# large rollback journal, reached through an ordinary health publication. A
+# routine write must not become lifetime-sized maintenance, so each operation
+# retires at most this many rows.
+#
+# Convergence: an operation appends exactly one row and may retire up to this
+# many, so while any overflow remains it strictly shrinks, and normal recurring
+# writes cannot outrun cleanup. Progress is monotonic and restart-safe because
+# the frontier is the table's own ``audit_id`` order, not separate state.
+AUDIT_MAINTENANCE_BATCH_ROWS = 1_000
 MAX_TEXT_BYTES = 512
 
 
@@ -385,7 +419,14 @@ class ProviderHealthObservation:
 
 @dataclass(frozen=True)
 class ProviderHealthAuditEvent:
-    """Safe append-only evidence for accepted health mutations."""
+    """Safe bounded-recent evidence for accepted health mutations.
+
+    Immutable while retained: a row is never rewritten once written. It is not
+    retained for the life of the device -- B07 requires this recurring history
+    to be bounded, so the oldest rows past the retention window are retired by
+    ``audit_id``. Duplicate suppression and idempotent replay do not depend on
+    these rows; they live in ``provider_health_commands``, which is untouched.
+    """
 
     SCHEMA: ClassVar[str] = PROVIDER_HEALTH_AUDIT_SCHEMA
 
@@ -640,6 +681,25 @@ class SQLiteProviderHealthStore:
                 record.report_revision,
                 _stamp(occurred_at),
             ),
+        )
+        database.execute(
+            """
+            DELETE FROM provider_health_audit
+            WHERE audit_id IN (
+                SELECT audit_id FROM provider_health_audit
+                WHERE audit_id <= COALESCE(
+                    (
+                        SELECT audit_id FROM provider_health_audit
+                        ORDER BY audit_id DESC
+                        LIMIT 1 OFFSET ?
+                    ),
+                    -1
+                )
+                ORDER BY audit_id ASC
+                LIMIT ?
+            )
+            """,
+            (MAX_HEALTH_AUDIT_ROWS, AUDIT_MAINTENANCE_BATCH_ROWS),
         )
 
     @staticmethod
