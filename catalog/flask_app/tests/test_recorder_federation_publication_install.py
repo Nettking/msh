@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import sqlite3
 from types import SimpleNamespace
 
 import pytest
@@ -13,6 +14,9 @@ from catalog.federation.recorder_delivery import RecorderDeliveryRunResult
 from catalog.federation.recorder_publication import (
     RecorderPublicationCycleReport,
     RecorderWorkerCycleResult,
+)
+from catalog.flask_app.services import (
+    recorder_federation_publication_install as install_module,
 )
 from catalog.flask_app.services.recorder_federation_publication_install import (
     install_recorder_federation_publication,
@@ -266,3 +270,121 @@ def test_degraded_publication_is_visible_in_the_monitor_snapshot(tmp_path):
     assert healthy.status == "running"
     assert healthy.last_error_code is None
     assert healthy.retired_batches == 0
+
+
+# --------------------------------------------------------------------------
+# B06: publication driver failure must be observable and bounded, not a
+#      once-per-second rebuild of the most expensive part of the driver
+# --------------------------------------------------------------------------
+
+
+def test_a_durable_store_failure_stays_inside_the_publication_loop(tmp_path):
+    """The outbox behind this loop is SQLite, so this is an ordinary condition.
+
+    A ``sqlite3.Error`` used to escape ``run_forever`` entirely. It was not
+    fatal -- the supervisor above rebuilt the worker -- but rebuilding discards
+    this loop's own consecutive-failure count and its poll interval, so a store
+    that had been unreadable for hours was presented as a first retry, and each
+    retry reloaded the Federation context and reconstructed an authenticated
+    storage client.
+    """
+
+    app, monitor = _configured_app(tmp_path)
+    app.config["RECORDER_FEDERATION_STORAGE_CLIENT_FACTORY"] = (
+        lambda _context: _Client()
+    )
+    with app.app_context():
+        worker = monitor.build_worker()
+    worker.poll_interval_seconds = 0.01
+    cycles = {"count": 0}
+
+    async def _locked_store(*, force_reconcile: bool = False):
+        cycles["count"] += 1
+        raise sqlite3.OperationalError("database is locked")
+
+    worker.run_cycle = _locked_store
+
+    # ``_run_worker_briefly`` awaits the loop task, so an escape fails here.
+    _run_worker_briefly(monitor, worker, until=lambda: cycles["count"] >= 3)
+
+    snapshot = monitor.snapshot()
+    assert snapshot.status == "failing"
+    assert snapshot.last_error_code == "OperationalError"
+    assert snapshot.consecutive_failures >= 3
+    assert cycles["count"] >= 3
+
+
+def test_a_repeated_restart_is_counted_and_backed_off(tmp_path, monkeypatch):
+    """A supervisor that never counts its restarts cannot report a stuck driver.
+
+    Every pass through this path reloads the authorized Federation context and
+    constructs an authenticated logical-storage client. At a fixed one-second
+    wait that is once per second, indefinitely, on a device whose Federation or
+    durable store is already failing.
+    """
+
+    _app, monitor = _configured_app(tmp_path)
+    waits: list[float] = []
+
+    def _never_builds():
+        raise FederationOperationError(
+            "recorder-publication-federation-required",
+            "a trusted Federation connection is required",
+        )
+
+    monkeypatch.setattr(monitor, "build_worker", _never_builds)
+
+    def _stop_after_five(delay: float) -> bool:
+        waits.append(delay)
+        return len(waits) >= 5
+
+    monkeypatch.setattr(monitor._stop, "wait", _stop_after_five)
+
+    monitor._run()
+
+    snapshot = monitor.snapshot()
+    assert snapshot.status == "waiting"
+    assert snapshot.last_error_code == "recorder-publication-federation-required"
+    assert snapshot.consecutive_failures == 5
+    # The first wait is unchanged, then the ladder grows and stays bounded.
+    assert waits == [1.0, 2.0, 4.0, 8.0, 16.0]
+    assert all(delay <= install_module._MAX_RETRY_SECONDS for delay in waits)
+
+
+def test_the_restart_ladder_is_bounded_and_reset_only_by_publishing(tmp_path):
+    """Constructing a worker is not evidence; a published cycle is."""
+
+    _app, monitor = _configured_app(tmp_path)
+
+    assert install_module._restart_delay_seconds(1) == 1.0
+    assert install_module._restart_delay_seconds(100) == (
+        install_module._MAX_RETRY_SECONDS
+    )
+
+    for _ in range(4):
+        monitor._record_restart_failure()
+    assert monitor._restart_count() == 4
+
+    # A cycle that failed leaves the ladder where it is: the worker built, but
+    # nothing was published, which is exactly the loop this bound exists for.
+    monitor._observe_cycle(
+        RecorderPublicationCycleReport(result=None, error_code="OperationalError")
+    )
+    assert monitor._restart_count() == 4
+
+    monitor._observe_cycle(
+        RecorderPublicationCycleReport(
+            result=RecorderWorkerCycleResult(
+                checkpoint_changed=False,
+                reconcile=None,
+                delivery=RecorderDeliveryRunResult(
+                    attempted=0,
+                    committed=0,
+                    pending=0,
+                    blocked_datasets=(),
+                ),
+                retirement=RetiredSummary(total=0, datasets=(), truncated=False),
+            )
+        )
+    )
+    assert monitor._restart_count() == 0

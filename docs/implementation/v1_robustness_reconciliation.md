@@ -171,7 +171,7 @@ Required properties:
 - recorder publication and analysis scheduler driver failure must be observable and recoverable rather than silently stranding durable work; and
 - stale host-process cleanup must verify responder process identity beyond a bare PID before terminating it.
 
-Robustness progress: **B06 3/8 properties automated-proven; B06 remains `OPEN`.**
+Robustness progress: **B06 4/8 properties automated-proven; B06 remains `OPEN`.**
 The merged tailnet responder process-identity delivery stores an atomic process
 record containing PID plus OS process-creation identity, uses stable Windows and
 Linux process handles before termination, fails closed on unsupported POSIX
@@ -208,9 +208,8 @@ covers the graceful operator stop under a failing filesystem, continued capture
 and raw archival during the failure, the byte-unchanged stale file, reporting
 through the next successful heartbeat, and the bounded announcement. The
 remaining B06 properties -- semantic liveness/readiness/degraded-dependency
-semantics, FCP-visible crash-loop state for Docker's bounded-rate restart, the
-supervisor/service-manager child-ownership boundary, and the publication half of
-the driver-observability bullet -- stay open. No physical evidence or acceptance
+semantics, FCP-visible crash-loop state for Docker's bounded-rate restart, and
+the supervisor/service-manager child-ownership boundary -- stay open. No physical evidence or acceptance
 state changed.
 
 The analysis-scheduler half of the publication/scheduler driver property is now
@@ -223,13 +222,40 @@ instead of leaving a stderr traceback and silently stranded queued work.
 The recorder-publication half of the same bullet is supervised one layer above
 its loop: `RecorderFederationPublicationMonitor._run` catches anything escaping
 `run_forever`, publishes a `retrying` snapshot carrying the error code, and
-retries on a bounded delay, while ordinary cycle failures surface as `failing`
-with a consecutive-failure count. That is why the analysis driver was the
-outlier -- its thread target *was* the loop, with no supervisor above it to
-record or restart anything. **Counting is left to review:** this delivery adds
-no automated coverage for a durable-store failure reaching the publication
-monitor, so the bullet is recorded as evidenced on the analysis side rather
-than claimed closed. No physical evidence or acceptance state changed.
+retries, while ordinary cycle failures surface as `failing` with a
+consecutive-failure count. That is why the analysis driver was the outlier --
+its thread target *was* the loop, with no supervisor above it to record or
+restart anything.
+
+The coverage that counting was waiting on has now been written, and it found
+two defects on that publication half. First, `run_forever`'s retry family
+omitted `sqlite3.Error`, even though the outbox and delivery queue behind the
+loop are SQLite and the analysis driver already treats a locked or unreadable
+store as an ordinary condition for a persistent driver. A durable-store failure
+therefore escaped the loop, and the supervisor rebuilt the whole worker instead
+of the loop retrying its own cycle -- discarding that loop's consecutive-failure
+count and its poll interval, so a store unreadable for hours was presented as a
+first retry. Second, both supervisor recovery paths waited a fixed one second
+with no count and no ceiling. Rebuilding this worker reloads the authorized
+Federation context, constructs an authenticated logical-storage client and
+reopens the durable outbox, so an unreachable Federation or an unopenable store
+meant doing all of that once per second, indefinitely, on the device the failure
+is already about -- the S02 shape of indefinite retry with cumulative work and
+no FCP-visible stuck state.
+
+`sqlite3.Error` now belongs to the cycle retry family, so a store failure is
+handled, counted and paced by the loop that owns it. The supervisor counts its
+own restarts into the `waiting`/`retrying` snapshots and waits on a bounded
+exponential ladder capped at 60 seconds, whose first wait is unchanged so
+ordinary recovery stays immediate. The ladder is cleared only by a cycle that
+actually published, never by merely managing to construct a worker, so a worker
+that builds and then fails every first cycle keeps escalating. Automated
+evidence drives a locked store through the real loop, drives the supervisor's
+own restart path, and pins the ladder's bound and its reset rule.
+
+With both halves now evidenced, the publication/scheduler driver-observability
+bullet is **automated-proven, taking B06 to 4/8 properties; B06 remains
+`OPEN`.** No physical evidence or acceptance state changed.
 
 ### B07 — bounded reconstructible and cumulative metadata growth
 

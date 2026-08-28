@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import json
 import re
+import sqlite3
 from collections.abc import Callable
 from dataclasses import dataclass, replace
 from datetime import datetime, timezone
@@ -689,6 +690,26 @@ class RecorderWorkerCycleResult:
     retirement: RetiredSummary = _NO_RETIREMENT
 
 
+#: Failures one bounded publication cycle must survive rather than escape on.
+#
+# The outbox and the delivery queue behind this loop are SQLite, so
+# ``sqlite3.Error`` -- a locked database, a transient disk I/O error, a store
+# that cannot be opened -- is an ordinary condition for this driver, exactly as
+# it is for the analysis lifecycle driver. Leaving it out did not make it fatal,
+# but it did make it escape: the supervisor above rebuilt the whole worker
+# instead, which discards this loop's own consecutive-failure count and its
+# poll interval, so a store that had been unreadable for hours was presented as
+# a first retry.
+_CYCLE_RETRY_ERRORS = (
+    FederationValidationError,
+    OSError,
+    RuntimeError,
+    TypeError,
+    ValueError,
+    sqlite3.Error,
+)
+
+
 @dataclass(frozen=True)
 class RecorderPublicationCycleReport:
     """What one bounded worker cycle proved, whether or not it succeeded.
@@ -914,13 +935,7 @@ class RecorderFederationDeliveryWorker:
         while not stop_event.is_set():
             try:
                 result = await self.run_cycle()
-            except (
-                FederationValidationError,
-                OSError,
-                RuntimeError,
-                TypeError,
-                ValueError,
-            ) as exc:
+            except _CYCLE_RETRY_ERRORS as exc:
                 # Capture remains independent and the next bounded cycle
                 # retries reconciliation/delivery from durable local state --
                 # but the failure is no longer invisible. Absorbing it silently

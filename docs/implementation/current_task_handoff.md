@@ -123,6 +123,22 @@ recovery, and the bounded announcement. That brings B06 to **3/8 properties
 automated-proven; B06 remains open**. No physical evidence or acceptance state
 changed.
 
+Writing the coverage the publication/scheduler driver bullet was waiting on
+found two more defects on the publication half. `run_forever`'s retry family
+omitted `sqlite3.Error` even though the outbox behind it is SQLite, so a locked
+or unreadable store escaped the loop and the supervisor rebuilt the whole worker
+instead -- discarding that loop's own failure count and poll interval, so a
+store unreadable for hours read as a first retry. And both supervisor recovery
+paths waited a fixed second with no count and no ceiling, so an unreachable
+Federation or an unopenable store meant reloading the authorized context and
+reconstructing an authenticated storage client once per second, indefinitely.
+A durable-store failure is now an ordinary cycle failure, counted and paced by
+the loop that owns it, and the supervisor counts its own restarts into the
+snapshot and waits on a bounded ladder capped at 60 seconds that only a cycle
+which actually published can clear. With both halves evidenced, that bullet is
+automated-proven and **B06 is 4/8 properties automated-proven; B06 remains
+open**. No physical evidence or acceptance state changed.
+
 The recorder path-confinement, finite-transaction, incremental recovery-frontier,
 healthy-source progress-isolation, and durable event-storm deliveries together
 advance **B02 8/9 properties automated-proven; B02 remains open**.
