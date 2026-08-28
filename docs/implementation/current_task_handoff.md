@@ -103,6 +103,26 @@ stale-heartbeat sweep now wakes both supported relay owners and produces a
 nonzero process exit so the existing Compose restart policy can act. Together
 these are **B06 2/8 properties automated-proven; B06 remains open**.
 
+The recorder status-I/O boundary delivery adds a third. `publish_status` writes
+the recorder heartbeat on every cycle and once more inside `run`'s shutdown
+block, and an `OSError` from a full, read-only or otherwise failing host
+filesystem used to escape the run loop, raise again during shutdown, replace the
+real stop reason and skip stop-target cleanup -- while the same failure inside
+capture was already contained by the per-source boundary. The supervised native
+recorder made the consequence concrete: its supervisor reads an operator stop
+from a graceful zero exit, so a refused heartbeat write during Ctrl+C turned the
+operator's own stop into a nonzero exit and restarted capture behind them. The
+write is now contained, announced when the condition appears or changes rather
+than once per cycle, and carried into the next heartbeat that reaches disk
+through an additive `status_publication_error` field. Nothing is fabricated: a
+refused write leaves the published file byte-identical and stale, which is
+exactly what the host updater's freshness check must read as not proven healthy.
+Automated evidence covers the graceful operator-stop exit, continued capture and
+raw archival during the failure, the unchanged stale file, reporting after
+recovery, and the bounded announcement. That brings B06 to **3/8 properties
+automated-proven; B06 remains open**. No physical evidence or acceptance state
+changed.
+
 The recorder path-confinement, finite-transaction, incremental recovery-frontier,
 healthy-source progress-isolation, and durable event-storm deliveries together
 advance **B02 8/9 properties automated-proven; B02 remains open**.

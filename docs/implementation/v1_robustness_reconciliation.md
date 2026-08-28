@@ -171,7 +171,7 @@ Required properties:
 - recorder publication and analysis scheduler driver failure must be observable and recoverable rather than silently stranding durable work; and
 - stale host-process cleanup must verify responder process identity beyond a bare PID before terminating it.
 
-Robustness progress: **B06 2/8 properties automated-proven; B06 remains `OPEN`.**
+Robustness progress: **B06 3/8 properties automated-proven; B06 remains `OPEN`.**
 The merged tailnet responder process-identity delivery stores an atomic process
 record containing PID plus OS process-creation identity, uses stable Windows and
 Linux process handles before termination, fails closed on unsupported POSIX
@@ -185,6 +185,33 @@ failure injection/cause propagation/nonzero entry-point exits/operator-stop task
 cleanup. Physical reboot/PID-reuse coverage remains in P05/P09, and P05 still
 must inject the relay database failure through the exact Compose candidate. No
 physical evidence or acceptance state changed.
+
+The recorder status-I/O boundary delivery adds the third property: the recorder
+status/final status bullet. `RecorderRuntime.publish_status` now contains
+`OSError` from the heartbeat write instead of ending the run loop, raising a
+second time inside `run`'s shutdown block, replacing the real stop reason and
+skipping `unregister_stop_target`. An equivalent failure inside capture was
+already contained by the per-source boundary; the heartbeat was the remaining
+path by which a failing host filesystem decided the capture process's lifecycle.
+Containment does not weaken the update contract, because nothing is fabricated:
+a refused write leaves the published file byte-identical and stale, so
+`read_recorder_status(...).is_fresh()` still refuses to treat that device as
+proven healthy. The failure is carried into the next heartbeat that reaches disk
+through an additive, length-bounded `status_publication_error` field and then
+cleared, and it is announced in the recorder log when the condition appears or
+changes rather than once per cycle, so containment does not answer one
+amplification with another. It also restores the recorder side of the operator
+stop contract the Windows supervisor's `Test-IntentionalStop` depends on -- a
+graceful zero exit -- which a refused shutdown write previously converted into a
+nonzero exit and an ordinary restart behind the operator. Automated evidence
+covers the graceful operator stop under a failing filesystem, continued capture
+and raw archival during the failure, the byte-unchanged stale file, reporting
+through the next successful heartbeat, and the bounded announcement. The
+remaining B06 properties -- semantic liveness/readiness/degraded-dependency
+semantics, FCP-visible crash-loop state for Docker's bounded-rate restart, the
+supervisor/service-manager child-ownership boundary, and the publication half of
+the driver-observability bullet -- stay open. No physical evidence or acceptance
+state changed.
 
 The analysis-scheduler half of the publication/scheduler driver property is now
 automated-proven separately. `AnalysisWorkService`'s persistent lifecycle driver

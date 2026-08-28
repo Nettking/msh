@@ -301,6 +301,11 @@ BATCH_SIZE = min(
 MAX_BATCHES_PER_CYCLE = max(1, _int_from_env("FCP_RECORDER_MAX_BATCHES_PER_CYCLE", 20))
 CONFIG_REFRESH_INTERVAL = _float_from_env("FCP_RECORDER_CONFIG_REFRESH_INTERVAL", 1.0)
 STATUS_INTERVAL = _float_from_env("FCP_RECORDER_STATUS_INTERVAL", 1.0)
+
+#: The published heartbeat is rewritten in place rather than appended to, but a
+#: bound keeps one unusually verbose OS message from dominating the file an
+#: operator reads under exactly the disk pressure that produced it.
+_MAX_STATUS_ERROR_CHARS = 200
 BACKOFF_INITIAL = _float_from_env("FCP_RECORDER_BACKOFF_INITIAL", 0.5)
 BACKOFF_MAX = _float_from_env("FCP_RECORDER_BACKOFF_MAX", 8.0)
 RUN_ONCE = _bool_from_env("FCP_RECORDER_ONCE", False)
@@ -472,6 +477,9 @@ class RecorderRuntime:
         self.state = "starting"
         self.last_config_refresh = 0.0
         self.last_status_write = 0.0
+        # Carried into the next heartbeat that actually reaches disk and then
+        # cleared, the same way a recovered source clears its own last error.
+        self.status_publication_error = ""
         self.store = DurableRecorderStore(DATA_DIR)
         self.executor = ThreadPoolExecutor(max_workers=8, thread_name_prefix="mtconnect")
         self._capture_futures: dict[
@@ -1260,8 +1268,51 @@ class RecorderRuntime:
                 "raw_archive_enabled": True,
                 "detailed_observation_archive_enabled": True,
                 "wide_compatibility_jsonl_enabled": True,
+                # Additive: existing readers ignore unknown keys, while an
+                # operator whose host filesystem failed can see that a
+                # heartbeat was lost rather than only finding a gap in the
+                # file's timestamps.
+                "status_publication_error": self.status_publication_error,
             }
-        _write_json_atomic(STATUS_FILE, payload)
+        try:
+            _write_json_atomic(STATUS_FILE, payload)
+        except OSError as exc:
+            # The heartbeat is operational reporting, not capture state, and a
+            # host filesystem failure while writing it must not decide this
+            # process's lifecycle. Capture already contains its own I/O
+            # failures inside the per-source boundary; letting the heartbeat
+            # escape ended the run loop instead, and an escape from the
+            # shutdown publish in ``run``'s ``finally`` replaced the real stop
+            # reason and skipped stop-target cleanup.
+            #
+            # A supervised native recorder makes that concrete. Its supervisor
+            # reads an operator stop from a graceful zero exit, so a failed
+            # status write during Ctrl+C turned the operator's stop into a
+            # nonzero exit and restarted capture behind them.
+            #
+            # Nothing is accepted silently and nothing is fabricated. The
+            # failure is logged, carried into the next heartbeat that reaches
+            # disk, and the published file itself stays exactly as stale as it
+            # was -- which is what a host updater must read as "not proven
+            # healthy", because freshness is judged from ``heartbeat_at``.
+            reported = f"{type(exc).__name__}: {exc}"[:_MAX_STATUS_ERROR_CHARS]
+            with self.lock:
+                repeated = self.status_publication_error == reported
+                self.status_publication_error = reported
+            # A failing filesystem is usually still failing on the next cycle,
+            # and a warning per heartbeat would answer one amplification with
+            # another on the host that is already out of room. The condition is
+            # announced when it appears or changes; while it persists unchanged
+            # it stays at debug level.
+            log.log(
+                logging.DEBUG if repeated else logging.WARNING,
+                "Recorder status heartbeat could not be written to %s: %s",
+                STATUS_FILE,
+                exc,
+            )
+            return
+        with self.lock:
+            self.status_publication_error = ""
 
     def run(self) -> None:
         DATA_DIR.mkdir(parents=True, exist_ok=True)
