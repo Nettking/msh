@@ -54,6 +54,7 @@ TRIAL_REPORT_EVENT = "software.trial.reported"
 SESSION_CREATED_EVENT = "session.created"
 MAX_TARGETS = 256
 MAX_EVENT_BYTES = 8192
+TRIAL_RETIREMENT_STATE_KEY = "trial_result_retirements"
 
 
 def _bounded(value: object) -> None:
@@ -346,6 +347,7 @@ def _empty_state() -> dict[str, object]:
         "last_revision": 0,
         "authority_node_id": None,
         "pending": {},
+        TRIAL_RETIREMENT_STATE_KEY: [],
     }
 
 
@@ -420,6 +422,74 @@ class FederationUpdateEventProcessor:
         self.service = service
         self.handoff = handoff
         self.state_file = Path(state_file)
+
+    @staticmethod
+    def _trial_retirement_ids(state: dict[str, object]) -> list[str]:
+        raw = state.get(TRIAL_RETIREMENT_STATE_KEY)
+        if not isinstance(raw, list):
+            return []
+        values: list[str] = []
+        seen: set[str] = set()
+        for item in raw:
+            if (
+                isinstance(item, str)
+                and 0 < len(item) <= 256
+                and item not in seen
+            ):
+                seen.add(item)
+                values.append(item)
+        return values
+
+    def _retire_trial_result(self, request_id: str) -> bool:
+        """Delete exactly one per-request trial publication, best effort."""
+
+        directory = getattr(self.handoff, "directory", None)
+        if not isinstance(directory, Path):
+            try:
+                directory = Path(directory)
+            except (TypeError, ValueError):
+                return False
+        digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
+        path = directory / f"trial-result-{digest}.json"
+        try:
+            path.unlink(missing_ok=True)
+        except OSError:
+            return False
+        return True
+
+    def _drain_trial_retirements(self, state: dict[str, object]) -> None:
+        retirements = self._trial_retirement_ids(state)
+        if not retirements:
+            if state.get(TRIAL_RETIREMENT_STATE_KEY) not in (None, []):
+                state[TRIAL_RETIREMENT_STATE_KEY] = []
+                _write_state(self.state_file, state)
+            return
+        remaining = [
+            request_id
+            for request_id in retirements
+            if not self._retire_trial_result(request_id)
+        ]
+        if (
+            remaining != retirements
+            or state.get(TRIAL_RETIREMENT_STATE_KEY) != retirements
+        ):
+            state[TRIAL_RETIREMENT_STATE_KEY] = remaining
+            _write_state(self.state_file, state)
+
+    def _persist_trial_retirement(
+        self,
+        state: dict[str, object],
+        request_id: str,
+    ) -> None:
+        retirements = self._trial_retirement_ids(state)
+        if request_id not in retirements:
+            retirements.append(request_id)
+        state[TRIAL_RETIREMENT_STATE_KEY] = retirements
+        # This write is the crash-safety boundary. The pending reader has
+        # already been removed in memory, and the durable retirement intent is
+        # committed in the same atomic state replacement before any unlink.
+        _write_state(self.state_file, state)
+        self._drain_trial_retirements(state)
 
     def _report(
         self,
@@ -531,7 +601,11 @@ class FederationUpdateEventProcessor:
                     # pending record so the later outcome is reported too.
                     continue
                 pending.pop(federation_request_id, None)
-                changed = True
+                state["pending"] = pending
+                self._persist_trial_retirement(state, host_request_id)
+                # Every change accumulated so far was included in the durable
+                # state write above. Later records may set this again.
+                changed = False
                 continue
             result = self._host_result(host_request_id)
             if result is None or result.target_commit != target_commit:
@@ -599,20 +673,28 @@ class FederationUpdateEventProcessor:
             if _trial_is_settled(existing):
                 pending.pop(federation_request_id, None)
                 state["pending"] = pending
-                _write_state(self.state_file, state)
+                self._persist_trial_retirement(state, host_request_id)
                 return state
         queued = self.handoff.trial(selection, request_id=host_request_id)
-        if _trial_is_settled(queued):
+        settled = _trial_is_settled(queued)
+        if settled:
             pending.pop(federation_request_id, None)
-        else:
-            # The recorder activation watcher only accepts a stop request for
-            # work this device is genuinely waiting on, so the pending record is
-            # written before the report, exactly as an update does.
-            pending[federation_request_id] = {
-                "kind": "trial",
-                "host_request_id": host_request_id,
-                "target_commit": selection.target_commit,
-            }
+            state["pending"] = pending
+            self._report_trial(
+                context,
+                federation_request_id=federation_request_id,
+                document=queued,
+            )
+            self._persist_trial_retirement(state, host_request_id)
+            return state
+        # The recorder activation watcher only accepts a stop request for work
+        # this device is genuinely waiting on, so the pending record is written
+        # before the report, exactly as an update does.
+        pending[federation_request_id] = {
+            "kind": "trial",
+            "host_request_id": host_request_id,
+            "target_commit": selection.target_commit,
+        }
         state["pending"] = pending
         _write_state(self.state_file, state)
         self._report_trial(
@@ -627,6 +709,7 @@ class FederationUpdateEventProcessor:
         if remote is None:
             return
         state = _read_state(self.state_file)
+        self._drain_trial_retirements(state)
         self._finish_pending(context, state)
         last_revision = state.get("last_revision", 0)
         if (
