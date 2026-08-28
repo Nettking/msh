@@ -17,6 +17,7 @@ from flask import (
     url_for,
 )
 
+from .services.data_upload_resource_admission import enqueue_with_resource_admission
 from .services.data_upload_service import DataUploadError, get_data_upload_service
 from .services.upload_analysis_job_service import (
     UploadAnalysisJobError,
@@ -83,7 +84,11 @@ def index():
 def upload():
     try:
         _validate_csrf()
-        batch = get_data_upload_service().enqueue(request.files.getlist("files"))
+        service = get_data_upload_service()
+        batch = enqueue_with_resource_admission(
+            service,
+            request.files.getlist("files"),
+        )
     except DataUploadError as exc:
         flash(exc.message, "error")
         return redirect(url_for("data_upload_web.index"))
