@@ -46,6 +46,8 @@ from catalog.flask_app.services.mtconnect_discovery_service import (
     validate_scan_cidr,
 )
 
+from .worker_health import WorkerHealth
+
 _STATE_SCHEMA = "fcp.recorder-control-processor.v1"
 _CONTROL_SCHEMA = "fcp.mtconnect_recorder.control.v1"
 _AUTO_CONFIG_SCHEMA = "fcp.mtconnect_recorder.autoconfig.v1"
@@ -183,6 +185,7 @@ class RecorderFederationControlWorker:
         )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self.health = WorkerHealth("federation-control")
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -195,6 +198,7 @@ class RecorderFederationControlWorker:
             name="fcp-recorder-federation-control",
             daemon=True,
         )
+        self.health.started()
         self._thread.start()
 
     def stop(self, *, timeout: float = 3.0) -> None:
@@ -519,8 +523,14 @@ class RecorderFederationControlWorker:
                         payload=report,
                     )
                     self._flush_pending(remote, state)
+                self.health.record_success()
                 self._stop.wait(self.poll_seconds)
-            except Exception:  # noqa: BLE001 - transport failures retry safely
+            except Exception as exc:  # noqa: BLE001 - transport failures retry safely
+                # Retrying is right: a control command must never end capture.
+                # Discarding the reason was not. An operator whose scan or
+                # source change never applies has no other surface on a
+                # headless recorder to learn that this loop is the reason.
+                self.health.record_failure(exc)
                 self._stop.wait(self.poll_seconds)
 
 

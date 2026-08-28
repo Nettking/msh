@@ -19,6 +19,8 @@ from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
+from flask import Flask, request, url_for
+from werkzeug.exceptions import HTTPException
 
 from catalog.federation.authoritative_replay import (
     AUTHORITATIVE_REPLAY_INCOMPLETE,
@@ -33,6 +35,8 @@ from catalog.federation.human_auth import (
 )
 from catalog.federation.models import SessionEvent
 from catalog.flask_app.auth import federation as human_auth
+from catalog.flask_app.auth import routes as auth_routes
+from catalog.flask_app.auth.extension import init_human_auth
 from catalog.flask_app.services import federation_leader_authority as leadership
 from catalog.node.identity import IdentityStore
 
@@ -373,3 +377,84 @@ def test_an_incomplete_human_auth_read_never_reports_a_prefix_login_mode(
     mode = service.mode(refresh=True)
     assert mode.mode == "local"
     assert mode.authority is None
+
+
+def _member_request_app(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Flask:
+    """A member installation whose surfaces run the real before-request hooks."""
+
+    monkeypatch.delenv("FCP_AUTH_DISABLED", raising=False)
+    monkeypatch.setenv("FCP_FLASK_SECRET", "s" * 48)
+    monkeypatch.setenv("FCP_PASSWORD_SALT", "p" * 48)
+    monkeypatch.setenv("FCP_AUTH_DATABASE", str(tmp_path / "users.sqlite3"))
+    application = Flask(__name__, template_folder="../templates")
+    application.testing = True
+    application.config["WTF_CSRF_ENABLED"] = False
+    init_human_auth(application)
+    return application
+
+
+def _established_member(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Pin the durable member signal the authority surfaces are anchored on."""
+
+    monkeypatch.setattr(human_auth, "saved_remote_member", lambda: True)
+    monkeypatch.setattr(auth_routes, "saved_remote_member", lambda: True)
+
+
+def test_an_incomplete_read_reports_an_unavailable_control_plane(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Failing closed has to reach the operator as an unavailable control plane.
+
+    ``mode`` degrades to ``local`` on an incomplete read, but ``saved_remote_member``
+    correctly keeps this device a member, so both authority surfaces fall through
+    to ``service.authority(refresh=True)`` -- which now raises rather than
+    answering from a prefix. Unhandled, that bounded refusal reaches the operator
+    as a broken device instead of the 503 these routes already define for an
+    authority they cannot resolve.
+    """
+
+    monkeypatch.setattr(human_auth, "EVENT_PAGE_SIZE", 1)
+    events = _human_auth_history(
+        _auth_leader_identity(tmp_path),
+        filler_events=human_auth.MAX_EVENT_PAGES + 8,
+    )
+    service, _coordinator = _human_auth_service(events)
+    application = _member_request_app(tmp_path, monkeypatch)
+    _established_member(monkeypatch)
+
+    with application.test_request_context("/admin/users"):
+        human_auth.install_federated_human_auth_service(service)
+        with pytest.raises(HTTPException) as unavailable:
+            auth_routes._member_admin_redirect()
+    assert unavailable.value.code == 503
+
+    with application.test_request_context("/"):
+        change_password = url_for("security.change_password")
+    with application.test_request_context(change_password, method="GET"):
+        assert request.endpoint == "security.change_password"
+        human_auth.install_federated_human_auth_service(service)
+        with pytest.raises(HTTPException) as refused:
+            human_auth.redirect_member_password_change()
+    assert refused.value.code == 503
+
+
+def test_a_complete_read_still_redirects_to_the_resolved_authority(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Reporting unavailable must not become the answer for a healthy member."""
+
+    monkeypatch.setattr(human_auth, "EVENT_PAGE_SIZE", 1)
+    events = _human_auth_history(_auth_leader_identity(tmp_path), filler_events=4)
+    service, _coordinator = _human_auth_service(events)
+    application = _member_request_app(tmp_path, monkeypatch)
+    _established_member(monkeypatch)
+
+    with application.test_request_context("/admin/users"):
+        human_auth.install_federated_human_auth_service(service)
+        outcome = auth_routes._member_admin_redirect()
+
+    assert outcome is not None
+    assert outcome.status_code in {301, 302, 303, 307, 308}
+    assert outcome.headers["Location"].startswith("https://leader-moved.example")

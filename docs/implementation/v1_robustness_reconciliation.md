@@ -122,6 +122,47 @@ Required properties:
 
 `compact_completed()` remains a payload compactor, not a retention bound.
 
+Robustness progress: **B03 2/6 properties automated-proven; B03 remains `OPEN`.**
+
+The isolation property is proven. Every item-level fault archive reconciliation
+can meet -- an observation file that is missing, unreadable, malformed, empty,
+sequence-discontinuous, carrying no usable receipt stamp, or holding a single
+observation larger than the bounded publication size -- was raised out of the
+whole reconcile pass. The worker above treats that as an ordinary cycle failure
+and retries next poll, which is right for a transient fault and useless for this
+one: the same item fails the same way forever. Nothing after it was ever
+published, and that includes every *other* source, because the loop over sorted
+sources never got past the bad one. Capture kept recording, so the durable work
+was not lost; it was stranded, permanently, behind a repeating cycle failure
+that named neither the item nor the source.
+
+Those faults now fence one source. The rest of that source waits behind the
+item, because the delivery queue preserves recorder sequence order per dataset
+and publishing across the gap would break the contract that makes a published
+dataset trustworthy; every other source publishes normally. The condition is
+carried in a bounded, truncation-flagged quarantine summary naming the source,
+the error code and the item's bounded locator -- never a local path, because the
+record reaches an operator health surface -- and the monitor reports the cycle as
+`degraded` with `recorder-archive-quarantined`, distinct from the retirement
+degradation it already had. Nothing is deleted: the raw archive is primary
+evidence and stays exactly where it is, so a repaired item publishes on the next
+pass. The fence is deliberately narrow: checkpoint and contract failures --
+unreadable or unsupported recorder state, a session mismatch -- stay fatal rather
+than becoming a quietly skipped source.
+
+The required-thread property is proven with it. Database/storage failures in the
+publication loop are now caught at that boundary on both sides: the merged
+native-recorder delivery covers the recorder's own publication store, and
+`sqlite3.Error` has been added to the Flask-side worker's cycle retry family, so
+a locked or unreadable outbox is handled, counted and paced by the loop that owns
+it rather than escaping to a supervisor rebuild. See the B06 record for that
+supervisor's own restart counting and bounded backoff.
+
+The remaining four properties are untouched: incremental reconciliation progress,
+measurable backlog catch-up after a long outage, the durable outbox
+retirement/frontier/tombstone design, and compaction-safe duplicate-suppression
+semantics. No physical evidence or acceptance state changed.
+
 ### B04 — one supported update/start contract and one host-mutation serialization boundary
 
 **State:** `CLOSED`
@@ -171,7 +212,7 @@ Required properties:
 - recorder publication and analysis scheduler driver failure must be observable and recoverable rather than silently stranding durable work; and
 - stale host-process cleanup must verify responder process identity beyond a bare PID before terminating it.
 
-Robustness progress: **B06 2/8 properties automated-proven; B06 remains `OPEN`.**
+Robustness progress: **B06 4/8 properties automated-proven; B06 remains `OPEN`.**
 The merged tailnet responder process-identity delivery stores an atomic process
 record containing PID plus OS process-creation identity, uses stable Windows and
 Linux process handles before termination, fails closed on unsupported POSIX
@@ -186,6 +227,32 @@ cleanup. Physical reboot/PID-reuse coverage remains in P05/P09, and P05 still
 must inject the relay database failure through the exact Compose candidate. No
 physical evidence or acceptance state changed.
 
+The recorder status-I/O boundary delivery adds the third property: the recorder
+status/final status bullet. `RecorderRuntime.publish_status` now contains
+`OSError` from the heartbeat write instead of ending the run loop, raising a
+second time inside `run`'s shutdown block, replacing the real stop reason and
+skipping `unregister_stop_target`. An equivalent failure inside capture was
+already contained by the per-source boundary; the heartbeat was the remaining
+path by which a failing host filesystem decided the capture process's lifecycle.
+Containment does not weaken the update contract, because nothing is fabricated:
+a refused write leaves the published file byte-identical and stale, so
+`read_recorder_status(...).is_fresh()` still refuses to treat that device as
+proven healthy. The failure is carried into the next heartbeat that reaches disk
+through an additive, length-bounded `status_publication_error` field and then
+cleared, and it is announced in the recorder log when the condition appears or
+changes rather than once per cycle, so containment does not answer one
+amplification with another. It also restores the recorder side of the operator
+stop contract the Windows supervisor's `Test-IntentionalStop` depends on -- a
+graceful zero exit -- which a refused shutdown write previously converted into a
+nonzero exit and an ordinary restart behind the operator. Automated evidence
+covers the graceful operator stop under a failing filesystem, continued capture
+and raw archival during the failure, the byte-unchanged stale file, reporting
+through the next successful heartbeat, and the bounded announcement. The
+remaining B06 properties -- semantic liveness/readiness/degraded-dependency
+semantics, FCP-visible crash-loop state for Docker's bounded-rate restart, and
+the supervisor/service-manager child-ownership boundary -- stay open. No physical evidence or acceptance
+state changed.
+
 The analysis-scheduler half of the publication/scheduler driver property is now
 automated-proven separately. `AnalysisWorkService`'s persistent lifecycle driver
 treats durable-store failure as an expected condition instead of dying on it,
@@ -196,13 +263,78 @@ instead of leaving a stderr traceback and silently stranded queued work.
 The recorder-publication half of the same bullet is supervised one layer above
 its loop: `RecorderFederationPublicationMonitor._run` catches anything escaping
 `run_forever`, publishes a `retrying` snapshot carrying the error code, and
-retries on a bounded delay, while ordinary cycle failures surface as `failing`
-with a consecutive-failure count. That is why the analysis driver was the
-outlier -- its thread target *was* the loop, with no supervisor above it to
-record or restart anything. **Counting is left to review:** this delivery adds
-no automated coverage for a durable-store failure reaching the publication
-monitor, so the bullet is recorded as evidenced on the analysis side rather
-than claimed closed. No physical evidence or acceptance state changed.
+retries, while ordinary cycle failures surface as `failing` with a
+consecutive-failure count. That is why the analysis driver was the outlier --
+its thread target *was* the loop, with no supervisor above it to record or
+restart anything.
+
+The coverage that counting was waiting on has now been written, and it found
+two defects on that publication half. First, `run_forever`'s retry family
+omitted `sqlite3.Error`, even though the outbox and delivery queue behind the
+loop are SQLite and the analysis driver already treats a locked or unreadable
+store as an ordinary condition for a persistent driver. A durable-store failure
+therefore escaped the loop, and the supervisor rebuilt the whole worker instead
+of the loop retrying its own cycle -- discarding that loop's consecutive-failure
+count and its poll interval, so a store unreadable for hours was presented as a
+first retry. Second, both supervisor recovery paths waited a fixed one second
+with no count and no ceiling. Rebuilding this worker reloads the authorized
+Federation context, constructs an authenticated logical-storage client and
+reopens the durable outbox, so an unreachable Federation or an unopenable store
+meant doing all of that once per second, indefinitely, on the device the failure
+is already about -- the S02 shape of indefinite retry with cumulative work and
+no FCP-visible stuck state.
+
+`sqlite3.Error` now belongs to the cycle retry family, so a store failure is
+handled, counted and paced by the loop that owns it. The supervisor counts its
+own restarts into the `waiting`/`retrying` snapshots and waits on a bounded
+exponential ladder capped at 60 seconds, whose first wait is unchanged so
+ordinary recovery stays immediate. The ladder is cleared only by a cycle that
+actually published, never by merely managing to construct a worker, so a worker
+that builds and then fails every first cycle keeps escalating. Automated
+evidence drives a locked store through the real loop, drives the supervisor's
+own restart path, and pins the ladder's bound and its reset rule.
+
+With both halves now evidenced, the publication/scheduler driver-observability
+bullet is **automated-proven, taking B06 to 4/8 properties; B06 remains
+`OPEN`.** No physical evidence or acceptance state changed.
+
+The same audit found the creator's logical-storage authority supervisor
+carrying the second of those two defects. Its snapshot exists, in its own words,
+to tell working from silently-not-running, but it recorded only a last error
+code, so one blip and an authority that had been restarting all day were
+indistinguishable; and every restart rebuilt the authority settings and the
+shared relay context on a fixed five-second wait with no ceiling. It now counts
+its restarts into that snapshot and waits on the same bounded ladder, cleared
+only by an announcement -- the authority proving it actually ran -- rather than
+by managing to compose settings again. This aligns it with the reconnect driver,
+which already counted attempts and backed off to the same ceiling, and with the
+publication supervisor above. It does not close a further B06 property: the
+bullet names the publication and analysis scheduler drivers, and this is the
+same discipline applied to a third required driver rather than a new one.
+**B06 stays at 4/8 and remains `OPEN`.**
+
+The standalone recorder's four required loops -- Federation update, host update
+agent, update activation and recorder control -- were the same shape again, and
+the worst placed for it. Each catches every failure and retries from durable
+state, which is the correct lifecycle since none of them may end capture, but
+each then discarded the failure entirely: no log, no counter, nothing anywhere.
+A loop that had failed on every pass since startup was indistinguishable from a
+loop with nothing to do, on a headless device whose only operator surface is its
+status heartbeat. The consequences are concrete: a `/federation/recorders` scan
+or source change that is never applied, and a device that never joins an
+**Update all devices** rollout, both while the recorder reports itself a
+connected member with no problem at all.
+
+Each loop now keeps a bounded consecutive-failure record with a named error
+code, announced in the recorder log when the condition appears or changes rather
+than once per poll, and cleared completely by a pass that succeeds. The launcher
+publishes those records into the heartbeat through the same read-only provider
+seam Federation status already uses, under an additive, count-bounded `workers`
+key, so capture stays unaware of the loops and a broken or oversized provider
+cannot break or grow the heartbeat. No loop's lifecycle changed: every failure
+is still retried exactly as before. This is added observability for the same
+bullet rather than a further property, so **B06 stays at 4/8 and remains
+`OPEN`.**
 
 ### B07 — bounded reconstructible and cumulative metadata growth
 
@@ -279,16 +411,60 @@ handover; only page size is accelerated. No page ceiling was widened, no
 additional history is read, and coordinator authority, fencing, revision-gap,
 lease and membership checks are unchanged.
 
-The explicit fail-closed requirement is proven only for those authority/security
-consumers. The shared-knowledge reader and the capability-request, update,
-software-version and recorder-control report aggregators still return what they
-accumulated at their own ceilings; each under-reports rather than granting
-authority, but none of them fails closed yet. The remaining five properties are
-untouched: snapshot/base-revision compaction, member-replicated history
-lifetime and request-history retirement horizons all depend on retirement
-mechanisms that do not exist, and the control-plane unavailable/reconnecting
-representation and the bounded-clock-skew/NTP prerequisite are still open. No
-physical evidence or acceptance state changed.
+The shared-knowledge reader is now wired onto the same primitive, on the same
+unchanged `REPLAY_PAGE_EVENTS`/`MAX_REPLAY_PAGES` ceilings. That consumer is not
+an authority projection, but its prefix behaviour was worse than
+under-reporting: `_reduce` learns that a document ever existed only from that
+document's own events, and `seen_document_ids` is the only reason `load_payload`
+leaves a deleted id alone. A read that stopped before a delete therefore treated
+the local cached copy as new content and re-published the withdrawn document
+into the append-only authoritative log, for every member and with no retraction
+available; the projection the caller wrote back to its own cache was also
+missing everything past the stopping point. Incomplete reads now raise the same
+bounded `authoritative-replay-incomplete` error, which the repository's existing
+degradation path turns into "keep reading the local cache and change nothing
+shared", reported at warning level to separate it from an ordinary unreachable
+relay. Regression evidence covers the resurrection itself, a write and a
+tombstone built on a prefix, the accelerated page-budget ceiling against a real
+coordinator, and the deletion still being honoured once complete history is
+readable again.
+
+Failing closed also has to arrive somewhere. `LoginMode` degrades to `local`
+on an incomplete read, but `saved_remote_member` correctly keeps an established
+member a member, so the two member authority surfaces -- user administration and
+password change -- fell through to `authority(refresh=True)`, which since this
+work raises instead of answering from a prefix. Unhandled in a `before_request`
+hook, that bounded refusal reached the operator as a broken device rather than
+as the `503` those routes already define for an authority they cannot resolve.
+`resolved_authority` now turns any bounded Federation failure there into the
+existing unresolved-authority answer, logging an incomplete authoritative read
+above an ordinary unreachable relay. It never widens anything: both callers
+refuse on an unresolved authority rather than falling back to a device-local
+page. This is the operator-representation half of the control-plane property;
+the explicit unavailable/reconnecting operator surface is still not built, so
+that property stays open.
+
+The Federation authority projection adapter is now wired onto the same reader
+as well, on its own unchanged ceilings. Its bounded loop measured progress by
+page length rather than by revision, so only budget exhaustion refused: an empty
+page while the coordinator still reported later history, and a page whose
+revisions were not contiguous, both returned the prefix and reported it as
+`current`. Membership, leadership and device naming are folded from that
+history, so the operator's Federation overview presented a revoked device as a
+current member and a demoted node as leader. `snapshot` already had the right
+representation for a bounded failure -- an explicit unavailable projection with
+a safe reason code -- so the refusal now reaches it, and it names
+`authoritative-replay-incomplete` instead of the generic projection failure.
+
+The explicit fail-closed requirement is still not closed. The capability-request,
+update, software-version and recorder-control report aggregators still return
+what they accumulated at their own ceilings; each under-reports rather than
+granting authority, but none of them fails closed yet, so B09 stays at 1/7. The
+remaining five properties are untouched: snapshot/base-revision compaction,
+member-replicated history lifetime and request-history retirement horizons all
+depend on retirement mechanisms that do not exist, and the control-plane
+unavailable/reconnecting representation and the bounded-clock-skew/NTP
+prerequisite are still open. No physical evidence or acceptance state changed.
 
 ### B10 — quiesced, capacity-safe backup/recovery and host-process identity
 

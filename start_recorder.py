@@ -519,6 +519,29 @@ def _shut_down(label: str, stop: Any) -> None:
         )
 
 
+def _publish_worker_health(workers: Mapping[str, Any]) -> None:
+    """Let capture publish the required loops' health in its heartbeat.
+
+    Each of these loops catches every failure and retries from durable state,
+    which is the right lifecycle -- none of them may end capture. But a loop
+    that has failed on every pass for a day otherwise looks exactly like a loop
+    with nothing to do, and a headless recorder has no other operator surface.
+    The heartbeat already proves liveness and membership, so a stuck required
+    loop is read from the same observation.
+    """
+
+    from catalog.mtconnect_recorder.runtime import set_worker_health_provider
+
+    def provider() -> dict[str, Any]:
+        return {
+            name: worker.health.snapshot()
+            for name, worker in workers.items()
+            if worker is not None
+        }
+
+    set_worker_health_provider(provider)
+
+
 def _publish_federation_status(node: RecorderFederationNode) -> None:
     """Let capture publish this recorder's Federation health in its heartbeat."""
 
@@ -682,6 +705,17 @@ def main(argv: list[str] | None = None) -> int:
         # rather than sitting on disk unexamined.
         activation = RecorderUpdateActivationWatcher(data_directory=data_dir)
         activation.start()
+
+        # Every required loop is started by now, so capture can publish their
+        # health alongside the Federation health it already carries.
+        _publish_worker_health(
+            {
+                "federation_control": federation_control,
+                "federation_update": federation_update,
+                "host_update_agent": host_update,
+                "update_activation": activation,
+            }
+        )
 
         print("Starting loss-aware MTConnect recorder")
         if parsed_sources:

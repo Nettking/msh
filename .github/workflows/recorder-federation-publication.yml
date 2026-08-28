@@ -20,6 +20,7 @@ on:
       - "catalog/federation/onboarding_compat.py"
       - "catalog/federation/tests/test_recorder_control_events.py"
       - "catalog/federation/tests/test_recorder_publication.py"
+      - "catalog/federation/tests/test_recorder_publication_quarantine.py"
       - "catalog/federation/tests/test_recorder_storage_relay.py"
       - "catalog/federation/tests/test_shared_file_storage.py"
       - "catalog/flask_app/app.py"
@@ -67,6 +68,7 @@ on:
       - "catalog/federation/onboarding_compat.py"
       - "catalog/federation/tests/test_recorder_control_events.py"
       - "catalog/federation/tests/test_recorder_publication.py"
+      - "catalog/federation/tests/test_recorder_publication_quarantine.py"
       - "catalog/federation/tests/test_recorder_storage_relay.py"
       - "catalog/federation/tests/test_shared_file_storage.py"
       - "catalog/flask_app/app.py"
@@ -169,6 +171,7 @@ jobs:
           catalog/standalone-recorder_v2/tests/test_lossless_recorder.py
           catalog/federation/tests/test_recorder_control_events.py
           catalog/federation/tests/test_recorder_publication.py
+          catalog/federation/tests/test_recorder_publication_quarantine.py
           catalog/federation/tests/test_recorder_storage_relay.py
           catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
@@ -177,6 +180,8 @@ jobs:
           catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py
           catalog/mtconnect_recorder/tests/test_recorder_federation_update.py
           catalog/mtconnect_recorder/tests/test_recorder_publication_store_failure.py
+          catalog/mtconnect_recorder/tests/test_recorder_status_io_boundary.py
+          catalog/mtconnect_recorder/tests/test_recorder_worker_health.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
           catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py
           catalog/mtconnect_recorder/tests/test_upgrade_compat.py
@@ -207,6 +212,7 @@ jobs:
           catalog/mtconnect_recorder/native_update_agent.py
           catalog/mtconnect_recorder/runtime.py
           catalog/mtconnect_recorder/upgrade_compat.py
+          catalog/mtconnect_recorder/worker_health.py
           catalog/mtconnect_recorder/tests/test_federation_control.py
           catalog/mtconnect_recorder/tests/test_federation_node.py
           catalog/mtconnect_recorder/tests/test_managed_service.py
@@ -214,6 +220,8 @@ jobs:
           catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py
           catalog/mtconnect_recorder/tests/test_recorder_federation_update.py
           catalog/mtconnect_recorder/tests/test_recorder_publication_store_failure.py
+          catalog/mtconnect_recorder/tests/test_recorder_status_io_boundary.py
+          catalog/mtconnect_recorder/tests/test_recorder_worker_health.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
           catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py
           catalog/mtconnect_recorder/tests/test_upgrade_compat.py
@@ -231,6 +239,7 @@ jobs:
           catalog/federation/recorder_publication.py
           catalog/federation/recorder_storage_relay.py
           catalog/federation/tests/test_recorder_publication.py
+          catalog/federation/tests/test_recorder_publication_quarantine.py
           catalog/federation/tests/test_recorder_storage_relay.py
           catalog/flask_app/services/federation_pairing_install.py
           catalog/flask_app/services/recorder_federation_publication_install.py

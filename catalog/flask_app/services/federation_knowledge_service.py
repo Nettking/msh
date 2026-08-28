@@ -10,12 +10,17 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Callable, Iterable
 
 from flask import current_app, has_app_context
 
+from catalog.federation.authoritative_replay import (
+    AUTHORITATIVE_REPLAY_INCOMPLETE,
+    replay_authoritative_history,
+)
 from catalog.federation.errors import FederationOperationError
 from catalog.federation.models import SessionEvent
 from catalog.federation.redaction import contains_secret_material
@@ -30,7 +35,9 @@ MAX_DOCUMENT_BYTES = 32_000
 # The authoritative log is read one bounded page at a time. The unpaged replay
 # API fails closed above its own window, which would take the shared knowledge
 # surface offline on the coordinator device once a Federation has accumulated
-# enough events of any kind.
+# enough events of any kind. Paging raises that ceiling; it does not remove the
+# fail-closed requirement, so the reader still has to prove it reached the
+# coordinator's current revision before any projection is built from it.
 REPLAY_PAGE_EVENTS = 500
 MAX_REPLAY_PAGES = 2_000
 
@@ -227,21 +234,30 @@ class FederationKnowledgeRepository:
                 )
         replay_page = getattr(coordinator, "replay_page", None)
         if callable(replay_page):
+            # ``_reduce`` records a deleted document id in ``seen_document_ids``
+            # from its delete event, and that set is the only thing stopping
+            # ``load_payload`` from re-importing a local cached copy. A read
+            # that stops short of the coordinator's current revision therefore
+            # does not merely show stale documents: it re-publishes withdrawn
+            # ones into the append-only authoritative log, for every member and
+            # with no retraction. The projection a caller writes back to its own
+            # cache would also be missing everything past the stopping point.
+            #
+            # So the prefix is refused rather than folded. Every caller here
+            # already treats a bounded Federation failure as "keep reading the
+            # local cache and change nothing shared", which is the safe
+            # degradation for an incomplete read too.
             events: list[SessionEvent] = []
-            last_applied_revision = 0
-            for _ in range(MAX_REPLAY_PAGES):
-                page, current_revision = replay_page(
+            replay_authoritative_history(
+                lambda last_revision: replay_page(
                     session_id=context.session_id,
                     actor_node_id=context.actor_node_id,
-                    last_applied_revision=last_applied_revision,
+                    last_applied_revision=last_revision,
                     limit=REPLAY_PAGE_EVENTS,
-                )
-                if not page:
-                    break
-                events.extend(page)
-                last_applied_revision = page[-1].revision
-                if last_applied_revision >= current_revision:
-                    break
+                ),
+                apply_page=events.extend,
+                max_pages=MAX_REPLAY_PAGES,
+            )
             return tuple(events)
         replay = getattr(coordinator, "replay", None)
         if not callable(replay):
@@ -589,11 +605,23 @@ class FederationKnowledgeRepository:
     ) -> None:
         if not has_app_context():
             return
-        current_app.logger.info(
+        code = getattr(exc, "code", type(exc).__name__)
+        # An unreachable relay is an ordinary transient condition. An
+        # incomplete authoritative read is not: the Federation answered, and
+        # this device still cannot see the current shared collection. It stays
+        # on its local cache until the history it cannot cross is addressed, so
+        # it is reported at a level an operator actually reads.
+        level = (
+            logging.WARNING
+            if code == AUTHORITATIVE_REPLAY_INCOMPLETE
+            else logging.INFO
+        )
+        current_app.logger.log(
+            level,
             "Shared knowledge %s for %s degraded to the local cache (%s)",
             operation,
             collection,
-            getattr(exc, "code", type(exc).__name__),
+            code,
         )
 
     @staticmethod

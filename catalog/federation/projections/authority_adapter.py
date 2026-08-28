@@ -6,6 +6,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any
 
+from catalog.federation.authoritative_replay import replay_authoritative_history
 from catalog.federation.device_names import DEVICE_NAME_EVENT, validate_device_name
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.session_leadership import (
@@ -22,6 +23,12 @@ from .adapter_common import (
     _value,
 )
 from .safety import safe_reason_code
+
+#: Unchanged bounded read of the authoritative session log for this projection.
+#: A page ceiling is a resource bound, not a retention policy: reaching it means
+#: the projection cannot be built, not that the log ended here.
+PROJECTION_REPLAY_PAGE_EVENTS = 1_000
+MAX_PROJECTION_REPLAY_PAGES = 100
 
 
 @dataclass(frozen=True)
@@ -337,22 +344,35 @@ class FederationAuthorityAdapter:
         if revision is None or revision <= 0:
             return ()
         if hasattr(self._coordinator, "replay_page"):
+            # Membership, leadership and naming are all folded from this
+            # history in revision order, so a read that stops short does not
+            # show an older Federation: it shows a wrong one. A revocation or a
+            # leadership handover recorded past the stopping point simply never
+            # happened for this projection, and the overview then presents a
+            # revoked device as a current member or a demoted node as leader.
+            #
+            # The counting loop this replaced could stop three ways: an empty
+            # page while the coordinator still reported later history, and a
+            # page whose revisions were not contiguous, both returned the
+            # prefix silently, because progress was measured by page length
+            # rather than by revision. Only budget exhaustion raised.
+            #
+            # The shared reader refuses all of them on the same unchanged
+            # ceilings. ``snapshot`` already turns a bounded failure into an
+            # explicit unavailable projection with a safe reason code, which is
+            # the representation this belongs in.
             events: list[Any] = []
-            last_revision = 0
-            for _ in range(100):
-                page, current_revision = self._coordinator.replay_page(
+            replay_authoritative_history(
+                lambda last_revision: self._coordinator.replay_page(
                     session_id=self._internal_session_id,
                     actor_node_id=self._actor_node_id,
                     last_applied_revision=last_revision,
-                    limit=1_000,
-                )
-                events.extend(page)
-                if not page or last_revision + len(page) >= current_revision:
-                    return tuple(events)
-                last_revision += len(page)
-            raise RuntimeError(
-                "federation event history exceeds the projection bound"
+                    limit=PROJECTION_REPLAY_PAGE_EVENTS,
+                ),
+                apply_page=events.extend,
+                max_pages=MAX_PROJECTION_REPLAY_PAGES,
             )
+            return tuple(events)
         if hasattr(self._coordinator, "replay"):
             return tuple(
                 self._coordinator.replay(

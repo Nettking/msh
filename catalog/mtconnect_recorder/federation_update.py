@@ -43,6 +43,7 @@ from .native_update import (
     read_json,
 )
 from .native_update_agent import NativeRecorderUpdateAgent
+from .worker_health import WorkerHealth
 
 #: The repository this process is running from. Resolved locally from this
 #: module's own location -- never from a peer, an argument, or an environment
@@ -92,6 +93,7 @@ class RecorderFederationUpdateWorker:
         )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self.health = WorkerHealth("federation-update")
 
     def start(self) -> None:
         if self._thread is not None and self._thread.is_alive():
@@ -104,6 +106,7 @@ class RecorderFederationUpdateWorker:
             name="fcp-recorder-federation-update",
             daemon=True,
         )
+        self.health.started()
         self._thread.start()
 
     def stop(self, *, timeout: float = SHUTDOWN_TIMEOUT_SECONDS) -> bool:
@@ -134,11 +137,16 @@ class RecorderFederationUpdateWorker:
         while not self._stop.is_set():
             try:
                 self.process_once()
-            except Exception:  # noqa: BLE001 - transport failures retry safely
+            except Exception as exc:  # noqa: BLE001 - transport failures retry safely
                 # Update participation must never be able to end capture. Every
-                # failure simply waits and replays again from durable state.
+                # failure simply waits and replays again from durable state --
+                # but it is recorded, because a loop that has failed on every
+                # pass for a day otherwise looks exactly like one with nothing
+                # to do, on a device with no other operator surface.
+                self.health.record_failure(exc)
                 self._stop.wait(self.poll_seconds)
                 continue
+            self.health.record_success()
             self._stop.wait(self.poll_seconds)
 
 
@@ -189,6 +197,7 @@ class RecorderHostUpdateAgentWorker:
             )
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self.health = WorkerHealth("host-update-agent")
 
     @property
     def supervised(self) -> bool:
@@ -205,6 +214,7 @@ class RecorderHostUpdateAgentWorker:
             name="fcp-recorder-host-update-agent",
             daemon=True,
         )
+        self.health.started()
         self._thread.start()
 
     def stop(self, *, timeout: float = SHUTDOWN_TIMEOUT_SECONDS) -> bool:
@@ -222,9 +232,11 @@ class RecorderHostUpdateAgentWorker:
         while not self._stop.is_set():
             try:
                 self.poll_once()
-            except Exception:  # noqa: BLE001 - a host failure must not end capture
+            except Exception as exc:  # noqa: BLE001 - a host failure must not end capture
+                self.health.record_failure(exc)
                 self._stop.wait(self.poll_seconds)
                 continue
+            self.health.record_success()
             self._stop.wait(self.poll_seconds)
 
 
@@ -321,6 +333,7 @@ class RecorderUpdateActivationWatcher:
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._activated = threading.Event()
+        self.health = WorkerHealth("update-activation")
         self.activated_request_id: str | None = None
         self.activated_target_commit: str | None = None
 
@@ -343,6 +356,7 @@ class RecorderUpdateActivationWatcher:
             name="fcp-recorder-update-activation",
             daemon=True,
         )
+        self.health.started()
         self._thread.start()
 
     def stop(self, *, timeout: float = 3.0) -> bool:
@@ -394,9 +408,11 @@ class RecorderUpdateActivationWatcher:
             try:
                 if self.poll_once():
                     return
-            except Exception:  # noqa: BLE001 - a bad marker must never stop capture
+            except Exception as exc:  # noqa: BLE001 - a bad marker must never stop capture
+                self.health.record_failure(exc)
                 self._stop.wait(self.poll_seconds)
                 continue
+            self.health.record_success()
             self._stop.wait(self.poll_seconds)
 
 

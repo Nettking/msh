@@ -103,6 +103,80 @@ stale-heartbeat sweep now wakes both supported relay owners and produces a
 nonzero process exit so the existing Compose restart policy can act. Together
 these are **B06 2/8 properties automated-proven; B06 remains open**.
 
+The recorder status-I/O boundary delivery adds a third. `publish_status` writes
+the recorder heartbeat on every cycle and once more inside `run`'s shutdown
+block, and an `OSError` from a full, read-only or otherwise failing host
+filesystem used to escape the run loop, raise again during shutdown, replace the
+real stop reason and skip stop-target cleanup -- while the same failure inside
+capture was already contained by the per-source boundary. The supervised native
+recorder made the consequence concrete: its supervisor reads an operator stop
+from a graceful zero exit, so a refused heartbeat write during Ctrl+C turned the
+operator's own stop into a nonzero exit and restarted capture behind them. The
+write is now contained, announced when the condition appears or changes rather
+than once per cycle, and carried into the next heartbeat that reaches disk
+through an additive `status_publication_error` field. Nothing is fabricated: a
+refused write leaves the published file byte-identical and stale, which is
+exactly what the host updater's freshness check must read as not proven healthy.
+Automated evidence covers the graceful operator-stop exit, continued capture and
+raw archival during the failure, the unchanged stale file, reporting after
+recovery, and the bounded announcement. That brings B06 to **3/8 properties
+automated-proven; B06 remains open**. No physical evidence or acceptance state
+changed.
+
+Writing the coverage the publication/scheduler driver bullet was waiting on
+found two more defects on the publication half. `run_forever`'s retry family
+omitted `sqlite3.Error` even though the outbox behind it is SQLite, so a locked
+or unreadable store escaped the loop and the supervisor rebuilt the whole worker
+instead -- discarding that loop's own failure count and poll interval, so a
+store unreadable for hours read as a first retry. And both supervisor recovery
+paths waited a fixed second with no count and no ceiling, so an unreachable
+Federation or an unopenable store meant reloading the authorized context and
+reconstructing an authenticated storage client once per second, indefinitely.
+A durable-store failure is now an ordinary cycle failure, counted and paced by
+the loop that owns it, and the supervisor counts its own restarts into the
+snapshot and waits on a bounded ladder capped at 60 seconds that only a cycle
+which actually published can clear. With both halves evidenced, that bullet is
+automated-proven and **B06 is 4/8 properties automated-proven; B06 remains
+open**. The same audit found the creator's logical-storage authority supervisor
+carrying the second of those defects -- a snapshot with no restart count and a
+fixed five-second rebuild with no ceiling -- and it now counts and backs off the
+same way, cleared only by an announcement. That is the same discipline applied
+to a third required driver rather than a new property, so the count is unchanged.
+
+The standalone recorder's four required loops -- Federation update, host update
+agent, update activation and recorder control -- were the same shape again and
+the worst placed for it. Each retried correctly and then discarded the failure,
+so a loop that had failed on every pass since startup looked exactly like a loop
+with nothing to do, on a device whose only operator surface is its heartbeat: a
+`/federation/recorders` scan or source change silently never applied, and a
+device silently absent from an **Update all devices** rollout. Each now keeps a
+bounded consecutive-failure record with a named error code, announced when the
+condition appears or changes rather than once per poll, and the launcher
+publishes those records into the heartbeat under an additive, count-bounded
+`workers` key through the same read-only provider seam Federation status uses.
+No loop's lifecycle changed. This is added observability for the same bullet,
+not a further property, so the count is still 4/8.
+
+No physical evidence or acceptance state changed.
+
+Archive reconciliation was stranding durable work on the same shape one layer
+down. Every item-level fault it can meet -- an observation file that is missing,
+unreadable, malformed, empty, sequence-discontinuous, carrying no usable receipt
+stamp, or holding a single observation larger than the bounded publication size
+-- was raised out of the whole pass, and the worker above retried the same item
+forever. Nothing after it was ever published, including every *other* source,
+because the loop over sorted sources never got past the bad one. Those faults
+now fence one source: the rest of that source waits behind the item, because the
+delivery queue preserves recorder sequence order per dataset, while every other
+source publishes. The condition is carried in a bounded quarantine summary
+naming the source, the code and a path-free item locator, and the monitor reports
+`degraded` with `recorder-archive-quarantined`. Nothing is deleted, so a repaired
+item publishes on the next pass, and checkpoint/contract failures stay fatal
+rather than becoming a quietly skipped source. With the required-thread
+containment on both the native and Flask sides, this is **B03 2/6 properties
+automated-proven; B03 remains open**. No physical evidence or acceptance state
+changed.
+
 The recorder path-confinement, finite-transaction, incremental recovery-frontier,
 healthy-source progress-isolation, and durable event-storm deliveries together
 advance **B02 8/9 properties automated-proven; B02 remains open**.
@@ -152,6 +226,51 @@ reset is also ownership- and path-confined rather than blindly deleting the
 expected pathname. B08's automated implementation properties are complete;
 P05/P09 exact-host hard-kill/power-loss evidence remains open and no physical
 acceptance state changed.
+
+Authoritative-replay completeness is shared by one primitive that folds a
+caller's own bounded pages and returns only once the coordinator's reported
+current revision has been reached; every other exit raises
+`authoritative-replay-incomplete`. Leadership and human-auth were wired onto it
+first. Shared knowledge is now wired onto it too, because its prefix behaviour
+was worse than under-reporting: a read that stopped before a document's delete
+event re-published that withdrawn document into the append-only authoritative
+log for every member. It now degrades to the local cache and changes nothing
+shared, reported at warning level rather than as an ordinary unreachable relay.
+The Federation authority projection adapter is wired onto it too: its bounded
+loop measured progress by page length rather than by revision, so an empty page
+or a non-contiguous page was folded into a `current` overview that presented a
+revoked device as a current member and a demoted node as leader. The remaining
+paged consumers -- the capability-request, update, software-version and
+recorder-control report aggregators -- still return what they accumulated at
+their ceilings, so **B09 stays at 1/7 properties automated-proven and remains
+open**. The two member authority surfaces -- user administration and password
+change -- now report an unresolvable authority as their existing bounded `503`
+rather than letting the refusal escape a `before_request` hook as a broken
+device; the explicit control-plane unavailable/reconnecting operator surface is
+still not built. No page ceiling was widened and no physical evidence or
+acceptance state changed.
+
+### Reconciled robustness branches
+
+Two branches were preserved for follow-up after the cleanup sequence and are now
+reconciled onto `main`. Neither was merged; both were re-derived, because both
+predated `main` substantially.
+
+- `claude/federation-v1-b06-recorder-status-io-boundary` — the recorder
+  status-I/O defect was still live on `main`, so the containment and its
+  consequence tests were rebuilt against the current runtime and are now merged
+  into this branch's B06 delivery. Nothing from that branch remains unported.
+- `claude/federation-v1-hardening-qfqvaf` — its `catalog/federation/event_replay.py`
+  reader and that reader's tests are **obsolete**, superseded by the merged
+  `catalog/federation/authoritative_replay.py`, which proves every shape that
+  one did and additionally refuses an event beyond the reported current revision,
+  refuses a non-advancing revision separately from a non-contiguous one, requires
+  the applied revision to *equal* rather than merely reach the reported head, and
+  validates event revision types. Its human-auth wiring is likewise superseded by
+  the merged delivery. Porting either would have created a second competing
+  primitive. What was still needed and is now delivered here: the shared-knowledge
+  consumer wired onto the merged reader, and `resolved_authority` for the two
+  member authority surfaces.
 
 1. Continue the reconciled robustness blockers B01-B10 from [the authoritative reconciliation](v1_robustness_reconciliation.md), one named delivery/PR at a time and in the recommended dependency order.
 2. Keep the documented non-goals and accepted boundaries out of the v1 implementation unless new concrete evidence invalidates them.

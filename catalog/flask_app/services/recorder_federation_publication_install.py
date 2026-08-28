@@ -29,6 +29,22 @@ from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
 _EXTENSION_KEY = "recorder_federation_publication"
 _DEFAULT_RETRY_SECONDS = 1.0
+#: Ceiling for the supervisor's own restart wait.
+#
+# Rebuilding this worker is not free: it reloads the authorized Federation
+# context, constructs an authenticated logical-storage client and reopens the
+# durable outbox. A fixed one-second retry turned an unreachable Federation or
+# an unopenable store into that work once per second, indefinitely, on the same
+# device the failure is already about. The first wait is unchanged so ordinary
+# recovery stays immediate; only a condition that keeps failing backs off.
+_MAX_RETRY_SECONDS = 60.0
+
+
+def _restart_delay_seconds(consecutive_failures: int) -> float:
+    """Bounded exponential wait before rebuilding the publication worker."""
+
+    exponent = max(0, consecutive_failures - 1)
+    return min(_DEFAULT_RETRY_SECONDS * 2.0**exponent, _MAX_RETRY_SECONDS)
 
 
 def _env_bool(name: str, default: bool = False) -> bool:
@@ -68,6 +84,9 @@ class RecorderFederationPublicationSnapshot:
     retired_batches: int = 0
     # Consecutive failed worker cycles. Zero whenever the last cycle completed.
     consecutive_failures: int = 0
+    # Sources fenced behind an archive item no retry can turn into a
+    # publication. Re-derived from the cycle that just ran, never accumulated.
+    quarantined_sources: int = 0
 
 
 class RecorderFederationPublicationMonitor:
@@ -85,6 +104,10 @@ class RecorderFederationPublicationMonitor:
             status="not-started",
             enabled=False,
         )
+        # Consecutive supervisor-level restarts: builds that could not produce
+        # a worker, and workers whose loop escaped. Cleared by a cycle that
+        # actually published, never by merely managing to construct a worker.
+        self._restart_failures = 0
 
     def snapshot(self) -> RecorderFederationPublicationSnapshot:
         with self._lock:
@@ -98,6 +121,7 @@ class RecorderFederationPublicationMonitor:
         error_code: str | None = None,
         retired_batches: int = 0,
         consecutive_failures: int = 0,
+        quarantined_sources: int = 0,
     ) -> None:
         with self._lock:
             self._snapshot = RecorderFederationPublicationSnapshot(
@@ -106,6 +130,7 @@ class RecorderFederationPublicationMonitor:
                 last_error_code=error_code,
                 retired_batches=retired_batches,
                 consecutive_failures=consecutive_failures,
+                quarantined_sources=quarantined_sources,
             )
 
     def _observe_cycle(self, report: RecorderPublicationCycleReport) -> None:
@@ -125,6 +150,13 @@ class RecorderFederationPublicationMonitor:
         state = report.state
         result = report.result
         retired = 0 if result is None else result.retirement.total
+        if state != "failing":
+            # The worker is not merely constructible, it is publishing. That is
+            # the only evidence that clears the restart backoff; a worker that
+            # builds and then fails its first cycle every time must keep
+            # escalating rather than reset the ladder on each attempt.
+            with self._lock:
+                self._restart_failures = 0
         if state == "failing":
             self._set_snapshot(
                 "failing",
@@ -134,11 +166,21 @@ class RecorderFederationPublicationMonitor:
             )
             return
         if state == "degraded":
+            quarantined = report.quarantined_sources
+            # Retirement means evidence was permanently withdrawn; quarantine
+            # means a source is fenced behind an item an operator has to
+            # resolve. Both need an operator, and they are different work, so
+            # the snapshot names which one it is rather than merging them.
             self._set_snapshot(
                 "degraded",
                 enabled=True,
-                error_code="recorder-delivery-retired",
+                error_code=(
+                    "recorder-delivery-retired"
+                    if retired
+                    else "recorder-archive-quarantined"
+                ),
                 retired_batches=retired,
+                quarantined_sources=quarantined,
             )
             return
         if state == "blocked":
@@ -149,6 +191,23 @@ class RecorderFederationPublicationMonitor:
             )
             return
         self._set_snapshot("running", enabled=True)
+
+    def _record_restart_failure(self) -> float:
+        """Count one supervisor-level restart and report how long to wait.
+
+        A restart that is never counted cannot be told apart from a first
+        blip, and a wait that never grows answers a persistent failure by
+        repeating its most expensive part once per second.
+        """
+
+        with self._lock:
+            self._restart_failures += 1
+            failures = self._restart_failures
+        return _restart_delay_seconds(failures)
+
+    def _restart_count(self) -> int:
+        with self._lock:
+            return self._restart_failures
 
     def _enabled(self) -> bool:
         return bool(
@@ -260,12 +319,14 @@ class RecorderFederationPublicationMonitor:
                     worker = self.build_worker()
             except Exception as exc:  # noqa: BLE001 - retry boundary is deliberate
                 code = str(getattr(exc, "code", type(exc).__name__))
+                delay = self._record_restart_failure()
                 self._set_snapshot(
                     "waiting",
                     enabled=self._enabled(),
                     error_code=code,
+                    consecutive_failures=self._restart_count(),
                 )
-                if self._stop.wait(_DEFAULT_RETRY_SECONDS):
+                if self._stop.wait(delay):
                     return
                 continue
 
@@ -277,8 +338,14 @@ class RecorderFederationPublicationMonitor:
                 loop.run_until_complete(self._run_worker(worker))
             except Exception as exc:  # noqa: BLE001 - worker must remain restartable
                 code = str(getattr(exc, "code", type(exc).__name__))
-                self._set_snapshot("retrying", enabled=True, error_code=code)
-                if self._stop.wait(_DEFAULT_RETRY_SECONDS):
+                delay = self._record_restart_failure()
+                self._set_snapshot(
+                    "retrying",
+                    enabled=True,
+                    error_code=code,
+                    consecutive_failures=self._restart_count(),
+                )
+                if self._stop.wait(delay):
                     return
             finally:
                 with self._lock:

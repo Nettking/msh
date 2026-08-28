@@ -22,6 +22,9 @@ from catalog.federation.recorder_storage_relay import (
     STORAGE_CONTROL_CAPABILITY_TYPE,
     STORAGE_CONTROL_CAPABILITY_VERSION,
 )
+from catalog.flask_app.services import (
+    federation_storage_authority_install as storage_install,
+)
 from catalog.flask_app.services.federation_storage_authority_install import (
     FederationStorageAuthorityMonitor,
     install_federation_storage_authority,
@@ -568,3 +571,84 @@ def test_the_documented_variables_are_the_ones_the_code_reads():
 
     for name in (BUDGET_ENV, FLOOR_ENV):
         assert name in example
+
+
+# --------------------------------------------------------------------------
+# B06: a required driver's restarts must be counted and bounded, not repeated
+#      at a constant rate forever
+# --------------------------------------------------------------------------
+
+
+def _announcement(status: CapabilityStatus) -> CapabilityAnnouncement:
+    return CapabilityAnnouncement(
+        capability_id="logical-storage-authority",
+        node_id=DEVICE,
+        session_id=SESSION,
+        type=STORAGE_CONTROL_CAPABILITY_TYPE,
+        protocol=STORAGE_CONTROL_CAPABILITY_PROTOCOL,
+        protocol_version=STORAGE_CONTROL_CAPABILITY_VERSION,
+        status=status,
+        properties={"kind": "x", "group_ids": ["fcp-local-storage"]},
+        announced_at=datetime.now(timezone.utc),
+    )
+
+
+def test_repeated_authority_restarts_are_counted_and_backed_off(monkeypatch):
+    """A last error code alone cannot separate one blip from a stuck driver.
+
+    Every pass through this path rebuilds the authority settings and the shared
+    relay context for the creator's logical storage. At a constant wait that is
+    the same work at the same rate forever, on a device whose relay or control
+    database is already failing, and the snapshot looks identical on the first
+    failure and the thousandth.
+    """
+
+    monitor = _monitor(context=_creator_context())
+    waits: list[float] = []
+
+    def failing_settings():
+        raise RuntimeError("not ready")
+
+    monkeypatch.setattr(monitor, "build_settings", failing_settings)
+
+    def _stop_after_five(delay: float) -> bool:
+        waits.append(delay)
+        return len(waits) >= 5
+
+    monkeypatch.setattr(monitor._stop, "wait", _stop_after_five)
+
+    monitor._run()
+
+    snapshot = monitor.snapshot()
+    assert snapshot.status == "waiting"
+    assert snapshot.last_error_code == "RuntimeError"
+    assert snapshot.consecutive_failures == 5
+    # The first wait is unchanged, then the ladder grows and stays bounded.
+    assert waits == [5.0, 10.0, 20.0, 40.0, 60.0]
+    assert all(delay <= storage_install._MAX_RETRY_SECONDS for delay in waits)
+
+
+def test_only_an_announcement_clears_the_restart_ladder():
+    """Composing settings again is not evidence that the authority ran."""
+
+    monitor = _monitor(context=_creator_context())
+
+    assert storage_install._restart_delay_seconds(1) == storage_install._RETRY_SECONDS
+    assert storage_install._restart_delay_seconds(50) == (
+        storage_install._MAX_RETRY_SECONDS
+    )
+
+    for _ in range(3):
+        monitor._record_restart_failure()
+    assert monitor._restart_count() == 3
+
+    # An authority that announced itself is running, even without groups.
+    monitor._on_announced(_announcement(CapabilityStatus.UNAVAILABLE))
+    assert monitor._restart_count() == 0
+    assert monitor.snapshot().consecutive_failures == 0
+
+    for _ in range(2):
+        monitor._record_restart_failure()
+    monitor._on_announced(_announcement(CapabilityStatus.READY))
+    assert monitor._restart_count() == 0
+    assert monitor.snapshot().status == "ready"
