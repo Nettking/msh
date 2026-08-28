@@ -1,4 +1,4 @@
-"""Host-resource admission for supported JSONL upload ingress."""
+"""Host-resource admission for supported JSONL upload staging."""
 
 from __future__ import annotations
 
@@ -20,12 +20,14 @@ def enqueue_with_resource_admission(
     *,
     admission: ProcessResourceAdmission | None = None,
 ) -> dict[str, Any]:
-    """Reserve the bounded staging transaction before upload bytes reach disk.
+    """Reserve the bounded staging transaction before the service writes it.
 
     The reservation covers the upload's declared maximum staging growth plus the
-    directory/owner/file entries it may create. The actual staged bytes remain
-    visible to the next filesystem measurement after the reservation is released,
-    while normal publication uses ``os.replace`` rather than duplicating the batch.
+    directory/owner/file entries it may create. Multipart parsing can happen before
+    this boundary and is not claimed by this reservation. The actual staged bytes
+    remain visible to the next filesystem measurement after the reservation is
+    released, while normal publication uses ``os.replace`` rather than duplicating
+    the batch.
     """
 
     controller = admission or _UPLOAD_RESOURCE_ADMISSION
