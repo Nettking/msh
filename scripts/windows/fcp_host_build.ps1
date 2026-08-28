@@ -19,11 +19,13 @@ $BuildTimeoutSeconds = 900
 $BuildPollMilliseconds = 250
 $DockerLifecycleTimeoutSeconds = 30
 $OidPattern = '^[0-9a-f]{40}$'
-# Only these Buildx node states positively establish a stopped writer. Anything
-# else, including an unparseable or newly introduced state, is refused.
 $BuilderQuiescentStates = @('inactive', 'stopped')
-# The docker-container driver backs a builder with a container named after it.
 $BuildKitContainerPrefix = 'buildx_buildkit_'
+$BuilderPrefix = 'fcp-build-'
+$BuilderRootEnv = 'FCP_BUILDER_ROOT_HEX'
+$MaxListedBuildersPerPass = 32
+$MaxExaminedBuildersPerPass = 16
+$MaxRemovalAttemptsPerPass = 8
 $DockerResourceHelper = Join-Path $PSScriptRoot 'fcp_docker_resource.ps1'
 if (-not (Test-Path -LiteralPath $DockerResourceHelper -PathType Leaf)) {
     throw 'docker_resource_helper_unavailable'
@@ -124,10 +126,6 @@ function Invoke-BoundedDockerResult(
     $exitCode = 127
     $failure = $null
     try {
-        # Created inside the guarded region: a temp-file failure out here would
-        # escape as an unhandled exception and skip required stop/prune work,
-        # instead of being reported as the ordinary bounded failure that every
-        # caller already treats fail-closed.
         $stdoutPath = [System.IO.Path]::GetTempFileName()
         $stderrPath = [System.IO.Path]::GetTempFileName()
         $process = Start-Process `
@@ -138,9 +136,6 @@ function Invoke-BoundedDockerResult(
             -RedirectStandardOutput $stdoutPath `
             -RedirectStandardError $stderrPath
         if (-not $process.WaitForExit($TimeoutSeconds * 1000)) {
-            # Kill the tree, not just the CLI: "docker buildx" runs the Buildx
-            # plugin as a child, and a surviving plugin would keep mutating
-            # builder state and cache after the mutation lock is released.
             try { & taskkill.exe /PID $process.Id /T /F 2>&1 | Out-Null } catch {}
             try { $process.WaitForExit(2000) | Out-Null } catch {}
             if (-not $process.HasExited) {
@@ -191,7 +186,7 @@ function Invoke-BoundedDockerResult(
 }
 
 function Get-FcpBuilderName {
-    return 'fcp-build-' + (Get-PathHash $RepoRoot)
+    return $BuilderPrefix + (Get-PathHash $RepoRoot)
 }
 
 function Get-FcpBuilderInspection([string]$Name) {
@@ -199,8 +194,6 @@ function Get-FcpBuilderInspection([string]$Name) {
 }
 
 function Test-FcpBuildKitContainerRunning([string]$Name) {
-    # Fails closed: if the running set cannot be established the writer is
-    # treated as possibly live rather than assumed gone.
     $listed = Invoke-BoundedDockerResult @('ps', '--format', '{{.Names}}')
     if ($listed.ExitCode -ne 0) { return $true }
     $prefix = $BuildKitContainerPrefix + $Name
@@ -216,9 +209,6 @@ function Test-FcpBuilderAbsent([string]$Name) {
     foreach ($line in @($listed.Output)) {
         if (([string]$line).Trim() -eq $Name) { return $false }
     }
-    # Buildx can drop its own store entry while the docker-container driver's
-    # BuildKit container keeps running, so disappearing from enumeration does
-    # not by itself prove the writer is gone.
     return -not (Test-FcpBuildKitContainerRunning $Name)
 }
 
@@ -245,14 +235,9 @@ function Test-FcpBuilderStopped([string]$Name) {
         }
     }
     if ($statuses.Count -eq 0) { return $false }
-    # Whitelist, not blacklist: an unrecognised or newly introduced Buildx state
-    # is refused rather than read as safe, because cache is discarded on the
-    # strength of this reading.
     foreach ($status in $statuses) {
         if ($status -notin $BuilderQuiescentStates) { return $false }
     }
-    # The builder record saying "stopped" describes the record, not the process
-    # holding the cache open, so the driver container is checked as well.
     return -not (Test-FcpBuildKitContainerRunning $Name)
 }
 
@@ -267,9 +252,6 @@ function Remove-FcpBuilder([string]$Name) {
 }
 
 function Settle-FcpBuildWriter([string]$Name, [switch]$DiscardCache) {
-    # Quiescence and cache discard are separate claims. A caller that promises
-    # the cache was bounded must not be handed a result that only proves the
-    # writer stopped, so both facts are reported rather than collapsed.
     $stopped = Invoke-BoundedDockerResult @('buildx', 'stop', $Name)
     if ($stopped.ExitCode -eq 0 -and (Test-FcpBuilderStopped $Name)) {
         if (-not $DiscardCache) {
@@ -286,6 +268,154 @@ function Settle-FcpBuildWriter([string]$Name, [switch]$DiscardCache) {
 
 function Stop-FcpBuildWriter([string]$Name, [switch]$DiscardCache) {
     return (Settle-FcpBuildWriter $Name -DiscardCache:$DiscardCache).Quiescent
+}
+
+function Get-FcpBuilderRootDriverOpt {
+    $bytes = [System.Text.Encoding]::UTF8.GetBytes((Normalize-DirectoryPath $RepoRoot))
+    $hex = -join ($bytes | ForEach-Object { $_.ToString('x2') })
+    return 'env.' + $BuilderRootEnv + '=' + $hex
+}
+
+function Get-FcpBuilderStampedRoot([string]$Name) {
+    $inspected = Invoke-BoundedDockerResult @(
+        'inspect',
+        '--format', '{{range .Config.Env}}{{println .}}{{end}}',
+        ($BuildKitContainerPrefix + $Name + '0')
+    )
+    if ($inspected.ExitCode -ne 0) { return '' }
+    $prefix = $BuilderRootEnv + '='
+    foreach ($line in @($inspected.Output)) {
+        $text = ([string]$line).Trim()
+        if (-not $text.StartsWith($prefix)) { continue }
+        $hex = $text.Substring($prefix.Length)
+        if ($hex.Length -eq 0 -or ($hex.Length % 2) -ne 0) { return '' }
+        if ($hex -notmatch '^[0-9a-fA-F]+$') { return '' }
+        try {
+            $bytes = New-Object byte[] ([int]($hex.Length / 2))
+            for ($index = 0; $index -lt $bytes.Length; $index++) {
+                $bytes[$index] = [Convert]::ToByte($hex.Substring($index * 2, 2), 16)
+            }
+            $strict = New-Object System.Text.UTF8Encoding($false, $true)
+            return $strict.GetString($bytes)
+        }
+        catch { return '' }
+    }
+    return ''
+}
+
+function Get-FcpBuilderRetirementCursorPath {
+    try {
+        $raw = (Last-Text (Invoke-Git @('rev-parse', '--git-path', 'fcp-builder-retirement.cursor'))).Trim()
+        if ([string]::IsNullOrWhiteSpace($raw)) { return '' }
+        if (-not [System.IO.Path]::IsPathRooted($raw)) {
+            $raw = Join-Path $RepoRoot $raw
+        }
+        return [System.IO.Path]::GetFullPath($raw)
+    }
+    catch { return '' }
+}
+
+function Get-FcpBuilderRetirementCursor {
+    $path = Get-FcpBuilderRetirementCursorPath
+    if ([string]::IsNullOrWhiteSpace($path)) { return '' }
+    try {
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return '' }
+        $value = ([System.IO.File]::ReadAllText($path)).Trim().ToLowerInvariant()
+        if ($value -match '^[0-9a-f]{12,64}$') { return $value }
+    }
+    catch {}
+    return ''
+}
+
+function Set-FcpBuilderRetirementCursor([AllowNull()][string]$Value) {
+    $path = Get-FcpBuilderRetirementCursorPath
+    if ([string]::IsNullOrWhiteSpace($path)) { return }
+    try {
+        if ([string]::IsNullOrWhiteSpace([string]$Value)) {
+            Remove-Item -LiteralPath $path -Force -ErrorAction SilentlyContinue
+            return
+        }
+        $text = ([string]$Value).Trim().ToLowerInvariant()
+        if ($text -notmatch '^[0-9a-f]{12,64}$') { return }
+        $parent = Split-Path -Parent $path
+        if (-not [string]::IsNullOrWhiteSpace($parent)) {
+            New-Item -ItemType Directory -Path $parent -Force | Out-Null
+        }
+        $temporary = "$path.tmp-$PID-$([guid]::NewGuid().ToString('N'))"
+        [System.IO.File]::WriteAllText(
+            $temporary,
+            $text + [Environment]::NewLine,
+            (New-Object System.Text.UTF8Encoding($false))
+        )
+        Move-Item -LiteralPath $temporary -Destination $path -Force
+    }
+    catch {}
+}
+
+function Invoke-FcpStrandedBuilderRetirement {
+    $current = Get-FcpBuilderName
+    $cursor = Get-FcpBuilderRetirementCursor
+    $arguments = @(
+        'ps', '--all', '--no-trunc', '--last', [string]$MaxListedBuildersPerPass,
+        '--filter', ('name=' + $BuildKitContainerPrefix + $BuilderPrefix)
+    )
+    if (-not [string]::IsNullOrWhiteSpace($cursor)) {
+        $arguments += @('--filter', ('before=' + $cursor))
+    }
+    $arguments += @('--format', '{{.ID}} {{.Names}}')
+    $listed = Invoke-BoundedDockerResult $arguments
+    if ($listed.ExitCode -ne 0) {
+        if (-not [string]::IsNullOrWhiteSpace($cursor)) {
+            Set-FcpBuilderRetirementCursor $null
+        }
+        return @()
+    }
+
+    $retired = @()
+    $names = @()
+    $seen = 0
+    $lastId = ''
+    $exactPrefix = $BuildKitContainerPrefix + $BuilderPrefix
+    foreach ($line in @($listed.Output)) {
+        $text = ([string]$line).Trim()
+        if ([string]::IsNullOrWhiteSpace($text)) { continue }
+        if ($text -notmatch '^(?<id>[0-9a-fA-F]{12,64})\s+(?<container>\S+)$') {
+            return @()
+        }
+        $seen++
+        $lastId = ([string]$Matches.id).ToLowerInvariant()
+        $container = [string]$Matches.container
+        if (-not $container.StartsWith($exactPrefix)) { continue }
+        if (-not $container.EndsWith('0')) { continue }
+        $name = $container.Substring($BuildKitContainerPrefix.Length, $container.Length - $BuildKitContainerPrefix.Length - 1)
+        if (-not $name.StartsWith($BuilderPrefix)) { continue }
+        if ($name -eq $current) { continue }
+        $names += $name
+    }
+    if ($seen -ge $MaxListedBuildersPerPass -and -not [string]::IsNullOrWhiteSpace($lastId)) {
+        Set-FcpBuilderRetirementCursor $lastId
+    }
+    else {
+        Set-FcpBuilderRetirementCursor $null
+    }
+
+    $examined = 0
+    $attempted = 0
+    foreach ($name in $names) {
+        if ($examined -ge $MaxExaminedBuildersPerPass) { break }
+        $examined++
+        $owner = Get-FcpBuilderStampedRoot $name
+        if ([string]::IsNullOrWhiteSpace($owner)) { continue }
+        $ownerExists = $true
+        try { $ownerExists = Test-Path -LiteralPath $owner -ErrorAction Stop }
+        catch { $ownerExists = $true }
+        if ($ownerExists) { continue }
+        if (Test-FcpBuildKitContainerRunning $name) { continue }
+        if ($attempted -ge $MaxRemovalAttemptsPerPass) { break }
+        $attempted++
+        if (Remove-FcpBuilder $name) { $retired += $name }
+    }
+    return $retired
 }
 
 function Ensure-FcpControllableBuilder {
@@ -313,7 +443,8 @@ function Ensure-FcpControllableBuilder {
         'buildx', 'create',
         '--name', $name,
         '--driver', 'docker-container',
-        '--driver-opt', 'default-load=true'
+        '--driver-opt', 'default-load=true',
+        '--driver-opt', (Get-FcpBuilderRootDriverOpt)
     )
     if ($created.ExitCode -ne 0) { throw 'controllable_builder_unavailable' }
     $inspection = Get-FcpBuilderInspection $name
@@ -475,6 +606,7 @@ function Assert-DiskPreflight {
     if (-not $settled.CacheDiscarded) {
         throw 'build_cache_discard_failed'
     }
+    Invoke-FcpStrandedBuilderRetirement | Out-Null
     $freeBytes = Get-FcpResourceFreeBytes -BackingPath $backingPath
     $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
     if ($level -in @('normal', 'warning')) { return $backingPath }
@@ -534,11 +666,6 @@ try {
         }
         $freeBytes = Get-FcpResourceFreeBytes -BackingPath $backingPath
         $level = Get-FcpResourcePressureLevel -FreeBytes $freeBytes
-        # Quiescence is proved on every branch before anything is discarded.
-        # Pruning is the branch that destroys cache, so it is the branch that
-        # most needs the writer proven dead first: an abandoned checkout-scoped
-        # BuildKit daemon left by an earlier crash would otherwise still be
-        # writing into the cache being pruned.
         $name = Get-FcpBuilderName
         if (-not (Test-FcpBuilderStopped $name) -and -not (Stop-FcpBuildWriter $name)) {
             throw 'build_writer_stop_unverified'

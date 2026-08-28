@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from catalog.federation import host_build
+from catalog.federation import builder_retirement, host_build
 from catalog.federation.host_resources import PressureLevel, ResourceAssessment
 
 
@@ -201,6 +201,8 @@ def test_new_controllable_builder_requires_docker_container_driver(
             "docker-container",
             "--driver-opt",
             "default-load=true",
+            "--driver-opt",
+            builder_retirement.builder_root_driver_opt(tmp_path),
         ]
     ]
 

@@ -13,7 +13,10 @@ def test_windows_host_build_owns_a_checkout_scoped_buildkit_writer() -> None:
     text = _read("scripts/windows/fcp_host_build.ps1")
 
     assert "function Get-FcpBuilderName" in text
-    assert "'fcp-build-' + (Get-PathHash $RepoRoot)" in text
+    # The prefix is now a named constant because retirement has to recognise
+    # FCP's own builders by it. The identity it composes is unchanged.
+    assert "$BuilderPrefix = 'fcp-build-'" in text
+    assert "$BuilderPrefix + (Get-PathHash $RepoRoot)" in text
     assert "'--driver', 'docker-container'" in text
     assert "'--driver-opt', 'default-load=true'" in text
     assert "'compose', 'build', '--help'" in text
