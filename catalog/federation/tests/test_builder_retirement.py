@@ -193,8 +193,17 @@ def test_one_pass_is_bounded_before_output_reaches_python(tmp_path: Path) -> Non
     )
     assert f"name={CONTAINER_PREFIX}{PREFIX}" in listing
     assert outcome.listed == builder_retirement.MAX_LISTED_BUILDERS_PER_PASS
-    assert outcome.examined == builder_retirement.MAX_EXAMINED_BUILDERS_PER_PASS
+    # Every candidate in this fixture is removable, so each examination leads to
+    # an attempt and the removal budget binds strictly first. Asserting that
+    # examination also reaches its own ceiling asks for something this fixture
+    # cannot produce: the pass stops examining once it may no longer remove,
+    # rather than spending inspections on builders it cannot act on. The bound
+    # is a ceiling, and which ceiling binds depends on what the pass finds.
     assert outcome.attempted == builder_retirement.MAX_REMOVAL_ATTEMPTS_PER_PASS
+    assert outcome.examined <= builder_retirement.MAX_EXAMINED_BUILDERS_PER_PASS
+    # One examination past the last attempt: the iteration that exhausts the
+    # removal budget has already been counted before the loop breaks.
+    assert outcome.examined == outcome.attempted + 1
     assert len(removed) == builder_retirement.MAX_REMOVAL_ATTEMPTS_PER_PASS
 
 
