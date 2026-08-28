@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -19,6 +20,7 @@ from catalog.capabilities.analysis.resource_admission import (
 )
 from catalog.capabilities.analysis.worker import FederatedAnalysisHandler as _BaseHandler
 from catalog.capabilities.dispatch import ExecutionResult
+from catalog.capabilities.jobs import AttemptStatus, JobAttempt, JobStatus
 from catalog.federation.host_resources import (
     FilesystemMeasurement,
     PressureThresholds,
@@ -68,12 +70,17 @@ def _job(*, plan_size: int = 1, slice_size: int = 1):
         source_signature="a" * 64,
         origin=ORIGIN_AUTOMATIC_DISCOVERY,
     )
-    return build_analysis_job(
+    job = build_analysis_job(
         work,
         plan_hash="sha256:" + ("1" * 64),
         plan_size=plan_size,
         slice_hash="sha256:" + ("2" * 64),
         slice_size=slice_size,
+    )
+    return replace(
+        job,
+        status=JobStatus.ACTIVE,
+        attempts=(JobAttempt("attempt-1", 1, AttemptStatus.ASSIGNED),),
     )
 
 
