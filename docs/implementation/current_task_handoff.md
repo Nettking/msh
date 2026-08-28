@@ -137,7 +137,12 @@ the loop that owns it, and the supervisor counts its own restarts into the
 snapshot and waits on a bounded ladder capped at 60 seconds that only a cycle
 which actually published can clear. With both halves evidenced, that bullet is
 automated-proven and **B06 is 4/8 properties automated-proven; B06 remains
-open**. No physical evidence or acceptance state changed.
+open**. The same audit found the creator's logical-storage authority supervisor
+carrying the second of those defects -- a snapshot with no restart count and a
+fixed five-second rebuild with no ceiling -- and it now counts and backs off the
+same way, cleared only by an announcement. That is the same discipline applied
+to a third required driver rather than a new property, so the count is unchanged.
+No physical evidence or acceptance state changed.
 
 The recorder path-confinement, finite-transaction, incremental recovery-frontier,
 healthy-source progress-isolation, and durable event-storm deliveries together

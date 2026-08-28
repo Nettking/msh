@@ -257,6 +257,21 @@ With both halves now evidenced, the publication/scheduler driver-observability
 bullet is **automated-proven, taking B06 to 4/8 properties; B06 remains
 `OPEN`.** No physical evidence or acceptance state changed.
 
+The same audit found the creator's logical-storage authority supervisor
+carrying the second of those two defects. Its snapshot exists, in its own words,
+to tell working from silently-not-running, but it recorded only a last error
+code, so one blip and an authority that had been restarting all day were
+indistinguishable; and every restart rebuilt the authority settings and the
+shared relay context on a fixed five-second wait with no ceiling. It now counts
+its restarts into that snapshot and waits on the same bounded ladder, cleared
+only by an announcement -- the authority proving it actually ran -- rather than
+by managing to compose settings again. This aligns it with the reconnect driver,
+which already counted attempts and backed off to the same ceiling, and with the
+publication supervisor above. It does not close a further B06 property: the
+bullet names the publication and analysis scheduler drivers, and this is the
+same discipline applied to a third required driver rather than a new one.
+**B06 stays at 4/8 and remains `OPEN`.**
+
 ### B07 — bounded reconstructible and cumulative metadata growth
 
 **State:** `OPEN`  

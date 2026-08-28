@@ -38,6 +38,23 @@ from .trusted_storage_authority_runtime import run_trusted_storage_authority
 
 _EXTENSION_KEY = "federation_storage_authority"
 _RETRY_SECONDS = 5.0
+#: Ceiling for this supervisor's own restart wait.
+#
+# Every restart rebuilds the authority settings and the shared relay context for
+# the creator's logical-storage authority. A fixed wait answered a condition
+# that keeps failing -- an unreachable relay, an unopenable control database --
+# by repeating that work at a constant rate forever. The first wait is unchanged
+# so ordinary recovery stays as prompt as it was; only a persistent failure
+# backs off. This matches the reconnect driver, which already counts its
+# attempts and backs off to the same ceiling.
+_MAX_RETRY_SECONDS = 60.0
+
+
+def _restart_delay_seconds(consecutive_failures: int) -> float:
+    """Bounded exponential wait before restarting the storage authority."""
+
+    exponent = max(0, consecutive_failures - 1)
+    return min(_RETRY_SECONDS * 2.0**exponent, _MAX_RETRY_SECONDS)
 _AI_BRIDGE_EXTENSION_KEY = "federated_ai_product_bridge"
 
 
@@ -84,6 +101,10 @@ class FederationStorageAuthoritySnapshot:
     enabled: bool
     ready_group_ids: tuple[str, ...] = ()
     last_error_code: str | None = None
+    # Consecutive supervisor restarts. A last error code alone cannot separate
+    # one blip from an authority that has been restarting all day, which is the
+    # difference between "retrying" and "not running".
+    consecutive_failures: int = 0
 
 
 @dataclass(frozen=True)
@@ -130,6 +151,9 @@ class FederationStorageAuthorityMonitor:
             status="not-started",
             enabled=False,
         )
+        # Cleared by an announcement, which is the authority proving it ran --
+        # never by merely managing to compose settings again.
+        self._restart_failures = 0
 
     # ---- observable state ------------------------------------------------
 
@@ -144,6 +168,7 @@ class FederationStorageAuthorityMonitor:
         enabled: bool,
         ready_group_ids: tuple[str, ...] = (),
         error_code: str | None = None,
+        consecutive_failures: int = 0,
     ) -> None:
         with self._lock:
             self._snapshot = FederationStorageAuthoritySnapshot(
@@ -151,7 +176,25 @@ class FederationStorageAuthorityMonitor:
                 enabled=enabled,
                 ready_group_ids=ready_group_ids,
                 last_error_code=error_code,
+                consecutive_failures=consecutive_failures,
             )
+
+    def _record_restart_failure(self) -> float:
+        """Count one supervisor restart and report how long to wait.
+
+        A restart that is never counted cannot be told apart from a first
+        blip, and a wait that never grows answers a persistent failure by
+        repeating its most expensive part at a constant rate.
+        """
+
+        with self._lock:
+            self._restart_failures += 1
+            failures = self._restart_failures
+        return _restart_delay_seconds(failures)
+
+    def _restart_count(self) -> int:
+        with self._lock:
+            return self._restart_failures
 
     def _on_announced(self, announcement: CapabilityAnnouncement) -> None:
         groups = announcement.properties.get("group_ids")
@@ -160,6 +203,12 @@ class FederationStorageAuthorityMonitor:
             for item in (groups if isinstance(groups, list) else ())
             if isinstance(item, str) and item
         )
+        # Reaching an announcement is the authority proving it actually ran, so
+        # this is the one thing that clears the restart ladder. Composing
+        # settings again is not evidence: an authority that starts and dies
+        # before announcing must keep escalating rather than reset each time.
+        with self._lock:
+            self._restart_failures = 0
         self._set_snapshot(
             "ready" if announcement.status is CapabilityStatus.READY else "no-groups",
             enabled=True,
@@ -446,8 +495,8 @@ class FederationStorageAuthorityMonitor:
             if shared is not None:
                 self._restore_storage_view(shared, view)
 
-    def _wait_retry(self) -> bool:
-        return self._stop.wait(_RETRY_SECONDS)
+    def _wait_retry(self, delay: float | None = None) -> bool:
+        return self._stop.wait(_RETRY_SECONDS if delay is None else delay)
 
     def _run_owned_attempt(self, settings: StorageAuthoritySettings) -> None:
         """Legacy low-level path for tests without an installed pairing runtime."""
@@ -493,12 +542,14 @@ class FederationStorageAuthorityMonitor:
                     settings = self.build_settings()
                     shared = self._shared_relay_context(settings)
             except Exception as exc:  # noqa: BLE001 - retry boundary is deliberate
+                delay = self._record_restart_failure()
                 self._set_snapshot(
                     "waiting",
                     enabled=self._enabled(),
                     error_code=str(getattr(exc, "code", type(exc).__name__)),
+                    consecutive_failures=self._restart_count(),
                 )
-                if self._wait_retry():
+                if self._wait_retry(delay):
                     return
                 continue
 
@@ -508,20 +559,24 @@ class FederationStorageAuthorityMonitor:
                 else:
                     self._run_shared_attempt(settings, shared)
             except (asyncio.CancelledError, concurrent.futures.CancelledError):
+                delay = self._record_restart_failure()
                 self._set_snapshot(
                     "retrying",
                     enabled=True,
                     error_code="storage-authority-cancelled",
+                    consecutive_failures=self._restart_count(),
                 )
-                if self._wait_retry():
+                if self._wait_retry(delay):
                     return
             except Exception as exc:  # noqa: BLE001 - authority stays restartable
+                delay = self._record_restart_failure()
                 self._set_snapshot(
                     "retrying",
                     enabled=True,
                     error_code=str(getattr(exc, "code", type(exc).__name__)),
+                    consecutive_failures=self._restart_count(),
                 )
-                if self._wait_retry():
+                if self._wait_retry(delay):
                     return
         self._set_snapshot("stopped", enabled=self._enabled())
 
