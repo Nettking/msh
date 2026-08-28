@@ -35,8 +35,6 @@ from catalog.flask_app.services.federation_active_leader_runtime import (
 )
 from catalog.flask_app.services.federation_update_handoff import HostUpdateHandoff
 
-from .worker_health import WorkerHealth
-
 from .native_identity import process_nonce, production_root, supervisor_session
 from .native_update import (
     NativeRecorderUpdatePaths,
@@ -45,6 +43,7 @@ from .native_update import (
     read_json,
 )
 from .native_update_agent import NativeRecorderUpdateAgent
+from .worker_health import WorkerHealth
 
 #: The repository this process is running from. Resolved locally from this
 #: module's own location -- never from a peer, an argument, or an environment
