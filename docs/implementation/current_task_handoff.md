@@ -159,6 +159,24 @@ not a further property, so the count is still 4/8.
 
 No physical evidence or acceptance state changed.
 
+Archive reconciliation was stranding durable work on the same shape one layer
+down. Every item-level fault it can meet -- an observation file that is missing,
+unreadable, malformed, empty, sequence-discontinuous, carrying no usable receipt
+stamp, or holding a single observation larger than the bounded publication size
+-- was raised out of the whole pass, and the worker above retried the same item
+forever. Nothing after it was ever published, including every *other* source,
+because the loop over sorted sources never got past the bad one. Those faults
+now fence one source: the rest of that source waits behind the item, because the
+delivery queue preserves recorder sequence order per dataset, while every other
+source publishes. The condition is carried in a bounded quarantine summary
+naming the source, the code and a path-free item locator, and the monitor reports
+`degraded` with `recorder-archive-quarantined`. Nothing is deleted, so a repaired
+item publishes on the next pass, and checkpoint/contract failures stay fatal
+rather than becoming a quietly skipped source. With the required-thread
+containment on both the native and Flask sides, this is **B03 2/6 properties
+automated-proven; B03 remains open**. No physical evidence or acceptance state
+changed.
+
 The recorder path-confinement, finite-transaction, incremental recovery-frontier,
 healthy-source progress-isolation, and durable event-storm deliveries together
 advance **B02 8/9 properties automated-proven; B02 remains open**.

@@ -122,6 +122,47 @@ Required properties:
 
 `compact_completed()` remains a payload compactor, not a retention bound.
 
+Robustness progress: **B03 2/6 properties automated-proven; B03 remains `OPEN`.**
+
+The isolation property is proven. Every item-level fault archive reconciliation
+can meet -- an observation file that is missing, unreadable, malformed, empty,
+sequence-discontinuous, carrying no usable receipt stamp, or holding a single
+observation larger than the bounded publication size -- was raised out of the
+whole reconcile pass. The worker above treats that as an ordinary cycle failure
+and retries next poll, which is right for a transient fault and useless for this
+one: the same item fails the same way forever. Nothing after it was ever
+published, and that includes every *other* source, because the loop over sorted
+sources never got past the bad one. Capture kept recording, so the durable work
+was not lost; it was stranded, permanently, behind a repeating cycle failure
+that named neither the item nor the source.
+
+Those faults now fence one source. The rest of that source waits behind the
+item, because the delivery queue preserves recorder sequence order per dataset
+and publishing across the gap would break the contract that makes a published
+dataset trustworthy; every other source publishes normally. The condition is
+carried in a bounded, truncation-flagged quarantine summary naming the source,
+the error code and the item's bounded locator -- never a local path, because the
+record reaches an operator health surface -- and the monitor reports the cycle as
+`degraded` with `recorder-archive-quarantined`, distinct from the retirement
+degradation it already had. Nothing is deleted: the raw archive is primary
+evidence and stays exactly where it is, so a repaired item publishes on the next
+pass. The fence is deliberately narrow: checkpoint and contract failures --
+unreadable or unsupported recorder state, a session mismatch -- stay fatal rather
+than becoming a quietly skipped source.
+
+The required-thread property is proven with it. Database/storage failures in the
+publication loop are now caught at that boundary on both sides: the merged
+native-recorder delivery covers the recorder's own publication store, and
+`sqlite3.Error` has been added to the Flask-side worker's cycle retry family, so
+a locked or unreadable outbox is handled, counted and paced by the loop that owns
+it rather than escaping to a supervisor rebuild. See the B06 record for that
+supervisor's own restart counting and bounded backoff.
+
+The remaining four properties are untouched: incremental reconciliation progress,
+measurable backlog catch-up after a long outage, the durable outbox
+retirement/frontier/tombstone design, and compaction-safe duplicate-suppression
+semantics. No physical evidence or acceptance state changed.
+
 ### B04 — one supported update/start contract and one host-mutation serialization boundary
 
 **State:** `CLOSED`

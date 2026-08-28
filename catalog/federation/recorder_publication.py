@@ -156,12 +156,65 @@ class RecorderPublicationTarget:
 
 
 @dataclass(frozen=True)
+class QuarantinedSource:
+    """One source whose archive reconciliation stopped on an unusable item.
+
+    The item itself is named only by its bounded raw identity, never by a path:
+    this record travels into an operator health surface.
+    """
+
+    source_name: str
+    error_code: str
+    batch_identity: str
+
+
+@dataclass(frozen=True)
+class QuarantineSummary:
+    """A bounded view of sources fenced behind an unusable archive item.
+
+    ``sources`` is truncated to a fixed sample while ``total`` counts every
+    quarantined source, so a health surface can report the condition truthfully
+    without materialising an unbounded result set.
+    """
+
+    total: int = 0
+    sources: tuple[QuarantinedSource, ...] = ()
+    truncated: bool = False
+
+
+#: Item-level archive faults that fence one source rather than the whole cycle.
+#
+# Each names an archive item this reconciler cannot turn into a publication:
+# unreadable, malformed, empty, discontinuous, or larger than the bounded
+# publication size. None of them is a reason the *other* sources cannot
+# publish, and none of them can be fixed by trying the same item again.
+QUARANTINE_CODES = frozenset(
+    {
+        "malformed-recorder-observation",
+        "recorder-observation-too-large",
+        "recorder-observations-empty",
+        "recorder-observations-missing",
+        "recorder-observations-unavailable",
+        "recorder-receipt-time-missing",
+        "recorder-sequence-mismatch",
+    }
+)
+
+#: Bounded sample of quarantined sources carried in one reconcile result.
+MAX_REPORTED_QUARANTINED_SOURCES = 8
+
+#: Bound on the item locator carried into an operator health surface.
+MAX_QUARANTINE_IDENTITY_CHARS = 64
+
+
+@dataclass(frozen=True)
 class RecorderReconcileResult:
     scanned_batches: int
     eligible_batches: int
     publication_chunks: int
     enqueued: int
     already_enqueued: int
+    quarantine: QuarantineSummary = QuarantineSummary()
 
 
 @dataclass(frozen=True)
@@ -404,12 +457,21 @@ class RecorderArchiveReconciler:
             observations[0].get("timestamp"),
         )
         for value in candidates:
-            if isinstance(value, str) and value.strip():
+            if not isinstance(value, str) or not value.strip():
+                continue
+            try:
                 return _parse_utc(value, "created_at")
+            except FederationValidationError:
+                # A stamp that is present but unparseable is not better
+                # evidence than the next candidate. Falling through also keeps
+                # this failure inside the item-level code below, rather than
+                # leaving it as the shared construction-validation code, which
+                # a per-item fence must not be widened to cover.
+                continue
         raise FederationValidationError(
             "recorder-receipt-time-missing",
             "created_at",
-            "committed batch has no durable receipt timestamp",
+            "committed batch has no usable durable receipt timestamp",
         )
 
     def _content(
@@ -497,153 +559,219 @@ class RecorderArchiveReconciler:
             chunks.append(current)
         return chunks
 
-    def reconcile(self) -> RecorderReconcileResult:
-        checkpoints = self._checkpoints()
-        scanned = 0
-        eligible = 0
-        publication_chunks = 0
-        enqueued = 0
-        existing = 0
-        for source_name in sorted(checkpoints):
-            checkpoint = checkpoints[source_name]
-            archive_names = tuple(
-                dict.fromkeys([source_name, *checkpoint.storage_aliases])
-            )
-            archive_refs: dict[
-                tuple[int, int, int], tuple[str, RawBatchRef]
-            ] = {}
-            for archive_source_name in archive_names:
-                for ref in self.store.iter_raw_batches(
-                    source_name=archive_source_name,
-                    instance_id=checkpoint.agent_instance_id,
-                ):
-                    identity = (
-                        ref.first_sequence,
-                        ref.last_sequence,
-                        ref.next_sequence,
-                    )
-                    candidate = (archive_source_name, ref)
-                    current_variant = archive_refs.get(identity)
-                    if current_variant is None or (
-                        ref.raw_sha256,
-                        ref.manifest_path.as_posix(),
-                    ) > (
-                        current_variant[1].raw_sha256,
-                        current_variant[1].manifest_path.as_posix(),
-                    ):
-                        # A crash can leave more than one raw envelope for the
-                        # same sequence range. Recovery deterministically picks
-                        # the greatest raw hash; publication must select that
-                        # same variant rather than binding both manifests to one
-                        # overwritten derived observation file.
-                        archive_refs[identity] = candidate
+    @staticmethod
+    def _quarantine_identity(exc: FederationValidationError) -> str:
+        """Name the unusable item without publishing a local path.
 
-            ordered_refs = sorted(
-                archive_refs.values(),
-                key=lambda item: (
-                    item[1].first_sequence,
-                    item[1].last_sequence,
-                    item[1].next_sequence,
-                    item[1].raw_sha256,
-                    item[1].manifest_path.as_posix(),
-                ),
-            )
-            for archive_source_name, ref in ordered_refs:
-                scanned += 1
-                if ref.next_sequence > checkpoint.next_sequence:
-                    continue
-                eligible += 1
-                day = ref.manifest_path.parent.name
-                observation_path = self._observation_path(
-                    source_name=source_name,
-                    archive_source_name=archive_source_name,
-                    instance_id=checkpoint.agent_instance_id,
-                    first_sequence=ref.first_sequence,
-                    last_sequence=ref.last_sequence,
-                    next_sequence=ref.next_sequence,
-                    raw_sha256=ref.raw_sha256,
-                    day=day,
+        ``field`` already carries the bounded locator this reconciler raises
+        with -- ``observation_file``, ``observation_file:<line>``,
+        ``observation``. It is the only part of the failure safe to put on an
+        operator health surface, so it is bounded and passed through as-is
+        rather than joined with a filesystem location.
+        """
+
+        field = getattr(exc, "field", None)
+        if not isinstance(field, str) or not field:
+            return "unknown"
+        return field[:MAX_QUARANTINE_IDENTITY_CHARS]
+
+    def _reconcile_source(
+        self,
+        source_name: str,
+        checkpoint: SourceCheckpoint,
+        counters: dict[str, int],
+    ) -> None:
+        """Enqueue one source's eligible archive, in strict sequence order."""
+
+        archive_names = tuple(
+            dict.fromkeys([source_name, *checkpoint.storage_aliases])
+        )
+        archive_refs: dict[
+            tuple[int, int, int], tuple[str, RawBatchRef]
+        ] = {}
+        for archive_source_name in archive_names:
+            for ref in self.store.iter_raw_batches(
+                source_name=archive_source_name,
+                instance_id=checkpoint.agent_instance_id,
+            ):
+                identity = (
+                    ref.first_sequence,
+                    ref.last_sequence,
+                    ref.next_sequence,
                 )
-                observations = self._read_observations(observation_path)
-                sequences = [int(item["sequence"]) for item in observations]
-                if (
-                    sequences[0] != ref.first_sequence
-                    or sequences[-1] != ref.last_sequence
-                    or len(observations) != ref.observation_count
-                    or sequences
-                    != list(range(ref.first_sequence, ref.last_sequence + 1))
+                candidate = (archive_source_name, ref)
+                current_variant = archive_refs.get(identity)
+                if current_variant is None or (
+                    ref.raw_sha256,
+                    ref.manifest_path.as_posix(),
+                ) > (
+                    current_variant[1].raw_sha256,
+                    current_variant[1].manifest_path.as_posix(),
                 ):
-                    raise FederationValidationError(
-                        "recorder-sequence-mismatch",
-                        "observation_file",
-                        (
-                            "detailed observation archive does not match "
-                            "its raw manifest or contains a sequence "
-                            "discontinuity"
-                        ),
-                    )
-                created_at = self._received_at(
-                    ref.manifest_path,
-                    observations,
+                    # A crash can leave more than one raw envelope for the
+                    # same sequence range. Recovery deterministically picks
+                    # the greatest raw hash; publication must select that
+                    # same variant rather than binding both manifests to one
+                    # overwritten derived observation file.
+                    archive_refs[identity] = candidate
+
+        ordered_refs = sorted(
+            archive_refs.values(),
+            key=lambda item: (
+                item[1].first_sequence,
+                item[1].last_sequence,
+                item[1].next_sequence,
+                item[1].raw_sha256,
+                item[1].manifest_path.as_posix(),
+            ),
+        )
+        for archive_source_name, ref in ordered_refs:
+            counters["scanned"] += 1
+            if ref.next_sequence > checkpoint.next_sequence:
+                continue
+            counters["eligible"] += 1
+            day = ref.manifest_path.parent.name
+            observation_path = self._observation_path(
+                source_name=source_name,
+                archive_source_name=archive_source_name,
+                instance_id=checkpoint.agent_instance_id,
+                first_sequence=ref.first_sequence,
+                last_sequence=ref.last_sequence,
+                next_sequence=ref.next_sequence,
+                raw_sha256=ref.raw_sha256,
+                day=day,
+            )
+            observations = self._read_observations(observation_path)
+            sequences = [int(item["sequence"]) for item in observations]
+            if (
+                sequences[0] != ref.first_sequence
+                or sequences[-1] != ref.last_sequence
+                or len(observations) != ref.observation_count
+                or sequences
+                != list(range(ref.first_sequence, ref.last_sequence + 1))
+            ):
+                raise FederationValidationError(
+                    "recorder-sequence-mismatch",
+                    "observation_file",
+                    (
+                        "detailed observation archive does not match "
+                        "its raw manifest or contains a sequence "
+                        "discontinuity"
+                    ),
                 )
-                chunks = self._chunks(
+            created_at = self._received_at(
+                ref.manifest_path,
+                observations,
+            )
+            chunks = self._chunks(
+                source_name=source_name,
+                checkpoint=checkpoint,
+                raw_sha256=ref.raw_sha256,
+                raw_first_sequence=ref.first_sequence,
+                raw_last_sequence=ref.last_sequence,
+                observations=observations,
+            )
+            dataset_id = self.target.dataset_id(source_name)
+            raw_hash = _hash(
+                ref.raw_sha256,
+                field="raw_sha256",
+            )[7:]
+            for chunk in chunks:
+                counters["chunks"] += 1
+                first_sequence = int(chunk[0]["sequence"])
+                last_sequence = int(chunk[-1]["sequence"])
+                batch_id = (
+                    f"{_slug(source_name)}:"
+                    f"{checkpoint.agent_instance_id}:"
+                    f"{first_sequence}:{last_sequence}:{raw_hash}"
+                )
+                idempotency_key = (
+                    f"{self.target.session_id}:{dataset_id}:{batch_id}"
+                )
+                content = self._content(
                     source_name=source_name,
                     checkpoint=checkpoint,
                     raw_sha256=ref.raw_sha256,
                     raw_first_sequence=ref.first_sequence,
                     raw_last_sequence=ref.last_sequence,
-                    observations=observations,
+                    observations=chunk,
                 )
-                dataset_id = self.target.dataset_id(source_name)
-                raw_hash = _hash(
-                    ref.raw_sha256,
-                    field="raw_sha256",
-                )[7:]
-                for chunk in chunks:
-                    publication_chunks += 1
-                    first_sequence = int(chunk[0]["sequence"])
-                    last_sequence = int(chunk[-1]["sequence"])
-                    batch_id = (
-                        f"{_slug(source_name)}:"
-                        f"{checkpoint.agent_instance_id}:"
-                        f"{first_sequence}:{last_sequence}:{raw_hash}"
-                    )
-                    idempotency_key = (
-                        f"{self.target.session_id}:{dataset_id}:{batch_id}"
-                    )
-                    content = self._content(
+                _entry, created = self.queue.enqueue(
+                    session_id=self.target.session_id,
+                    group_id=self.target.group_id,
+                    dataset_id=dataset_id,
+                    dataset_schema_name=self.target.dataset_schema_name,
+                    dataset_schema_version=(
+                        self.target.dataset_schema_version
+                    ),
+                    batch_id=batch_id,
+                    idempotency_key=idempotency_key,
+                    content=content,
+                    created_at=created_at,
+                )
+                if created:
+                    counters["enqueued"] += 1
+                else:
+                    counters["existing"] += 1
+
+    def reconcile(self) -> RecorderReconcileResult:
+        checkpoints = self._checkpoints()
+        counters = {
+            "scanned": 0,
+            "eligible": 0,
+            "chunks": 0,
+            "enqueued": 0,
+            "existing": 0,
+        }
+        quarantined: list[QuarantinedSource] = []
+        for source_name in sorted(checkpoints):
+            try:
+                self._reconcile_source(
+                    source_name,
+                    checkpoints[source_name],
+                    counters,
+                )
+            except FederationValidationError as exc:
+                if exc.code not in QUARANTINE_CODES:
+                    raise
+                # One unusable archive item used to end the whole cycle, and
+                # the next cycle failed on the same item again. Nothing after
+                # it was ever published -- not the rest of this source's
+                # archive, and not any other source, because the loop above
+                # never got that far. Capture kept recording, so the durable
+                # work was not lost, it was stranded, permanently and silently
+                # apart from a repeating cycle failure.
+                #
+                # This source stops here instead. Recorder sequence order is
+                # preserved per dataset by the delivery queue and must not be
+                # broken by publishing across the gap, so the rest of *this*
+                # source waits behind the item an operator has to resolve --
+                # but every other source now progresses, and the condition is
+                # named rather than inferred from a loop that keeps failing.
+                #
+                # Nothing is deleted. The raw archive is primary evidence and
+                # stays exactly where it is.
+                quarantined.append(
+                    QuarantinedSource(
                         source_name=source_name,
-                        checkpoint=checkpoint,
-                        raw_sha256=ref.raw_sha256,
-                        raw_first_sequence=ref.first_sequence,
-                        raw_last_sequence=ref.last_sequence,
-                        observations=chunk,
+                        error_code=exc.code,
+                        batch_identity=self._quarantine_identity(exc),
                     )
-                    _entry, created = self.queue.enqueue(
-                        session_id=self.target.session_id,
-                        group_id=self.target.group_id,
-                        dataset_id=dataset_id,
-                        dataset_schema_name=self.target.dataset_schema_name,
-                        dataset_schema_version=(
-                            self.target.dataset_schema_version
-                        ),
-                        batch_id=batch_id,
-                        idempotency_key=idempotency_key,
-                        content=content,
-                        created_at=created_at,
-                    )
-                    if created:
-                        enqueued += 1
-                    else:
-                        existing += 1
+                )
 
         return RecorderReconcileResult(
-            scanned_batches=scanned,
-            eligible_batches=eligible,
-            publication_chunks=publication_chunks,
-            enqueued=enqueued,
-            already_enqueued=existing,
+            scanned_batches=counters["scanned"],
+            eligible_batches=counters["eligible"],
+            publication_chunks=counters["chunks"],
+            enqueued=counters["enqueued"],
+            already_enqueued=counters["existing"],
+            quarantine=QuarantineSummary(
+                total=len(quarantined),
+                sources=tuple(quarantined[:MAX_REPORTED_QUARANTINED_SOURCES]),
+                truncated=len(quarantined) > MAX_REPORTED_QUARANTINED_SOURCES,
+            ),
         )
+
 
 
 class RecorderFederationPublisher:
@@ -733,9 +861,21 @@ class RecorderPublicationCycleReport:
             return "failing"
         if self.result.retirement.total:
             return "degraded"
+        if self.quarantined_sources:
+            # Delivery works and every other source is publishing, but one
+            # source's archive is fenced behind an item no retry can fix. That
+            # is not a failing cycle and it is not ordinary pending work: it
+            # needs an operator, so it is reported as degraded rather than
+            # hidden behind a healthy-looking cycle.
+            return "degraded"
         if self.result.delivery.blocked_datasets:
             return "blocked"
         return "publishing"
+
+    @property
+    def quarantined_sources(self) -> int:
+        reconcile = None if self.result is None else self.result.reconcile
+        return 0 if reconcile is None else reconcile.quarantine.total
 
     @property
     def healthy(self) -> bool:
@@ -966,6 +1106,11 @@ class RecorderFederationDeliveryWorker:
 
 __all__ = [
     "DEFAULT_MAX_CONTENT_BYTES",
+    "MAX_QUARANTINE_IDENTITY_CHARS",
+    "MAX_REPORTED_QUARANTINED_SOURCES",
+    "QUARANTINE_CODES",
+    "QuarantineSummary",
+    "QuarantinedSource",
     "MAX_SAFE_CONTENT_BYTES",
     "PUBLICATION_HEALTH_STATES",
     "RECORDER_DATASET_SCHEMA_NAME",

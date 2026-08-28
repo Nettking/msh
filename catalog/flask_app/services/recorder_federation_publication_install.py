@@ -84,6 +84,9 @@ class RecorderFederationPublicationSnapshot:
     retired_batches: int = 0
     # Consecutive failed worker cycles. Zero whenever the last cycle completed.
     consecutive_failures: int = 0
+    # Sources fenced behind an archive item no retry can turn into a
+    # publication. Re-derived from the cycle that just ran, never accumulated.
+    quarantined_sources: int = 0
 
 
 class RecorderFederationPublicationMonitor:
@@ -118,6 +121,7 @@ class RecorderFederationPublicationMonitor:
         error_code: str | None = None,
         retired_batches: int = 0,
         consecutive_failures: int = 0,
+        quarantined_sources: int = 0,
     ) -> None:
         with self._lock:
             self._snapshot = RecorderFederationPublicationSnapshot(
@@ -126,6 +130,7 @@ class RecorderFederationPublicationMonitor:
                 last_error_code=error_code,
                 retired_batches=retired_batches,
                 consecutive_failures=consecutive_failures,
+                quarantined_sources=quarantined_sources,
             )
 
     def _observe_cycle(self, report: RecorderPublicationCycleReport) -> None:
@@ -161,11 +166,21 @@ class RecorderFederationPublicationMonitor:
             )
             return
         if state == "degraded":
+            quarantined = report.quarantined_sources
+            # Retirement means evidence was permanently withdrawn; quarantine
+            # means a source is fenced behind an item an operator has to
+            # resolve. Both need an operator, and they are different work, so
+            # the snapshot names which one it is rather than merging them.
             self._set_snapshot(
                 "degraded",
                 enabled=True,
-                error_code="recorder-delivery-retired",
+                error_code=(
+                    "recorder-delivery-retired"
+                    if retired
+                    else "recorder-archive-quarantined"
+                ),
                 retired_batches=retired,
+                quarantined_sources=quarantined,
             )
             return
         if state == "blocked":
