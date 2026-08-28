@@ -173,6 +173,22 @@ expected pathname. B08's automated implementation properties are complete;
 P05/P09 exact-host hard-kill/power-loss evidence remains open and no physical
 acceptance state changed.
 
+Authoritative-replay completeness is shared by one primitive that folds a
+caller's own bounded pages and returns only once the coordinator's reported
+current revision has been reached; every other exit raises
+`authoritative-replay-incomplete`. Leadership and human-auth were wired onto it
+first. Shared knowledge is now wired onto it too, because its prefix behaviour
+was worse than under-reporting: a read that stopped before a document's delete
+event re-published that withdrawn document into the append-only authoritative
+log for every member. It now degrades to the local cache and changes nothing
+shared, reported at warning level rather than as an ordinary unreachable relay.
+The remaining paged consumers -- the capability-request, update,
+software-version and recorder-control report aggregators, and the authority
+projection adapter's own event read -- still return what they accumulated at
+their ceilings, so **B09 stays at 1/7 properties automated-proven and remains
+open**. No page ceiling was widened and no physical evidence or acceptance state
+changed.
+
 1. Continue the reconciled robustness blockers B01-B10 from [the authoritative reconciliation](v1_robustness_reconciliation.md), one named delivery/PR at a time and in the recommended dependency order.
 2. Keep the documented non-goals and accepted boundaries out of the v1 implementation unless new concrete evidence invalidates them.
 3. Execute the corrected P01-P12 physical fault/growth/restore campaign on one exact candidate after the blocker implementations and automated gates are green; green CI alone is insufficient.

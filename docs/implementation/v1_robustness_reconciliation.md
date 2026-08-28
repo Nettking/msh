@@ -306,16 +306,34 @@ handover; only page size is accelerated. No page ceiling was widened, no
 additional history is read, and coordinator authority, fencing, revision-gap,
 lease and membership checks are unchanged.
 
-The explicit fail-closed requirement is proven only for those authority/security
-consumers. The shared-knowledge reader and the capability-request, update,
-software-version and recorder-control report aggregators still return what they
-accumulated at their own ceilings; each under-reports rather than granting
-authority, but none of them fails closed yet. The remaining five properties are
-untouched: snapshot/base-revision compaction, member-replicated history
-lifetime and request-history retirement horizons all depend on retirement
-mechanisms that do not exist, and the control-plane unavailable/reconnecting
-representation and the bounded-clock-skew/NTP prerequisite are still open. No
-physical evidence or acceptance state changed.
+The shared-knowledge reader is now wired onto the same primitive, on the same
+unchanged `REPLAY_PAGE_EVENTS`/`MAX_REPLAY_PAGES` ceilings. That consumer is not
+an authority projection, but its prefix behaviour was worse than
+under-reporting: `_reduce` learns that a document ever existed only from that
+document's own events, and `seen_document_ids` is the only reason `load_payload`
+leaves a deleted id alone. A read that stopped before a delete therefore treated
+the local cached copy as new content and re-published the withdrawn document
+into the append-only authoritative log, for every member and with no retraction
+available; the projection the caller wrote back to its own cache was also
+missing everything past the stopping point. Incomplete reads now raise the same
+bounded `authoritative-replay-incomplete` error, which the repository's existing
+degradation path turns into "keep reading the local cache and change nothing
+shared", reported at warning level to separate it from an ordinary unreachable
+relay. Regression evidence covers the resurrection itself, a write and a
+tombstone built on a prefix, the accelerated page-budget ceiling against a real
+coordinator, and the deletion still being honoured once complete history is
+readable again.
+
+The explicit fail-closed requirement is still not closed. The capability-request,
+update, software-version and recorder-control report aggregators, and the
+Federation authority projection adapter's own bounded event read, still return
+what they accumulated at their own ceilings; each under-reports rather than
+granting authority, but none of them fails closed yet, so B09 stays at 1/7. The
+remaining five properties are untouched: snapshot/base-revision compaction,
+member-replicated history lifetime and request-history retirement horizons all
+depend on retirement mechanisms that do not exist, and the control-plane
+unavailable/reconnecting representation and the bounded-clock-skew/NTP
+prerequisite are still open. No physical evidence or acceptance state changed.
 
 ### B10 — quiesced, capacity-safe backup/recovery and host-process identity
 
