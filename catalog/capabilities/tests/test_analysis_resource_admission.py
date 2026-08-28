@@ -114,7 +114,7 @@ def test_resource_pressure_refuses_before_workspace_writer_starts(tmp_path: Path
     result = asyncio.run(handler.execute(_job()))
 
     assert result.succeeded is False
-    assert result.error_code == "analysis-resource-pressure"
+    assert result.reason_code == "analysis-resource-pressure"
     assert not workspace_root.exists()
 
 
@@ -146,7 +146,7 @@ def test_concurrent_attempts_cannot_double_spend_one_workspace_resource(
 
     assert first_result.succeeded is True
     assert second_result.succeeded is False
-    assert second_result.error_code == "analysis-resource-pressure"
+    assert second_result.reason_code == "analysis-resource-pressure"
 
 
 def test_reservation_releases_after_materialization_failure(tmp_path: Path, monkeypatch) -> None:
@@ -167,7 +167,7 @@ def test_reservation_releases_after_materialization_failure(tmp_path: Path, monk
     second = asyncio.run(handler.execute(_job()))
 
     assert first.succeeded is False
-    assert first.error_code == "analysis-input-unavailable"
+    assert first.reason_code == "analysis-input-unavailable"
     assert second.succeeded is True
     assert calls == 2
 
