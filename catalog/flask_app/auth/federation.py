@@ -17,6 +17,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
+import logging
 import os
 import secrets
 import threading
@@ -42,7 +43,10 @@ from flask import (
 from flask_login import login_user, logout_user
 from flask_security import current_user
 
-from catalog.federation.authoritative_replay import replay_authoritative_history
+from catalog.federation.authoritative_replay import (
+    AUTHORITATIVE_REPLAY_INCOMPLETE,
+    replay_authoritative_history,
+)
 from catalog.federation.errors import FederationOperationError
 from catalog.federation.human_auth import (
     AUTHORITY_EVENT,
@@ -1141,6 +1145,42 @@ def callback():
     return redirect(next_url)
 
 
+def resolved_authority(
+    service: FederationHumanAuthService, mode: LoginMode
+) -> AuthorityRecord | None:
+    """Resolve the sign-in authority, or report it as unresolved.
+
+    Reading the authority is a bounded Federation operation and it can fail
+    closed: the relay is unreachable, or the authoritative history could not be
+    read completely, which since B09 raises rather than answering from a prefix.
+    Both mean the same thing to these routes -- the control plane cannot be
+    resolved right now -- and both already have a defined representation, the
+    caller's own ``abort(503)``.
+
+    Letting the refusal escape a ``before_request`` hook instead presented an
+    unavailable control plane to the operator as a broken device. Returning
+    ``None`` never widens anything: every caller treats it as unresolved and
+    refuses, rather than falling back to a device-local page.
+    """
+
+    if mode.authority is not None:
+        return mode.authority
+    try:
+        return service.authority(refresh=True)
+    except FederationOperationError as exc:
+        code = getattr(exc, "code", type(exc).__name__)
+        # An unreachable relay is ordinary. A history this device cannot read
+        # to its end is not, and it does not clear itself.
+        current_app.logger.log(
+            logging.WARNING
+            if code == AUTHORITATIVE_REPLAY_INCOMPLETE
+            else logging.INFO,
+            "Federation human-auth authority is unavailable (%s)",
+            code,
+        )
+        return None
+
+
 def guard_member_local_password_login():
     """Prevent a member-local password database from bypassing Federation SSO."""
 
@@ -1168,7 +1208,7 @@ def redirect_member_password_change():
         return None
     if request.method != "GET":
         abort(403)
-    authority = mode.authority or service.authority(refresh=True)
+    authority = resolved_authority(service, mode)
     if authority is None:
         abort(503)
     return redirect(f"{authority.base_url}{url_for('security.change_password')}")
@@ -1202,6 +1242,7 @@ __all__ = [
     "get_federated_human_auth_service",
     "guard_member_local_password_login",
     "redirect_member_password_change",
+    "resolved_authority",
     "saved_remote_member",
     "sync_federated_human_user",
 ]

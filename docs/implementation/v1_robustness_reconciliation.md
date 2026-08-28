@@ -324,6 +324,21 @@ tombstone built on a prefix, the accelerated page-budget ceiling against a real
 coordinator, and the deletion still being honoured once complete history is
 readable again.
 
+Failing closed also has to arrive somewhere. `LoginMode` degrades to `local`
+on an incomplete read, but `saved_remote_member` correctly keeps an established
+member a member, so the two member authority surfaces -- user administration and
+password change -- fell through to `authority(refresh=True)`, which since this
+work raises instead of answering from a prefix. Unhandled in a `before_request`
+hook, that bounded refusal reached the operator as a broken device rather than
+as the `503` those routes already define for an authority they cannot resolve.
+`resolved_authority` now turns any bounded Federation failure there into the
+existing unresolved-authority answer, logging an incomplete authoritative read
+above an ordinary unreachable relay. It never widens anything: both callers
+refuse on an unresolved authority rather than falling back to a device-local
+page. This is the operator-representation half of the control-plane property;
+the explicit unavailable/reconnecting operator surface is still not built, so
+that property stays open.
+
 The explicit fail-closed requirement is still not closed. The capability-request,
 update, software-version and recorder-control report aggregators, and the
 Federation authority projection adapter's own bounded event read, still return

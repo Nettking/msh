@@ -18,7 +18,11 @@ from flask import (
 from flask_security import current_user, hash_password
 from sqlalchemy.exc import IntegrityError
 
-from .federation import get_federated_human_auth_service, saved_remote_member
+from .federation import (
+    get_federated_human_auth_service,
+    resolved_authority,
+    saved_remote_member,
+)
 from .models import FirstUserBootstrapClaim, Role, User, db
 from .policy import ROLE_SUMMARIES
 
@@ -55,7 +59,7 @@ def _member_admin_redirect():
     mode = service.mode(refresh=True)
     if not mode.is_member and not saved_remote_member():
         return None
-    authority = mode.authority or service.authority(refresh=True)
+    authority = resolved_authority(service, mode)
     if authority is None:
         abort(503)
     return redirect(f"{authority.base_url}{url_for('auth_users.users')}")

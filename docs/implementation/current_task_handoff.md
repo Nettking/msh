@@ -186,8 +186,34 @@ The remaining paged consumers -- the capability-request, update,
 software-version and recorder-control report aggregators, and the authority
 projection adapter's own event read -- still return what they accumulated at
 their ceilings, so **B09 stays at 1/7 properties automated-proven and remains
-open**. No page ceiling was widened and no physical evidence or acceptance state
-changed.
+open**. The two member authority surfaces -- user administration and password
+change -- now report an unresolvable authority as their existing bounded `503`
+rather than letting the refusal escape a `before_request` hook as a broken
+device; the explicit control-plane unavailable/reconnecting operator surface is
+still not built. No page ceiling was widened and no physical evidence or
+acceptance state changed.
+
+### Reconciled robustness branches
+
+Two branches were preserved for follow-up after the cleanup sequence and are now
+reconciled onto `main`. Neither was merged; both were re-derived, because both
+predated `main` substantially.
+
+- `claude/federation-v1-b06-recorder-status-io-boundary` — the recorder
+  status-I/O defect was still live on `main`, so the containment and its
+  consequence tests were rebuilt against the current runtime and are now merged
+  into this branch's B06 delivery. Nothing from that branch remains unported.
+- `claude/federation-v1-hardening-qfqvaf` — its `catalog/federation/event_replay.py`
+  reader and that reader's tests are **obsolete**, superseded by the merged
+  `catalog/federation/authoritative_replay.py`, which proves every shape that
+  one did and additionally refuses an event beyond the reported current revision,
+  refuses a non-advancing revision separately from a non-contiguous one, requires
+  the applied revision to *equal* rather than merely reach the reported head, and
+  validates event revision types. Its human-auth wiring is likewise superseded by
+  the merged delivery. Porting either would have created a second competing
+  primitive. What was still needed and is now delivered here: the shared-knowledge
+  consumer wired onto the merged reader, and `resolved_authority` for the two
+  member authority surfaces.
 
 1. Continue the reconciled robustness blockers B01-B10 from [the authoritative reconciliation](v1_robustness_reconciliation.md), one named delivery/PR at a time and in the recommended dependency order.
 2. Keep the documented non-goals and accepted boundaries out of the v1 implementation unless new concrete evidence invalidates them.
