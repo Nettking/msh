@@ -339,9 +339,20 @@ page. This is the operator-representation half of the control-plane property;
 the explicit unavailable/reconnecting operator surface is still not built, so
 that property stays open.
 
+The Federation authority projection adapter is now wired onto the same reader
+as well, on its own unchanged ceilings. Its bounded loop measured progress by
+page length rather than by revision, so only budget exhaustion refused: an empty
+page while the coordinator still reported later history, and a page whose
+revisions were not contiguous, both returned the prefix and reported it as
+`current`. Membership, leadership and device naming are folded from that
+history, so the operator's Federation overview presented a revoked device as a
+current member and a demoted node as leader. `snapshot` already had the right
+representation for a bounded failure -- an explicit unavailable projection with
+a safe reason code -- so the refusal now reaches it, and it names
+`authoritative-replay-incomplete` instead of the generic projection failure.
+
 The explicit fail-closed requirement is still not closed. The capability-request,
-update, software-version and recorder-control report aggregators, and the
-Federation authority projection adapter's own bounded event read, still return
+update, software-version and recorder-control report aggregators still return
 what they accumulated at their own ceilings; each under-reports rather than
 granting authority, but none of them fails closed yet, so B09 stays at 1/7. The
 remaining five properties are untouched: snapshot/base-revision compaction,

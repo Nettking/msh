@@ -182,9 +182,12 @@ was worse than under-reporting: a read that stopped before a document's delete
 event re-published that withdrawn document into the append-only authoritative
 log for every member. It now degrades to the local cache and changes nothing
 shared, reported at warning level rather than as an ordinary unreachable relay.
-The remaining paged consumers -- the capability-request, update,
-software-version and recorder-control report aggregators, and the authority
-projection adapter's own event read -- still return what they accumulated at
+The Federation authority projection adapter is wired onto it too: its bounded
+loop measured progress by page length rather than by revision, so an empty page
+or a non-contiguous page was folded into a `current` overview that presented a
+revoked device as a current member and a demoted node as leader. The remaining
+paged consumers -- the capability-request, update, software-version and
+recorder-control report aggregators -- still return what they accumulated at
 their ceilings, so **B09 stays at 1/7 properties automated-proven and remains
 open**. The two member authority surfaces -- user administration and password
 change -- now report an unresolvable authority as their existing bounded `503`
