@@ -142,6 +142,21 @@ carrying the second of those defects -- a snapshot with no restart count and a
 fixed five-second rebuild with no ceiling -- and it now counts and backs off the
 same way, cleared only by an announcement. That is the same discipline applied
 to a third required driver rather than a new property, so the count is unchanged.
+
+The standalone recorder's four required loops -- Federation update, host update
+agent, update activation and recorder control -- were the same shape again and
+the worst placed for it. Each retried correctly and then discarded the failure,
+so a loop that had failed on every pass since startup looked exactly like a loop
+with nothing to do, on a device whose only operator surface is its heartbeat: a
+`/federation/recorders` scan or source change silently never applied, and a
+device silently absent from an **Update all devices** rollout. Each now keeps a
+bounded consecutive-failure record with a named error code, announced when the
+condition appears or changes rather than once per poll, and the launcher
+publishes those records into the heartbeat under an additive, count-bounded
+`workers` key through the same read-only provider seam Federation status uses.
+No loop's lifecycle changed. This is added observability for the same bullet,
+not a further property, so the count is still 4/8.
+
 No physical evidence or acceptance state changed.
 
 The recorder path-confinement, finite-transaction, incremental recovery-frontier,

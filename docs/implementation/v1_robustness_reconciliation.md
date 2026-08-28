@@ -272,6 +272,29 @@ bullet names the publication and analysis scheduler drivers, and this is the
 same discipline applied to a third required driver rather than a new one.
 **B06 stays at 4/8 and remains `OPEN`.**
 
+The standalone recorder's four required loops -- Federation update, host update
+agent, update activation and recorder control -- were the same shape again, and
+the worst placed for it. Each catches every failure and retries from durable
+state, which is the correct lifecycle since none of them may end capture, but
+each then discarded the failure entirely: no log, no counter, nothing anywhere.
+A loop that had failed on every pass since startup was indistinguishable from a
+loop with nothing to do, on a headless device whose only operator surface is its
+status heartbeat. The consequences are concrete: a `/federation/recorders` scan
+or source change that is never applied, and a device that never joins an
+**Update all devices** rollout, both while the recorder reports itself a
+connected member with no problem at all.
+
+Each loop now keeps a bounded consecutive-failure record with a named error
+code, announced in the recorder log when the condition appears or changes rather
+than once per poll, and cleared completely by a pass that succeeds. The launcher
+publishes those records into the heartbeat through the same read-only provider
+seam Federation status already uses, under an additive, count-bounded `workers`
+key, so capture stays unaware of the loops and a broken or oversized provider
+cannot break or grow the heartbeat. No loop's lifecycle changed: every failure
+is still retried exactly as before. This is added observability for the same
+bullet rather than a further property, so **B06 stays at 4/8 and remains
+`OPEN`.**
+
 ### B07 — bounded reconstructible and cumulative metadata growth
 
 **State:** `OPEN`  

@@ -405,6 +405,12 @@ def request_external_stop() -> bool:
 
 _FEDERATION_STATUS_LOCK = threading.Lock()
 _FEDERATION_STATUS_PROVIDER: Any = None
+_WORKER_HEALTH_PROVIDER: Any = None
+
+#: Bound on the published worker-health map. The launcher owns a small fixed
+#: set of required loops; the ceiling exists so a heartbeat can never be grown
+#: by whatever a provider happens to return.
+MAX_PUBLISHED_WORKERS = 16
 
 
 def set_federation_status_provider(provider: Any) -> None:
@@ -421,6 +427,24 @@ def set_federation_status_provider(provider: Any) -> None:
         _FEDERATION_STATUS_PROVIDER = provider
 
 
+def set_worker_health_provider(provider: Any) -> None:
+    """Publish the required background loops' health in the same heartbeat.
+
+    The recorder's Federation update, host update, activation and control loops
+    each catch every failure and retry from durable state, which is the right
+    lifecycle. Discarding the failure was not: a loop that has failed on every
+    pass for a day looked exactly like a loop with nothing to do, and a
+    headless recorder has no other operator surface on which to notice.
+
+    Capture stays unaware of those loops. The launcher hands it a read-only
+    view, exactly as it does for Federation status.
+    """
+
+    global _WORKER_HEALTH_PROVIDER
+    with _FEDERATION_STATUS_LOCK:
+        _WORKER_HEALTH_PROVIDER = provider
+
+
 def _federation_status() -> dict[str, Any]:
     with _FEDERATION_STATUS_LOCK:
         provider = _FEDERATION_STATUS_PROVIDER
@@ -431,6 +455,24 @@ def _federation_status() -> dict[str, Any]:
     except Exception:  # noqa: BLE001 - status must never break the heartbeat
         return {"status": "unavailable"}
     return value if isinstance(value, dict) else {"status": "unavailable"}
+
+
+def _worker_health() -> dict[str, Any]:
+    with _FEDERATION_STATUS_LOCK:
+        provider = _WORKER_HEALTH_PROVIDER
+    if provider is None:
+        return {}
+    try:
+        value = provider()
+    except Exception:  # noqa: BLE001 - status must never break the heartbeat
+        return {"status": "unavailable"}
+    if not isinstance(value, dict):
+        return {"status": "unavailable"}
+    return {
+        str(name): entry
+        for name, entry in list(value.items())[:MAX_PUBLISHED_WORKERS]
+        if isinstance(entry, dict)
+    }
 
 
 def last_stop_reason() -> str | None:
@@ -1273,6 +1315,9 @@ class RecorderRuntime:
                 # heartbeat was lost rather than only finding a gap in the
                 # file's timestamps.
                 "status_publication_error": self.status_publication_error,
+                # Also additive: whether each required background loop is
+                # running, and whether it has been failing rather than idle.
+                "workers": _worker_health(),
             }
         try:
             _write_json_atomic(STATUS_FILE, payload)
