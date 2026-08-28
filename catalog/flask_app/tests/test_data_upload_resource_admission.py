@@ -126,6 +126,24 @@ def test_reservation_is_released_after_upload_call(tmp_path: Path) -> None:
     assert second.calls == 1
 
 
+def test_reservation_is_released_when_upload_call_fails(tmp_path: Path) -> None:
+    class _FailingUploadService(_FakeUploadService):
+        def enqueue(self, files: Any) -> dict[str, Any]:
+            self.calls += 1
+            raise DataUploadError("upload-invalid-json", "bad upload")
+
+    admission = _admission(lambda _path: _measurement("data", free_bytes=350))
+    failing = _FailingUploadService(tmp_path)
+    succeeding = _FakeUploadService(tmp_path)
+
+    with pytest.raises(DataUploadError) as raised:
+        enqueue_with_resource_admission(failing, (), admission=admission)
+    assert raised.value.code == "upload-invalid-json"
+
+    enqueue_with_resource_admission(succeeding, (), admission=admission)
+    assert succeeding.calls == 1
+
+
 def test_distinct_backing_resources_have_independent_envelopes(tmp_path: Path) -> None:
     root_a = tmp_path / "a"
     root_b = tmp_path / "b"
