@@ -176,6 +176,7 @@ jobs:
           catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py
           catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py
           catalog/mtconnect_recorder/tests/test_recorder_federation_update.py
+          catalog/mtconnect_recorder/tests/test_recorder_publication_store_failure.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
           catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py
           catalog/mtconnect_recorder/tests/test_upgrade_compat.py
@@ -212,6 +213,7 @@ jobs:
           catalog/mtconnect_recorder/tests/test_native_recorder_supervisor_boundary.py
           catalog/mtconnect_recorder/tests/test_native_recorder_update_agent.py
           catalog/mtconnect_recorder/tests/test_recorder_federation_update.py
+          catalog/mtconnect_recorder/tests/test_recorder_publication_store_failure.py
           catalog/mtconnect_recorder/tests/test_start_recorder.py
           catalog/mtconnect_recorder/tests/test_tailscale_recorder_launcher.py
           catalog/mtconnect_recorder/tests/test_upgrade_compat.py
