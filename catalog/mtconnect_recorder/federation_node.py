@@ -13,9 +13,11 @@ from __future__ import annotations
 
 import asyncio
 import math
+import sqlite3
 import threading
 import time
 import uuid
+from contextlib import suppress
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -56,6 +58,29 @@ from catalog.mtconnect_recorder.storage import DurableRecorderStore
 
 MAX_SHARING_READY_SECONDS = 600.0
 MAX_FEDERATION_REQUEST_SECONDS = 120.0
+
+#: Every condition the publication driver retries rather than dies on.
+#:
+#: One tuple, used by the per-cycle boundary *and* by the failure handler's own
+#: durable re-read. Two lists drift, and the drift is not symmetric: the handler
+#: re-reads the same outbox the cycle just failed on, so anything the cycle
+#: treats as retryable can arrive there a second time. A narrower handler guard
+#: would let that second occurrence escape to the terminal boundary and convert
+#: a retryable condition into a dead driver -- exactly the failure this boundary
+#: exists to prevent. ``SQLiteOutbox.pending()`` raises ``sqlite3.Error`` from
+#: the store and ``FederationValidationError`` (``malformed-outbox-row``) from
+#: its own row decoding, so both paths are genuinely reachable.
+PUBLICATION_RETRY_ERRORS: tuple[type[BaseException], ...] = (
+    FederationValidationError,
+    FederationOperationError,
+    AuthenticationError,
+    OSError,
+    RuntimeError,
+    TimeoutError,
+    # SQLite reports a full disk, an I/O error, a lock held past its busy
+    # timeout and a malformed image as sqlite3.Error, which is not an OSError.
+    sqlite3.Error,
+)
 
 
 @dataclass(frozen=True)
@@ -245,6 +270,12 @@ SHARING_STATE_REMEDIES: dict[str, str] = {
     "discovering": (
         "the recorder is still looking for the leader's storage authority; if "
         "this persists, confirm the leader is running that authority process"
+    ),
+    "publication-driver-failed": (
+        "the recorder's Federation publication worker stopped on an "
+        "unexpected fault and locally committed evidence is no longer being "
+        "delivered; the capture archive is intact, so restart the recorder "
+        "and report the recorded error code"
     ),
     "degraded": (
         "some recorder evidence was permanently withdrawn from publication "
@@ -710,20 +741,44 @@ class RecorderFederationNode:
                     ):
                         if storage_client is not None:
                             await storage_client.close()
-                        authority_node_id = selected.authority_node_id
-                        group_id = selected.group_id
-                        storage_client = RelayRecorderStorageClient(
+                        # Build the route whole, then publish it. Every part of
+                        # this can fail on an ordinary bad day -- `_worker()`
+                        # opens the durable outbox, so a locked, full, readonly
+                        # or malformed SQLite file raises right here -- and the
+                        # retry that failure now gets is only a recovery if the
+                        # next cycle rebuilds. Recording the authority and the
+                        # client before the worker exists made the next cycle
+                        # believe the route was already built, skip rebuilding
+                        # it, and die on the assertion below with the store
+                        # fault replaced by an AssertionError.
+                        storage_client = None
+                        worker = None
+                        outbox = None
+                        authority_node_id = None
+                        group_id = None
+                        candidate = RelayRecorderStorageClient(
                             client,
                             session_id=state.binding.internal_session_id,
-                            authority_node_id=authority_node_id,
+                            authority_node_id=selected.authority_node_id,
                             request_timeout=self.request_timeout,
                         )
-                        await storage_client.start()
-                        worker, outbox = self._worker(
-                            state=state,
-                            storage_client=storage_client,
-                            group_id=group_id,
-                        )
+                        try:
+                            await candidate.start()
+                            worker, outbox = self._worker(
+                                state=state,
+                                storage_client=candidate,
+                                group_id=selected.group_id,
+                            )
+                        except BaseException:
+                            # Nothing owns this client yet, so the loop's own
+                            # cleanup will not close it. A failure to close
+                            # must not replace the fault being reported.
+                            with suppress(*PUBLICATION_RETRY_ERRORS):
+                                await candidate.close()
+                            raise
+                        storage_client = candidate
+                        authority_node_id = selected.authority_node_id
+                        group_id = selected.group_id
 
                     assert worker is not None and outbox is not None
                     cycle = await worker.run_cycle()
@@ -757,36 +812,61 @@ class RecorderFederationNode:
                     )
                     failures = 0
                     await asyncio.sleep(self.publication_poll_seconds)
-                except (
-                    FederationValidationError,
-                    FederationOperationError,
-                    AuthenticationError,
-                    OSError,
-                    RuntimeError,
-                    TimeoutError,
-                ) as exc:
+                except PUBLICATION_RETRY_ERRORS as exc:
                     failures += 1
-                    pending_snapshot = (
-                        ()
-                        if outbox is None
-                        else await asyncio.to_thread(outbox.pending)
-                    )
+                    # Re-reading the backlog is how the count stays durable
+                    # truth, but it reads the very store the cycle just failed
+                    # on. Whatever the cycle retried, this read can raise
+                    # again, so it is guarded by the same contract rather than
+                    # a narrower one -- and an unreadable backlog keeps the
+                    # last count this loop actually proved rather than being
+                    # answered with an invented zero.
+                    pending_batches = self.snapshot().pending_batches
+                    if outbox is not None:
+                        try:
+                            pending_snapshot = await asyncio.to_thread(
+                                outbox.pending
+                            )
+                        except PUBLICATION_RETRY_ERRORS:
+                            pass
+                        else:
+                            pending_batches = len(
+                                _current_recorder_pending(
+                                    pending_snapshot,
+                                    session_id=(
+                                        state.binding.internal_session_id
+                                    ),
+                                    group_id=group_id or "",
+                                )
+                            )
                     self._set_snapshot(
                         status="retrying",
                         storage_state="backlogged",
                         jsonl_state="backlogged",
-                        pending_batches=len(
-                            _current_recorder_pending(
-                                pending_snapshot,
-                                session_id=state.binding.internal_session_id,
-                                group_id=group_id or "",
-                            )
-                        ),
+                        pending_batches=pending_batches,
                         last_error_code=str(
                             getattr(exc, "code", type(exc).__name__)
                         ),
                     )
                     await asyncio.sleep(min(10.0, float(2 ** min(failures - 1, 3))))
+        except asyncio.CancelledError:
+            # Operator stop and process shutdown keep their existing meaning.
+            raise
+        except Exception as exc:
+            # Nothing above reads this coroutine's future once the recorder is
+            # running, so an unclassified fault used to end publication in
+            # complete silence: no log, no snapshot change, no restart, and a
+            # Federation health report frozen on the last successful cycle.
+            # The fault still ends the loop -- it is unclassified, and inventing
+            # a retry for it would be guessing -- but it can no longer be
+            # mistaken for a working publisher.
+            self._set_snapshot(
+                status="failed",
+                storage_state="publication-driver-failed",
+                jsonl_state="publication-driver-failed",
+                last_error_code=str(getattr(exc, "code", type(exc).__name__)),
+            )
+            raise
         finally:
             if storage_client is not None:
                 await storage_client.close()
