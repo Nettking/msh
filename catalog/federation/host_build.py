@@ -24,6 +24,7 @@ from pathlib import Path
 
 from .docker_resources import docker_backing_resource_path
 from .host_resources import PressureLevel, ProcessResourceAdmission, ResourceAssessment
+from .image_retirement import retire_superseded_images
 
 try:  # pragma: no cover - exercised only on supported POSIX hosts
     import fcntl
@@ -760,6 +761,13 @@ def build_core_images_locked(
     after = resolve_clean_commit(root)
     if after != commit:
         raise RuntimeError("build_context_changed")
+
+    # Only now is the transition verified: the build succeeded, its cache
+    # lifecycle completed, every core image carries the exact source identity,
+    # and the source still proves out. The images the Compose tags used to point
+    # at are superseded from this point. Reclaiming that space is bounded work
+    # and best effort: it must never turn an accepted build into a failed one.
+    retire_superseded_images(root, build_env, active_commit=commit)
     return commit
 
 
