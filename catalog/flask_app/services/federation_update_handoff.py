@@ -42,6 +42,29 @@ ACTIVATION_GRACE_SECONDS = 2
 HOST_REQUEST_TTL_SECONDS = 120
 WRITER_LOCK_STALE_SECONDS = 30
 
+# B07 note -- branch-listing results.
+#
+# ``approved_branches`` mints a fresh request id per call and the host agent
+# writes one ``branches-result-<digest>.json`` for it. The Federation view calls
+# this on every render, so these accumulated for the life of the device until
+# each call started deleting the one result it consumed.
+#
+# Retiring results left behind by a reader that timed out or died is NOT done
+# here, and cannot be done safely with what exists today. The writer lock covers
+# only publication of ``request.json``; the agent claims that request before it
+# writes any result, so a second caller can be enqueued and polling while the
+# first is still active. On disk, a live reader's result is indistinguishable
+# from an abandoned one -- mtime orders candidates but does not establish
+# orphanhood -- so any size- or age-triggered sweep will eventually delete a
+# result some concurrent caller is still waiting for, manufacturing the
+# approved-main-only fallback for a valid request.
+#
+# BLOCKED: retiring abandoned branch results requires a durable active-reader
+# registry (or a reader-owned lease per request id) that this handoff does not
+# have. Update and trial results are a separate matter again: their request ids
+# are durable state re-read to reconcile a pending update or trial, so they are
+# never swept regardless.
+
 
 def _stamp(value: datetime) -> str:
     return value.astimezone(timezone.utc).isoformat().replace("+00:00", "Z")
@@ -327,12 +350,38 @@ class HostUpdateHandoff:
         except HostUpdateBusyError:
             return ()
         deadline = time.monotonic() + self.timeout
-        while time.monotonic() < deadline:
-            value = self._read(self._branches_result_path(request_id))
-            if value is not None and value.get("schema") == BRANCHES_RESULT_SCHEMA:
-                return branches_from_result(value)
-            time.sleep(self.poll_interval)
-        return ()
+        try:
+            while time.monotonic() < deadline:
+                value = self._read(self._branches_result_path(request_id))
+                if value is not None and value.get("schema") == BRANCHES_RESULT_SCHEMA:
+                    return branches_from_result(value)
+                time.sleep(self.poll_interval)
+            return ()
+        finally:
+            # This call owns this request id and nothing else does: it is a
+            # local uuid4 that is never persisted, so once this returns no code
+            # path can address the file again. Deleting exactly the file this
+            # call is responsible for is therefore provably safe, and it is the
+            # only branch result this call is entitled to delete.
+            #
+            # Results belonging to *other* readers are deliberately left alone.
+            # The writer lock only covers publishing request.json; the agent
+            # claims that request before writing a result, so a second caller
+            # can be polling concurrently. Nothing on disk distinguishes a live
+            # reader's result from one abandoned by a reader that died, so a
+            # size- or age-triggered sweep would eventually delete a result a
+            # concurrent caller is still waiting for. See the module note on
+            # what retiring those would require.
+            self._retire_branch_result(request_id)
+
+    def _retire_branch_result(self, request_id: str) -> None:
+        """Delete the one branch result this call consumed. Never raises."""
+
+        try:
+            self._branches_result_path(request_id).unlink(missing_ok=True)
+        except OSError:
+            # Reclaiming space is best effort; a dropdown never fails a page.
+            pass
 
     def _branches_result_path(self, request_id: str) -> Path:
         digest = hashlib.sha256(request_id.encode("utf-8")).hexdigest()
