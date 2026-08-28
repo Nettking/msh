@@ -22,6 +22,11 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from .builder_retirement import (
+    BuilderRetirementOutcome,
+    builder_root_driver_opt,
+    retire_stranded_builders,
+)
 from .docker_resources import docker_backing_resource_path
 from .host_resources import PressureLevel, ProcessResourceAdmission, ResourceAssessment
 from .image_retirement import retire_superseded_images
@@ -202,12 +207,7 @@ def _run_in_own_process_group(
 
 
 def _process_group_exists(process: subprocess.Popen[str], pgid: int) -> bool:
-    """Return whether any process remains in the helper's isolated group.
-
-    ``Popen.poll`` reaps the direct child when it has exited. That matters because
-    a dead-but-unreaped Docker parent can otherwise make a signal-0 group probe
-    look live even after the parent has stopped.
-    """
+    """Return whether any process remains in the helper's isolated group."""
 
     try:
         process.poll()
@@ -221,7 +221,6 @@ def _process_group_exists(process: subprocess.Popen[str], pgid: int) -> bool:
     except ProcessLookupError:
         return False
     except OSError:
-        # A group we cannot positively inspect is treated as still live.
         return True
     return True
 
@@ -306,20 +305,11 @@ def _builder_absent(root: Path, name: str, env: Mapping[str, str]) -> bool:
     names = {line.strip() for line in listed.stdout.splitlines() if line.strip()}
     if name in names:
         return False
-    # Buildx can remove its own store entry while the docker-container driver's
-    # BuildKit container keeps running, so the builder disappearing from
-    # enumeration does not by itself prove the writer is gone.
     return not _buildkit_container_running(root, name, env)
 
 
 def ensure_controllable_builder(root: Path, env: Mapping[str, str]) -> str:
-    """Ensure the checkout has one independently stoppable BuildKit daemon.
-
-    FCP intentionally requires the docker-container driver. The default Docker
-    builder embeds BuildKit inside the Docker daemon, so stopping the CLI cannot
-    prove that build writes have ceased. New builders request ``default-load`` so
-    Compose retains its existing local-image behavior.
-    """
+    """Ensure the checkout has one independently stoppable BuildKit daemon."""
 
     name = builder_name(root)
     try:
@@ -354,6 +344,8 @@ def ensure_controllable_builder(root: Path, env: Mapping[str, str]) -> str:
                 "docker-container",
                 "--driver-opt",
                 "default-load=true",
+                "--driver-opt",
+                builder_root_driver_opt(root),
             ],
             env=env,
             timeout=60.0,
@@ -395,22 +387,13 @@ def _builder_stopped(root: Path, name: str, env: Mapping[str, str]) -> bool:
     ]
     if not statuses:
         return False
-    # Whitelist, not blacklist: a state this build does not recognise is refused
-    # rather than read as safe.
     if not all(value in BUILDER_QUIESCENT_STATES for value in statuses):
         return False
-    # A reported-stopped node still has to be checked against the actual driver
-    # container, because the report describes the builder record rather than the
-    # process holding the cache open.
     return not _buildkit_container_running(root, name, env)
 
 
 def _buildkit_container_running(root: Path, name: str, env: Mapping[str, str]) -> bool:
-    """Report whether this builder's own BuildKit container is still running.
-
-    Fails closed: if the running set cannot be established, the writer is
-    treated as possibly live rather than assumed gone.
-    """
+    """Report whether this builder's own BuildKit container is still running."""
 
     try:
         listed = _docker_run(
@@ -452,13 +435,7 @@ def _remove_builder(root: Path, name: str, env: Mapping[str, str]) -> bool:
 
 @dataclass(frozen=True)
 class BuildWriterSettlement:
-    """Two separate facts about one settle attempt.
-
-    A stopped writer and a discarded cache are different claims with different
-    consequences, and one does not imply the other. Collapsing them lets a path
-    that promises the cache is bounded report success after only proving the
-    writer stopped.
-    """
+    """Two separate facts about one settle attempt."""
 
     quiescent: bool
     cache_discarded: bool
@@ -471,8 +448,6 @@ def settle_build_writer(
     *,
     discard_cache: bool = False,
 ) -> BuildWriterSettlement:
-    """Stop the FCP BuildKit writer, reporting quiescence and discard separately."""
-
     try:
         stopped = _docker_run(
             root,
@@ -485,8 +460,6 @@ def settle_build_writer(
     if stopped is not None and stopped.returncode == 0 and _builder_stopped(root, name, env):
         if not discard_cache:
             return BuildWriterSettlement(quiescent=True, cache_discarded=False)
-        # The writer is proven stopped. Whether its cache actually went away is
-        # a separate outcome and is reported as one.
         return BuildWriterSettlement(
             quiescent=True,
             cache_discarded=_remove_builder(root, name, env),
@@ -502,8 +475,6 @@ def stop_build_writer(
     *,
     discard_cache: bool = False,
 ) -> bool:
-    """Return only whether the writer was positively proven quiescent."""
-
     return settle_build_writer(root, name, env, discard_cache=discard_cache).quiescent
 
 
@@ -513,8 +484,6 @@ def prune_build_cache(
     *,
     name: str | None = None,
 ) -> bool:
-    """Bound only FCP-owned build cache, never unrelated host builder state."""
-
     selected = name or builder_name(root)
     try:
         inspected = _builder_inspection(root, selected, env)
@@ -546,17 +515,21 @@ def prune_build_cache(
     return completed.returncode == 0
 
 
+def retire_stranded_build_writers(
+    root: Path,
+    env: Mapping[str, str],
+) -> BuilderRetirementOutcome:
+    return retire_stranded_builders(
+        current_builder=builder_name(root),
+        builder_prefix=BUILDER_PREFIX,
+        container_prefix=BUILDKIT_CONTAINER_PREFIX,
+        docker_run=lambda args: _docker_run(root, list(args), env=env, timeout=30.0),
+        container_running=lambda name: _buildkit_container_running(root, name, env),
+        remove_builder=lambda name: _remove_builder(root, name, env),
+    )
+
+
 def preflight_disk(root: Path, env: Mapping[str, str]) -> None:
-    """Admit a core build against Docker's proven host backing resource.
-
-    Every start first proves the checkout-scoped FCP builder is quiescent, so an
-    abandoned BuildKit daemon cannot outlive the host-mutation owner and overlap a
-    later build. NORMAL/WARNING preserves its cache. PRESSURE/CRITICAL additionally
-    discards reconstructible FCP builder cache before remeasuring the same backing
-    resource. An unproven or still-pressured resource fails closed before a new
-    BuildKit writer starts.
-    """
-
     admission = ProcessResourceAdmission()
     backing_path, before = docker_resource_assessment(root, env, controller=admission)
     name = builder_name(root)
@@ -569,6 +542,7 @@ def preflight_disk(root: Path, env: Mapping[str, str]) -> None:
         raise RuntimeError("build_writer_stop_unverified")
     if not settled.cache_discarded:
         raise RuntimeError("build_cache_discard_failed")
+    retire_stranded_build_writers(root, env)
     after = admission.assessment(backing_path)
     if after.level < PressureLevel.PRESSURE:
         return
@@ -576,8 +550,6 @@ def preflight_disk(root: Path, env: Mapping[str, str]) -> None:
 
 
 def _settle_build_client(process: subprocess.Popen[object]) -> bool:
-    """Stop the isolated Compose/Buildx client process group and prove it exited."""
-
     if process.poll() is not None:
         return True
     killpg = getattr(os, "killpg", None)
@@ -627,8 +599,6 @@ def _verify_core_image_commits(
     env: Mapping[str, str],
     expected_commit: str,
 ) -> None:
-    """Require every local Compose core image to carry the exact source identity."""
-
     for service in CORE_BUILD_SERVICES:
         image = _docker_run(
             root,
@@ -664,8 +634,6 @@ def controlled_core_build(
     timeout_seconds: float = BUILD_TIMEOUT_SECONDS,
     poll_seconds: float = BUILD_PRESSURE_POLL_SECONDS,
 ) -> None:
-    """Run one unknown-size build and stop its writer before CRITICAL reserve use."""
-
     if timeout_seconds <= 0 or poll_seconds <= 0:
         raise ValueError("build timing bounds must be positive")
     admission = controller or ProcessResourceAdmission()
@@ -746,8 +714,6 @@ def build_core_images_locked(
     *,
     expected_commit: str | None = None,
 ) -> str:
-    """Build core images while the caller holds ``host_mutation_lock``."""
-
     commit = resolve_clean_commit(root)
     if expected_commit is not None and commit != expected_commit.lower():
         raise RuntimeError("source_verification_failed")
@@ -761,12 +727,6 @@ def build_core_images_locked(
     after = resolve_clean_commit(root)
     if after != commit:
         raise RuntimeError("build_context_changed")
-
-    # Only now is the transition verified: the build succeeded, its cache
-    # lifecycle completed, every core image carries the exact source identity,
-    # and the source still proves out. The images the Compose tags used to point
-    # at are superseded from this point. Reclaiming that space is bounded work
-    # and best effort: it must never turn an accepted build into a failed one.
     retire_superseded_images(root, build_env, active_commit=commit)
     return commit
 
