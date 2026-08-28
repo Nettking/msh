@@ -17,6 +17,17 @@ from catalog.relay.authentication import authentication_message
 from catalog.relay.service import RelayConfigurationError, RelayServer
 
 
+# Every wait in this module is a wait for the relay to do something, so a
+# timeout here is a hang, not silence being asserted. The relay promises no
+# latency bound, and on a shared CI runner one of these round trips goes through
+# a real WebSocket server and a real SQLite audit write while the rest of the
+# suite runs alongside it. Bounding that at two seconds turns ordinary runner
+# load into a correctness failure on tests that are not measuring latency. Set
+# it where only a genuine hang trips it, while still failing the run well before
+# the job's own timeout.
+RELAY_RESPONSE_TIMEOUT_SECONDS = 30
+
+
 @dataclass
 class AuthenticatedClient:
     websocket: ClientConnection
@@ -57,7 +68,9 @@ class AuthenticatedClient:
         return request_id
 
     async def receive(self, message_type: str) -> RelayEnvelope:
-        frame = await asyncio.wait_for(self.websocket.recv(), timeout=2)
+        frame = await asyncio.wait_for(
+            self.websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS
+        )
         envelope = RelayEnvelope.from_json(frame)
         assert envelope.message_type == message_type
         return envelope
@@ -77,11 +90,11 @@ async def _challenge(
         relay.url,
         max_size=65_536,
         compression=None,
-        open_timeout=2,
-        close_timeout=2,
+        open_timeout=RELAY_RESPONSE_TIMEOUT_SECONDS,
+        close_timeout=RELAY_RESPONSE_TIMEOUT_SECONDS,
     )
     challenge = RelayEnvelope.from_json(
-        await asyncio.wait_for(websocket.recv(), timeout=2)
+        await asyncio.wait_for(websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS)
     )
     assert challenge.message_type == "auth.challenge"
     return websocket, challenge
@@ -131,13 +144,13 @@ async def _enroll(
     )
     await websocket.send(enrollment.to_json())
     proof_required = RelayEnvelope.from_json(
-        await asyncio.wait_for(websocket.recv(), timeout=2)
+        await asyncio.wait_for(websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS)
     )
     assert proof_required.message_type == "node.enroll.proof-required"
     assert proof_required.payload["challenge_id"] == challenge.request_id
     await _send_authentication(websocket, challenge, credentials)
     accepted = RelayEnvelope.from_json(
-        await asyncio.wait_for(websocket.recv(), timeout=2)
+        await asyncio.wait_for(websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS)
     )
     assert accepted.message_type == "node.enroll.accepted"
     assert accepted.payload["node_id"] == credentials.identity.node_id
@@ -150,7 +163,7 @@ async def _authenticate(
     websocket, challenge = await _challenge(relay)
     await _send_authentication(websocket, challenge, credentials)
     accepted = RelayEnvelope.from_json(
-        await asyncio.wait_for(websocket.recv(), timeout=2)
+        await asyncio.wait_for(websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS)
     )
     assert accepted.message_type == "auth.accepted"
     return AuthenticatedClient(websocket, credentials)
@@ -201,7 +214,9 @@ def test_pre_auth_oversized_frame_is_closed_and_audited(
             websocket, _ = await _challenge(relay)
             await websocket.send("x" * 65_537)
             with pytest.raises(ConnectionClosed):
-                await asyncio.wait_for(websocket.recv(), timeout=2)
+                await asyncio.wait_for(
+                    websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS
+                )
             await websocket.wait_closed()
             await relay.stop()
             assert any(
@@ -459,7 +474,9 @@ def test_wrong_session_and_revocation_are_rejected_without_affecting_peer(
             )
             assert changed is True
             live_revocation = RelayEnvelope.from_json(
-                await asyncio.wait_for(second.websocket.recv(), timeout=2)
+                await asyncio.wait_for(
+                    second.websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS
+                )
             )
             assert live_revocation.message_type == "relay.error"
             assert (
@@ -474,7 +491,9 @@ def test_wrong_session_and_revocation_are_rejected_without_affecting_peer(
                     websocket, challenge, second_credentials
                 )
                 revoked = RelayEnvelope.from_json(
-                    await asyncio.wait_for(websocket.recv(), timeout=2)
+                    await asyncio.wait_for(
+                        websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS
+                    )
                 )
                 assert revoked.message_type == "relay.error"
                 assert revoked.payload["error"]["code"] == "revoked-node"
@@ -539,7 +558,9 @@ def test_wrong_private_key_and_unsupported_protocol_are_safe_errors(
                 )
                 await websocket.send(response.to_json())
                 rejected = RelayEnvelope.from_json(
-                    await asyncio.wait_for(websocket.recv(), timeout=2)
+                    await asyncio.wait_for(
+                        websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS
+                    )
                 )
                 assert rejected.message_type == "relay.error"
                 assert rejected.payload == {
@@ -570,7 +591,9 @@ def test_wrong_private_key_and_unsupported_protocol_are_safe_errors(
                 }
                 await websocket.send(json.dumps(incompatible))
                 rejected = RelayEnvelope.from_json(
-                    await asyncio.wait_for(websocket.recv(), timeout=2)
+                    await asyncio.wait_for(
+                        websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS
+                    )
                 )
                 assert rejected.message_type == "relay.error"
                 assert (
@@ -608,7 +631,9 @@ def test_never_enrolled_identity_is_rejected_and_audited(
                 websocket, challenge, unknown_credentials
             )
             rejected = RelayEnvelope.from_json(
-                await asyncio.wait_for(websocket.recv(), timeout=2)
+                await asyncio.wait_for(
+                    websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS
+                )
             )
 
             assert rejected.message_type == "relay.error"
@@ -659,7 +684,9 @@ def test_failed_enrollment_proof_does_not_enroll_or_consume_token(
                 )
                 await websocket.send(enrollment.to_json())
                 proof_required = RelayEnvelope.from_json(
-                    await asyncio.wait_for(websocket.recv(), timeout=2)
+                    await asyncio.wait_for(
+                        websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS
+                    )
                 )
                 assert (
                     proof_required.message_type
@@ -672,7 +699,9 @@ def test_failed_enrollment_proof_does_not_enroll_or_consume_token(
                     actor_node_id=intended_credentials.identity.node_id,
                 )
                 rejected = RelayEnvelope.from_json(
-                    await asyncio.wait_for(websocket.recv(), timeout=2)
+                    await asyncio.wait_for(
+                        websocket.recv(), timeout=RELAY_RESPONSE_TIMEOUT_SECONDS
+                    )
                 )
                 assert (
                     rejected.payload["error"]["code"]
