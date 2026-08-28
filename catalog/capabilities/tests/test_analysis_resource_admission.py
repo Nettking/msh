@@ -57,7 +57,7 @@ def _admission(measurer: Any) -> ProcessResourceAdmission:
     )
 
 
-def _job():
+def _job(*, plan_size: int = 1, slice_size: int = 1):
     work = AnalysisWorkSlice(
         session_id="session-resource-admission",
         slice_kind=SLICE_KIND_DATE,
@@ -71,15 +71,17 @@ def _job():
     return build_analysis_job(
         work,
         plan_hash="sha256:" + ("1" * 64),
-        plan_size=1,
+        plan_size=plan_size,
         slice_hash="sha256:" + ("2" * 64),
-        slice_size=1,
+        slice_size=slice_size,
     )
 
 
 def _handler(
     workspace_root: Path,
     admission: ProcessResourceAdmission,
+    *,
+    max_slice_bytes: int = 1,
 ) -> FederatedAnalysisHandler:
     return FederatedAnalysisHandler(
         session_id="session-resource-admission",
@@ -91,24 +93,32 @@ def _handler(
         content_store=None,
         clock=lambda: NOW,
         data_owner_node_id=lambda _job: "node-owner",
-        max_slice_bytes=1,
+        max_slice_bytes=max_slice_bytes,
         resource_admission=admission,
     )
 
 
-def test_workspace_requirement_covers_transfer_publication_and_extraction_peak() -> None:
-    bytes_required, inodes_required = analysis_workspace_resource_requirement(512)
+def test_workspace_requirement_covers_both_publication_peaks() -> None:
+    plan_dominant_bytes, plan_dominant_inodes = analysis_workspace_resource_requirement(512)
+    assert plan_dominant_bytes == 2 * MAX_PLAN_BYTES
+    assert plan_dominant_inodes == MAX_PLAN_BYTES + MAX_SLICE_ENTRIES + 16
 
-    assert bytes_required == (2 * 512) + MAX_PLAN_BYTES
-    assert inodes_required == 512 + MAX_SLICE_ENTRIES + 16
+    slice_dominant_bytes, _ = analysis_workspace_resource_requirement(
+        512,
+        plan_bytes=1,
+    )
+    assert slice_dominant_bytes == 1 + (2 * 512)
 
-    _, maximum_inodes = analysis_workspace_resource_requirement(MAX_TRANSFER_CHUNKS + 1)
+    _, maximum_inodes = analysis_workspace_resource_requirement(
+        MAX_TRANSFER_CHUNKS + 1,
+        plan_bytes=1,
+    )
     assert maximum_inodes == MAX_TRANSFER_CHUNKS + MAX_SLICE_ENTRIES + 16
 
 
 def test_resource_pressure_refuses_before_workspace_writer_starts(tmp_path: Path) -> None:
     workspace_root = tmp_path / "workspaces"
-    admission = _admission(lambda _path: _measurement("data", free_bytes=8_200))
+    admission = _admission(lambda _path: _measurement("data", free_bytes=102))
     handler = _handler(workspace_root, admission)
 
     result = asyncio.run(handler.execute(_job()))
@@ -118,12 +128,28 @@ def test_resource_pressure_refuses_before_workspace_writer_starts(tmp_path: Path
     assert not workspace_root.exists()
 
 
+def test_declared_slice_validation_precedes_resource_admission(tmp_path: Path) -> None:
+    def must_not_measure(_path):
+        raise AssertionError("resource measurement must follow pure job validation")
+
+    handler = _handler(
+        tmp_path / "workspaces",
+        _admission(must_not_measure),
+        max_slice_bytes=1,
+    )
+
+    result = asyncio.run(handler.execute(_job(slice_size=2)))
+
+    assert result.succeeded is False
+    assert result.reason_code == "analysis-slice-too-large"
+
+
 def test_concurrent_attempts_cannot_double_spend_one_workspace_resource(
     tmp_path: Path, monkeypatch,
 ) -> None:
     entered = asyncio.Event()
     release = asyncio.Event()
-    admission = _admission(lambda _path: _measurement("data", free_bytes=16_450))
+    admission = _admission(lambda _path: _measurement("data", free_bytes=105))
     first = _handler(tmp_path / "workspaces-a", admission)
     second = _handler(tmp_path / "workspaces-b", admission)
 
@@ -150,7 +176,7 @@ def test_concurrent_attempts_cannot_double_spend_one_workspace_resource(
 
 
 def test_reservation_releases_after_materialization_failure(tmp_path: Path, monkeypatch) -> None:
-    admission = _admission(lambda _path: _measurement("data", free_bytes=8_500))
+    admission = _admission(lambda _path: _measurement("data", free_bytes=105))
     handler = _handler(tmp_path / "workspaces", admission)
     calls = 0
 
@@ -181,7 +207,7 @@ def test_distinct_workspace_resources_have_independent_envelopes(
     def measure(path: Path | str) -> FilesystemMeasurement:
         text = str(path)
         resource_id = "a" if text.endswith("a") else "b"
-        return _measurement(resource_id, free_bytes=8_500)
+        return _measurement(resource_id, free_bytes=105)
 
     admission = _admission(measure)
     first = _handler(root_a, admission)
