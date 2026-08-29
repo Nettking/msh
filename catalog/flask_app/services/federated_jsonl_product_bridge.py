@@ -19,10 +19,11 @@ import sqlite3
 import tempfile
 import threading
 from collections.abc import Callable, Iterable, Mapping
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 
 from flask import Flask
 
@@ -32,12 +33,15 @@ from catalog.federation.errors import (
     FederationOperationError,
     FederationValidationError,
 )
+from catalog.federation.host_resources import HostResourceRefused, ProcessResourceAdmission
 from catalog.federation.shared_file_storage import (
     FEDERATED_JSONL_CHUNK_BYTES,
     FEDERATED_JSONL_CONTENT_SCHEMA,
     FEDERATED_JSONL_DATASET_SCHEMA_NAME,
     FEDERATED_JSONL_DATASET_SCHEMA_VERSION,
     FEDERATED_JSONL_ENCODING,
+    FEDERATED_JSONL_MAX_ENCODED_BYTES,
+    FEDERATED_JSONL_MAX_FILE_BYTES,
     encode_federated_jsonl_chunk,
     federated_jsonl_batch_id,
     federated_jsonl_dataset_id,
@@ -61,12 +65,12 @@ _DEFAULT_MAX_PUBLISH_CHUNKS = 64
 _HARD_MAX_PAGES = 20
 _HARD_MAX_REMOTE_BATCHES = _PAGE_SIZE * _HARD_MAX_PAGES
 _HARD_MAX_PUBLISH_CHUNKS = 128
-# Remote JSONL lands on local disk and is never evicted, so the mirror needs the
-# same kind of ceiling the recorder telemetry mirror already enforces. Reaching
-# it stops further materialization instead of failing the pass, so local
-# publication and discovery keep working and the condition stays visible.
 _DEFAULT_MAX_MIRROR_BYTES = 2 * 1024 * 1024 * 1024
 _HARD_MAX_MIRROR_BYTES = 64 * 1024 * 1024 * 1024
+_JSONL_CACHE_INODES = 2
+_JSONL_CHUNK_INODES = 2
+_JSONL_MATERIALIZATION_INODES = 2
+_FEDERATED_JSONL_RESOURCE_ADMISSION = ProcessResourceAdmission()
 _STORAGE_GROUP_CONFIG_KEYS = (
     "FEDERATED_JSONL_STORAGE_GROUP_ID",
     "FEDERATED_TELEMETRY_STORAGE_GROUP_ID",
@@ -75,17 +79,9 @@ _STORAGE_GROUP_CONFIG_KEYS = (
     "RECORDER_FEDERATION_STORAGE_GROUP_ID",
 )
 _EXCLUDED_LOCAL_PREFIXES = (
-    # Already mirrored from the Federation; republishing would loop.
     "federation/",
-    # Has a stronger sequence-aware publication and mirror contract of its own.
     "sources/mtconnect_recorder/jsonl/",
 )
-#: Prefixes that are published by default but that a deployment may withhold.
-#: Browser uploads are the case that matters: they are shared like any other
-#: local JSONL, and an installation that treats uploaded files as device-local
-#: material sets ``FEDERATED_JSONL_PUBLISH_UPLOADS`` to false to keep them off
-#: the Federation. Files already committed stay committed; the log is
-#: append-only, so this governs what is published from now on.
 _OPTIONAL_LOCAL_PREFIXES = {"uploads/": "FEDERATED_JSONL_PUBLISH_UPLOADS"}
 
 Clock = Callable[[], datetime]
@@ -102,6 +98,30 @@ class FederatedJsonlPublishResult:
     authority_node_id: str
     group_id: str
     published_chunks: int
+
+
+class _BoundedWriter:
+    """Refuse a temp-file write before its declared byte ceiling is crossed."""
+
+    def __init__(self, handle: Any, max_bytes: int) -> None:
+        self._handle = handle
+        self._max_bytes = max(int(max_bytes), 0)
+        self._written = 0
+
+    def write(self, data: bytes | bytearray | memoryview) -> int:
+        length = len(data)
+        if self._written + length > self._max_bytes:
+            raise FederationValidationError(
+                "federated-jsonl-size-limit",
+                "size_bytes",
+                f"Federated JSONL temporary output must not exceed {self._max_bytes} bytes",
+            )
+        written = self._handle.write(data)
+        self._written += written
+        return written
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._handle, name)
 
 
 def _utc_now() -> datetime:
@@ -136,6 +156,13 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+def _local_gzip_requirement(source_bytes: int) -> int:
+    """Conservative upper bound for one new gzip temp/cache publication."""
+
+    bounded = max(int(source_bytes), 0)
+    return min(FEDERATED_JSONL_MAX_ENCODED_BYTES, (2 * bounded) + 1024)
+
+
 class FederatedJsonlProductBridge:
     """Publish local JSONL and materialize remote JSONL as one logical corpus."""
 
@@ -150,6 +177,7 @@ class FederatedJsonlProductBridge:
         mirror_root: str | Path | None = None,
         artifact_refresh_callback: RefreshCallback | None = None,
         runtime_refresh_callback: RuntimeRefreshCallback | None = None,
+        resource_admission: ProcessResourceAdmission | None = None,
         clock: Clock = _utc_now,
     ) -> None:
         self.app = app
@@ -181,6 +209,7 @@ class FederatedJsonlProductBridge:
         ).resolve()
         self.artifact_refresh_callback = artifact_refresh_callback
         self.runtime_refresh_callback = runtime_refresh_callback
+        self.resource_admission = resource_admission or _FEDERATED_JSONL_RESOURCE_ADMISSION
         self.clock = clock
         self._sync_lock = threading.Lock()
         self._resume_scope: tuple[str, str, str] | None = None
@@ -203,6 +232,27 @@ class FederatedJsonlProductBridge:
             "last_error": None,
             "last_sync": None,
         }
+
+    @contextmanager
+    def _reserve(
+        self,
+        path: Path,
+        *,
+        bytes_required: int,
+        inodes_required: int,
+    ) -> Iterator[object]:
+        try:
+            with self.resource_admission.reserve(
+                path,
+                bytes_required=bytes_required,
+                inodes_required=inodes_required,
+            ) as reservation:
+                yield reservation
+        except HostResourceRefused as exc:
+            raise FederationOperationError(
+                "federated-jsonl-resource-pressure",
+                "host resource pressure refused a Federated JSONL disk write",
+            ) from exc
 
     def _ensure_initialized(self) -> None:
         if self._initialized:
@@ -398,6 +448,12 @@ class FederatedJsonlProductBridge:
         self, node_id: str, relative_path: str, path: Path
     ) -> sqlite3.Row:
         stat_before = path.stat()
+        if stat_before.st_size > FEDERATED_JSONL_MAX_FILE_BYTES:
+            raise FederationValidationError(
+                "federated-jsonl-file-too-large",
+                "file_size",
+                f"Federated JSONL source must not exceed {FEDERATED_JSONL_MAX_FILE_BYTES} bytes",
+            )
         existing = self._local_row(relative_path)
         if (
             existing is not None
@@ -410,92 +466,99 @@ class FederatedJsonlProductBridge:
 
         file_digest = hashlib.sha256()
         temp_path: Path | None = None
+        requirement = _local_gzip_requirement(stat_before.st_size)
         try:
-            with tempfile.NamedTemporaryFile(
-                prefix="fcp-jsonl-",
-                suffix=".jsonl.gz",
-                dir=self.cache_root,
-                delete=False,
-            ) as temporary:
-                temp_path = Path(temporary.name)
-                with gzip.GzipFile(
-                    filename="",
-                    mode="wb",
-                    fileobj=temporary,
-                    mtime=0,
-                ) as compressed, path.open("rb") as source:
-                    for raw in iter(lambda: source.read(1024 * 1024), b""):
-                        file_digest.update(raw)
-                        compressed.write(raw)
-                temporary.flush()
-                os.fsync(temporary.fileno())
-            assert temp_path is not None
-            stat_after = path.stat()
-            if (
-                stat_after.st_size != stat_before.st_size
-                or stat_after.st_mtime_ns != stat_before.st_mtime_ns
+            with self._reserve(
+                self.cache_root,
+                bytes_required=requirement,
+                inodes_required=_JSONL_CACHE_INODES,
             ):
-                raise FederationOperationError(
-                    "federated-jsonl-source-changed",
-                    f"{relative_path} changed while it was being prepared",
-                )
-            file_sha256 = f"sha256:{file_digest.hexdigest()}"
-            encoded_sha256 = _sha256_path(temp_path)
-            encoded_size = temp_path.stat().st_size
-            final_cache = self.cache_root / f"{file_sha256[7:]}.jsonl.gz"
-            if final_cache.exists():
+                with tempfile.NamedTemporaryFile(
+                    prefix="fcp-jsonl-",
+                    suffix=".jsonl.gz",
+                    dir=self.cache_root,
+                    delete=False,
+                ) as temporary:
+                    temp_path = Path(temporary.name)
+                    bounded = _BoundedWriter(temporary, FEDERATED_JSONL_MAX_ENCODED_BYTES)
+                    with gzip.GzipFile(
+                        filename="",
+                        mode="wb",
+                        fileobj=bounded,
+                        mtime=0,
+                    ) as compressed, path.open("rb") as source:
+                        for raw in iter(lambda: source.read(1024 * 1024), b""):
+                            file_digest.update(raw)
+                            compressed.write(raw)
+                    temporary.flush()
+                    os.fsync(temporary.fileno())
+                assert temp_path is not None
+                stat_after = path.stat()
                 if (
-                    final_cache.stat().st_size != encoded_size
-                    or _sha256_path(final_cache) != encoded_sha256
+                    stat_after.st_size != stat_before.st_size
+                    or stat_after.st_mtime_ns != stat_before.st_mtime_ns
                 ):
                     raise FederationOperationError(
-                        "federated-jsonl-cache-conflict",
-                        "content-addressed gzip cache contains different bytes",
+                        "federated-jsonl-source-changed",
+                        f"{relative_path} changed while it was being prepared",
                     )
-                temp_path.unlink(missing_ok=True)
-            else:
-                os.replace(temp_path, final_cache)
-                _fsync_directory(self.cache_root)
-            chunk_count = max(
-                1,
-                (encoded_size + FEDERATED_JSONL_CHUNK_BYTES - 1)
-                // FEDERATED_JSONL_CHUNK_BYTES,
-            )
-            dataset_id = federated_jsonl_dataset_id(node_id, relative_path)
-            with self._connect() as connection:
-                connection.execute(
-                    """
-                    INSERT INTO local_files(
-                        relative_path,size_bytes,mtime_ns,file_sha256,encoded_sha256,
-                        encoded_size,dataset_id,chunk_count,next_chunk,cache_path,published_at
-                    ) VALUES(?,?,?,?,?,?,?,?,0,?,NULL)
-                    ON CONFLICT(relative_path) DO UPDATE SET
-                        size_bytes=excluded.size_bytes,
-                        mtime_ns=excluded.mtime_ns,
-                        file_sha256=excluded.file_sha256,
-                        encoded_sha256=excluded.encoded_sha256,
-                        encoded_size=excluded.encoded_size,
-                        dataset_id=excluded.dataset_id,
-                        chunk_count=excluded.chunk_count,
-                        next_chunk=0,
-                        cache_path=excluded.cache_path,
-                        published_at=NULL
-                    """,
-                    (
-                        relative_path,
-                        stat_before.st_size,
-                        stat_before.st_mtime_ns,
-                        file_sha256,
-                        encoded_sha256,
-                        encoded_size,
-                        dataset_id,
-                        chunk_count,
-                        str(final_cache),
-                    ),
+                file_sha256 = f"sha256:{file_digest.hexdigest()}"
+                encoded_sha256 = _sha256_path(temp_path)
+                encoded_size = temp_path.stat().st_size
+                final_cache = self.cache_root / f"{file_sha256[7:]}.jsonl.gz"
+                if final_cache.exists():
+                    if (
+                        final_cache.stat().st_size != encoded_size
+                        or _sha256_path(final_cache) != encoded_sha256
+                    ):
+                        raise FederationOperationError(
+                            "federated-jsonl-cache-conflict",
+                            "content-addressed gzip cache contains different bytes",
+                        )
+                    temp_path.unlink(missing_ok=True)
+                else:
+                    os.replace(temp_path, final_cache)
+                    _fsync_directory(self.cache_root)
+                chunk_count = max(
+                    1,
+                    (encoded_size + FEDERATED_JSONL_CHUNK_BYTES - 1)
+                    // FEDERATED_JSONL_CHUNK_BYTES,
                 )
-            row = self._local_row(relative_path)
-            assert row is not None
-            return row
+                dataset_id = federated_jsonl_dataset_id(node_id, relative_path)
+                with self._connect() as connection:
+                    connection.execute(
+                        """
+                        INSERT INTO local_files(
+                            relative_path,size_bytes,mtime_ns,file_sha256,encoded_sha256,
+                            encoded_size,dataset_id,chunk_count,next_chunk,cache_path,published_at
+                        ) VALUES(?,?,?,?,?,?,?,?,0,?,NULL)
+                        ON CONFLICT(relative_path) DO UPDATE SET
+                            size_bytes=excluded.size_bytes,
+                            mtime_ns=excluded.mtime_ns,
+                            file_sha256=excluded.file_sha256,
+                            encoded_sha256=excluded.encoded_sha256,
+                            encoded_size=excluded.encoded_size,
+                            dataset_id=excluded.dataset_id,
+                            chunk_count=excluded.chunk_count,
+                            next_chunk=0,
+                            cache_path=excluded.cache_path,
+                            published_at=NULL
+                        """,
+                        (
+                            relative_path,
+                            stat_before.st_size,
+                            stat_before.st_mtime_ns,
+                            file_sha256,
+                            encoded_sha256,
+                            encoded_size,
+                            dataset_id,
+                            chunk_count,
+                            str(final_cache),
+                        ),
+                    )
+                row = self._local_row(relative_path)
+                assert row is not None
+                return row
         except BaseException:
             if temp_path is not None:
                 temp_path.unlink(missing_ok=True)
@@ -697,14 +760,7 @@ class FederatedJsonlProductBridge:
         authority_node_id: str,
         group_id: str,
     ) -> FederatedJsonlPublishResult:
-        """Run one bounded publisher-only pass over local ``data/**/*.jsonl``.
-
-        This entry point is suitable for a headless lifecycle that already has
-        a trusted Federation context and a selected logical-storage route. It
-        deliberately does not discover, read, materialize, or refresh remote
-        data. Candidate filtering, durable progress, chunk schemas and
-        idempotency are shared with :meth:`sync`.
-        """
+        """Run one bounded publisher-only pass over local ``data/**/*.jsonl``."""
 
         self._ensure_initialized()
         if not self._sync_lock.acquire(blocking=False):
@@ -804,13 +860,26 @@ class FederatedJsonlProductBridge:
                 "content.chunk_index",
                 "staged chunk path already contains different bytes",
             )
-        with tempfile.NamedTemporaryFile("wb", dir=path.parent, delete=False) as handle:
-            handle.write(data)
-            handle.flush()
-            os.fsync(handle.fileno())
-            temporary = Path(handle.name)
-        os.replace(temporary, path)
-        _fsync_directory(path.parent)
+        with self._reserve(
+            path.parent,
+            bytes_required=len(data),
+            inodes_required=_JSONL_CHUNK_INODES,
+        ):
+            temporary: Path | None = None
+            try:
+                with tempfile.NamedTemporaryFile(
+                    "wb", dir=path.parent, delete=False
+                ) as handle:
+                    temporary = Path(handle.name)
+                    handle.write(data)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, path)
+                temporary = None
+                _fsync_directory(path.parent)
+            finally:
+                if temporary is not None:
+                    temporary.unlink(missing_ok=True)
 
     def _record_remote_chunk(
         self,
@@ -987,6 +1056,8 @@ class FederatedJsonlProductBridge:
         producer = str(first["producer_node_id"])
         relative_path = str(first["relative_path"])
         source_mtime_ns = int(first["source_mtime_ns"])
+        declared_encoded_size = int(first["encoded_size"])
+        declared_file_size = int(first["file_size"])
         with self._connect() as connection:
             current = connection.execute(
                 """
@@ -1001,99 +1072,129 @@ class FederatedJsonlProductBridge:
             if candidate_key <= current_key:
                 return False
 
+        quota = self._mirror_quota_bytes()
+        retained = self._mirrored_bytes(excluding=(session_id, dataset_id))
+        if retained + declared_file_size > quota:
+            self._set_state(
+                mirror_bytes=retained,
+                mirror_quota_bytes=quota,
+                mirror_quota_reached=True,
+            )
+            return False
+
+        staged_size = sum(Path(str(row["chunk_path"])).stat().st_size for row in rows)
+        if staged_size != declared_encoded_size:
+            raise FederationValidationError(
+                "federated-jsonl-encoded-size-mismatch",
+                "content.encoded_size",
+                "staged gzip size does not match committed metadata",
+            )
+
         target = self._target_path(producer, relative_path)
-        with tempfile.NamedTemporaryFile("wb", dir=self.cache_root, delete=False) as encoded:
-            encoded_temp = Path(encoded.name)
-            for row in rows:
-                with Path(str(row["chunk_path"])).open("rb") as chunk:
-                    while data := chunk.read(1024 * 1024):
-                        encoded.write(data)
-            encoded.flush()
-            os.fsync(encoded.fileno())
+        encoded_temp: Path | None = None
         raw_temp: Path | None = None
         try:
-            if encoded_temp.stat().st_size != int(first["encoded_size"]):
-                raise FederationValidationError(
-                    "federated-jsonl-encoded-size-mismatch",
-                    "content.encoded_size",
-                    "reconstructed gzip size does not match committed metadata",
+            with ExitStack() as reservations:
+                reservations.enter_context(
+                    self._reserve(
+                        self.cache_root,
+                        bytes_required=declared_encoded_size,
+                        inodes_required=_JSONL_MATERIALIZATION_INODES,
+                    )
                 )
-            if _sha256_path(encoded_temp) != encoded_sha256:
-                raise FederationValidationError(
-                    "federated-jsonl-encoded-hash-mismatch",
-                    "content.encoded_sha256",
-                    "reconstructed gzip hash does not match committed metadata",
+                reservations.enter_context(
+                    self._reserve(
+                        target.parent,
+                        bytes_required=declared_file_size,
+                        inodes_required=_JSONL_MATERIALIZATION_INODES,
+                    )
                 )
-            with tempfile.NamedTemporaryFile("wb", dir=target.parent, delete=False) as raw:
-                raw_temp = Path(raw.name)
-                digest = hashlib.sha256()
-                size = 0
-                with gzip.open(encoded_temp, "rb") as compressed:
-                    while data := compressed.read(1024 * 1024):
-                        size += len(data)
-                        digest.update(data)
-                        raw.write(data)
-                raw.flush()
-                os.fsync(raw.fileno())
-            if size != int(first["file_size"]):
-                raise FederationValidationError(
-                    "federated-jsonl-file-size-mismatch",
-                    "content.file_size",
-                    "reconstructed JSONL size does not match committed metadata",
-                )
-            if f"sha256:{digest.hexdigest()}" != file_sha256:
-                raise FederationValidationError(
-                    "federated-jsonl-file-hash-mismatch",
-                    "content.file_sha256",
-                    "reconstructed JSONL hash does not match committed metadata",
-                )
-            # A replacement for an already-mirrored dataset only costs its delta,
-            # so the existing row is excluded from the running total.
-            quota = self._mirror_quota_bytes()
-            retained = self._mirrored_bytes(excluding=(session_id, dataset_id))
-            if retained + size > quota:
-                self._set_state(
-                    mirror_bytes=retained,
-                    mirror_quota_bytes=quota,
-                    mirror_quota_reached=True,
-                )
-                return False
-            os.replace(raw_temp, target)
-            raw_temp = None
-            _fsync_directory(target.parent)
-            with self._connect() as connection:
-                connection.execute(
-                    """
-                    INSERT INTO materialized_files(
-                        session_id,dataset_id,producer_node_id,relative_path,
-                        file_sha256,source_mtime_ns,target_path,size_bytes,updated_at
-                    ) VALUES(?,?,?,?,?,?,?,?,?)
-                    ON CONFLICT(session_id,dataset_id) DO UPDATE SET
-                        producer_node_id=excluded.producer_node_id,
-                        relative_path=excluded.relative_path,
-                        file_sha256=excluded.file_sha256,
-                        source_mtime_ns=excluded.source_mtime_ns,
-                        target_path=excluded.target_path,
-                        size_bytes=excluded.size_bytes,
-                        updated_at=excluded.updated_at
-                    """,
-                    (
-                        session_id,
-                        dataset_id,
-                        producer,
-                        relative_path,
-                        file_sha256,
-                        source_mtime_ns,
-                        str(target),
-                        size,
-                        _stamp(self.clock()),
-                    ),
-                )
-            for row in rows:
-                Path(str(row["chunk_path"])).unlink(missing_ok=True)
-            return True
+                with tempfile.NamedTemporaryFile(
+                    "wb", dir=self.cache_root, delete=False
+                ) as encoded:
+                    encoded_temp = Path(encoded.name)
+                    bounded_encoded = _BoundedWriter(encoded, declared_encoded_size)
+                    for row in rows:
+                        with Path(str(row["chunk_path"])).open("rb") as chunk:
+                            while data := chunk.read(1024 * 1024):
+                                bounded_encoded.write(data)
+                    encoded.flush()
+                    os.fsync(encoded.fileno())
+                if encoded_temp.stat().st_size != declared_encoded_size:
+                    raise FederationValidationError(
+                        "federated-jsonl-encoded-size-mismatch",
+                        "content.encoded_size",
+                        "reconstructed gzip size does not match committed metadata",
+                    )
+                if _sha256_path(encoded_temp) != encoded_sha256:
+                    raise FederationValidationError(
+                        "federated-jsonl-encoded-hash-mismatch",
+                        "content.encoded_sha256",
+                        "reconstructed gzip hash does not match committed metadata",
+                    )
+                with tempfile.NamedTemporaryFile(
+                    "wb", dir=target.parent, delete=False
+                ) as raw:
+                    raw_temp = Path(raw.name)
+                    bounded_raw = _BoundedWriter(raw, declared_file_size)
+                    digest = hashlib.sha256()
+                    size = 0
+                    with gzip.open(encoded_temp, "rb") as compressed:
+                        while data := compressed.read(1024 * 1024):
+                            size += len(data)
+                            digest.update(data)
+                            bounded_raw.write(data)
+                    raw.flush()
+                    os.fsync(raw.fileno())
+                if size != declared_file_size:
+                    raise FederationValidationError(
+                        "federated-jsonl-file-size-mismatch",
+                        "content.file_size",
+                        "reconstructed JSONL size does not match committed metadata",
+                    )
+                if f"sha256:{digest.hexdigest()}" != file_sha256:
+                    raise FederationValidationError(
+                        "federated-jsonl-file-hash-mismatch",
+                        "content.file_sha256",
+                        "reconstructed JSONL hash does not match committed metadata",
+                    )
+                os.replace(raw_temp, target)
+                raw_temp = None
+                _fsync_directory(target.parent)
+                with self._connect() as connection:
+                    connection.execute(
+                        """
+                        INSERT INTO materialized_files(
+                            session_id,dataset_id,producer_node_id,relative_path,
+                            file_sha256,source_mtime_ns,target_path,size_bytes,updated_at
+                        ) VALUES(?,?,?,?,?,?,?,?,?)
+                        ON CONFLICT(session_id,dataset_id) DO UPDATE SET
+                            producer_node_id=excluded.producer_node_id,
+                            relative_path=excluded.relative_path,
+                            file_sha256=excluded.file_sha256,
+                            source_mtime_ns=excluded.source_mtime_ns,
+                            target_path=excluded.target_path,
+                            size_bytes=excluded.size_bytes,
+                            updated_at=excluded.updated_at
+                        """,
+                        (
+                            session_id,
+                            dataset_id,
+                            producer,
+                            relative_path,
+                            file_sha256,
+                            source_mtime_ns,
+                            str(target),
+                            size,
+                            _stamp(self.clock()),
+                        ),
+                    )
+                for row in rows:
+                    Path(str(row["chunk_path"])).unlink(missing_ok=True)
+                return True
         finally:
-            encoded_temp.unlink(missing_ok=True)
+            if encoded_temp is not None:
+                encoded_temp.unlink(missing_ok=True)
             if raw_temp is not None:
                 raw_temp.unlink(missing_ok=True)
 
