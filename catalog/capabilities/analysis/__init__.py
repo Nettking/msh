@@ -37,6 +37,7 @@ from .provisioning import (
     analysis_handler_descriptor,
     lifecycle_worker_factory,
 )
+from .resource_admission import FederatedAnalysisHandler
 from .scheduler import (
     DECISION_DISPATCHED,
     DECISION_NO_PROVIDER,
@@ -51,11 +52,7 @@ from .service import (
     AnalysisJobRegistry,
     AnalysisWorkService,
 )
-from .worker import (
-    AnalysisExecutionReport,
-    AnalysisSliceExecutor,
-    FederatedAnalysisHandler,
-)
+from .worker import AnalysisExecutionReport, AnalysisSliceExecutor
 
 __all__ = [
     "ANALYSIS_CAPABILITY_TYPE",
