@@ -84,11 +84,11 @@ def _scheduler(
     return scheduler
 
 
-def test_publication_requirement_covers_plan_plus_bounded_slice() -> None:
+def test_publication_requirement_covers_atomic_replacement_peaks() -> None:
     assert analysis_publication_resource_requirement(
         7,
         max_slice_bytes=11,
-    ) == (18, 8)
+    ) == (29, 8)
 
 
 def test_pressure_refuses_before_base_submission_starts(
