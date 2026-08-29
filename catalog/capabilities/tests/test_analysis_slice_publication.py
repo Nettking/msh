@@ -41,6 +41,45 @@ def test_failed_slice_pack_does_not_replace_the_published_target(
     assert list(destination.parent.glob(f".{destination.name}.*.partial")) == []
 
 
+def test_archive_metadata_cannot_grow_partial_beyond_publication_cap(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    root = tmp_path / "input"
+    root.mkdir()
+    files = []
+    for index in range(packaging.MAX_SLICE_ENTRIES):
+        source = root / f"{index:04d}.jsonl"
+        source.write_bytes(b"")
+        files.append(source)
+
+    destination = tmp_path / "artifacts" / "slice.tar.gz"
+    max_bytes = 8 * 1024
+    observed_peak = 0
+    bounded_writer = packaging._BoundedArchiveWriter
+
+    class ObservedBoundedWriter(bounded_writer):
+        def write(self, data):
+            nonlocal observed_peak
+            written = super().write(data)
+            observed_peak = max(observed_peak, int(self._handle.tell()))
+            return written
+
+    monkeypatch.setattr(packaging, "_BoundedArchiveWriter", ObservedBoundedWriter)
+
+    with pytest.raises(FederationValidationError) as captured:
+        packaging.write_slice_archive(
+            destination,
+            files=tuple(files),
+            root=root,
+            max_bytes=max_bytes,
+        )
+
+    assert captured.value.code == "analysis-slice-too-large"
+    assert observed_peak <= max_bytes
+    assert not destination.exists()
+    assert list(destination.parent.glob(f".{destination.name}.*.partial")) == []
+
+
 def test_retry_rebuilds_a_partial_slice_before_authority_registration(
     tmp_path: Path,
 ) -> None:
