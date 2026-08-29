@@ -1,0 +1,275 @@
+from __future__ import annotations
+
+import json
+from contextlib import contextmanager
+from datetime import datetime, timezone
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Iterator
+
+import pytest
+from flask import Flask
+
+from catalog.federation.errors import FederationOperationError
+from catalog.federation.host_resources import HostResourceRefused
+from catalog.federation.models import CommitState
+from catalog.federation.storage_catalog import CommittedBatchReference
+from catalog.federation.storage_protocol import BatchIngestRequest
+from catalog.flask_app.services.federated_jsonl_product_bridge import (
+    FederatedJsonlProductBridge,
+)
+
+_MANIFEST_HASH = "sha256:" + "a" * 64
+
+
+class _RecordingAdmission:
+    def __init__(self, *, fail_call: int | None = None) -> None:
+        self.fail_call = fail_call
+        self.calls: list[tuple[Path, int, int]] = []
+        self.active = 0
+        self.max_active = 0
+
+    @contextmanager
+    def reserve(
+        self,
+        path: Path,
+        *,
+        bytes_required: int,
+        inodes_required: int = 0,
+    ) -> Iterator[object]:
+        self.calls.append((Path(path), bytes_required, inodes_required))
+        if self.fail_call == len(self.calls):
+            raise HostResourceRefused("resource_pressure", SimpleNamespace())
+        self.active += 1
+        self.max_active = max(self.max_active, self.active)
+        try:
+            yield SimpleNamespace()
+        finally:
+            self.active -= 1
+
+
+class _PublishingRuntime:
+    def __init__(self) -> None:
+        self.batches: list[dict[str, object]] = []
+
+    def publish_federated_batches(
+        self,
+        runtime_state: object,
+        *,
+        session_id: str,
+        authority_node_id: str,
+        batches: list[dict[str, object]],
+    ) -> tuple[object, ...]:
+        del runtime_state, session_id, authority_node_id
+        self.batches.extend(batches)
+        return tuple(SimpleNamespace(committed=True) for _ in batches)
+
+
+def _bridge(
+    tmp_path: Path,
+    name: str,
+    *,
+    admission: _RecordingAdmission,
+    relay_runtime: object | None = None,
+) -> FederatedJsonlProductBridge:
+    data_root = tmp_path / name / "data"
+    app = Flask(name)
+    bridge = FederatedJsonlProductBridge(
+        app,
+        SimpleNamespace(relay_runtime=relay_runtime),
+        data_root=data_root,
+        database=tmp_path / name / "state.sqlite3",
+        cache_root=tmp_path / name / "cache",
+        mirror_root=data_root / "federation" / "shared" / "jsonl-files",
+        resource_admission=admission,  # type: ignore[arg-type]
+    )
+    bridge._ensure_initialized()
+    return bridge
+
+
+def _trusted_scope(session_id: str, node_id: str) -> tuple[object, object]:
+    runtime_state = SimpleNamespace(
+        binding=SimpleNamespace(internal_session_id=session_id)
+    )
+    context = SimpleNamespace(
+        binding=SimpleNamespace(internal_session_id=session_id),
+        credentials=SimpleNamespace(identity=SimpleNamespace(node_id=node_id)),
+    )
+    return runtime_state, context
+
+
+def _reference(batch: dict[str, object], *, session_id: str) -> CommittedBatchReference:
+    content = batch["content"]
+    assert isinstance(content, dict)
+    encoded = json.dumps(
+        content,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        allow_nan=False,
+    ).encode("utf-8")
+    return CommittedBatchReference(
+        session_id=session_id,
+        group_id=str(batch["group_id"]),
+        dataset_id=str(batch["dataset_id"]),
+        batch_id=str(batch["batch_id"]),
+        idempotency_key=str(batch["idempotency_key"]),
+        content_hash=BatchIngestRequest.calculate_content_hash(content),
+        size_bytes=len(encoded),
+        schema_name=str(batch["dataset_schema_name"]),
+        schema_version=int(batch["dataset_schema_version"]),
+        source_id=None,
+        first_sequence=None,
+        last_sequence=None,
+        commit_state=CommitState.COMMITTED,
+        acknowledged_provider_ids=("storage-a",),
+        committed_at=datetime(2026, 8, 30, tzinfo=timezone.utc),
+        manifest_revision=1,
+        manifest_hash=_MANIFEST_HASH,
+    )
+
+
+def _published_batch(
+    tmp_path: Path,
+    *,
+    payload: bytes = b'{"machine_id":"m","value":1}\n',
+) -> tuple[dict[str, object], str]:
+    runtime = _PublishingRuntime()
+    admission = _RecordingAdmission()
+    bridge = _bridge(
+        tmp_path,
+        "producer",
+        admission=admission,
+        relay_runtime=runtime,
+    )
+    source = bridge.data_root / "sources" / "demo" / "day.jsonl"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_bytes(payload)
+    session_id = "session-jsonl-resource"
+    runtime_state, context = _trusted_scope(session_id, "node-producer")
+    result = bridge.publish_local_once(
+        runtime_state,
+        context,
+        authority_node_id="node-storage",
+        group_id="storage-1",
+    )
+    assert result.published_chunks == 1
+    assert len(runtime.batches) == 1
+    return runtime.batches[0], session_id
+
+
+def test_local_gzip_cache_refuses_before_creating_temp_output(tmp_path: Path) -> None:
+    admission = _RecordingAdmission(fail_call=1)
+    runtime = _PublishingRuntime()
+    bridge = _bridge(
+        tmp_path,
+        "local-refusal",
+        admission=admission,
+        relay_runtime=runtime,
+    )
+    source = bridge.data_root / "sources" / "demo" / "day.jsonl"
+    source.parent.mkdir(parents=True, exist_ok=True)
+    source.write_text('{"value":1}\n', encoding="utf-8")
+    runtime_state, context = _trusted_scope("session-local", "node-local")
+
+    with pytest.raises(FederationOperationError) as captured:
+        bridge.publish_local_once(
+            runtime_state,
+            context,
+            authority_node_id="node-storage",
+            group_id="storage-1",
+        )
+
+    assert captured.value.code == "federated-jsonl-resource-pressure"
+    assert admission.calls[0][0] == bridge.cache_root
+    assert list(bridge.cache_root.iterdir()) == []
+    assert runtime.batches == []
+
+
+def test_remote_chunk_staging_refuses_before_temp_write(tmp_path: Path) -> None:
+    admission = _RecordingAdmission(fail_call=1)
+    bridge = _bridge(tmp_path, "chunk-refusal", admission=admission)
+    target = bridge.cache_root / "remote" / "hash" / "00000000.chunk"
+    target.parent.mkdir(parents=True, exist_ok=True)
+
+    with pytest.raises(FederationOperationError) as captured:
+        bridge._write_chunk(target, b"bounded chunk")
+
+    assert captured.value.code == "federated-jsonl-resource-pressure"
+    assert admission.calls == [(target.parent, len(b"bounded chunk"), 2)]
+    assert list(target.parent.iterdir()) == []
+
+
+def test_materialization_reserves_encoded_and_raw_peaks_together(tmp_path: Path) -> None:
+    batch, session_id = _published_batch(tmp_path)
+    content = batch["content"]
+    assert isinstance(content, dict)
+    admission = _RecordingAdmission()
+    consumer = _bridge(tmp_path, "consumer", admission=admission)
+
+    materialized = consumer._ingest_remote(
+        _reference(batch, session_id=session_id),
+        content,
+        local_node_id="node-consumer",
+    )
+
+    assert materialized is True
+    assert len(admission.calls) == 3
+    chunk_call, encoded_call, raw_call = admission.calls
+    assert chunk_call[1] <= int(content["encoded_size"])
+    assert encoded_call[0] == consumer.cache_root
+    assert encoded_call[1] == int(content["encoded_size"])
+    assert raw_call[1] == int(content["file_size"])
+    assert admission.max_active == 2
+    targets = list(consumer.mirror_root.rglob("*.jsonl"))
+    assert len(targets) == 1
+    assert targets[0].read_bytes() == b'{"machine_id":"m","value":1}\n'
+
+
+def test_mirror_quota_refuses_before_reconstruction_temp_files(tmp_path: Path) -> None:
+    payload = b'{"machine_id":"m","value":"' + (b"x" * 2048) + b'"}\n'
+    batch, session_id = _published_batch(tmp_path, payload=payload)
+    content = batch["content"]
+    assert isinstance(content, dict)
+    admission = _RecordingAdmission()
+    consumer = _bridge(tmp_path, "quota", admission=admission)
+    consumer.app.config["FEDERATED_JSONL_MAX_MIRROR_BYTES"] = len(payload) - 1
+
+    materialized = consumer._ingest_remote(
+        _reference(batch, session_id=session_id),
+        content,
+        local_node_id="node-consumer",
+    )
+
+    assert materialized is False
+    # The one admitted write is the retained remote chunk. The quota check runs
+    # before either reconstruction temp file is created, so there are no second
+    # and third reservations for encoded/raw materialization.
+    assert len(admission.calls) == 1
+    assert list(consumer.mirror_root.rglob("*.jsonl")) == []
+    snapshot = consumer.snapshot()
+    assert snapshot["mirror_quota_reached"] is True
+
+
+def test_materialization_releases_first_reservation_when_second_is_refused(
+    tmp_path: Path,
+) -> None:
+    batch, session_id = _published_batch(tmp_path)
+    content = batch["content"]
+    assert isinstance(content, dict)
+    # Call 1 is chunk staging, call 2 is encoded reconstruction, and call 3 is
+    # raw materialization. Refusing call 3 must unwind call 2 as well.
+    admission = _RecordingAdmission(fail_call=3)
+    consumer = _bridge(tmp_path, "unwind", admission=admission)
+
+    with pytest.raises(FederationOperationError) as captured:
+        consumer._ingest_remote(
+            _reference(batch, session_id=session_id),
+            content,
+            local_node_id="node-consumer",
+        )
+
+    assert captured.value.code == "federated-jsonl-resource-pressure"
+    assert admission.active == 0
+    assert list(consumer.cache_root.glob("tmp*")) == []
+    assert list(consumer.mirror_root.rglob("*.jsonl")) == []
