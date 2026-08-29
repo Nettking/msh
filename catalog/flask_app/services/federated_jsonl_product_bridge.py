@@ -18,12 +18,12 @@ import os
 import sqlite3
 import tempfile
 import threading
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any
 
 from flask import Flask
 
@@ -33,7 +33,11 @@ from catalog.federation.errors import (
     FederationOperationError,
     FederationValidationError,
 )
-from catalog.federation.host_resources import HostResourceRefused, ProcessResourceAdmission
+from catalog.federation.host_resources import (
+    HostResourceRefused,
+    ProcessResourceAdmission,
+)
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.federation.shared_file_storage import (
     FEDERATED_JSONL_CHUNK_BYTES,
     FEDERATED_JSONL_CONTENT_SCHEMA,
@@ -65,12 +69,15 @@ _DEFAULT_MAX_PUBLISH_CHUNKS = 64
 _HARD_MAX_PAGES = 20
 _HARD_MAX_REMOTE_BATCHES = _PAGE_SIZE * _HARD_MAX_PAGES
 _HARD_MAX_PUBLISH_CHUNKS = 128
+# Remote JSONL lands on local disk and is never evicted, so the mirror needs the
+# same kind of ceiling the recorder telemetry mirror already enforces. Reaching
+# it stops further materialization instead of failing the pass, so local
+# publication and discovery keep working and the condition stays visible.
 _DEFAULT_MAX_MIRROR_BYTES = 2 * 1024 * 1024 * 1024
 _HARD_MAX_MIRROR_BYTES = 64 * 1024 * 1024 * 1024
 _JSONL_CACHE_INODES = 2
 _JSONL_CHUNK_INODES = 2
 _JSONL_MATERIALIZATION_INODES = 2
-_FEDERATED_JSONL_RESOURCE_ADMISSION = ProcessResourceAdmission()
 _STORAGE_GROUP_CONFIG_KEYS = (
     "FEDERATED_JSONL_STORAGE_GROUP_ID",
     "FEDERATED_TELEMETRY_STORAGE_GROUP_ID",
@@ -79,9 +86,17 @@ _STORAGE_GROUP_CONFIG_KEYS = (
     "RECORDER_FEDERATION_STORAGE_GROUP_ID",
 )
 _EXCLUDED_LOCAL_PREFIXES = (
+    # Already mirrored from the Federation; republishing would loop.
     "federation/",
+    # Has a stronger sequence-aware publication and mirror contract of its own.
     "sources/mtconnect_recorder/jsonl/",
 )
+#: Prefixes that are published by default but that a deployment may withhold.
+#: Browser uploads are the case that matters: they are shared like any other
+#: local JSONL, and an installation that treats uploaded files as device-local
+#: material sets ``FEDERATED_JSONL_PUBLISH_UPLOADS`` to false to keep them off
+#: the Federation. Files already committed stay committed; the log is
+#: append-only, so this governs what is published from now on.
 _OPTIONAL_LOCAL_PREFIXES = {"uploads/": "FEDERATED_JSONL_PUBLISH_UPLOADS"}
 
 Clock = Callable[[], datetime]
@@ -114,7 +129,8 @@ class _BoundedWriter:
             raise FederationValidationError(
                 "federated-jsonl-size-limit",
                 "size_bytes",
-                f"Federated JSONL temporary output must not exceed {self._max_bytes} bytes",
+                "Federated JSONL temporary output must not exceed "
+                f"{self._max_bytes} bytes",
             )
         written = self._handle.write(data)
         self._written += written
@@ -209,7 +225,7 @@ class FederatedJsonlProductBridge:
         ).resolve()
         self.artifact_refresh_callback = artifact_refresh_callback
         self.runtime_refresh_callback = runtime_refresh_callback
-        self.resource_admission = resource_admission or _FEDERATED_JSONL_RESOURCE_ADMISSION
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
         self.clock = clock
         self._sync_lock = threading.Lock()
         self._resume_scope: tuple[str, str, str] | None = None
@@ -452,7 +468,8 @@ class FederatedJsonlProductBridge:
             raise FederationValidationError(
                 "federated-jsonl-file-too-large",
                 "file_size",
-                f"Federated JSONL source must not exceed {FEDERATED_JSONL_MAX_FILE_BYTES} bytes",
+                "Federated JSONL source must not exceed "
+                f"{FEDERATED_JSONL_MAX_FILE_BYTES} bytes",
             )
         existing = self._local_row(relative_path)
         if (
@@ -760,7 +777,14 @@ class FederatedJsonlProductBridge:
         authority_node_id: str,
         group_id: str,
     ) -> FederatedJsonlPublishResult:
-        """Run one bounded publisher-only pass over local ``data/**/*.jsonl``."""
+        """Run one bounded publisher-only pass over local ``data/**/*.jsonl``.
+
+        This entry point is suitable for a headless lifecycle that already has
+        a trusted Federation context and a selected logical-storage route. It
+        deliberately does not discover, read, materialize, or refresh remote
+        data. Candidate filtering, durable progress, chunk schemas and
+        idempotency are shared with :meth:`sync`.
+        """
 
         self._ensure_initialized()
         if not self._sync_lock.acquire(blocking=False):
