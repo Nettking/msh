@@ -23,12 +23,10 @@ from .scheduler import FederatedAnalysisScheduler as _FederatedAnalysisScheduler
 from .scheduler import SubmissionOutcome
 from .worker import FederatedAnalysisHandler as _FederatedAnalysisHandler
 
-# Separate process-wide controllers cover the two host-owned boundaries. Paths
-# that resolve to one filesystem still coalesce inside each boundary, while a
-# worker reservation never accidentally accounts for data-owner publication in
-# another process-local lifecycle.
-_ANALYSIS_WORKSPACE_ADMISSION = ProcessResourceAdmission()
-_ANALYSIS_PUBLICATION_ADMISSION = ProcessResourceAdmission()
+# One process-wide controller is shared by every supported analysis boundary so
+# a worker materialization and a data-owner publication on the same filesystem
+# cannot independently spend the same measured headroom.
+_ANALYSIS_RESOURCE_ADMISSION = ProcessResourceAdmission()
 
 # Fixed workspace entries cover the ownership marker, plan/slice publication
 # files, staging/publication directories and a small margin for atomic temp files.
@@ -80,16 +78,19 @@ def analysis_publication_resource_requirement(
 ) -> tuple[int, int]:
     """Return the bounded data-owner input-publication reservation.
 
-    Admission happens before either artifact writer starts. At the publication
-    peak the plan body may already be durable while the deterministic slice
-    archive is being built in its same-directory atomic partial, so reserve the
-    full plan plus the maximum legal slice body. The archive itself is one file;
-    source member count does not multiply destination inode consumption.
+    Atomic replacement may temporarily retain an existing destination while its
+    new same-directory partial is written. The plan therefore peaks at two plan
+    bodies, while slice publication can peak at the durable plan plus an existing
+    slice body plus the replacement partial. Reserve the larger legal phase.
     """
 
     bounded_plan = max(int(plan_bytes), 0)
     bounded_slice = max(int(max_slice_bytes), 0)
-    return bounded_plan + bounded_slice, _ANALYSIS_PUBLICATION_FIXED_INODES
+    bytes_required = max(
+        2 * bounded_plan,
+        bounded_plan + (2 * bounded_slice),
+    )
+    return bytes_required, _ANALYSIS_PUBLICATION_FIXED_INODES
 
 
 class FederatedAnalysisHandler(_FederatedAnalysisHandler):
@@ -102,7 +103,7 @@ class FederatedAnalysisHandler(_FederatedAnalysisHandler):
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.resource_admission = resource_admission or _ANALYSIS_WORKSPACE_ADMISSION
+        self.resource_admission = resource_admission or _ANALYSIS_RESOURCE_ADMISSION
 
     async def execute(self, job: JobContract) -> ExecutionResult:
         try:
@@ -164,7 +165,7 @@ class FederatedAnalysisScheduler(_FederatedAnalysisScheduler):
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.resource_admission = resource_admission or _ANALYSIS_PUBLICATION_ADMISSION
+        self.resource_admission = resource_admission or _ANALYSIS_RESOURCE_ADMISSION
 
     def submit(
         self,
