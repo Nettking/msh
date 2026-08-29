@@ -172,6 +172,20 @@ def _fsync_directory(path: Path) -> None:
         os.close(descriptor)
 
 
+def _missing_directory_count(path: Path) -> int:
+    """Count directory inodes one transaction may have to create."""
+
+    count = 0
+    current = path
+    while not current.exists():
+        count += 1
+        parent = current.parent
+        if parent == current:
+            break
+        current = parent
+    return count
+
+
 def _local_gzip_requirement(source_bytes: int) -> int:
     """Conservative upper bound for one new gzip temp/cache publication."""
 
@@ -871,7 +885,6 @@ class FederatedJsonlProductBridge:
 
     def _chunk_path(self, encoded_sha256: str, chunk_index: int) -> Path:
         directory = self.cache_root / "remote" / encoded_sha256[7:]
-        directory.mkdir(parents=True, exist_ok=True)
         return directory / f"{chunk_index:08d}.chunk"
 
     def _write_chunk(self, path: Path, data: bytes) -> None:
@@ -884,11 +897,13 @@ class FederatedJsonlProductBridge:
                 "content.chunk_index",
                 "staged chunk path already contains different bytes",
             )
+        missing_directories = _missing_directory_count(path.parent)
         with self._reserve(
             path.parent,
             bytes_required=len(data),
-            inodes_required=_JSONL_CHUNK_INODES,
+            inodes_required=_JSONL_CHUNK_INODES + missing_directories,
         ):
+            path.parent.mkdir(parents=True, exist_ok=True)
             temporary: Path | None = None
             try:
                 with tempfile.NamedTemporaryFile(
@@ -1018,7 +1033,6 @@ class FederatedJsonlProductBridge:
 
     def _target_path(self, producer: str, relative_path: str) -> Path:
         target = self.mirror_root / _safe_node_directory(producer) / Path(relative_path)
-        target.parent.mkdir(parents=True, exist_ok=True)
         resolved_root = self.mirror_root.resolve()
         try:
             target.resolve().relative_to(resolved_root)
@@ -1115,6 +1129,7 @@ class FederatedJsonlProductBridge:
             )
 
         target = self._target_path(producer, relative_path)
+        target_missing_directories = _missing_directory_count(target.parent)
         encoded_temp: Path | None = None
         raw_temp: Path | None = None
         try:
@@ -1130,9 +1145,13 @@ class FederatedJsonlProductBridge:
                     self._reserve(
                         target.parent,
                         bytes_required=declared_file_size,
-                        inodes_required=_JSONL_MATERIALIZATION_INODES,
+                        inodes_required=(
+                            _JSONL_MATERIALIZATION_INODES
+                            + target_missing_directories
+                        ),
                     )
                 )
+                target.parent.mkdir(parents=True, exist_ok=True)
                 with tempfile.NamedTemporaryFile(
                     "wb", dir=self.cache_root, delete=False
                 ) as encoded:
