@@ -1,27 +1,45 @@
-"""Host-resource admission for federated analysis workspace materialization."""
+"""Host-resource admission for federated analysis materialization and publication."""
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+from pathlib import Path
 from typing import Any
 
 from catalog.capabilities.dispatch import ExecutionResult
 from catalog.capabilities.jobs import JobContract
-from catalog.federation.errors import FederationValidationError
+from catalog.federation.errors import FederationOperationError, FederationValidationError
 from catalog.federation.host_resources import HostResourceRefused, ProcessResourceAdmission
 from catalog.federation.object_transfer import MAX_TRANSFER_CHUNKS
 
-from .contracts import ANALYSIS_DATA_SLICE_SCHEMA, ANALYSIS_PLAN_SCHEMA, MAX_PLAN_BYTES
+from .contracts import (
+    ANALYSIS_DATA_SLICE_SCHEMA,
+    ANALYSIS_PLAN_SCHEMA,
+    MAX_PLAN_BYTES,
+    AnalysisWorkSlice,
+)
 from .packaging import MAX_SLICE_ENTRIES
+from .scheduler import FederatedAnalysisScheduler as _FederatedAnalysisScheduler
+from .scheduler import SubmissionOutcome
 from .worker import FederatedAnalysisHandler as _FederatedAnalysisHandler
 
-# One process-wide controller is shared by every supported analysis handler so
-# concurrent attempts cannot independently spend the same filesystem headroom.
+# Separate process-wide controllers cover the two host-owned boundaries. Paths
+# that resolve to one filesystem still coalesce inside each boundary, while a
+# worker reservation never accidentally accounts for data-owner publication in
+# another process-local lifecycle.
 _ANALYSIS_WORKSPACE_ADMISSION = ProcessResourceAdmission()
+_ANALYSIS_PUBLICATION_ADMISSION = ProcessResourceAdmission()
 
 # Fixed workspace entries cover the ownership marker, plan/slice publication
 # files, staging/publication directories and a small margin for atomic temp files.
 # Journal completion capacity remains protected by the shared CRITICAL reserve.
 _ANALYSIS_WORKSPACE_FIXED_INODES = 16
+
+# Data-owner publication creates one plan artifact and one deterministic slice
+# archive. Each uses an atomic partial/final identity, with a small fixed margin
+# for publication directories and filesystem bookkeeping. Archive members are
+# inputs to one tar.gz and therefore do not consume one destination inode each.
+_ANALYSIS_PUBLICATION_FIXED_INODES = 8
 
 
 def analysis_workspace_resource_requirement(
@@ -53,6 +71,25 @@ def analysis_workspace_resource_requirement(
     )
     inodes_required = transfer_inodes + MAX_SLICE_ENTRIES + _ANALYSIS_WORKSPACE_FIXED_INODES
     return bytes_required, inodes_required
+
+
+def analysis_publication_resource_requirement(
+    plan_bytes: int,
+    *,
+    max_slice_bytes: int,
+) -> tuple[int, int]:
+    """Return the bounded data-owner input-publication reservation.
+
+    Admission happens before either artifact writer starts. At the publication
+    peak the plan body may already be durable while the deterministic slice
+    archive is being built in its same-directory atomic partial, so reserve the
+    full plan plus the maximum legal slice body. The archive itself is one file;
+    source member count does not multiply destination inode consumption.
+    """
+
+    bounded_plan = max(int(plan_bytes), 0)
+    bounded_slice = max(int(max_slice_bytes), 0)
+    return bounded_plan + bounded_slice, _ANALYSIS_PUBLICATION_FIXED_INODES
 
 
 class FederatedAnalysisHandler(_FederatedAnalysisHandler):
@@ -117,7 +154,55 @@ class FederatedAnalysisHandler(_FederatedAnalysisHandler):
             return await super()._execute(job)
 
 
+class FederatedAnalysisScheduler(_FederatedAnalysisScheduler):
+    """Scheduler with shared admission around data-owner input publication."""
+
+    def __init__(
+        self,
+        *args: Any,
+        resource_admission: ProcessResourceAdmission | None = None,
+        **kwargs: Any,
+    ) -> None:
+        super().__init__(*args, **kwargs)
+        self.resource_admission = resource_admission or _ANALYSIS_PUBLICATION_ADMISSION
+
+    def submit(
+        self,
+        work: AnalysisWorkSlice,
+        *,
+        slice_files: Sequence[Path],
+        slice_root: Path,
+    ) -> SubmissionOutcome:
+        # Build/validate the bounded plan before measuring host capacity. This
+        # preserves validation precedence and avoids reporting malformed work as
+        # resource pressure. The base implementation intentionally rebuilds the
+        # same deterministic bytes inside the admitted transaction.
+        plan_bytes = work.plan_bytes()
+        bytes_required, inodes_required = analysis_publication_resource_requirement(
+            len(plan_bytes),
+            max_slice_bytes=self.gateway.content_store.max_bytes,
+        )
+        try:
+            with self.resource_admission.reserve(
+                self.gateway.content_store.root,
+                bytes_required=bytes_required,
+                inodes_required=inodes_required,
+            ):
+                return super().submit(
+                    work,
+                    slice_files=slice_files,
+                    slice_root=slice_root,
+                )
+        except HostResourceRefused as exc:
+            raise FederationOperationError(
+                "analysis-resource-pressure",
+                "host resource pressure refused analysis input publication",
+            ) from exc
+
+
 __all__ = [
     "FederatedAnalysisHandler",
+    "FederatedAnalysisScheduler",
+    "analysis_publication_resource_requirement",
     "analysis_workspace_resource_requirement",
 ]
