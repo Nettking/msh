@@ -156,7 +156,7 @@ def test_concurrent_attempts_cannot_double_spend_one_workspace_resource(
 ) -> None:
     entered = asyncio.Event()
     release = asyncio.Event()
-    admission = _admission(lambda _path: _measurement("data", free_bytes=105))
+    admission = _admission(lambda _path: _measurement("data", free_bytes=203))
     first = _handler(tmp_path / "workspaces-a", admission)
     second = _handler(tmp_path / "workspaces-b", admission)
 
@@ -183,7 +183,7 @@ def test_concurrent_attempts_cannot_double_spend_one_workspace_resource(
 
 
 def test_reservation_releases_after_materialization_failure(tmp_path: Path, monkeypatch) -> None:
-    admission = _admission(lambda _path: _measurement("data", free_bytes=105))
+    admission = _admission(lambda _path: _measurement("data", free_bytes=203))
     handler = _handler(tmp_path / "workspaces", admission)
     calls = 0
 
@@ -214,7 +214,7 @@ def test_distinct_workspace_resources_have_independent_envelopes(
     def measure(path: Path | str) -> FilesystemMeasurement:
         text = str(path)
         resource_id = "a" if text.endswith("a") else "b"
-        return _measurement(resource_id, free_bytes=105)
+        return _measurement(resource_id, free_bytes=203)
 
     admission = _admission(measure)
     first = _handler(root_a, admission)
