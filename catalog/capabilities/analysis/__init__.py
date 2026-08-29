@@ -37,12 +37,11 @@ from .provisioning import (
     analysis_handler_descriptor,
     lifecycle_worker_factory,
 )
-from .resource_admission import FederatedAnalysisHandler
+from .resource_admission import FederatedAnalysisHandler, FederatedAnalysisScheduler
 from .scheduler import (
     DECISION_DISPATCHED,
     DECISION_NO_PROVIDER,
     DECISION_TERMINAL,
-    FederatedAnalysisScheduler,
     SchedulingOutcome,
     SubmissionOutcome,
 )

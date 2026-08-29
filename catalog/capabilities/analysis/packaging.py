@@ -18,6 +18,7 @@ import tempfile
 from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
+from typing import Any
 
 from catalog.federation.errors import FederationValidationError
 
@@ -44,6 +45,30 @@ class SliceArchiveComparison(Enum):
 
 class _SourceChangedDuringPacking(RuntimeError):
     """Internal signal that a live source changed during one bounded pack attempt."""
+
+
+class _BoundedArchiveWriter:
+    """File wrapper that prevents an unpublished archive exceeding its byte cap."""
+
+    def __init__(self, handle: Any, max_bytes: int) -> None:
+        self._handle = handle
+        self._max_bytes = max(int(max_bytes), 0)
+        self._written = 0
+
+    def write(self, data: bytes | bytearray | memoryview) -> int:
+        length = len(data)
+        if self._written + length > self._max_bytes:
+            raise FederationValidationError(
+                "analysis-slice-too-large",
+                "size_bytes",
+                f"packed analysis input must not exceed {self._max_bytes} bytes",
+            )
+        written = self._handle.write(data)
+        self._written += written
+        return written
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self._handle, name)
 
 
 def _stat_signature(value: os.stat_result) -> tuple[int, int, int, int, int]:
@@ -294,6 +319,8 @@ def write_slice_archive(
     size and timestamps after the bytes have been consumed. A concurrent
     truncate/rewrite aborts only the unpublished same-directory partial and is
     retried a finite number of times; an unstable source eventually fails closed.
+    The compressed output is hard-bounded while streaming so tar/gzip metadata
+    can never make the unpublished partial consume more than ``max_bytes``.
     """
 
     members = _validated_members(files, root)
@@ -311,8 +338,9 @@ def write_slice_archive(
             total = 0
             with os.fdopen(descriptor, "wb") as raw:
                 descriptor = -1
+                bounded_raw = _BoundedArchiveWriter(raw, max_bytes)
                 with (
-                    gzip.GzipFile(filename="", mode="wb", fileobj=raw, mtime=0)
+                    gzip.GzipFile(filename="", mode="wb", fileobj=bounded_raw, mtime=0)
                     as compressed,
                     tarfile.open(
                         fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT
@@ -351,7 +379,7 @@ def write_slice_archive(
                 raw.flush()
                 os.fsync(raw.fileno())
             size = temporary.stat().st_size
-            if size > max_bytes:
+            if size > max_bytes:  # defensive: the streaming writer already enforces this
                 raise FederationValidationError(
                     "analysis-slice-too-large",
                     "size_bytes",
