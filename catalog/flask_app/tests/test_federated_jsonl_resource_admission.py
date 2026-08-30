@@ -10,7 +10,10 @@ from typing import Iterator
 import pytest
 from flask import Flask
 
-from catalog.federation.errors import FederationOperationError
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.federation.host_resources import HostResourceRefused
 from catalog.federation.models import CommitState
 from catalog.federation.storage_catalog import CommittedBatchReference
@@ -23,9 +26,16 @@ _MANIFEST_HASH = "sha256:" + "a" * 64
 
 
 class _RecordingAdmission:
-    def __init__(self, *, fail_call: int | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        fail_call: int | None = None,
+        changed_resource_assessment: int | None = None,
+    ) -> None:
         self.fail_call = fail_call
+        self.changed_resource_assessment = changed_resource_assessment
         self.calls: list[tuple[Path, int, int]] = []
+        self.assessment_calls = 0
         self.active = 0
         self.max_active = 0
 
@@ -43,9 +53,19 @@ class _RecordingAdmission:
         self.active += 1
         self.max_active = max(self.max_active, self.active)
         try:
-            yield SimpleNamespace()
+            yield SimpleNamespace(resource_id="test-resource")
         finally:
             self.active -= 1
+
+    def assessment(self, path: Path) -> object:
+        del path
+        self.assessment_calls += 1
+        resource_id = (
+            "changed-resource"
+            if self.changed_resource_assessment == self.assessment_calls
+            else "test-resource"
+        )
+        return SimpleNamespace(resource_id=resource_id)
 
 
 class _PublishingRuntime:
@@ -200,6 +220,22 @@ def test_remote_chunk_staging_refuses_before_temp_write(tmp_path: Path) -> None:
     assert list(target.parent.iterdir()) == []
 
 
+def test_remote_chunk_refuses_if_backing_resource_changes_after_mkdir(
+    tmp_path: Path,
+) -> None:
+    admission = _RecordingAdmission(changed_resource_assessment=1)
+    bridge = _bridge(tmp_path, "chunk-resource-change", admission=admission)
+    target = bridge.cache_root / "remote" / "hash" / "00000000.chunk"
+
+    with pytest.raises(FederationOperationError) as captured:
+        bridge._write_chunk(target, b"bounded chunk")
+
+    assert captured.value.code == "federated-jsonl-resource-changed"
+    assert target.parent.is_dir()
+    assert list(target.parent.iterdir()) == []
+    assert admission.active == 0
+
+
 def test_materialization_reserves_encoded_and_raw_peaks_together(tmp_path: Path) -> None:
     batch, session_id = _published_batch(tmp_path)
     content = batch["content"]
@@ -224,6 +260,67 @@ def test_materialization_reserves_encoded_and_raw_peaks_together(tmp_path: Path)
     targets = list(consumer.mirror_root.rglob("*.jsonl"))
     assert len(targets) == 1
     assert targets[0].read_bytes() == b'{"machine_id":"m","value":1}\n'
+
+
+def test_materialization_revalidates_target_after_directory_creation(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    batch, session_id = _published_batch(tmp_path)
+    content = batch["content"]
+    assert isinstance(content, dict)
+    admission = _RecordingAdmission()
+    consumer = _bridge(tmp_path, "target-revalidation", admission=admission)
+    original_target_path = consumer._target_path
+    calls = 0
+
+    def guarded_target_path(producer: str, relative_path: str) -> Path:
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise FederationValidationError(
+                "unsafe-federated-jsonl-target",
+                "content.relative_path",
+                "simulated target escape after directory creation",
+            )
+        return original_target_path(producer, relative_path)
+
+    monkeypatch.setattr(consumer, "_target_path", guarded_target_path)
+
+    with pytest.raises(FederationValidationError) as captured:
+        consumer._ingest_remote(
+            _reference(batch, session_id=session_id),
+            content,
+            local_node_id="node-consumer",
+        )
+
+    assert captured.value.code == "unsafe-federated-jsonl-target"
+    assert calls == 2
+    assert list(consumer.mirror_root.rglob("*.jsonl")) == []
+    assert admission.active == 0
+
+
+def test_materialization_refuses_if_backing_resource_changes_after_mkdir(
+    tmp_path: Path,
+) -> None:
+    batch, session_id = _published_batch(tmp_path)
+    content = batch["content"]
+    assert isinstance(content, dict)
+    # Assessment 1 validates remote chunk staging. Assessment 2 occurs after the
+    # mirror parent is created but before reconstruction starts.
+    admission = _RecordingAdmission(changed_resource_assessment=2)
+    consumer = _bridge(tmp_path, "materialization-resource-change", admission=admission)
+
+    with pytest.raises(FederationOperationError) as captured:
+        consumer._ingest_remote(
+            _reference(batch, session_id=session_id),
+            content,
+            local_node_id="node-consumer",
+        )
+
+    assert captured.value.code == "federated-jsonl-resource-changed"
+    assert list(consumer.mirror_root.rglob("*.jsonl")) == []
+    assert admission.active == 0
 
 
 def test_mirror_quota_refuses_before_reconstruction_temp_files(tmp_path: Path) -> None:
