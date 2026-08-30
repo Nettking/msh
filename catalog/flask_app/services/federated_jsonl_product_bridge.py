@@ -1067,6 +1067,93 @@ class FederatedJsonlProductBridge:
             encoded_sha256=encoded_sha256,
         )
 
+    def _consume_staged_rows(self, rows: Iterable[sqlite3.Row]) -> None:
+        rows = tuple(rows)
+        for row in rows:
+            if row["chunk_path"]:
+                Path(str(row["chunk_path"])).unlink(missing_ok=True)
+        if not rows:
+            return
+        with self._connect() as connection:
+            connection.executemany(
+                """
+                UPDATE seen_batches SET chunk_path=NULL
+                WHERE session_id=? AND group_id=? AND dataset_id=? AND batch_id=?
+                """,
+                (
+                    (
+                        str(row["session_id"]),
+                        str(row["group_id"]),
+                        str(row["dataset_id"]),
+                        str(row["batch_id"]),
+                    )
+                    for row in rows
+                ),
+            )
+
+    def _record_materialized_file(
+        self,
+        *,
+        session_id: str,
+        dataset_id: str,
+        producer: str,
+        relative_path: str,
+        file_sha256: str,
+        source_mtime_ns: int,
+        target: Path,
+        size: int,
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO materialized_files(
+                    session_id,dataset_id,producer_node_id,relative_path,
+                    file_sha256,source_mtime_ns,target_path,size_bytes,updated_at
+                ) VALUES(?,?,?,?,?,?,?,?,?)
+                ON CONFLICT(session_id,dataset_id) DO UPDATE SET
+                    producer_node_id=excluded.producer_node_id,
+                    relative_path=excluded.relative_path,
+                    file_sha256=excluded.file_sha256,
+                    source_mtime_ns=excluded.source_mtime_ns,
+                    target_path=excluded.target_path,
+                    size_bytes=excluded.size_bytes,
+                    updated_at=excluded.updated_at
+                """,
+                (
+                    session_id,
+                    dataset_id,
+                    producer,
+                    relative_path,
+                    file_sha256,
+                    source_mtime_ns,
+                    str(target),
+                    size,
+                    _stamp(self.clock()),
+                ),
+            )
+
+    def _retry_staged_materializations(self, *, session_id: str) -> int:
+        with self._connect() as connection:
+            versions = connection.execute(
+                """
+                SELECT DISTINCT dataset_id,file_sha256,encoded_sha256
+                FROM seen_batches
+                WHERE session_id=? AND chunk_path IS NOT NULL
+                ORDER BY dataset_id,file_sha256,encoded_sha256
+                """,
+                (session_id,),
+            ).fetchall()
+        materialized = 0
+        for version in versions:
+            if self._try_materialize(
+                session_id=session_id,
+                dataset_id=str(version["dataset_id"]),
+                file_sha256=str(version["file_sha256"]),
+                encoded_sha256=str(version["encoded_sha256"]),
+            ):
+                materialized += 1
+        return materialized
+
     def _target_path(self, producer: str, relative_path: str) -> Path:
         target = self.mirror_root / _safe_node_directory(producer) / Path(relative_path)
         resolved_root = self.mirror_root.resolve()
@@ -1111,9 +1198,7 @@ class FederatedJsonlProductBridge:
                 (session_id, file_sha256, dataset_id),
             ).fetchone()
         if local_duplicate is not None or remote_duplicate is not None:
-            for row in rows:
-                if row["chunk_path"]:
-                    Path(str(row["chunk_path"])).unlink(missing_ok=True)
+            self._consume_staged_rows(rows)
             return False
         first = rows[0]
         chunk_count = int(first["chunk_count"])
@@ -1165,6 +1250,23 @@ class FederatedJsonlProductBridge:
             )
 
         target = self._target_path(producer, relative_path)
+        if (
+            target.is_file()
+            and target.stat().st_size == declared_file_size
+            and _sha256_path(target) == file_sha256
+        ):
+            self._record_materialized_file(
+                session_id=session_id,
+                dataset_id=dataset_id,
+                producer=producer,
+                relative_path=relative_path,
+                file_sha256=file_sha256,
+                source_mtime_ns=source_mtime_ns,
+                target=target,
+                size=declared_file_size,
+            )
+            self._consume_staged_rows(rows)
+            return True
         target_missing_directories = _missing_directory_count(target.parent)
         encoded_temp: Path | None = None
         raw_temp: Path | None = None
@@ -1246,36 +1348,17 @@ class FederatedJsonlProductBridge:
                 os.replace(raw_temp, target)
                 raw_temp = None
                 _fsync_directory(target.parent)
-                with self._connect() as connection:
-                    connection.execute(
-                        """
-                        INSERT INTO materialized_files(
-                            session_id,dataset_id,producer_node_id,relative_path,
-                            file_sha256,source_mtime_ns,target_path,size_bytes,updated_at
-                        ) VALUES(?,?,?,?,?,?,?,?,?)
-                        ON CONFLICT(session_id,dataset_id) DO UPDATE SET
-                            producer_node_id=excluded.producer_node_id,
-                            relative_path=excluded.relative_path,
-                            file_sha256=excluded.file_sha256,
-                            source_mtime_ns=excluded.source_mtime_ns,
-                            target_path=excluded.target_path,
-                            size_bytes=excluded.size_bytes,
-                            updated_at=excluded.updated_at
-                        """,
-                        (
-                            session_id,
-                            dataset_id,
-                            producer,
-                            relative_path,
-                            file_sha256,
-                            source_mtime_ns,
-                            str(target),
-                            size,
-                            _stamp(self.clock()),
-                        ),
-                    )
-                for row in rows:
-                    Path(str(row["chunk_path"])).unlink(missing_ok=True)
+                self._record_materialized_file(
+                    session_id=session_id,
+                    dataset_id=dataset_id,
+                    producer=producer,
+                    relative_path=relative_path,
+                    file_sha256=file_sha256,
+                    source_mtime_ns=source_mtime_ns,
+                    target=target,
+                    size=size,
+                )
+                self._consume_staged_rows(rows)
                 return True
         finally:
             if encoded_temp is not None:
@@ -1519,13 +1602,15 @@ class FederatedJsonlProductBridge:
                 authority_node_id=authority_node_id,
                 group_id=group_id,
             )
-            discovered, downloaded, materialized = self._mirror_remote(
+            materialized = self._retry_staged_materializations(session_id=session_id)
+            discovered, downloaded, newly_materialized = self._mirror_remote(
                 runtime_state,
                 session_id=session_id,
                 local_node_id=node_id,
                 authority_node_id=authority_node_id,
                 group_id=group_id,
             )
+            materialized += newly_materialized
             if materialized:
                 self._request_refreshes()
             quota = self._mirror_quota_bytes()

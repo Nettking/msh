@@ -399,3 +399,76 @@ def test_materialization_atomic_admission_refuses_without_partial_reservation(
     assert admission.active == 0
     assert list(consumer.cache_root.glob("tmp*")) == []
     assert list(consumer.mirror_root.rglob("*.jsonl")) == []
+
+
+def test_staged_materialization_retries_without_rediscovering_seen_batch(
+    tmp_path: Path,
+) -> None:
+    batch, session_id = _published_batch(tmp_path)
+    content = batch["content"]
+    assert isinstance(content, dict)
+    admission = _RecordingAdmission(fail_call=3)
+    consumer = _bridge(tmp_path, "retry-staged", admission=admission)
+
+    with pytest.raises(FederationOperationError) as captured:
+        consumer._ingest_remote(
+            _reference(batch, session_id=session_id),
+            content,
+            local_node_id="node-consumer",
+        )
+    assert captured.value.code == "federated-jsonl-resource-pressure"
+    assert consumer._seen(_reference(batch, session_id=session_id)) is True
+    assert list(consumer.mirror_root.rglob("*.jsonl")) == []
+
+    admission.fail_call = None
+    assert consumer._retry_staged_materializations(session_id=session_id) == 1
+    targets = list(consumer.mirror_root.rglob("*.jsonl"))
+    assert len(targets) == 1
+    assert targets[0].read_bytes() == b'{"machine_id":"m","value":1}\n'
+    with consumer._connect() as connection:
+        staged = connection.execute(
+            "SELECT COUNT(*) AS n FROM seen_batches WHERE chunk_path IS NOT NULL"
+        ).fetchone()
+    assert int(staged["n"]) == 0
+
+
+def test_retry_reconciles_valid_replaced_target_without_reconstruction(
+    tmp_path: Path,
+) -> None:
+    payload = b'{"machine_id":"m","value":1}\n'
+    batch, session_id = _published_batch(tmp_path, payload=payload)
+    content = batch["content"]
+    assert isinstance(content, dict)
+    admission = _RecordingAdmission(fail_call=3)
+    consumer = _bridge(tmp_path, "reconcile-target", admission=admission)
+
+    with pytest.raises(FederationOperationError):
+        consumer._ingest_remote(
+            _reference(batch, session_id=session_id),
+            content,
+            local_node_id="node-consumer",
+        )
+    producer = str(content["producer_node_id"])
+    relative_path = str(content["relative_path"])
+    target = consumer._target_path(producer, relative_path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(payload)
+    many_calls_before = len(admission.many_calls)
+
+    admission.fail_call = None
+    assert consumer._retry_staged_materializations(session_id=session_id) == 1
+    assert len(admission.many_calls) == many_calls_before
+    with consumer._connect() as connection:
+        row = connection.execute(
+            "SELECT file_sha256,target_path,size_bytes FROM materialized_files "
+            "WHERE session_id=? AND dataset_id=?",
+            (session_id, str(batch["dataset_id"])),
+        ).fetchone()
+        staged = connection.execute(
+            "SELECT COUNT(*) AS n FROM seen_batches WHERE chunk_path IS NOT NULL"
+        ).fetchone()
+    assert row is not None
+    assert str(row["file_sha256"]) == str(content["file_sha256"])
+    assert Path(str(row["target_path"])) == target
+    assert int(row["size_bytes"]) == len(payload)
+    assert int(staged["n"]) == 0
