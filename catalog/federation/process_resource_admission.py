@@ -1,9 +1,13 @@
 """Process-wide host-resource admission shared by bounded FCP writers.
 
 The default controller serializes filesystem measurement with reservation
-accounting. This closes the measure-before-lock race in the base primitive for
-all supported writers using the process-wide seam, and exposes one atomic
-multi-resource reservation for logical transactions that span several paths.
+accounting. This closes the measure-before-lock race for all supported writers
+using the process-wide seam, and exposes one atomic multi-resource reservation
+for logical transactions that span several paths.
+
+The base ProcessResourceAdmission remains import-compatible for callers outside
+this shared seam. New supported runtime writers should use
+PROCESS_RESOURCE_ADMISSION or inject SerializedProcessResourceAdmission in tests.
 """
 
 from __future__ import annotations
