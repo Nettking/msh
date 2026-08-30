@@ -1,18 +1,17 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterator
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
-from typing import Iterator
 
 import pytest
 from flask import Flask
 
 from catalog.federation.errors import (
     FederationOperationError,
-    FederationValidationError,
 )
 from catalog.federation.host_resources import HostResourceRefused
 from catalog.federation.models import CommitState
@@ -251,7 +250,8 @@ def test_remote_chunk_staging_refuses_before_temp_write(tmp_path: Path) -> None:
         bridge._write_chunk(target, b"bounded chunk")
 
     assert captured.value.code == "federated-jsonl-resource-pressure"
-    assert admission.calls == [(target.parent, len(b"bounded chunk"), 2)]
+    # Stable managed traversal may create both remote/hash directories.
+    assert admission.calls == [(target.parent, len(b"bounded chunk"), 4)]
     assert list(target.parent.iterdir()) == []
 
 
@@ -301,41 +301,35 @@ def test_materialization_reserves_encoded_and_raw_peaks_together(tmp_path: Path)
     assert targets[0].read_bytes() == b'{"machine_id":"m","value":1}\n'
 
 
-def test_materialization_revalidates_target_after_directory_creation(
+def test_materialization_rejects_redirect_component_without_outside_write(
     tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     batch, session_id = _published_batch(tmp_path)
     content = batch["content"]
     assert isinstance(content, dict)
     admission = _RecordingAdmission()
-    consumer = _bridge(tmp_path, "target-revalidation", admission=admission)
-    original_target_path = consumer._target_path
-    calls = 0
+    consumer = _bridge(tmp_path, "target-boundary", admission=admission)
+    target = consumer._target_path(
+        str(content["producer_node_id"]), str(content["relative_path"])
+    )
+    relative = target.relative_to(consumer.mirror_root)
+    producer_directory = consumer.mirror_root / relative.parts[0]
+    outside = tmp_path / "outside-materialization"
+    outside.mkdir()
+    try:
+        producer_directory.symlink_to(outside, target_is_directory=True)
+    except OSError as exc:
+        pytest.skip(f"symlink creation unavailable: {exc}")
 
-    def guarded_target_path(producer: str, relative_path: str) -> Path:
-        nonlocal calls
-        calls += 1
-        if calls == 2:
-            raise FederationValidationError(
-                "unsafe-federated-jsonl-target",
-                "content.relative_path",
-                "simulated target escape after directory creation",
-            )
-        return original_target_path(producer, relative_path)
-
-    monkeypatch.setattr(consumer, "_target_path", guarded_target_path)
-
-    with pytest.raises(FederationValidationError) as captured:
+    with pytest.raises(FederationOperationError) as captured:
         consumer._ingest_remote(
             _reference(batch, session_id=session_id),
             content,
             local_node_id="node-consumer",
         )
 
-    assert captured.value.code == "unsafe-federated-jsonl-target"
-    assert calls == 2
-    assert list(consumer.mirror_root.rglob("*.jsonl")) == []
+    assert captured.value.code == "federated-jsonl-filesystem-boundary"
+    assert list(outside.rglob("*.jsonl")) == []
     assert admission.active == 0
 
 

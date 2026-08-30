@@ -16,10 +16,9 @@ import gzip
 import hashlib
 import os
 import sqlite3
-import tempfile
 import threading
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -52,6 +51,11 @@ from catalog.federation.shared_file_storage import (
     federated_jsonl_idempotency_key,
     normalize_jsonl_relative_path,
     validate_federated_jsonl_ingest,
+)
+from catalog.federation.stable_filesystem import (
+    StableDirectory,
+    StableFilesystemError,
+    stable_directory,
 )
 from catalog.federation.storage_catalog import (
     CommittedBatchPage,
@@ -324,6 +328,48 @@ class FederatedJsonlProductBridge:
             )
         actual = self.resource_admission.assessment(path).resource_id
         if actual != expected:
+            raise FederationOperationError(
+                "federated-jsonl-resource-changed",
+                "Federated JSONL destination changed backing resource after admission",
+            )
+
+    @contextmanager
+    def _stable_directory(
+        self, root: Path, relative: Path = Path("."), *, create: bool = False
+    ) -> Iterator[StableDirectory]:
+        try:
+            with stable_directory(root, relative, create=create) as boundary:
+                yield boundary
+        except FileNotFoundError:
+            raise
+        except (OSError, StableFilesystemError) as exc:
+            raise FederationOperationError(
+                "federated-jsonl-filesystem-boundary",
+                "Federated JSONL managed path could not be held behind a stable filesystem boundary",
+            ) from exc
+
+    def _assert_stable_reserved_resource(
+        self, boundary: StableDirectory, reservation: object
+    ) -> None:
+        expected = getattr(reservation, "resource_id", None)
+        if not isinstance(expected, str) or not expected:
+            raise FederationOperationError(
+                "federated-jsonl-resource-identity-unavailable",
+                "resource admission did not expose the reserved backing resource",
+            )
+        actual = boundary.resource_id
+        if expected == actual:
+            return
+        # Test/adaptor admissions may expose synthetic identities. Production
+        # reservations use device:/volume: identities and must match the pinned
+        # directory handle directly; never fall back to a path snapshot there.
+        if expected.startswith(("device:", "volume:", "volume-anchor:")):
+            raise FederationOperationError(
+                "federated-jsonl-resource-changed",
+                "Federated JSONL destination changed backing resource after admission",
+            )
+        measured = self.resource_admission.assessment(boundary.path).resource_id
+        if measured != expected:
             raise FederationOperationError(
                 "federated-jsonl-resource-changed",
                 "Federated JSONL destination changed backing resource after admission",
@@ -620,34 +666,30 @@ class FederatedJsonlProductBridge:
                 return existing
 
         file_digest = hashlib.sha256()
-        temp_path: Path | None = None
         requirement = _local_gzip_requirement(stat_before.st_size)
-        try:
-            with self._reserve(
-                self.cache_root,
-                bytes_required=requirement,
-                inodes_required=_JSONL_CACHE_INODES,
-            ):
-                with tempfile.NamedTemporaryFile(
-                    prefix="fcp-jsonl-",
-                    suffix=".jsonl.gz",
-                    dir=self.cache_root,
-                    delete=False,
-                ) as temporary:
-                    temp_path = Path(temporary.name)
-                    bounded = _BoundedWriter(temporary, FEDERATED_JSONL_MAX_ENCODED_BYTES)
-                    with gzip.GzipFile(
-                        filename="",
-                        mode="wb",
-                        fileobj=bounded,
-                        mtime=0,
-                    ) as compressed, path.open("rb") as source:
-                        for raw in iter(lambda: source.read(1024 * 1024), b""):
-                            file_digest.update(raw)
-                            compressed.write(raw)
-                    temporary.flush()
-                    os.fsync(temporary.fileno())
-                assert temp_path is not None
+        with self._reserve(
+            self.cache_root,
+            bytes_required=requirement,
+            inodes_required=_JSONL_CACHE_INODES,
+        ) as reservation, self._stable_directory(
+            self.cache_root
+        ) as cache_directory:
+            self._assert_stable_reserved_resource(cache_directory, reservation)
+            with cache_directory.temporary_file(
+                prefix="fcp-jsonl-", suffix=".jsonl.gz"
+            ) as (temp_name, temporary):
+                bounded = _BoundedWriter(temporary, FEDERATED_JSONL_MAX_ENCODED_BYTES)
+                with gzip.GzipFile(
+                    filename="",
+                    mode="wb",
+                    fileobj=bounded,
+                    mtime=0,
+                ) as compressed, path.open("rb") as source:
+                    for raw in iter(lambda: source.read(1024 * 1024), b""):
+                        file_digest.update(raw)
+                        compressed.write(raw)
+                temporary.flush()
+                os.fsync(temporary.fileno())
                 stat_after = path.stat()
                 if (
                     stat_after.st_size != stat_before.st_size
@@ -658,22 +700,22 @@ class FederatedJsonlProductBridge:
                         f"{relative_path} changed while it was being prepared",
                     )
                 file_sha256 = f"sha256:{file_digest.hexdigest()}"
-                encoded_sha256 = _sha256_path(temp_path)
-                encoded_size = temp_path.stat().st_size
-                final_cache = self.cache_root / f"{file_sha256[7:]}.jsonl.gz"
-                if final_cache.exists():
+                encoded_sha256 = cache_directory.sha256(temp_name)
+                encoded_size = cache_directory.stat(temp_name).st_size
+                final_name = f"{file_sha256[7:]}.jsonl.gz"
+                final_cache = self.cache_root / final_name
+                if cache_directory.is_file(final_name):
                     if (
-                        final_cache.stat().st_size != encoded_size
-                        or _sha256_path(final_cache) != encoded_sha256
+                        cache_directory.stat(final_name).st_size != encoded_size
+                        or cache_directory.sha256(final_name) != encoded_sha256
                     ):
                         raise FederationOperationError(
                             "federated-jsonl-cache-conflict",
                             "content-addressed gzip cache contains different bytes",
                         )
-                    temp_path.unlink(missing_ok=True)
                 else:
-                    os.replace(temp_path, final_cache)
-                    _fsync_directory(self.cache_root)
+                    cache_directory.replace(temp_name, final_name)
+                    cache_directory.fsync()
                 chunk_count = max(
                     1,
                     (encoded_size + FEDERATED_JSONL_CHUNK_BYTES - 1)
@@ -711,13 +753,9 @@ class FederatedJsonlProductBridge:
                             str(final_cache),
                         ),
                     )
-                row = self._local_row(relative_path)
-                assert row is not None
-                return row
-        except BaseException:
-            if temp_path is not None:
-                temp_path.unlink(missing_ok=True)
-            raise
+        row = self._local_row(relative_path)
+        assert row is not None
+        return row
 
     def _prepare_local_rows(self, node_id: str) -> None:
         for relative_path, path in self._local_candidates():
@@ -1016,15 +1054,31 @@ class FederatedJsonlProductBridge:
             self._write_chunk_locked(path, data)
 
     def _write_chunk_locked(self, path: Path, data: bytes) -> None:
-        if path.exists():
-            digest = f"sha256:{hashlib.sha256(data).hexdigest()}"
-            if path.stat().st_size == len(data) and _sha256_path(path) == digest:
-                return
+        try:
+            relative_parent = path.parent.relative_to(self.cache_root)
+        except ValueError as exc:
             raise FederationValidationError(
-                "federated-jsonl-staging-conflict",
+                "unsafe-federated-jsonl-staging-target",
                 "content.chunk_index",
-                "staged chunk path already contains different bytes",
-            )
+                "staged chunk path escaped the managed cache root",
+            ) from exc
+        try:
+            with self._stable_directory(self.cache_root, relative_parent) as directory:
+                if directory.is_file(path.name):
+                    digest = f"sha256:{hashlib.sha256(data).hexdigest()}"
+                    if (
+                        directory.stat(path.name).st_size == len(data)
+                        and directory.sha256(path.name) == digest
+                    ):
+                        return
+                    raise FederationValidationError(
+                        "federated-jsonl-staging-conflict",
+                        "content.chunk_index",
+                        "staged chunk path already contains different bytes",
+                    )
+        except FileNotFoundError:
+            pass
+
         staged_bytes, staged_files = self._physical_staged_usage()
         if (
             staged_bytes + len(data) > self._staged_quota_bytes()
@@ -1034,29 +1088,32 @@ class FederatedJsonlProductBridge:
                 "federated-jsonl-staged-cache-full",
                 "remote Federated JSONL staged-cache quota is exhausted",
             )
-        missing_directories = _missing_directory_count(path.parent)
         with self._reserve(
             path.parent,
             bytes_required=len(data),
-            inodes_required=_JSONL_CHUNK_INODES + missing_directories,
-        ) as reservation:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            self._assert_reserved_resource(path.parent, reservation)
-            temporary: Path | None = None
-            try:
-                with tempfile.NamedTemporaryFile(
-                    "wb", dir=path.parent, delete=False
-                ) as handle:
-                    temporary = Path(handle.name)
-                    handle.write(data)
-                    handle.flush()
-                    os.fsync(handle.fileno())
-                os.replace(temporary, path)
-                temporary = None
-                _fsync_directory(path.parent)
-            finally:
-                if temporary is not None:
-                    temporary.unlink(missing_ok=True)
+            inodes_required=_JSONL_CHUNK_INODES + len(relative_parent.parts),
+        ) as reservation, self._stable_directory(
+            self.cache_root, relative_parent, create=True
+        ) as directory:
+            self._assert_stable_reserved_resource(directory, reservation)
+            if directory.is_file(path.name):
+                digest = f"sha256:{hashlib.sha256(data).hexdigest()}"
+                if (
+                    directory.stat(path.name).st_size == len(data)
+                    and directory.sha256(path.name) == digest
+                ):
+                    return
+                raise FederationValidationError(
+                    "federated-jsonl-staging-conflict",
+                    "content.chunk_index",
+                    "staged chunk path already contains different bytes",
+                )
+            with directory.temporary_file(prefix="fcp-chunk-") as (temp_name, handle):
+                handle.write(data)
+                handle.flush()
+                os.fsync(handle.fileno())
+                directory.replace(temp_name, path.name)
+                directory.fsync()
 
     def _record_remote_chunk(
         self,
@@ -1286,11 +1343,17 @@ class FederatedJsonlProductBridge:
         return materialized
 
     def _target_path(self, producer: str, relative_path: str) -> Path:
-        target = self.mirror_root / _safe_node_directory(producer) / Path(relative_path)
-        resolved_root = self.mirror_root.resolve()
+        relative = Path(relative_path)
+        if relative.is_absolute() or any(part == ".." for part in relative.parts):
+            raise FederationValidationError(
+                "unsafe-federated-jsonl-target",
+                "content.relative_path",
+                "materialized path escaped the managed mirror root",
+            )
+        target = self.mirror_root / _safe_node_directory(producer) / relative
         try:
-            target.resolve().relative_to(resolved_root)
-        except (OSError, ValueError) as exc:
+            target.relative_to(self.mirror_root)
+        except ValueError as exc:
             raise FederationValidationError(
                 "unsafe-federated-jsonl-target",
                 "content.relative_path",
@@ -1381,56 +1444,58 @@ class FederatedJsonlProductBridge:
             )
 
         target = self._target_path(producer, relative_path)
-        if (
-            target.is_file()
-            and target.stat().st_size == declared_file_size
-            and _sha256_path(target) == file_sha256
-        ):
-            self._record_materialized_file(
-                session_id=session_id,
-                dataset_id=dataset_id,
-                producer=producer,
-                relative_path=relative_path,
-                file_sha256=file_sha256,
-                source_mtime_ns=source_mtime_ns,
-                target=target,
-                size=declared_file_size,
-                rows=rows,
-            )
-            return True
-        target_missing_directories = _missing_directory_count(target.parent)
-        encoded_temp: Path | None = None
-        raw_temp: Path | None = None
+        relative_parent = target.parent.relative_to(self.mirror_root)
         try:
-            requirements = (
-                (
-                    self.cache_root,
-                    declared_encoded_size,
-                    _JSONL_MATERIALIZATION_INODES,
-                ),
-                (
-                    target.parent,
-                    declared_file_size,
-                    _JSONL_MATERIALIZATION_INODES + target_missing_directories,
-                ),
-            )
-            with self._reserve_many(requirements) as materialization_reservations:
-                if not materialization_reservations:
-                    raise FederationOperationError(
-                        "federated-jsonl-resource-identity-unavailable",
-                        "atomic resource admission returned no backing resource",
+            with self._stable_directory(self.mirror_root, relative_parent) as target_directory:
+                if (
+                    target_directory.is_file(target.name)
+                    and target_directory.stat(target.name).st_size == declared_file_size
+                    and target_directory.sha256(target.name) == file_sha256
+                ):
+                    self._record_materialized_file(
+                        session_id=session_id,
+                        dataset_id=dataset_id,
+                        producer=producer,
+                        relative_path=relative_path,
+                        file_sha256=file_sha256,
+                        source_mtime_ns=source_mtime_ns,
+                        target=target,
+                        size=declared_file_size,
+                        rows=rows,
                     )
-                # reserve_many preserves first-seen resource order. The target
-                # requirement is second; when both paths share a filesystem the
-                # single coalesced reservation covers both requirements.
-                raw_reservation = materialization_reservations[-1]
-                target.parent.mkdir(parents=True, exist_ok=True)
-                target = self._target_path(producer, relative_path)
-                self._assert_reserved_resource(target.parent, raw_reservation)
-                with tempfile.NamedTemporaryFile(
-                    "wb", dir=self.cache_root, delete=False
-                ) as encoded:
-                    encoded_temp = Path(encoded.name)
+                    return True
+        except FileNotFoundError:
+            pass
+
+        requirements = (
+            (
+                self.cache_root,
+                declared_encoded_size,
+                _JSONL_MATERIALIZATION_INODES,
+            ),
+            (
+                target.parent,
+                declared_file_size,
+                _JSONL_MATERIALIZATION_INODES + len(relative_parent.parts),
+            ),
+        )
+        with self._reserve_many(requirements) as materialization_reservations:
+            if not materialization_reservations:
+                raise FederationOperationError(
+                    "federated-jsonl-resource-identity-unavailable",
+                    "atomic resource admission returned no backing resource",
+                )
+            cache_reservation = materialization_reservations[0]
+            target_reservation = materialization_reservations[-1]
+            with self._stable_directory(self.cache_root) as cache_directory, self._stable_directory(
+                self.mirror_root, relative_parent, create=True
+            ) as target_directory:
+                self._assert_stable_reserved_resource(cache_directory, cache_reservation)
+                self._assert_stable_reserved_resource(target_directory, target_reservation)
+                with cache_directory.temporary_file(prefix="fcp-encoded-") as (
+                    encoded_name,
+                    encoded,
+                ):
                     bounded_encoded = _BoundedWriter(encoded, declared_encoded_size)
                     for row in rows:
                         with Path(str(row["chunk_path"])).open("rb") as chunk:
@@ -1438,47 +1503,48 @@ class FederatedJsonlProductBridge:
                                 bounded_encoded.write(data)
                     encoded.flush()
                     os.fsync(encoded.fileno())
-                if encoded_temp.stat().st_size != declared_encoded_size:
-                    raise FederationValidationError(
-                        "federated-jsonl-encoded-size-mismatch",
-                        "content.encoded_size",
-                        "reconstructed gzip size does not match committed metadata",
-                    )
-                if _sha256_path(encoded_temp) != encoded_sha256:
-                    raise FederationValidationError(
-                        "federated-jsonl-encoded-hash-mismatch",
-                        "content.encoded_sha256",
-                        "reconstructed gzip hash does not match committed metadata",
-                    )
-                with tempfile.NamedTemporaryFile(
-                    "wb", dir=target.parent, delete=False
-                ) as raw:
-                    raw_temp = Path(raw.name)
-                    bounded_raw = _BoundedWriter(raw, declared_file_size)
-                    digest = hashlib.sha256()
-                    size = 0
-                    with gzip.open(encoded_temp, "rb") as compressed:
-                        while data := compressed.read(1024 * 1024):
-                            size += len(data)
-                            digest.update(data)
-                            bounded_raw.write(data)
-                    raw.flush()
-                    os.fsync(raw.fileno())
-                if size != declared_file_size:
-                    raise FederationValidationError(
-                        "federated-jsonl-file-size-mismatch",
-                        "content.file_size",
-                        "reconstructed JSONL size does not match committed metadata",
-                    )
-                if f"sha256:{digest.hexdigest()}" != file_sha256:
-                    raise FederationValidationError(
-                        "federated-jsonl-file-hash-mismatch",
-                        "content.file_sha256",
-                        "reconstructed JSONL hash does not match committed metadata",
-                    )
-                os.replace(raw_temp, target)
-                raw_temp = None
-                _fsync_directory(target.parent)
+                    if cache_directory.stat(encoded_name).st_size != declared_encoded_size:
+                        raise FederationValidationError(
+                            "federated-jsonl-encoded-size-mismatch",
+                            "content.encoded_size",
+                            "reconstructed gzip size does not match committed metadata",
+                        )
+                    if cache_directory.sha256(encoded_name) != encoded_sha256:
+                        raise FederationValidationError(
+                            "federated-jsonl-encoded-hash-mismatch",
+                            "content.encoded_sha256",
+                            "reconstructed gzip hash does not match committed metadata",
+                        )
+                    with target_directory.temporary_file(prefix="fcp-raw-") as (
+                        raw_name,
+                        raw,
+                    ):
+                        bounded_raw = _BoundedWriter(raw, declared_file_size)
+                        digest = hashlib.sha256()
+                        size = 0
+                        with cache_directory.open_read(encoded_name) as encoded_source, gzip.GzipFile(
+                            fileobj=encoded_source, mode="rb"
+                        ) as compressed:
+                            while data := compressed.read(1024 * 1024):
+                                size += len(data)
+                                digest.update(data)
+                                bounded_raw.write(data)
+                        raw.flush()
+                        os.fsync(raw.fileno())
+                        if size != declared_file_size:
+                            raise FederationValidationError(
+                                "federated-jsonl-file-size-mismatch",
+                                "content.file_size",
+                                "reconstructed JSONL size does not match committed metadata",
+                            )
+                        if f"sha256:{digest.hexdigest()}" != file_sha256:
+                            raise FederationValidationError(
+                                "federated-jsonl-file-hash-mismatch",
+                                "content.file_sha256",
+                                "reconstructed JSONL hash does not match committed metadata",
+                            )
+                        target_directory.replace(raw_name, target.name)
+                        target_directory.fsync()
                 self._record_materialized_file(
                     session_id=session_id,
                     dataset_id=dataset_id,
@@ -1491,11 +1557,6 @@ class FederatedJsonlProductBridge:
                     rows=rows,
                 )
                 return True
-        finally:
-            if encoded_temp is not None:
-                encoded_temp.unlink(missing_ok=True)
-            if raw_temp is not None:
-                raw_temp.unlink(missing_ok=True)
 
     def _ingest_remote(
         self,

@@ -283,9 +283,9 @@ class StableDirectory:
         self._full(destination_name)
         if os.name != "nt":
             assert self._fd is not None
-            if os.replace not in os.supports_dir_fd:
-                raise StableFilesystemError("platform lacks descriptor-relative atomic replace")
-            os.replace(
+            if os.rename not in os.supports_dir_fd:
+                raise StableFilesystemError("platform lacks descriptor-relative atomic rename")
+            os.rename(
                 source_name,
                 destination_name,
                 src_dir_fd=self._fd,
