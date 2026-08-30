@@ -130,7 +130,15 @@ def _bridge(
         mirror_root=data_root / "federation" / "shared" / "jsonl-files",
         resource_admission=admission,  # type: ignore[arg-type]
     )
+    pending_failure = admission.fail_call
+    admission.fail_call = None
     bridge._ensure_initialized()
+    admission.calls.clear()
+    admission.many_calls.clear()
+    admission.assessment_calls = 0
+    admission.active = 0
+    admission.max_active = 0
+    admission.fail_call = pending_failure
     return bridge
 
 
@@ -277,15 +285,17 @@ def test_materialization_reserves_encoded_and_raw_peaks_together(tmp_path: Path)
     )
 
     assert materialized is True
-    assert len(admission.calls) == 3
+    payload_calls = [call for call in admission.calls if call[0] != consumer.database.parent]
+    assert len(payload_calls) == 3
     assert len(admission.many_calls) == 1
     assert len(admission.many_calls[0]) == 2
-    chunk_call, encoded_call, raw_call = admission.calls
+    chunk_call, encoded_call, raw_call = payload_calls
     assert chunk_call[1] <= int(content["encoded_size"])
     assert encoded_call[0] == consumer.cache_root
     assert encoded_call[1] == int(content["encoded_size"])
     assert raw_call[1] == int(content["file_size"])
-    assert admission.max_active == 2
+    # encoded + raw remain admitted while SQLite bookkeeping is admitted.
+    assert admission.max_active == 3
     targets = list(consumer.mirror_root.rglob("*.jsonl"))
     assert len(targets) == 1
     assert targets[0].read_bytes() == b'{"machine_id":"m","value":1}\n'
@@ -371,7 +381,8 @@ def test_mirror_quota_refuses_before_reconstruction_temp_files(tmp_path: Path) -
     # The one admitted write is the retained remote chunk. The quota check runs
     # before either reconstruction temp file is created, so there are no second
     # and third reservations for encoded/raw materialization.
-    assert len(admission.calls) == 1
+    payload_calls = [call for call in admission.calls if call[0] != consumer.database.parent]
+    assert len(payload_calls) == 1
     assert list(consumer.mirror_root.rglob("*.jsonl")) == []
     snapshot = consumer.snapshot()
     assert snapshot["mirror_quota_reached"] is True
@@ -385,7 +396,7 @@ def test_materialization_atomic_admission_refuses_without_partial_reservation(
     assert isinstance(content, dict)
     # Call 1 is chunk staging. Calls 2 and 3 are submitted in one reserve_many
     # transaction, so refusing the raw requirement must publish neither one.
-    admission = _RecordingAdmission(fail_call=3)
+    admission = _RecordingAdmission(fail_call=4)
     consumer = _bridge(tmp_path, "unwind", admission=admission)
 
     with pytest.raises(FederationOperationError) as captured:
@@ -407,7 +418,7 @@ def test_staged_materialization_retries_without_rediscovering_seen_batch(
     batch, session_id = _published_batch(tmp_path)
     content = batch["content"]
     assert isinstance(content, dict)
-    admission = _RecordingAdmission(fail_call=3)
+    admission = _RecordingAdmission(fail_call=4)
     consumer = _bridge(tmp_path, "retry-staged", admission=admission)
 
     with pytest.raises(FederationOperationError) as captured:
@@ -439,7 +450,7 @@ def test_retry_reconciles_valid_replaced_target_without_reconstruction(
     batch, session_id = _published_batch(tmp_path, payload=payload)
     content = batch["content"]
     assert isinstance(content, dict)
-    admission = _RecordingAdmission(fail_call=3)
+    admission = _RecordingAdmission(fail_call=4)
     consumer = _bridge(tmp_path, "reconcile-target", admission=admission)
 
     with pytest.raises(FederationOperationError):
@@ -497,3 +508,72 @@ def test_retry_ignores_incomplete_staged_versions(tmp_path: Path) -> None:
         )
     assert consumer._retry_staged_materializations(session_id="session-incomplete") == 0
     assert admission.many_calls == []
+
+
+def test_bootstrap_refuses_before_creating_bridge_directories(tmp_path: Path) -> None:
+    admission = _RecordingAdmission(fail_call=1)
+    root = tmp_path / "bootstrap-refusal"
+    app = Flask("bootstrap-refusal")
+    bridge = FederatedJsonlProductBridge(
+        app, SimpleNamespace(relay_runtime=None), data_root=root / "data",
+        database=root / "state" / "sync.sqlite3", cache_root=root / "cache",
+        mirror_root=root / "mirror", resource_admission=admission,
+    )
+    with pytest.raises(FederationOperationError) as captured:
+        bridge._ensure_initialized()
+    assert captured.value.code == "federated-jsonl-resource-pressure"
+    assert not root.exists()
+
+
+def test_sqlite_state_mutation_uses_resource_admission(tmp_path: Path) -> None:
+    admission = _RecordingAdmission()
+    bridge = _bridge(tmp_path, "sqlite-write", admission=admission)
+    with bridge._write_connection() as connection:
+        connection.execute(
+            "INSERT INTO local_files(relative_path,size_bytes,mtime_ns,file_sha256,encoded_sha256,encoded_size,dataset_id,chunk_count,next_chunk,cache_path,published_at) VALUES(?,?,?,?,?,?,?,?,?,?,?)",
+            ("x.jsonl",1,1,"sha256:" + "1"*64,"sha256:" + "2"*64,1,"d",1,0,"x",None),
+        )
+    assert len(admission.calls) == 1
+    assert admission.calls[0][0] == bridge.database.parent
+    assert admission.calls[0][1] > 0
+    assert admission.calls[0][2] >= 3
+
+
+def test_staged_cache_quota_counts_orphaned_chunk_bytes(tmp_path: Path) -> None:
+    admission = _RecordingAdmission()
+    bridge = _bridge(tmp_path, "staged-quota", admission=admission)
+    bridge.app.config["FEDERATED_JSONL_MAX_STAGED_BYTES"] = 8
+    orphan = bridge.cache_root / "remote" / "orphan" / "00000000.chunk"
+    orphan.parent.mkdir(parents=True, exist_ok=True)
+    orphan.write_bytes(b"12345678")
+    target = bridge.cache_root / "remote" / "new" / "00000000.chunk"
+    with pytest.raises(FederationOperationError) as captured:
+        bridge._write_chunk(target, b"x")
+    assert captured.value.code == "federated-jsonl-staged-cache-full"
+    assert not target.exists()
+
+
+def test_orphan_cleanup_removes_unreferenced_staged_chunks(tmp_path: Path) -> None:
+    admission = _RecordingAdmission()
+    bridge = _bridge(tmp_path, "orphan-cleanup", admission=admission)
+    orphan = bridge.cache_root / "remote" / "orphan" / "00000000.chunk"
+    orphan.parent.mkdir(parents=True, exist_ok=True)
+    orphan.write_bytes(b"orphan")
+    assert bridge._cleanup_orphaned_staged_chunks() == 1
+    assert not orphan.exists()
+
+
+def test_staged_cache_file_quota_bounds_tiny_chunks(tmp_path: Path) -> None:
+    admission = _RecordingAdmission()
+    bridge = _bridge(tmp_path, "staged-files", admission=admission)
+    bridge.app.config["FEDERATED_JSONL_MAX_STAGED_FILES"] = 2
+    remote = bridge.cache_root / "remote"
+    for index in range(2):
+        staged = remote / f"existing-{index}" / "00000000.chunk"
+        staged.parent.mkdir(parents=True, exist_ok=True)
+        staged.write_bytes(b"x")
+    target = remote / "new" / "00000000.chunk"
+    with pytest.raises(FederationOperationError) as captured:
+        bridge._write_chunk(target, b"x")
+    assert captured.value.code == "federated-jsonl-staged-cache-full"
+    assert not target.exists()

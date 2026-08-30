@@ -75,9 +75,19 @@ _HARD_MAX_PUBLISH_CHUNKS = 128
 # publication and discovery keep working and the condition stays visible.
 _DEFAULT_MAX_MIRROR_BYTES = 2 * 1024 * 1024 * 1024
 _HARD_MAX_MIRROR_BYTES = 64 * 1024 * 1024 * 1024
+_DEFAULT_MAX_STAGED_BYTES = 512 * 1024 * 1024
+_HARD_MAX_STAGED_BYTES = 16 * 1024 * 1024 * 1024
+_DEFAULT_MAX_STAGED_FILES = 8192
+_HARD_MAX_STAGED_FILES = 1_000_000
+_STAGED_CACHE_SCAN_MULTIPLIER = 4
+_SQLITE_WRITE_RESERVE_BYTES = 2 * 1024 * 1024
+_SQLITE_WRITE_INODES = 3
+_SQLITE_BOOTSTRAP_RESERVE_BYTES = 4 * 1024 * 1024
+_SQLITE_WAL_AUTOCHECKPOINT_PAGES = 64
 _JSONL_CACHE_INODES = 2
 _JSONL_CHUNK_INODES = 2
 _JSONL_MATERIALIZATION_INODES = 2
+_STAGED_CACHE_LOCK = threading.RLock()
 _STORAGE_GROUP_CONFIG_KEYS = (
     "FEDERATED_JSONL_STORAGE_GROUP_ID",
     "FEDERATED_TELEMETRY_STORAGE_GROUP_ID",
@@ -325,11 +335,15 @@ class FederatedJsonlProductBridge:
         with self._init_lock:
             if self._initialized:
                 return
-            self.data_root.mkdir(parents=True, exist_ok=True)
-            self.database.parent.mkdir(parents=True, exist_ok=True)
-            self.cache_root.mkdir(parents=True, exist_ok=True)
-            self.mirror_root.mkdir(parents=True, exist_ok=True)
-            self._initialize_database()
+            bootstrap_dirs = (self.data_root, self.database.parent, self.cache_root, self.mirror_root)
+            requirements = tuple(
+                (directory, 0, _missing_directory_count(directory))
+                for directory in bootstrap_dirs
+            ) + ((self.database.parent, _SQLITE_BOOTSTRAP_RESERVE_BYTES, _SQLITE_WRITE_INODES),)
+            with self._reserve_many(requirements):
+                for directory in bootstrap_dirs:
+                    directory.mkdir(parents=True, exist_ok=True)
+                self._initialize_database()
             self._initialized = True
 
     def _connect(self) -> sqlite3.Connection:
@@ -338,7 +352,21 @@ class FederatedJsonlProductBridge:
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA busy_timeout=30000")
         connection.execute("PRAGMA synchronous=FULL")
+        connection.execute(f"PRAGMA wal_autocheckpoint={_SQLITE_WAL_AUTOCHECKPOINT_PAGES}")
         return connection
+
+    @contextmanager
+    def _write_connection(self) -> Iterator[sqlite3.Connection]:
+        missing_directories = _missing_directory_count(self.database.parent)
+        with self._reserve(
+            self.database.parent,
+            bytes_required=_SQLITE_WRITE_RESERVE_BYTES,
+            inodes_required=_SQLITE_WRITE_INODES + missing_directories,
+        ) as reservation:
+            self.database.parent.mkdir(parents=True, exist_ok=True)
+            self._assert_reserved_resource(self.database.parent, reservation)
+            with self._connect() as connection:
+                yield connection
 
     def _initialize_database(self) -> None:
         with self._connect() as connection:
@@ -431,6 +459,67 @@ class FederatedJsonlProductBridge:
             _DEFAULT_MAX_MIRROR_BYTES,
             _HARD_MAX_MIRROR_BYTES,
         )
+
+    def _staged_quota_bytes(self) -> int:
+        return self._positive_bound(
+            "FEDERATED_JSONL_MAX_STAGED_BYTES", _DEFAULT_MAX_STAGED_BYTES, _HARD_MAX_STAGED_BYTES
+        )
+
+    def _staged_file_quota(self) -> int:
+        return self._positive_bound(
+            "FEDERATED_JSONL_MAX_STAGED_FILES",
+            _DEFAULT_MAX_STAGED_FILES,
+            _HARD_MAX_STAGED_FILES,
+        )
+
+    def _physical_staged_usage(self) -> tuple[int, int]:
+        remote = self.cache_root / "remote"
+        if not remote.is_dir():
+            return 0, 0
+        total = 0
+        files = 0
+        for staged in remote.rglob("*.chunk"):
+            try:
+                total += staged.stat().st_size
+            except FileNotFoundError:
+                continue
+            files += 1
+            if total >= self._staged_quota_bytes() or files >= self._staged_file_quota():
+                break
+        return total, files
+
+    def _cleanup_orphaned_staged_chunks(self) -> int:
+        with _STAGED_CACHE_LOCK:
+            remote = self.cache_root / "remote"
+            if not remote.is_dir():
+                return 0
+            maximum = self._positive_bound(
+                "FEDERATED_JSONL_MAX_BATCHES_PER_SYNC",
+                _DEFAULT_MAX_REMOTE_BATCHES,
+                _HARD_MAX_REMOTE_BATCHES,
+            )
+            scan_limit = min(
+                self._staged_file_quota(), maximum * _STAGED_CACHE_SCAN_MULTIPLIER
+            )
+            removed = 0
+            scanned = 0
+            with self._connect() as connection:
+                for staged in remote.rglob("*.chunk"):
+                    if removed >= maximum or scanned >= scan_limit:
+                        break
+                    scanned += 1
+                    referenced = connection.execute(
+                        "SELECT 1 FROM seen_batches WHERE chunk_path=? LIMIT 1",
+                        (str(staged),),
+                    ).fetchone()
+                    if referenced is not None:
+                        continue
+                    try:
+                        staged.unlink()
+                        removed += 1
+                    except FileNotFoundError:
+                        continue
+            return removed
 
     def _mirrored_bytes(self, *, excluding: tuple[str, str] | None = None) -> int:
         """Total bytes this device holds from other members' JSONL files."""
@@ -591,7 +680,7 @@ class FederatedJsonlProductBridge:
                     // FEDERATED_JSONL_CHUNK_BYTES,
                 )
                 dataset_id = federated_jsonl_dataset_id(node_id, relative_path)
-                with self._connect() as connection:
+                with self._write_connection() as connection:
                     connection.execute(
                         """
                         INSERT INTO local_files(
@@ -734,7 +823,7 @@ class FederatedJsonlProductBridge:
             _batch, relative_path, index = entry
             if getattr(outcome, "committed", False) is not True:
                 continue
-            with self._connect() as connection:
+            with self._write_connection() as connection:
                 row = connection.execute(
                     "SELECT next_chunk,chunk_count FROM local_files WHERE relative_path=?",
                     (relative_path,),
@@ -923,6 +1012,10 @@ class FederatedJsonlProductBridge:
         return directory / f"{chunk_index:08d}.chunk"
 
     def _write_chunk(self, path: Path, data: bytes) -> None:
+        with _STAGED_CACHE_LOCK:
+            self._write_chunk_locked(path, data)
+
+    def _write_chunk_locked(self, path: Path, data: bytes) -> None:
         if path.exists():
             digest = f"sha256:{hashlib.sha256(data).hexdigest()}"
             if path.stat().st_size == len(data) and _sha256_path(path) == digest:
@@ -931,6 +1024,15 @@ class FederatedJsonlProductBridge:
                 "federated-jsonl-staging-conflict",
                 "content.chunk_index",
                 "staged chunk path already contains different bytes",
+            )
+        staged_bytes, staged_files = self._physical_staged_usage()
+        if (
+            staged_bytes + len(data) > self._staged_quota_bytes()
+            or staged_files + 1 > self._staged_file_quota()
+        ):
+            raise FederationOperationError(
+                "federated-jsonl-staged-cache-full",
+                "remote Federated JSONL staged-cache quota is exhausted",
             )
         missing_directories = _missing_directory_count(path.parent)
         with self._reserve(
@@ -1029,7 +1131,7 @@ class FederatedJsonlProductBridge:
             chunk_path = self._chunk_path(encoded_sha256, chunk_index)
             self._write_chunk(chunk_path, decoded)
 
-        with self._connect() as connection:
+        with self._write_connection() as connection:
             connection.execute(
                 """
                 INSERT OR IGNORE INTO seen_batches(
@@ -1071,7 +1173,7 @@ class FederatedJsonlProductBridge:
         rows = tuple(rows)
         if not rows:
             return
-        with self._connect() as connection:
+        with self._write_connection() as connection:
             connection.executemany(
                 """
                 UPDATE seen_batches SET chunk_path=NULL
@@ -1105,7 +1207,7 @@ class FederatedJsonlProductBridge:
         rows: Iterable[sqlite3.Row],
     ) -> None:
         staged_rows = tuple(rows)
-        with self._connect() as connection:
+        with self._write_connection() as connection:
             connection.execute(
                 """
                 INSERT INTO materialized_files(
@@ -1591,6 +1693,7 @@ class FederatedJsonlProductBridge:
         try:
             self._set_state(status="syncing", last_error=None)
             session_id, node_id = self._context_ids(runtime_state, context)
+            self._cleanup_orphaned_staged_chunks()
             runtime = getattr(self.onboarding_service, "relay_runtime", None)
             if runtime is None:
                 raise FederationOperationError(
