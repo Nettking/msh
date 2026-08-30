@@ -284,6 +284,22 @@ class FederatedJsonlProductBridge:
                 "host resource pressure refused a Federated JSONL disk write",
             ) from exc
 
+    def _assert_reserved_resource(self, path: Path, reservation: object) -> None:
+        """Fail closed if a missing-path reservation moved to another filesystem."""
+
+        expected = getattr(reservation, "resource_id", None)
+        if not isinstance(expected, str) or not expected:
+            raise FederationOperationError(
+                "federated-jsonl-resource-identity-unavailable",
+                "resource admission did not expose the reserved backing resource",
+            )
+        actual = self.resource_admission.assessment(path).resource_id
+        if actual != expected:
+            raise FederationOperationError(
+                "federated-jsonl-resource-changed",
+                "Federated JSONL destination changed backing resource after admission",
+            )
+
     def _ensure_initialized(self) -> None:
         if self._initialized:
             return
@@ -902,8 +918,9 @@ class FederatedJsonlProductBridge:
             path.parent,
             bytes_required=len(data),
             inodes_required=_JSONL_CHUNK_INODES + missing_directories,
-        ):
+        ) as reservation:
             path.parent.mkdir(parents=True, exist_ok=True)
+            self._assert_reserved_resource(path.parent, reservation)
             temporary: Path | None = None
             try:
                 with tempfile.NamedTemporaryFile(
@@ -1141,7 +1158,7 @@ class FederatedJsonlProductBridge:
                         inodes_required=_JSONL_MATERIALIZATION_INODES,
                     )
                 )
-                reservations.enter_context(
+                raw_reservation = reservations.enter_context(
                     self._reserve(
                         target.parent,
                         bytes_required=declared_file_size,
@@ -1152,6 +1169,8 @@ class FederatedJsonlProductBridge:
                     )
                 )
                 target.parent.mkdir(parents=True, exist_ok=True)
+                target = self._target_path(producer, relative_path)
+                self._assert_reserved_resource(target.parent, raw_reservation)
                 with tempfile.NamedTemporaryFile(
                     "wb", dir=self.cache_root, delete=False
                 ) as encoded:
