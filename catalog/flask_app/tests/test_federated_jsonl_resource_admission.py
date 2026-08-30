@@ -472,3 +472,28 @@ def test_retry_reconciles_valid_replaced_target_without_reconstruction(
     assert Path(str(row["target_path"])) == target
     assert int(row["size_bytes"]) == len(payload)
     assert int(staged["n"]) == 0
+
+
+def test_retry_ignores_incomplete_staged_versions(tmp_path: Path) -> None:
+    admission = _RecordingAdmission()
+    consumer = _bridge(tmp_path, "retry-incomplete", admission=admission)
+    with consumer._connect() as connection:
+        connection.execute(
+            """
+            INSERT INTO seen_batches(
+                session_id,group_id,dataset_id,batch_id,producer_node_id,
+                relative_path,file_sha256,encoded_sha256,file_size,encoded_size,
+                source_mtime_ns,chunk_index,chunk_count,chunk_sha256,chunk_path,
+                committed_at
+            ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (
+                "session-incomplete","storage-1","dataset-incomplete","batch-0",
+                "node-remote","sources/demo/day.jsonl","sha256:" + "1" * 64,
+                "sha256:" + "2" * 64,10,10,1,0,2,"sha256:" + "3" * 64,
+                str(consumer.cache_root / "missing.chunk"),
+                "2026-08-30T00:00:00+00:00",
+            ),
+        )
+    assert consumer._retry_staged_materializations(session_id="session-incomplete") == 0
+    assert admission.many_calls == []

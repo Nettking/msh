@@ -1069,9 +1069,6 @@ class FederatedJsonlProductBridge:
 
     def _consume_staged_rows(self, rows: Iterable[sqlite3.Row]) -> None:
         rows = tuple(rows)
-        for row in rows:
-            if row["chunk_path"]:
-                Path(str(row["chunk_path"])).unlink(missing_ok=True)
         if not rows:
             return
         with self._connect() as connection:
@@ -1090,6 +1087,9 @@ class FederatedJsonlProductBridge:
                     for row in rows
                 ),
             )
+        for row in rows:
+            if row["chunk_path"]:
+                Path(str(row["chunk_path"])).unlink(missing_ok=True)
 
     def _record_materialized_file(
         self,
@@ -1102,7 +1102,9 @@ class FederatedJsonlProductBridge:
         source_mtime_ns: int,
         target: Path,
         size: int,
+        rows: Iterable[sqlite3.Row],
     ) -> None:
+        staged_rows = tuple(rows)
         with self._connect() as connection:
             connection.execute(
                 """
@@ -1131,17 +1133,44 @@ class FederatedJsonlProductBridge:
                     _stamp(self.clock()),
                 ),
             )
+            connection.executemany(
+                """
+                UPDATE seen_batches SET chunk_path=NULL
+                WHERE session_id=? AND group_id=? AND dataset_id=? AND batch_id=?
+                """,
+                (
+                    (
+                        str(row["session_id"]),
+                        str(row["group_id"]),
+                        str(row["dataset_id"]),
+                        str(row["batch_id"]),
+                    )
+                    for row in staged_rows
+                ),
+            )
+        for row in staged_rows:
+            if row["chunk_path"]:
+                Path(str(row["chunk_path"])).unlink(missing_ok=True)
 
     def _retry_staged_materializations(self, *, session_id: str) -> int:
+        max_versions = self._positive_bound(
+            "FEDERATED_JSONL_MAX_BATCHES_PER_SYNC",
+            _DEFAULT_MAX_REMOTE_BATCHES,
+            _HARD_MAX_REMOTE_BATCHES,
+        )
         with self._connect() as connection:
             versions = connection.execute(
                 """
-                SELECT DISTINCT dataset_id,file_sha256,encoded_sha256
+                SELECT dataset_id,file_sha256,encoded_sha256
                 FROM seen_batches
                 WHERE session_id=? AND chunk_path IS NOT NULL
-                ORDER BY dataset_id,file_sha256,encoded_sha256
+                GROUP BY dataset_id,file_sha256,encoded_sha256
+                HAVING COUNT(*)=MAX(chunk_count)
+                   AND COUNT(DISTINCT chunk_index)=MAX(chunk_count)
+                ORDER BY MAX(committed_at),dataset_id,file_sha256,encoded_sha256
+                LIMIT ?
                 """,
-                (session_id,),
+                (session_id, max_versions),
             ).fetchall()
         materialized = 0
         for version in versions:
@@ -1264,8 +1293,8 @@ class FederatedJsonlProductBridge:
                 source_mtime_ns=source_mtime_ns,
                 target=target,
                 size=declared_file_size,
+                rows=rows,
             )
-            self._consume_staged_rows(rows)
             return True
         target_missing_directories = _missing_directory_count(target.parent)
         encoded_temp: Path | None = None
@@ -1357,8 +1386,8 @@ class FederatedJsonlProductBridge:
                     source_mtime_ns=source_mtime_ns,
                     target=target,
                     size=size,
+                    rows=rows,
                 )
-                self._consume_staged_rows(rows)
                 return True
         finally:
             if encoded_temp is not None:
