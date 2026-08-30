@@ -186,12 +186,19 @@ def _resource_identity(path: Path) -> str:
     stat = path.stat()
     device_id = int(stat.st_dev)
     if os.name == "nt":
+        # CPython 3.12 exposes the Windows volume serial number through st_dev.
+        # Prefer it over a drive/share anchor so a directory-mounted volume is
+        # distinct from its host drive, while two mount paths to the same volume
+        # still share one admission envelope. Keep an anchor fallback for a
+        # filesystem/runtime that cannot provide a non-zero device identifier.
         if device_id:
             return f"volume:{device_id}"
         anchor = path.anchor.casefold()
         if not anchor:
             raise OSError("Windows resource path has no device id or volume/share anchor")
         return f"volume-anchor:{anchor}"
+    # st_dev identifies the mounted resource on POSIX. It is deliberately local
+    # only; no filesystem layout is published to Federation peers.
     return f"device:{device_id}"
 
 
@@ -202,6 +209,8 @@ def _inode_measurement(path: Path) -> tuple[int | None, int | None]:
     try:
         value = statvfs(path)
     except OSError:
+        # Some mounted filesystems expose byte capacity but no usable inode
+        # accounting. That is different from the whole measurement failing.
         return None, None
     total = int(getattr(value, "f_files", 0) or 0)
     available = getattr(value, "f_favail", None)
@@ -211,6 +220,7 @@ def _inode_measurement(path: Path) -> tuple[int | None, int | None]:
         return None, None
     free = int(available)
     if free < 0:
+        # Negative/sentinel inode counts are not usable capacity evidence.
         return None, None
     return total, free
 

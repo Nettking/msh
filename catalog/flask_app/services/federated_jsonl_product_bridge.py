@@ -284,6 +284,25 @@ class FederatedJsonlProductBridge:
                 "host resource pressure refused a Federated JSONL disk write",
             ) from exc
 
+    @contextmanager
+    def _reserve_many(
+        self, requirements: tuple[tuple[Path, int, int], ...]
+    ) -> Iterator[tuple[object, ...]]:
+        reserve_many = getattr(self.resource_admission, "reserve_many", None)
+        if not callable(reserve_many):
+            raise FederationOperationError(
+                "federated-jsonl-resource-admission-incompatible",
+                "resource admission does not support atomic multi-resource reservations",
+            )
+        try:
+            with reserve_many(requirements) as reservations:
+                yield tuple(reservations)
+        except HostResourceRefused as exc:
+            raise FederationOperationError(
+                "federated-jsonl-resource-pressure",
+                "host resource pressure refused a Federated JSONL disk write",
+            ) from exc
+
     def _assert_reserved_resource(self, path: Path, reservation: object) -> None:
         """Fail closed if a missing-path reservation moved to another filesystem."""
 
@@ -1150,24 +1169,28 @@ class FederatedJsonlProductBridge:
         encoded_temp: Path | None = None
         raw_temp: Path | None = None
         try:
-            with ExitStack() as reservations:
-                reservations.enter_context(
-                    self._reserve(
-                        self.cache_root,
-                        bytes_required=declared_encoded_size,
-                        inodes_required=_JSONL_MATERIALIZATION_INODES,
+            requirements = (
+                (
+                    self.cache_root,
+                    declared_encoded_size,
+                    _JSONL_MATERIALIZATION_INODES,
+                ),
+                (
+                    target.parent,
+                    declared_file_size,
+                    _JSONL_MATERIALIZATION_INODES + target_missing_directories,
+                ),
+            )
+            with self._reserve_many(requirements) as materialization_reservations:
+                if not materialization_reservations:
+                    raise FederationOperationError(
+                        "federated-jsonl-resource-identity-unavailable",
+                        "atomic resource admission returned no backing resource",
                     )
-                )
-                raw_reservation = reservations.enter_context(
-                    self._reserve(
-                        target.parent,
-                        bytes_required=declared_file_size,
-                        inodes_required=(
-                            _JSONL_MATERIALIZATION_INODES
-                            + target_missing_directories
-                        ),
-                    )
-                )
+                # reserve_many preserves first-seen resource order. The target
+                # requirement is second; when both paths share a filesystem the
+                # single coalesced reservation covers both requirements.
+                raw_reservation = materialization_reservations[-1]
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target = self._target_path(producer, relative_path)
                 self._assert_reserved_resource(target.parent, raw_reservation)

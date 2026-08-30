@@ -35,6 +35,7 @@ class _RecordingAdmission:
         self.fail_call = fail_call
         self.changed_resource_assessment = changed_resource_assessment
         self.calls: list[tuple[Path, int, int]] = []
+        self.many_calls: list[tuple[tuple[Path, int, int], ...]] = []
         self.assessment_calls = 0
         self.active = 0
         self.max_active = 0
@@ -56,6 +57,32 @@ class _RecordingAdmission:
             yield SimpleNamespace(resource_id="test-resource")
         finally:
             self.active -= 1
+
+    @contextmanager
+    def reserve_many(
+        self, requirements: tuple[tuple[Path, int, int], ...]
+    ) -> Iterator[tuple[object, ...]]:
+        requested = tuple(
+            (Path(path), bytes_required, inodes_required)
+            for path, bytes_required, inodes_required in requirements
+        )
+        self.many_calls.append(requested)
+        first_call = len(self.calls) + 1
+        self.calls.extend(requested)
+        last_call = len(self.calls)
+        if (
+            self.fail_call is not None
+            and first_call <= self.fail_call <= last_call
+        ):
+            raise HostResourceRefused("resource_pressure", SimpleNamespace())
+        self.active += len(requested)
+        self.max_active = max(self.max_active, self.active)
+        try:
+            # The fake models the common same-filesystem case, so atomic
+            # admission coalesces both requirements into one resource.
+            yield (SimpleNamespace(resource_id="test-resource"),)
+        finally:
+            self.active -= len(requested)
 
     def assessment(self, path: Path) -> object:
         del path
@@ -251,6 +278,8 @@ def test_materialization_reserves_encoded_and_raw_peaks_together(tmp_path: Path)
 
     assert materialized is True
     assert len(admission.calls) == 3
+    assert len(admission.many_calls) == 1
+    assert len(admission.many_calls[0]) == 2
     chunk_call, encoded_call, raw_call = admission.calls
     assert chunk_call[1] <= int(content["encoded_size"])
     assert encoded_call[0] == consumer.cache_root
@@ -348,14 +377,14 @@ def test_mirror_quota_refuses_before_reconstruction_temp_files(tmp_path: Path) -
     assert snapshot["mirror_quota_reached"] is True
 
 
-def test_materialization_releases_first_reservation_when_second_is_refused(
+def test_materialization_atomic_admission_refuses_without_partial_reservation(
     tmp_path: Path,
 ) -> None:
     batch, session_id = _published_batch(tmp_path)
     content = batch["content"]
     assert isinstance(content, dict)
-    # Call 1 is chunk staging, call 2 is encoded reconstruction, and call 3 is
-    # raw materialization. Refusing call 3 must unwind call 2 as well.
+    # Call 1 is chunk staging. Calls 2 and 3 are submitted in one reserve_many
+    # transaction, so refusing the raw requirement must publish neither one.
     admission = _RecordingAdmission(fail_call=3)
     consumer = _bridge(tmp_path, "unwind", admission=admission)
 
