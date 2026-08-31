@@ -49,6 +49,7 @@ class ComputeCandidateSource:
                         "handler_capability_type": descriptor.capability_type,
                         "protocol_version": descriptor.protocol_version,
                         "descriptor_fingerprint": descriptor.descriptor_fingerprint,
+                        "handler_attributes": descriptor.attributes,
                     },
                 )
             )
