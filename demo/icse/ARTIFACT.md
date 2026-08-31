@@ -2,9 +2,9 @@
 
 ## Artifact identity
 
-**Artifact:** FCP ICSE Tool Demonstration  
-**Candidate version:** 0.1.0  
-**Primary entrypoint:** `demo/icse/docker-compose.yml`  
+**Artifact:** FCP ICSE Tool Demonstration
+**Candidate version:** 0.1.0
+**Primary entrypoint:** `demo/icse/docker-compose.yml`
 **Evidence schema:** `fcp.icse-demo-summary.v1`
 
 The artifact evaluates a bounded tool-integration claim through four deterministic
