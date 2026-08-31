@@ -290,6 +290,9 @@ python -m pytest -o addopts= --basetemp .pytest-b01-override -q \
   catalog/federation/tests/test_resource_overrides.py
 ```
 
+The combined directly relevant collection on the implementation-plus-ledger
+workspace collected **315 tests**, with **310 passed** and **5 platform skips**.
+
 ## Architectural blockers and exact residual work
 
 1. **Pre-route multipart spooling:** the Flask/Werkzeug application now bounds
