@@ -22,10 +22,12 @@ from catalog.capabilities.analysis.contracts import (
     ORIGIN_MANUAL_UPLOAD,
     SLICE_KIND_DATE,
 )
-from catalog.capabilities.analysis.resource_admission import reserve_analysis_requirements
+from catalog.capabilities.analysis.resource_admission import (
+    reserve_analysis_requirements,
+)
+from catalog.capabilities.job_store import DurableJobSnapshot
 from catalog.federation.host_resources import ProcessResourceAdmission
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
-from catalog.capabilities.job_store import DurableJobSnapshot
 from catalog.orchestrator.analysis_runtime import DiscoveryAnalysisGateway
 from catalog.runner.data_filtering import (
     date_range_source_signature,
@@ -282,28 +284,27 @@ class UploadAnalysisJobService:
                     4,
                 )
             ],
-        ):
-            with self._connect() as connection:
-                for job_id in submitted:
-                    connection.execute(
-                        """
+        ), self._connect() as connection:
+            for job_id in submitted:
+                connection.execute(
+                    """
                         INSERT INTO data_upload_analysis_jobs(
                             job_id,batch_id,session_id,coordinator_id,provider_id,
                             baseline_update_at,created_at,execution_id
                         ) VALUES(?,?,?,?,?,?,?,?)
                         ON CONFLICT(job_id,batch_id) DO NOTHING
                         """,
-                        (
-                            job_id,
-                            batch_id,
-                            identity.session_id,
-                            identity.coordinator_node_id,
-                            None,
-                            None,
-                            _stamp(now),
-                            job_id,
-                        ),
-                    )
+                    (
+                        job_id,
+                        batch_id,
+                        identity.session_id,
+                        identity.coordinator_node_id,
+                        None,
+                        None,
+                        _stamp(now),
+                        job_id,
+                    ),
+                )
         return submitted[0]
 
     def start_tracking(self, job_id: str) -> None:

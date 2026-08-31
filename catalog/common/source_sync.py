@@ -8,17 +8,16 @@ high-water marks without coupling the rest of FCP to one vendor API.
 
 from __future__ import annotations
 
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta, timezone
 import json
 import os
-from pathlib import Path
 import tempfile
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any
 
 from catalog.federation.host_resources import ProcessResourceAdmission
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
-
 
 UTC_SUFFIX = "Z"
 MAX_SOURCE_SYNC_STATE_BYTES = 1024 * 1024

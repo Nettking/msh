@@ -264,7 +264,7 @@ class FilesystemBatchStorageProvider:
     ) -> None:
         """Fail closed if mkdir/replace crossed to another backing resource."""
         resource_ids = {
-            str(getattr(reservation, "resource_id")) for reservation in reservations
+            str(reservation.resource_id) for reservation in reservations
         }
         measure = getattr(self.resource_admission, "_measure", None)
         if not callable(measure):

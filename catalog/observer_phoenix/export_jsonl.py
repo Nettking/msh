@@ -9,21 +9,30 @@ scans do not ingest connector metadata as if it were machine data.
 from __future__ import annotations
 
 import argparse
-from collections import defaultdict
-from datetime import timedelta
 import json
 import os
-from pathlib import Path
 import tempfile
-from typing import Any, Iterable
+from collections import defaultdict
+from collections.abc import Iterable
+from datetime import timedelta
+from pathlib import Path
+from typing import Any
 
-from catalog.capabilities.analysis.resource_admission import reserve_analysis_requirements
+from catalog.capabilities.analysis.resource_admission import (
+    reserve_analysis_requirements,
+)
+from catalog.common.source_sync import (
+    format_utc,
+    load_state,
+    parse_utc,
+    save_state,
+    subtract_overlap,
+    utc_now,
+)
 from catalog.federation.host_resources import ProcessResourceAdmission
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
-from catalog.common.source_sync import format_utc, load_state, parse_utc, save_state, subtract_overlap, utc_now
 from catalog.observer_phoenix.client import ObserverPhoenixClient, ObserverPhoenixConfig
 from catalog.observer_phoenix.settings import resolve_runtime_config
-
 
 SOURCE_NAME = "observer_phoenix"
 WATERMARK_NAME = "trend_measurements"
@@ -179,8 +188,7 @@ def append_unique_jsonl(
 ) -> tuple[int, dict[str, int]]:
     grouped: dict[str, list[tuple[dict[str, Any], bytes]]] = defaultdict(list)
     estimated_bytes = 0
-    estimated_records = 0
-    for record in records:
+    for estimated_records, record in enumerate(records, start=1):
         date_key = parse_utc(str(record["timestamp"])).date().isoformat()
         payload = (
             json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n"
@@ -188,7 +196,6 @@ def append_unique_jsonl(
         if len(payload) > MAX_OBSERVER_RECORD_BYTES:
             raise ValueError("Observer Phoenix record exceeds its bounded JSONL size")
         estimated_bytes += len(payload)
-        estimated_records += 1
         if (
             estimated_records > MAX_OBSERVER_EXPORT_RECORDS
             or estimated_bytes > MAX_OBSERVER_EXPORT_BYTES

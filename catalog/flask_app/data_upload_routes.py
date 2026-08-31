@@ -24,7 +24,6 @@ from .services.upload_analysis_job_service import (
     get_upload_analysis_job_service,
 )
 
-
 data_upload_web = Blueprint(
     "data_upload_web",
     __name__,

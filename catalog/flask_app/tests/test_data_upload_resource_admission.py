@@ -15,12 +15,17 @@ from catalog.federation.host_resources import (
     PressureThresholds,
     ProcessResourceAdmission,
 )
-from catalog.federation.process_resource_admission import SerializedProcessResourceAdmission
+from catalog.federation.process_resource_admission import (
+    SerializedProcessResourceAdmission,
+)
 from catalog.flask_app import data_upload_routes
 from catalog.flask_app.services.data_upload_resource_admission import (
     enqueue_with_resource_admission,
 )
-from catalog.flask_app.services.data_upload_service import DataUploadError, DataUploadService
+from catalog.flask_app.services.data_upload_service import (
+    DataUploadError,
+    DataUploadService,
+)
 
 
 class _FakeUploadService:

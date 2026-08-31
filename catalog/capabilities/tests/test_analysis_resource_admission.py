@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from catalog.capabilities.analysis.content_store import LocalArtifactContentStore
 from catalog.capabilities.analysis.contracts import (
     MAX_PLAN_BYTES,
     ORIGIN_AUTOMATIC_DISCOVERY,
@@ -18,8 +19,9 @@ from catalog.capabilities.analysis.resource_admission import (
     FederatedAnalysisHandler,
     analysis_workspace_resource_requirement,
 )
-from catalog.capabilities.analysis.content_store import LocalArtifactContentStore
-from catalog.capabilities.analysis.worker import FederatedAnalysisHandler as _BaseHandler
+from catalog.capabilities.analysis.worker import (
+    FederatedAnalysisHandler as _BaseHandler,
+)
 from catalog.capabilities.dispatch import ExecutionResult
 from catalog.capabilities.jobs import AttemptStatus, JobAttempt, JobStatus
 from catalog.federation.host_resources import (

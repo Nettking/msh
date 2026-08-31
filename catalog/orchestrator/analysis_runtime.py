@@ -43,16 +43,18 @@ from catalog.capabilities.analysis.contracts import (
 from catalog.capabilities.analysis.provisioning import dispatched_data_owner_node_id
 from catalog.capabilities.analysis.resource_admission import ProcessResourceAdmission
 from catalog.capabilities.analysis.scheduler import SubmissionOutcome
-from catalog.capabilities.artifact_secure_runtime import SQLiteCapabilityArtifactAuthority
+from catalog.capabilities.artifact_secure_runtime import (
+    SQLiteCapabilityArtifactAuthority,
+)
 from catalog.capabilities.efficiency import ExecutionEfficiencyRuntime
 from catalog.capabilities.jobs import JobStatus
 from catalog.capabilities.lifecycle_store import SQLiteJobLifecycleStore
 from catalog.capabilities.retry_claim import attempt_owner
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.node.identity import IdentityStore
 from catalog.orchestrator.analysis_federation import DeviceFederationAuthority
 from catalog.runner.data_filtering import source_files_for_dates
 from catalog.runner.script_catalog import discover_runnable_scripts, repo_root
-from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from .pipeline import StatusPrinter, _run_for_date_slice
 
@@ -61,7 +63,7 @@ _IDENTITY_LOCK = threading.Lock()
 
 _FEDERATION_SUPPLIER: (
     Callable[
-        ["AnalysisIdentity", Path, Callable[[], datetime]],
+        [AnalysisIdentity, Path, Callable[[], datetime]],
         DeviceFederationAuthority | None,
     ]
     | None
@@ -85,7 +87,7 @@ def register_identity_supplier(
 
 def register_federation_supplier(
     supplier: Callable[
-        ["AnalysisIdentity", Path, Callable[[], datetime]],
+        [AnalysisIdentity, Path, Callable[[], datetime]],
         DeviceFederationAuthority | None,
     ],
     *,

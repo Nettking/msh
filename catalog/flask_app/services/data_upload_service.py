@@ -27,8 +27,13 @@ from flask import current_app
 from werkzeug.datastructures import FileStorage
 from werkzeug.utils import secure_filename
 
-from catalog.capabilities.analysis.resource_admission import reserve_analysis_requirements
-from catalog.federation.host_resources import HostResourceRefused, ProcessResourceAdmission
+from catalog.capabilities.analysis.resource_admission import (
+    reserve_analysis_requirements,
+)
+from catalog.federation.host_resources import (
+    HostResourceRefused,
+    ProcessResourceAdmission,
+)
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.orchestrator.pipeline import get_runtime_manager
 from catalog.runner.script_catalog import repo_root

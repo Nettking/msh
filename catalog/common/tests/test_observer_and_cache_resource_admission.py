@@ -13,9 +13,10 @@ from catalog.federation.host_resources import (
     HostResourceRefused,
     PressureThresholds,
 )
-from catalog.federation.process_resource_admission import SerializedProcessResourceAdmission
+from catalog.federation.process_resource_admission import (
+    SerializedProcessResourceAdmission,
+)
 from catalog.observer_phoenix import export_jsonl
-
 
 NOW = datetime(2026, 8, 31, tzinfo=timezone.utc)
 

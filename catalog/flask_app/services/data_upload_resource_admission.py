@@ -7,7 +7,10 @@ from typing import Any
 
 from werkzeug.datastructures import FileStorage
 
-from catalog.federation.host_resources import HostResourceRefused, ProcessResourceAdmission
+from catalog.federation.host_resources import (
+    HostResourceRefused,
+    ProcessResourceAdmission,
+)
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from .data_upload_service import DataUploadError, DataUploadService

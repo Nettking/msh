@@ -11,10 +11,10 @@ import hashlib
 import os
 import tempfile
 from collections.abc import Iterable, Iterator
+from collections.abc import Iterator as TypingIterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator as TypingIterator
 
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.host_resources import ProcessResourceAdmission

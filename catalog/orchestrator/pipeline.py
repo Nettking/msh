@@ -23,9 +23,6 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Any
 
-from catalog.common.artifact_registry import configured_scan_dirs, scan_artifacts
-from catalog.common.basic_metrics import basic_metrics_path, build_basic_metrics_dataset
-from catalog.common.data_loading import iter_jsonl_files
 from catalog.capabilities.analysis.contracts import DEFAULT_MAX_SLICE_BYTES
 from catalog.capabilities.analysis.resource_admission import (
     MAX_DATA_INDEX_BYTES,
@@ -33,6 +30,9 @@ from catalog.capabilities.analysis.resource_admission import (
     analysis_script_workspace_resource_requirement,
     reserve_analysis_requirements,
 )
+from catalog.common.artifact_registry import configured_scan_dirs, scan_artifacts
+from catalog.common.basic_metrics import basic_metrics_path, build_basic_metrics_dataset
+from catalog.common.data_loading import iter_jsonl_files
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.runner.data_filtering import (
     date_range_source_signature,

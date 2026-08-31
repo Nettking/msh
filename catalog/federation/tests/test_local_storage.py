@@ -7,10 +7,15 @@ from pathlib import Path
 
 import pytest
 
-from catalog.federation.host_resources import FilesystemMeasurement, PressureThresholds
 from catalog.federation.errors import FederationValidationError
-from catalog.federation.local_storage import FilesystemBatchStorageProvider, LocalStorageService
-from catalog.federation.process_resource_admission import SerializedProcessResourceAdmission
+from catalog.federation.host_resources import FilesystemMeasurement, PressureThresholds
+from catalog.federation.local_storage import (
+    FilesystemBatchStorageProvider,
+    LocalStorageService,
+)
+from catalog.federation.process_resource_admission import (
+    SerializedProcessResourceAdmission,
+)
 from catalog.federation.storage_protocol import (
     STORAGE_PROTOCOL,
     STORAGE_PROTOCOL_VERSION,

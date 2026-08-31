@@ -9,8 +9,14 @@ from typing import Any
 
 from catalog.capabilities.dispatch import ExecutionResult
 from catalog.capabilities.jobs import JobContract
-from catalog.federation.errors import FederationOperationError, FederationValidationError
-from catalog.federation.host_resources import HostResourceRefused, ProcessResourceAdmission
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
+from catalog.federation.host_resources import (
+    HostResourceRefused,
+    ProcessResourceAdmission,
+)
 from catalog.federation.object_transfer import MAX_TRANSFER_CHUNKS
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
@@ -289,15 +295,15 @@ class FederatedAnalysisScheduler(_FederatedAnalysisScheduler):
 
 
 __all__ = [
-    "FederatedAnalysisHandler",
-    "FederatedAnalysisScheduler",
-    "MAX_ANALYSIS_RESULT_BYTES",
     "MAX_ANALYSIS_METADATA_BYTES",
+    "MAX_ANALYSIS_RESULT_BYTES",
     "MAX_CATALOG_COPY_BYTES",
     "MAX_CATALOG_COPY_INODES",
     "MAX_DATA_INDEX_BYTES",
     "MAX_SCRIPT_OUTPUT_BYTES",
     "MAX_SCRIPT_OUTPUT_INODES",
+    "FederatedAnalysisHandler",
+    "FederatedAnalysisScheduler",
     "analysis_publication_resource_requirement",
     "analysis_result_resource_requirement",
     "analysis_script_workspace_resource_requirement",

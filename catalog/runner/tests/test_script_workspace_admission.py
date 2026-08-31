@@ -14,7 +14,6 @@ from catalog.federation.host_resources import (
 from catalog.runner import script_exec
 from catalog.runner.script_catalog import ScriptOption
 
-
 NOW = datetime(2026, 8, 31, tzinfo=timezone.utc)
 
 

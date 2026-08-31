@@ -13,15 +13,18 @@ import shutil
 import tempfile
 import threading
 import time
+from collections.abc import Iterable, Sequence
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 import pandas as pd
 
+from catalog.capabilities.analysis.resource_admission import (
+    reserve_analysis_requirements,
+)
 from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
-from catalog.capabilities.analysis.resource_admission import reserve_analysis_requirements
 from catalog.federation.host_resources import ProcessResourceAdmission
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
