@@ -10,6 +10,13 @@ build cleanup and exact source re-proof, before optional AI/model activation wor
 B01 build admission and live pressure handling are injected at this runner seam so
 ordinary launcher builds and Update-All share one Docker-backing-resource contract
 without duplicating the mature update engine.
+
+B05 activation recovery is also owned here. The runner observes the existing
+engine's Flask stop/start boundary through the same subprocess proxy. A failure
+after the previous Flask container was stopped but before target replacement
+restarts that exact stopped container and verifies its previous build identity.
+Once target replacement has begun, failure is recorded as ``activation_required``
+with a deterministic retry path rather than pretending source rollback is safe.
 """
 
 from __future__ import annotations
@@ -36,6 +43,8 @@ from catalog.federation.agent_log import bound_agent_log
 ENGINE_NAME = "fcp_update_engine.py"
 MAX_REQUEST_BYTES = 8192
 CORE_BUILD_COMMAND = ["docker", "compose", "build", "relay", "flask", "recorder"]
+FLASK_STOP_COMMAND = ["docker", "compose", "stop", "flask"]
+FLASK_START_COMMAND = ["docker", "compose", "up", "-d", "flask"]
 
 
 def _digest(path: Path) -> str:
@@ -68,8 +77,18 @@ def _apply_target(path: Path, engine: ModuleType) -> str | None:
     return target.lower()
 
 
+def _read_result(path: Path) -> dict[str, object] | None:
+    try:
+        if path.stat().st_size > MAX_REQUEST_BYTES:
+            return None
+        value = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
 class _ControlledSubprocess:
-    """Module-shaped subprocess proxy that intercepts only the core build."""
+    """Module-shaped subprocess proxy for the controlled build and activation phase."""
 
     SubprocessError = subprocess.SubprocessError
     CompletedProcess = subprocess.CompletedProcess
@@ -77,6 +96,8 @@ class _ControlledSubprocess:
     def __init__(self, root: Path, original_run) -> None:
         self.root = root
         self.original_run = original_run
+        self.flask_stopped = False
+        self.target_flask_started = False
 
     def run(self, argv, **kwargs):
         command = list(argv)
@@ -85,7 +106,116 @@ class _ControlledSubprocess:
             build_env = os.environ.copy() if environment is None else dict(environment)
             host_build.controlled_core_build(self.root, build_env)
             return subprocess.CompletedProcess(command, 0)
+        if command == FLASK_STOP_COMMAND:
+            completed = self.original_run(argv, **kwargs)
+            if completed.returncode == 0:
+                self.flask_stopped = True
+            return completed
+        if command == FLASK_START_COMMAND:
+            # Invocation itself crosses the replacement boundary. Even a failed
+            # Compose command may have recreated the container before returning.
+            self.target_flask_started = True
         return self.original_run(argv, **kwargs)
+
+
+def restore_previous_flask_runtime(
+    engine: ModuleType,
+    root: Path,
+    previous_commit: str,
+) -> bool:
+    """Restart the still-existing pre-target Flask container and prove identity."""
+
+    try:
+        completed = subprocess.run(
+            ["docker", "compose", "start", "flask"],
+            cwd=root,
+            shell=False,
+            check=False,
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return False
+    return completed.returncode == 0 and engine.running_commit(root) == previous_commit
+
+
+def record_activation_recovery(
+    engine: ModuleType,
+    result_file: Path,
+    result: dict[str, object],
+    *,
+    state: str,
+    running: str | None,
+    code: str,
+    message: str,
+) -> None:
+    request_id = result.get("request_id")
+    target = result.get("target_commit")
+    current = result.get("current_commit")
+    if not isinstance(request_id, str) or not engine.REQUEST_ID_RE.fullmatch(request_id):
+        return
+    engine.write_result(
+        result_file,
+        request_id=request_id,
+        action="apply",
+        state=state,
+        current=current if isinstance(current, str) else None,
+        target=target if isinstance(target, str) else None,
+        running=running,
+        code=code,
+        message=message,
+    )
+
+
+def _recover_failed_activation(
+    engine: ModuleType,
+    root: Path,
+    result_file: Path,
+    proxy: _ControlledSubprocess,
+    *,
+    previous_commit: str | None,
+    target: str,
+) -> None:
+    result = _read_result(result_file)
+    if (
+        result is None
+        or result.get("action") != "apply"
+        or result.get("target_commit") != target
+        or result.get("code") != "host_update_failed"
+    ):
+        return
+
+    if proxy.flask_stopped and not proxy.target_flask_started and previous_commit:
+        if restore_previous_flask_runtime(engine, root, previous_commit):
+            record_activation_recovery(
+                engine,
+                result_file,
+                result,
+                state="error",
+                running=previous_commit,
+                code="activation_recovered",
+                message=(
+                    "Target activation failed before Flask replacement. The previous "
+                    "core runtime was restarted and verified; retry the approved apply."
+                ),
+            )
+            return
+
+    if proxy.target_flask_started:
+        record_activation_recovery(
+            engine,
+            result_file,
+            result,
+            state="activation_required",
+            running=engine.running_commit(root),
+            code="activation_required",
+            message=(
+                "Target activation began but runtime verification did not complete. "
+                "Source remains on the approved target; retry the same apply to resume "
+                "activation."
+            ),
+        )
 
 
 def _serialized_apply(
@@ -103,6 +233,8 @@ def _serialized_apply(
     original_preflight = engine.preflight_disk
     original_prune = engine.prune_build_cache
     original_subprocess = engine.subprocess
+    previous_commit = engine.running_commit(root)
+    controlled_subprocess = _ControlledSubprocess(root, original_subprocess.run)
 
     def release_after_build() -> None:
         nonlocal lock_held
@@ -129,9 +261,19 @@ def _serialized_apply(
 
     engine.preflight_disk = guarded_preflight
     engine.prune_build_cache = guarded_post_build_prune
-    engine.subprocess = _ControlledSubprocess(root, original_subprocess.run)
+    engine.subprocess = controlled_subprocess
     try:
-        return bool(engine.process_once(root, request_file, result_file))
+        processed = bool(engine.process_once(root, request_file, result_file))
+        if processed:
+            _recover_failed_activation(
+                engine,
+                root,
+                result_file,
+                controlled_subprocess,
+                previous_commit=previous_commit,
+                target=target,
+            )
+        return processed
     finally:
         engine.preflight_disk = original_preflight
         engine.prune_build_cache = original_prune
