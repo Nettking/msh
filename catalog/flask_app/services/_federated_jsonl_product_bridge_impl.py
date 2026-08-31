@@ -18,7 +18,7 @@ import os
 import sqlite3
 import threading
 from collections.abc import Callable, Iterable, Iterator, Mapping
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -388,14 +388,20 @@ class FederatedJsonlProductBridge:
         """
 
         matches: list[object] = []
+        failures: list[FederationOperationError] = []
         for reservation in reservations:
             try:
                 self._assert_stable_reserved_resource(boundary, reservation)
-            except FederationOperationError:
+            except FederationOperationError as exc:
+                failures.append(exc)
                 continue
             matches.append(reservation)
         if len(matches) == 1:
             return matches[0]
+        if len(reservations) == 1 and len(failures) == 1:
+            # Preserve a proved TOCTOU/resource-identity failure instead of
+            # hiding it behind the generic no-match error.
+            raise failures[0]
         raise FederationOperationError(
             "federated-jsonl-resource-identity-unavailable",
             "atomic resource admission did not expose the reservation for a pinned destination",
@@ -1102,11 +1108,25 @@ class FederatedJsonlProductBridge:
         directory = self.cache_root / "remote" / encoded_sha256[7:]
         return directory / f"{chunk_index:08d}.chunk"
 
-    def _write_chunk(self, path: Path, data: bytes) -> None:
+    def _write_chunk(
+        self,
+        path: Path,
+        data: bytes,
+        *,
+        admitted_reservation: object | None = None,
+    ) -> None:
         with _STAGED_CACHE_LOCK:
-            self._write_chunk_locked(path, data)
+            self._write_chunk_locked(
+                path, data, admitted_reservation=admitted_reservation
+            )
 
-    def _write_chunk_locked(self, path: Path, data: bytes) -> None:
+    def _write_chunk_locked(
+        self,
+        path: Path,
+        data: bytes,
+        *,
+        admitted_reservation: object | None = None,
+    ) -> None:
         try:
             relative_parent = path.parent.relative_to(self.cache_root)
         except ValueError as exc:
@@ -1141,11 +1161,16 @@ class FederatedJsonlProductBridge:
                 "federated-jsonl-staged-cache-full",
                 "remote Federated JSONL staged-cache quota is exhausted",
             )
-        with self._reserve(
-            path.parent,
-            bytes_required=len(data),
-            inodes_required=_JSONL_CHUNK_INODES + len(relative_parent.parts),
-        ) as reservation, self._stable_directory(
+        reservation_context = (
+            self._reserve(
+                path.parent,
+                bytes_required=len(data),
+                inodes_required=_JSONL_CHUNK_INODES + len(relative_parent.parts),
+            )
+            if admitted_reservation is None
+            else nullcontext(admitted_reservation)
+        )
+        with reservation_context as reservation, self._stable_directory(
             self.cache_root, relative_parent, create=True
         ) as directory:
             self._assert_stable_reserved_resource(directory, reservation)
@@ -1239,37 +1264,79 @@ class FederatedJsonlProductBridge:
 
         if producer != local_node_id:
             chunk_path = self._chunk_path(encoded_sha256, chunk_index)
-            self._write_chunk(chunk_path, decoded)
-
-        with self._write_connection() as connection:
-            connection.execute(
-                """
-                INSERT OR IGNORE INTO seen_batches(
-                    session_id,group_id,dataset_id,batch_id,producer_node_id,
-                    relative_path,file_sha256,encoded_sha256,file_size,encoded_size,
-                    source_mtime_ns,chunk_index,chunk_count,chunk_sha256,chunk_path,
-                    committed_at
-                ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
+        requirements: list[tuple[Path, int, int]] = []
+        if chunk_path is not None:
+            relative_chunk_parent = chunk_path.parent.relative_to(self.cache_root)
+            requirements.append(
                 (
-                    reference.session_id,
-                    reference.group_id,
-                    reference.dataset_id,
-                    reference.batch_id,
-                    producer,
-                    relative_path,
-                    file_sha256,
-                    encoded_sha256,
-                    int(content["file_size"]),
-                    int(content["encoded_size"]),
-                    int(content["source_mtime_ns"]),
-                    chunk_index,
-                    chunk_count,
-                    chunk_sha256,
-                    None if chunk_path is None else str(chunk_path),
-                    reference.committed_at.isoformat(),
-                ),
+                    chunk_path.parent,
+                    len(decoded),
+                    _JSONL_CHUNK_INODES + len(relative_chunk_parent.parts),
+                )
             )
+        requirements.append(
+            (
+                self.database.parent,
+                _SQLITE_WRITE_RESERVE_BYTES,
+                _SQLITE_WRITE_INODES + _missing_directory_count(self.database.parent),
+            )
+        )
+        with self._reserve_many(requirements) as reservations:
+            if not reservations:
+                raise FederationOperationError(
+                    "federated-jsonl-resource-identity-unavailable",
+                    "atomic resource admission returned no backing resource",
+                )
+            with self._stable_directory(self.database.parent) as database_directory:
+                database_reservation = self._reservation_for_boundary(
+                    database_directory, reservations
+                )
+                chunk_reservation = None
+                if chunk_path is not None:
+                    with self._stable_directory(
+                        self.cache_root, relative_chunk_parent, create=True
+                    ) as chunk_directory:
+                        chunk_reservation = self._reservation_for_boundary(
+                            chunk_directory, reservations
+                        )
+                if chunk_path is not None:
+                    self._write_chunk(
+                        chunk_path,
+                        decoded,
+                        admitted_reservation=chunk_reservation,
+                    )
+
+                with self._write_connection(
+                    admitted_reservation=database_reservation
+                ) as connection:
+                    connection.execute(
+                        """
+                        INSERT OR IGNORE INTO seen_batches(
+                            session_id,group_id,dataset_id,batch_id,producer_node_id,
+                            relative_path,file_sha256,encoded_sha256,file_size,encoded_size,
+                            source_mtime_ns,chunk_index,chunk_count,chunk_sha256,chunk_path,
+                            committed_at
+                        ) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+                        """,
+                        (
+                            reference.session_id,
+                            reference.group_id,
+                            reference.dataset_id,
+                            reference.batch_id,
+                            producer,
+                            relative_path,
+                            file_sha256,
+                            encoded_sha256,
+                            int(content["file_size"]),
+                            int(content["encoded_size"]),
+                            int(content["source_mtime_ns"]),
+                            chunk_index,
+                            chunk_count,
+                            chunk_sha256,
+                            None if chunk_path is None else str(chunk_path),
+                            reference.committed_at.isoformat(),
+                        ),
+                    )
         if producer == local_node_id:
             return False
         return self._try_materialize(
