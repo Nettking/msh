@@ -11,13 +11,16 @@ import json
 import os
 import sqlite3
 import tempfile
-from contextlib import AbstractContextManager, nullcontext
+from collections.abc import Iterable, Iterator
+from contextlib import AbstractContextManager, ExitStack, contextmanager, nullcontext
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
 from typing import Protocol
 
 from .errors import FederationValidationError
+from .host_resources import HostResourceRefused, ProcessResourceAdmission
+from .process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from .sqlite_schema import SQLiteMigration, ensure_sqlite_schema
 from .storage_allocation import StorageAllocation
 from .storage_protocol import (
@@ -86,6 +89,9 @@ _STORAGE_INDEX_BASE_COLUMNS = frozenset(
 _STORAGE_INDEX_SCHEMA_COLUMNS = frozenset(
     {"dataset_schema_name", "dataset_schema_version"}
 )
+_STORAGE_SQLITE_RESERVE_BYTES = 2 * 1024 * 1024
+_STORAGE_SQLITE_RESERVE_INODES = 4
+_STORAGE_PUBLICATION_RESERVE_INODES = 3
 
 
 def _storage_index_table_exists(connection: sqlite3.Connection) -> bool:
@@ -189,16 +195,47 @@ class FilesystemBatchStorageProvider:
         root: Path,
         *,
         allocation: StorageAllocation | None = None,
+        resource_admission: ProcessResourceAdmission | None = None,
     ) -> None:
         self.root = Path(root)
         self.batch_root = self.root / "batches"
-        self.batch_root.mkdir(parents=True, exist_ok=True)
         self.database_path = self.root / "storage-index.sqlite3"
-        # Without an allocation this provider accepts batches until the volume
-        # itself refuses, which is how a storage contribution could consume its
-        # host's whole disk. Callers that serve the Federation pass one.
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        # StorageAllocation remains the contribution/failover budget. The
+        # process-wide admission is an additional host guard for every provider,
+        # including providers without a private allocation.
         self.allocation = allocation
-        self._initialize()
+        with self._reserve_resources(
+            (
+                (self.root, _STORAGE_SQLITE_RESERVE_BYTES, _STORAGE_SQLITE_RESERVE_INODES),
+                (self.batch_root, 0, 2),
+            )
+        ):
+            self.batch_root.mkdir(parents=True, exist_ok=True)
+            self._initialize()
+
+    @contextmanager
+    def _reserve_resources(
+        self,
+        requirements: Iterable[tuple[Path, int, int]],
+    ) -> Iterator[tuple[object, ...]]:
+        reserve_many = getattr(self.resource_admission, "reserve_many", None)
+        if callable(reserve_many):
+            with reserve_many(requirements) as reservations:
+                yield tuple(reservations)
+            return
+        with ExitStack() as stack:
+            reservations = tuple(
+                stack.enter_context(
+                    self.resource_admission.reserve(
+                        path,
+                        bytes_required=bytes_required,
+                        inodes_required=inodes_required,
+                    )
+                )
+                for path, bytes_required, inodes_required in requirements
+            )
+            yield reservations
 
     def _claim(self, nbytes: int) -> AbstractContextManager[None]:
         """Hold the bytes a batch needs, or refuse before anything is written."""
@@ -212,7 +249,34 @@ class FilesystemBatchStorageProvider:
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA foreign_keys = ON")
         connection.execute("PRAGMA journal_mode = WAL")
+        # Keep the journal from growing without bound between ingest calls.
+        # The durable catalogue itself is retained for idempotency; its WAL is
+        # only an implementation journal and may be checkpointed safely.
+        connection.execute("PRAGMA synchronous = FULL")
+        connection.execute("PRAGMA wal_autocheckpoint = 100")
+        connection.execute("PRAGMA journal_size_limit = 1048576")
         return connection
+
+    def _assert_resource_identity(
+        self,
+        reservations: tuple[object, ...],
+        *paths: Path,
+    ) -> None:
+        """Fail closed if mkdir/replace crossed to another backing resource."""
+        resource_ids = {
+            str(getattr(reservation, "resource_id")) for reservation in reservations
+        }
+        measure = getattr(self.resource_admission, "_measure", None)
+        if not callable(measure):
+            return
+        for path in paths:
+            measurement = measure(path)
+            if not measurement.available or measurement.resource_id not in resource_ids:
+                raise FederationValidationError(
+                    "storage-backing-resource-changed",
+                    "path",
+                    "storage path no longer resolves to the admitted backing resource",
+                )
 
     def _initialize(self) -> None:
         with self._connect() as connection:
@@ -310,10 +374,47 @@ class FilesystemBatchStorageProvider:
         )
 
     def ingest(self, request: BatchIngestRequest) -> BatchIngestResult:
+        """Admit filesystem, SQLite, and WAL growth before opening the writer."""
+        request.validate_content_hash()
+        payload = json.dumps(
+            request.to_dict(),
+            sort_keys=True,
+            separators=(",", ":"),
+            ensure_ascii=False,
+        ).encode("utf-8")
+        try:
+            with self._reserve_resources(
+                (
+                    (
+                        self.root,
+                        len(payload) + _STORAGE_SQLITE_RESERVE_BYTES,
+                        _STORAGE_SQLITE_RESERVE_INODES,
+                    ),
+                    (
+                        self.batch_root,
+                        len(payload),
+                        _STORAGE_PUBLICATION_RESERVE_INODES,
+                    ),
+                )
+            ) as reservations:
+                return self._ingest_unadmitted(request, reservations)
+        except HostResourceRefused as exc:
+            raise FederationValidationError(
+                "storage-resource-pressure",
+                "resource",
+                "storage ingest refused under host resource pressure",
+            ) from exc
+
+    def _ingest_unadmitted(
+        self,
+        request: BatchIngestRequest,
+        reservations: tuple[object, ...],
+    ) -> BatchIngestResult:
         request.validate_content_hash()
         relative_path = self._relative_path(request)
         final_path = self._stored_path(relative_path.as_posix())
         final_path.parent.mkdir(parents=True, exist_ok=True)
+        self._assert_resource_identity(reservations, final_path.parent, self.root)
 
         with self._connect() as connection:
             connection.execute("BEGIN IMMEDIATE")
@@ -402,6 +503,11 @@ class FilesystemBatchStorageProvider:
                         handle.flush()
                         os.fsync(handle.fileno())
                     os.replace(temporary_path, final_path)
+                    self._assert_resource_identity(
+                        reservations,
+                        final_path.parent,
+                        self.database_path.parent,
+                    )
                     self._fsync_directory(final_path.parent)
                     connection.execute(
                         """INSERT INTO committed_batches
@@ -423,6 +529,12 @@ class FilesystemBatchStorageProvider:
                         ),
                     )
                     connection.commit()
+                    try:
+                        connection.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                    except sqlite3.Error:
+                        # A concurrent reader may defer a checkpoint; the WAL
+                        # autochekpoint and journal-size limit remain active.
+                        pass
                 except Exception:
                     temporary_path.unlink(missing_ok=True)
                     if final_path.exists():

@@ -22,6 +22,9 @@ from catalog.capabilities.analysis.contracts import (
     ORIGIN_MANUAL_UPLOAD,
     SLICE_KIND_DATE,
 )
+from catalog.capabilities.analysis.resource_admission import reserve_analysis_requirements
+from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.capabilities.job_store import DurableJobSnapshot
 from catalog.orchestrator.analysis_runtime import DiscoveryAnalysisGateway
 from catalog.runner.data_filtering import (
@@ -62,16 +65,22 @@ class UploadAnalysisJobService:
         clock: Callable[[], datetime] = _now,
         script_keys: tuple[str, ...] = AUTOMATIC_RUNTIME_SCRIPT_KEYS,
         runtime_namespace: str = "default",
+        resource_admission: ProcessResourceAdmission | None = None,
     ) -> None:
         self.database = Path(database)
-        self.database.parent.mkdir(parents=True, exist_ok=True)
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        with reserve_analysis_requirements(
+            self.resource_admission,
+            [(self.database.parent, 2 * 1024 * 1024, 4)],
+        ):
+            self.database.parent.mkdir(parents=True, exist_ok=True)
+            self._initialize_links()
         self.gateway = gateway if gateway is not None else DiscoveryAnalysisGateway()
         self.data_dir = Path(data_dir) if data_dir is not None else repo_root() / "data"
         self.clock = clock
         self.script_keys = tuple(script_keys)
         self.runtime_namespace = runtime_namespace
         self._lock = threading.Lock()
-        self._initialize_links()
 
     # ------------------------------------------------------------------
 
@@ -264,27 +273,37 @@ class UploadAnalysisJobService:
             )
         identity = gateway.runtime.identity
         now = self.clock()
-        with self._connect() as connection:
-            for job_id in submitted:
-                connection.execute(
-                    """
-                    INSERT INTO data_upload_analysis_jobs(
-                        job_id,batch_id,session_id,coordinator_id,provider_id,
-                        baseline_update_at,created_at,execution_id
-                    ) VALUES(?,?,?,?,?,?,?,?)
-                    ON CONFLICT(job_id,batch_id) DO NOTHING
-                    """,
-                    (
-                        job_id,
-                        batch_id,
-                        identity.session_id,
-                        identity.coordinator_node_id,
-                        None,
-                        None,
-                        _stamp(now),
-                        job_id,
-                    ),
+        with reserve_analysis_requirements(
+            self.resource_admission,
+            [
+                (
+                    self.database.parent,
+                    2 * 1024 * 1024 + (len(submitted) * 8 * 1024),
+                    4,
                 )
+            ],
+        ):
+            with self._connect() as connection:
+                for job_id in submitted:
+                    connection.execute(
+                        """
+                        INSERT INTO data_upload_analysis_jobs(
+                            job_id,batch_id,session_id,coordinator_id,provider_id,
+                            baseline_update_at,created_at,execution_id
+                        ) VALUES(?,?,?,?,?,?,?,?)
+                        ON CONFLICT(job_id,batch_id) DO NOTHING
+                        """,
+                        (
+                            job_id,
+                            batch_id,
+                            identity.session_id,
+                            identity.coordinator_node_id,
+                            None,
+                            None,
+                            _stamp(now),
+                            job_id,
+                        ),
+                    )
         return submitted[0]
 
     def start_tracking(self, job_id: str) -> None:

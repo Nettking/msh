@@ -1,21 +1,26 @@
 from __future__ import annotations
 
+import io
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
 import pytest
+from flask import Flask
+from werkzeug.datastructures import FileStorage
 
 from catalog.federation.host_resources import (
     FilesystemMeasurement,
     PressureThresholds,
     ProcessResourceAdmission,
 )
+from catalog.federation.process_resource_admission import SerializedProcessResourceAdmission
+from catalog.flask_app import data_upload_routes
 from catalog.flask_app.services.data_upload_resource_admission import (
     enqueue_with_resource_admission,
 )
-from catalog.flask_app.services.data_upload_service import DataUploadError
+from catalog.flask_app.services.data_upload_service import DataUploadError, DataUploadService
 
 
 class _FakeUploadService:
@@ -160,3 +165,105 @@ def test_distinct_backing_resources_have_independent_envelopes(tmp_path: Path) -
 
     assert first.calls == 0
     assert second.calls == 1
+
+
+def test_service_admission_refuses_before_staging_request_bytes(
+    tmp_path: Path,
+) -> None:
+    mode = {"free_bytes": 10_000_000}
+
+    def measure(_path: Path | str) -> FilesystemMeasurement:
+        return _measurement("upload-resource", free_bytes=mode["free_bytes"])
+
+    admission = SerializedProcessResourceAdmission(
+        thresholds=PressureThresholds(
+            critical_free_bytes=100,
+            pressure_free_bytes=200,
+            warning_free_bytes=300,
+            critical_free_inodes=0,
+            pressure_free_inodes=0,
+            warning_free_inodes=0,
+            max_measurement_age_seconds=60,
+        ),
+        measurer=measure,
+        clock=lambda: datetime(2026, 8, 28, 12, 0, tzinfo=timezone.utc),
+    )
+    service = DataUploadService(
+        database=tmp_path / "imports" / "uploads.sqlite3",
+        staging_root=tmp_path / "imports" / "staging",
+        published_root=tmp_path / "data" / "uploads",
+        runtime_manager=_FakeUploadService(tmp_path),
+        max_files=2,
+        max_file_bytes=1024,
+        max_total_bytes=2048,
+        resource_admission=admission,
+    )
+    payload = FileStorage(stream=io.BytesIO(b'{"ok":true}\n'), filename="data.jsonl")
+    mode["free_bytes"] = 200
+
+    with pytest.raises(DataUploadError) as raised:
+        service.enqueue((payload,))
+
+    assert raised.value.code == "upload-resource-pressure"
+    assert tuple(service.staging_root.iterdir()) == ()
+
+
+def test_async_import_pressure_keeps_batch_queued_and_hidden(tmp_path: Path, monkeypatch) -> None:
+    mode = {"free_bytes": 10_000_000}
+
+    def measure(_path: Path | str) -> FilesystemMeasurement:
+        return _measurement("upload-resource", free_bytes=mode["free_bytes"])
+
+    admission = SerializedProcessResourceAdmission(
+        thresholds=PressureThresholds(
+            critical_free_bytes=100,
+            pressure_free_bytes=200,
+            warning_free_bytes=300,
+            critical_free_inodes=0,
+            pressure_free_inodes=0,
+            warning_free_inodes=0,
+            max_measurement_age_seconds=60,
+        ),
+        measurer=measure,
+        clock=lambda: datetime(2026, 8, 28, 12, 0, tzinfo=timezone.utc),
+    )
+    service = DataUploadService(
+        database=tmp_path / "imports" / "uploads.sqlite3",
+        staging_root=tmp_path / "imports" / "staging",
+        published_root=tmp_path / "data" / "uploads",
+        runtime_manager=_FakeUploadService(tmp_path),
+        max_files=2,
+        max_file_bytes=1024,
+        max_total_bytes=2048,
+        resource_admission=admission,
+    )
+    monkeypatch.setattr(service, "_start_import", lambda *args, **kwargs: True)
+    payload = FileStorage(stream=io.BytesIO(b'{"ok":true}\n'), filename="data.jsonl")
+    batch = service.enqueue((payload,))
+    batch_id = str(batch["batch_id"])
+    mode["free_bytes"] = 200
+
+    service._import_batch_serialized(batch_id)
+
+    assert service.batch(batch_id)["status"] == "queued"
+    assert not (service.published_root / batch_id).exists()
+    assert (service.staging_root / batch_id).is_dir()
+
+
+def test_declared_multipart_limit_is_checked_before_request_files_access() -> None:
+    app = Flask(__name__)
+    app.config["TESTING"] = True
+
+    with app.test_request_context(
+        "/data-upload/",
+        method="POST",
+    ):
+        from flask import request
+
+        request.environ["CONTENT_LENGTH"] = "400000"
+        with pytest.raises(DataUploadError) as raised:
+            data_upload_routes._validate_declared_upload_size(
+                type("Service", (), {"max_total_bytes": 100})()
+            )
+
+    assert raised.value.code == "upload-request-too-large"

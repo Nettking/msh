@@ -33,6 +33,27 @@ data_upload_web = Blueprint(
 )
 
 _CSRF_SESSION_KEY = "data_upload_csrf_token"
+_MULTIPART_OVERHEAD_BYTES = 256 * 1024
+
+
+def _validate_declared_upload_size(service) -> None:
+    """Reject oversized declared bodies before Werkzeug parses multipart data.
+
+    Flask/Werkzeug owns multipart parsing and may spool a request before this
+    route is entered. A declared Content-Length is the one pre-parser signal
+    available here, so enforce the application payload ceiling plus a bounded
+    allowance for supported multipart framing. Chunked/unknown-length requests
+    remain governed by the streaming service limits after framework parsing.
+    """
+    content_length = request.content_length
+    if content_length is None:
+        return
+    maximum = service.max_total_bytes + _MULTIPART_OVERHEAD_BYTES
+    if content_length > maximum:
+        raise DataUploadError(
+            "upload-request-too-large",
+            "The upload request exceeds the bounded multipart request limit.",
+        )
 
 
 def _csrf_token() -> str:
@@ -83,8 +104,9 @@ def index():
 @data_upload_web.post("/")
 def upload():
     try:
-        _validate_csrf()
         service = get_data_upload_service()
+        _validate_declared_upload_size(service)
+        _validate_csrf()
         batch = enqueue_with_resource_admission(
             service,
             request.files.getlist("files"),

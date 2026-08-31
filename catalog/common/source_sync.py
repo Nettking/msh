@@ -11,11 +11,17 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timedelta, timezone
 import json
+import os
 from pathlib import Path
+import tempfile
 from typing import Any
+
+from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 
 UTC_SUFFIX = "Z"
+MAX_SOURCE_SYNC_STATE_BYTES = 1024 * 1024
 
 
 class SourceSyncError(RuntimeError):
@@ -110,8 +116,42 @@ def load_state(data_dir: Path, source_name: str) -> SourceSyncState:
     )
 
 
-def save_state(data_dir: Path, state: SourceSyncState) -> Path:
+def save_state(
+    data_dir: Path,
+    state: SourceSyncState,
+    *,
+    resource_admission: ProcessResourceAdmission | None = None,
+) -> Path:
     path = state_path(data_dir, state.source_name)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(asdict(state), indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    payload = (json.dumps(asdict(state), indent=2, sort_keys=True) + "\n").encode(
+        "utf-8"
+    )
+    if len(payload) > MAX_SOURCE_SYNC_STATE_BYTES:
+        raise SourceSyncError("Source synchronization state exceeds its bounded size.")
+    try:
+        existing_bytes = path.stat().st_size if path.exists() else 0
+    except OSError as exc:
+        raise SourceSyncError("Could not inspect existing source synchronization state.") from exc
+    controller = resource_admission or PROCESS_RESOURCE_ADMISSION
+    with controller.reserve(
+        path.parent,
+        # Atomic replacement retains the old state until the new file is
+        # durable, so both identities must fit at the same time.
+        bytes_required=existing_bytes + len(payload),
+        inodes_required=3,
+    ):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        descriptor, temporary_name = tempfile.mkstemp(
+            prefix=f".{path.name}.", suffix=".partial", dir=path.parent
+        )
+        temporary = Path(temporary_name)
+        try:
+            with os.fdopen(descriptor, "wb") as handle:
+                handle.write(payload)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(temporary, path)
+        except BaseException:
+            temporary.unlink(missing_ok=True)
+            raise
     return path

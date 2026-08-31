@@ -31,6 +31,11 @@ def enqueue_with_resource_admission(
 
     controller = admission or PROCESS_RESOURCE_ADMISSION
     try:
+        if isinstance(service, DataUploadService):
+            # DataUploadService admits the staging + SQLite metadata transaction
+            # itself. Keeping this handoff inside the service avoids nesting the
+            # route reservation around asynchronous publication work.
+            return service.enqueue(files, resource_admission=controller)
         with controller.reserve(
             service.staging_root,
             bytes_required=service.max_total_bytes,

@@ -12,9 +12,14 @@ import argparse
 from collections import defaultdict
 from datetime import timedelta
 import json
+import os
 from pathlib import Path
+import tempfile
 from typing import Any, Iterable
 
+from catalog.capabilities.analysis.resource_admission import reserve_analysis_requirements
+from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 from catalog.common.source_sync import format_utc, load_state, parse_utc, save_state, subtract_overlap, utc_now
 from catalog.observer_phoenix.client import ObserverPhoenixClient, ObserverPhoenixConfig
 from catalog.observer_phoenix.settings import resolve_runtime_config
@@ -22,6 +27,11 @@ from catalog.observer_phoenix.settings import resolve_runtime_config
 
 SOURCE_NAME = "observer_phoenix"
 WATERMARK_NAME = "trend_measurements"
+MAX_OBSERVER_RECORD_BYTES = 256 * 1024
+MAX_OBSERVER_EXPORT_BYTES = 512 * 1024 * 1024
+MAX_OBSERVER_FILE_BYTES = 256 * 1024 * 1024
+MAX_OBSERVER_EXPORT_RECORDS = 250_000
+_OBSERVER_WRITE_INODES = 3
 
 
 def parse_args() -> argparse.Namespace:
@@ -160,28 +170,93 @@ def _existing_record_ids(path: Path) -> set[str]:
     return existing
 
 
-def append_unique_jsonl(records: Iterable[dict[str, Any]], *, data_dir: Path, source_name: str) -> tuple[int, dict[str, int]]:
-    grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
+def append_unique_jsonl(
+    records: Iterable[dict[str, Any]],
+    *,
+    data_dir: Path,
+    source_name: str,
+    resource_admission: ProcessResourceAdmission | None = None,
+) -> tuple[int, dict[str, int]]:
+    grouped: dict[str, list[tuple[dict[str, Any], bytes]]] = defaultdict(list)
+    estimated_bytes = 0
+    estimated_records = 0
     for record in records:
         date_key = parse_utc(str(record["timestamp"])).date().isoformat()
-        grouped[date_key].append(record)
+        payload = (
+            json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n"
+        ).encode("utf-8")
+        if len(payload) > MAX_OBSERVER_RECORD_BYTES:
+            raise ValueError("Observer Phoenix record exceeds its bounded JSONL size")
+        estimated_bytes += len(payload)
+        estimated_records += 1
+        if (
+            estimated_records > MAX_OBSERVER_EXPORT_RECORDS
+            or estimated_bytes > MAX_OBSERVER_EXPORT_BYTES
+        ):
+            raise ValueError("Observer Phoenix export exceeds its bounded size")
+        grouped[date_key].append((record, payload))
 
     written = 0
     written_by_file: dict[str, int] = {}
     root = target_jsonl_dir(data_dir, source_name)
-    root.mkdir(parents=True, exist_ok=True)
+    plans: list[tuple[Path, bytes, bytes, int]] = []
     for date_key, date_records in sorted(grouped.items()):
         path = root / f"{date_key}.jsonl"
         existing_ids = _existing_record_ids(path)
-        new_records = [record for record in date_records if str(record.get("source_record_id")) not in existing_ids]
+        existing_bytes = path.read_bytes() if path.exists() else b""
+        if len(existing_bytes) > MAX_OBSERVER_FILE_BYTES:
+            raise ValueError("Observer Phoenix JSONL file exceeds its bounded size")
+        new_records = [
+            (record, payload)
+            for record, payload in date_records
+            if str(record.get("source_record_id")) not in existing_ids
+        ]
         if not new_records:
             written_by_file[path.as_posix()] = 0
             continue
-        with path.open("a", encoding="utf-8") as handle:
-            for record in new_records:
-                handle.write(json.dumps(record, sort_keys=True, ensure_ascii=False) + "\n")
-        written += len(new_records)
-        written_by_file[path.as_posix()] = len(new_records)
+        prefix = existing_bytes
+        if prefix and not prefix.endswith(b"\n"):
+            prefix += b"\n"
+        new_bytes = b"".join(payload for _record, payload in new_records)
+        final_bytes = prefix + new_bytes
+        if len(final_bytes) > MAX_OBSERVER_FILE_BYTES:
+            raise ValueError("Observer Phoenix JSONL file exceeds its bounded size")
+        plans.append((path, prefix, new_bytes, len(new_records)))
+
+    if not plans:
+        return 0, written_by_file
+
+    requirements = [
+        (
+            root,
+            sum(len(prefix) + len(new) for _path, prefix, new, _count in plans),
+            len(plans) + 2,
+        )
+    ]
+    requirements.extend(
+        (path, len(prefix) + len(new), _OBSERVER_WRITE_INODES)
+        for path, prefix, new, _count in plans
+    )
+    controller = resource_admission or PROCESS_RESOURCE_ADMISSION
+    with reserve_analysis_requirements(controller, requirements):
+        root.mkdir(parents=True, exist_ok=True)
+        for path, prefix, new_bytes, count in plans:
+            descriptor, temporary_name = tempfile.mkstemp(
+                prefix=f".{path.name}.", suffix=".partial", dir=root
+            )
+            temporary = Path(temporary_name)
+            try:
+                with os.fdopen(descriptor, "wb") as handle:
+                    handle.write(prefix)
+                    handle.write(new_bytes)
+                    handle.flush()
+                    os.fsync(handle.fileno())
+                os.replace(temporary, path)
+            except BaseException:
+                temporary.unlink(missing_ok=True)
+                raise
+            written += count
+            written_by_file[path.as_posix()] = count
     return written, written_by_file
 
 

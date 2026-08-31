@@ -8,6 +8,7 @@ query helpers over that cache.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import tempfile
 import threading
@@ -20,6 +21,9 @@ from typing import Any, Iterable, Sequence
 import pandas as pd
 
 from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
+from catalog.capabilities.analysis.resource_admission import reserve_analysis_requirements
+from catalog.federation.host_resources import ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 TELEMETRY_FIELDS: tuple[str, ...] = (
     "timestamp",
@@ -60,8 +64,16 @@ UNKNOWN_PARTITION = "__unknown__"
 MANIFEST_FILENAME = "_manifest.json"
 MANIFEST_VERSION = 1
 DEFAULT_CACHE_STATUS_TTL_SECONDS = 5.0
+MAX_CACHE_SOURCE_BYTES = 2 * 1024 * 1024 * 1024
+MAX_CACHE_REBUILD_BYTES = 8 * 1024 * 1024 * 1024
+MAX_CACHE_REBUILD_INODES = 250_000
+_CACHE_REBUILD_FIXED_BYTES = 64 * 1024 * 1024
 _CACHE_STATUS_LOCK = threading.Lock()
 _CACHE_STATUS_CACHE: dict[tuple[str, str | None], tuple[float, CacheStatus]] = {}
+
+
+class TelemetryCacheBuildError(RuntimeError):
+    """A cache rebuild exceeded its bounded source/output envelope."""
 
 
 @dataclass(frozen=True)
@@ -143,7 +155,36 @@ def load_jsonl_records(files: Iterable[Path], *, data_dir: Path | str = "data") 
     return _coerce_telemetry_frame(frame)
 
 
-def rebuild_cache(data_dir: Path | str = "data", cache_dir: Path | str | None = None) -> CacheBuildResult:
+def _tree_usage(root: Path) -> tuple[int, int]:
+    """Count cache bytes and identities without following links."""
+    if not root.exists():
+        return 0, 0
+    total_bytes = 0
+    total_inodes = 1
+    for directory, dir_names, file_names in os.walk(root, followlinks=False):
+        safe_dirs: list[str] = []
+        for name in dir_names:
+            path = Path(directory) / name
+            if path.is_symlink():
+                total_inodes += 1
+            else:
+                safe_dirs.append(name)
+                total_inodes += 1
+        dir_names[:] = safe_dirs
+        for name in file_names:
+            path = Path(directory) / name
+            metadata = path.lstat()
+            total_bytes += int(metadata.st_size)
+            total_inodes += 1
+    return total_bytes, total_inodes
+
+
+def rebuild_cache(
+    data_dir: Path | str = "data",
+    cache_dir: Path | str | None = None,
+    *,
+    resource_admission: ProcessResourceAdmission | None = None,
+) -> CacheBuildResult:
     """Rebuild the full Parquet cache from raw JSONL files.
 
     The rebuild is atomic at the directory level: Parquet is written to a
@@ -155,19 +196,46 @@ def rebuild_cache(data_dir: Path | str = "data", cache_dir: Path | str | None = 
     root = Path(data_dir)
     output = Path(cache_dir) if cache_dir is not None else default_cache_dir(root)
     files = discover_jsonl_files(root)
-    frame = load_jsonl_records(files, data_dir=root)
+    source_bytes = 0
+    for source in files:
+        try:
+            source_bytes += int(source.stat().st_size)
+        except OSError as exc:
+            raise TelemetryCacheBuildError("telemetry source changed during cache admission") from exc
+    if source_bytes > MAX_CACHE_SOURCE_BYTES:
+        raise TelemetryCacheBuildError("telemetry source exceeds the bounded cache rebuild input")
+    existing_bytes, existing_inodes = _tree_usage(output)
+    estimated_output_bytes = max(
+        _CACHE_REBUILD_FIXED_BYTES,
+        (2 * source_bytes) + _CACHE_REBUILD_FIXED_BYTES,
+    )
+    required_bytes = existing_bytes + estimated_output_bytes
+    required_inodes = existing_inodes + MAX_CACHE_REBUILD_INODES
+    if required_bytes > MAX_CACHE_REBUILD_BYTES:
+        raise TelemetryCacheBuildError("telemetry cache rebuild exceeds its bounded output envelope")
+    if required_inodes > MAX_CACHE_REBUILD_INODES * 2:
+        raise TelemetryCacheBuildError("telemetry cache rebuild exceeds its bounded inode envelope")
 
-    output.parent.mkdir(parents=True, exist_ok=True)
-    temp_dir = Path(tempfile.mkdtemp(prefix=f".{output.name}-", dir=output.parent))
-    try:
-        _write_partitioned_parquet(frame, temp_dir)
-        _write_manifest(temp_dir, data_dir=root, sources=files, row_count=len(frame))
-        if output.exists():
-            shutil.rmtree(output)
-        temp_dir.replace(output)
-    except Exception:
-        shutil.rmtree(temp_dir, ignore_errors=True)
-        raise
+    controller = resource_admission or PROCESS_RESOURCE_ADMISSION
+    with reserve_analysis_requirements(
+        controller,
+        [(output.parent, required_bytes, required_inodes)],
+    ):
+        frame = load_jsonl_records(files, data_dir=root)
+        output.parent.mkdir(parents=True, exist_ok=True)
+        temp_dir = Path(tempfile.mkdtemp(prefix=f".{output.name}-", dir=output.parent))
+        try:
+            _write_partitioned_parquet(frame, temp_dir)
+            _write_manifest(temp_dir, data_dir=root, sources=files, row_count=len(frame))
+            built_bytes, built_inodes = _tree_usage(temp_dir)
+            if built_bytes > estimated_output_bytes or built_inodes > MAX_CACHE_REBUILD_INODES:
+                raise TelemetryCacheBuildError("telemetry cache output exceeded its bounded envelope")
+            if output.exists():
+                shutil.rmtree(output)
+            temp_dir.replace(output)
+        except Exception:
+            shutil.rmtree(temp_dir, ignore_errors=True)
+            raise
 
     invalidate_cache_status(root, output)
     return CacheBuildResult(row_count=len(frame), source_file_count=len(files), cache_path=output)
