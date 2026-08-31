@@ -76,10 +76,10 @@ def _reserve_completion_many(
         _validate_requirement(bytes_required, inodes_required)
 
     reservations: tuple[ResourceReservation, ...] = ()
-    with controller._lock:  # noqa: SLF001 - same invariant as shared controller
+    with controller._lock:
         grouped: dict[str, tuple[FilesystemMeasurement, int, int]] = {}
         for path, bytes_required, inodes_required in requested:
-            measurement = controller._measure(path)  # noqa: SLF001
+            measurement = controller._measure(path)
             existing = grouped.get(measurement.resource_id)
             if existing is None:
                 grouped[measurement.resource_id] = (
@@ -101,7 +101,7 @@ def _reserve_completion_many(
             bytes_required,
             inodes_required,
         ) in grouped.items():
-            active_bytes, active_inodes = controller._active_for(resource_id)  # noqa: SLF001
+            active_bytes, active_inodes = controller._active_for(resource_id)
             before = assess_measurement(
                 measurement,
                 thresholds=controller.thresholds,
@@ -130,10 +130,10 @@ def _reserve_completion_many(
             )
 
         for reservation in pending:
-            active_bytes, active_inodes = controller._active_for(  # noqa: SLF001
+            active_bytes, active_inodes = controller._active_for(
                 reservation.resource_id
             )
-            controller._reserved[reservation.resource_id] = (  # noqa: SLF001
+            controller._reserved[reservation.resource_id] = (
                 active_bytes + reservation.reserved_bytes,
                 active_inodes + reservation.reserved_inodes,
             )
@@ -142,9 +142,9 @@ def _reserve_completion_many(
     try:
         yield reservations
     finally:
-        with controller._lock:  # noqa: SLF001
+        with controller._lock:
             for reservation in reservations:
-                current_bytes, current_inodes = controller._active_for(  # noqa: SLF001
+                current_bytes, current_inodes = controller._active_for(
                     reservation.resource_id
                 )
                 remaining = (
@@ -152,9 +152,9 @@ def _reserve_completion_many(
                     max(current_inodes - reservation.reserved_inodes, 0),
                 )
                 if remaining == (0, 0):
-                    controller._reserved.pop(reservation.resource_id, None)  # noqa: SLF001
+                    controller._reserved.pop(reservation.resource_id, None)
                 else:
-                    controller._reserved[reservation.resource_id] = remaining  # noqa: SLF001
+                    controller._reserved[reservation.resource_id] = remaining
 
 
 class RecorderAdmissionController(SerializedProcessResourceAdmission):
@@ -173,7 +173,9 @@ class RecorderAdmissionController(SerializedProcessResourceAdmission):
             ((path, bytes_required, inodes_required),),
         ) as reservations:
             if not reservations:
-                raise RuntimeError("single-resource completion admission returned no reservation")
+                raise RuntimeError(
+                    "single-resource completion admission returned no reservation"
+                )
             yield reservations[0]
 
 
