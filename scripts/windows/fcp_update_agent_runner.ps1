@@ -54,17 +54,7 @@ function Get-RequestResultFile([string]$RequestId) {
 }
 
 function Test-ApplyRequest([string]$Path) {
-    if (-not (Test-Path -LiteralPath $Path)) { return $false }
-    try {
-        $item = Get-Item -LiteralPath $Path
-        if ($item.Length -gt $MaxBytes) { return $false }
-        $request = [System.IO.File]::ReadAllText($Path) | ConvertFrom-Json
-        return (
-            [string]$request.schema -eq $RequestSchema -and
-            [string]$request.action -eq 'apply'
-        )
-    }
-    catch { return $false }
+    return $null -ne (Get-ApplyRequestIdentity $Path)
 }
 
 function Get-ApplyRequestIdentity([string]$Path) {
@@ -300,8 +290,8 @@ try {
             continue
         }
 
-        $isApply = Test-ApplyRequest $RequestFile
-        $applyIdentity = if ($isApply) { Get-ApplyRequestIdentity $RequestFile } else { $null }
+        $applyIdentity = Get-ApplyRequestIdentity $RequestFile
+        $isApply = $null -ne $applyIdentity
         $mutationMutex = $null
         $mutationAcquired = $false
         $proxyDirectory = $null
@@ -318,7 +308,6 @@ try {
         $previousActivationPhase = $null
         try {
             if ($isApply) {
-                if ($null -eq $applyIdentity) { throw 'malformed_apply_identity' }
                 $mutationMutex = [System.Threading.Mutex]::new(
                     $false,
                     "Global\FCPHostMutation-$pathHash"
