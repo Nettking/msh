@@ -72,7 +72,9 @@ def test_windows_recovery_correlates_result_to_exact_apply_request() -> None:
         )
     ]
     assert "[string]$result.request_id -ne $ExpectedRequestId" in reconcile
-    assert "[string]$result.target_commit -ne $ExpectedTargetCommit" in reconcile
+    assert "([string]$result.target_commit).ToLowerInvariant() -ne $ExpectedTargetCommit" in reconcile
+    assert "-ExpectedRequestId ([string]$applyIdentity.RequestId)" in runner
+    assert "-ExpectedTargetCommit ([string]$applyIdentity.TargetCommit)" in runner
 
 
 def test_recovery_is_bounded_to_one_restore_or_one_explicit_state_transition() -> None:
