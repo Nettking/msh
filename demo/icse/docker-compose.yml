@@ -1,0 +1,14 @@
+services:
+  demo:
+    build:
+      context: ../..
+      dockerfile: Dockerfile.cli
+      args:
+        FCP_BUILD_COMMIT: ${FCP_BUILD_COMMIT:-unknown}
+    working_dir: /app
+    entrypoint: ["python", "-m", "demo.icse.run"]
+    environment:
+      PYTHONUNBUFFERED: "1"
+      FCP_BUILD_COMMIT: ${FCP_BUILD_COMMIT:-unknown}
+    volumes:
+      - "${FCP_ICSE_OUTPUT_DIR:-./evidence}:/evidence"
