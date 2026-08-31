@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import threading
 from datetime import datetime, timezone
+from typing import Self
 
 from catalog.federation.host_resources import (
     FilesystemMeasurement,
@@ -23,7 +24,7 @@ class _GateLock:
         self.release = threading.Event()
         self._gated = False
 
-    def __enter__(self) -> _GateLock:
+    def __enter__(self) -> Self:
         if (
             self.enabled
             and not self._gated
