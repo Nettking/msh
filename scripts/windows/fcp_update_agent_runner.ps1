@@ -36,9 +36,7 @@ function Get-PathHash([string]$Value) {
         $bytes = [System.Text.Encoding]::UTF8.GetBytes($Value.ToLowerInvariant())
         return ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').Substring(0, 24)
     }
-    finally {
-        $sha.Dispose()
-    }
+    finally { $sha.Dispose() }
 }
 
 function Get-RequestResultFile([string]$RequestId) {
@@ -48,13 +46,7 @@ function Get-RequestResultFile([string]$RequestId) {
         $digest = ([System.BitConverter]::ToString($sha.ComputeHash($bytes))).Replace('-', '').ToLowerInvariant()
         return Join-Path $AgentDirectory "result-$digest.json"
     }
-    finally {
-        $sha.Dispose()
-    }
-}
-
-function Test-ApplyRequest([string]$Path) {
-    return $null -ne (Get-ApplyRequestIdentity $Path)
+    finally { $sha.Dispose() }
 }
 
 function Get-ApplyRequestIdentity([string]$Path) {
@@ -71,12 +63,13 @@ function Get-ApplyRequestIdentity([string]$Path) {
             $requestId -notmatch $RequestIdPattern -or
             $target -notmatch $OidPattern
         ) { return $null }
-        return [pscustomobject]@{
-            RequestId = $requestId
-            TargetCommit = $target
-        }
+        return [pscustomobject]@{ RequestId = $requestId; TargetCommit = $target }
     }
     catch { return $null }
+}
+
+function Test-ApplyRequest([string]$Path) {
+    return $null -ne (Get-ApplyRequestIdentity $Path)
 }
 
 function Invoke-PostBuildCachePrune {
@@ -98,20 +91,11 @@ function Start-ReplacementRunner {
     $scriptLiteral = "'" + $RunnerPath.Replace("'", "''") + "'"
     $rootLiteral = "'" + $RepoRoot.Replace("'", "''") + "'"
     $dataLiteral = "'" + $DataDirectory.Replace("'", "''") + "'"
-    $command = (
-        "Start-Sleep -Milliseconds 500; & $scriptLiteral " +
-        "-RepoRoot $rootLiteral -DataDirectory $dataLiteral -PollSeconds $PollSeconds"
-    )
-    $encoded = [Convert]::ToBase64String(
-        [System.Text.Encoding]::Unicode.GetBytes($command)
-    )
-    Start-Process `
-        -FilePath 'powershell.exe' `
-        -ArgumentList @(
-            '-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass',
-            '-EncodedCommand', $encoded
-        ) `
-        -WindowStyle Hidden | Out-Null
+    $command = "Start-Sleep -Milliseconds 500; & $scriptLiteral -RepoRoot $rootLiteral -DataDirectory $dataLiteral -PollSeconds $PollSeconds"
+    $encoded = [Convert]::ToBase64String([System.Text.Encoding]::Unicode.GetBytes($command))
+    Start-Process -FilePath 'powershell.exe' -ArgumentList @(
+        '-NoProfile', '-WindowStyle', 'Hidden', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', $encoded
+    ) -WindowStyle Hidden | Out-Null
 }
 
 function Restore-ProcessEnvironment([string]$Name, [AllowNull()][string]$Value) {
@@ -131,9 +115,7 @@ function Invoke-DockerResult([string]$DockerExe, [string[]]$Arguments) {
         $output = @($_.Exception.Message)
         $exitCode = 127
     }
-    finally {
-        $ErrorActionPreference = $previous
-    }
+    finally { $ErrorActionPreference = $previous }
     return [pscustomobject]@{ Output = @($output); ExitCode = $exitCode }
 }
 
@@ -150,11 +132,22 @@ function Get-RunningFlaskCommit([string]$DockerExe) {
     return $value
 }
 
+function Test-RuntimeUsable([string]$DockerExe, [string]$ExpectedCommit) {
+    if ((Get-RunningFlaskCommit $DockerExe) -ne $ExpectedCommit) { return $false }
+    $health = Invoke-DockerResult $DockerExe @(
+        'compose', 'exec', '-T', 'flask', 'python', '-c',
+        "import urllib.request; r=urllib.request.urlopen('http://127.0.0.1:5000/federation',timeout=3); assert 200 <= r.status < 500"
+    )
+    if ($health.ExitCode -ne 0) { return $false }
+    $services = Invoke-DockerResult $DockerExe @('compose', 'ps', '--status', 'running', '--services')
+    if ($services.ExitCode -ne 0) { return $false }
+    $names = @($services.Output | ForEach-Object { ([string]$_).Trim() } | Where-Object { $_ })
+    return ($names -contains 'relay' -and $names -contains 'recorder' -and $names -contains 'flask')
+}
+
 function Write-JsonAtomic([string]$Path, [object]$Value) {
     $json = $Value | ConvertTo-Json -Compress -Depth 8
-    if ([System.Text.Encoding]::UTF8.GetByteCount($json) -gt $MaxBytes) {
-        throw 'result_too_large'
-    }
+    if ([System.Text.Encoding]::UTF8.GetByteCount($json) -gt $MaxBytes) { throw 'result_too_large' }
     $directory = Split-Path -Parent $Path
     New-Item -ItemType Directory -Path $directory -Force | Out-Null
     $temp = Join-Path $directory ('.' + [System.IO.Path]::GetFileName($Path) + '.' + [guid]::NewGuid().ToString('N'))
@@ -162,13 +155,11 @@ function Write-JsonAtomic([string]$Path, [object]$Value) {
         [System.IO.File]::WriteAllText($temp, $json, [System.Text.UTF8Encoding]::new($false))
         Move-Item -LiteralPath $temp -Destination $Path -Force
     }
-    finally {
-        Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue
-    }
+    finally { Remove-Item -LiteralPath $temp -Force -ErrorAction SilentlyContinue }
 }
 
-function Get-UpdateResult {
-    $path = Join-Path $AgentDirectory 'result.json'
+function Get-UpdateResultForRequest([string]$RequestId) {
+    $path = Get-RequestResultFile $RequestId
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return $null }
     try {
         $item = Get-Item -LiteralPath $path
@@ -176,6 +167,16 @@ function Get-UpdateResult {
         return [System.IO.File]::ReadAllText($path) | ConvertFrom-Json
     }
     catch { return $null }
+}
+
+function New-SyntheticActivationResult([string]$RequestId, [string]$TargetCommit) {
+    return [pscustomobject]@{
+        request_id = $RequestId
+        action = 'apply'
+        current_commit = $TargetCommit
+        target_commit = $TargetCommit
+        code = 'host_update_failed'
+    }
 }
 
 function Write-ActivationRecovery(
@@ -207,7 +208,7 @@ function Restore-PreviousFlaskRuntime([string]$DockerExe, [string]$PreviousCommi
     if ([string]::IsNullOrWhiteSpace($PreviousCommit)) { return $false }
     $started = Invoke-DockerResult $DockerExe @('compose', 'start', 'flask')
     if ($started.ExitCode -ne 0) { return $false }
-    return (Get-RunningFlaskCommit $DockerExe) -eq $PreviousCommit
+    return Test-RuntimeUsable $DockerExe $PreviousCommit
 }
 
 function Reconcile-FailedActivation(
@@ -215,17 +216,9 @@ function Reconcile-FailedActivation(
     [AllowNull()][string]$PreviousCommit,
     [string]$PhaseFile,
     [string]$ExpectedRequestId,
-    [string]$ExpectedTargetCommit
+    [string]$ExpectedTargetCommit,
+    [bool]$AllowMissingResult = $false
 ) {
-    $result = Get-UpdateResult
-    if (
-        $null -eq $result -or
-        [string]$result.action -ne 'apply' -or
-        [string]$result.code -ne 'host_update_failed' -or
-        [string]$result.request_id -ne $ExpectedRequestId -or
-        ([string]$result.target_commit).ToLowerInvariant() -ne $ExpectedTargetCommit
-    ) { return }
-
     $phase = ''
     try {
         if (Test-Path -LiteralPath $PhaseFile -PathType Leaf) {
@@ -233,27 +226,41 @@ function Reconcile-FailedActivation(
         }
     }
     catch { $phase = '' }
+    if ($phase -notin @('flask-stopped', 'target-started')) { return }
 
-    if ($phase -eq 'flask-stopped' -and -not [string]::IsNullOrWhiteSpace($PreviousCommit)) {
-        if (Restore-PreviousFlaskRuntime $DockerExe $PreviousCommit) {
-            Write-ActivationRecovery `
-                -Result $result `
-                -State 'error' `
-                -RunningCommit $PreviousCommit `
+    $result = Get-UpdateResultForRequest $ExpectedRequestId
+    if ($null -eq $result) {
+        if (-not $AllowMissingResult) { return }
+        $result = New-SyntheticActivationResult $ExpectedRequestId $ExpectedTargetCommit
+    }
+    elseif (
+        [string]$result.action -ne 'apply' -or
+        [string]$result.code -ne 'host_update_failed' -or
+        [string]$result.request_id -ne $ExpectedRequestId -or
+        ([string]$result.target_commit).ToLowerInvariant() -ne $ExpectedTargetCommit
+    ) { return }
+
+    if ($phase -eq 'flask-stopped') {
+        if (
+            -not [string]::IsNullOrWhiteSpace($PreviousCommit) -and
+            (Restore-PreviousFlaskRuntime $DockerExe $PreviousCommit)
+        ) {
+            Write-ActivationRecovery -Result $result -State 'error' -RunningCommit $PreviousCommit `
                 -Code 'activation_recovered' `
-                -Message 'Target activation failed before Flask replacement. The previous core runtime was restarted and verified; retry the approved apply.'
+                -Message 'Target activation failed before Flask replacement. The previous Flask runtime was restarted and passed the runtime health proof; retry the approved apply.'
             return
         }
+        Write-ActivationRecovery -Result $result -State 'activation_required' `
+            -RunningCommit (Get-RunningFlaskCommit $DockerExe) `
+            -Code 'activation_restore_failed' `
+            -Message 'Target activation failed after the previous Flask runtime was stopped, and bounded restoration could not prove a usable runtime. Source remains on the approved target; retry the same apply to resume activation.'
+        return
     }
 
-    if ($phase -eq 'target-started') {
-        Write-ActivationRecovery `
-            -Result $result `
-            -State 'activation_required' `
-            -RunningCommit (Get-RunningFlaskCommit $DockerExe) `
-            -Code 'activation_required' `
-            -Message 'Target activation began but runtime verification did not complete. Source remains on the approved target; retry the same apply to resume activation.'
-    }
+    Write-ActivationRecovery -Result $result -State 'activation_required' `
+        -RunningCommit (Get-RunningFlaskCommit $DockerExe) `
+        -Code 'activation_required' `
+        -Message 'Target activation began but runtime verification did not complete. Source remains on the approved target; retry the same apply to resume activation.'
 }
 
 $RepoRoot = Normalize-DirectoryPath $RepoRoot
@@ -264,12 +271,8 @@ New-Item -ItemType Directory -Path $AgentDirectory -Force | Out-Null
 $RunnerPath = [System.IO.Path]::GetFullPath($PSCommandPath)
 $EnginePath = Join-Path (Split-Path -Parent $RunnerPath) 'fcp_update_engine.ps1'
 $ProxySource = Join-Path (Split-Path -Parent $RunnerPath) 'fcp_docker_build_proxy.cmd'
-if (-not (Test-Path -LiteralPath $EnginePath -PathType Leaf)) {
-    throw 'update_engine_unavailable'
-}
-if (-not (Test-Path -LiteralPath $ProxySource -PathType Leaf)) {
-    throw 'controlled_build_proxy_unavailable'
-}
+if (-not (Test-Path -LiteralPath $EnginePath -PathType Leaf)) { throw 'update_engine_unavailable' }
+if (-not (Test-Path -LiteralPath $ProxySource -PathType Leaf)) { throw 'controlled_build_proxy_unavailable' }
 $InitialRunnerHash = (Get-FileHash -LiteralPath $RunnerPath -Algorithm SHA256).Hash
 $InitialEngineHash = (Get-FileHash -LiteralPath $EnginePath -Algorithm SHA256).Hash
 $InitialProxyHash = (Get-FileHash -LiteralPath $ProxySource -Algorithm SHA256).Hash
@@ -308,28 +311,17 @@ try {
         $previousActivationPhase = $null
         try {
             if ($isApply) {
-                $mutationMutex = [System.Threading.Mutex]::new(
-                    $false,
-                    "Global\FCPHostMutation-$pathHash"
-                )
-                try {
-                    $mutationAcquired = $mutationMutex.WaitOne([TimeSpan]::FromSeconds(30))
-                }
-                catch [System.Threading.AbandonedMutexException] {
-                    $mutationAcquired = $true
-                }
+                $mutationMutex = [System.Threading.Mutex]::new($false, "Global\FCPHostMutation-$pathHash")
+                try { $mutationAcquired = $mutationMutex.WaitOne([TimeSpan]::FromSeconds(30)) }
+                catch [System.Threading.AbandonedMutexException] { $mutationAcquired = $true }
                 if (-not $mutationAcquired) {
                     if ($Once) { exit 1 }
                     Start-Sleep -Milliseconds 250
                     continue
                 }
 
-                $dockerCommand = Get-Command docker -CommandType Application -ErrorAction Stop |
-                    Select-Object -First 1
-                if (
-                    $null -eq $dockerCommand -or
-                    [string]::IsNullOrWhiteSpace([string]$dockerCommand.Source)
-                ) {
+                $dockerCommand = Get-Command docker -CommandType Application -ErrorAction Stop | Select-Object -First 1
+                if ($null -eq $dockerCommand -or [string]::IsNullOrWhiteSpace([string]$dockerCommand.Source)) {
                     throw 'docker_executable_unavailable'
                 }
                 $realDocker = [string]$dockerCommand.Source
@@ -342,26 +334,14 @@ try {
                 $previousLeaseMarker = $env:FCP_HOST_MUTATION_LEASE_ACTIVE
                 $previousActivationPhase = $env:FCP_ACTIVATION_PHASE_FILE
 
-                $proxyDirectory = Join-Path $AgentDirectory (
-                    "docker-proxy-$PID-$([guid]::NewGuid().ToString('N'))"
-                )
+                $proxyDirectory = Join-Path $AgentDirectory ("docker-proxy-$PID-$([guid]::NewGuid().ToString('N'))")
                 New-Item -ItemType Directory -Path $proxyDirectory -Force | Out-Null
-                Copy-Item -LiteralPath $ProxySource -Destination (
-                    Join-Path $proxyDirectory 'docker.cmd'
-                ) -Force
-                Copy-Item -LiteralPath (
-                    Join-Path (Split-Path -Parent $RunnerPath) 'fcp_host_build.ps1'
-                ) -Destination (Join-Path $proxyDirectory 'fcp_host_build.ps1') -Force
-                Copy-Item -LiteralPath (
-                    Join-Path (Split-Path -Parent $RunnerPath) 'fcp_docker_resource.ps1'
-                ) -Destination (Join-Path $proxyDirectory 'fcp_docker_resource.ps1') -Force
+                Copy-Item -LiteralPath $ProxySource -Destination (Join-Path $proxyDirectory 'docker.cmd') -Force
+                Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $RunnerPath) 'fcp_host_build.ps1') -Destination (Join-Path $proxyDirectory 'fcp_host_build.ps1') -Force
+                Copy-Item -LiteralPath (Join-Path (Split-Path -Parent $RunnerPath) 'fcp_docker_resource.ps1') -Destination (Join-Path $proxyDirectory 'fcp_docker_resource.ps1') -Force
 
-                $buildOutput = Join-Path $AgentDirectory (
-                    "controlled-build-$PID-$([guid]::NewGuid().ToString('N')).txt"
-                )
-                $activationPhaseFile = Join-Path $AgentDirectory (
-                    "activation-phase-$PID-$([guid]::NewGuid().ToString('N')).txt"
-                )
+                $buildOutput = Join-Path $AgentDirectory ("controlled-build-$PID-$([guid]::NewGuid().ToString('N')).txt")
+                $activationPhaseFile = Join-Path $AgentDirectory ("activation-phase-$PID-$([guid]::NewGuid().ToString('N')).txt")
                 $env:FCP_REAL_DOCKER_EXE = $realDocker
                 $env:FCP_CONTROLLED_BUILD_ACTIVE = '1'
                 $env:FCP_CONTROLLED_BUILD_REPO_ROOT = $RepoRoot
@@ -371,28 +351,19 @@ try {
                 $env:PATH = $proxyDirectory + [System.IO.Path]::PathSeparator + $previousPath
             }
 
-            & powershell.exe `
-                -NoProfile `
-                -ExecutionPolicy Bypass `
-                -File $EnginePath `
-                -RepoRoot $RepoRoot `
-                -DataDirectory $DataDirectory `
-                -PollSeconds $PollSeconds `
-                -Once
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $EnginePath `
+                -RepoRoot $RepoRoot -DataDirectory $DataDirectory -PollSeconds $PollSeconds -Once
             $engineExit = $LASTEXITCODE
 
             if ($isApply) {
                 Invoke-PostBuildCachePrune | Out-Null
-                Reconcile-FailedActivation `
-                    -DockerExe $realDocker `
-                    -PreviousCommit $previousRunning `
+                Reconcile-FailedActivation -DockerExe $realDocker -PreviousCommit $previousRunning `
                     -PhaseFile $activationPhaseFile `
                     -ExpectedRequestId ([string]$applyIdentity.RequestId) `
-                    -ExpectedTargetCommit ([string]$applyIdentity.TargetCommit)
+                    -ExpectedTargetCommit ([string]$applyIdentity.TargetCommit) `
+                    -AllowMissingResult ($engineExit -ne 0)
             }
-            if ($engineExit -ne 0) {
-                Write-Warning "FCP update engine exited with code $engineExit."
-            }
+            if ($engineExit -ne 0) { Write-Warning "FCP update engine exited with code $engineExit." }
         }
         finally {
             if ($isApply) {
@@ -403,15 +374,9 @@ try {
                 Restore-ProcessEnvironment 'FCP_CONTROLLED_BUILD_OUTPUT' $previousControlledOutput
                 Restore-ProcessEnvironment 'FCP_HOST_MUTATION_LEASE_ACTIVE' $previousLeaseMarker
                 Restore-ProcessEnvironment 'FCP_ACTIVATION_PHASE_FILE' $previousActivationPhase
-                if (-not [string]::IsNullOrWhiteSpace([string]$activationPhaseFile)) {
-                    Remove-Item -LiteralPath $activationPhaseFile -Force -ErrorAction SilentlyContinue
-                }
-                if (-not [string]::IsNullOrWhiteSpace([string]$buildOutput)) {
-                    Remove-Item -LiteralPath $buildOutput -Force -ErrorAction SilentlyContinue
-                }
-                if (-not [string]::IsNullOrWhiteSpace([string]$proxyDirectory)) {
-                    Remove-Item -LiteralPath $proxyDirectory -Recurse -Force -ErrorAction SilentlyContinue
-                }
+                if (-not [string]::IsNullOrWhiteSpace([string]$activationPhaseFile)) { Remove-Item -LiteralPath $activationPhaseFile -Force -ErrorAction SilentlyContinue }
+                if (-not [string]::IsNullOrWhiteSpace([string]$buildOutput)) { Remove-Item -LiteralPath $buildOutput -Force -ErrorAction SilentlyContinue }
+                if (-not [string]::IsNullOrWhiteSpace([string]$proxyDirectory)) { Remove-Item -LiteralPath $proxyDirectory -Recurse -Force -ErrorAction SilentlyContinue }
             }
             if ($mutationAcquired -and $null -ne $mutationMutex) {
                 try { $mutationMutex.ReleaseMutex() | Out-Null } catch {}
