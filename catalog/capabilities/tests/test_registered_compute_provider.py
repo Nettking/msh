@@ -191,7 +191,7 @@ def test_active_compute_contribution_reaches_health_selection_and_ownership(
     assert enrollment is not None
     assert enrollment.state is ProviderEnrollmentState.PENDING
     assert enrollment.capability_id == binding.capability_id
-    assert binding.attributes == analysis_provider_attributes(handler_revision=1)
+    assert binding.descriptor.attributes == analysis_provider_attributes(handler_revision=1)
 
     current[0] += timedelta(seconds=10)
     replay_binding, replay_announcement, replay_enrollment = runtime.reconcile_contribution(
