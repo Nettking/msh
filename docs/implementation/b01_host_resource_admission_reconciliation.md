@@ -75,8 +75,8 @@ invoked Docker or host command is safe.
 | Recorder capture/recovery/publication (`mtconnect_recorder/resource_pressure.py`, `_resource_pressure_impl.py`) | Sequence-bounded raw XML, manifest, observation NDJSON, normalized JSONL, probe and checkpoint files. `RecorderResourceBudget` supplies finite byte/inode envelopes. | One aggregate controller is shared by recorder transaction writers; completion admission permits only already-durable recovery work while preserving the critical floor. Atomic replacement and focused refusal/unwind tests exist. Destination confinement and the recorder's own outbox are separate boundaries. | **PARTIAL** |
 | Recorder Federation outbox (`catalog/federation/outbox.py`) | SQLite rows carry JSON payloads up to `MAX_PAYLOAD_BYTES` (1 MiB), but offline history is cumulative and SQLite/WAL growth is not globally bounded. | `BEGIN IMMEDIATE` gives transaction serialization, but this writer never calls `PROCESS_RESOURCE_ADMISSION`; no byte/inode admission or completion envelope exists. | **MISSING** |
 | Federated JSONL local gzip cache (`_prepare_local_file`) | Source is capped by `FEDERATED_JSONL_MAX_FILE_BYTES`; gzip output is capped by `FEDERATED_JSONL_MAX_ENCODED_BYTES`; cache temp/final files share the configured cache resource. | Stable-directory handles, source re-stat/hash, bounded writer, and cache reservation are present. Commits `11c60cd`/`24ea125` add the SQLite `local_files` envelope to the same atomic reservation and use its identity-matched reservation for completion. Hard-kill temp cleanup and cumulative SQLite/WAL growth remain unproven. | **PARTIAL** |
-| Federated JSONL remote chunk staging (`_write_chunk`, `_record_remote_chunk`) | Each decoded chunk is bounded by the protocol/chunk limit and staged as a content-addressed `.chunk`; staged-cache byte/file quotas exist. | Stable boundary and atomic temp-to-final rename are present, but the chunk reservation ends before `seen_batches` SQLite bookkeeping is reserved. Hard-killed `fcp-chunk-*`/other temporary names are not covered by the restart scan, and the SQLite/WAL envelope is not proven for all batch histories. | **PARTIAL** |
-| Federated JSONL reconstruction/materialization (`_try_materialize`) | Declared encoded and raw file sizes are bounded; one encoded gzip and one raw JSONL temp coexist before atomic publication. Mirror quota bounds retained remote bytes. | `reserve_many` now covers encoded, raw, and SQLite completion peaks; stable-directory identity checks, exact size/hash validation, atomic replacement, and the admitted `materialized_files`/staged-row mutation are tested, including a real `PRESSURE` regression. Temporary reconstruction cleanup is only context-manager based, hard-kill names can strand, and chunk-ingest bookkeeping remains separately admitted. | **PARTIAL** |
+| Federated JSONL remote chunk staging (`_write_chunk`, `_record_remote_chunk`) | Each decoded chunk is bounded by the protocol/chunk limit and staged as a content-addressed `.chunk`; staged-cache byte/file quotas exist. | `reserve_many` now keeps the chunk bytes/inodes and `seen_batches` SQLite mutation in one atomic envelope, with stable-directory identity checks and a real completion-at-`PRESSURE` regression. Hard-killed `fcp-chunk-*`/other temporary names are not covered by the restart scan, and the SQLite/WAL envelope is not proven for all batch histories. | **PARTIAL** |
+| Federated JSONL reconstruction/materialization (`_try_materialize`) | Declared encoded and raw file sizes are bounded; one encoded gzip and one raw JSONL temp coexist before atomic publication. Mirror quota bounds retained remote bytes. | `reserve_many` now covers encoded, raw, and SQLite completion peaks; stable-directory identity checks, exact size/hash validation, atomic replacement, and the admitted `materialized_files`/staged-row mutation are tested, including a real `PRESSURE` regression. Temporary reconstruction cleanup is only context-manager based, hard-kill names can strand, and cumulative SQLite/WAL growth remains unproven. | **PARTIAL** |
 | Browser multipart parser (`flask_app/data_upload_routes.py` request parsing) | Werkzeug/WSGI may spool the request body to the OS temporary filesystem before the route's admission guard; app `MAX_CONTENT_LENGTH` is 1.1 GiB by default. | No shared byte/inode reservation can run before `request.form`/`request.files` parsing, and the parser temp resource is not pinned to the configured upload roots. | **MISSING** |
 | Browser upload staging/publication (`data_upload_resource_admission.py`, `data_upload_service.py`) | Staging reserves configured total bytes and files/inodes; final uploaded data is intentionally cumulative and user-visible. | Shared admission and exception unwind cover staging. Reservation ends when enqueue returns, before asynchronous final-directory/marker and metadata writes; roots are independently configurable and only lexical checks/revalidation are used. SQLite metadata is cumulative without a lifetime admission budget. | **PARTIAL** |
 | Analysis input workspace/data-owner publication (`capabilities/analysis/resource_admission.py`) | Input plan/slice and data-owner publication use bounded workspace/atomic-replacement envelopes. | Shared admission and worker/scheduler wrappers exist, but the stable destination boundary, all metadata writes, and result-output lifecycle are not covered by the same proof. | **PARTIAL** |
@@ -93,23 +93,26 @@ invoked Docker or host command is safe.
 
 ## Implemented in this continuation
 
-Commits `11c60cd` and `24ea125` target the concrete Federated JSONL completion
-bug above:
+Commits `11c60cd`, `24ea125`, and `1ef6304` target concrete Federated JSONL
+completion bugs above:
 local-cache and materialization transactions now admit their bounded SQLite
 bookkeeping in the same atomic reservation as the large filesystem peak, and
 their inner bookkeeping path uses that already-held reservation instead of
 re-admitting at `PRESSURE`. Both implementation variants (the stable-filesystem
 public class and its implementation base) use the same identity-matched
-reservation selection. A regression test exercises the real serialized
-controller at the pressure boundary. This scoped change cannot close
-chunk-ingest completion, uploads, analysis outputs, or cumulative outboxes.
+reservation selection. Remote chunk staging now applies the same envelope to
+the chunk file and its `seen_batches` row; the reservation remains held through
+the atomic temp-to-final write and SQLite commit. Regressions exercise the real
+serialized controller at both pressure boundaries. This scoped change cannot
+close hard-kill temporary cleanup, cumulative SQLite/WAL growth, uploads,
+analysis outputs, or cumulative outboxes.
 
 Focused verification at this head:
 
 - `python -m pytest -q --basetemp=.pytest-tmp catalog/flask_app/tests/test_federated_jsonl_resource_admission.py`
-  — **16 passed, 1 skipped** (including local-cache and remote-materialization
-  completion-at-pressure regressions);
-- the combined Federated JSONL/model admission subset — **32 passed, 3
+  — **17 passed, 1 skipped** (including local-cache, remote-chunk, and
+  remote-materialization completion-at-pressure regressions);
+- the combined Federated JSONL/model admission subset — **33 passed, 3
   skipped**; and
 - `ruff check` on both bridge implementations and the focused test — **passed**.
 
@@ -128,8 +131,8 @@ machine or acceptance state was accessed.
   analysis, storage-provider, and SQLite boundaries still need independent
   identity/restart work.
 - The JSONL SQLite reserve is a bounded transaction envelope, not a proof that
-  arbitrary historical SQLite/WAL growth fits that envelope. Chunk bookkeeping
-  and hard-kill temporary cleanup remain unresolved.
+  arbitrary historical SQLite/WAL growth fits that envelope. Hard-kill
+  temporary cleanup remains unresolved.
 - No physical Federation machine, acceptance state, merge action, or release
   state was touched. Draft PR #383 remains the only publication target.
 
