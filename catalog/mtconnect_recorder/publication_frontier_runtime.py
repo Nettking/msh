@@ -1,10 +1,10 @@
 """Recorder-side composition for the incremental publication frontier.
 
 The frontier record is written while the recorder's existing B01 transaction
-reservation is still held.  This module does not create a second reservation:
-it extends the existing finite data requirement, then wraps the detailed
-observation writer (which is already inside that transaction) to publish the
-bounded discovery identity after immutable raw evidence exists.
+reservation is still held. This module does not create a second reservation:
+it extends the existing finite data requirement, then scopes the detailed
+observation writer to recorder runtime stores so unrelated direct stores are
+not changed by import order.
 """
 from __future__ import annotations
 
@@ -25,15 +25,66 @@ from .storage import _confined_storage_path
 _INSTALLED = "_PUBLICATION_FRONTIER_RUNTIME_INSTALLED"
 
 
+def _mark_pending_after_observation_write(
+    store: Any,
+    *,
+    source_name: str,
+    batch: Any,
+    raw_sha256: str,
+) -> None:
+    first = batch.first_observation_sequence
+    last = batch.last_observation_sequence
+    if first is None or last is None:
+        raise ValueError("Publication discovery requires sequence-bounded observations.")
+    day, base_name = store._batch_location(
+        source_name=source_name,
+        batch=batch,
+        raw_sha256=raw_sha256,
+    )
+    raw_path = _confined_storage_path(
+        store.raw_root,
+        _slug(source_name),
+        str(batch.header.instance_id),
+        day,
+        f"{base_name}.xml.gz",
+    )
+    # ``_batch_location`` uses the same validated identity as the raw writer.
+    # Resolve the manifest name exactly as store_raw_batch does; no archive
+    # traversal is needed to publish the discovery pointer.
+    manifest_path = raw_path.with_suffix(".manifest.json")
+    RecorderPublicationFrontier(store).mark_pending(
+        source_name=source_name,
+        archive_source_name=source_name,
+        instance_id=int(batch.header.instance_id),
+        ref=RawBatchRef(
+            raw_path=raw_path,
+            manifest_path=manifest_path,
+            raw_sha256=raw_sha256,
+            requested_from=int(first),
+            first_sequence=int(first),
+            last_sequence=int(last),
+            next_sequence=int(batch.header.next_sequence),
+            observation_count=len(batch.observations),
+            manifest_schema=RAW_BATCH_MANIFEST_SCHEMA,
+            received_at=(
+                str(batch.observations[0].get("received_at"))
+                if batch.observations and batch.observations[0].get("received_at")
+                else None
+            ),
+            source_name=source_name,
+        ),
+    )
+
+
 def install_publication_frontier_runtime(runtime_module: ModuleType) -> None:
     """Attach frontier discovery to the already resource-aware recorder runtime."""
 
     if getattr(runtime_module, _INSTALLED, False):
         return
 
-    # Resource admission is installed before this function is called. Patch the
-    # concrete guard class that is actually attached to recorder runtimes, not
-    # the historical implementation class retained for compatibility.
+    # Resource admission is installed before this function is called. Extend
+    # the concrete runtime guard so the bounded frontier record remains inside
+    # the same recorder transaction reservation rather than nesting admission.
     from . import resource_pressure as pressure
 
     guard_class = pressure.RecorderResourceGuard
@@ -59,70 +110,38 @@ def install_publication_frontier_runtime(runtime_module: ModuleType) -> None:
 
     guard_class._requirements = frontier_requirements
 
+    # Do not mutate the shared DurableRecorderStore class. Doing so makes
+    # unrelated direct-store behavior depend on whether recorder runtime startup
+    # happened earlier in the process. A runtime-local subclass preserves the
+    # normal storage API while confining producer-side publication bookkeeping
+    # to stores actually constructed by RecorderRuntime.
     store_class = runtime_module.DurableRecorderStore
-    original_store_observation = store_class.store_observation_batch
 
-    def store_observation_with_publication_frontier(
-        self: Any,
-        *,
-        source_name: str,
-        batch: Any,
-        raw_sha256: str | None = None,
-    ) -> Path:
-        path = original_store_observation(
+    class PublicationFrontierDurableRecorderStore(store_class):
+        def store_observation_batch(
             self,
-            source_name=source_name,
-            batch=batch,
-            raw_sha256=raw_sha256,
-        )
-        if raw_sha256 is None:
-            return path
-        first = batch.first_observation_sequence
-        last = batch.last_observation_sequence
-        if first is None or last is None:
-            raise ValueError("Publication discovery requires sequence-bounded observations.")
-        day, base_name = self._batch_location(
-            source_name=source_name,
-            batch=batch,
-            raw_sha256=raw_sha256,
-        )
-        raw_path = _confined_storage_path(
-            self.raw_root,
-            _slug(source_name),
-            str(batch.header.instance_id),
-            day,
-            f"{base_name}.xml.gz",
-        )
-        # ``_batch_location`` uses the same validated identity as the raw writer.
-        # Resolve the manifest name exactly as store_raw_batch does; no archive
-        # traversal is needed to publish the discovery pointer.
-        manifest_path = raw_path.with_suffix(".manifest.json")
-        frontier = RecorderPublicationFrontier(self)
-        frontier.mark_pending(
-            source_name=source_name,
-            archive_source_name=source_name,
-            instance_id=int(batch.header.instance_id),
-            ref=RawBatchRef(
-                raw_path=raw_path,
-                manifest_path=manifest_path,
-                raw_sha256=raw_sha256,
-                requested_from=int(first),
-                first_sequence=int(first),
-                last_sequence=int(last),
-                next_sequence=int(batch.header.next_sequence),
-                observation_count=len(batch.observations),
-                manifest_schema=RAW_BATCH_MANIFEST_SCHEMA,
-                received_at=(
-                    str(batch.observations[0].get("received_at"))
-                    if batch.observations and batch.observations[0].get("received_at")
-                    else None
-                ),
+            *,
+            source_name: str,
+            batch: Any,
+            raw_sha256: str | None = None,
+        ) -> Path:
+            path = super().store_observation_batch(
                 source_name=source_name,
-            ),
-        )
-        return path
+                batch=batch,
+                raw_sha256=raw_sha256,
+            )
+            if raw_sha256 is not None:
+                _mark_pending_after_observation_write(
+                    self,
+                    source_name=source_name,
+                    batch=batch,
+                    raw_sha256=raw_sha256,
+                )
+            return path
 
-    store_class.store_observation_batch = store_observation_with_publication_frontier
+    PublicationFrontierDurableRecorderStore.__name__ = store_class.__name__
+    PublicationFrontierDurableRecorderStore.__qualname__ = store_class.__qualname__
+    runtime_module.DurableRecorderStore = PublicationFrontierDurableRecorderStore
     setattr(runtime_module, _INSTALLED, True)
 
 
