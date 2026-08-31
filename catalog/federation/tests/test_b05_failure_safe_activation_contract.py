@@ -55,11 +55,24 @@ def test_windows_runtime_verification_failure_has_bounded_activation_recovery_st
     assert "-Code 'activation_required'" in runner
     assert "retry the same apply" in runner
     assert "target-started" in proxy
-    # The marker is written before forwarding `compose up -d flask`, because a
-    # failed Compose invocation may already have replaced the old container.
     assert proxy.index("echo target-started") < proxy.index(
         '"%FCP_REAL_DOCKER_EXE%" %*', proxy.index(":flask_start")
     )
+
+
+def test_windows_recovery_correlates_result_to_exact_apply_request() -> None:
+    runner = _text("scripts/windows/fcp_update_agent_runner.ps1")
+
+    assert "Get-ApplyRequestIdentity" in runner
+    assert "ExpectedRequestId" in runner
+    assert "ExpectedTargetCommit" in runner
+    reconcile = runner[
+        runner.index("function Reconcile-FailedActivation") : runner.index(
+            "$RepoRoot = Normalize-DirectoryPath"
+        )
+    ]
+    assert "[string]$result.request_id -ne $ExpectedRequestId" in reconcile
+    assert "[string]$result.target_commit -ne $ExpectedTargetCommit" in reconcile
 
 
 def test_recovery_is_bounded_to_one_restore_or_one_explicit_state_transition() -> None:
@@ -67,9 +80,17 @@ def test_recovery_is_bounded_to_one_restore_or_one_explicit_state_transition() -
     windows = _text("scripts/windows/fcp_update_agent_runner.ps1")
 
     assert posix.count('["docker", "compose", "start", "flask"]') == 1
-    assert "while" not in posix[posix.index("def restore_previous_flask_runtime") : posix.index("def record_activation_recovery")]
+    assert "while" not in posix[
+        posix.index("def restore_previous_flask_runtime") : posix.index(
+            "def record_activation_recovery"
+        )
+    ]
     assert windows.count("@('compose', 'start', 'flask')") == 1
-    assert "while" not in windows[windows.index("function Restore-PreviousFlaskRuntime") : windows.index("function Reconcile-FailedActivation")].lower()
+    assert "while" not in windows[
+        windows.index("function Restore-PreviousFlaskRuntime") : windows.index(
+            "function Reconcile-FailedActivation"
+        )
+    ].lower()
 
 
 def test_activation_recovery_never_introduces_source_rollback() -> None:
