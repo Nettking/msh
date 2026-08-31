@@ -148,9 +148,12 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
         target: Path,
         size: int,
         rows: Iterable[object],
+        admitted_reservation: object | None = None,
     ) -> None:
         staged_rows = tuple(rows)
-        with self._write_connection() as connection:
+        with self._write_connection(
+            admitted_reservation=admitted_reservation
+        ) as connection:
             connection.execute(
                 """
                 INSERT INTO materialized_files(
@@ -312,6 +315,12 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
                 declared_file_size,
                 _impl._JSONL_MATERIALIZATION_INODES + len(relative_parent.parts),
             ),
+            (
+                self.database.parent,
+                _impl._SQLITE_WRITE_RESERVE_BYTES,
+                _impl._SQLITE_WRITE_INODES
+                + _impl._missing_directory_count(self.database.parent),
+            ),
         )
         with self._reserve_many(requirements) as materialization_reservations:
             if not materialization_reservations:
@@ -319,16 +328,22 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
                     "federated-jsonl-resource-identity-unavailable",
                     "atomic resource admission returned no backing resource",
                 )
-            cache_reservation = materialization_reservations[0]
-            target_reservation = materialization_reservations[-1]
             with (
                 self._stable_directory(self.cache_root) as cache_directory,
                 self._stable_directory(
                     self.mirror_root, relative_parent, create=True
                 ) as target_directory,
+                self._stable_directory(self.database.parent) as database_directory,
             ):
-                self._assert_stable_reserved_resource(cache_directory, cache_reservation)
-                self._assert_stable_reserved_resource(target_directory, target_reservation)
+                self._reservation_for_boundary(
+                    cache_directory, materialization_reservations
+                )
+                self._reservation_for_boundary(
+                    target_directory, materialization_reservations
+                )
+                database_reservation = self._reservation_for_boundary(
+                    database_directory, materialization_reservations
+                )
                 with cache_directory.temporary_file(prefix="fcp-encoded-") as (
                     encoded_name,
                     encoded,
@@ -395,6 +410,7 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
                     target=target,
                     size=size,
                     rows=rows,
+                    admitted_reservation=database_reservation,
                 )
                 return True
 
