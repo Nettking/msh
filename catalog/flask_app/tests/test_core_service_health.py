@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -33,7 +34,9 @@ def _status(
     )
 
 
-def test_relay_listener_can_be_alive_while_authority_readiness_is_degraded(tmp_path: Path) -> None:
+def test_relay_listener_can_be_alive_while_authority_readiness_is_degraded(
+    tmp_path: Path,
+) -> None:
     health = relay_health(
         host="relay",
         port=8765,
@@ -48,7 +51,9 @@ def test_relay_listener_can_be_alive_while_authority_readiness_is_degraded(tmp_p
     assert health.code == "relay-authority-store-unavailable"
 
 
-def test_relay_is_ready_only_when_listener_and_authority_store_are_available(tmp_path: Path) -> None:
+def test_relay_is_ready_only_when_listener_and_authority_store_are_available(
+    tmp_path: Path,
+) -> None:
     health = relay_health(
         host="relay",
         port=8765,
@@ -58,6 +63,22 @@ def test_relay_is_ready_only_when_listener_and_authority_store_are_available(tmp
     )
 
     assert health.liveness == "alive"
+    assert health.readiness == "ready"
+    assert health.dependency == "healthy"
+
+
+def test_relay_readiness_uses_real_read_only_sqlite_probe(tmp_path: Path) -> None:
+    database = tmp_path / "control.sqlite3"
+    with sqlite3.connect(database) as connection:
+        connection.execute("CREATE TABLE marker (value INTEGER)")
+
+    health = relay_health(
+        host="relay",
+        port=8765,
+        coordinator_database=database,
+        listener_probe=lambda _host, _port: True,
+    )
+
     assert health.readiness == "ready"
     assert health.dependency == "healthy"
 
@@ -75,7 +96,9 @@ def test_stale_recorder_heartbeat_is_not_liveness(tmp_path: Path) -> None:
     assert health.code == "recorder-heartbeat-stale"
 
 
-def test_recorder_local_readiness_survives_federation_dependency_failure(tmp_path: Path) -> None:
+def test_recorder_local_readiness_survives_federation_dependency_failure(
+    tmp_path: Path,
+) -> None:
     health = recorder_health(
         tmp_path / "status.json",
         now=NOW,
@@ -100,7 +123,7 @@ def test_recorder_error_state_is_alive_but_not_ready(tmp_path: Path) -> None:
     assert health.code == "recorder-error"
 
 
-def test_flask_remains_ready_when_optional_core_dependency_is_degraded(tmp_path: Path) -> None:
+def test_flask_remains_ready_when_core_dependency_is_degraded(tmp_path: Path) -> None:
     relay = relay_health(
         host="relay",
         port=8765,
