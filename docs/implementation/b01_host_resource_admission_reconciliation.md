@@ -85,4 +85,3 @@ replace this in-progress section before the draft is ready for review.
 No writer is declared fully reconciled by this initial checkpoint. No new B01
 fix has been selected or implemented yet. The next checkpoint will publish the
 complete code-backed writer ledger before substantial implementation begins.
-
