@@ -14,7 +14,7 @@ without duplicating the mature update engine.
 B05 activation recovery is also owned here. The runner observes the existing
 engine's Flask stop/start boundary through the same subprocess proxy. A failure
 after the previous Flask container was stopped but before target replacement
-restarts that exact stopped container and verifies its previous build identity.
+restarts that exact stopped container and verifies that the runtime is usable.
 Once target replacement has begun, failure is recorded as ``activation_required``
 with a deterministic retry path rather than pretending source rollback is safe.
 """
@@ -60,7 +60,7 @@ def _load_engine(path: Path) -> ModuleType:
     return module
 
 
-def _apply_target(path: Path, engine: ModuleType) -> str | None:
+def _apply_identity(path: Path, engine: ModuleType) -> tuple[str, str] | None:
     try:
         if path.stat().st_size > MAX_REQUEST_BYTES:
             return None
@@ -71,10 +71,16 @@ def _apply_target(path: Path, engine: ModuleType) -> str | None:
         return None
     if value.get("schema") != engine.REQUEST_SCHEMA or value.get("action") != "apply":
         return None
+    request_id = value.get("request_id")
     target = value.get("target_commit")
-    if not isinstance(target, str) or not engine.OID_RE.fullmatch(target):
+    if (
+        not isinstance(request_id, str)
+        or not engine.REQUEST_ID_RE.fullmatch(request_id)
+        or not isinstance(target, str)
+        or not engine.OID_RE.fullmatch(target)
+    ):
         return None
-    return target.lower()
+    return request_id, target.lower()
 
 
 def _read_result(path: Path) -> dict[str, object] | None:
@@ -92,6 +98,18 @@ def _running_commit(engine: ModuleType, root: Path) -> str | None:
 
     probe = getattr(engine, "running_commit", None)
     return probe(root) if callable(probe) else None
+
+
+def _runtime_usable(engine: ModuleType, root: Path, expected_commit: str) -> bool:
+    """Require the engine's production readiness proof when that seam exists."""
+
+    probe = getattr(engine, "wait_runtime", None)
+    if callable(probe):
+        try:
+            return probe(root, expected_commit) == expected_commit
+        except Exception:  # noqa: BLE001 - failed health proof means not recovered
+            return False
+    return _running_commit(engine, root) == expected_commit
 
 
 class _ControlledSubprocess:
@@ -130,7 +148,7 @@ def restore_previous_flask_runtime(
     root: Path,
     previous_commit: str,
 ) -> bool:
-    """Restart the still-existing pre-target Flask container and prove identity."""
+    """Restart the still-existing pre-target Flask container and prove usability."""
 
     try:
         completed = subprocess.run(
@@ -144,7 +162,7 @@ def restore_previous_flask_runtime(
         )
     except (OSError, subprocess.SubprocessError):
         return False
-    return completed.returncode == 0 and _running_commit(engine, root) == previous_commit
+    return completed.returncode == 0 and _runtime_usable(engine, root, previous_commit)
 
 
 def record_activation_recovery(
@@ -175,6 +193,34 @@ def record_activation_recovery(
     )
 
 
+def _correlated_failure_result(
+    result_file: Path,
+    *,
+    expected_request_id: str,
+    target: str,
+    allow_missing_result: bool,
+) -> dict[str, object] | None:
+    result = _read_result(result_file)
+    if result is not None:
+        if (
+            result.get("action") != "apply"
+            or result.get("request_id") != expected_request_id
+            or result.get("target_commit") != target
+            or result.get("code") != "host_update_failed"
+        ):
+            return None
+        return result
+    if not allow_missing_result:
+        return None
+    return {
+        "request_id": expected_request_id,
+        "action": "apply",
+        "current_commit": target,
+        "target_commit": target,
+        "code": "host_update_failed",
+    }
+
+
 def _recover_failed_activation(
     engine: ModuleType,
     root: Path,
@@ -182,19 +228,23 @@ def _recover_failed_activation(
     proxy: _ControlledSubprocess,
     *,
     previous_commit: str | None,
+    expected_request_id: str,
     target: str,
+    allow_missing_result: bool = False,
 ) -> None:
-    result = _read_result(result_file)
-    if (
-        result is None
-        or result.get("action") != "apply"
-        or result.get("target_commit") != target
-        or result.get("code") != "host_update_failed"
-    ):
+    if not proxy.flask_stopped and not proxy.target_flask_started:
+        return
+    result = _correlated_failure_result(
+        result_file,
+        expected_request_id=expected_request_id,
+        target=target,
+        allow_missing_result=allow_missing_result,
+    )
+    if result is None:
         return
 
-    if proxy.flask_stopped and not proxy.target_flask_started and previous_commit:
-        if restore_previous_flask_runtime(engine, root, previous_commit):
+    if proxy.flask_stopped and not proxy.target_flask_started:
+        if previous_commit and restore_previous_flask_runtime(engine, root, previous_commit):
             record_activation_recovery(
                 engine,
                 result_file,
@@ -204,10 +254,25 @@ def _recover_failed_activation(
                 code="activation_recovered",
                 message=(
                     "Target activation failed before Flask replacement. The previous "
-                    "core runtime was restarted and verified; retry the approved apply."
+                    "Flask runtime was restarted and passed the runtime health proof; "
+                    "retry the approved apply."
                 ),
             )
             return
+        record_activation_recovery(
+            engine,
+            result_file,
+            result,
+            state="activation_required",
+            running=_running_commit(engine, root),
+            code="activation_restore_failed",
+            message=(
+                "Target activation failed after the previous Flask runtime was stopped, "
+                "and bounded restoration could not prove a usable runtime. Source remains "
+                "on the approved target; retry the same apply to resume activation."
+            ),
+        )
+        return
 
     if proxy.target_flask_started:
         record_activation_recovery(
@@ -230,6 +295,7 @@ def _serialized_apply(
     root: Path,
     request_file: Path,
     result_file: Path,
+    request_id: str,
     target: str,
 ) -> bool:
     lock = host_build.host_mutation_lock(root)
@@ -252,9 +318,6 @@ def _serialized_apply(
     def guarded_post_build_prune(*_args, **_kwargs):
         nonlocal prune_called
         prune_called = True
-        # controlled_core_build already pruned the checkout-scoped Buildx cache
-        # and positively stopped the BuildKit writer. Do not wake it again merely
-        # to repeat the legacy default-builder prune.
         proven = host_build.resolve_clean_commit(root)
         if proven != target:
             raise RuntimeError("build_context_changed")
@@ -270,7 +333,20 @@ def _serialized_apply(
     engine.prune_build_cache = guarded_post_build_prune
     engine.subprocess = controlled_subprocess
     try:
-        processed = bool(engine.process_once(root, request_file, result_file))
+        try:
+            processed = bool(engine.process_once(root, request_file, result_file))
+        except Exception:
+            _recover_failed_activation(
+                engine,
+                root,
+                result_file,
+                controlled_subprocess,
+                previous_commit=previous_commit,
+                expected_request_id=request_id,
+                target=target,
+                allow_missing_result=True,
+            )
+            raise
         if processed:
             _recover_failed_activation(
                 engine,
@@ -278,6 +354,7 @@ def _serialized_apply(
                 result_file,
                 controlled_subprocess,
                 previous_commit=previous_commit,
+                expected_request_id=request_id,
                 target=target,
             )
         return processed
@@ -286,9 +363,6 @@ def _serialized_apply(
         engine.prune_build_cache = original_prune
         engine.subprocess = original_subprocess
         if build_phase_entered and not prune_called:
-            # A build/preflight raised before the ordinary post-build release
-            # point. The controlled builder is reconstructible, so discard only
-            # its own cache while proving no BuildKit writer remains live.
             try:
                 host_build.stop_build_writer(
                     root,
@@ -310,15 +384,21 @@ def process_once(
     request_file: Path,
     result_file: Path,
 ) -> bool:
-    target = _apply_target(request_file, engine)
-    if target is None:
+    identity = _apply_identity(request_file, engine)
+    if identity is None:
         return bool(engine.process_once(root, request_file, result_file))
+    request_id, target = identity
     try:
-        return _serialized_apply(engine, root, request_file, result_file, target)
+        return _serialized_apply(
+            engine,
+            root,
+            request_file,
+            result_file,
+            request_id,
+            target,
+        )
     except RuntimeError as exc:
         if str(exc) == "host_mutation_busy":
-            # The launcher/update transaction holding the lock owns the host.
-            # Leave the durable request untouched and retry on the next poll.
             return False
         raise
 
@@ -343,9 +423,6 @@ def main() -> int:
     initial_runner_digest = _digest(runner_path)
     initial_engine_digest = _digest(engine_path)
 
-    # Preserve the existing singleton boundary. An agent process from the
-    # immediately previous release self-reloads this public entrypoint after it
-    # completes the update that installs the new shim/runner.
     lock_path = directory / "agent.lock"
     with lock_path.open("a+", encoding="utf-8") as singleton:
         try:
@@ -354,8 +431,6 @@ def main() -> int:
             return 0
 
         while True:
-            # This process owns the singleton lock, so it is the one writer that
-            # can decide when its own log has grown past its bound.
             bound_agent_log(directory)
             processed = process_once(engine, root, request_file, result_file)
             if args.once:
