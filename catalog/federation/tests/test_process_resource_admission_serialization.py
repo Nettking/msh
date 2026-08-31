@@ -53,9 +53,10 @@ def test_reserve_remeasures_after_prior_writer_consumes_and_releases() -> None:
     with admission.reserve(Path("writer-a"), bytes_required=150):
         free_bytes -= 150
 
-    with pytest.raises(HostResourceRefused) as captured:
-        with admission.reserve(Path("writer-b"), bytes_required=150):
-            pass
+    with pytest.raises(HostResourceRefused) as captured, admission.reserve(
+        Path("writer-b"), bytes_required=150
+    ):
+        pass
 
     assert captured.value.code == "resource_pressure"
 
@@ -83,13 +84,13 @@ def test_measurement_is_inside_the_same_lock_as_accounting() -> None:
         thresholds=_thresholds(),
         measurer=measure,
     )
-    errors: list[BaseException] = []
+    errors: list[Exception] = []
 
     def reserve(path: str) -> None:
         try:
             with admission.reserve(Path(path), bytes_required=1):
                 pass
-        except BaseException as exc:  # pragma: no cover - failure transport
+        except Exception as exc:  # pragma: no cover - failure transport
             errors.append(exc)
 
     first = threading.Thread(target=reserve, args=("first",))
@@ -150,13 +151,12 @@ def test_reserve_many_is_all_or_nothing_across_resources() -> None:
         measurer=measure,
     )
 
-    with pytest.raises(HostResourceRefused):
-        with admission.reserve_many(
-            (
-                (Path("healthy"), 100, 0),
-                (Path("pressured"), 1, 0),
-            )
-        ):
-            pass
+    with pytest.raises(HostResourceRefused), admission.reserve_many(
+        (
+            (Path("healthy"), 100, 0),
+            (Path("pressured"), 1, 0),
+        )
+    ):
+        pass
 
     assert admission._reserved == {}
