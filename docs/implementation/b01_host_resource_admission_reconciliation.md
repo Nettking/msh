@@ -93,7 +93,8 @@ invoked Docker or host command is safe.
 
 ## Implemented in this continuation
 
-Commit `11c60cd` targets the concrete Federated JSONL completion bug above:
+Commits `11c60cd` and `24ea125` target the concrete Federated JSONL completion
+bug above:
 local-cache and materialization transactions now admit their bounded SQLite
 bookkeeping in the same atomic reservation as the large filesystem peak, and
 their inner bookkeeping path uses that already-held reservation instead of
@@ -106,7 +107,8 @@ chunk-ingest completion, uploads, analysis outputs, or cumulative outboxes.
 Focused verification at this head:
 
 - `python -m pytest -q --basetemp=.pytest-tmp catalog/flask_app/tests/test_federated_jsonl_resource_admission.py`
-  — **15 passed, 1 skipped**;
+  — **16 passed, 1 skipped** (including local-cache and remote-materialization
+  completion-at-pressure regressions);
 - the combined Federated JSONL/model admission subset — **32 passed, 3
   skipped**; and
 - `ruff check` on both bridge implementations and the focused test — **passed**.
