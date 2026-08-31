@@ -30,7 +30,15 @@ def test_windows_resume_failure_restores_previous_flask_before_reporting_failure
 def test_restore_success_requires_runtime_health() -> None:
     posix = _text("scripts/posix/fcp_update_agent_runner.py")
     windows = _text("scripts/windows/fcp_update_agent_runner.ps1")
-    assert "wait_runtime" in posix[posix.index("def restore_previous_flask_runtime") :]
+    restore = posix[
+        posix.index("def restore_previous_flask_runtime") : posix.index(
+            "def record_activation_recovery"
+        )
+    ]
+    assert "_runtime_usable" in restore
+    assert "wait_runtime" in posix[
+        posix.index("def _runtime_usable") : posix.index("class _ControlledSubprocess")
+    ]
     assert "Test-RuntimeUsable" in windows
 
 
