@@ -62,6 +62,16 @@ def test_windows_runtime_verification_failure_has_bounded_activation_recovery_st
     )
 
 
+def test_recovery_is_bounded_to_one_restore_or_one_explicit_state_transition() -> None:
+    posix = _text("scripts/posix/fcp_update_agent_runner.py")
+    windows = _text("scripts/windows/fcp_update_agent_runner.ps1")
+
+    assert posix.count('["docker", "compose", "start", "flask"]') == 1
+    assert "while" not in posix[posix.index("def restore_previous_flask_runtime") : posix.index("def record_activation_recovery")]
+    assert windows.count("@('compose', 'start', 'flask')") == 1
+    assert "while" not in windows[windows.index("function Restore-PreviousFlaskRuntime") : windows.index("function Reconcile-FailedActivation")].lower()
+
+
 def test_activation_recovery_never_introduces_source_rollback() -> None:
     texts = (
         _text("scripts/posix/fcp_update_agent_runner.py"),
