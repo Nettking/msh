@@ -6,6 +6,7 @@ on:
       - ".github/workflows/b01-federated-jsonl-admission.yml"
       - "catalog/federation/host_resources.py"
       - "catalog/federation/process_resource_admission.py"
+      - "catalog/federation/resource_override.py"
       - "catalog/federation/stable_filesystem.py"
       - "catalog/federation/_stable_filesystem_impl.py"
       - "catalog/federation/tests/test_host_resource_admission_serialization.py"
@@ -15,6 +16,8 @@ on:
       - "catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py"
       - "catalog/flask_app/tests/test_federated_jsonl_resource_admission.py"
       - "catalog/flask_app/tests/test_federated_jsonl_staged_boundary.py"
+      - "catalog/federation/tests/test_resource_overrides.py"
+      - "catalog/flask_app/auth/policy.py"
   workflow_dispatch:
 
 permissions:
@@ -55,6 +58,7 @@ jobs:
           python -m compileall -q
           catalog/federation/host_resources.py
           catalog/federation/process_resource_admission.py
+          catalog/federation/resource_override.py
           catalog/federation/stable_filesystem.py
           catalog/federation/_stable_filesystem_impl.py
           catalog/flask_app/services/federated_jsonl_product_bridge.py
@@ -68,12 +72,14 @@ jobs:
           catalog/federation/tests/test_stable_filesystem.py
           catalog/flask_app/tests/test_federated_jsonl_resource_admission.py
           catalog/flask_app/tests/test_federated_jsonl_staged_boundary.py
+          catalog/federation/tests/test_resource_overrides.py
 
       - name: Ruff admission boundary
         run: >-
           python -m ruff check
           catalog/federation/host_resources.py
           catalog/federation/process_resource_admission.py
+          catalog/federation/resource_override.py
           catalog/federation/stable_filesystem.py
           catalog/federation/_stable_filesystem_impl.py
           catalog/federation/tests/test_host_resource_admission_serialization.py
@@ -83,6 +89,8 @@ jobs:
           catalog/flask_app/services/_federated_jsonl_product_bridge_impl.py
           catalog/flask_app/tests/test_federated_jsonl_resource_admission.py
           catalog/flask_app/tests/test_federated_jsonl_staged_boundary.py
+          catalog/federation/tests/test_resource_overrides.py
+          catalog/flask_app/auth/policy.py
           --ignore I001,RUF022,B008,C408,PLC0206
 
       - name: Diff hygiene

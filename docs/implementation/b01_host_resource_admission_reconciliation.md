@@ -22,8 +22,12 @@ The branch was validated without merging or rebasing:
 - branch: `codex/b01-host-resource-reconciliation-20260831`;
 - prior-phase verified branch head: `08a89420d6610520698566af7a47caa0a85465f4`;
 - continuation starting head: `0341166d5611d7bbd59616af8e6614a49a1aa26c`;
+- override-control continuation starting head:
+  `a1ea7acc28b6170d7df13805a70196545badd767`;
 - final implementation head before the documentation-only handoff correction:
   `47fae81f4bc05a8b5ad78cc4927b61db78e53d56`;
+- current continuation implementation head:
+  `0dd64d4a4d8446e1ea6b5a085ef304cefc54d1f1`;
 - current-main baseline: `954faa357638b13d7291e69ea98fa620c0c3d637`;
 - merge-base: `17e279c01ae6d48ca9c0f4a0b3eaddbb5922d0ef`;
 - the B06 files introduced by #387 and ICSE demo files introduced by #381 are
@@ -75,6 +79,10 @@ The shared resource authority is real production code:
 - `catalog/federation/process_resource_admission.py` provides the process-wide
   `PROCESS_RESOURCE_ADMISSION`, serialized measurement/accounting, same-resource
   coalescing, atomic `reserve_many`, and exception-safe release.
+- `catalog/federation/resource_override.py` provides the policy authority for
+  authorized, exact-scope, expiring retention/maintenance decisions and the
+  durable audit record. Its emergency lease is one-shot, process-local, and
+  non-rehydratable; it is only consumed by the shared controller.
 - Focused tests cover byte pressure, inode-only exhaustion, unavailable/stale
   measurements, same-resource aggregation, distinct resources, serialization,
   cross-resource all-or-nothing refusal, and exception unwind.
@@ -90,6 +98,7 @@ still matters.
 | Writer boundary | Consequence and remaining proof | Status |
 |---|---|---|
 | Shared process-wide admission (`host_resources.py`, `process_resource_admission.py`) | Measures bytes/inodes by backing-resource identity; serializes the decision; coalesces requirements; supports atomic multi-resource reservations and unwind. | **PROVEN** |
+| Authorized resource-policy override control plane (`federation/resource_override.py`) | Admin-only/permission-gated retention and maintenance records are exact-scope, expiring, durable-audited, and revocable. Emergency leases are exact-operation/resource-set, one-shot, byte/inode-capped, process-local, and accepted only by the shared controller; PRESSURE may be overridden only above the CRITICAL floor. Consequence tests prove refusal, expiry, revocation, reuse, identity/scope mismatch, cap enforcement, audit-write pressure refusal, and exception unwind. | **PROVEN** |
 | Recorder capture/recovery/publication (`mtconnect_recorder/resource_pressure.py`, `_resource_pressure_impl.py`) | Sequence-bounded raw XML, manifests, observation NDJSON, normalized JSONL, probes, and checkpoints retain the inherited recorder budget/controller behavior. Recorder publication/outbox ownership and the excluded B03 seam are not re-opened here. | **PARTIAL** |
 | Recorder Federation durable outbox (`catalog/federation/outbox.py`) | Initialization/migration and every state-changing transaction now use the shared controller with bounded byte/inode estimates, WAL autocheckpoint/journal-size limits, rollback, and backing-resource identity checks. Completed/retired payload compaction is bounded. Pending rows and the durable idempotency/tombstone history cannot be automatically deleted without changing at-least-once delivery or re-enqueue suppression. | **PARTIAL** |
 | Federated JSONL local gzip cache (`_prepare_local_file`) | Inherited source/output bounds, stable-directory handling, source re-stat/hash validation, atomic publication, and SQLite transaction envelopes remain. Authenticated owned `fcp-jsonl-*` cleanup is now bounded and proven; cumulative `local_files`/WAL growth is not closed in this PR. | **PARTIAL** |
@@ -116,7 +125,7 @@ still matters.
 | Legacy `data_upload_records` full-payload duplication | The current import path does not persist the obsolete full payload column; this is no longer a supported writer boundary. | **OUT-OF-SCOPE** |
 | Durable resumable transfer, backup/export/import, and migration helpers not instantiated by v1 | No supported installed-product invocation was identified. Claiming admission here would be speculation; adding one would be a separate product boundary. | **OUT-OF-SCOPE** |
 | Crash-stranded `fcp-chunk-*`, `fcp-encoded-*`, `fcp-raw-*`, and B01-owned cache temporaries | Supported JSONL staging/materialization uses authenticated stable-directory owner records; analysis, upload request, observer, source-sync, storage publication, session/filter/index, playback, basic-metrics, content, archive, and telemetry-cache temporaries use authenticated managed roots. Startup/re-entry traversal is bounded, locked active work is skipped, exact filesystem identity and namespace/proof checks are required, and symlinks/reparse points or malformed ownership are never deleted. Consequence tests cover abandoned reclaim, live preservation, unrelated preservation, directory cleanup, and symlink/root safety. Generic or unowned temporary names are deliberately never scavenged. | **PROVEN** |
-| Cross-writer SQLite/WAL aggregate growth | Per-transaction shared admission and WAL/journal headroom now cover the outbox, upload metadata, storage provider, analysis job/lifecycle, analysis authority, dispatch, coordinator, provider enrollment/health, and efficiency stores, plus the admitted JSONL/cache paths. The remaining gap is aggregate growth after successful transactions: SQLite main files, durable pending/terminal history, JSONL indexes, storage idempotency rows, upload metadata, and user-visible data still need an authorized retention/archive contract. Safe deletion is constrained by delivery identity, ordering gaps, idempotency, tombstones, or source-of-truth semantics. | **PARTIAL** |
+| Cross-writer SQLite/WAL aggregate growth | Per-transaction shared admission and WAL/journal headroom now cover the outbox, upload metadata, storage provider, analysis job/lifecycle, analysis authority, dispatch, coordinator, provider enrollment/health, and efficiency stores, plus the admitted JSONL/cache paths. The remaining gap is aggregate growth after successful transactions: SQLite main files, durable pending/terminal history, JSONL indexes, storage idempotency rows, upload metadata, user-visible data, and the new override audit ledger still need an authorized retention/archive contract. Safe deletion is constrained by delivery identity, ordering gaps, idempotency, tombstones, source-of-truth semantics, or auditability. | **PARTIAL** |
 
 ## Retention and archive decisions requiring Martin
 
@@ -137,6 +146,7 @@ each cumulative store and the consequence of each alternative.
 | Execution-efficiency observations and derived profiles | Existing configured observation retention and profile rebuild semantics remain; WAL is mechanically checkpointed. | Whether physical SQLite high-water space must be compacted, and the safe operational trigger for VACUUM/backup replacement. | Keep current logical retention; add explicit online backup/VACUUM mechanics only after Martin chooses an operational size/maintenance policy. |
 | Telemetry Parquet cache and analysis derived/cache artifacts | Disposable and rebuildable; source JSONL/session data is authoritative; rebuild tree is bounded and authenticated. | No user-data retention decision is required for the cache itself; only whether operators want a maintenance trigger/telemetry for rebuild cost. | Keep cache disposable and rebuildable. This is not a cumulative-retention blocker for the cache boundary. |
 | Session run outputs and playback/analysis exports | Per-run writes are admitted and bounded; completed user-visible outputs remain available for cache reuse. | Whether completed run outputs are retained forever, archived, or pruned when a session is closed. | Keep until an explicit session-output policy exists; deletion must update session metadata and preserve any required audit/replay references. |
+| Resource override audit ledger | Each issuance/revocation rewrite is bounded, atomically published, identity-checked, and admitted through the shared controller; emergency leases are not rehydrated from it. | Required audit lifetime, archive medium, and whether an immutable external archive becomes the authoritative record. | Keep the local ledger append-history until an authoritative archive/checkpoint contract exists; then compact only behind that identity. Do not silently delete audit evidence as part of B01. |
 
 The recommendation column is a design recommendation for Martin, not an
 implemented retention policy. Until those decisions are made, aggregate-growth
@@ -160,6 +170,7 @@ write boundaries:
 | Validation precedence | Pure job/plan/slice validation remains before host measurement. Multipart declared-length validation occurs before form/file access; unknown un-terminated requests fail closed without FCP spool creation. |
 | Windows/Linux divergence | Windows temporary handles are closed before replacement, owner locks are released before sidecar deletion, and stable NT handle-relative replacement/deletion is retained. POSIX symlink/race tests run where the platform permits them; privilege-limited Windows symlink cases are explicit skips, not passing assertions. |
 | Mocks hiding writer behavior | The added analysis test uses the real harness stack, content store, lifecycle/job database, artifact authority, and registry for success/refusal consequences. Existing unit tests remain focused on individual writer failure/unwind paths. |
+| Override authority abuse, expiry, and hard-floor bypass | The lease is minted only by `ResourceOverrideAuthority`, requires the new admin-only `resource.override` permission (or an explicit trusted equivalent), binds to one exact operation and measured resource set, is one-shot and expiring, and cannot pass CRITICAL or exceed byte/inode caps. The 7-test consequence suite uses the real serialized controller and verifies audit-write refusal and unwind. |
 
 The review found and fixed the Windows open-handle replacement failure, the
 Windows sidecar cleanup ordering failure, malformed ownership/marker handling,
@@ -207,13 +218,17 @@ The coherent implementation slices pushed to the branch are:
   baseline.
 - `47fae81` — refreshed the scorecard, retention/archive decision table,
   live-main baseline, adversarial findings, and handoff language.
+- `0dd64d4` — added the authorized, audited retention/maintenance policy
+  override authority and one-shot bounded emergency admission lease on the
+  shared process-wide controller, with pressure, hard-floor, scope, cap,
+  expiry, revocation, audit-write, reuse, and unwind consequence tests.
 
 The earlier Federated JSONL completion-at-`PRESSURE` work is inherited by this
 branch and was not reworked as a writer-ledger refinement.
 
 ## Verification evidence
 
-The pre-ledger focused consequence run after `82e46d2` collected **308 tests**
+The pre-override focused consequence run after `82e46d2` collected **308 tests**
 and passed all 308. It covers the directly affected analysis,
 artifact-authority, upload, temporary-root, observer/cache, JSONL, storage, and
 outbox regression files. That same set passed against the final implementation
@@ -268,6 +283,13 @@ green signal in this checkout because acceptance/Flask modules require
 uninstalled `email_validator`/`flask_security` dependencies. No physical
 acceptance path was accessed.
 
+The new override consequence suite passed **7 tests** on `0dd64d4`:
+
+```text
+python -m pytest -o addopts= --basetemp .pytest-b01-override -q \
+  catalog/federation/tests/test_resource_overrides.py
+```
+
 ## Architectural blockers and exact residual work
 
 1. **Pre-route multipart spooling:** the Flask/Werkzeug application now bounds
@@ -286,6 +308,11 @@ acceptance path was accessed.
    coherent follow-up is one product-level retention design that names the
    archive/identity replacement, then implements bounded compaction/retention
    for outbox, JSONL indexes, storage catalogue, and upload metadata together.
+   The override authority now provides the requested authorized, scoped,
+   expiring, audited decision mechanism and a bounded emergency admission
+   escape hatch, but it does not choose retention values or authorize deletion
+   by itself. Its own audit ledger consequently needs the same explicit audit
+   lifetime/archive decision.
 3. **Supported crash-stranded temporary files:** authenticated managed roots
    and the stable JSONL directory boundary now reclaim abandoned owned files
    under bounded traversal, while locked/live, malformed, symlink/reparse,
