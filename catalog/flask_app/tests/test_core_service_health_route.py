@@ -6,10 +6,11 @@ from catalog.flask_app import federation_recorder_routes as routes
 
 
 def test_core_health_route_reports_degradation_without_http_failure(monkeypatch) -> None:
-    monkeypatch.setattr(
-        routes,
-        "core_service_health_snapshot",
-        lambda **_kwargs: {
+    captured: dict[str, object] = {}
+
+    def snapshot(**kwargs):
+        captured.update(kwargs)
+        return {
             "status": "degraded",
             "services": [
                 {
@@ -37,8 +38,9 @@ def test_core_health_route_reports_degradation_without_http_failure(monkeypatch)
                     "message": "The managed recorder is ready.",
                 },
             ],
-        },
-    )
+        }
+
+    monkeypatch.setattr(routes, "core_service_health_snapshot", snapshot)
     app = Flask(__name__)
     app.register_blueprint(routes.federation_recorder_web)
 
@@ -47,6 +49,7 @@ def test_core_health_route_reports_degradation_without_http_failure(monkeypatch)
     assert response.status_code == 200
     assert response.headers["Cache-Control"] == "no-store"
     assert response.headers["Pragma"] == "no-cache"
+    assert captured["listener_probe"] is routes.bounded_relay_listener_probe
     assert response.get_json()["status"] == "degraded"
     services = {item["service"]: item for item in response.get_json()["services"]}
     assert services["flask"]["readiness"] == "ready"
