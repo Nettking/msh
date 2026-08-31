@@ -24,6 +24,7 @@ def _normal_assessment() -> ResourceAssessment:
         observed_at=datetime.now(timezone.utc),
     )
 
+
 ROOT = Path(__file__).resolve().parents[3]
 
 _POSIX_ONLY = pytest.mark.skipif(
@@ -79,6 +80,7 @@ def test_serialized_apply_releases_lock_only_after_controlled_build(
 ) -> None:
     runner = _load_runner()
     target = "a" * 40
+    request_id = "request-1"
     events: list[str] = []
 
     @contextmanager
@@ -105,9 +107,6 @@ def test_serialized_apply_releases_lock_only_after_controlled_build(
         "stop_build_writer",
         lambda *_args, **_kwargs: events.append("preflight-quiescence") or True,
     )
-    # The serialized apply now runs the real controlled preflight, which proves
-    # the Docker backing resource before anything else. Give it one so the
-    # ordering under test is reached instead of failing on an unproven resource.
     monkeypatch.setattr(
         runner.host_build,
         "docker_resource_assessment",
@@ -154,14 +153,12 @@ def test_serialized_apply_releases_lock_only_after_controlled_build(
             tmp_path,
             tmp_path / "request.json",
             tmp_path / "result.json",
+            request_id,
             target,
         )
         is True
     )
 
-    # The preflight quiescence proof is production behaviour that runs inside
-    # the lock and before the controlled build, so it belongs in the expected
-    # ordering rather than being stubbed away.
     assert events == [
         "lock-enter",
         "preflight-quiescence",
