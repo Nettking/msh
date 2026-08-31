@@ -67,11 +67,29 @@ function Test-ApplyRequest([string]$Path) {
     catch { return $false }
 }
 
+function Get-ApplyRequestIdentity([string]$Path) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Leaf)) { return $null }
+    try {
+        $item = Get-Item -LiteralPath $Path
+        if ($item.Length -gt $MaxBytes) { return $null }
+        $request = [System.IO.File]::ReadAllText($Path) | ConvertFrom-Json
+        $requestId = [string]$request.request_id
+        $target = ([string]$request.target_commit).ToLowerInvariant()
+        if (
+            [string]$request.schema -ne $RequestSchema -or
+            [string]$request.action -ne 'apply' -or
+            $requestId -notmatch $RequestIdPattern -or
+            $target -notmatch $OidPattern
+        ) { return $null }
+        return [pscustomobject]@{
+            RequestId = $requestId
+            TargetCommit = $target
+        }
+    }
+    catch { return $null }
+}
+
 function Invoke-PostBuildCachePrune {
-    # During an apply, PATH points at the private docker proxy. The legacy
-    # command shape is intentionally retained so the mature engine/runner
-    # contract stays stable, but the proxy maps it to checkout-scoped Buildx
-    # cleanup and never to Docker's global default-builder cache.
     try {
         & docker builder prune --force "--keep-storage=$BuildCacheKeepBytes" | Out-Null
         if ($LASTEXITCODE -ne 0) {
@@ -205,13 +223,17 @@ function Restore-PreviousFlaskRuntime([string]$DockerExe, [string]$PreviousCommi
 function Reconcile-FailedActivation(
     [string]$DockerExe,
     [AllowNull()][string]$PreviousCommit,
-    [string]$PhaseFile
+    [string]$PhaseFile,
+    [string]$ExpectedRequestId,
+    [string]$ExpectedTargetCommit
 ) {
     $result = Get-UpdateResult
     if (
         $null -eq $result -or
         [string]$result.action -ne 'apply' -or
-        [string]$result.code -ne 'host_update_failed'
+        [string]$result.code -ne 'host_update_failed' -or
+        [string]$result.request_id -ne $ExpectedRequestId -or
+        ([string]$result.target_commit).ToLowerInvariant() -ne $ExpectedTargetCommit
     ) { return }
 
     $phase = ''
@@ -279,6 +301,7 @@ try {
         }
 
         $isApply = Test-ApplyRequest $RequestFile
+        $applyIdentity = if ($isApply) { Get-ApplyRequestIdentity $RequestFile } else { $null }
         $mutationMutex = $null
         $mutationAcquired = $false
         $proxyDirectory = $null
@@ -295,6 +318,7 @@ try {
         $previousActivationPhase = $null
         try {
             if ($isApply) {
+                if ($null -eq $applyIdentity) { throw 'malformed_apply_identity' }
                 $mutationMutex = [System.Threading.Mutex]::new(
                     $false,
                     "Global\FCPHostMutation-$pathHash"
@@ -311,9 +335,6 @@ try {
                     continue
                 }
 
-                # Keep the mature engine unchanged. During an apply, a private
-                # docker.cmd shim intercepts its exact core-build/cache commands
-                # and records only the Flask stop/start activation boundary.
                 $dockerCommand = Get-Command docker -CommandType Application -ErrorAction Stop |
                     Select-Object -First 1
                 if (
@@ -371,14 +392,14 @@ try {
                 -Once
             $engineExit = $LASTEXITCODE
 
-            # Keep the old runner cleanup point while the private Docker proxy is
-            # still active so this can only touch the FCP Buildx builder.
             if ($isApply) {
                 Invoke-PostBuildCachePrune | Out-Null
                 Reconcile-FailedActivation `
                     -DockerExe $realDocker `
                     -PreviousCommit $previousRunning `
-                    -PhaseFile $activationPhaseFile
+                    -PhaseFile $activationPhaseFile `
+                    -ExpectedRequestId ([string]$applyIdentity.RequestId) `
+                    -ExpectedTargetCommit ([string]$applyIdentity.TargetCommit)
             }
             if ($engineExit -ne 0) {
                 Write-Warning "FCP update engine exited with code $engineExit."
