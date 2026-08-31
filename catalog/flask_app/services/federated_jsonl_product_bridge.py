@@ -1,6 +1,6 @@
 """Federated JSONL bridge with stable staged-chunk lifecycle hardening.
 
-The implementation lives in ``_federated_jsonl_product_bridge_impl``.  This
+The implementation lives in ``_federated_jsonl_product_bridge_impl``. This
 module keeps the public import surface unchanged while overriding the remaining
 staged-chunk lifecycle operations that must never dereference a persisted
 lexical path directly after admission/staging.
@@ -42,9 +42,11 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
     @contextmanager
     def _open_staged(self, value: object) -> Iterator[BinaryIO]:
         relative_parent, name = self._staged_components(value)
-        with self._stable_directory(self.cache_root, relative_parent) as directory:
-            with directory.open_read(name) as handle:
-                yield handle
+        with (
+            self._stable_directory(self.cache_root, relative_parent) as directory,
+            directory.open_read(name) as handle,
+        ):
+            yield handle
 
     def _stat_staged(self, value: object):
         relative_parent, name = self._staged_components(value)
@@ -319,9 +321,12 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
                 )
             cache_reservation = materialization_reservations[0]
             target_reservation = materialization_reservations[-1]
-            with self._stable_directory(self.cache_root) as cache_directory, self._stable_directory(
-                self.mirror_root, relative_parent, create=True
-            ) as target_directory:
+            with (
+                self._stable_directory(self.cache_root) as cache_directory,
+                self._stable_directory(
+                    self.mirror_root, relative_parent, create=True
+                ) as target_directory,
+            ):
                 self._assert_stable_reserved_resource(cache_directory, cache_reservation)
                 self._assert_stable_reserved_resource(target_directory, target_reservation)
                 with cache_directory.temporary_file(prefix="fcp-encoded-") as (
@@ -354,9 +359,12 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
                         bounded_raw = _impl._BoundedWriter(raw, declared_file_size)
                         digest = _impl.hashlib.sha256()
                         size = 0
-                        with cache_directory.open_read(encoded_name) as encoded_source, _impl.gzip.GzipFile(
-                            fileobj=encoded_source, mode="rb"
-                        ) as compressed:
+                        with (
+                            cache_directory.open_read(encoded_name) as encoded_source,
+                            _impl.gzip.GzipFile(
+                                fileobj=encoded_source, mode="rb"
+                            ) as compressed,
+                        ):
                             while data := compressed.read(1024 * 1024):
                                 size += len(data)
                                 digest.update(data)
