@@ -5,6 +5,7 @@ from pathlib import Path
 
 import pytest
 
+from catalog.federation.host_resources import measure_filesystem
 from catalog.federation.stable_filesystem import StableFilesystemError, stable_directory
 
 
@@ -21,6 +22,15 @@ def test_stable_directory_temp_replace_round_trip(tmp_path: Path) -> None:
         assert directory.stat("result.bin").st_size == 7
         assert directory.sha256("result.bin").startswith("sha256:")
     assert (root / "nested" / "leaf" / "result.bin").read_bytes() == b"payload"
+
+
+def test_stable_directory_resource_id_matches_admission_measurement(tmp_path: Path) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    with stable_directory(root, Path("nested/leaf"), create=True) as directory:
+        measurement = measure_filesystem(root / "nested" / "leaf")
+        assert measurement.available is True
+        assert directory.resource_id == measurement.resource_id
 
 
 @pytest.mark.skipif(os.name == "nt", reason="POSIX descriptor-relative race consequence")
