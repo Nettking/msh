@@ -8,8 +8,8 @@ from typing import Any
 
 import pytest
 from flask import Flask
-from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.datastructures import FileStorage
+from werkzeug.exceptions import RequestEntityTooLarge
 from werkzeug.test import EnvironBuilder
 
 from catalog.federation.host_resources import (

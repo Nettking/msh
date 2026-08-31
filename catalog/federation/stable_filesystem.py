@@ -127,9 +127,9 @@ StableDirectory = _impl.StableDirectory
 stable_directory = _impl.stable_directory
 
 __all__ = [
+    "TEMPORARY_OWNER_SUFFIX",
     "StableDirectory",
     "StableFilesystemError",
-    "TEMPORARY_OWNER_SUFFIX",
     "TemporaryScavengeReport",
     "stable_directory",
 ]

@@ -53,9 +53,9 @@ from catalog.federation.shared_file_storage import (
     validate_federated_jsonl_ingest,
 )
 from catalog.federation.stable_filesystem import (
+    TEMPORARY_OWNER_SUFFIX,
     StableDirectory,
     StableFilesystemError,
-    TEMPORARY_OWNER_SUFFIX,
     stable_directory,
 )
 from catalog.federation.storage_catalog import (

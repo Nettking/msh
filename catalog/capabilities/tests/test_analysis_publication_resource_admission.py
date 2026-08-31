@@ -13,18 +13,20 @@ from catalog.capabilities.analysis.resource_admission import (
     FederatedAnalysisScheduler,
     analysis_publication_resource_requirement,
 )
-from catalog.capabilities.tests.analysis_harness import build_stack, work_slice
 from catalog.capabilities.analysis.scheduler import (
     FederatedAnalysisScheduler as BaseFederatedAnalysisScheduler,
 )
-from catalog.federation.errors import FederationOperationError, FederationValidationError
+from catalog.capabilities.tests.analysis_harness import build_stack, work_slice
+from catalog.federation.errors import (
+    FederationOperationError,
+    FederationValidationError,
+)
 from catalog.federation.host_resources import (
     FilesystemMeasurement,
     HostResourceRefused,
     PressureThresholds,
     ProcessResourceAdmission,
 )
-
 
 NOW = datetime(2026, 8, 29, 9, 45, tzinfo=timezone.utc)
 THRESHOLDS = PressureThresholds(

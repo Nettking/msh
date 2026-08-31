@@ -96,9 +96,11 @@ class SQLiteArtifactAuthority:
 
     @contextmanager
     def _admitted_connection(self, *, admission_held: bool = False):
-        with self._resource_reservation(admission_held=admission_held):
-            with self._connect() as connection:
-                yield connection
+        with (
+            self._resource_reservation(admission_held=admission_held),
+            self._connect() as connection,
+        ):
+            yield connection
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(
