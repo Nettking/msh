@@ -27,6 +27,7 @@ from catalog.federation.errors import (
 )
 
 from .capability_onboarding_routes import _CSRF_SESSION_KEY, _csrf_token
+from .services.bounded_relay_probe import bounded_relay_listener_probe
 from .services.core_service_health import core_service_health_snapshot
 from .services.federation_recorder_control_service import (
     FederationRecorderControlError,
@@ -100,6 +101,7 @@ def core_health() -> Response:
                 "data/source_state/mtconnect_recorder_status.json",
             )
         ),
+        listener_probe=bounded_relay_listener_probe,
     )
     response = jsonify(snapshot)
     # A degraded dependency is operator evidence, not proof that Flask itself
