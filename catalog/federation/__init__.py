@@ -126,6 +126,14 @@ from .reporting import (
     StorageReplicaReport,
     assess_storage_replica_report,
 )
+from .resource_override import (
+    ADMISSION_EMERGENCY,
+    MAINTENANCE_POLICY,
+    RETENTION_POLICY,
+    OperatorPrincipal,
+    OverrideAuditRecord,
+    ResourceOverrideAuthority,
+)
 from .selection import (
     StoragePromotionCandidate,
     StoragePromotionSelection,
@@ -171,9 +179,11 @@ from .storage_protocol import (
 from .write_authority import AuthorizedStorageService, StorageWriteAuthorityValidator
 
 __all__ = [
+    "ADMISSION_EMERGENCY",
     "DEFAULT_DATASET_SCHEMA_NAME",
     "DEFAULT_DATASET_SCHEMA_VERSION",
     "FORMER_PRIMARY_RECOVERY_SCHEMA",
+    "MAINTENANCE_POLICY",
     "MANIFEST_SCHEMA",
     "PHASE_D_SERVICE_REPLICATION_OWNER",
     "PROMOTION_FINALIZATION_SCHEMA",
@@ -184,6 +194,7 @@ __all__ = [
     "REPLICATION_SCHEMA",
     "REPORT_PROTOCOL_VERSION",
     "REPORT_SCHEMA",
+    "RETENTION_POLICY",
     "STORAGE_ASSIGNMENT_CHANGED",
     "STORAGE_GROUP_CREATED",
     "STORAGE_LEADER_GRANTED",
@@ -209,8 +220,8 @@ __all__ = [
     "CapabilityProvider",
     "CapabilityStatus",
     "CommitState",
-    "CommittedBatchIdentity",
     "CommittedBatchDeltaPage",
+    "CommittedBatchIdentity",
     "CommittedBatchPage",
     "CommittedBatchReference",
     "ControlledHandover",
@@ -243,8 +254,10 @@ __all__ = [
     "ManifestItemKind",
     "ManifestItemProposal",
     "NodeIdentity",
+    "OperatorPrincipal",
     "OutboxEntry",
     "OutboxState",
+    "OverrideAuditRecord",
     "PhaseDControlPlane",
     "PhaseDHandoverCoordinator",
     "PhaseDIngestOutcome",
@@ -264,6 +277,7 @@ __all__ = [
     "ReplicationTarget",
     "ReplicationTransport",
     "ReplicationWorker",
+    "ResourceOverrideAuthority",
     "SQLiteOutbox",
     "SequenceRange",
     "Session",
