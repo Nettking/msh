@@ -26,14 +26,21 @@ The branch was validated without merging or rebasing:
   `a1ea7acc28b6170d7df13805a70196545badd767`;
 - final implementation head before the documentation-only handoff correction:
   `47fae81f4bc05a8b5ad78cc4927b61db78e53d56`;
-- current continuation implementation head:
+- current override-control implementation head:
   `0dd64d4a4d8446e1ea6b5a085ef304cefc54d1f1`;
+- audit-publication hardening head:
+  `c5a8dca4796de5b6dfc2bba1a6e2f7c978657ab7`;
 - current-main baseline: `954faa357638b13d7291e69ea98fa620c0c3d637`;
 - merge-base: `17e279c01ae6d48ca9c0f4a0b3eaddbb5922d0ef`;
 - the B06 files introduced by #387 and ICSE demo files introduced by #381 are
-  in `main`, not in this branch diff;
-- no B06 health files, ICSE demo files, physical Federation machines, physical
-  evidence, merge action, or release state were accessed.
+  in `main`; they were not pulled into this branch and no continuation commit
+  in the override tranche modifies them;
+- the complete branch diff retains the earlier B01 analysis-authority change
+  to `catalog/capabilities/provider_health.py`. That path is called out for
+  explicit reviewer acceptance because its filename overlaps the health-work
+  boundary, but the diff is not the B06 implementation from #387;
+- no ICSE demo files, physical Federation machines, physical evidence, merge
+  action, or release state were accessed.
 
 The parallel-work boundary was respected. No continuation change touches
 `catalog/federation/recorder_publication.py`, recorder publication discovery or
@@ -181,6 +188,12 @@ limitations are the production WSGI pre-route boundary, product retention
 authority, and deliberately ambiguous temporary records; none is hidden by a
 green unit test.
 
+For the override audit ledger specifically, the review also bounded
+load/publication size, rejected non-finite lease durations, deep-copied mutable
+policy values, and used a POSIX directory descriptor plus target and parent
+identity checks across atomic replacement; the Windows path keeps the same
+checks with the platform's path-based replacement primitive.
+
 ## Implemented in this continuation
 
 The coherent implementation slices pushed to the branch are:
@@ -222,6 +235,12 @@ The coherent implementation slices pushed to the branch are:
   override authority and one-shot bounded emergency admission lease on the
   shared process-wide controller, with pressure, hard-floor, scope, cap,
   expiry, revocation, audit-write, reuse, and unwind consequence tests.
+- `5c7f9ef` — exposed the override implementation and consequence suite in the
+  B01 workflow and refreshed the scorecard/retention/adversarial evidence.
+- `d4f9e77` — recorded the combined directly relevant test collection.
+- `c5a8dca` — hardened override audit load/publication against oversized audit
+  state, mutable-value aliasing, non-finite lease bounds, parent/target identity
+  races, and POSIX directory substitution during atomic replacement.
 
 The earlier Federated JSONL completion-at-`PRESSURE` work is inherited by this
 branch and was not reworked as a writer-ledger refinement.
@@ -283,10 +302,11 @@ green signal in this checkout because acceptance/Flask modules require
 uninstalled `email_validator`/`flask_security` dependencies. No physical
 acceptance path was accessed.
 
-The new override consequence suite passed **7 tests** on `0dd64d4`:
+The new override consequence suite passed **7 tests** on
+`c5a8dca4796de5b6dfc2bba1a6e2f7c978657ab7`:
 
 ```text
-python -m pytest -o addopts= --basetemp .pytest-b01-override -q \
+python -m pytest -o addopts= --basetemp .pytest-b01-override-hardening -q \
   catalog/federation/tests/test_resource_overrides.py
 ```
 
@@ -328,10 +348,10 @@ workspace collected **315 tests**, with **310 passed** and **5 platform skips**.
 
 ## Handoff facts
 
-After the documentation-only correction is pushed, the exact final head SHA,
-current-main SHA, complete tracked changed-file list, and exact-head workflow
-identifiers will be recorded in this section. The prior implementation head is
-`47fae81f4bc05a8b5ad78cc4927b61db78e53d56`; current main is
+The latest implementation head before this ledger refresh is
+`c5a8dca4796de5b6dfc2bba1a6e2f7c978657ab7`; the exact final documentation
+head and exact-head workflow identifiers are recorded in the PR body and final
+handoff after the documentation commit. Current main is
 `954faa357638b13d7291e69ea98fa620c0c3d637`; the PR base and merge-base are
 `17e279c01ae6d48ca9c0f4a0b3eaddbb5922d0ef`. This document does not accept
 physical evidence, declare B01 complete, or authorize a merge.
