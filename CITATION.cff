@@ -8,8 +8,6 @@ authors:
     orcid: "https://orcid.org/0009-0004-9991-3578"
 version: "0.1.0"
 license: MIT
-repository-code: "https://github.com/Nettking/msh"
-url: "https://github.com/Nettking/msh/tree/main/demo/icse"
 abstract: >-
   Reviewer artifact for the FCP capability-oriented federation tool demonstration.
   It evaluates selective contribution, capability-specific authority, runtime
