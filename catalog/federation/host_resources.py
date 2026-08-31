@@ -413,8 +413,8 @@ class ProcessResourceAdmission:
             return _unavailable_measurement(observed_at=self.clock())
 
     def assessment(self, path: Path | str) -> ResourceAssessment:
-        measurement = self._measure(path)
         with self._lock:
+            measurement = self._measure(path)
             reserved_bytes, reserved_inodes = self._active_for(measurement.resource_id)
             return assess_measurement(
                 measurement,
@@ -450,9 +450,9 @@ class ProcessResourceAdmission:
         if not _valid_capacity(bytes_required) or not _valid_capacity(inodes_required):
             raise ValueError("resource requirement must be non-negative integers")
 
-        measurement = self._measure(path)
-        resource_id = measurement.resource_id
         with self._lock:
+            measurement = self._measure(path)
+            resource_id = measurement.resource_id
             active_bytes, active_inodes = self._active_for(resource_id)
             before = assess_measurement(
                 measurement,

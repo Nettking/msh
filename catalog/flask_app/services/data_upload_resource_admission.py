@@ -8,10 +8,9 @@ from typing import Any
 from werkzeug.datastructures import FileStorage
 
 from catalog.federation.host_resources import HostResourceRefused, ProcessResourceAdmission
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from .data_upload_service import DataUploadError, DataUploadService
-
-_UPLOAD_RESOURCE_ADMISSION = ProcessResourceAdmission()
 
 
 def enqueue_with_resource_admission(
@@ -30,7 +29,7 @@ def enqueue_with_resource_admission(
     the batch.
     """
 
-    controller = admission or _UPLOAD_RESOURCE_ADMISSION
+    controller = admission or PROCESS_RESOURCE_ADMISSION
     try:
         with controller.reserve(
             service.staging_root,

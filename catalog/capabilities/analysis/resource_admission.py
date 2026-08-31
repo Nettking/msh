@@ -11,6 +11,7 @@ from catalog.capabilities.jobs import JobContract
 from catalog.federation.errors import FederationOperationError, FederationValidationError
 from catalog.federation.host_resources import HostResourceRefused, ProcessResourceAdmission
 from catalog.federation.object_transfer import MAX_TRANSFER_CHUNKS
+from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 from .contracts import (
     ANALYSIS_DATA_SLICE_SCHEMA,
@@ -22,11 +23,6 @@ from .packaging import MAX_SLICE_ENTRIES
 from .scheduler import FederatedAnalysisScheduler as _FederatedAnalysisScheduler
 from .scheduler import SubmissionOutcome
 from .worker import FederatedAnalysisHandler as _FederatedAnalysisHandler
-
-# One process-wide controller is shared by every supported analysis boundary so
-# a worker materialization and a data-owner publication on the same filesystem
-# cannot independently spend the same measured headroom.
-_ANALYSIS_RESOURCE_ADMISSION = ProcessResourceAdmission()
 
 # Fixed workspace entries cover the ownership marker, plan/slice publication
 # files, staging/publication directories and a small margin for atomic temp files.
@@ -103,7 +99,7 @@ class FederatedAnalysisHandler(_FederatedAnalysisHandler):
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.resource_admission = resource_admission or _ANALYSIS_RESOURCE_ADMISSION
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
 
     async def execute(self, job: JobContract) -> ExecutionResult:
         try:
@@ -165,7 +161,7 @@ class FederatedAnalysisScheduler(_FederatedAnalysisScheduler):
         **kwargs: Any,
     ) -> None:
         super().__init__(*args, **kwargs)
-        self.resource_admission = resource_admission or _ANALYSIS_RESOURCE_ADMISSION
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
 
     def submit(
         self,
