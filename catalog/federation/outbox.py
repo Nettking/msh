@@ -6,14 +6,18 @@ import hashlib
 import json
 import re
 import sqlite3
-from collections.abc import Callable
+from collections.abc import Callable, Iterable, Iterator
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import Enum
+from functools import wraps
 from pathlib import Path
 from typing import Any
 
 from .errors import FederationValidationError
+from .host_resources import ProcessResourceAdmission
+from .process_resource_admission import PROCESS_RESOURCE_ADMISSION
 
 SCHEMA_VERSION = 3
 MAX_ERROR_LENGTH = 2048
@@ -24,6 +28,24 @@ MAX_RETIRED_SUMMARY_DATASETS = 1_000
 MAX_RETIREMENT_REASON_LENGTH = 64
 MAX_RETIREMENT_DATASET_LENGTH = 512
 COMPLETED_RECEIPT_SCHEMA = "fcp.outbox.completed_receipt.v1"
+_OUTBOX_MUTATION_FIXED_BYTES = 2 * 1024 * 1024
+_OUTBOX_MUTATION_FIXED_INODES = 4
+_OUTBOX_COMPACTION_BYTES = 8 * 1024 * 1024
+_OUTBOX_MAX_MIGRATION_BYTES = 2 * 1024 * 1024 * 1024
+
+
+def _admit_mutation(*, bytes_required: int) -> Callable[[Callable[..., Any]], Callable[..., Any]]:
+    """Wrap one SQLite mutation in bounded process-wide admission."""
+
+    def decorate(method: Callable[..., Any]) -> Callable[..., Any]:
+        @wraps(method)
+        def admitted(self: Any, *args: Any, **kwargs: Any) -> Any:
+            with self._mutation_admission(bytes_required=bytes_required):
+                return method(self, *args, **kwargs)
+
+        return admitted
+
+    return decorate
 
 #: A retirement reason is an operator-facing classification, never an error
 #: message.  Keeping it a bounded lowercase token means it can be persisted,
@@ -227,10 +249,113 @@ def _outbox_table_ddl(name: str, *, if_not_exists: bool) -> str:
 class SQLiteOutbox:
     """Each mutation uses BEGIN IMMEDIATE; no delivery item is destructively claimed."""
 
-    def __init__(self, database: Path | str) -> None:
+    def __init__(
+        self,
+        database: Path | str,
+        *,
+        resource_admission: ProcessResourceAdmission | None = None,
+    ) -> None:
         self.database = str(database)
-        Path(self.database).parent.mkdir(parents=True, exist_ok=True)
-        self.initialize()
+        self.database_path = Path(self.database)
+        self.resource_admission = resource_admission or PROCESS_RESOURCE_ADMISSION
+        with self._reserve_resources(
+            self._migration_requirements(),
+        ) as reservations:
+            self.database_path.parent.mkdir(parents=True, exist_ok=True)
+            self._assert_resource_identity(reservations)
+            self._initialize_unadmitted()
+            self._assert_resource_identity(reservations)
+
+    def _database_bytes(self) -> int:
+        total = 0
+        for suffix in ("", "-wal", "-shm"):
+            try:
+                total += int(Path(f"{self.database}{suffix}").stat().st_size)
+            except FileNotFoundError:
+                continue
+            except OSError as exc:
+                raise FederationValidationError(
+                    "outbox-resource-measurement-failed",
+                    "database",
+                    "could not measure the durable outbox before admission",
+                ) from exc
+        return total
+
+    def _migration_requirements(self) -> tuple[tuple[Path, int, int], ...]:
+        existing = self._database_bytes()
+        if existing > _OUTBOX_MAX_MIGRATION_BYTES:
+            raise FederationValidationError(
+                "outbox-resource-envelope",
+                "database",
+                "durable outbox is too large for a bounded startup migration",
+            )
+        # A v2-to-v3 migration rebuilds the table while retaining the old one
+        # until the transactional DROP. Reserve the old database plus a second
+        # bounded copy, WAL/journal headroom, and the atomic temp identities.
+        return (
+            (
+                self.database_path.parent,
+                max(
+                    _OUTBOX_MUTATION_FIXED_BYTES,
+                    (2 * existing) + _OUTBOX_MUTATION_FIXED_BYTES,
+                ),
+                _OUTBOX_MUTATION_FIXED_INODES + 2,
+            ),
+        )
+
+    @contextmanager
+    def _reserve_resources(
+        self,
+        requirements: Iterable[tuple[Path, int, int]],
+    ) -> Iterator[tuple[object, ...]]:
+        reserve_many = getattr(self.resource_admission, "reserve_many", None)
+        if callable(reserve_many):
+            with reserve_many(requirements) as reservations:
+                yield tuple(reservations)
+            return
+        with ExitStack() as stack:
+            reservations = tuple(
+                stack.enter_context(
+                    self.resource_admission.reserve(
+                        path,
+                        bytes_required=bytes_required,
+                        inodes_required=inodes_required,
+                    )
+                )
+                for path, bytes_required, inodes_required in requirements
+            )
+            yield reservations
+
+    def _assert_resource_identity(self, reservations: tuple[object, ...]) -> None:
+        measure = getattr(self.resource_admission, "_measure", None)
+        if not callable(measure):
+            return
+        resource_ids = {
+            str(reservation.resource_id) for reservation in reservations
+        }
+        measurement = measure(self.database_path.parent)
+        if not measurement.available or measurement.resource_id not in resource_ids:
+            raise FederationValidationError(
+                "outbox-backing-resource-changed",
+                "database",
+                "outbox path no longer resolves to its admitted backing resource",
+            )
+
+    @contextmanager
+    def _mutation_admission(
+        self,
+        *,
+        bytes_required: int = _OUTBOX_MUTATION_FIXED_BYTES,
+        inodes_required: int = _OUTBOX_MUTATION_FIXED_INODES,
+    ) -> Iterator[None]:
+        with self._reserve_resources(
+            ((self.database_path.parent, bytes_required, inodes_required),)
+        ) as reservations:
+            self._assert_resource_identity(reservations)
+            try:
+                yield
+            finally:
+                self._assert_resource_identity(reservations)
 
     def _connect(self) -> sqlite3.Connection:
         connection = sqlite3.connect(self.database, timeout=30)
@@ -238,9 +363,19 @@ class SQLiteOutbox:
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA busy_timeout=30000")
         connection.execute("PRAGMA synchronous=FULL")
+        connection.execute("PRAGMA wal_autocheckpoint=100")
+        connection.execute("PRAGMA journal_size_limit=1048576")
         return connection
 
     def initialize(self) -> None:
+        """Reconcile the schema under the same bounded startup admission."""
+
+        with self._reserve_resources(self._migration_requirements()) as reservations:
+            self._assert_resource_identity(reservations)
+            self._initialize_unadmitted()
+            self._assert_resource_identity(reservations)
+
+    def _initialize_unadmitted(self) -> None:
         with self._connect() as db:
             db.execute("PRAGMA journal_mode=WAL")
             db.executescript(f"""
@@ -438,6 +573,9 @@ class SQLiteOutbox:
             now=now,
         )
 
+    @_admit_mutation(
+        bytes_required=_OUTBOX_MUTATION_FIXED_BYTES + MAX_PAYLOAD_BYTES,
+    )
     def _insert(
         self,
         *,
@@ -452,9 +590,9 @@ class SQLiteOutbox:
     ) -> tuple[OutboxEntry, bool]:
         timestamp = _time(now)
         with self._connect() as db:
-            db.execute("BEGIN IMMEDIATE")
-            try:
-                cursor = db.execute(
+                db.execute("BEGIN IMMEDIATE")
+                try:
+                    cursor = db.execute(
                     """INSERT INTO outbox
                     (session_id,destination_id,schema_id,payload_json,idempotency_key,content_hash,
                      state,created_at,updated_at,next_attempt_at) VALUES(?,?,?,?,?,?,?,?,?,?)
@@ -472,55 +610,55 @@ class SQLiteOutbox:
                         timestamp,
                     ),
                 )
-                row = db.execute(
-                    "SELECT * FROM outbox WHERE session_id=? AND destination_id=? AND idempotency_key=?",
-                    (session_id, destination_id, idempotency_key),
-                ).fetchone()
-                # A terminal row's payload is no longer authoritative: it will
-                # never be delivered from it again, and it may be a bounded
-                # identity receipt or the very corruption that got the row
-                # retired.  Comparing it against the payload reconciliation
-                # just rebuilt would raise a false idempotency conflict on
-                # every archive scan -- and because that conflict propagates
-                # out of the scan, one tombstone would abort reconciliation of
-                # the entire archive.  Identity is compared instead, and
-                # identity is what duplicate suppression depends on: a key
-                # genuinely reused for different content still has a different
-                # content hash and still fails closed.
-                terminal = row["state"] in (
-                    OutboxState.COMPLETED.value,
-                    OutboxState.RETIRED.value,
-                )
-                if (
-                    row["content_hash"] != content_hash
-                    or row["schema_id"] != schema_id
-                    or (not terminal and row["payload_json"] != payload_json)
-                ):
-                    raise FederationValidationError(
-                        "idempotency-conflict",
-                        "idempotency_key",
-                        "identity was reused with different content",
-                    )
-                # Only unactivated routing intent is promoted.  A retired row
-                # is deliberately terminal: re-observing the same archive must
-                # never turn a withdrawn identity back into deliverable work.
-                if (
-                    state is OutboxState.PENDING
-                    and row["state"] == OutboxState.PREPARED.value
-                ):
-                    db.execute(
-                        "UPDATE outbox SET state='pending',updated_at=?,next_attempt_at=? "
-                        "WHERE outbox_id=?",
-                        (timestamp, timestamp, row["outbox_id"]),
-                    )
                     row = db.execute(
-                        "SELECT * FROM outbox WHERE outbox_id=?", (row["outbox_id"],)
+                        "SELECT * FROM outbox WHERE session_id=? AND destination_id=? AND idempotency_key=?",
+                        (session_id, destination_id, idempotency_key),
                     ).fetchone()
-                db.commit()
-                return self._decode(row), cursor.rowcount == 1
-            except Exception:
-                db.rollback()
-                raise
+                    # A terminal row's payload is no longer authoritative: it will
+                    # never be delivered from it again, and it may be a bounded
+                    # identity receipt or the very corruption that got the row
+                    # retired.  Comparing it against the payload reconciliation
+                    # just rebuilt would raise a false idempotency conflict on
+                    # every archive scan -- and because that conflict propagates
+                    # out of the scan, one tombstone would abort reconciliation of
+                    # the entire archive.  Identity is compared instead, and
+                    # identity is what duplicate suppression depends on: a key
+                    # genuinely reused for different content still has a different
+                    # content hash and still fails closed.
+                    terminal = row["state"] in (
+                        OutboxState.COMPLETED.value,
+                        OutboxState.RETIRED.value,
+                    )
+                    if (
+                        row["content_hash"] != content_hash
+                        or row["schema_id"] != schema_id
+                        or (not terminal and row["payload_json"] != payload_json)
+                    ):
+                        raise FederationValidationError(
+                            "idempotency-conflict",
+                            "idempotency_key",
+                            "identity was reused with different content",
+                        )
+                    # Only unactivated routing intent is promoted.  A retired row
+                    # is deliberately terminal: re-observing the same archive must
+                    # never turn a withdrawn identity back into deliverable work.
+                    if (
+                        state is OutboxState.PENDING
+                        and row["state"] == OutboxState.PREPARED.value
+                    ):
+                        db.execute(
+                            "UPDATE outbox SET state='pending',updated_at=?,next_attempt_at=? "
+                            "WHERE outbox_id=?",
+                            (timestamp, timestamp, row["outbox_id"]),
+                        )
+                        row = db.execute(
+                            "SELECT * FROM outbox WHERE outbox_id=?", (row["outbox_id"],)
+                        ).fetchone()
+                    db.commit()
+                    return self._decode(row), cursor.rowcount == 1
+                except Exception:
+                    db.rollback()
+                    raise
 
     def prepared(self) -> tuple[OutboxEntry, ...]:
         with self._connect() as db:
@@ -531,6 +669,7 @@ class SQLiteOutbox:
                 )
             )
 
+    @_admit_mutation(bytes_required=_OUTBOX_MUTATION_FIXED_BYTES)
     def activate(self, outbox_id: int, *, now: datetime) -> OutboxEntry:
         """Atomically make a prepared intent deliverable; safe to repeat."""
         with self._connect() as db:
@@ -569,6 +708,9 @@ class SQLiteOutbox:
             ).fetchone()
         return self._decode(row) if row else None
 
+    @_admit_mutation(
+        bytes_required=_OUTBOX_MUTATION_FIXED_BYTES + MAX_PAYLOAD_BYTES,
+    )
     def acknowledge(self, outbox_id: int, *, now: datetime) -> OutboxEntry:
         with self._connect() as db:
             db.execute("BEGIN IMMEDIATE")
@@ -663,6 +805,7 @@ class SQLiteOutbox:
 
         return self._compact(OutboxState.RETIRED, limit=limit)
 
+    @_admit_mutation(bytes_required=_OUTBOX_COMPACTION_BYTES)
     def _compact(self, state: OutboxState, *, limit: int) -> int:
         if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
             raise FederationValidationError(
@@ -699,6 +842,7 @@ class SQLiteOutbox:
                 db.rollback()
                 raise
 
+    @_admit_mutation(bytes_required=_OUTBOX_MUTATION_FIXED_BYTES)
     def record_failure(
         self,
         outbox_id: int,
@@ -750,6 +894,7 @@ class SQLiteOutbox:
             db.commit()
         return self.get(outbox_id)  # type: ignore[return-value]
 
+    @_admit_mutation(bytes_required=_OUTBOX_MUTATION_FIXED_BYTES)
     def retire(
         self,
         outbox_id: int,
@@ -838,6 +983,7 @@ class SQLiteOutbox:
                 db.rollback()
                 raise
 
+    @_admit_mutation(bytes_required=_OUTBOX_MUTATION_FIXED_BYTES)
     def reinstate(self, outbox_id: int, *, now: datetime) -> OutboxEntry:
         """Return a retired entry to ordinary retryable delivery.
 
