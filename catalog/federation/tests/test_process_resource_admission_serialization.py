@@ -84,13 +84,13 @@ def test_measurement_is_inside_the_same_lock_as_accounting() -> None:
         thresholds=_thresholds(),
         measurer=measure,
     )
-    errors: list[Exception] = []
+    errors: list[HostResourceRefused] = []
 
     def reserve(path: str) -> None:
         try:
             with admission.reserve(Path(path), bytes_required=1):
                 pass
-        except Exception as exc:  # pragma: no cover - failure transport
+        except HostResourceRefused as exc:  # pragma: no cover - failure transport
             errors.append(exc)
 
     first = threading.Thread(target=reserve, args=("first",))
