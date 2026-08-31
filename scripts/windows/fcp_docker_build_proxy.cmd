@@ -6,9 +6,22 @@ if not defined FCP_REAL_DOCKER_EXE exit /b 64
 
 if /I "%~1"=="compose" if /I "%~2"=="build" if /I "%~3"=="relay" if /I "%~4"=="flask" if /I "%~5"=="recorder" if "%~6"=="" goto :controlled_build
 if /I "%~1"=="builder" if /I "%~2"=="prune" goto :cache_cleanup
+if /I "%~1"=="compose" if /I "%~2"=="stop" if /I "%~3"=="flask" if "%~4"=="" goto :flask_stop
+if /I "%~1"=="compose" if /I "%~2"=="up" if /I "%~3"=="-d" if /I "%~4"=="flask" if "%~5"=="" goto :flask_start
 
 :forward
 if not defined FCP_REAL_DOCKER_EXE exit /b 64
+"%FCP_REAL_DOCKER_EXE%" %*
+exit /b %ERRORLEVEL%
+
+:flask_stop
+"%FCP_REAL_DOCKER_EXE%" %*
+set "FCP_FORWARD_EXIT=%ERRORLEVEL%"
+if "%FCP_FORWARD_EXIT%"=="0" if defined FCP_ACTIVATION_PHASE_FILE >"%FCP_ACTIVATION_PHASE_FILE%" echo flask-stopped
+exit /b %FCP_FORWARD_EXIT%
+
+:flask_start
+if defined FCP_ACTIVATION_PHASE_FILE >"%FCP_ACTIVATION_PHASE_FILE%" echo target-started
 "%FCP_REAL_DOCKER_EXE%" %*
 exit /b %ERRORLEVEL%
 

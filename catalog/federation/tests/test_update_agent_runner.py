@@ -25,6 +25,7 @@ def runner():
 def _engine(events: list[str], *, fail_before_prune: bool = False):
     engine = SimpleNamespace()
     engine.REQUEST_SCHEMA = "fcp.host-update-request.v1"
+    engine.REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9._:-]{1,128}$")
     engine.OID_RE = re.compile(r"^[0-9a-f]{40}$")
     engine.subprocess = subprocess
 
@@ -55,6 +56,7 @@ def _apply_request(path: Path, target: str) -> None:
         json.dumps(
             {
                 "schema": "fcp.host-update-request.v1",
+                "request_id": "test-apply-request",
                 "action": "apply",
                 "target_commit": target,
             }
