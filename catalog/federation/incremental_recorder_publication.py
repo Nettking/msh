@@ -8,8 +8,8 @@ has durably accepted the corresponding batch identity.
 """
 from __future__ import annotations
 
+from collections.abc import Iterator
 from contextlib import contextmanager
-from typing import Iterator
 
 from catalog.mtconnect_recorder.model import RawBatchRef, SourceCheckpoint
 from catalog.mtconnect_recorder.publication_frontier import (
