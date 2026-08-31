@@ -225,6 +225,8 @@ def _load_or_create_auto_session(
     end_date,
     script_options,
     runtime_namespace: str,
+    resource_admission: ProcessResourceAdmission | None = None,
+    admission_held: bool = False,
 ):
     session_id = _auto_session_id(
         start_date.isoformat(),
@@ -246,7 +248,12 @@ def _load_or_create_auto_session(
                 runtime_payload["runtime_namespace"] = runtime_namespace
                 changed = True
             if changed:
-                write_session_metadata(session_dir, metadata)
+                write_session_metadata(
+                    session_dir,
+                    metadata,
+                    resource_admission=resource_admission,
+                    admission_held=admission_held,
+                )
             return session_id, session_dir, metadata, "reused"
 
     session_dir.mkdir(parents=True, exist_ok=True)
@@ -259,7 +266,12 @@ def _load_or_create_auto_session(
         runtime_namespace=runtime_namespace,
         script_options=script_options,
     )
-    write_session_metadata(session_dir, metadata)
+    write_session_metadata(
+        session_dir,
+        metadata,
+        resource_admission=resource_admission,
+        admission_held=admission_held,
+    )
     return session_id, session_dir, metadata, "created"
 
 
@@ -435,6 +447,8 @@ def _run_for_date_slice_unadmitted(
         end_date=target_day,
         script_options=script_options,
         runtime_namespace=runtime_namespace,
+        resource_admission=resource_admission,
+        admission_held=resource_admission is not None,
     )
     status.info(
         f"{session_mode} bootstrap/update session: {session_id} ({target_day.isoformat()})"
@@ -446,6 +460,8 @@ def _run_for_date_slice_unadmitted(
         metadata=metadata,
         active_slice=active_slice,
         remaining_slices=remaining_slices,
+        resource_admission=resource_admission,
+        admission_held=resource_admission is not None,
     )
     filter_progress_context = _format_filter_progress_context(
         active_slice=active_slice,
@@ -469,7 +485,11 @@ def _run_for_date_slice_unadmitted(
     if filter_status == "cached" and derived_dataset.exists():
         status.info(f"reusing derived metrics dataset: {derived_dataset}")
     else:
-        derived_path, derived_rows = build_basic_metrics_dataset(filtered_data_dir)
+        derived_path, derived_rows = build_basic_metrics_dataset(
+            filtered_data_dir,
+            resource_admission=resource_admission,
+            admission_held=resource_admission is not None,
+        )
         status.info(
             f"prepared derived metrics dataset: {derived_rows} rows at {derived_path}"
         )
@@ -534,7 +554,10 @@ def _run_for_date_slice_unadmitted(
     ready, missing = playback_readiness(session_dir, metadata)
     if ready:
         export_path, export_state = prepare_session_playback_exports(
-            session_dir, metadata
+            session_dir,
+            metadata,
+            resource_admission=resource_admission,
+            admission_held=resource_admission is not None,
         )
         if export_state == "cached":
             status.info(f"playback export already fresh: {export_path}")
@@ -554,7 +577,12 @@ def _run_for_date_slice_unadmitted(
             "script_keys": list(script_keys),
             "excluded_script_keys": list(BOOTSTRAP_FULL_ANALYSIS_EXCLUDED_SCRIPT_KEYS),
         }
-        write_session_metadata(session_dir, metadata)
+        write_session_metadata(
+            session_dir,
+            metadata,
+            resource_admission=resource_admission,
+            admission_held=resource_admission is not None,
+        )
 
     artifacts, warnings = scan_artifacts(_canonical_scan_roots())
     return OrchestrationResult(

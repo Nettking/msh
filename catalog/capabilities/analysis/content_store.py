@@ -9,13 +9,17 @@ from __future__ import annotations
 
 import hashlib
 import os
-import tempfile
 from collections.abc import Iterable, Iterator
 from collections.abc import Iterator as TypingIterator
 from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from pathlib import Path
 
+from catalog.common.managed_temporary import (
+    ManagedTemporaryFile,
+    ManagedTemporaryRoot,
+    scavenge_managed_temporary_root,
+)
 from catalog.federation.errors import FederationValidationError
 from catalog.federation.host_resources import ProcessResourceAdmission
 from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
@@ -24,7 +28,10 @@ from ..artifact_contracts import _logical_key
 from .contracts import DEFAULT_MAX_SLICE_BYTES
 
 DEFAULT_CHUNK_BYTES = 1024 * 1024
-_ARTIFACT_WRITE_INODES = 3  # destination parent margin, partial, replacement
+_ARTIFACT_WRITE_INODES = 8  # managed root marker/owner plus destination margin
+_ARTIFACT_TEMP_NAMESPACE = "analysis-artifact-content"
+_ARTIFACT_TEMP_ROOT_NAME = ".fcp-analysis-content-tmp"
+_ARTIFACT_TEMP_TRAVERSAL_LIMIT = 4096
 
 
 @dataclass(frozen=True)
@@ -81,30 +88,57 @@ class LocalArtifactContentStore:
         destination.parent.mkdir(parents=True, exist_ok=True)
         digest = hashlib.sha256()
         size = 0
-        descriptor, name = tempfile.mkstemp(dir=destination.parent, suffix=".partial")
-        temporary = Path(name)
+        temporary_root = ManagedTemporaryRoot(
+            self.root / _ARTIFACT_TEMP_ROOT_NAME,
+            namespace=_ARTIFACT_TEMP_NAMESPACE,
+        )
+        scavenge_managed_temporary_root(
+            temporary_root.root,
+            namespace=_ARTIFACT_TEMP_NAMESPACE,
+            max_entries=_ARTIFACT_TEMP_TRAVERSAL_LIMIT,
+        )
+        temporary: ManagedTemporaryFile | None = None
         try:
-            with os.fdopen(descriptor, "wb") as handle:
-                for chunk in chunks:
-                    if not isinstance(chunk, (bytes, bytearray)):
-                        raise FederationValidationError(
-                            "invalid-artifact-chunk", "chunk", "must be bytes"
-                        )
-                    size += len(chunk)
-                    if size > self.max_bytes:
-                        raise FederationValidationError(
-                            "analysis-artifact-too-large",
-                            "size_bytes",
-                            f"must not exceed {self.max_bytes} bytes",
-                        )
-                    digest.update(chunk)
-                    handle.write(chunk)
-                handle.flush()
-                os.fsync(handle.fileno())
-            os.replace(temporary, destination)
-        except BaseException:
-            temporary.unlink(missing_ok=True)
-            raise
+            temporary = temporary_root.allocate(
+                prefix="fcp-analysis-artifact-",
+                suffix=".partial",
+            )
+            for chunk in chunks:
+                if not isinstance(chunk, (bytes, bytearray)):
+                    raise FederationValidationError(
+                        "invalid-artifact-chunk", "chunk", "must be bytes"
+                    )
+                size += len(chunk)
+                if size > self.max_bytes:
+                    raise FederationValidationError(
+                        "analysis-artifact-too-large",
+                        "size_bytes",
+                        f"must not exceed {self.max_bytes} bytes",
+                    )
+                digest.update(chunk)
+                temporary.write(chunk)
+            temporary.flush()
+            os.fsync(temporary.fileno())
+            temporary.prepare_for_replace()
+            try:
+                if temporary.path.stat().st_dev != destination.parent.stat().st_dev:
+                    raise FederationValidationError(
+                        "analysis-artifact-backing-resource-changed",
+                        "object_key",
+                        "temporary and destination paths are on different filesystems",
+                    )
+            except FileNotFoundError:
+                # The temporary path is still present here; a missing parent
+                # is an unsafe publication boundary rather than a retry hint.
+                raise FederationValidationError(
+                    "analysis-artifact-backing-resource-changed",
+                    "object_key",
+                    "artifact publication parent disappeared",
+                )
+            temporary.path.replace(destination)
+        finally:
+            if temporary is not None:
+                temporary.close()
         return ContentIdentity("sha256:" + digest.hexdigest(), size)
 
     @contextmanager

@@ -97,7 +97,7 @@ def test_pressure_refuses_before_base_submission_starts(
 ) -> None:
     called = False
 
-    def base_submit(self, work, *, slice_files, slice_root):
+    def base_submit(self, work, *, slice_files, slice_root, **_kwargs):
         nonlocal called
         called = True
         return object()
@@ -122,7 +122,7 @@ def test_warning_with_safe_emergency_reserve_allows_submission(
 ) -> None:
     sentinel = object()
 
-    def base_submit(self, work, *, slice_files, slice_root):
+    def base_submit(self, work, *, slice_files, slice_root, **_kwargs):
         return sentinel
 
     monkeypatch.setattr(BaseFederatedAnalysisScheduler, "submit", base_submit)
@@ -143,7 +143,7 @@ def test_concurrent_submissions_cannot_double_spend_one_resource(
     release = threading.Event()
     first_result: list[object] = []
 
-    def base_submit(self, work, *, slice_files, slice_root):
+    def base_submit(self, work, *, slice_files, slice_root, **_kwargs):
         entered.set()
         assert release.wait(timeout=5)
         return object()
@@ -187,7 +187,7 @@ def test_distinct_backing_resources_have_independent_envelopes(
         resource = "disk-a" if path == root_a else "disk-b"
         return _measurement(resource, 203)
 
-    def base_submit(self, work, *, slice_files, slice_root):
+    def base_submit(self, work, *, slice_files, slice_root, **_kwargs):
         if self.gateway.content_store.root == root_a:
             entered_a.set()
         else:
@@ -226,7 +226,7 @@ def test_reservation_releases_after_publication_failure(
 ) -> None:
     attempts = 0
 
-    def base_submit(self, work, *, slice_files, slice_root):
+    def base_submit(self, work, *, slice_files, slice_root, **_kwargs):
         nonlocal attempts
         attempts += 1
         if attempts == 1:
@@ -257,7 +257,7 @@ def test_validation_precedes_resource_measurement(
         measurements += 1
         return _measurement("disk", 102)
 
-    def base_submit(self, work, *, slice_files, slice_root):
+    def base_submit(self, work, *, slice_files, slice_root, **_kwargs):
         raise AssertionError("base submit must not run for invalid work")
 
     monkeypatch.setattr(BaseFederatedAnalysisScheduler, "submit", base_submit)
@@ -274,7 +274,7 @@ def test_existing_registered_slice_validation_error_is_preserved(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    def base_submit(self, work, *, slice_files, slice_root):
+    def base_submit(self, work, *, slice_files, slice_root, **_kwargs):
         raise FederationValidationError(
             "analysis-slice-registered-content-invalid",
             "object_key",

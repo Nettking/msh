@@ -9,18 +9,24 @@ that had no timestamp field.
 from __future__ import annotations
 
 import hashlib
+import io
 import json
+import os
 import re
 import shutil
 from collections.abc import Iterable
 from datetime import date, datetime
 from pathlib import Path
-from tempfile import NamedTemporaryFile
 from typing import Any
 
 ROOT_DIR = Path(__file__).resolve().parents[2]
 
 from catalog.common.data_loading import iter_jsonl_files, iter_jsonl_records
+from catalog.common.managed_temporary import (
+    ManagedTemporaryFile,
+    ManagedTemporaryRoot,
+    scavenge_managed_temporary_root,
+)
 from catalog.common.time_utils import (
     date_from_filename,
     parse_iso_timestamp,
@@ -33,17 +39,63 @@ DATA_INDEX_VERSION = 2
 DATA_INDEX_FILE = ROOT_DIR / "results" / "runner" / "data_index.json"
 FILTER_PROGRESS_FILE_INTERVAL = 25
 FILTER_PROGRESS_RECORD_INTERVAL = 100_000
+MAX_FILTERED_DATA_BYTES = 512 * 1024 * 1024
+MAX_FILTERED_DATA_INODES = 4096
+MAX_DATA_INDEX_BYTES = 16 * 1024 * 1024
+_FILTER_TEMP_NAMESPACE = "analysis-filter-output"
+_FILTER_TEMP_TRAVERSAL_LIMIT = MAX_FILTERED_DATA_INODES
+_INDEX_TEMP_NAMESPACE = "runner-data-index"
 
 
-def source_date_signatures(data_dir: Path) -> dict[str, str]:
+def _fsync_directory(path: Path) -> None:
+    if os.name == "nt":
+        return
+    descriptor = os.open(str(path), os.O_RDONLY | getattr(os, "O_DIRECTORY", 0))
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
+def _reserve(requirements, *, resource_admission, admission_held):
+    if admission_held:
+        from contextlib import nullcontext
+
+        return nullcontext()
+    from catalog.capabilities.analysis.resource_admission import (
+        reserve_analysis_requirements,
+    )
+    from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
+
+    return reserve_analysis_requirements(
+        resource_admission or PROCESS_RESOURCE_ADMISSION,
+        requirements,
+    )
+
+
+def source_date_signatures(
+    data_dir: Path,
+    *,
+    resource_admission=None,
+    admission_held: bool = False,
+) -> dict[str, str]:
     """Return stable source identities grouped by represented telemetry date.
 
     The data index already owns the repository's conservative size/mtime freshness
     contract. Reuse that contract to invalidate filtered sessions when a newly
     published upload changes the source set for a date processed previously.
     """
-    index_data, root_entries, _stats = _refresh_data_index_for_root(data_dir)
-    _write_data_index(index_data)
+    with _reserve(
+        [(DATA_INDEX_FILE.parent, MAX_DATA_INDEX_BYTES, 4)],
+        resource_admission=resource_admission,
+        admission_held=admission_held,
+    ):
+        index_data, root_entries, _stats = _refresh_data_index_for_root(data_dir)
+        _write_data_index(
+            index_data,
+            resource_admission=resource_admission,
+            admission_held=True,
+        )
     digests: dict[str, Any] = {}
     for relative_path, entry in sorted(root_entries.items()):
         identity = (
@@ -76,13 +128,34 @@ def date_range_source_signature(
     return digest.hexdigest()
 
 
-def discover_available_dates(data_dir: Path) -> list[date]:
+def discover_available_dates(
+    data_dir: Path,
+    *,
+    resource_admission=None,
+    admission_held: bool = False,
+) -> list[date]:
     """Discover all source dates, reusing indexed metadata when size/mtime match.
 
     The returned dates drive bootstrap and catch-up scheduling, so this function
     is conservative: changed files are reparsed, unchanged files reuse cached
     timestamp-derived or filename-fallback dates.
     """
+    with _reserve(
+        [(DATA_INDEX_FILE.parent, MAX_DATA_INDEX_BYTES, 4)],
+        resource_admission=resource_admission,
+        admission_held=admission_held,
+    ):
+        return _discover_available_dates_unadmitted(
+            data_dir,
+            resource_admission=resource_admission,
+        )
+
+
+def _discover_available_dates_unadmitted(
+    data_dir: Path,
+    *,
+    resource_admission=None,
+) -> list[date]:
     print(f"[runner] Loaded data index from {DATA_INDEX_FILE}", flush=True)
     index_data, root_entries, stats = _refresh_data_index_for_root(data_dir)
 
@@ -100,12 +173,22 @@ def discover_available_dates(data_dir: Path) -> list[date]:
     )
     print(f"[runner] Total indexed files: {len(root_entries)}", flush=True)
     print(f"[runner] Writing data index to {DATA_INDEX_FILE}", flush=True)
-    _write_data_index(index_data)
+    _write_data_index(
+        index_data,
+        resource_admission=resource_admission,
+        admission_held=True,
+    )
 
     return sorted(dates)
 
 
-def source_files_for_dates(data_dir: Path, dates: Iterable[date | str]) -> tuple[Path, ...]:
+def source_files_for_dates(
+    data_dir: Path,
+    dates: Iterable[date | str],
+    *,
+    resource_admission=None,
+    admission_held: bool = False,
+) -> tuple[Path, ...]:
     """Return the source JSONL files that represent the requested dates.
 
     The data index already knows which dates each file contains, so a caller that
@@ -116,8 +199,17 @@ def source_files_for_dates(data_dir: Path, dates: Iterable[date | str]) -> tuple
     wanted: set[date] = set()
     for item in dates:
         wanted.add(item if isinstance(item, date) else date.fromisoformat(str(item)))
-    index_data, root_entries, _stats = _refresh_data_index_for_root(data_dir)
-    _write_data_index(index_data)
+    with _reserve(
+        [(DATA_INDEX_FILE.parent, MAX_DATA_INDEX_BYTES, 4)],
+        resource_admission=resource_admission,
+        admission_held=admission_held,
+    ):
+        index_data, root_entries, _stats = _refresh_data_index_for_root(data_dir)
+        _write_data_index(
+            index_data,
+            resource_admission=resource_admission,
+            admission_held=True,
+        )
     selected: list[Path] = []
     for relative_path, entry in sorted(root_entries.items()):
         if not _deserialize_dates(entry.get("dates", [])) & wanted:
@@ -138,6 +230,8 @@ def filter_data_by_date_range(
     end_hour: int | None = None,
     active_slice: date | str | None = None,
     remaining_slices: int | None = None,
+    resource_admission=None,
+    admission_held: bool = False,
 ) -> tuple[int, int]:
     """Filter JSONL records into a destination directory based on date or hour range.
 
@@ -146,14 +240,60 @@ def filter_data_by_date_range(
     allowed for date ranges. Hour filtering never uses filename fallback because
     an hour cannot be inferred safely from the path.
     """
+    with _reserve(
+        [
+            (destination_data_dir, MAX_FILTERED_DATA_BYTES, MAX_FILTERED_DATA_INODES),
+            (DATA_INDEX_FILE.parent, MAX_DATA_INDEX_BYTES, 4),
+        ],
+        resource_admission=resource_admission,
+        admission_held=admission_held,
+    ):
+        return _filter_data_by_date_range_unadmitted(
+            source_data_dir,
+            destination_data_dir,
+            start_date,
+            end_date,
+            start_hour=start_hour,
+            end_hour=end_hour,
+            active_slice=active_slice,
+            remaining_slices=remaining_slices,
+            resource_admission=resource_admission,
+        )
+
+
+def _filter_data_by_date_range_unadmitted(
+    source_data_dir: Path,
+    destination_data_dir: Path,
+    start_date: date,
+    end_date: date,
+    *,
+    start_hour: int | None = None,
+    end_hour: int | None = None,
+    active_slice: date | str | None = None,
+    remaining_slices: int | None = None,
+    resource_admission=None,
+) -> tuple[int, int]:
     destination_data_dir.mkdir(parents=True, exist_ok=True)
+    temporary_root = ManagedTemporaryRoot(
+        destination_data_dir / ".fcp-filter-tmp",
+        namespace=_FILTER_TEMP_NAMESPACE,
+    )
+    scavenge_managed_temporary_root(
+        temporary_root.root,
+        namespace=_FILTER_TEMP_NAMESPACE,
+        max_entries=_FILTER_TEMP_TRAVERSAL_LIMIT,
+    )
     source_root = source_data_dir.resolve()
     use_hour_filter = (
         start_date == end_date and start_hour is not None and end_hour is not None
     )
 
     index_data, root_entries, _stats = _refresh_data_index_for_root(source_data_dir)
-    _write_data_index(index_data)
+    _write_data_index(
+        index_data,
+        resource_admission=resource_admission,
+        admission_held=True,
+    )
 
     candidate_entries = _select_candidate_entries(root_entries, start_date, end_date)
     print(
@@ -211,7 +351,27 @@ def filter_data_by_date_range(
             matched_files=written_files,
             matched_records=matched_records,
         )
-        with destination_file.open("w", encoding="utf-8") as dst:
+        temporary: ManagedTemporaryFile | None = None
+        text_handle: io.TextIOWrapper | None = None
+        output_bytes = 0
+        try:
+            temporary = temporary_root.allocate(prefix="fcp-filter-", suffix=".partial")
+            text_handle = io.TextIOWrapper(
+                temporary.handle,
+                encoding="utf-8",
+                newline="",
+            )
+
+            def emit(record: dict[str, Any], handle=text_handle) -> None:
+                nonlocal output_bytes
+                encoded = (json.dumps(record, ensure_ascii=False) + "\n").encode(
+                    "utf-8"
+                )
+                output_bytes += len(encoded)
+                if output_bytes > MAX_FILTERED_DATA_BYTES:
+                    raise ValueError("filtered session output exceeded its bounded envelope")
+                handle.write(encoded.decode("utf-8"))
+
             records_processed = 0
             for record in iter_jsonl_records(source_file):
                 records_processed += 1
@@ -224,7 +384,7 @@ def filter_data_by_date_range(
                     if record_dt.date() != start_date:
                         continue
                     if start_hour <= record_dt.hour <= end_hour:
-                        dst.write(json.dumps(record, ensure_ascii=False) + "\n")
+                        emit(record)
                         matched_records += 1
                         file_matched += 1
                     continue
@@ -232,13 +392,13 @@ def filter_data_by_date_range(
                 record_date = parse_timestamp_to_date(str(record.get("timestamp", "")))
                 if record_date is None:
                     if not file_has_timestamp and file_in_fallback_window:
-                        dst.write(json.dumps(record, ensure_ascii=False) + "\n")
+                        emit(record)
                         matched_records += 1
                         file_matched += 1
                     continue
 
                 if start_date <= record_date <= end_date:
-                    dst.write(json.dumps(record, ensure_ascii=False) + "\n")
+                    emit(record)
                     matched_records += 1
                     file_matched += 1
 
@@ -253,11 +413,21 @@ def filter_data_by_date_range(
                         file_records=records_processed,
                         force=True,
                     )
+            text_handle.flush()
+            os.fsync(text_handle.buffer.fileno())
+            text_handle.close()
+            text_handle = None
 
-        if file_matched > 0:
-            written_files += 1
-        else:
-            destination_file.unlink(missing_ok=True)
+            if file_matched > 0:
+                temporary.prepare_for_replace()
+                temporary.path.replace(destination_file)
+                _fsync_directory(destination_file.parent)
+                written_files += 1
+        finally:
+            if text_handle is not None and not text_handle.closed:
+                text_handle.close()
+            if temporary is not None:
+                temporary.close()
         processed_files += 1
 
         progress.report(
@@ -288,6 +458,8 @@ def ensure_session_filtered_data(
     metadata: dict,
     active_slice: date | str | None = None,
     remaining_slices: int | None = None,
+    resource_admission=None,
+    admission_held: bool = False,
 ) -> tuple[int, int, str]:
     """Ensure the session-scoped filtered dataset exists for current metadata.
 
@@ -295,13 +467,44 @@ def ensure_session_filtered_data(
     the filter signature and filtered output directory look valid, data is reused;
     otherwise the old filtered copy is removed and regenerated from source JSONL.
     """
+    with _reserve(
+        [
+            (session_dir, MAX_FILTERED_DATA_BYTES + (2 * 1024 * 1024), MAX_FILTERED_DATA_INODES + 8),
+            (DATA_INDEX_FILE.parent, MAX_DATA_INDEX_BYTES, 4),
+        ],
+        resource_admission=resource_admission,
+        admission_held=admission_held,
+    ):
+        return _ensure_session_filtered_data_unadmitted(
+            source_data_dir=source_data_dir,
+            session_dir=session_dir,
+            metadata=metadata,
+            active_slice=active_slice,
+            remaining_slices=remaining_slices,
+            resource_admission=resource_admission,
+        )
+
+
+def _ensure_session_filtered_data_unadmitted(
+    *,
+    source_data_dir: Path,
+    session_dir: Path,
+    metadata: dict,
+    active_slice: date | str | None = None,
+    remaining_slices: int | None = None,
+    resource_admission=None,
+) -> tuple[int, int, str]:
     filtered_data_dir = session_dir / str(metadata["paths"]["filtered_data_dir"])
     filter_result = metadata.setdefault("filter_result", {})
     filter_config = metadata["filter"]
     filter_start_date = date.fromisoformat(str(filter_config["start_date"]))
     filter_end_date = date.fromisoformat(str(filter_config["end_date"]))
     source_signature = date_range_source_signature(
-        source_date_signatures(source_data_dir),
+        source_date_signatures(
+            source_data_dir,
+            resource_admission=resource_admission,
+            admission_held=True,
+        ),
         filter_start_date,
         filter_end_date,
     )
@@ -334,6 +537,8 @@ def ensure_session_filtered_data(
         ),
         active_slice=active_slice,
         remaining_slices=remaining_slices,
+        resource_admission=resource_admission,
+        admission_held=True,
     )
     filter_result["matched_records"] = matched_records
     filter_result["matched_files"] = matched_files
@@ -342,7 +547,12 @@ def ensure_session_filtered_data(
     filter_result["generated_at"] = (
         datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     )
-    write_session_metadata(session_dir, metadata)
+    write_session_metadata(
+        session_dir,
+        metadata,
+        resource_admission=resource_admission,
+        admission_held=True,
+    )
     return matched_records, matched_files, "created"
 
 
@@ -791,14 +1001,50 @@ def _store_cached_root_entries(
     roots[str(data_root)] = {"files": file_entries}
 
 
-def _write_data_index(index_data: dict) -> None:
-    """Write the runner data index to disk atomically."""
-    DATA_INDEX_FILE.parent.mkdir(parents=True, exist_ok=True)
-    with NamedTemporaryFile(
-        "w", encoding="utf-8", dir=DATA_INDEX_FILE.parent, delete=False
-    ) as tmp:
-        json.dump(index_data, tmp, ensure_ascii=False, indent=2, sort_keys=True)
-        tmp.write("\n")
-        temp_path = Path(tmp.name)
+def _write_data_index(
+    index_data: dict,
+    *,
+    resource_admission=None,
+    admission_held: bool = False,
+) -> None:
+    """Write the runner data index atomically under shared admission."""
 
-    temp_path.replace(DATA_INDEX_FILE)
+    if not admission_held:
+        with _reserve(
+            [(DATA_INDEX_FILE.parent, MAX_DATA_INDEX_BYTES, 4)],
+            resource_admission=resource_admission,
+            admission_held=False,
+        ):
+            return _write_data_index(
+                index_data,
+                resource_admission=resource_admission,
+                admission_held=True,
+            )
+
+    DATA_INDEX_FILE.parent.mkdir(parents=True, exist_ok=True)
+    temporary_root = ManagedTemporaryRoot(
+        DATA_INDEX_FILE.parent / ".fcp-runner-index-tmp",
+        namespace=_INDEX_TEMP_NAMESPACE,
+    )
+    scavenge_managed_temporary_root(
+        temporary_root.root,
+        namespace=_INDEX_TEMP_NAMESPACE,
+        max_entries=32,
+    )
+    temporary: ManagedTemporaryFile | None = None
+    try:
+        temporary = temporary_root.allocate(prefix="fcp-data-index-", suffix=".partial")
+        payload = (
+            json.dumps(index_data, ensure_ascii=False, indent=2, sort_keys=True) + "\n"
+        ).encode("utf-8")
+        if len(payload) > MAX_DATA_INDEX_BYTES:
+            raise ValueError("runner data index exceeded its bounded envelope")
+        temporary.write(payload)
+        temporary.flush()
+        os.fsync(temporary.fileno())
+        temporary.prepare_for_replace()
+        temporary.path.replace(DATA_INDEX_FILE)
+        _fsync_directory(DATA_INDEX_FILE.parent)
+    finally:
+        if temporary is not None:
+            temporary.close()

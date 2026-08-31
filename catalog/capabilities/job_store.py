@@ -592,7 +592,11 @@ class SQLiteJobStore:
             yield
 
     @contextmanager
-    def _admitted_connection(self):
+    def _admitted_connection(self, *, admission_held: bool = False):
+        if admission_held:
+            with self._connect() as connection:
+                yield connection
+            return
         with self._resource_reservation(), self._connect() as connection:
             yield connection
 
@@ -602,6 +606,10 @@ class SQLiteJobStore:
         connection.execute("PRAGMA foreign_keys=ON")
         connection.execute("PRAGMA busy_timeout=30000")
         connection.execute("PRAGMA synchronous=FULL")
+        # Keep the transient WAL bounded mechanically without changing the
+        # durable job/history retention policy.  Per-mutation admission still
+        # reserves the database-side byte and inode growth through commit.
+        connection.execute("PRAGMA wal_autocheckpoint=64")
         return connection
 
     @staticmethod
@@ -847,6 +855,7 @@ class SQLiteJobStore:
         *,
         coordinator_id: str,
         now: datetime,
+        admission_held: bool = False,
     ) -> JobStoreResult:
         if not isinstance(job, JobContract):
             raise FederationValidationError(
@@ -871,7 +880,7 @@ class SQLiteJobStore:
                 "coordinator_id": coordinator_id,
             },
         )
-        with self._admitted_connection() as connection:
+        with self._admitted_connection(admission_held=admission_held) as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 replay = self._command_replay(
@@ -979,6 +988,7 @@ class SQLiteJobStore:
         command_id: str,
         expected_revision: int,
         now: datetime,
+        admission_held: bool = False,
     ) -> JobStoreResult:
         job_id = _text(job_id, "job_id")
         coordinator_id = _text(coordinator_id, "coordinator_id")
@@ -993,7 +1003,7 @@ class SQLiteJobStore:
                 "expected_revision": expected_revision,
             },
         )
-        with self._admitted_connection() as connection:
+        with self._admitted_connection(admission_held=admission_held) as connection:
             connection.execute("BEGIN IMMEDIATE")
             try:
                 row = self._row(connection, job_id)

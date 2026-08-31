@@ -360,7 +360,10 @@ def _execute_script_for_session_unadmitted(
     script_entry["last_run_at"] = datetime.utcnow().replace(microsecond=0).isoformat() + "Z"
     script_entry["duration_seconds"] = duration_seconds
     script_entry["exit_code"] = exit_code
-    write_session_metadata(session_dir, metadata)
+    # The core entry point either owns the script-workspace reservation or was
+    # explicitly handed an enclosing analysis reservation. Do not re-admit the
+    # same completion metadata write inside that transaction.
+    write_session_metadata(session_dir, metadata, admission_held=True)
 
     state = "reran" if force_rerun and previous_status == "done" else "ran"
     return {

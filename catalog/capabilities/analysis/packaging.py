@@ -14,12 +14,16 @@ import gzip
 import os
 import re
 import tarfile
-import tempfile
 from collections.abc import Sequence
 from enum import Enum
 from pathlib import Path
 from typing import Any
 
+from catalog.common.managed_temporary import (
+    ManagedTemporaryFile,
+    ManagedTemporaryRoot,
+    scavenge_managed_temporary_root,
+)
 from catalog.federation.errors import FederationValidationError
 
 from .contracts import DEFAULT_MAX_SLICE_BYTES
@@ -33,6 +37,9 @@ _SAFE_MEMBER_RE = re.compile(r"^[A-Za-z0-9._-]+(?:/[A-Za-z0-9._-]+)*$")
 _COPY_CHUNK_BYTES = 1024 * 1024
 _SOURCE_STABILITY_ATTEMPTS = 8
 _STABLE_MISMATCH_CONFIRMATIONS = 2
+_ARCHIVE_TEMP_NAMESPACE = "analysis-slice-archive"
+_ARCHIVE_TEMP_ROOT_NAME = ".fcp-analysis-archive-tmp"
+_ARCHIVE_TEMP_TRAVERSAL_LIMIT = 64
 
 
 class SliceArchiveComparison(Enum):
@@ -310,6 +317,45 @@ def write_slice_archive(
     files: Sequence[Path],
     root: Path,
     max_bytes: int = DEFAULT_MAX_SLICE_BYTES,
+    resource_admission=None,
+    admission_held: bool = False,
+) -> int:
+    """Validate and admit one deterministic input-publication transaction."""
+
+    # Keep pure source/path validation ahead of host-capacity reporting. A
+    # malformed or escaping source is a validation failure, never pressure.
+    _validated_members(files, root)
+    if admission_held:
+        return _write_slice_archive_unadmitted(
+            destination,
+            files=files,
+            root=root,
+            max_bytes=max_bytes,
+        )
+    from catalog.capabilities.analysis.resource_admission import (
+        reserve_analysis_requirements,
+    )
+    from catalog.federation.process_resource_admission import PROCESS_RESOURCE_ADMISSION
+
+    controller = resource_admission or PROCESS_RESOURCE_ADMISSION
+    with reserve_analysis_requirements(
+        controller,
+        ((destination.parent, 2 * max(int(max_bytes), 0), 4),),
+    ):
+        return _write_slice_archive_unadmitted(
+            destination,
+            files=files,
+            root=root,
+            max_bytes=max_bytes,
+        )
+
+
+def _write_slice_archive_unadmitted(
+    destination: Path,
+    *,
+    files: Sequence[Path],
+    root: Path,
+    max_bytes: int = DEFAULT_MAX_SLICE_BYTES,
 ) -> int:
     """Atomically publish a deterministic ``tar.gz`` and return its byte size.
 
@@ -325,80 +371,89 @@ def write_slice_archive(
 
     members = _validated_members(files, root)
     destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary_root = ManagedTemporaryRoot(
+        destination.parent / _ARCHIVE_TEMP_ROOT_NAME,
+        namespace=_ARCHIVE_TEMP_NAMESPACE,
+    )
+    scavenge_managed_temporary_root(
+        temporary_root.root,
+        namespace=_ARCHIVE_TEMP_NAMESPACE,
+        max_entries=_ARCHIVE_TEMP_TRAVERSAL_LIMIT,
+    )
     last_change: BaseException | None = None
 
     for _attempt in range(_SOURCE_STABILITY_ATTEMPTS):
-        descriptor, temporary_name = tempfile.mkstemp(
-            prefix=f".{destination.name}.",
-            suffix=".partial",
-            dir=destination.parent,
-        )
-        temporary = Path(temporary_name)
+        temporary: ManagedTemporaryFile | None = None
         try:
+            temporary = temporary_root.allocate(
+                prefix="fcp-slice-archive-",
+                suffix=".partial",
+            )
+            raw = temporary.handle
             total = 0
-            with os.fdopen(descriptor, "wb") as raw:
-                descriptor = -1
-                bounded_raw = _BoundedArchiveWriter(raw, max_bytes)
-                with (
-                    gzip.GzipFile(filename="", mode="wb", fileobj=bounded_raw, mtime=0)
-                    as compressed,
-                    tarfile.open(
-                        fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT
-                    ) as archive,
-                ):
-                    for name, path in members:
-                        with path.open("rb") as handle:
-                            before = os.fstat(handle.fileno())
-                            size = int(before.st_size)
-                            total += size
-                            if total > max_bytes:
-                                raise FederationValidationError(
-                                    "analysis-slice-too-large",
-                                    "files",
-                                    f"packed analysis input must not exceed {max_bytes} bytes",
-                                )
-                            info = tarfile.TarInfo(name=name)
-                            info.size = size
-                            info.mtime = _FIXED_MTIME
-                            info.mode = _FIXED_MODE
-                            info.uid = 0
-                            info.gid = 0
-                            info.uname = ""
-                            info.gname = ""
-                            info.type = tarfile.REGTYPE
-                            try:
-                                archive.addfile(info, handle)
-                            except OSError as exc:
-                                after = os.fstat(handle.fileno())
-                                if _stat_signature(before) != _stat_signature(after):
-                                    raise _SourceChangedDuringPacking from exc
-                                raise
+            bounded_raw = _BoundedArchiveWriter(raw, max_bytes)
+            with (
+                gzip.GzipFile(filename="", mode="wb", fileobj=bounded_raw, mtime=0)
+                as compressed,
+                tarfile.open(
+                    fileobj=compressed, mode="w", format=tarfile.PAX_FORMAT
+                ) as archive,
+            ):
+                for name, path in members:
+                    with path.open("rb") as handle:
+                        before = os.fstat(handle.fileno())
+                        size = int(before.st_size)
+                        total += size
+                        if total > max_bytes:
+                            raise FederationValidationError(
+                                "analysis-slice-too-large",
+                                "files",
+                                f"packed analysis input must not exceed {max_bytes} bytes",
+                            )
+                        info = tarfile.TarInfo(name=name)
+                        info.size = size
+                        info.mtime = _FIXED_MTIME
+                        info.mode = _FIXED_MODE
+                        info.uid = 0
+                        info.gid = 0
+                        info.uname = ""
+                        info.gname = ""
+                        info.type = tarfile.REGTYPE
+                        try:
+                            archive.addfile(info, handle)
+                        except OSError as exc:
                             after = os.fstat(handle.fileno())
                             if _stat_signature(before) != _stat_signature(after):
-                                raise _SourceChangedDuringPacking
-                raw.flush()
-                os.fsync(raw.fileno())
-            size = temporary.stat().st_size
+                                raise _SourceChangedDuringPacking from exc
+                            raise
+                        after = os.fstat(handle.fileno())
+                        if _stat_signature(before) != _stat_signature(after):
+                            raise _SourceChangedDuringPacking
+            raw.flush()
+            os.fsync(raw.fileno())
+            size = temporary.path.stat().st_size
             if size > max_bytes:  # defensive: the streaming writer already enforces this
                 raise FederationValidationError(
                     "analysis-slice-too-large",
                     "size_bytes",
                     f"packed analysis input must not exceed {max_bytes} bytes",
                 )
-            os.replace(temporary, destination)
+            if temporary.path.stat().st_dev != destination.parent.stat().st_dev:
+                raise FederationValidationError(
+                    "analysis-slice-backing-resource-changed",
+                    "destination",
+                    "temporary and destination paths are on different filesystems",
+                )
+            temporary.prepare_for_replace()
+            temporary.path.replace(destination)
             _sync_directory(destination.parent)
             return size
         except _SourceChangedDuringPacking as exc:
             last_change = exc
-            if descriptor >= 0:
-                os.close(descriptor)
-            temporary.unlink(missing_ok=True)
             continue
-        except BaseException:
-            if descriptor >= 0:
-                os.close(descriptor)
-            temporary.unlink(missing_ok=True)
-            raise
+        finally:
+            if temporary is not None:
+                temporary.close()
 
     raise FederationValidationError(
         "analysis-slice-source-changing",

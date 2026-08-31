@@ -221,7 +221,7 @@ def test_date_slice_forces_analysis_only_when_filtered_input_was_rebuilt(
     monkeypatch.setattr(
         pipeline,
         "build_basic_metrics_dataset",
-        lambda _data_dir: (session_dir / "derived.csv", 1),
+        lambda _data_dir, **_kwargs: (session_dir / "derived.csv", 1),
     )
 
     def _execute(**kwargs):

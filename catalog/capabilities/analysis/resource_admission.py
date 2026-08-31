@@ -289,16 +289,36 @@ class FederatedAnalysisScheduler(_FederatedAnalysisScheduler):
             len(plan_bytes),
             max_slice_bytes=self.gateway.content_store.max_bytes,
         )
+        # Submission is one logical publication transaction: the plan and slice
+        # bodies are durable content, and the job row/audit/WAL mutation makes
+        # them discoverable. Admit both backing resources before any of those
+        # writers run, then tell the nested helpers the reservation is already
+        # held so completion bookkeeping does not spend it twice.
+        job_store_bytes = 8 * 1024 * 1024
+        job_store_inodes = 4
+        store = getattr(self, "store", None)
+        store_database = getattr(store, "database", None)
         try:
-            with self.resource_admission.reserve(
-                self.gateway.content_store.root,
-                bytes_required=bytes_required,
-                inodes_required=inodes_required,
+            requirements = [
+                (
+                    self.gateway.content_store.root,
+                    bytes_required,
+                    inodes_required,
+                ),
+            ]
+            if store_database is not None:
+                requirements.append(
+                    (store_database, job_store_bytes, job_store_inodes)
+                )
+            with reserve_analysis_requirements(
+                self.resource_admission,
+                requirements,
             ):
                 return super().submit(
                     work,
                     slice_files=slice_files,
                     slice_root=slice_root,
+                    admission_held=True,
                 )
         except HostResourceRefused as exc:
             raise FederationOperationError(
