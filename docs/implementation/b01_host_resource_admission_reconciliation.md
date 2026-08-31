@@ -123,6 +123,11 @@ The coherent implementation slices pushed to the branch are:
 - `5dcca17` — shared admission for analysis runtime identity, job/lifecycle,
   provider-authority, dispatch-inbox, job-index, and efficiency SQLite writers,
   with startup/refusal/unwind consequence tests;
+- `a4ba794` — deferred admitted analysis workspace reconciliation until after
+  pure job validation, preserving refusal ordering and constructor side-effect
+  behavior;
+- `dabab65` — admitted runtime session-metadata reconciliation writes and
+  refreshed the baseline to the latest fetched `main`;
 - `b36799b` — mechanical normalization of the touched Python files plus the
   observer enumeration fix.
 
@@ -131,7 +136,7 @@ branch and was not reworked as a writer-ledger refinement.
 
 ## Verification evidence
 
-The final focused consequence set collected **213 tests** and passed all 213:
+The final focused consequence set collected **214 tests** and passed all 214:
 
 ```text
 pytest --basetemp .pytest-b01-final-focus -q \
@@ -160,7 +165,7 @@ Additional focused results were 10 analysis/script-admission tests, 8 upload
 resource-admission tests, 13 local-storage tests, 33 storage regression and
 exhaustion tests, 4 observer/cache consequence tests, 5 upload-analysis-job
 tests, and 63 outbox/phase-1/compaction/retirement tests. These subsets overlap
-the 213-test final set.
+the 214-test final set.
 
 `python -m compileall -q catalog` passed. Ruff passed for the changed Python
 files when the repository's existing baseline rules (`B008`, `S110`, `DTZ003`,
