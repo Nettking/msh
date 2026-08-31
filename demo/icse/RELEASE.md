@@ -3,15 +3,18 @@
 This file is a maintainer checklist for turning the draft reviewer artifact into
 an immutable paper artifact. Do not cite a moving branch as the final artifact.
 
-## 1. Resolve release metadata
+## 1. Confirm release metadata
 
-Before the public release:
+The publication metadata is now selected:
 
-- choose and add the repository/software license deliberately;
-- replace the provisional `Nettking` alias in `CITATION.cff` with the final
-  scholarly author list and ORCID identifiers where available;
-- confirm the artifact title and version (`0.1.0` unless intentionally changed);
-- keep the claim boundary in `README.md` and `ARTIFACT.md` aligned with the paper.
+- software license: **MIT**, with `LICENSE` at repository root;
+- sole scholarly creator: **Martin Arthur Andersen**;
+- ORCID: `0009-0004-9991-3578`;
+- artifact version: `0.1.0` unless intentionally changed before freeze.
+
+Before the public release, confirm that the artifact title and version still match
+the paper and keep the claim boundary in `README.md` and `ARTIFACT.md` aligned
+with the manuscript.
 
 If the final DOI should be embedded in `CITATION.cff`, create a Zenodo draft and
 reserve its DOI before the final code freeze. Do not invent or predict a DOI.
@@ -75,7 +78,7 @@ Before publishing the Zenodo record, verify:
 - the archive contains `source/` and `artifact/` under one versioned root;
 - `artifact/artifact-manifest.json` names the exact release-tag commit;
 - Ubuntu, Windows, and Compose evidence each report E1-E4 passing;
-- title, version, authors, ORCIDs, and license are correct; and
+- title, version, author, ORCID, and MIT license are correct; and
 - the record is classified as software.
 
 Publish the record only after these checks. If the package changes after that

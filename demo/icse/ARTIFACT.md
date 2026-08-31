@@ -137,15 +137,13 @@ The first Docker build may require internet access to obtain base-image and
 Python dependency layers. The artifact does not currently publish a prebuilt
 container image.
 
-The repository currently has no declared software license. Consequently, this
-candidate establishes technical reproducibility but does **not** assert reuse or
-redistribution rights beyond what applicable law and the repository host permit.
-A license decision is required before the public archival release.
+The repository is licensed under the MIT License. The publication bundle records
+that license state and includes the repository `LICENSE` file in the exact source
+tree archived for the evaluated revision.
 
-`CITATION.cff` currently uses the repository identity `Nettking` as a provisional
-author alias because final publication author names and ORCID identifiers have
-not yet been frozen. That metadata must be replaced with the final scholarly
-author list before the immutable release is created.
+`CITATION.cff` identifies Martin Arthur Andersen as the sole scholarly creator,
+with ORCID `0009-0004-9991-3578`. A DOI is intentionally omitted until a real
+Zenodo record has been reserved or published.
 
 ## Claim boundary
 
