@@ -91,16 +91,30 @@ invoked Docker or host command is safe.
 | Legacy upload payload duplication (`data_upload_records`) | Current import path streams and validates without persisting the old full payload column. | Existing regression asserts zero legacy payload rows. | **OBSOLETE_REQUIREMENT** |
 | Durable resumable transfer, backup/export/import/migration paths not instantiated by the v1 product | Code/search finds helpers and migration tooling, but no supported installed-product runtime boundary with a current admission contract. | Until a supported invocation is identified, claiming either protection or a new fix would be speculation. | **NOT_V1_SUPPORTED pending evidence** |
 
-## Selected implementation scope
+## Implemented in this continuation
 
-The first implementation checkpoint targets the concrete Federated JSONL
-completion bug above: local-cache and materialization transactions will admit
-their bounded SQLite bookkeeping in the same atomic reservation as the large
-filesystem peak, and their inner bookkeeping path will use that already-held
-reservation instead of re-admitting at `PRESSURE`. A regression test will
-exercise the real serialized controller at the pressure boundary. This scoped
-change cannot close chunk-ingest, uploads, analysis outputs, or cumulative
-outboxes.
+Commit `11c60cd` targets the concrete Federated JSONL completion bug above:
+local-cache and materialization transactions now admit their bounded SQLite
+bookkeeping in the same atomic reservation as the large filesystem peak, and
+their inner bookkeeping path uses that already-held reservation instead of
+re-admitting at `PRESSURE`. Both implementation variants (the stable-filesystem
+public class and its implementation base) use the same identity-matched
+reservation selection. A regression test exercises the real serialized
+controller at the pressure boundary. This scoped change cannot close
+chunk-ingest completion, uploads, analysis outputs, or cumulative outboxes.
+
+Focused verification at this head:
+
+- `python -m pytest -q --basetemp=.pytest-tmp catalog/flask_app/tests/test_federated_jsonl_resource_admission.py`
+  — **15 passed, 1 skipped**;
+- the combined Federated JSONL/model admission subset — **32 passed, 3
+  skipped**; and
+- `ruff check` on both bridge implementations and the focused test — **passed**.
+
+The repository-wide collection was also attempted. It is not a valid green
+signal in this checkout because 36 Flask/acceptance modules cannot import the
+uninstalled `email_validator`/`flask_security` dependencies; no acceptance
+machine or acceptance state was accessed.
 
 ## Open blockers and assumptions
 
