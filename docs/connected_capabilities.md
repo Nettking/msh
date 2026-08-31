@@ -14,7 +14,8 @@ The FCP device sends the repository question and retrieved repository context to
 
 ## Install the FCP provider on the laptop
 
-The recommended provider is installed from the FCP repository. Only Docker and Git are required on the laptop:
+The recommended provider is installed from the FCP repository. Docker, Git,
+and Python 3 are required on the laptop:
 
 ```bash
 git clone <repository-url> fcp
