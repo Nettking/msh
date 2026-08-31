@@ -73,17 +73,24 @@ The dedicated `ICSE tool demonstration` workflow executes:
    summaries report the same source revision and the same four passing
    scenarios.
 
-The resulting publication bundle contains:
+The resulting workflow artifact contains:
 
-- a Git-generated source archive for the exact tested revision;
 - Ubuntu, Windows, and Docker Compose `icse-summary.json` evidence;
 - `artifact-manifest.json` binding those records to the source revision;
-- `CITATION.cff`, this README, and the reviewer guide; and
-- `SHA256SUMS` covering every file in the bundle.
+- `CITATION.cff`, this README, and the reviewer guide;
+- `SHA256SUMS` for the unpacked artifact evidence/metadata;
+- `ZENODO_SHA256` for the complete publication archive; and
+- one self-contained `fcp-icse-tool-demo-<version>.zip`.
 
-Tags matching `fcp-icse-tool-demo-v*` trigger the same workflow. The paper must
-cite the immutable release/tag or archival DOI whose tag-triggered run is green,
-not a moving draft branch or a pre-tag CI result.
+The self-contained ZIP contains the exact Git-tracked source tree directly under
+`source/` and the validated artifact evidence/metadata under `artifact/`. This is
+the canonical file to attach to the GitHub Release and deposit as the Zenodo
+software artifact.
+
+Tags matching `fcp-icse-tool-demo-v*` trigger the same workflow. A tag such as
+`fcp-icse-tool-demo-v0.1.0` yields `fcp-icse-tool-demo-0.1.0.zip`. The paper must
+cite the immutable release/tag and DOI whose tag-triggered run is green, not a
+moving draft branch or a pre-tag CI result.
 
 ## Evidence emitted
 

@@ -13,7 +13,8 @@ Before the public release:
 - confirm the artifact title and version (`0.1.0` unless intentionally changed);
 - keep the claim boundary in `README.md` and `ARTIFACT.md` aligned with the paper.
 
-Do not add a DOI before Zenodo has actually minted it.
+If the final DOI should be embedded in `CITATION.cff`, create a Zenodo draft and
+reserve its DOI before the final code freeze. Do not invent or predict a DOI.
 
 ## 2. Freeze the code revision
 
@@ -32,50 +33,67 @@ change, create a new patch release and tag instead.
 ## 3. Require tag-triggered evidence
 
 The release tag must trigger the same workflow used during review. Before making
-a GitHub Release, require the tag run to complete successfully with:
+a GitHub Release or publishing the Zenodo record, require the tag run to complete
+successfully with:
 
 - Ubuntu direct E1-E4: PASS;
 - Windows direct E1-E4: PASS;
 - Docker Compose E1-E4: PASS and retained evidence; and
 - publication bundle: PASS.
 
-Download the publication bundle from that tag-triggered run and retain its
-`artifact-manifest.json` and `SHA256SUMS` with the publication records.
+Download the publication bundle from that tag-triggered run. For version 0.1.0,
+the canonical archival file is:
 
-The manifest must identify the tag's exact source revision, and all three
-evidence files must identify that same revision.
+```text
+fcp-icse-tool-demo-0.1.0.zip
+```
 
-## 4. Archive through Zenodo
+Verify it against `ZENODO_SHA256`. Also retain `artifact-manifest.json` and
+`SHA256SUMS` with the publication records. The manifest and all three evidence
+files must identify the tag's exact source revision.
 
-Before creating the GitHub Release, connect the `Nettking/msh` repository to the
-Zenodo GitHub integration. `CITATION.cff` is sufficient for the metadata needed
-here; do not add a duplicate `.zenodo.json` unless Zenodo-specific metadata is
-actually required, because Zenodo gives `.zenodo.json` precedence when both are
-present.
+Do not rebuild the canonical ZIP locally after the tag run.
 
-After the tag-triggered artifact run is green, create a GitHub Release from the
-same immutable tag. Allow Zenodo to ingest the release and mint the software
-record DOI. Verify that:
+## 4. Publish the immutable archive
 
-- the archived source corresponds to the release tag;
-- title, version, authors, and license are correct;
-- the Zenodo record is classified as software; and
-- the DOI resolves before inserting it into the paper or external artifact page.
+Create a GitHub Release from the same immutable tag and attach the exact
+CI-generated publication ZIP. The release asset and the Zenodo file should be
+byte-for-byte the same object.
 
-If Zenodo reports an archival failure, correct the release metadata and publish
-a new version rather than rewriting the already cited tag.
+Use a **manual Zenodo software deposit** as the canonical paper artifact so the
+DOI identifies the validated source-and-evidence package, not merely a source
+snapshot. Upload only the CI-generated publication ZIP to the software record,
+select resource type `Software`, and use the final scholarly creator, version,
+license, and related-paper metadata.
+
+Because this manual deposit is the canonical DOI-bearing artifact, do not also
+create a second automatic Zenodo GitHub-integration DOI for the same release.
+
+Before publishing the Zenodo record, verify:
+
+- the uploaded file checksum matches `ZENODO_SHA256`;
+- the archive contains `source/` and `artifact/` under one versioned root;
+- `artifact/artifact-manifest.json` names the exact release-tag commit;
+- Ubuntu, Windows, and Compose evidence each report E1-E4 passing;
+- title, version, authors, ORCIDs, and license are correct; and
+- the record is classified as software.
+
+Publish the record only after these checks. If the package changes after that
+point, create a new artifact version rather than silently replacing the cited
+release.
 
 ## 5. Paper-facing finalization
 
-Only after the DOI exists, update the paper/tool-artifact record with:
+After the DOI resolves, update the paper/tool-artifact record with:
 
 - artifact title and version;
 - immutable Git tag;
 - exact commit SHA;
 - Zenodo DOI;
 - GitHub Release identifier;
-- publication-bundle workflow run identifier; and
-- `SHA256SUMS` or the bundle digest used for the archived evidence copy.
+- tag-triggered publication-bundle workflow run identifier;
+- `ZENODO_SHA256`; and
+- the bounded claim/evaluation statement used by the artifact.
 
 The paper's evaluation statements must remain within the claim boundary stated
 in the artifact documentation.
