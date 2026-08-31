@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 import hmac
+import os
+from pathlib import Path
 
 from flask import (
     Blueprint,
     Response,
     current_app,
     flash,
+    jsonify,
     make_response,
     redirect,
     render_template,
@@ -24,6 +27,8 @@ from catalog.federation.errors import (
 )
 
 from .capability_onboarding_routes import _CSRF_SESSION_KEY, _csrf_token
+from .services.bounded_relay_probe import bounded_relay_listener_probe
+from .services.core_service_health import core_service_health_snapshot
 from .services.federation_recorder_control_service import (
     FederationRecorderControlError,
     get_federation_recorder_control_service,
@@ -77,6 +82,36 @@ def _dispatch_before_legacy_runtime_gate() -> Response | None:
     if view is None:
         return None
     return current_app.ensure_sync(view)(**(request.view_args or {}))
+
+
+@federation_recorder_web.get("/federation/health", strict_slashes=False)
+def core_health() -> Response:
+    """Expose read-only semantic health without becoming a restart trigger."""
+
+    snapshot = core_service_health_snapshot(
+        coordinator_database=Path(
+            os.getenv(
+                "FCP_FEDERATION_COORDINATOR_DATABASE",
+                "/var/lib/fcp-relay/control.sqlite3",
+            )
+        ),
+        recorder_status_file=Path(
+            os.getenv(
+                "FCP_RECORDER_STATUS_FILE",
+                "data/source_state/mtconnect_recorder_status.json",
+            )
+        ),
+        listener_probe=bounded_relay_listener_probe,
+    )
+    response = jsonify(snapshot)
+    # A degraded dependency is operator evidence, not proof that Flask itself
+    # should be restarted. Always serve the semantic snapshot successfully and
+    # let its explicit readiness/dependency fields carry the failure state.
+    response.status_code = 200
+    response.headers["Cache-Control"] = "no-store"
+    response.headers["Pragma"] = "no-cache"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    return response
 
 
 @federation_recorder_web.get("/federation/recorders", strict_slashes=False)
