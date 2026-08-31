@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from catalog.mtconnect_recorder import runtime as recorder_runtime
 from catalog.mtconnect_recorder.publication_frontier import RecorderPublicationFrontier
+from catalog.mtconnect_recorder.publication_frontier_runtime import (
+    install_publication_frontier_runtime,
+)
 from catalog.mtconnect_recorder.storage import DurableRecorderStore as DirectRecorderStore
 
 
@@ -19,8 +22,13 @@ def _batch():
 
 
 def test_publication_frontier_writer_is_scoped_to_runtime_store(tmp_path):
-    """Runtime startup must not change unrelated direct-store output by import order."""
+    """Runtime composition must not change unrelated direct-store output."""
 
+    # Importing a submodule directly can pre-populate package.runtime and bypass
+    # the package __getattr__ hook. Production startup calls the same explicit
+    # installer after B01 composition; invoke it here so this regression tests
+    # the boundary itself rather than Python package import order.
+    install_publication_frontier_runtime(recorder_runtime)
     assert recorder_runtime.DurableRecorderStore is not DirectRecorderStore
 
     direct = DirectRecorderStore(tmp_path / "direct")
