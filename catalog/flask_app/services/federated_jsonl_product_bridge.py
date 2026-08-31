@@ -207,26 +207,36 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
             rows = connection.execute(
                 """
                 SELECT * FROM seen_batches
-                WHERE session_id=? AND dataset_id=? AND file_sha256=? AND encoded_sha256=?
+                WHERE session_id=? AND dataset_id=? AND file_sha256=?
+                  AND encoded_sha256=?
                 ORDER BY chunk_index
                 """,
                 (session_id, dataset_id, file_sha256, encoded_sha256),
             ).fetchall()
         if not rows:
             return False
-        local_duplicate = self._local_duplicate(file_sha256)
-        remote_duplicate = self._remote_duplicate(session_id, dataset_id, file_sha256)
+        with self._connect() as connection:
+            local_duplicate = connection.execute(
+                "SELECT 1 FROM local_files WHERE file_sha256=? LIMIT 1",
+                (file_sha256,),
+            ).fetchone()
+            remote_duplicate = connection.execute(
+                """SELECT 1 FROM materialized_files
+                   WHERE session_id=? AND file_sha256=? AND dataset_id<>? LIMIT 1""",
+                (session_id, file_sha256, dataset_id),
+            ).fetchone()
         if local_duplicate is not None or remote_duplicate is not None:
             self._consume_staged_rows(rows)
             return False
         first = rows[0]
         chunk_count = int(first["chunk_count"])
-        if len(rows) != chunk_count or [int(row["chunk_index"]) for row in rows] != list(
-            range(chunk_count)
-        ):
+        if len(rows) != chunk_count:
+            return False
+        if [int(row["chunk_index"]) for row in rows] != list(range(chunk_count)):
             return False
         if any(not row["chunk_path"] for row in rows):
             return False
+
         producer = str(first["producer_node_id"])
         relative_path = str(first["relative_path"])
         source_mtime_ns = int(first["source_mtime_ns"])
@@ -234,7 +244,10 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
         declared_file_size = int(first["file_size"])
         with self._connect() as connection:
             current = connection.execute(
-                "SELECT file_sha256,source_mtime_ns FROM materialized_files WHERE session_id=? AND dataset_id=?",
+                """
+                SELECT file_sha256,source_mtime_ns FROM materialized_files
+                WHERE session_id=? AND dataset_id=?
+                """,
                 (session_id, dataset_id),
             ).fetchone()
         if current is not None:
@@ -254,8 +267,11 @@ class FederatedJsonlProductBridge(_impl.FederatedJsonlProductBridge):
             return False
 
         staged_size = 0
-        for row in rows:
-            staged_size += self._stat_staged(row["chunk_path"]).st_size
+        try:
+            for row in rows:
+                staged_size += self._stat_staged(row["chunk_path"]).st_size
+        except FileNotFoundError:
+            return False
         if staged_size != declared_encoded_size:
             raise _impl.FederationValidationError(
                 "federated-jsonl-encoded-size-mismatch",
